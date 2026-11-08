@@ -1,11 +1,13 @@
 package ai.opencode.feature.transcript.markdown.ui
 
 import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionTunables
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptLayoutTuning
-import ai.opencode.feature.transcript.TranscriptTunables
+import ai.opencode.feature.transcript.rows.DisclosureMotion
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Animatable
@@ -38,6 +40,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
 import kotlin.math.exp
+import kotlin.math.max
 
 /**
  * A band's grow-in or close, timed like the list's disclosure motion (iOS `BandMotion`): the
@@ -64,12 +67,12 @@ object BandMotion {
         return (low + high) / 2
     }
 
-    /** The disclosure's duration (`TranscriptTunables.disclosureOpen` / `disclosureClose`). */
-    fun duration(opening: Boolean): Double = if (opening) TranscriptTunables.disclosureOpen else TranscriptTunables.disclosureClose
+    /** The disclosure's duration (`DisclosureMotion.duration`: `Motion.layout`, its exit closing). */
+    fun duration(opening: Boolean): Double = DisclosureMotion.duration(opening)
 
-    /** Under Reduce Motion: a 0.2 s cross-fade (smoothstep). */
+    /** Under Reduce Motion: a cross-fade on `Motion.reduced` (smoothstep). */
     fun fade(elapsed: Double): Double {
-        val t = (elapsed / 0.2).coerceIn(0.0, 1.0)
+        val t = (elapsed / max(MotionTunables.reducedDuration.value, 0.01)).coerceIn(0.0, 1.0)
         return t * t * (3 - 2 * t)
     }
 }
@@ -198,10 +201,13 @@ fun TranscriptBand(
 }
 
 /**
- * What a disclosure reveals fades in as the row grows over it, and out (quicker) as the row
- * closes over it (iOS `AnyTransition.disclosed`).
+ * What a disclosure reveals fades in on `Motion.swap` as the row grows over it, and out on its
+ * quicker exit as the row closes over it (`Motion.reduced` under Reduce Motion; iOS
+ * `AnyTransition.disclosed(reduceMotion:)`).
  */
 object DisclosedTransition {
-    val enter: EnterTransition = fadeIn(tween(220, easing = Motion.EaseOut))
-    val exit: ExitTransition = fadeOut(tween(140, easing = Motion.EaseOut))
+    val enter: EnterTransition
+        @Composable get() = fadeIn(Motion.swap.animation(reduceMotion = rememberReduceMotion()))
+    val exit: ExitTransition
+        @Composable get() = fadeOut(Motion.swap.animation(MotionPhase.Exit, reduceMotion = rememberReduceMotion()))
 }

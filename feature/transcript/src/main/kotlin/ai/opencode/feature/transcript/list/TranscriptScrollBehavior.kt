@@ -92,6 +92,7 @@ class TranscriptScrollBehavior {
                 val distance = distanceFromBottom(viewport)
                 val arrived = lastScrolledDistance?.let { it > REST_DISTANCE } ?: true
                 val towardEnd = lastScrolledOffsetY?.let { viewport.offsetY > it + 0.5f } ?: true
+                val towardTop = lastScrolledOffsetY?.let { viewport.offsetY < it - 0.5f } ?: false
                 lastScrolledOffsetY = viewport.offsetY
                 lastScrolledDistance = distance
                 if (distance <= REST_DISTANCE && viewport.trailingSpace == 0f && (arrived || towardEnd)) {
@@ -99,7 +100,13 @@ class TranscriptScrollBehavior {
                 } else if (mode == Mode.Browsing && distance > LEAVE_DISTANCE) {
                     setJumpButton(true, commands)
                 }
-                requestEarlierHistoryIfNeeded(viewport, commands)
+                // Only a browsing reader's way up: a following one nudging the list or
+                // bouncing back off the end isn't heading for older history.
+                var lookahead = 1f
+                if (mode == Mode.Browsing && towardTop && distance > REST_DISTANCE) {
+                    lookahead = UPWARD_PAGING_LOOKAHEAD
+                }
+                requestEarlierHistoryIfNeeded(viewport, commands, lookahead)
             }
 
             is Event.UserSettled -> {
@@ -238,8 +245,13 @@ class TranscriptScrollBehavior {
         commands += Command.ShowJumpButton(shows)
     }
 
-    private fun requestEarlierHistoryIfNeeded(viewport: Viewport, commands: MutableList<Command>) {
-        if (!viewport.canRequestEarlierHistory || holdsEarlierHistory || viewport.offsetY >= viewport.visibleHeight ||
+    /**
+     * [lookahead]: how many screens above the reader an earlier page is asked for. One at rest;
+     * more while the reader scrolls up toward it ([UPWARD_PAGING_LOOKAHEAD]), so the page lands
+     * before they reach the top.
+     */
+    private fun requestEarlierHistoryIfNeeded(viewport: Viewport, commands: MutableList<Command>, lookahead: Float = 1f) {
+        if (!viewport.canRequestEarlierHistory || holdsEarlierHistory || viewport.offsetY >= viewport.visibleHeight * lookahead ||
             requestedEarlierHistory
         ) {
             return
@@ -266,6 +278,8 @@ class TranscriptScrollBehavior {
         const val LEAVE_DISTANCE = 120f
         /** Coming to rest within this of the bottom is following again. */
         const val REST_DISTANCE = 1f
+        /** While the reader scrolls up, earlier history is asked for this many screens before the top. */
+        const val UPWARD_PAGING_LOOKAHEAD = 2.5f
 
         /** How far past the end of the content the reader stands. */
         fun positionFloor(viewport: Viewport): Float =

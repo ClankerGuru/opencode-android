@@ -293,7 +293,7 @@ internal class SessionSendFlights(
         pillFlights += flight
         scope.launch {
             try {
-                flight.progress.animateTo(1f, MotionSpring(TranscriptTunables.sendPillDuration).spec())
+                flight.progress.animateTo(1f, Motion.flight.animation())
             } finally {
                 pillFlights -= flight
                 departure.release()

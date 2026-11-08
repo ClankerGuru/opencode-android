@@ -1,7 +1,13 @@
 package ai.opencode.feature.transcript.list
 
+import ai.opencode.core.motion.AmbientClock
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionCurve
 import ai.opencode.core.motion.MotionFrameAction
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionTunables
 import ai.opencode.core.motion.motionBlurReveal
 import ai.opencode.core.motion.motionFrameLoop
 import ai.opencode.core.motion.rememberReduceMotion
@@ -91,23 +97,19 @@ object EmptyStateTunables {
     /** The Tuning Panel sections it registers (the key segment after the group), in order. */
     val sectionTitles = listOf("Empty")
 
-    const val breathPeriod = 1.7
     const val breathMinOpacity = 0.45
     const val breathMinScale = 0.94f
-    const val breathSettle = 0.34
     const val reducedLoadingOpacity = 0.5
-    val revealSpring = MotionSpring(0.42, 0.0)
-    const val revealBlur = 8f
-    const val revealRise = 6f
-    const val subtitleDelay = 0.04
-    const val exitFade = 0.22
     const val glyphSize = 48f
     const val glyphSpacing = 14f
     const val subtitleSpacing = 6f
     const val verticalOffset = 0f
 }
 
-/** iOS `EmptyGlyphBreath`: phase, position and velocity survive a loading/reduced-motion change. */
+/**
+ * iOS `EmptyGlyphBreath`: one `AmbientClock` breath long; phase, position and velocity survive a
+ * loading/reduced-motion change, settling on `Motion.layout` (`Motion.reduced` under Reduce Motion).
+ */
 data class EmptyGlyphBreath(
     val isActive: Boolean = false,
     val reduceMotion: Boolean = false,
@@ -119,14 +121,14 @@ data class EmptyGlyphBreath(
     private fun target(time: Double): Pair<Double, Double> {
         if (!isActive) return 0.0 to 0.0
         if (reduceMotion) return 1.0 to 0.0
-        val omega = 2 * PI / max(0.2, EmptyStateTunables.breathPeriod)
+        val omega = 2 * PI / AmbientClock.breathPeriod
         val x = omega * (phase + max(0.0, time - start))
         return (0.5 - 0.5 * cos(x)) to (0.5 * omega * sin(x))
     }
 
     private fun error(time: Double): Pair<Double, Double> = ai.opencode.core.motion.SpringSolver.evaluate(
         from = offset, to = 0.0, initialVelocity = offsetVelocity,
-        spring = MotionSpring(if (reduceMotion) ai.opencode.core.motion.Motion.reducedFade else EmptyStateTunables.breathSettle, 0.0),
+        spring = MotionSpring(Motion.layout.curve(reduceMotion = reduceMotion).duration, 0.0),
         elapsed = max(0.0, time - start),
     )
 
@@ -150,13 +152,17 @@ data class EmptyGlyphBreath(
     fun retarget(active: Boolean, reduced: Boolean, time: Double): EmptyGlyphBreath {
         val current = excursion(time)
         var next = EmptyGlyphBreath(active, reduced, time)
-        if (active && !reduced) next = next.copy(phase = acos(1 - 2 * current.first) / (2 * PI) * max(0.2, EmptyStateTunables.breathPeriod))
+        if (active && !reduced) next = next.copy(phase = acos(1 - 2 * current.first) / (2 * PI) * AmbientClock.breathPeriod)
         val target = next.target(time)
         return next.copy(offset = current.first - target.first, offsetVelocity = current.second - target.second)
     }
 }
 
-/** The empty copy's spring retargets from both its value and its velocity, including during its delay. */
+/**
+ * The empty copy's spring retargets from both its value and its velocity, including during its
+ * delay. The text reveals on `Motion.layout` and leaves on its exit (`Motion.collapse`);
+ * `Motion.reduced` under Reduce Motion.
+ */
 data class EmptyStateMotion(
     val isLoading: Boolean,
     val showsEmptyState: Boolean,
@@ -173,16 +179,19 @@ data class EmptyStateMotion(
     fun text(time: Double, subtitle: Boolean = false): Pair<Double, Double> {
         val from = if (subtitle) subtitleFrom else titleFrom
         val velocity = if (subtitle) subtitleVelocity else titleVelocity
-        val delay = if (subtitle && !reduceMotion && target > 0.5) EmptyStateTunables.subtitleDelay else 0.0
+        val delay = if (subtitle && !reduceMotion && target > 0.5) MotionRole.staggerDelay(1) else 0.0
         val elapsed = max(0.0, time - start) - delay
         if (elapsed <= 0) return from.coerceIn(0.0, 1.0) to velocity
         val result = ai.opencode.core.motion.SpringSolver.evaluate(
             from = from, to = target, initialVelocity = velocity,
-            spring = if (reduceMotion) MotionSpring(ai.opencode.core.motion.Motion.reducedFade, 0.0) else EmptyStateTunables.revealSpring,
+            spring = MotionSpring(revealCurve().duration, 0.0),
             elapsed = elapsed,
         )
         return result.first.coerceIn(0.0, 1.0) to result.second
     }
+
+    private fun revealCurve(): MotionCurve =
+        Motion.layout.curve(if (target > 0.5) MotionPhase.Enter else MotionPhase.Exit, reduceMotion)
 
     fun isSettled(time: Double): Boolean = breath.isSettled(time) && listOf(text(time), text(time, true)).all {
         abs(it.first - target) < 0.002 && abs(it.second) < 0.01
@@ -198,15 +207,15 @@ data class EmptyStateMotion(
     }
 }
 
-/** iOS `MarkLoadingTunables` (`mark.loading.*`). */
+/**
+ * How long a load waits before the mark shows, and how long it stays once it has (iOS
+ * `MarkLoadingTunables`, `mark.loading.*`). Its fades are `Motion.swap`'s.
+ */
 object MarkLoadingTunables {
     const val appearDelay = 0.3
     const val minimumTime = 0.4
-    const val fadeIn = 0.2
-    const val fadeOut = 0.15
-    /** Upper ends of iOS's `minimumTime` (0...1) and `fadeOut` (0.01...0.5) tuning ranges. */
+    /** Upper end of iOS's `minimumTime` (0...1) tuning range. */
     const val minimumTimeUpperBound = 1.0
-    const val fadeOutUpperBound = 0.5
 }
 
 /**
@@ -217,8 +226,10 @@ data class MarkLoadingTiming(
     val start: Double?,
     val delay: Double = MarkLoadingTunables.appearDelay,
     val minimum: Double = MarkLoadingTunables.minimumTime,
-    val fadeIn: Double = MarkLoadingTunables.fadeIn,
-    val fadeOut: Double = MarkLoadingTunables.fadeOut,
+    /** The mark arrives on `Motion.swap`'s entrance. */
+    val fadeIn: Double = MotionTunables.swapInDuration.value,
+    /** The hand-off: the content arrives on `Motion.swap`'s entrance as the mark leaves. */
+    val fadeOut: Double = MotionTunables.swapInDuration.value,
 ) {
     fun opacity(now: Double): Double {
         val start = start ?: return 0.0
@@ -244,8 +255,14 @@ data class MarkLoadingTiming(
          * `TranscriptTouchSafety.handoffDeadline`): its longest supported hold and fade, plus a
          * second, however slow lab motion runs.
          */
-        const val handoffTouchDeadline: Double =
-            MarkLoadingTunables.minimumTimeUpperBound + MarkLoadingTunables.fadeOutUpperBound + 1
+        val handoffTouchDeadline: Double get() = maximumDuration + 1
+
+        /**
+         * The longest a hand-off can take: its longest supported hold and fade (iOS
+         * `TranscriptMarkHandoff.maximumDuration`).
+         */
+        val maximumDuration: Double
+            get() = MarkLoadingTunables.minimumTimeUpperBound + (MotionTunables.swapInDuration.range?.endInclusive ?: 0.5)
 
         /**
          * Wall seconds after which a hand-off ends even if its frames never ran (iOS
@@ -257,9 +274,7 @@ data class MarkLoadingTiming(
             fade: Double,
             timeScale: ai.opencode.core.tuning.AnimationTimeScale = ai.opencode.core.tuning.AnimationTimeScale.shared,
         ): Double {
-            val maximumHold = max(hold, MarkLoadingTunables.minimumTimeUpperBound)
-            val maximumFade = max(fade, MarkLoadingTunables.fadeOutUpperBound)
-            return timeScale.wallSeconds(maximumHold + maximumFade) + 0.1
+            return timeScale.wallSeconds(max(hold + fade, maximumDuration)) + 0.1
         }
     }
 }
@@ -268,7 +283,7 @@ data class MarkLoadingTiming(
 object LoadingGlyphPulse {
     fun excursion(elapsed: Double?): Double {
         val e = elapsed ?: return 0.0
-        val period = max(0.2, EmptyStateTunables.breathPeriod)
+        val period = AmbientClock.breathPeriod
         return 0.5 - 0.5 * cos(max(0.0, e) * 2 * PI / period)
     }
 
@@ -378,7 +393,7 @@ fun TranscriptEmptyView(
             Spacer(Modifier.height(EmptyStateTunables.glyphSpacing.dp))
             Text(
                 "No messages yet",
-                modifier = Modifier.motionBlurReveal(motion.text(now).first.toFloat(), EmptyStateTunables.revealBlur.dp, EmptyStateTunables.revealRise.dp, reduceMotion)
+                modifier = Modifier.motionBlurReveal(motion.text(now).first.toFloat(), MotionTunables.blurPanel.value, MotionTunables.entranceRise.value, reduceMotion)
                     .then(if (!showsText) Modifier.clearAndSetSemantics { } else Modifier),
                 style = OpenCodeTextStyles.title2.copy(fontWeight = FontWeight.Bold),
                 color = OpenCodeTheme.colors.text,
@@ -387,7 +402,7 @@ fun TranscriptEmptyView(
             Spacer(Modifier.height(EmptyStateTunables.subtitleSpacing.dp))
             Text(
                 "Start the session below",
-                modifier = Modifier.motionBlurReveal(motion.text(now, true).first.toFloat(), EmptyStateTunables.revealBlur.dp, EmptyStateTunables.revealRise.dp, reduceMotion)
+                modifier = Modifier.motionBlurReveal(motion.text(now, true).first.toFloat(), MotionTunables.blurPanel.value, MotionTunables.entranceRise.value, reduceMotion)
                     .then(if (!showsText) Modifier.clearAndSetSemantics { } else Modifier),
                 style = OpenCodeTextStyles.subheadline,
                 color = OpenCodeTheme.colors.secondaryText,

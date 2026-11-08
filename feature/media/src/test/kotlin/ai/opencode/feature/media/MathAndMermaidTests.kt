@@ -12,7 +12,11 @@ import org.junit.Test
 /**
  * The Mermaid half of iOS `MathAndMermaidTests.swift` whose subjects live in `:feature:media`
  * (cache keys, which failures are cached, diagram kinds, the card's size). Markdown parsing of
- * math and Mermaid fences is `:feature:transcript`'s.
+ * math and Mermaid fences is `:feature:transcript`'s. Not ported: iOS
+ * `theOffMainParseLaysMermaidOutBeforeTheCardAsks` and `rejectedMermaidIsCachedAsInvalid` (iOS
+ * `MermaidLayout` runs Pele in JavaScriptCore off the main actor; Android has no in-process
+ * JavaScript engine, Pele runs in the WebView's renderer process) and
+ * `idleRendererLetsItsWebViewGo` (needs a real WebView, which JVM tests don't have).
  */
 class MathAndMermaidTests {
     @Test
@@ -28,6 +32,20 @@ class MathAndMermaidTests {
         assertEquals(32, key.sourceHash.length)
         assertEquals("${key.sourceHash}|light|320", key.string)
         assertEquals(2, MermaidTheme.entries.map { MermaidCacheKey(source, it).string }.toSet().size)
+    }
+
+    @Test
+    fun mermaidSourcesHashOncePerSource() {
+        val source = "flowchart TD\n  A${java.util.UUID.randomUUID().toString().replace("-", "")} --> B"
+        val first = MermaidSyntax.hash(source)
+        val runs = MermaidSyntax.hashCount
+        // A card asks for its keys on every recomposition.
+        repeat(50) {
+            assertEquals(first, MermaidCacheKey(source, MermaidTheme.Dark, width = 300f).sourceHash)
+        }
+        assertTrue("Only another test's sources may have hashed meanwhile", MermaidSyntax.hashCount - runs <= 1)
+        assertEquals(32, first.length)
+        assertTrue(first.all { it in "0123456789abcdef" })
     }
 
     @Test

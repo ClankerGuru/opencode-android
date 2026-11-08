@@ -28,7 +28,7 @@ import kotlin.math.roundToInt
  * label's space closing) add up to one and nothing passes its place (iOS `PromotionMotion`).
  */
 object PromotionMotion {
-    val duration: Double get() = TranscriptTunables.promotionDuration
+    val duration: Double get() = Motion.layout.curve().duration
     val spring: MotionSpring get() = MotionSpring(duration, 0.0)
 
     /** The row's own animation of a change: none under Reduce Motion or while the list morphs it. */
@@ -53,7 +53,7 @@ object PromotionMotion {
      * lands, on its own animation.
      */
     fun pendingLabelEnter(): EnterTransition =
-        fadeIn(Motion.easeOut(duration)) + expandVertically(spring.spec(), expandFrom = Alignment.Bottom)
+        fadeIn(Motion.swap.animation()) + expandVertically(spring.spec(), expandFrom = Alignment.Bottom)
 
     fun pendingLabelExit(density: Float): ExitTransition = labelExit(density)
 }

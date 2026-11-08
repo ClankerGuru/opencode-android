@@ -29,10 +29,39 @@ data class MermaidCacheKey private constructor(
 
 /** Port of iOS `MermaidSyntax`. */
 object MermaidSyntax {
-    /** The first 16 bytes of the source's SHA-256, hex. */
-    fun hash(source: String): String =
-        MessageDigest.getInstance("SHA-256").digest(source.toByteArray(Charsets.UTF_8))
-            .take(16).joinToString("") { "%02x".format(it) }
+    /** Hashes by source; emptied when full. */
+    private val hashes = HashMap<String, String>()
+
+    /** SHA-256s worked out, for tests. */
+    @Volatile
+    var hashCount = 0
+        private set
+
+    /**
+     * The first 16 bytes of the source's SHA-256, hex, worked out once per source: a card asks
+     * for its keys on every recomposition.
+     */
+    fun hash(source: String): String {
+        synchronized(hashes) {
+            hashes[source]?.let { return it }
+        }
+        val digest = MessageDigest.getInstance("SHA-256").digest(source.toByteArray(Charsets.UTF_8))
+        val hex = StringBuilder(32)
+        for (index in 0 until 16) {
+            val byte = digest[index].toInt() and 0xFF
+            hex.append(HEX_DIGITS[byte shr 4])
+            hex.append(HEX_DIGITS[byte and 0x0F])
+        }
+        val hash = hex.toString()
+        synchronized(hashes) {
+            if (hashes.size >= 128) hashes.clear()
+            hashes[source] = hash
+            hashCount += 1
+        }
+        return hash
+    }
+
+    private const val HEX_DIGITS = "0123456789abcdef"
 
     /**
      * The diagram's kind from its first statement, for TalkBack: “Flowchart”, “Sequence

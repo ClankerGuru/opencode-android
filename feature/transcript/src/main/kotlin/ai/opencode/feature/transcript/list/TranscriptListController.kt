@@ -471,7 +471,7 @@ class TranscriptListController(
             val hold = if (previous.isLoading) MarkLoadingTiming(emptyLoadingSince).handoffDelay(time) else 0.0
             if (hold != null) {
                 beginHandoff(previous.isLoading, previous.showsEmptyState, emptyLoadingSince, time, hold,
-                    if (previous.isLoading) MarkLoadingTunables.fadeOut else EmptyStateTunables.exitFade)
+                    MarkLoadingTiming(emptyLoadingSince).fadeOut)
                 pendingEffects += { startMotion() }
             }
         }
@@ -1415,7 +1415,7 @@ class TranscriptListController(
         }
         // Entrances fade on the same clock.
         if (pendingEntrances.isNotEmpty()) {
-            pendingEntrances.entries.removeAll { now - (entranceStarts[it.key] ?: it.value.first) > RowEntrance.WINDOW + RowEntrance.SETTLING_DURATION }
+            pendingEntrances.entries.removeAll { now - (entranceStarts[it.key] ?: it.value.first) > RowEntrance.WINDOW + RowEntrance.maximumDuration }
             entranceStarts.keys.retainAll(pendingEntrances.keys)
             if (pendingEntrances.isNotEmpty()) {
                 frameTick++
@@ -1587,10 +1587,8 @@ class TranscriptListController(
             return measured
         }
         growths[key] = RowGrowth(from, measured, transcriptNow(), width,
-            springDuration = if (revised) {
-                val entry = (snapshot.rows[key.removePrefix("m:")] as? MessageRow.Entry)?.entry
-                if (entry is TranscriptEntry.ReplyEnd) ai.opencode.feature.transcript.links.LinkPreviewMotion.grow else ai.opencode.feature.media.AgentImageTunables.grow
-            } else null,
+            // A revised row (link previews, image rows) opens on `Motion.layout`.
+            springDuration = if (revised) ai.opencode.core.motion.Motion.layout.curve().duration else null,
         ).also { it.changedRow = revised || browsingGrows }
         revisedRows.remove(key)
         imageGrowth?.beginGrowth()
@@ -1650,11 +1648,7 @@ class TranscriptListController(
             return null
         }
         val start = entranceStarts.getOrPut(key) { time }
-        val duration = when (style) {
-            RowEntranceStyle.Arrival -> RowEntrance.DURATION
-            RowEntranceStyle.Settling -> RowEntrance.SETTLING_DURATION
-            RowEntranceStyle.WithFlight -> RowEntrance.WITH_FLIGHT_DURATION
-        }
+        val duration = RowEntrance.duration(style)
         val progress = ((time - start) / duration).toFloat()
         if (progress >= 1f) {
             pendingEntrances.remove(key)
@@ -2084,10 +2078,10 @@ class TranscriptListController(
     }
 }
 
-/** A disclosure's row height on its critically damped spring (open 0.3 s, close 0.24 s). */
+/** A disclosure's row height on its critically damped spring (`DisclosureMotion`). */
 private class DisclosureHeight(var height: Float, var target: Float, opening: Boolean) {
     private var velocity = 0.0
-    private val omega = 2 * Math.PI / if (opening) TranscriptTunables.disclosureOpen else TranscriptTunables.disclosureClose
+    private val omega = 2 * Math.PI / ai.opencode.feature.transcript.rows.DisclosureMotion.duration(opening)
 
     fun retarget(target: Float) {
         this.target = target

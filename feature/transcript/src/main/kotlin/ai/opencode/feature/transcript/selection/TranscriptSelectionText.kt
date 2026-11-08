@@ -489,7 +489,7 @@ class TranscriptSelectionDocument(val leaves: List<TranscriptSelectionLeaf>) {
                             leaves += TranscriptSelectionText.leaf(key, TranscriptSelectionLeaf.Role.Code(kind.code.language), blockIndex, kind.code.source)
                         is OpenCodeMarkdownBlock.Kind.Math -> {
                             val sizePx = InlineMath.fontSizePx(MarkdownStyle.bodyTextSize, context.density) * 1.15f
-                            val typesets = MathRenderer.render(kind.math.source, sizePx, true) != null
+                            val typesets = MathRenderer.typesets(kind.math.source, display = true, fontSizePx = sizePx)
                             leaves += TranscriptSelectionText.leaf(key, TranscriptSelectionLeaf.Role.Math, blockIndex, kind.math.raw, isImage = typesets)
                         }
                         is OpenCodeMarkdownBlock.Kind.Table -> {

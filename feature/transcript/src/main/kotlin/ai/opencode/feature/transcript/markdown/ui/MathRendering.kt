@@ -53,10 +53,22 @@ object MathRenderer {
 
     private val cache = object : LruCache<String, Entry>(400) {}
 
+    /**
+     * Whether jlatexmath typeset each source, whatever size it was drawn at: a formula parses or
+     * doesn't, so asking never renders it again.
+     */
+    private val typesetCache = object : LruCache<String, Boolean>(400) {}
+
+    /** jlatexmath renders run, for tests. */
+    @Volatile
+    var rendersForTesting = 0
+        private set
+
     /** [fontSizePx] is the typeset size in pixels (iOS points × the display scale). */
     fun render(source: String, fontSizePx: Float, display: Boolean): Rendered? {
         val key = "${if (display) "display" else "inline"}|$fontSizePx|$source"
         cache.get(key)?.let { return it.rendered }
+        rendersForTesting += 1
         val rendered = runCatching {
             val icon = TeXFormula(source).TeXIconBuilder()
                 .setStyle(if (display) TeXConstants.STYLE_DISPLAY else TeXConstants.STYLE_TEXT)
@@ -73,8 +85,21 @@ object MathRenderer {
             Rendered(bitmap.asImageBitmap(), icon.iconDepth.toFloat())
         }.getOrNull()
         cache.put(key, Entry(rendered))
+        typesetCache.put(typesetKey(source, display), rendered != null)
         return rendered
     }
+
+    /**
+     * Whether jlatexmath typesets [source] (at any size): drawn as an image, rather than as its
+     * source. Answered from the render that drew it; not drawn yet, it typesets at [fontSizePx],
+     * the size the text draws it at.
+     */
+    fun typesets(source: String, display: Boolean, fontSizePx: Float): Boolean {
+        typesetCache.get(typesetKey(source, display))?.let { return it }
+        return render(source, fontSizePx, display) != null
+    }
+
+    private fun typesetKey(source: String, display: Boolean): String = "${if (display) "display" else "inline"}|$source"
 }
 
 /**

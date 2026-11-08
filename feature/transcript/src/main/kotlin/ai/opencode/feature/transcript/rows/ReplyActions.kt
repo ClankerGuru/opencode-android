@@ -1,5 +1,6 @@
 package ai.opencode.feature.transcript.rows
 
+import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -65,7 +66,7 @@ object ReplyCopyGlyph {
         val scale = min(LocalDensity.current.fontScale, 1.35f)
         val size = (17f * scale).dp
         Box(modifier.width(slot), contentAlignment = Alignment.Center) {
-            Crossfade(copied, animationSpec = Motion.easeInOut(0.2), label = "ReplyCopyGlyph") { isCopied ->
+            Crossfade(copied, animationSpec = Motion.swap.animation(reduceMotion = rememberReduceMotion()), label = "ReplyCopyGlyph") { isCopied ->
                 OpenCodeIcon(if (isCopied) "checkmark" else "square.on.square", contentDescription = null, size = size, tint = OpenCodeTheme.colors.secondaryText)
             }
         }

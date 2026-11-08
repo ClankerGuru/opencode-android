@@ -1,10 +1,10 @@
 package ai.opencode.feature.transcript.markdown.ui
 
+import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeColors
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.feature.transcript.LocalTranscriptLayoutTuning
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -70,8 +70,9 @@ fun HairlineRule(modifier: Modifier = Modifier, alpha: Float = 1f) {
  */
 @Composable
 fun Modifier.horizontalOverflowFade(state: ScrollState, width: Dp = 40.dp): Modifier {
-    val leading by animateFloatAsState(if (state.value > 1) 1f else 0f, tween(150, easing = Motion.EaseOut), label = "leadingFade")
-    val trailing by animateFloatAsState(if (state.maxValue - state.value > 1) 1f else 0f, tween(150, easing = Motion.EaseOut), label = "trailingFade")
+    val fade = Motion.swap.animation<Float>(reduceMotion = rememberReduceMotion())
+    val leading by animateFloatAsState(if (state.value > 1) 1f else 0f, fade, label = "leadingFade")
+    val trailing by animateFloatAsState(if (state.maxValue - state.value > 1) 1f else 0f, fade, label = "trailingFade")
     return graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
         .drawWithContent {
             drawContent()

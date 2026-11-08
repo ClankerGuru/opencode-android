@@ -1,5 +1,6 @@
 package ai.opencode.feature.transcript.links
 
+import ai.opencode.core.motion.MotionTunables
 import ai.opencode.core.motion.motionBlurReveal
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.feature.media.AgentImageRowGrowth
@@ -33,23 +34,9 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
-
-/**
- * iOS `LinkPreviewMotion` tunables (`transcript.links.*`), at their defaults: the Tuning Panel
- * isn't ported.
- */
-object LinkPreviewMotion {
-    /** Link row spring (s). */
-    const val grow = 0.4
-    /** Link materialise (s). */
-    const val fade = 0.2
-    /** Link arrival blur (pt). */
-    const val blur = 3f
-}
 
 /** iOS `AnimationTimeScale.shared.referenceNow()`: seconds on the frame clock's timebase. */
 internal fun referenceNow(): Double = System.nanoTime() / 1e9
@@ -71,7 +58,11 @@ class LinkPreviewRowPresentation {
     ) {
         val progress: Double get() = progress(referenceNow())
 
-        fun progress(now: Double): Double = min(1.0, max(0.0, (now - started) / max(0.01, duration)))
+        /** Eased out, as `Motion.swap` fades. */
+        fun progress(now: Double): Double {
+            val t = min(1.0, max(0.0, (now - started) / max(0.01, duration)))
+            return 1 - (1 - t) * (1 - t)
+        }
 
         fun layers(now: Double): List<Layer> {
             val p = progress(now)
@@ -114,7 +105,8 @@ class LinkPreviewRowPresentation {
  */
 @Composable
 internal fun ArrivingLinkPreview(preview: LinkPreview, block: Int, presentation: LinkPreviewRowPresentation) {
-    val change = presentation.change(preview, duration = LinkPreviewMotion.fade)
+    // A preview materialises on `Motion.swap`, out of a subtle blur.
+    val change = presentation.change(preview, duration = MotionTunables.swapInDuration.value)
     val growth = LocalAgentImageRowGrowth.current
     val reduceMotion = rememberReduceMotion()
     val density = LocalDensity.current
@@ -205,7 +197,7 @@ internal fun LinkPreviewTextTransition(
         content = {
             Text(
                 current ?: AnnotatedString(""),
-                Modifier.motionBlurReveal(opacity.toFloat(), maxBlur = LinkPreviewMotion.blur.dp, reduceMotion = reduceMotion),
+                Modifier.motionBlurReveal(opacity.toFloat(), maxBlur = MotionTunables.blurSubtle.value, reduceMotion = reduceMotion),
                 style = style, maxLines = maxLines, overflow = overflow, softWrap = softWrap,
             )
             for ((text, layerOpacity) in overlays) {
@@ -213,7 +205,7 @@ internal fun LinkPreviewTextTransition(
                     text!!,
                     Modifier
                         .graphicsLayer { alpha = layerOpacity.toFloat() }
-                        .motionBlurReveal((1 - progress).toFloat(), maxBlur = LinkPreviewMotion.blur.dp, reduceMotion = reduceMotion)
+                        .motionBlurReveal((1 - progress).toFloat(), maxBlur = MotionTunables.blurSubtle.value, reduceMotion = reduceMotion)
                         .clearAndSetSemantics {},
                     style = style, maxLines = maxLines, overflow = overflow, softWrap = softWrap,
                 )

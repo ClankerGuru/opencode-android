@@ -1,5 +1,7 @@
 package ai.opencode.feature.transcript.list
 
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionTunables
 import ai.opencode.feature.transcript.TranscriptTunables
 import kotlin.math.E
 import kotlin.math.PI
@@ -228,9 +230,8 @@ class GrowthSoftEdge {
     }
 
     companion object {
-        /** iOS `growthMaskLeaveDuration`. */
-        const val LEAVE_DURATION = 0.2
-        /** `CAMediaTimingFunction(name: .easeOut)`. */
-        private val LEAVE_EASING = androidx.compose.animation.core.CubicBezierEasing(0f, 0f, 0.58f, 1f)
+        /** The faded line brightens as `Motion.swap` brings a change in. */
+        val LEAVE_DURATION: Double get() = MotionTunables.swapInDuration.value
+        private val LEAVE_EASING = Motion.EaseOut
     }
 }

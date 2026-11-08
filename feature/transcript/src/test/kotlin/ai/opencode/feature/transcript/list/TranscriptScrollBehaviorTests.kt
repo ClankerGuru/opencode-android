@@ -248,18 +248,18 @@ class TranscriptScrollBehaviorTests {
     fun bottomHysteresisTransitionsBetweenFollowingAndBrowsing() {
         val behavior = TranscriptScrollBehavior()
 
-        assertTrue(behavior.handle(Event.UserScrolled(viewport(offset = 900f, height = 1_500f, visible = 500f))).isEmpty())
+        assertTrue(behavior.handle(Event.UserScrolled(viewport(offset = 900f, height = 1_500f, visible = 500f, canRequestEarlierHistory = false))).isEmpty())
         assertEquals(Mode.Following, behavior.mode)
         // A deliberate scroll of more than a few lines leaves the bottom.
-        assertEquals(listOf(Command.ShowJumpButton(true)), behavior.handle(Event.UserScrolled(viewport(offset = 870f, height = 1_500f, visible = 500f))))
+        assertEquals(listOf(Command.ShowJumpButton(true)), behavior.handle(Event.UserScrolled(viewport(offset = 870f, height = 1_500f, visible = 500f, canRequestEarlierHistory = false))))
         assertEquals(Mode.Browsing, behavior.mode)
         // Reaching the bottom mid-drag is not a return, but Jump to latest leaves at once;
         // coming to rest there is the return.
-        assertEquals(listOf(Command.ShowJumpButton(false)), behavior.handle(Event.UserScrolled(viewport(offset = 1_000f, height = 1_500f, visible = 500f))))
+        assertEquals(listOf(Command.ShowJumpButton(false)), behavior.handle(Event.UserScrolled(viewport(offset = 1_000f, height = 1_500f, visible = 500f, canRequestEarlierHistory = false))))
         assertEquals(Mode.Browsing, behavior.mode)
         assertEquals(
             listOf(Command.ScrollToBottom(animated = false)),
-            behavior.handle(Event.UserSettled(viewport(offset = 1_000f, height = 1_500f, visible = 500f), contentArrived = false)),
+            behavior.handle(Event.UserSettled(viewport(offset = 1_000f, height = 1_500f, visible = 500f, canRequestEarlierHistory = false), contentArrived = false)),
         )
         assertEquals(Mode.Following, behavior.mode)
     }
@@ -269,21 +269,21 @@ class TranscriptScrollBehaviorTests {
         val behavior = TranscriptScrollBehavior()
         behavior.handle(Event.UserLeftBottom)
         assertTrue(behavior.showsJumpButton)
-        behavior.handle(Event.DragBegan(viewport(offset = 600f, height = 1_500f, visible = 500f)))
-        assertTrue("Still 100 pt short", behavior.handle(Event.UserScrolled(viewport(offset = 900f, height = 1_500f, visible = 500f))).isEmpty())
+        behavior.handle(Event.DragBegan(viewport(offset = 600f, height = 1_500f, visible = 500f, canRequestEarlierHistory = false)))
+        assertTrue("Still 100 pt short", behavior.handle(Event.UserScrolled(viewport(offset = 900f, height = 1_500f, visible = 500f, canRequestEarlierHistory = false))).isEmpty())
         assertEquals(
             "Within the 1 pt of the end",
             listOf(Command.ShowJumpButton(false)),
-            behavior.handle(Event.UserScrolled(viewport(offset = 999.5f, height = 1_500f, visible = 500f))),
+            behavior.handle(Event.UserScrolled(viewport(offset = 999.5f, height = 1_500f, visible = 500f, canRequestEarlierHistory = false))),
         )
         // Rubber-banding past the end and springing back changes nothing more.
-        assertTrue(behavior.handle(Event.UserScrolled(viewport(offset = 1_080f, height = 1_500f, visible = 500f))).isEmpty())
-        assertTrue(behavior.handle(Event.UserScrolled(viewport(offset = 1_020f, height = 1_500f, visible = 500f))).isEmpty())
-        assertTrue(behavior.handle(Event.UserScrolled(viewport(offset = 1_000f, height = 1_500f, visible = 500f))).isEmpty())
+        assertTrue(behavior.handle(Event.UserScrolled(viewport(offset = 1_080f, height = 1_500f, visible = 500f, canRequestEarlierHistory = false))).isEmpty())
+        assertTrue(behavior.handle(Event.UserScrolled(viewport(offset = 1_020f, height = 1_500f, visible = 500f, canRequestEarlierHistory = false))).isEmpty())
+        assertTrue(behavior.handle(Event.UserScrolled(viewport(offset = 1_000f, height = 1_500f, visible = 500f, canRequestEarlierHistory = false))).isEmpty())
         assertEquals("Resting decides following", Mode.Browsing, behavior.mode)
         assertEquals(
             listOf(Command.ScrollToBottom(animated = false)),
-            behavior.handle(Event.UserSettled(viewport(offset = 1_000f, height = 1_500f, visible = 500f), contentArrived = false)),
+            behavior.handle(Event.UserSettled(viewport(offset = 1_000f, height = 1_500f, visible = 500f, canRequestEarlierHistory = false), contentArrived = false)),
         )
         assertEquals(Mode.Following, behavior.mode)
         assertFalse(behavior.showsJumpButton)
@@ -304,17 +304,17 @@ class TranscriptScrollBehaviorTests {
     fun jumpToLatestReturnsOnlyWellClearOfTheEnd() {
         val behavior = TranscriptScrollBehavior()
         behavior.handle(Event.UserLeftBottom)
-        behavior.handle(Event.DragBegan(viewport(offset = 600f, height = 1_500f, visible = 500f)))
-        assertEquals(listOf(Command.ShowJumpButton(false)), behavior.handle(Event.UserScrolled(viewport(offset = 1_000f, height = 1_500f, visible = 500f))))
+        behavior.handle(Event.DragBegan(viewport(offset = 600f, height = 1_500f, visible = 500f, canRequestEarlierHistory = false)))
+        assertEquals(listOf(Command.ShowJumpButton(false)), behavior.handle(Event.UserScrolled(viewport(offset = 1_000f, height = 1_500f, visible = 500f, canRequestEarlierHistory = false))))
         // Hovering near the edge never flickers it.
-        assertTrue(behavior.handle(Event.UserScrolled(viewport(offset = 990f, height = 1_500f, visible = 500f))).isEmpty())
-        assertTrue(behavior.handle(Event.UserScrolled(viewport(offset = 1_000f, height = 1_500f, visible = 500f))).isEmpty())
-        assertTrue(behavior.handle(Event.UserScrolled(viewport(offset = 940f, height = 1_500f, visible = 500f))).isEmpty())
-        assertTrue("Exactly 120 pt away", behavior.handle(Event.UserScrolled(viewport(offset = 880f, height = 1_500f, visible = 500f))).isEmpty())
-        assertEquals(listOf(Command.ShowJumpButton(true)), behavior.handle(Event.UserScrolled(viewport(offset = 870f, height = 1_500f, visible = 500f))))
+        assertTrue(behavior.handle(Event.UserScrolled(viewport(offset = 990f, height = 1_500f, visible = 500f, canRequestEarlierHistory = false))).isEmpty())
+        assertTrue(behavior.handle(Event.UserScrolled(viewport(offset = 1_000f, height = 1_500f, visible = 500f, canRequestEarlierHistory = false))).isEmpty())
+        assertTrue(behavior.handle(Event.UserScrolled(viewport(offset = 940f, height = 1_500f, visible = 500f, canRequestEarlierHistory = false))).isEmpty())
+        assertTrue("Exactly 120 pt away", behavior.handle(Event.UserScrolled(viewport(offset = 880f, height = 1_500f, visible = 500f, canRequestEarlierHistory = false))).isEmpty())
+        assertEquals(listOf(Command.ShowJumpButton(true)), behavior.handle(Event.UserScrolled(viewport(offset = 870f, height = 1_500f, visible = 500f, canRequestEarlierHistory = false))))
         // Coming back down, it stays until the end itself.
-        assertTrue(behavior.handle(Event.UserScrolled(viewport(offset = 990f, height = 1_500f, visible = 500f))).isEmpty())
-        assertEquals(listOf(Command.ShowJumpButton(false)), behavior.handle(Event.UserScrolled(viewport(offset = 1_000f, height = 1_500f, visible = 500f))))
+        assertTrue(behavior.handle(Event.UserScrolled(viewport(offset = 990f, height = 1_500f, visible = 500f, canRequestEarlierHistory = false))).isEmpty())
+        assertEquals(listOf(Command.ShowJumpButton(false)), behavior.handle(Event.UserScrolled(viewport(offset = 1_000f, height = 1_500f, visible = 500f, canRequestEarlierHistory = false))))
     }
 
     @Test
@@ -535,11 +535,11 @@ class TranscriptScrollBehaviorTests {
     fun aFollowerFarBehindAStreamIsNotLeftByALandingFinger() {
         val behavior = TranscriptScrollBehavior()
         // The finger lands while the end is 300 pt ahead of the follower.
-        behavior.handle(Event.DragBegan(viewport(offset = 1_200f, height = 2_000f, visible = 500f)))
-        assertTrue(behavior.handle(Event.UserScrolled(viewport(offset = 1_195f, height = 2_000f, visible = 500f))).isEmpty())
+        behavior.handle(Event.DragBegan(viewport(offset = 1_200f, height = 2_000f, visible = 500f, canRequestEarlierHistory = false)))
+        assertTrue(behavior.handle(Event.UserScrolled(viewport(offset = 1_195f, height = 2_000f, visible = 500f, canRequestEarlierHistory = false))).isEmpty())
         assertEquals(Mode.Following, behavior.mode)
         // Carried 150 pt up by the finger itself, it leaves.
-        assertEquals(listOf(Command.ShowJumpButton(true)), behavior.handle(Event.UserScrolled(viewport(offset = 1_050f, height = 2_000f, visible = 500f))))
+        assertEquals(listOf(Command.ShowJumpButton(true)), behavior.handle(Event.UserScrolled(viewport(offset = 1_050f, height = 2_000f, visible = 500f, canRequestEarlierHistory = false))))
     }
 
     @Test

@@ -1,15 +1,21 @@
 package ai.opencode.feature.transcript.list
 
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionTunables
+import ai.opencode.core.motion.SpringSolver
 import ai.opencode.feature.transcript.TranscriptTunables
-import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import kotlin.math.PI
+import kotlin.math.max
 
 /**
- * How a new row arrives (iOS `RowEntrance.Style`). `Settling`: a quiet row landing among rows
- * already read (a model switch) takes a slower, even fade. `WithFlight`: a sent message's time
- * stamp, held back until the flight's last stretch.
+ * How a new row arrives (iOS `RowEntrance.Style`). `Arrival`: fades in on `Motion.swap` while it
+ * rises into place on `Motion.layout`. `Settling`: a quiet row landing among rows already read (a
+ * model switch) fades evenly over the whole rise, so it's seen arriving rather than popping in.
+ * `WithFlight`: a sent message's time stamp, held back until the flight's last stretch, then
+ * settling down into place as its bubble lands, on the send flight's own clock.
  */
 enum class RowEntranceStyle { Arrival, Settling, WithFlight }
 
@@ -18,39 +24,54 @@ enum class RowEntranceStyle { Arrival, Settling, WithFlight }
  * Presentation-only (a graphics layer): layout, reuse and self-sizing are unaffected.
  */
 object RowEntrance {
-    val DURATION: Double get() = TranscriptTunables.entranceDuration
-    val SETTLING_DURATION: Double get() = TranscriptTunables.settlingDuration
-    /** About as long as a send's flight. */
-    const val WITH_FLIGHT_DURATION = 0.45
-    /** A row leaving the screen without a motion of its own fades out this fast. */
-    const val EXIT_DURATION = 0.2
-    val RISE: Float get() = TranscriptTunables.entranceRise
+    val RISE: Float get() = Motion.entranceRise.value
     /** Larger insertions are a refresh or a page, not arrivals. */
     const val MAXIMUM_ROWS = 4
     /** How long a row inserted off screen may still fade in when it appears. */
     const val WINDOW = 0.5
 
-    private val arrivalEasing = CubicBezierEasing(0.2f, 0.8f, 0.2f, 1f)
-    private val settlingEasing = FastOutSlowInEasing.let { CubicBezierEasing(0.42f, 0f, 0.58f, 1f) }
-    private val withFlightEasing = CubicBezierEasing(0f, 0f, 0.58f, 1f)
+    /** The send flight's length as a spring's perceptual duration (`2π / ω`), iOS `SendFlight.duration`. */
+    val withFlightDuration: Double get() = 2 * PI / max(TranscriptTunables.sendFlightOmega, 0.01)
 
-    /** Opacity and rise (dp, positive = below) at [progress] `0..1` of [style]'s duration. */
-    fun pose(progress: Float, style: RowEntranceStyle): Pair<Float, Float> = when (style) {
-        RowEntranceStyle.Arrival -> {
-            val t = arrivalEasing.transform(progress)
-            t to RISE * (1 - t)
-        }
-        RowEntranceStyle.Settling -> {
-            val t = settlingEasing.transform(progress)
-            t to RISE * (1 - t)
-        }
-        RowEntranceStyle.WithFlight -> {
-            // Held until 35 %, then settles down 4 pt into place.
-            val t = withFlightEasing.transform(progress)
-            val k = ((t - 0.35f) / 0.65f).coerceIn(0f, 1f)
-            k to -4f * (1 - k)
+    /** How long [style]'s entrance runs: its fade or its rise, whichever is longer. */
+    fun duration(style: RowEntranceStyle): Double = when (style) {
+        RowEntranceStyle.Arrival, RowEntranceStyle.Settling -> max(MotionTunables.swapInDuration.value, Motion.layout.curve().duration)
+        RowEntranceStyle.WithFlight -> withFlightDuration
+    }
+
+    /** The longest any entrance runs. */
+    val maximumDuration: Double get() = max(duration(RowEntranceStyle.Arrival), withFlightDuration)
+
+    /** Opacity and rise (dp, positive = below) at [progress] `0..1` of [style]'s [duration]. */
+    fun pose(progress: Float, style: RowEntranceStyle): Pair<Float, Float> {
+        val elapsed = progress * duration(style)
+        return when (style) {
+            RowEntranceStyle.Arrival -> {
+                val fade = Motion.EaseOut.transform(fraction(elapsed, MotionTunables.swapInDuration.value))
+                fade to RISE * lift(elapsed)
+            }
+            RowEntranceStyle.Settling -> {
+                // An even fade across the rise's beat.
+                val fade = Motion.EaseInOut.transform(fraction(elapsed, Motion.layout.curve().duration))
+                fade to RISE * lift(elapsed)
+            }
+            RowEntranceStyle.WithFlight -> {
+                // Held until 35 %, then settles down 4 pt into place.
+                val t = Motion.EaseOut.transform(progress.coerceIn(0f, 1f))
+                val k = ((t - 0.35f) / 0.65f).coerceIn(0f, 1f)
+                k to -4f * (1 - k)
+            }
         }
     }
+
+    /** What's left of the rise (`1 → 0`) [elapsed] seconds in, on `Motion.layout`. */
+    private fun lift(elapsed: Double): Float {
+        val parameters = Motion.layout.curve(MotionPhase.Enter).springParameters
+        val (value, _) = SpringSolver.evaluate(from = 1.0, to = 0.0, omega = parameters.omega, zeta = parameters.zeta, elapsed = elapsed)
+        return value.toFloat().coerceIn(0f, 1f)
+    }
+
+    private fun fraction(elapsed: Double, duration: Double): Float = (elapsed / max(duration, 0.01)).toFloat().coerceIn(0f, 1f)
 }
 
 /** Applies a row's entrance pose while [entrance] is non-null (read in the draw phase only). */

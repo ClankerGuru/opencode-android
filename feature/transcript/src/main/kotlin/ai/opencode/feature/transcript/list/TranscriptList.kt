@@ -2,6 +2,8 @@ package ai.opencode.feature.transcript.list
 
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.diagnostics.PerfTimeline
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.touch.TouchRecovery
 import ai.opencode.core.touch.rememberTouchRecovery
@@ -384,7 +386,7 @@ private fun TranscriptListContent(
                                 // Working handing off to the reply's end has already become it (iOS `handsOff`): no fade.
                                 fadeOutSpec = if (item == TranscriptItemID.Empty || !controller.fadesRemovals ||
                                     (item == TranscriptItemID.Working && configuration.workingHandsOffToCopy)
-                                ) null else androidx.compose.animation.core.tween((RowEntrance.EXIT_DURATION * 1000).toInt(), easing = androidx.compose.animation.core.CubicBezierEasing(0f, 0f, 0.58f, 1f)) /* iOS .curveEaseOut */,
+                                ) null else Motion.swap.animation(MotionPhase.Exit) /* a row leaving the screen fades on Motion.swap's exit */,
                             )
                             .fillMaxWidth()
                             .wrapContentWidth()
