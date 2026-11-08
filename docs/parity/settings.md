@@ -263,7 +263,7 @@ left to that module's port ("skipped"); "dropped" tests can't exist on Android.
 | `VoiceRouteTests.swift` | `VoiceRouteTests.kt` | 2 (Settings/`VoiceRoutePreferences` halves of `inactiveGemini…`, `grokSuppresses…`) | rest (`:feature:voice`); `SessionFeature.State` checks (`:feature:session`) | – |
 | `VoiceRoutingBaselineTests.swift` | `VoiceRoutingBaselineTests.kt` | 1 | – | – |
 | `HomeChildFeatureTests.swift` | `HomeChildFeatureTests.kt` | 1 (`HomeSettingsFeature`: support plus the Automatic models answer) | `HomeNotificationsFeature` and other Home children (`:feature:drawer`) | – Sync b1c67259 (0fbb99f8): `modelPickerStyleIsOneSetting` deleted with iOS (−1). Sync 3cea48b2 (9c94975e, bf0dbcb7): only the Home connection half changed (drawer). |
-| `AppFeatureTests.swift` | `AppFeatureTests.kt` | 1 (`appVersionPrefersOpenCodeVersion`: the label; Android reads the package version, no Info.plist key) | the rest (`:app`, `:server`) | – Sync 3cea48b2 (9c94975e): nothing here changed. |
+| `AppFeatureTests.swift` | `AppFeatureTests.kt` | 1 (`appVersionPrefersOpenCodeVersion`: the label; Android reads the package version, no Info.plist key) | the rest (`:app`, `:server`) | – Sync 3cea48b2 (9c94975e): nothing here changed. Sync 440b77f0 (0eb5c365): nothing here changed (the rename is `:app`'s). |
 
 Production bugs the ported tests found: none (every ported test passed against the existing port).
 

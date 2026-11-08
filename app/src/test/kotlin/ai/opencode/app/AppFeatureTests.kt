@@ -596,7 +596,7 @@ class AppFeatureTests {
     }
 
     @Test
-    fun credentialFieldFocusOrderResignsOnConnectAndNamePromptUsesFriendlyName() {
+    fun credentialFieldFocusOrderAndNamePromptUsesFriendlyName() {
         var state = shared.appState().copy(serverURL = "")
         assertEquals("Optional", shared.run { state.credentialNamePrompt })
         state = state.copy(serverURL = "http://my-mac.local:4096")

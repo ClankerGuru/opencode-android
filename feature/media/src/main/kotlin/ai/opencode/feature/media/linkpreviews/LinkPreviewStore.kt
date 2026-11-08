@@ -159,6 +159,56 @@ data class LinkPreview(
 }
 
 /**
+ * Work the network path set aside (iOS `DeferredRetries`): the rows waiting on each key, its retry
+ * budget when the path comes back, and the most recent [limit] keys only.
+ */
+internal class DeferredRetries<Payload>(val limit: Int, val retryLimit: Int) {
+    data class Entry<Payload>(val payload: Payload, val rows: Set<String>)
+
+    private val entries = HashMap<String, Entry<Payload>>()
+    private val order = ArrayDeque<String>()
+    private val retries = HashMap<String, Int>()
+
+    /** A snapshot, safe to walk while retrying. */
+    val all: Map<String, Entry<Payload>> get() = entries.toMap()
+
+    fun contains(key: String): Boolean = entries[key] != null
+
+    /** Sets [key] aside for a later retry, with every row waiting on it. */
+    fun record(key: String, payload: Payload, rows: Set<String>) {
+        if (rows.isEmpty()) return
+        val existing = entries[key]
+        if (existing == null) {
+            order.addLast(key)
+            while (order.size > limit) entries.remove(order.removeFirst())
+        }
+        val waitingRows = (existing?.rows ?: emptySet()) + rows
+        entries[key] = Entry(payload, waitingRows)
+    }
+
+    /** The key answered: nothing left to retry for it. */
+    fun clear(key: String) {
+        retries.remove(key)
+        if (entries.remove(key) == null) return
+        order.remove(key)
+    }
+
+    /** Another try when the path comes back, unless its retries are spent: then it is forgotten. */
+    fun retry(key: String): Boolean {
+        val attempts = retries[key] ?: 0
+        if (attempts >= retryLimit) {
+            entries.remove(key)
+            return false
+        }
+        retries[key] = attempts + 1
+        return true
+    }
+}
+
+/** A key with nothing to carry: only its rows. */
+internal fun DeferredRetries<Unit>.record(key: String, rows: Set<String>) = record(key, Unit, rows)
+
+/**
  * The transcript list's link previews (iOS `LinkPreviewStore`): which links each finished reply
  * names, what is known about them, and which rows to reload when an answer arrives. Not
  * observed: a row redraws by being reloaded ([onArrival]) with a bumped [revision].
@@ -187,13 +237,10 @@ class LinkPreviewStore(
     /** Site icons by registrable domain, and the rows waiting for each. */
     private val icons = HashMap<String, SiteIconResult>()
     private val waitingIcons = HashMap<String, MutableSet<String>>()
-    private val deferredTargets = HashMap<String, Pair<LinkPreviewTarget, Set<String>>>()
-    private val deferredOrder = ArrayDeque<String>()
-    private val targetPathRetries = HashMap<String, Int>()
-    private val deferredIcons = HashMap<String, MutableSet<String>>()
-    private val deferredIconOrder = ArrayDeque<String>()
+    /** Links and icons set aside by the network path, each with the rows waiting on it. */
+    private val deferredLinks = DeferredRetries<LinkPreviewTarget>(MAXIMUM_DEFERRED_ENTRIES, MAXIMUM_PATH_RETRIES)
+    private val deferredIcons = DeferredRetries<Unit>(MAXIMUM_DEFERRED_ENTRIES, MAXIMUM_PATH_RETRIES)
     private val iconRetryExpires = HashMap<String, Long>()
-    private val iconPathRetries = HashMap<String, Int>()
     /** Bumped for a row when its metadata arrives, so a reloaded row redraws. */
     private val revisions = HashMap<String, Int>()
     private val targetsByEntry = HashMap<String, Pair<List<LinkTextBlock>, List<LinkPreviewTarget>>>()
@@ -320,8 +367,8 @@ class LinkPreviewStore(
         if (results[key] == null) client.stale(target)?.let { results[key] = LinkPreviewResult.Loaded(it) }
         val expiry = resultExpires[key]
         if (results[key] != null && expiry != null && expiry > currentTime) {
-            if (results[key] == LinkPreviewResult.Deferred || deferredTargets[key] != null) {
-                recordDeferredTarget(target, setOf(row))
+            if (results[key] == LinkPreviewResult.Deferred || deferredLinks.contains(key)) {
+                deferredLinks.record(key, target, setOf(row))
             }
             return
         }
@@ -332,10 +379,9 @@ class LinkPreviewStore(
             val result = client.load(target)
             val rows = waiting.remove(key) ?: emptySet()
             if (result == LinkPreviewResult.Deferred) {
-                recordDeferredTarget(target, rows)
+                deferredLinks.record(key, target, rows)
             } else {
-                deferredTargets.remove(key)
-                targetPathRetries.remove(key)
+                deferredLinks.clear(key)
             }
             if (result == LinkPreviewResult.Deferred && isLoaded(results[key])) {
                 // Stale-while-revalidate: keep the last good rich metadata when a refresh fails
@@ -348,10 +394,10 @@ class LinkPreviewStore(
             if (changed) bitmaps.remove(key)
             // A new appearance may retry a transient failure. Never schedule a retry from the
             // arrival reload itself or poll an offscreen card.
-            val lifetime = when {
-                result == LinkPreviewResult.Deferred -> RETRY_FLOOR
-                RichLinkSource.of(target.url) == null -> LinkPreviewLoader.LOADED_LIFETIME
-                else -> LinkPreviewLoader.RICH_LIFETIME
+            val lifetime = if (result == LinkPreviewResult.Deferred) {
+                RETRY_FLOOR
+            } else {
+                LinkPreviewLoader.freshLifetime(RichLinkSource.of(target.url))
             }
             resultExpires[key] = now() + lifetime
             if (changed) arrived(rows)
@@ -372,7 +418,7 @@ class LinkPreviewStore(
         val cached = client.cachedIcon(domain)
         if (cached != null && cached != SiteIconResult.Deferred) {
             icons[domain] = cached
-            deferredIcons.remove(domain)
+            deferredIcons.clear(domain)
             iconRetryExpires.remove(domain)
             // Cached since this row was drawn: show it.
             if (cached is SiteIconResult.Icon) arrived(setOf(row))
@@ -380,7 +426,7 @@ class LinkPreviewStore(
         }
         val expiry = iconRetryExpires[domain]
         if (expiry != null && expiry > now()) {
-            recordDeferredIcon(domain, setOf(row))
+            deferredIcons.record(domain, setOf(row))
             return
         }
         loadIcon(domain, setOf(row))
@@ -395,34 +441,14 @@ class LinkPreviewStore(
             val waitingRows = waitingIcons.remove(domain) ?: emptySet()
             if (result == SiteIconResult.Deferred) {
                 iconRetryExpires[domain] = now() + RETRY_FLOOR
-                recordDeferredIcon(domain, waitingRows)
+                deferredIcons.record(domain, waitingRows)
                 return@launch
             }
-            deferredIcons.remove(domain)
+            deferredIcons.clear(domain)
             iconRetryExpires.remove(domain)
-            iconPathRetries.remove(domain)
             icons[domain] = result
             if (result is SiteIconResult.Icon) arrived(waitingRows)
         }
-    }
-
-    private fun recordDeferredTarget(target: LinkPreviewTarget, rows: Set<String>) {
-        if (rows.isEmpty()) return
-        val key = target.key
-        if (deferredTargets[key] == null) {
-            deferredOrder.addLast(key)
-            while (deferredOrder.size > MAXIMUM_DEFERRED_ENTRIES) deferredTargets.remove(deferredOrder.removeFirst())
-        }
-        deferredTargets[key] = target to ((deferredTargets[key]?.second ?: emptySet()) + rows)
-    }
-
-    private fun recordDeferredIcon(domain: String, rows: Set<String>) {
-        if (rows.isEmpty()) return
-        if (deferredIcons[domain] == null) {
-            deferredIconOrder.addLast(domain)
-            while (deferredIconOrder.size > MAXIMUM_DEFERRED_ENTRIES) deferredIcons.remove(deferredIconOrder.removeFirst())
-        }
-        deferredIcons.getOrPut(domain) { mutableSetOf() }.addAll(rows)
     }
 
     /**
@@ -430,25 +456,15 @@ class LinkPreviewStore(
      * [MAXIMUM_PATH_RETRIES]) when the network path becomes unconstrained.
      */
     fun retryDeferredOnUnconstrainedPath() {
-        for ((key, entry) in deferredTargets.toMap()) {
-            val attempts = targetPathRetries[key] ?: 0
-            if (attempts >= MAXIMUM_PATH_RETRIES) {
-                deferredTargets.remove(key)
-                continue
-            }
-            targetPathRetries[key] = attempts + 1
+        for ((key, entry) in deferredLinks.all) {
+            if (!deferredLinks.retry(key)) continue
             resultExpires.remove(key)
-            for (row in entry.second) appeared(entry.first, row)
+            for (row in entry.rows) appeared(entry.payload, row)
         }
-        for ((domain, rows) in deferredIcons.mapValues { it.value.toSet() }) {
-            val attempts = iconPathRetries[domain] ?: 0
-            if (attempts >= MAXIMUM_PATH_RETRIES) {
-                deferredIcons.remove(domain)
-                continue
-            }
-            iconPathRetries[domain] = attempts + 1
+        for ((domain, entry) in deferredIcons.all) {
+            if (!deferredIcons.retry(domain)) continue
             iconRetryExpires.remove(domain)
-            loadIcon(domain, rows)
+            loadIcon(domain, entry.rows)
         }
     }
 

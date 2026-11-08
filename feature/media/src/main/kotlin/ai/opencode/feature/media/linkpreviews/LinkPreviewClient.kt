@@ -376,7 +376,7 @@ class LinkPreviewLoader(
                     metadata = metadata.copy(image = artwork(source?.imageURL, pixels = 960) ?: existing?.metadata?.image)
                 }
                 val fetchedAt = cache.now()
-                val lifetime = if (source == null) LOADED_LIFETIME else RICH_LIFETIME
+                val lifetime = freshLifetime(source)
                 Record(
                     metadata = metadata,
                     expires = fetchedAt + if (metadata == null) UNAVAILABLE_LIFETIME else lifetime,
@@ -432,6 +432,12 @@ class LinkPreviewLoader(
         const val UNAVAILABLE_LIFETIME: Long = 24L * 3600 * 1000
         /** GitHub and video metadata: five minutes. */
         const val RICH_LIFETIME: Long = 5L * 60 * 1000
+
+        /**
+         * How long an answer stays fresh: a post's text a week, a page's metadata (a repository's
+         * stars, a video's title) five minutes. The store reads this for its own retry window.
+         */
+        fun freshLifetime(source: RichLinkSource?): Long = if (source == null) LOADED_LIFETIME else RICH_LIFETIME
         const val MEMORY_LIMIT = 64
         const val DISK_LIMIT: Long = 50L shl 20
         private const val SWEEP_INTERVAL: Long = 600L * 1000

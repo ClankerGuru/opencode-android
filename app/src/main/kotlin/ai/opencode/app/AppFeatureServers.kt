@@ -12,8 +12,6 @@ import ai.opencode.feature.system.SystemIntegrationClient
 import ai.opencode.feature.system.notifications.AppIconBadgeClient
 import ai.opencode.feature.system.notifications.SessionNotificationsClient
 import ai.opencode.feature.system.share.ShareInboxClient
-import ai.opencode.server.OpenCodeClientError
-import ai.opencode.server.OpenCodePairingLink
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.ServerSharedKeys
 import ai.opencode.server.rememberName
@@ -48,7 +46,6 @@ internal fun AppFeature.selectServer(
     keepingHome = keepingHome,
 )
 
-/** Opens the pairing scanner (iOS `beginPairing`). */
 /** The form opens over Home; Home stays until the edit connects. */
 internal fun editServer(server: OpenCodeServer, state: AppFeature.State): AppFeature.State {
     val saved = state.knownServers.firstOrNull { it.persistenceID == server.persistenceID } ?: server
@@ -60,7 +57,8 @@ internal fun confirmRemoval(server: OpenCodeServer, state: AppFeature.State): Ef
     if (state.home?.server?.persistenceID == server.persistenceID) Effect.none()
     else Effect.send(AppFeature.Action.ServerDeleted(server))
 
-internal fun beginPairing(state: AppFeature.State): AppFeature.State =
+/** Pairing's own screen: scan a code, or paste the link `opencode pair` prints. */
+internal fun beginScanningPairingCode(state: AppFeature.State): AppFeature.State =
     state.copy(editingSavedServer = null, isScanningPairingCode = true)
 
 /** Opens the form for a new server: the last failed entry, or a blank one. */
@@ -98,17 +96,7 @@ internal fun pastePairingCode(state: AppFeature.State): Reduced<AppFeature.State
 internal fun pasteProblem(text: String): String? {
     if (text.isBlank()) return AppFeature.EMPTY_CLIPBOARD_MESSAGE
     val error = validatePairing(text).exceptionOrNull() ?: return null
-    return if (error.message == AppFeature.invalidPairingCodeMessage) AppFeature.NOT_A_PAIRING_LINK_MESSAGE else error.message.orEmpty()
-}
-
-/** Exchange a one-time pairing link for a token, then connect normally. */
-internal fun validatePairing(text: String): Result<OpenCodePairingLink> {
-    val link = OpenCodePairingLink.decode(text)
-        ?: return Result.failure(OpenCodeClientError(AppFeature.invalidPairingCodeMessage))
-    // `opencode pair` reports whatever the service is bound to. If that's only loopback, no
-    // amount of retrying will help — say so precisely.
-    if (link.isLoopback) return Result.failure(OpenCodeClientError(AppFeature.loopbackPairingMessage))
-    return Result.success(link.normalizedForRedemption)
+    return pairingProblem(error.message.orEmpty())
 }
 
 internal fun cancelConnection(

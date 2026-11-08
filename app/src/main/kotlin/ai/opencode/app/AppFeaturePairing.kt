@@ -1,18 +1,27 @@
 package ai.opencode.app
 
+import ai.opencode.core.dependencies.UuidClient
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
+import ai.opencode.core.log.AppLog
 import ai.opencode.core.sharing.InstallHistory
 import ai.opencode.core.store.Effect
+import ai.opencode.core.store.Reduced
+import ai.opencode.core.store.cancellable
+import ai.opencode.core.ui.ThisDevice
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.notices.AccessibilityAnnouncer
+import ai.opencode.server.OpenCodeClient
+import ai.opencode.server.OpenCodeClientError
+import ai.opencode.server.OpenCodePairingLink
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.friendlyName
 
 /*
- * Port of iOS `App/AppFeature+Pairing.swift`: where a pairing lands once its computer's sessions
- * load (t485). The install's first computer opens a ready session, another new computer opens
+ * Port of iOS `App/AppFeature+Pairing.swift`: everything pairing in one place. Validating a
+ * pasted or scanned code, an unsolicited link waiting for confirmation, redeeming it, and where a
+ * pairing lands once its computer's sessions load (t485). The install's first computer opens a ready session, another new computer opens
  * the drawer on its sessions, and re-pairing a known one stays put. Every pairing that lands
  * plays the handshake: `success` and, for TalkBack, the computer's name.
  */
@@ -54,3 +63,99 @@ internal fun landPairing(arrival: PairingArrival?, server: OpenCodeServer, asked
         PairingArrival.knownComputer -> Effect.none()
     }
 }
+
+/** A pasted or scanned code, as a target to redeem, or as the reason it isn't one. */
+internal fun validatePairing(text: String): Result<OpenCodePairingLink> {
+    val link = OpenCodePairingLink.decode(text)
+        ?: return Result.failure(OpenCodeClientError(invalidPairingCodeMessage))
+    // `opencode pair` reports whatever the service is bound to. If that's only loopback, no
+    // amount of retrying will help — say so precisely.
+    if (link.isLoopback) return Result.failure(OpenCodeClientError(loopbackPairingMessage))
+    return Result.success(link.normalizedForRedemption)
+}
+
+/**
+ * What a failed pairing says beside Paste: a code that isn't a pairing link at all reads as one,
+ * not as the long "run opencode pair" hint.
+ */
+internal fun pairingProblem(message: String): String =
+    if (message == invalidPairingCodeMessage) AppFeature.NOT_A_PAIRING_LINK_MESSAGE else message
+
+/**
+ * An unsolicited pairing link (an opened link, a transcript or browser tap) waits for
+ * confirmation; one arriving while another waits is ignored.
+ */
+internal fun requestPairing(text: String, state: AppFeature.State): Reduced<AppFeature.State, AppFeature.Action> {
+    LaunchBloomController.completeColdLaunch()
+    val pending = state.pendingPairing
+    if (pending != null) {
+        val count = state.ignoredPendingPairingCount + 1
+        AppLog.app.info { "pairing link ignored while pending id=${pending.id} ignoredCount=$count" }
+        return Reduced(state.copy(ignoredPendingPairingCount = count))
+    }
+    val result = validatePairing(text)
+    val link = result.getOrNull()
+    if (link == null) {
+        dependency(HapticsClient).play(Haptic.error)
+        return Reduced(state.copy(pairingError = result.exceptionOrNull()?.message))
+    }
+    return Reduced(
+        state.copy(
+            pairingError = null,
+            ignoredPendingPairingCount = 0,
+            pendingPairing = AppFeature.PendingPairing(
+                id = dependency(UuidClient).next().toString(),
+                link = link,
+                replacedServerNames = link.replacedServers(state.knownServers).map { it.displayName },
+            ),
+        ),
+    )
+}
+
+/** The person confirmed the waiting link: leave Home and redeem it. */
+internal fun beginPairing(link: OpenCodePairingLink, state: AppFeature.State): Reduced<AppFeature.State, AppFeature.Action> {
+    val next = leaveHome(
+        state.copy(
+            pendingPairing = null,
+            ignoredPendingPairingCount = 0,
+            pairingError = null,
+            isScanningPairingCode = false,
+            isEditingServer = false,
+            editingSavedServer = null,
+            manualEntryDraft = null,
+        ),
+    )
+    dependency(HapticsClient).play(Haptic.tap)
+    return redeem(link, next)
+}
+
+/** Exchange a one-time pairing link for a token, then connect normally. */
+internal fun redeem(link: OpenCodePairingLink, state: AppFeature.State): Reduced<AppFeature.State, AppFeature.Action> {
+    val normalized = link.normalizedForRedemption
+    val generation = state.connectionGeneration + 1
+    val attempt = AppFeature.ConnectionAttempt(id = generation, server = normalized.server)
+    val next = state.copy(
+        pendingNotification = null,
+        connection = AppFeature.State.Connection.Pairing,
+        connectionGeneration = generation,
+        connectionAttempt = attempt,
+    )
+    val client = dependency(OpenCodeClient)
+    return Reduced(
+        next,
+        Effect.run<AppFeature.Action> { send ->
+            val result = try {
+                Result.success(client.redeemPairing(normalized))
+            } catch (error: OpenCodeClientError) {
+                Result.failure(error)
+            }
+            send(AppFeature.Action.PairingRedeemed(attempt.id, result))
+        }.cancellable(AppFeature.CancelID.Health, cancelInFlight = true),
+    )
+}
+
+internal const val invalidPairingCodeMessage =
+    "That isn’t an OpenCode pairing code. Run opencode pair --remote on your computer, then scan its QR code or paste the link it prints."
+
+internal val loopbackPairingMessage: String
+    get() = "That server only listens on localhost, so this ${ThisDevice.casualName} can’t reach it. Run opencode pair --remote on your computer instead, which works from any network."

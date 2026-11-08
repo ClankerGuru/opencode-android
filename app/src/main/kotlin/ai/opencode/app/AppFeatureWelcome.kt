@@ -37,7 +37,7 @@ private fun welcome(
 ): Reduced<AppFeature.State, AppFeature.Action> =
     when (request) {
         WelcomeFeature.Request.Scan -> {
-            val opening = beginPairing(state.copy(pasteError = null))
+            val opening = beginScanningPairingCode(state.copy(pasteError = null))
             if (overHome) Reduced(opening) else cancelConnection(opening)
         }
         WelcomeFeature.Request.EnterAddress -> {

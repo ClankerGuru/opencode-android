@@ -172,9 +172,6 @@ private fun AppFeature.State.clientToolScreenBlock(includingRequestDock: Boolean
         val voice = detail.voice ?: return ClientToolCardBlock.NoCall
         if (voice.phase != VoiceFeature.State.Phase.Live) return ClientToolCardBlock.NoCall
         if (!isInForeground) return ClientToolCardBlock.Background
-        val coversApp = isEditingServer || isScanningPairingCode ||
-            pendingPairing != null || pairingError != null ||
-            shareError != null || notificationError != null || systemActionError != null
         // Not `presentsOverHome`: a pushed subagent shows the call's card too. What's New and
         // the onboarding playground are Settings pages on Android.
         val coversHome = home.catchUp != null || home.isSettingsShown ||
@@ -186,7 +183,7 @@ private fun AppFeature.State.clientToolScreenBlock(includingRequestDock: Boolean
         for (screen in listOf(detail) + home.subagentStack) {
             if (screen.activePicker != null || screen.folderBrowser != null || screen.shellOutput != null) coversSession = true
         }
-        if (coversApp || coversHome || coversSession) return ClientToolCardBlock.Covered
+        if (presentsOverApp || coversHome || coversSession) return ClientToolCardBlock.Covered
         return null
 }
 
