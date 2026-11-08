@@ -832,7 +832,13 @@ fun ComposerTextInput(
         // then as hidden while they rise for this field: keys on their way up aren't leaving.
         if (imeTarget.getBottom(density) > 0) return@LaunchedEffect
         if (!windowInfo.isWindowFocused || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return@LaunchedEffect
-        dismissKeyboard()
+        // QA AF-02: on the drawer's card the drawer takes the focus (`releaseFocus`) instead of it
+        // being cleared. `clearFocus` also drops the window's view focus, and after a key (Back,
+        // or TalkBack's Back) the window gives it straight back: an input-focus event TalkBack
+        // follows to the screen's first element ("Open sessions"). VoiceOver stays on the text
+        // view as UIKit resigns it (iOS `dismissKeyboard`, ComposerTextInput.swift:802-805). The
+        // field still loses its focus: the caret goes and `onFocusedChange(false)` reaches the host.
+        if (drawerHold?.releaseFocus() != true) dismissKeyboard()
     }
 
     // The caret's drop handle, the selection handles and the text toolbar are popup windows over

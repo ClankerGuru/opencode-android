@@ -137,6 +137,9 @@ private data class AccessibilityFocusRequestElement(val request: AccessibilityFo
     override fun update(node: AccessibilityFocusRequestNode) = node.update(request)
 }
 
+/** How long a refused move keeps trying (see [AccessibilityFocusRequestNode]). */
+private const val RETRY_NANOS = 1_000_000_000L
+
 private class AccessibilityFocusRequestNode(private var request: AccessibilityFocusRequest?) :
     Modifier.Node(), SemanticsModifierNode, CompositionLocalConsumerModifierNode {
     private var pending: Job? = null
@@ -172,7 +175,13 @@ private class AccessibilityFocusRequestNode(private var request: AccessibilityFo
             }
             if (event.isSpent) return@launch
             event.isSpent = true
-            moveAccessibilityFocus()
+            // Not in the accessibility tree yet (still transparent as it fades in, as Catch Up's
+            // chrome is for its first frames): the move is refused, so it tries again each frame
+            // for a moment.
+            val deadline = withFrameNanos { it } + RETRY_NANOS
+            while (!moveAccessibilityFocus()) {
+                if (withFrameNanos { it } > deadline) return@launch
+            }
         }
     }
 

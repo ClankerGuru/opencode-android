@@ -611,6 +611,7 @@ fun SessionDrawerContainer(
         controller.isContentPushed = { pushed }
         // Nothing focused, nothing to take: a clear would only drop and regain the view's focus.
         controller.clearFocus = { if (holdsFocus && !focusSink.requestFocus()) focusManager.clearFocus(force = true) }
+        keyboardHold.focusRelease = { focusSink.requestFocus() }
         controller.cardLayer = cardLayer
         controller.chromeLayer = chromeLayer
         controller.onArrived = onArrived
