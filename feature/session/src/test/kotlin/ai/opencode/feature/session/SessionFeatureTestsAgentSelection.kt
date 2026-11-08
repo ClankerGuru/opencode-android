@@ -404,6 +404,10 @@ class AgentSelectionComposerTests {
             } finally {
                 activity.pause().stop().destroy()
                 store.close()
+                // Drain the composition's teardown from the process-wide `AndroidUiDispatcher.Main`:
+                // Robolectric drops the main looper's messages between tests, which would strand its
+                // scheduled dispatch and stall the next test's effects.
+                shadowOf(Looper.getMainLooper()).idle()
             }
         }
     }
