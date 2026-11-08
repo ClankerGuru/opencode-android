@@ -974,7 +974,7 @@ private fun MoveToBackgroundAction(activity: WorkingActivity, onMove: () -> Unit
                 .clickable(
                     role = Role.Button,
                     // iOS `accessibilityHint`: TalkBack's click label.
-                    onClickLabel = "Keeps the running work going in the background so the agent reads your next message",
+                    onClickLabel = "Keep the running work going in the background so the agent reads your next message",
                     onClick = onMove,
                 )
                 .semantics { contentDescription = "Move to Background" }

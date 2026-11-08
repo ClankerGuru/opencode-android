@@ -111,11 +111,8 @@ fun AppearanceSettingsView(store: SettingsStore) {
             }
         }
         settingsSection(key = "theme", header = "Theme") {
+            // The clickable row merges its texts: "Theme", then the theme (iOS's label and value).
             SettingsRowFrame(
-                Modifier.semantics(mergeDescendants = true) {
-                    contentDescription = "Theme"
-                    stateDescription = appTheme.title
-                },
                 onClick = { store.send(SettingsFeature.Action.PagePushed(SettingsPage.Themes)) },
             ) {
                 val swatch = @Composable {
@@ -297,11 +294,9 @@ private fun ThemeOptionRow(
     onClick: () -> Unit,
 ) {
     val variant = definition.variant(isDark)
+    // The clickable row merges its title: the theme's name once (iOS's label), then selected.
     SettingsRowFrame(
-        Modifier.semantics(mergeDescendants = true) {
-            contentDescription = theme.title
-            selected = isSelected
-        },
+        Modifier.semantics { selected = isSelected },
         onClick = onClick,
         role = Role.RadioButton,
     ) {

@@ -251,7 +251,7 @@ fun DraftProjectList(
                             chosen = rowIsChosen,
                             ownHighlight = reducedMotion,
                             iconWidth = iconWidth,
-                            hint = if (isComposing) "Chooses where the session starts" else null,
+                            hint = if (isComposing) "Choose where the session starts" else null,
                             onClick = { if (isComposing) onAll() else onPick(project) },
                             tag = "draft-project-row",
                             takesTouches = !hidden,
@@ -309,7 +309,7 @@ private fun DraftProjectRow(
             .then(if (takesTouches) Modifier.clickable(role = Role.Button, onClickLabel = hint, onClick = onClick) else Modifier)
             .padding(start = 17.dp, end = 16.dp)
             .testTag(tag)
-            .semantics(mergeDescendants = true) {
+            .clearAndSetSemantics {
                 selected = chosen
                 contentDescription = title
             },

@@ -75,6 +75,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -203,7 +204,7 @@ private fun ConnectionCardContent(
                     contentDescription = monitor.name
                     stateDescription = accessibilityValue
                     role = Role.Button
-                    onClick(label = "Shows the server") { onOpen(); true }
+                    onClick(label = "Show the server") { onOpen(); true }
                 },
         ) {
             ConnectionScopeView(
@@ -588,17 +589,16 @@ fun ServerPage(store: SettingsStore) {
                     contentDescription = "Address"
                     stateDescription = monitor.server.host
                 }) {
-                    Text("Address", style = SettingsText.title, color = OpenCodeTheme.colors.text)
-                    SelectionContainer(Modifier.weight(1f)) {
-                        Text(
-                            monitor.server.host,
-                            style = SettingsText.title.copy(fontFamily = FontFamily.Monospace),
-                            color = OpenCodeTheme.colors.secondaryText,
-                            maxLines = 1,
-                            overflow = TextOverflow.MiddleEllipsis,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
+                    LabeledContent("Address", Modifier.weight(1f)) {
+                        SelectionContainer {
+                            Text(
+                                monitor.server.host,
+                                style = SettingsText.title.copy(fontFamily = FontFamily.Monospace),
+                                color = OpenCodeTheme.colors.secondaryText,
+                                maxLines = 1,
+                                overflow = TextOverflow.MiddleEllipsis,
+                            )
+                        }
                     }
                 }
                 SettingsDivider()
@@ -682,22 +682,71 @@ private fun StatusRow(presentation: ConnectionStatusPresentation) {
         contentDescription = "Status"
         stateDescription = presentation.spokenStatus
     }) {
-        Text("Status", style = SettingsText.title, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            OpenCodeIcon(presentation.symbol, contentDescription = null, size = 18.dp, tint = color)
-            val body = SettingsText.title.copy(fontFeatureSettings = "tnum")
-            val milliseconds = presentation.milliseconds
-            if (milliseconds != null) {
-                RollingNumber(
-                    text = "${presentation.word} · $milliseconds ms",
-                    style = body,
-                    color = color,
-                    motion = millisecondsRoll,
-                    alignment = RollingNumberAlignment.End,
-                )
-            } else {
-                Text(presentation.text, style = body, color = color, maxLines = 1)
+        LabeledContent("Status", Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                OpenCodeIcon(presentation.symbol, contentDescription = null, size = 18.dp, tint = color)
+                val body = SettingsText.title.copy(fontFeatureSettings = "tnum")
+                val milliseconds = presentation.milliseconds
+                if (milliseconds != null) {
+                    RollingNumber(
+                        text = "${presentation.word} · $milliseconds ms",
+                        style = body,
+                        color = color,
+                        motion = millisecondsRoll,
+                        alignment = RollingNumberAlignment.End,
+                    )
+                } else {
+                    Text(presentation.text, style = body, color = color, maxLines = 1)
+                }
             }
         }
     }
+}
+
+/**
+ * iOS `LabeledContent` in a list: the label leading and the value trailing on one line when both
+ * fit at their full widths; otherwise the value stacks under the label, leading, so the label
+ * never breaks inside a word (QA D-01). Once stacked it stays stacked while shown at that width
+ * and text size, so a value that changes width (Status's round trip, 9 ↔ 10 ms) can't flip the
+ * row and move every row below it (QA H-02).
+ */
+@Composable
+private fun LabeledContent(label: String, modifier: Modifier = Modifier, value: @Composable () -> Unit) {
+    val stacked = remember(LocalDensity.current) { StackedWidth() }
+    Layout(
+        content = {
+            Text(label, style = SettingsText.title, color = OpenCodeTheme.colors.text)
+            Box { value() }
+        },
+        modifier = modifier,
+    ) { measurables, constraints ->
+        val (labelPart, valuePart) = measurables
+        val width = constraints.maxWidth
+        val spacing = 16.dp.roundToPx()
+        // Each measured once, at the full width: what fits beside the other keeps its natural width.
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val labelPlaced = labelPart.measure(loose)
+        val valuePlaced = valuePart.measure(loose)
+        val stacks = stacked.width == width || labelPlaced.width + spacing + valuePlaced.width > width
+        if (stacks) stacked.width = width
+        if (!stacks) {
+            val height = maxOf(labelPlaced.height, valuePlaced.height).coerceAtLeast(constraints.minHeight)
+            layout(width, height) {
+                labelPlaced.placeRelative(0, (height - labelPlaced.height) / 2)
+                valuePlaced.placeRelative(width - valuePlaced.width, (height - valuePlaced.height) / 2)
+            }
+        } else {
+            val gap = 2.dp.roundToPx()
+            val height = (labelPlaced.height + gap + valuePlaced.height).coerceAtLeast(constraints.minHeight)
+            layout(width, height) {
+                labelPlaced.placeRelative(0, 0)
+                valuePlaced.placeRelative(0, labelPlaced.height + gap)
+            }
+        }
+    }
+}
+
+/** The width a [LabeledContent] row stacked at; read and written only while it measures. */
+private class StackedWidth {
+    var width = -1
 }
