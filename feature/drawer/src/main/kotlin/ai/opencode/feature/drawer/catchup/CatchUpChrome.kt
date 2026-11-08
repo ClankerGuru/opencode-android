@@ -48,10 +48,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -107,17 +105,8 @@ fun CatchUpChrome(
                     modifier = Modifier
                         .graphicsLayer { alpha = 1f - finishedProgress }
                         .then(
-                            if (finished) {
-                                Modifier.clearAndSetSemantics {}
-                            } else {
-                                Modifier.semantics {
-                                    heading()
-                                    // TalkBack reads each new count as a card goes or comes back, so Keep
-                                    // Unread, Mark as Read and Undo answer; the focus stays on the button
-                                    // pressed, as VoiceOver's does.
-                                    liveRegion = LiveRegionMode.Polite
-                                }
-                            },
+                            if (finished) Modifier.clearAndSetSemantics {}
+                            else Modifier.semantics { heading() },
                         ),
                 )
                 Row(
