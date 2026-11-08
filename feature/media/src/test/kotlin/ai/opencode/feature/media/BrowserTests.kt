@@ -466,6 +466,34 @@ class LinkMenuTests {
         assertEquals(MAX_CUSTOM_ACCESSIBILITY_ACTIONS, guarded.size)
         assertEquals("Action 0", guarded.first().label)
     }
+
+    /** Android-only (F-73): TalkBack shows one of several actions with the same label, so links sharing a host need their own names. */
+    @Test
+    fun linksOnOneHostGetDistinctActionNames() {
+        val links = List(7) { "https://example.net/n-${it + 1}" }
+        // As a bare URL renders: the icon slot's word joiner, then the address without its scheme.
+        val shown = links.associateWith { "\u2060" + it.removePrefix("https://") }
+        val labels = links.flatMap { url ->
+            LinkMenuAction.actions(url, ExperimentalFeatures.testValue).map { LinkMenuText.accessibilityName(it, url, links, shown::get) }
+        }
+        assertEquals(28, labels.size)
+        assertEquals(28, labels.toSet().size)
+        assertEquals("Open example.net/n-4 in Browser", labels[12])
+        assertEquals("example.net/n-9", LinkMenuText.chooserTitle("https://example.net/n-9", links + "https://example.net/n-9"))
+
+        // A link's own text names it; the same text twice falls back to the path, then to its place.
+        val docs = "https://example.com/docs"
+        val api = "https://example.com/api"
+        val other = "https://x.com/post"
+        val texts = mapOf(docs to "docs", api to "API", other to "post")
+        assertEquals("Copy Link to docs on example.com", LinkMenuText.accessibilityName(LinkMenuAction.Copy, docs, listOf(docs, api, other), texts::get))
+        assertEquals("Copy Link to x.com", LinkMenuText.accessibilityName(LinkMenuAction.Copy, other, listOf(docs, api, other), texts::get))
+        val here = mapOf(docs to "here", api to "here")
+        assertEquals("example.com/api", LinkMenuText.accessibilityTarget(api, listOf(docs, api), here::get))
+        val root = "https://example.com"
+        val rootSlash = "https://example.com/"
+        assertEquals("example.com link 2", LinkMenuText.accessibilityTarget(rootSlash, listOf(root, rootSlash)))
+    }
 }
 
 /**

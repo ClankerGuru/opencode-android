@@ -312,8 +312,17 @@ object LinkMenuText {
             ?: BrowserLinkPolicy.displayHost(url)
             ?: url
 
-    /** One link: the menu's own titles. Several: each names its host. */
-    fun accessibilityName(action: LinkMenuAction, url: String, among: List<String>): String {
+    /**
+     * One link: the menu's own titles. Several: each names its host, and a host that several
+     * links share also names what tells each apart ([accessibilityTarget]). [linkText] is a link's
+     * own text in the reply.
+     */
+    fun accessibilityName(
+        action: LinkMenuAction,
+        url: String,
+        among: List<String>,
+        linkText: (String) -> String? = { null },
+    ): String {
         val id = SessionLink.id(url)
         if (id != null) {
             val name = SessionLink.title(url) ?: SessionLink.shortID(id)
@@ -323,7 +332,7 @@ object LinkMenuText {
             }
         }
         if (among.size <= 1) return action.title.replace("…", "")
-        val host = displayHost(url)
+        val host = accessibilityTarget(url, among, linkText)
         return when (action) {
             LinkMenuAction.OpenInAppBrowser -> "Open $host in App Browser"
             LinkMenuAction.OpenInSafari -> "Open $host in Browser"
@@ -333,6 +342,38 @@ object LinkMenuText {
             LinkMenuAction.OpenSession, LinkMenuAction.CopySessionID -> action.title
         }
     }
+
+    /**
+     * What names a web link among the text's links: its host (as iOS), or, when another link has
+     * the same host, also what tells it apart: its own text if that isn't its address (“docs on
+     * example.com”), else its path (“example.net/n-3”), else its place (“example.net link 3”).
+     * Android-only: TalkBack shows one of several actions with the same label, VoiceOver all.
+     */
+    fun accessibilityTarget(url: String, among: List<String>, linkText: (String) -> String? = { null }): String {
+        val host = displayHost(url)
+        if (SessionLink.id(url) != null) return host
+        val sameHost = among.filter { SessionLink.id(it) == null && displayHost(it) == host }
+        if (sameHost.size <= 1) return host
+        fun ownText(link: String): String? {
+            val text = linkText(link)?.filterNot { it in invisibleLinkChars }?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+            // A bare URL shows its own address (scheme dropped, maybe shortened): that names nothing new.
+            val bare = text.lowercase().removePrefix("https://").removePrefix("http://").removePrefix("www.")
+            return text.takeUnless { bare.startsWith(host.lowercase().removePrefix("www.")) }
+        }
+        ownText(url)?.let { text -> if (sameHost.count { ownText(it) == text } == 1) return "$text on $host" }
+        path(url)?.let { path -> if (sameHost.count { path(it) == path } == 1) return "$host$path" }
+        return "$host link ${among.indexOf(url) + 1}"
+    }
+
+    /** [url]'s path and query, without a trailing slash; null when it has none. */
+    private fun path(url: String): String? {
+        val rest = url.substringAfter("://", "").substringBefore('#')
+        val slash = rest.indexOfAny(charArrayOf('/', '?')).takeIf { it >= 0 } ?: return null
+        return rest.substring(slash).trimEnd('/').takeIf { it.isNotEmpty() }
+    }
+
+    /** The word joiner and object placeholders a link's inline icon slot adds to its text. */
+    private val invisibleLinkChars = setOf('\u2060', '\uFFFC', '\uFFFD', '\u200B')
 
     /** TalkBack's name for the action that lists the links whose actions don't fit on the text. */
     const val moreLinks = "More Links"
@@ -364,10 +405,21 @@ object LinkMenuText {
         return AccessibilityActions(kept, perLink.drop(cut).map { it.first })
     }
 
-    /** A link's row in the More Links chooser: a session's name, or the address. */
-    fun chooserTitle(url: String): String {
-        val id = SessionLink.id(url) ?: return url
+    /** A link's row in the More Links chooser: a session's name, or the link named as its actions name it. */
+    fun chooserTitle(url: String, among: List<String>, linkText: (String) -> String? = { null }): String {
+        val id = SessionLink.id(url) ?: return accessibilityTarget(url, among, linkText)
         return SessionLink.title(url) ?: SessionLink.shortID(id)
+    }
+
+    /** Each link's own text in [text], by URL (its first run). */
+    fun linkTexts(text: AnnotatedString, ranges: List<Pair<IntRange, String>> = linkRanges(text)): Map<String, String> {
+        val texts = LinkedHashMap<String, String>()
+        for ((range, url) in ranges) {
+            if (url in texts) continue
+            val end = (range.last + 1).coerceAtMost(text.length)
+            if (range.first in 0 until end) texts[url] = text.text.substring(range.first, end)
+        }
+        return texts
     }
 
     /**
@@ -493,6 +545,7 @@ fun LinkMenu(
     val ranges = remember(text) { LinkMenuText.linkRanges(text) }
     val webRanges = remember(ranges) { ranges.filter { LinkMenuAction.offers(it.second) } }
     val links = remember(webRanges) { webRanges.map { it.second }.distinct() }
+    val linkTexts = remember(text, webRanges) { LinkMenuText.linkTexts(text, webRanges) }
     if (handler == null || links.isEmpty()) {
         Box(modifier) { content() }
         return
@@ -518,7 +571,7 @@ fun LinkMenu(
                 customActions = buildList {
                     for ((action, url) in plan.actions) {
                         add(
-                            CustomAccessibilityAction(LinkMenuText.accessibilityName(action, url, links)) {
+                            CustomAccessibilityAction(LinkMenuText.accessibilityName(action, url, links, linkTexts::get)) {
                                 handler.perform(action, url)
                                 true
                             },
@@ -597,7 +650,7 @@ fun LinkMenu(
             DropdownMenu(expanded = true, onDismissRequest = { chooser = null }) {
                 for (url in more) {
                     DropdownMenuItem(
-                        text = { Text(LinkMenuText.chooserTitle(url), maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                        text = { Text(LinkMenuText.chooserTitle(url, links, linkTexts::get), maxLines = 2, overflow = TextOverflow.Ellipsis) },
                         leadingIcon = {
                             OpenCodeIcon(if (SessionLink.id(url) == null) "globe" else "bubble.left.and.text.bubble.right", contentDescription = null)
                         },
