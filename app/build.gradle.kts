@@ -49,6 +49,11 @@ android {
     buildFeatures {
         buildConfig = true
     }
+    // The app is English only, as iOS's bundle: keep library (Material, AndroidX) translations
+    // out so their labels, e.g. a sheet's "Drag handle", read in English beside the app's own.
+    androidResources {
+        localeFilters += "en"
+    }
 }
 
 dependencies {
