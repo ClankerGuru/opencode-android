@@ -236,6 +236,7 @@ fun SessionTranscriptView(
     DisposableEffect(host) {
         onDispose {
             host?.showsJumpButton = false
+            host?.veilsJumpButton = false
             scrollEdgeBridge.reportedShowsJumpButton = false
         }
     }
@@ -265,6 +266,7 @@ fun SessionTranscriptView(
             layoutTuning = TranscriptTunables.layoutSnapshot(),
             onScrolledUnderHeader = { scrollEdgeBridge.scrolled(underHeader = it, revealDistance = top.revealDistance) },
             borrowedDrag = scrollEdgeBridge.borrowedDrag,
+            onHidesChanged = { host?.veilsJumpButton = it },
         )
     }
 

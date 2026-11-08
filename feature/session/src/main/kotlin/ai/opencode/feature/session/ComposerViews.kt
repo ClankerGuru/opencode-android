@@ -704,6 +704,7 @@ fun ComposerPillContent(title: String, rolls: Boolean = false, leading: @Composa
  * iOS `JumpToLatestPill`: scales and fades in and out on a spring, retargeting mid-flight; it
  * leaves the tree (and TalkBack) once its outro settles. In a pill row beside the queued pill its
  * slot (the gap before it included) opens and closes on the same spring. Reduce Motion cross-fades.
+ * While [veiled] (read when drawn) it keeps its state but isn't drawn, touched or read out (AI-01).
  */
 @Composable
 fun JumpToLatestPill(
@@ -711,6 +712,7 @@ fun JumpToLatestPill(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     collapsesSlot: Boolean = false,
+    veiled: () -> Boolean = { false },
 ) {
     val reduceMotion = rememberReduceMotion()
     val presence = remember { Animatable(if (isShown) 1f else 0f) }
@@ -754,11 +756,12 @@ fun JumpToLatestPill(
                 val p = presence.value
                 Box(
                     Modifier
+                        .graphicsLayer { if (veiled()) alpha = 0f }
                         .scale(if (reduceMotion) 1f else 0.5f + 0.5f * p)
                         .alpha(p.coerceIn(0f, 1f))
                         .coveredByBackgroundWork()
                         .then(
-                            if (isShown) {
+                            if (isShown && !veiled()) {
                                 Modifier
                                     .clickable(interactionSource = interactions, indication = null, role = Role.Button, onClick = onClick)
                                     .semantics { contentDescription = "Scroll to latest" }

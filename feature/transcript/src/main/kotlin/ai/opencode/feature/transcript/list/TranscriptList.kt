@@ -166,8 +166,6 @@ private fun ReplySelectionBackHandler(selection: TranscriptReplySelection) {
 private class RestoreHide {
     var decide = true
     var hides by mutableStateOf(false)
-    /** The jump button the list last asked for, shown once it stops hiding. */
-    var jump = false
 }
 
 /** Longest a restoring list stays invisible waiting for its row's page; then it shows where it is and still goes back to the row when it lands. */
@@ -203,7 +201,9 @@ class TranscriptSlots(
  * is there, browsing otherwise. [contentPadding] is the header above and the composer's own
  * obstruction below (iOS `contentInset`); the keyboard is the session's `imePadding`.
  * [jumpRequest] increments when the reader taps Jump to latest; [onShowsJumpButtonChanged]
- * reports the behavior's button visibility.
+ * reports the behavior's button visibility. [onHidesChanged] reports the list staying invisible
+ * while a row saved across process death loads (V-01): the button keeps its state meanwhile and
+ * should be drawn only once the rows are (AI-01).
  */
 @Composable
 fun TranscriptList(
@@ -217,10 +217,11 @@ fun TranscriptList(
     layoutTuning: TranscriptLayoutTuning = LocalTranscriptLayoutTuning.current,
     onScrolledUnderHeader: (Float) -> Unit = {},
     borrowedDrag: TranscriptBorrowedDrag? = null,
+    onHidesChanged: (Boolean) -> Unit = {},
 ) {
     // A new session is a new list (iOS resets the controller; the draft becoming its session keeps it).
     key(configuration.sessionID ?: "draft", configuration.historyGeneration) {
-        TranscriptListContent(configuration, send, modifier, contentPadding, jumpRequest, onShowsJumpButtonChanged, slots, layoutTuning, onScrolledUnderHeader, borrowedDrag)
+        TranscriptListContent(configuration, send, modifier, contentPadding, jumpRequest, onShowsJumpButtonChanged, slots, layoutTuning, onScrolledUnderHeader, borrowedDrag, onHidesChanged)
     }
 }
 
@@ -237,6 +238,7 @@ private fun TranscriptListContent(
     layoutTuning: TranscriptLayoutTuning,
     onScrolledUnderHeader: (Float) -> Unit,
     borrowedDrag: TranscriptBorrowedDrag?,
+    onHidesChanged: (Boolean) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val initialIndex = remember { (configuration.entries.size + configuration.queuedInputs.size + 2).coerceAtLeast(0) }
@@ -255,6 +257,7 @@ private fun TranscriptListContent(
     val reduceMotion = rememberReduceMotion()
     val currentSend by rememberUpdatedState(send)
     val currentShowsJump by rememberUpdatedState(onShowsJumpButtonChanged)
+    val currentHidesChanged by rememberUpdatedState(onHidesChanged)
 
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val resumed by lifecycle.currentStateFlow.collectAsState()
@@ -264,14 +267,12 @@ private fun TranscriptListContent(
     // loading) would see the list clamped at the end and then jump. It stays invisible until the
     // row is put back, the restore ends, or RESTORE_HIDE_LIMIT_MS passes; header and composer show.
     val restoreHide = remember { RestoreHide() }
-    controller.setShowsJumpButton = { restoreHide.jump = it; currentShowsJump(it && !restoreHide.hides) }
+    // While it hides, the jump button's changes still go out, and the screen draws the button only
+    // with the rows ([onHidesChanged]), so it's at rest on the frame the list shows (AI-01).
+    controller.setShowsJumpButton = { currentShowsJump(it) }
     // The screen may start the pill as it last was (F-38); once laid out, this list says what its
-    // own restored state shows, so the two can't disagree. A list hiding for V-01 holds it back
-    // until it shows, as for any other jump-button change.
-    LaunchedEffect(controller) {
-        restoreHide.jump = behavior.showsJumpButton
-        currentShowsJump(behavior.showsJumpButton && !restoreHide.hides)
-    }
+    // own restored state shows, so the two can't disagree.
+    LaunchedEffect(controller) { currentShowsJump(behavior.showsJumpButton) }
     controller.density = density.density
     controller.frameDuration = ai.opencode.core.motion.rememberFrameDurationSeconds()
     controller.reduceMotion = reduceMotion
@@ -295,11 +296,12 @@ private fun TranscriptListContent(
         val key = position.anchor?.first
         restoreHide.hides = key != null && behavior.mode == TranscriptScrollBehavior.Mode.Browsing &&
             controller.snapshot.items.none { it.key == key }
+        if (restoreHide.hides) currentHidesChanged(true)
     }
     val endRestoreHide = {
         if (restoreHide.hides) {
             restoreHide.hides = false
-            currentShowsJump(restoreHide.jump)
+            currentHidesChanged(false)
         }
     }
     controller.obstructionChanged(contentPadding.calculateBottomPadding().value, WindowInsets.ime.inContainer().getBottom(density) / density.density)
