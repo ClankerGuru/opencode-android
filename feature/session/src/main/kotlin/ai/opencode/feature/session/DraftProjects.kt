@@ -244,7 +244,7 @@ fun DraftProjectList(
             shown.forEachIndexed { index, project ->
                 val rowIsChosen = index == chosenIndex
                 if (!onlyKept || index == kept) {
-                    DraftProjectFade(isHidden = isComposing && index != kept, reducedMotion = reducedMotion) {
+                    DraftProjectFade(isHidden = isComposing && index != kept, reducedMotion = reducedMotion) { hidden ->
                         DraftProjectRow(
                             title = project.name,
                             symbol = if (rowIsChosen) SFSymbol.FolderFill else SFSymbol.Folder,
@@ -254,6 +254,7 @@ fun DraftProjectList(
                             hint = if (isComposing) "Chooses where the session starts" else null,
                             onClick = { if (isComposing) onAll() else onPick(project) },
                             tag = "draft-project-row",
+                            takesTouches = !hidden,
                         )
                     }
                 } else {
@@ -261,7 +262,7 @@ fun DraftProjectList(
                 }
             }
             if (!onlyKept || kept == shown.size) {
-                DraftProjectFade(isHidden = isComposing && kept != shown.size, reducedMotion = reducedMotion) {
+                DraftProjectFade(isHidden = isComposing && kept != shown.size, reducedMotion = reducedMotion) { hidden ->
                     DraftProjectRow(
                         title = if (shown.isEmpty()) "Choose Folder…" else "All Projects",
                         symbol = if (shown.isEmpty()) SFSymbol.FolderBadgePlus else SFSymbol.Magnifyingglass,
@@ -271,6 +272,7 @@ fun DraftProjectList(
                         hint = null,
                         onClick = onAll,
                         tag = "draft-projects-all",
+                        takesTouches = !hidden,
                     )
                 }
             } else {
@@ -284,7 +286,17 @@ private fun isChosen(project: OpenCodeProject, chosen: OpenCodeProject?): Boolea
     chosen != null && (project.id == chosen.id || project.directory == chosen.directory)
 
 @Composable
-private fun DraftProjectRow(title: String, symbol: SFSymbol, chosen: Boolean, ownHighlight: Boolean, iconWidth: androidx.compose.ui.unit.Dp, hint: String?, onClick: () -> Unit, tag: String) {
+private fun DraftProjectRow(
+    title: String,
+    symbol: SFSymbol,
+    chosen: Boolean,
+    ownHighlight: Boolean,
+    iconWidth: androidx.compose.ui.unit.Dp,
+    hint: String?,
+    onClick: () -> Unit,
+    tag: String,
+    takesTouches: Boolean,
+) {
     // Reduce Motion: the row's own highlight cross-fades in place (iOS easeInOut reducedFade).
     val highlight by animateFloatAsState(if (chosen && ownHighlight) 1f else 0f, Motion.easeInOut(ProjectPickerTunables.reducedFade), label = "draftProjectHighlight")
     Row(
@@ -292,7 +304,9 @@ private fun DraftProjectRow(title: String, symbol: SFSymbol, chosen: Boolean, ow
             .fillMaxWidth()
             .heightIn(min = 48.dp)
             .background(OpenCodeTheme.colors.text.copy(alpha = 0.06f * highlight), RoundedCornerShape(50))
-            .clickable(role = Role.Button, onClickLabel = hint, onClick = onClick)
+            // A hidden row has no pointer node at all: a disabled one would still be hit and end
+            // the search, eating taps meant for the chosen row folded under it.
+            .then(if (takesTouches) Modifier.clickable(role = Role.Button, onClickLabel = hint, onClick = onClick) else Modifier)
             .padding(start = 17.dp, end = 16.dp)
             .testTag(tag)
             .semantics(mergeDescendants = true) {
@@ -317,11 +331,12 @@ private fun DraftProjectRow(title: String, symbol: SFSymbol, chosen: Boolean, ow
 
 /**
  * A row folded away: it fades and blurs out where it is, quickly, so it's gone before the chosen
- * row glides past; unfolding, it comes back just behind. Hidden rows take no touches and leave
- * TalkBack.
+ * row glides past; unfolding, it comes back just behind. Hidden rows leave TalkBack, and [content]
+ * gets `hidden` to drop its touch handling (iOS `.allowsHitTesting(!isHidden)`): taps pass
+ * through to the chosen row, which sits in the last row's slot when folded.
  */
 @Composable
-private fun DraftProjectFade(isHidden: Boolean, reducedMotion: Boolean, content: @Composable () -> Unit) {
+private fun DraftProjectFade(isHidden: Boolean, reducedMotion: Boolean, content: @Composable (hidden: Boolean) -> Unit) {
     val alpha by animateFloatAsState(
         targetValue = if (isHidden) 0f else 1f,
         animationSpec = if (isHidden) Motion.easeOut(0.16) else Motion.easeOut(0.26, delaySeconds = 0.08),
@@ -334,11 +349,7 @@ private fun DraftProjectFade(isHidden: Boolean, reducedMotion: Boolean, content:
             .transitionBlur(blur.dp)
             .then(if (isHidden) Modifier.clearAndSetSemantics { hideFromAccessibility() } else Modifier),
     ) {
-        content()
-        if (isHidden) {
-            // Hidden rows take no touches.
-            Box(Modifier.matchParentSize().clickable(enabled = false) {})
-        }
+        content(isHidden)
     }
 }
 

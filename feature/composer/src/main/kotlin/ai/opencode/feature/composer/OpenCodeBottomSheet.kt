@@ -60,17 +60,39 @@ fun OpenCodeSheetHost(content: @Composable () -> Unit) {
         if (covered) focusManager.clearFocus()
         onDispose { if (saved) focus.restoreFocusedChild() }
     }
+    val ime = WindowInsets.ime
+    val coveredIme = remember(covered, ime) { if (covered) KeyboardLeavingInsets(ime) else null }
     Box(Modifier.fillMaxSize()) {
         Box(
             Modifier.fillMaxSize().focusRequester(focus)
                 .focusProperties { onEnter = { if (covered) cancelFocusChange() } }.focusGroup()
-                .then(if (covered) Modifier.clearAndSetSemantics { }.consumeWindowInsets(WindowInsets.ime) else Modifier),
+                .then(if (coveredIme != null) Modifier.clearAndSetSemantics { }.consumeWindowInsets(coveredIme) else Modifier),
         ) {
             CompositionLocalProvider(LocalSheetPresentations provides presentations, content = content)
         }
         presentations.forEach { presentation ->
             androidx.compose.runtime.key(presentation) { presentation.content() }
         }
+    }
+}
+
+/**
+ * What a covered screen doesn't see of [ime]: the keys above the lowest they've been since the
+ * sheet came up. A keyboard leaving as the sheet opens is still seen to its end, so a composer
+ * docked on it rides down with it (iOS: the keyboard and the composer leave together, the sheet
+ * rises over them) instead of dropping behind the keys at once; a keyboard the sheet's own field
+ * raises is never seen, as a Dialog's window wouldn't let it be.
+ */
+private class KeyboardLeavingInsets(private val ime: WindowInsets) : WindowInsets {
+    private var lowest = Int.MAX_VALUE
+
+    override fun getLeft(density: Density, layoutDirection: LayoutDirection) = 0
+    override fun getTop(density: Density) = 0
+    override fun getRight(density: Density, layoutDirection: LayoutDirection) = 0
+    override fun getBottom(density: Density): Int {
+        val bottom = ime.getBottom(density)
+        if (bottom < lowest) lowest = bottom
+        return bottom - lowest
     }
 }
 

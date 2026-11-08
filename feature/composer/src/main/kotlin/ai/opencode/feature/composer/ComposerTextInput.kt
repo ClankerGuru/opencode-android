@@ -21,9 +21,12 @@ import androidx.compose.foundation.content.hasMediaType
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.DragInteraction
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
@@ -79,6 +82,7 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextLayoutResult
@@ -88,6 +92,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.android.awaitFrame
@@ -541,7 +547,7 @@ private class ComposerFieldSwipeInput : ComposerSwipeInput {
  * the parent's draft as it is now (a composition's [text] can lag the reader's edit), and a new
  * [focusRequest] places the caret at the end ([ComposerTextInputController.syncText]).
  */
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun ComposerTextInput(
     text: String,
@@ -746,6 +752,22 @@ fun ComposerTextInput(
     fun dismissKeyboard() {
         currentOnDismissKeyboard?.invoke()
         if (hasFocus) focusManager.clearFocus()
+    }
+
+    // On iOS the keyboard only leaves as the field resigns, so a hidden keyboard is an unfocused
+    // composer. Android's Back hides the IME and leaves the field focused (caret showing, row
+    // open, a draft's projects folded): the keys leaving on their own take the focus with them.
+    // Not while the drawer holds them down, or when another window or the background took them.
+    val imeVisible = WindowInsets.isImeVisible
+    val windowInfo = LocalWindowInfo.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var imeWasVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(imeVisible) {
+        val left = imeWasVisible && !imeVisible
+        imeWasVisible = imeVisible
+        if (!left || !hasFocus || drawerHold?.isHeld(fieldKey) == true || isKeyboardHeld) return@LaunchedEffect
+        if (!windowInfo.isWindowFocused || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return@LaunchedEffect
+        dismissKeyboard()
     }
 
     fun focusKeyboard() {
