@@ -1,10 +1,12 @@
 package ai.opencode.feature.system.share
 
+import ai.opencode.feature.system.LeftToRight
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.ui.OpenCodeAppTheme
 import ai.opencode.feature.system.intents.SystemActionActivity
 import android.app.Application
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -39,6 +41,11 @@ import kotlinx.coroutines.withTimeoutOrNull
  */
 class ShareActivity : ComponentActivity() {
     private val holder: ShareHolder by viewModels()
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(newBase)
+        applyOverrideConfiguration(LeftToRight.configuration())
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
