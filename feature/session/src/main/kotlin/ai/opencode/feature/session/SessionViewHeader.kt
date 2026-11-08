@@ -17,8 +17,10 @@ import ai.opencode.core.ui.OpenCodeIconButtonStyle
 import ai.opencode.core.ui.OpenCodeIconSize
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.accessibilityFocusRequest
 import ai.opencode.core.ui.accessibilityFocusTarget
 import ai.opencode.core.ui.openCodeTapTarget
+import ai.opencode.core.ui.rememberAccessibilityFocusRequest
 import ai.opencode.feature.composer.EscapeHandler
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
@@ -317,12 +319,27 @@ private fun HeaderTitle(
     val project = listContext.project?.name ?: model.draftProjectName
     val projectColor = headerProjectColor(OpenCodeTheme.colors)
     val fontScale = LocalDensity.current.fontScale
+    // TalkBack goes back to the title once Session Info, opened from it, closes, as VoiceOver
+    // returns to the button that presented the sheet; with the keyboard up it landed on the
+    // drawer button (QA F-57).
+    var returnsFocusAfterInfo by remember { mutableStateOf(false) }
+    var infoCloses by remember { mutableIntStateOf(0) }
+    val showsInfo by store.observe { it.activePicker == State.ActivePicker.session }
+    LaunchedEffect(showsInfo) {
+        if (showsInfo || !returnsFocusAfterInfo) return@LaunchedEffect
+        returnsFocusAfterInfo = false
+        infoCloses++
+    }
+    val infoFocus = rememberAccessibilityFocusRequest(infoCloses.takeIf { it > 0 })
     // Auto Rename's new title waits for the breath to ease back to full; another session switched
     // in place shows its own title at once.
     BreathingTitleHold(identity = model.identity, title = latestTitle, isBreathing = model.isSyncing) { title, animates ->
         val subtitle = if (model.autoRenameFailed) "Couldn’t rename" else project
         val onClick: () -> Unit = onCatchUpOpen
-            ?: { store.send(if (model.isDraft) Action.ProjectButtonTapped else Action.SessionInfoTapped) }
+            ?: {
+                if (!model.isDraft) returnsFocusAfterInfo = true
+                store.send(if (model.isDraft) Action.ProjectButtonTapped else Action.SessionInfoTapped)
+            }
         val hint = when {
             onCatchUpOpen != null -> "Open the session and leave Catch Up"
             model.isDraft -> if (model.canChooseProject) "Choose where the session starts" else null
@@ -347,6 +364,8 @@ private fun HeaderTitle(
                 .clickable(role = Role.Button, onClickLabel = hint, onClick = onClick)
                 .openCodeTapTarget()
                 .testTag(if (model.isDraft) "draft-title" else "session-title")
+                // Ahead of the clearing below, which would drop its marker.
+                .accessibilityFocusRequest(infoFocus)
                 .clearAndSetSemantics {
                     contentDescription = listOfNotNull(title, subtitle).joinToString(", ")
                     if (value.isNotEmpty()) stateDescription = value
@@ -419,6 +438,15 @@ private fun SessionMenuButton(store: StoreOf<State, Action>, model: SessionHeade
     var returnsFocusAfterInfo by remember { mutableStateOf(false) }
     val showsInfo by store.observe { it.activePicker == State.ActivePicker.session }
     val more = remember { AccessibilityFocusTarget() }
+    // Likewise once a dialog the menu opened (Rename, Delete) closes, as VoiceOver returns to the
+    // button behind an alert; with the keyboard up it landed on the title (QA F-57).
+    var returnsFocusAfterDialog by remember { mutableStateOf(false) }
+    val showsDialog by store.observe { it.sessionSheet?.let { sheet -> sheet.isRenaming || sheet.confirmsDeletion } == true }
+    LaunchedEffect(showsDialog) {
+        if (showsDialog || !returnsFocusAfterDialog) return@LaunchedEffect
+        returnsFocusAfterDialog = false
+        view.focusSessionMenuButtonForAccessibility(more)
+    }
     LaunchedEffect(showsInfo) {
         if (showsInfo || !returnsFocusAfterInfo) return@LaunchedEffect
         returnsFocusAfterInfo = false
@@ -454,6 +482,10 @@ private fun SessionMenuButton(store: StoreOf<State, Action>, model: SessionHeade
             send = {
                 expanded = false
                 if (it == Action.SessionInfoTapped) returnsFocusAfterInfo = true
+                val opensDialog = (it as? Action.SessionMenu)?.action
+                if (opensDialog is SessionSheetFeature.Action.RenameTapped || opensDialog == SessionSheetFeature.Action.DeleteTapped) {
+                    returnsFocusAfterDialog = true
+                }
                 store.send(it)
             },
         )
