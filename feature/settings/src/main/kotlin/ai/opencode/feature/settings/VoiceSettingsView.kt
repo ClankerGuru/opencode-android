@@ -15,12 +15,12 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.voice.CallVoice
-import ai.opencode.feature.voice.ServerVoiceError
 import ai.opencode.feature.voice.ServerVoiceProvider
 import ai.opencode.feature.voice.VoiceCallLog
 import ai.opencode.feature.voice.VoiceCallLogList
 import ai.opencode.feature.voice.VoiceCallReplayView
 import ai.opencode.feature.voice.VoiceEngine
+import ai.opencode.feature.voice.VoiceProvider
 import ai.opencode.feature.voice.VoiceRoute
 import ai.opencode.feature.voice.VoiceServerChoice
 import ai.opencode.feature.voice.VoiceCallSoundPack
@@ -98,7 +98,6 @@ internal fun rememberVoiceSharedRevision(): Any {
         remember { shared(VoiceSharedKeys.serverVoiceProvider).flow }.collectAsState().value,
         remember { shared(VoiceSharedKeys.serverVoiceSupportByServer).flow }.collectAsState().value,
         remember { shared(VoiceSharedKeys.voiceServerChoice).flow }.collectAsState().value,
-        remember { shared(ExperimentalFeature.serverVoice.key).flow }.collectAsState().value,
         remember { shared(ExperimentalFeature.voiceSessionDelegator.key).flow }.collectAsState().value,
         remember { shared(VoiceSharedKeys.voiceDelegatorChoice).flow }.collectAsState().value,
         remember { shared(VoiceSharedKeys.voiceModelsByServer).flow }.collectAsState().value,
@@ -110,8 +109,8 @@ internal fun rememberVoiceSharedRevision(): Any {
 
 /**
  * Port of iOS `VoiceSettingsView` / `AdvancedSettingsView` (`Settings/SettingsView.swift`):
- * Settings › Voice. 1. Enable Voice; 2. with Server Voice, Voice Server and Voice Provider; Model
- * (provider plus model), that provider's Key row, and Voice; 3. Raise to Talk and Call History.
+ * Settings › Voice. 1. Enable Voice; 2. the Voice Provider row and Model; for Grok, Model (provider
+ * plus model) and its xAI Key row. Then Voice; 3. Raise to Talk and Call History.
  */
 @Composable
 fun VoiceSettingsView(store: SettingsStore) {
@@ -122,7 +121,7 @@ fun VoiceSettingsView(store: SettingsStore) {
     val reduceMotion = rememberReduceMotion()
     val settings = { action: HomeSettingsFeature.Action -> store.send(SettingsFeature.Action.Settings(action)) }
     LaunchedEffect(voice) { voice.send(VoiceSettingsFeature.Action.Task) }
-    // The server that brokers Server Voice calls, asked again when it changes.
+    // The server that brokers calls, asked again when it changes.
     val brokerID = state.broker.server?.persistenceID
     LaunchedEffect(brokerID) {
         if (brokerID != null) settings(HomeSettingsFeature.Action.CheckServerVoiceSupport)
@@ -159,15 +158,7 @@ fun VoiceSettingsView(store: SettingsStore) {
         if (state.voiceModeEnabled) {
             settingsSection(
                 key = "configuration",
-                footer = {
-                    if (state.showsServerUnsupported && !state.showsProviderRow) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            OpenCodeIcon(SFSymbol.InfoCircle, contentDescription = null, size = 16.dp, tint = OpenCodeTheme.colors.secondaryText)
-                            SettingsFooterText(ServerVoiceError.unsupportedServerNotice)
-                        }
-                    }
-                    SettingsFooterText(keySource.footer)
-                },
+                footer = { SettingsFooterText(keySource.footer) },
             ) {
                 var first = true
                 fun divider() = if (first) { first = false; false } else true
@@ -176,16 +167,14 @@ fun VoiceSettingsView(store: SettingsStore) {
                     VoiceProviderSettingsRow(state) { store.send(SettingsFeature.Action.PagePushed(SettingsPage.VoiceProvider())) }
                 }
                 val route = state.route
-                if (route != VoiceRoute.Server(VoiceRoute.ServerRoute.GeminiLive) &&
-                    (state.showsProviderRow || route != VoiceRoute.Unavailable(VoiceRoute.Reason.ServerUnsupported))
-                ) {
+                if (route != VoiceRoute.Server(VoiceRoute.ServerRoute.GeminiLive)) {
                     if (divider()) SettingsDivider()
                     SettingsMenuRow(
                         title = "Model",
                         value = state.modelRowValue,
                         selection = state.voiceEngine,
-                        sections = state.providerGroups.map { group ->
-                            group.name to group.engines.map { SettingsMenuOption(it, it.title) }
+                        sections = VoiceProvider.allCases.map { provider ->
+                            provider.displayName to provider.engines.map { SettingsMenuOption(it, it.title) }
                         },
                         onSelect = {
                             voice.send(VoiceSettingsFeature.Action.VoiceEngineChanged(it))

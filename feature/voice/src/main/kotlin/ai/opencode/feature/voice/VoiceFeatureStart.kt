@@ -38,21 +38,18 @@ fun VoiceFeature.State.setActiveRoute(
 internal fun VoiceFeature.startCall(state: VoiceFeature.State): Reduced<VoiceFeature.State, VoiceFeature.Action> {
     var next = state
     val target = next.target
-    val experimentalFeatures = dependency(ExperimentalFeatures)
-    val serverVoiceOn = experimentalFeatures(ExperimentalFeature.serverVoice)
     val selectedEngine = next.resolvedEngine
     val openAIKey = next.callAPIKey(VoiceEngine.gptLive)?.trim() ?: ""
     val xaiKey = next.callAPIKey(VoiceEngine.grok)?.trim() ?: ""
-    if (serverVoiceOn && next.voiceServer == VoiceServerChoice.Connected) {
+    if (next.voiceServer == VoiceServerChoice.Connected) {
         shared(VoiceSharedKeys.voiceServerChoice).update { it.pinningConnected(target.server) }
     }
-    val saved = if (serverVoiceOn) VoiceFeature.savedServers else emptyList()
+    val saved = VoiceFeature.savedServers
     val (broker, readiness) = VoiceBroker.resolve(
-        serverVoice = serverVoiceOn,
         choice = next.voiceServer,
         provider = next.serverVoiceProvider,
         connected = target.server,
-        saved = { saved },
+        saved = saved,
         answers = next.voiceModelsByServer,
         support = next.serverVoiceSupportByServer,
         hasOpenAIKey = openAIKey.isNotEmpty(),
@@ -79,23 +76,22 @@ internal fun VoiceFeature.startCall(state: VoiceFeature.State): Reduced<VoiceFea
     val movedOn: (OpenCodeServer) -> VoiceBroker? = movedOn@{ server ->
         if (!broker.isAutomatic) return@movedOn null
         VoiceBroker(
-            serverVoice = true,
             choice = VoiceServerChoice.Automatic,
             connected = target.server,
-            saved = { saved },
+            saved = saved,
             readiness = readiness.copy(support = readiness.support + (server.persistenceID to ServerVoiceSupport.unsupported)),
         )
     }
     val place: (VoiceBroker) -> VoiceCallPlace? = place@{ placeBroker ->
         val server = placeBroker.server
-        if (!serverVoiceOn || server == null || selectedEngine == VoiceEngine.grok) return@place null
+        if (server == null || selectedEngine == VoiceEngine.grok) return@place null
         VoiceCallPlace(name = server.friendlyName, brand = readiness.brand(server, placeBroker.provider))
     }
     val route = resolve(broker, initialSupport)
-    next = next.copy(diagnosesFailure = serverVoiceOn && selectedEngine != VoiceEngine.grok, callPlace = null)
+    next = next.copy(diagnosesFailure = selectedEngine != VoiceEngine.grok, callPlace = null)
     val shouldProbe = serverVoiceEnabled && selectedEngine != VoiceEngine.grok && initialSupport != ServerVoiceSupport.supported
     if (route is VoiceRoute.Unavailable && !shouldProbe) {
-        if (serverVoiceOn) next = next.setActiveRoute(route, usesDelegator = false).copy(callPlace = place(broker))
+        next = next.setActiveRoute(route, usesDelegator = false).copy(callPlace = place(broker))
         return Reduced(next.withPhase(VoiceFeature.State.Phase.Failed(route.reason.message)))
     }
     val key = if (selectedEngine == VoiceEngine.grok) xaiKey else openAIKey
@@ -128,6 +124,7 @@ internal fun VoiceFeature.startCall(state: VoiceFeature.State): Reduced<VoiceFea
         startedViewing = next.viewing,
     )
     val delegatorEnabled = voiceDelegator.isEnabled && key != "lab"
+    val experimentalFeatures = dependency(ExperimentalFeatures)
     val sessionDelegatorEligible = experimentalFeatures(ExperimentalFeature.voiceSessionDelegator) &&
         next.voiceDelegatorChoice.usesOpenCodeSession &&
         key != "lab"

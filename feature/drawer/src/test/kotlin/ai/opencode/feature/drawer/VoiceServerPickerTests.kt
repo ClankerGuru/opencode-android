@@ -1,8 +1,6 @@
 package ai.opencode.feature.drawer
 
-import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.SharedStore
-import ai.opencode.core.sharing.experimental
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
@@ -55,11 +53,10 @@ class VoiceServerPickerTests {
                 )
             }
         }
-        // `save([server, studio])`: saved, `server` in use, Server Voice on.
+        // `save([server, studio])`: saved, `server` in use.
         store.withDependencies {
             shared(ServerSharedKeys.savedServers).set(listOf(server, studio))
             shared(ServerSharedKeys.savedServer).set(server)
-            shared(experimental(ExperimentalFeature.serverVoice)).set(true)
             shared(VoiceSharedKeys.voiceServerChoice).set(VoiceServerChoice.Connected)
         }
         fun choice() = store.withDependencies { shared(VoiceSharedKeys.voiceServerChoice).value }

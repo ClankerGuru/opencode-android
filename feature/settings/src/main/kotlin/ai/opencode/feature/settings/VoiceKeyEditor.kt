@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.dp
 
 /**
  * iOS `VoiceKeyEditor`: the selected model's provider key, its reveal button and Verify, under
- * the Key row. Kept out of every screenshot (iOS `.hidesFromScreenshots()`).
+ * Grok's xAI Key row, and on Your OpenAI Account. Kept out of every screenshot (iOS `.hidesFromScreenshots()`).
  */
 @Composable
 internal fun VoiceKeyEditor(state: VoiceSettingsFeature.State, voice: VoiceStore, settings: (HomeSettingsFeature.Action) -> Unit) {

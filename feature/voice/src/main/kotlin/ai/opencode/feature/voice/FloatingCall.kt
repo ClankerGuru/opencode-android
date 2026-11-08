@@ -545,7 +545,8 @@ private class FloatingCallSurfaceModel(
 ) {
     val layout = FloatingCallLayout()
     val opacity = Animatable(0f)
-    var place by mutableStateOf(FloatingCallPlace())
+    /** Where the orb rests: the call center's, so this call and the next share one value. */
+    val place: FloatingCallPlace get() = center.place ?: FloatingCallPlace()
     val float = FloatingCallFloatMotion()
     val motion = FloatingCallStageMotion()
     val connect = FloatingCallConnectMotion()
@@ -556,7 +557,6 @@ private class FloatingCallSurfaceModel(
 
     var touch: FloatingCallOrbTouch? = null
     var dragMode: FloatingCallDragMode? = null
-    var dragNearest: FloatingCallStage? = null
     var tagJob: Job? = null
     var mountJob: Job? = null
     var lastPanelRequest = 0
@@ -618,7 +618,6 @@ private class FloatingCallSurfaceModel(
                 }
             }
         }
-        place = center.place ?: FloatingCallPlace()
         lastPanelRequest = center.panelRequest.count
         // Carried over to another screen grown: it stays grown.
         val stage = store.state.floatingStage.stage
@@ -768,7 +767,6 @@ private class FloatingCallSurfaceModel(
     fun rest(point: Offset) {
         val area = liveRestArea()
         val next = FloatingCallPlace(point.x, if (point.y >= area.bounds.bottom - 0.5f) null else point.y)
-        if (place != next) place = next
         if (center.place != next) center.place = next
     }
 
@@ -936,7 +934,6 @@ private class FloatingCallSurfaceModel(
                 }
             } finally {
                 dragMode = null
-                dragNearest = null
             }
         }
     }
@@ -948,8 +945,7 @@ private class FloatingCallSurfaceModel(
         if (dragMode != FloatingCallDragMode.stage) return
         motion.drag(location.y.toDouble(), geometry)
         val nearest = geometry.nearest(motion.progress)
-        if (nearest != dragNearest) {
-            dragNearest = nearest
+        if (nearest != store.state.floatingStage.dragTarget) {
             send(FloatingCallStageFeature.Action.DragCrossed(nearest))
         }
     }
@@ -963,14 +959,12 @@ private class FloatingCallSurfaceModel(
         bloomMounted = true
         dismissKeyboard()
         motion.beginDrag(location.y.toDouble(), geometry)
-        dragNearest = store.state.floatingStage.stage
         send(FloatingCallStageFeature.Action.DragBegan)
     }
 
     private fun shapeEnded(velocityY: Float) {
         val mode = dragMode
         dragMode = null
-        dragNearest = null
         if (mode != FloatingCallDragMode.stage) return
         val settled = stageGeometry().settle(motion.progress, velocityY.toDouble())
         // A request that came up mid-drag holds it at the orb.
@@ -1149,7 +1143,6 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
         isMuted = isMuted,
         isSpeaking = isSpeaking,
         scene = scene,
-        isConnecting = phase == VoiceFeature.State.Phase.Connecting,
         tool = runningTool,
     )
 

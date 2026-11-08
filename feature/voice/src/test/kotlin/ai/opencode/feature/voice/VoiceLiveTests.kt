@@ -573,6 +573,7 @@ class VoiceEnginePersistenceTests {
 
     @Test fun defaultsToGPTLiveAndPersistsSelectionAcrossCalls() = runTest {
         val shared = VoiceTestShared()
+        shared.set(VoiceSharedKeys.voiceServerChoice, VoiceServerChoice.Phone)
         shared.set(VoiceSharedKeys.voiceEngine, VoiceEngine.gptLive)
         var voiceEngine = shared.get(VoiceSharedKeys.voiceEngine)
         assertEquals(VoiceEngine.gptLive, voiceEngine)

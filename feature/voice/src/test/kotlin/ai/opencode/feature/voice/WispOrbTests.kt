@@ -22,12 +22,10 @@ class WispOrbTests {
         speaking: Boolean = false,
         muted: Boolean = false,
         scene: FloatingCallScene? = null,
-        connecting: Boolean = false,
-    ) = LivingOrbConfig(mood = mood, isMuted = muted, isSpeaking = speaking, scene = scene, isConnecting = connecting)
+    ) = LivingOrbConfig(mood = mood, isMuted = muted, isSpeaking = speaking, scene = scene)
 
     @Test fun callMomentsMapToWispStates() {
         assertEquals(WispOrbState.connecting, config(FloatingCallMood.connecting).wispState(userLevel = 0f))
-        assertEquals(WispOrbState.connecting, config(FloatingCallMood.live, connecting = true).wispState(userLevel = 0f))
         assertEquals(WispOrbState.listening, config(FloatingCallMood.live).wispState(userLevel = 0f))
         assertEquals(WispOrbState.listening, config(FloatingCallMood.live).wispState(userLevel = 0.5f))
         assertEquals(WispOrbState.speaking, config(FloatingCallMood.live, speaking = true).wispState(userLevel = 0f))
@@ -61,9 +59,9 @@ class WispOrbTests {
 
     /** Every field is a `float4`, in the shader's order. */
     @Test fun uniformsMatchTheShadersLayout() {
-        assertEquals(66 * 4, WispOrbUniforms().data.size)
+        assertEquals(63 * 4, WispOrbUniforms().data.size)
         assertEquals(30, WispOrbUniforms.circles)
-        assertEquals(62, WispOrbUniforms.view)
+        assertEquals(59, WispOrbUniforms.view)
     }
 
     @Test fun aVoiceLightsTheLensAndStaysFinite() {

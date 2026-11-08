@@ -72,10 +72,6 @@ data class WelcomeSceneLayout(
     fun desktop(point: Offset): Offset =
         Offset(laptopScreen.left + point.x * laptopScale, laptopScreen.top + point.y * laptopScale)
 
-    /** A point in the phone's logical space, in the scene. */
-    fun phonePoint(point: Offset): Offset =
-        Offset(phoneScreen.left + point.x * phoneScale, phoneScreen.top + point.y * phoneScale)
-
     companion object {
         /** The phone's height over the laptop's. */
         const val PHONE_RATIO = 1.45f

@@ -317,7 +317,6 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val openAIAPIKey: Shared<String?> = shared(SharedKeys.openAIAPIKey),
         val xaiAPIKey: Shared<String?> = shared(SharedKeys.xaiAPIKey),
         val voiceEngine: Shared<VoiceEngine> = shared(VoiceSharedKeys.voiceEngine),
-        val serverVoiceExperiment: Shared<Boolean> = shared(ExperimentalFeature.serverVoice.key),
         val serverVoiceProvider: Shared<ServerVoiceProvider> = shared(VoiceSharedKeys.serverVoiceProvider),
         val voiceServer: Shared<VoiceServerChoice> = shared(VoiceSharedKeys.voiceServerChoice),
         val serverVoiceSupportByServer: Shared<Map<String, ServerVoiceSupport>> = shared(VoiceSharedKeys.serverVoiceSupportByServer),

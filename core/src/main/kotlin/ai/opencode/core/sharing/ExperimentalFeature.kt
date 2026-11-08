@@ -48,7 +48,6 @@ enum class ExperimentalFeature(
     hideModels("hide-models", "Hide Unused Models", ExperimentalGroup.composer, "eye.slash"),
 
     // Calls
-    serverVoice("server-voice", "Server Voice", ExperimentalGroup.calls, "waveform", "Server-key calls and Gemini Live"),
     backgroundCallIntent(
         "background-call-intent", "Background Action Button Call", ExperimentalGroup.calls, "button.programmable",
         "Calls start without opening the app",
@@ -116,7 +115,8 @@ enum class ExperimentalFeature(
          * Switches of removed experiments (Session Switcher, Title Is the Switch, Floating Call,
          * Call Tray) and of ones now always on (Composer Autocomplete, Server Flow, New Plus Menu,
          * Project Icons, Image Link Previews, Living Orb, New Messages Divider, Open Links from
-         * Calls, Audio in Calls, Server Details), with the call-style migration's markers. Nothing reads them; they're cleared at launch.
+         * Calls, Audio in Calls, Server Details, Server Voice), with the call-style migration's
+         * markers. Nothing reads them; they're cleared at launch.
          */
         val retiredKeys: List<String> = buildList {
             add("experimental-session-switcher")
@@ -131,7 +131,7 @@ enum class ExperimentalFeature(
             add("call-style-migrated-orb-default")
             val alwaysOn = listOf(
                 "image-link-previews", "living-orb", "new-messages-divider",
-                "open-links-from-calls", "audio-in-calls", "server-details",
+                "open-links-from-calls", "audio-in-calls", "server-details", "server-voice",
             )
             for (name in alwaysOn) {
                 add("experimental-$name")

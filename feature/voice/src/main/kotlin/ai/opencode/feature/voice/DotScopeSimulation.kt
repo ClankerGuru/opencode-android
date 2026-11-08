@@ -40,8 +40,12 @@ enum class VoiceCallHaptic {
 data class ScopeVector2(val x: Float = 0f, val y: Float = 0f)
 
 /** Plain, fixed-240-Hz simulation. The renderer reads a packed xyzw light field;
- * no per-frame reducer actions, platform graphics objects or audio side effects. */
+ * no per-frame reducer actions, platform graphics objects or audio side effects.
+ *
+ * The call only shares the retired call bar's sweep geometry ([Scan]): its cues and haptics are
+ * still timed from where the beam would turn. Nothing here draws a call. */
 class DotScopeSimulation {
+    /** The call's stage on its cue clock, for `VoiceCallSounds`. */
     enum class Stage { connecting, live, ending }
     @Serializable enum class Cue { sweepRight, sweepLeft, connected, ended }
 
@@ -93,10 +97,6 @@ class DotScopeSimulation {
         val history = FloatArray(historyLength * 5); var head = 0
     }
     var windowInsets = ScopeVector2(windowInset, windowInset)
-    var visibleBar = ScopeVector2()
-    var reachesLeadingEdge = false
-    var trayFade = windowFade
-    var trayScanReach = 1f
     val you = Voice()
     val agent = Voice()
     private val traces = arrayOf(Trace(floatArrayOf(0.1f, 1.7f, 3.3f, 4.6f)), Trace(floatArrayOf(2.4f, 0.6f, 5.1f, 1.9f)))
@@ -114,133 +114,38 @@ class DotScopeSimulation {
     private var beamGrid: DotScopeGrid? = null
     private var primed = false
     private var steps = 0
-    var stage = Stage.live; private set
-    private var stageStart = Double.NEGATIVE_INFINITY
-    private var wasLive = true
-    private var origin = TransitionOrigin()
-    data class TransitionOrigin(
-        val progress: Float = 0f, val overshoot: Float = 0f, val head: Float = 2.5f,
-        val grid: Float = 1f, val liveUnfold: Float = 1f, val liveReachFactor: Float = 2f,
-    )
-    fun setStage(stage: Stage, elapsed: Double? = null) {
-        val now = time + pending
-        if (stage != this.stage) {
-            captureOrigin(now)
-            if (stage != Stage.ending) wasLive = stage == Stage.live
-            this.stage = stage
-            stageStart = if (steps > 0) now else now - max(0.0, elapsed ?: 0.0)
-        } else if (elapsed != null && elapsed >= 0) {
-            if (!stageStart.isFinite() || steps == 0) stageStart = now - elapsed
-            else if (stage == Stage.connecting) stageStart += ((now - elapsed - stageStart) * 0.2).coerceIn(-0.002, 0.002)
-        }
-    }
-    private fun captureOrigin(now: Double) {
-        if (!stageStart.isFinite()) { origin = TransitionOrigin(); return }
-        val elapsed = (now - stageStart).coerceIn(0.0, 60.0).toFloat()
-        when (stage) {
-            Stage.connecting -> {
-                val beam = Scan.connectingBeam(elapsed, scanLeadingInset, scanTrailingInset)
-                origin = TransitionOrigin(beam.progress, beam.overshoot, beam.head, min(1f, elapsed / 0.3f), 0f, 0f)
-            }
-            Stage.live -> origin = origin.copy(head = 2.8f, grid = min(1f, origin.grid + elapsed / 0.3f),
-                liveUnfold = smoothstep(0f, 0.10f, elapsed), liveReachFactor = Scan.passPosition((elapsed / Scan.bloomDuration).coerceIn(0f, 1f)))
-            Stage.ending -> Unit
-        }
-    }
-
-    class Scan(
-        val stage: Stage, val elapsed: Float, val width: Float, val drawn: Boolean = true,
-        val origin: TransitionOrigin = TransitionOrigin(), val leftInset: Float = edgeInset,
-        val rightInset: Float = edgeInset, val leftEndingStart: Float = endingStart,
-    ) {
-        var grid = 1f; var presence = 1f; var helix = 1f; var decay = 1f; var tail = 1f
-        var front = 0f; var head = 0f; var reach = 0f
-        private val x0 = beamX(origin.progress, width, leftInset, rightInset) + origin.overshoot
-        init {
-            val t = max(0f, elapsed)
-            when (stage) {
-                Stage.connecting -> {
-                    grid = min(1f, t / 0.3f); helix = 0f
-                    val beam = connectingBeam(t, leftInset, rightInset)
-                    front = beamX(beam.progress, width, leftInset, rightInset) + beam.overshoot; head = beam.head
-                }
-                Stage.live -> {
-                    grid = min(1f, origin.grid + t / 0.3f)
-                    reach = (width + 20) * passPosition((t / bloomDuration).coerceIn(0f, 1f))
-                    front = min(width, x0 + reach); head = origin.head * (1 - smoothstep(0.08f, bloomDuration, t))
-                }
-                Stage.ending -> {
-                    if (drawn) {
-                        front = leftEndingStart + (width - leftEndingStart - endingStop) * passPosition(t / endingPass)
-                        head = 2.8f * smoothstep(0f, 0.035f, t) * (1 - smoothstep(0.42f, 0.53f, t))
-                    } else {
-                        front = x0 + max(0f, width - endingStop - x0) * passPosition(t / endingPass)
-                        head = origin.head * (1 - smoothstep(0.42f, 0.53f, t)); helix = 0f
-                    }
-                    val exit = exitDuration.toFloat()
-                    grid = origin.grid * (1 - smoothstep(exit - 0.25f, exit, t))
-                    presence = 1 - smoothstep(exit - 0.12f, exit, t)
-                    decay = 1 - 0.75f * smoothstep(0f, 0.08f, t); tail = 1 - smoothstep(0f, 0.1f, t)
-                }
-            }
-        }
-        data class Envelope(val amp: Float, val reveal: Float, val bright: Float, val swell: Float)
-        fun envelope(x: Float): Envelope = when (stage) {
-            Stage.connecting -> { val beam = head * bump(x - front, 12f); Envelope(0f, min(1f, beam), beam, 0f) }
-            Stage.live -> {
-                val dist = abs(x - x0); val unfold = smoothstep(0f, 0.10f, elapsed)
-                val braid = unfold * (1 - smoothstep(max(0f, reach - 26), max(0.001f, reach), dist))
-                val amp = braid * (1 - smoothstep(max(0f, reach - 40), max(0.001f, reach - 6), dist))
-                val beam = head * bump(dist - reach, 12f)
-                val swell = 1.8f * unfold * (head / max(origin.head, 1f)) * bump(dist - max(0f, reach - 28), 26f)
-                Envelope(amp, max(braid, min(1f, beam)), amp + beam, swell)
-            }
-            Stage.ending -> {
-                val beam = head * bump(x - front, 12f)
-                if (!drawn) Envelope(0f, min(1f, beam), beam, 0f) else {
-                    val priorReach = (width + 20) * origin.liveReachFactor
-                    val priorDrawn = origin.liveUnfold * (1 - smoothstep(max(0f, priorReach - 28), priorReach + 4, abs(x - x0)))
-                    val erase = smoothstep(0f, 0.04f, elapsed)
-                    val kept = priorDrawn * (1 - erase * (1 - smoothstep(front - 18, front + 12, x)))
-                    val amp = kept * (1 - erase * (1 - smoothstep(front - 8, front + 48, x)))
-                    Envelope(amp, max(kept, min(1f, beam)), amp + beam, 0f)
-                }
-            }
-        }
+    /**
+     * The retired call bar's sweep, kept because the call's cues and haptics are still timed from
+     * it (`VoiceCallSounds`, `VoiceHapticDesign`). Nothing draws it.
+     */
+    object Scan {
         data class Beam(val progress: Float, val along: Float, val overshoot: Float, val head: Float)
         data class Arrivals(val mute: Float, val end: Float)
-        companion object {
-            const val sweepPass = 0.55f; const val bloomDuration = 0.48f; const val edgeInset = 62f
-            const val launchInset = 28f; const val launchIgnition = 0.24f
-            const val endingPass = 0.48f; const val endingStart = 44f; const val endingStop = 36f
-            fun beamX(progress: Float, width: Float, leftInset: Float = edgeInset, rightInset: Float = edgeInset) = leftInset + max(0f, width - leftInset - rightInset) * progress.coerceIn(0f, 1f)
-            fun passPosition(p: Float) = 0.5f - 0.5f * cos(PI.toFloat() * p.coerceIn(0f, 1f))
-            fun connectingHead(along: Float) = 2.5f + sin(PI.toFloat() * along.coerceIn(0f, 1f))
-            @Suppress("UNUSED_PARAMETER")
-            fun connectingBeam(elapsed: Float, leftInset: Float = edgeInset, rightInset: Float = edgeInset): Beam {
-                val t = max(0f, elapsed); val pass = t / sweepPass; val along = pass - floor(pass); val index = floor(pass).toInt()
-                val head = connectingHead(along)
-                if (index > 0) return Beam(passPosition(if (index % 2 == 1) along else 1 - along), along, 0f, head)
-                val left = 1 - 0.5f * (sin(PI.toFloat() / 2 * along) + passPosition(along))
-                return Beam(left, along, (rightInset - launchInset) * left, head * (0.35f + 0.65f * smoothstep(0f, launchIgnition, t)))
-            }
-            fun passTime(covering: Float) = acos(1 - 2 * covering.coerceIn(0f, 1f)) / PI.toFloat()
-            fun bloomArrivals(origin: Float, overshoot: Float = 0f, width: Float): Arrivals {
-                val x0 = beamX(origin, width) + overshoot; val span = width + 20
-                return Arrivals(bloomDuration * passTime((x0 - windowInset) / span), bloomDuration * passTime((width - windowInset - x0) / span))
-            }
-            fun endingArrival(drawn: Boolean, origin: Float, overshoot: Float = 0f, width: Float): Float {
-                val start = if (drawn) endingStart else beamX(origin, width) + overshoot
-                val span = width - endingStop - start
-                return if (span <= 0) 0f else endingPass * passTime((width - windowInset - start) / span)
-            }
-            private fun bump(d: Float, width: Float) = exp(-(d / width) * (d / width))
+        const val sweepPass = 0.55f; const val bloomDuration = 0.48f; const val edgeInset = 62f
+        const val launchInset = 28f; const val launchIgnition = 0.24f
+        const val endingPass = 0.48f; const val endingStart = 44f; const val endingStop = 36f
+        fun beamX(progress: Float, width: Float, leftInset: Float = edgeInset, rightInset: Float = edgeInset) = leftInset + max(0f, width - leftInset - rightInset) * progress.coerceIn(0f, 1f)
+        fun passPosition(p: Float) = 0.5f - 0.5f * cos(PI.toFloat() * p.coerceIn(0f, 1f))
+        fun connectingHead(along: Float) = 2.5f + sin(PI.toFloat() * along.coerceIn(0f, 1f))
+        @Suppress("UNUSED_PARAMETER")
+        fun connectingBeam(elapsed: Float, leftInset: Float = edgeInset, rightInset: Float = edgeInset): Beam {
+            val t = max(0f, elapsed); val pass = t / sweepPass; val along = pass - floor(pass); val index = floor(pass).toInt()
+            val head = connectingHead(along)
+            if (index > 0) return Beam(passPosition(if (index % 2 == 1) along else 1 - along), along, 0f, head)
+            val left = 1 - 0.5f * (sin(PI.toFloat() / 2 * along) + passPosition(along))
+            return Beam(left, along, (rightInset - launchInset) * left, head * (0.35f + 0.65f * smoothstep(0f, launchIgnition, t)))
+        }
+        fun passTime(covering: Float) = acos(1 - 2 * covering.coerceIn(0f, 1f)) / PI.toFloat()
+        fun bloomArrivals(origin: Float, overshoot: Float = 0f, width: Float): Arrivals {
+            val x0 = beamX(origin, width) + overshoot; val span = width + 20
+            return Arrivals(bloomDuration * passTime((x0 - windowInset) / span), bloomDuration * passTime((width - windowInset - x0) / span))
+        }
+        fun endingArrival(drawn: Boolean, origin: Float, overshoot: Float = 0f, width: Float): Float {
+            val start = if (drawn) endingStart else beamX(origin, width) + overshoot
+            val span = width - endingStop - start
+            return if (span <= 0) 0f else endingPass * passTime((width - windowInset - start) / span)
         }
     }
-    private val scanLeadingInset get() = if (!reachesLeadingEdge) Scan.edgeInset else Scan.edgeInset + (max(14f, windowInsets.x + 0.35f * trayFade) - Scan.edgeInset) * trayScanReach.coerceIn(0f, 1f)
-    private val scanTrailingInset get() = if (!reachesLeadingEdge) Scan.edgeInset else Scan.edgeInset + (windowInsets.y + 0.35f * trayFade - Scan.edgeInset) * trayScanReach.coerceIn(0f, 1f)
-    fun scan(width: Float) = Scan(stage, min(60.0, time + pending - stageStart).toFloat(), if (visibleBar.y > 0) visibleBar.y else width,
-        wasLive, origin, scanLeadingInset, scanTrailingInset, if (reachesLeadingEdge) min(Scan.endingStart, scanLeadingInset) else Scan.endingStart)
     val glow get() = ScopeVector2(traces[0].glow, traces[1].glow)
     val breath get() = 0.5f + 0.5f * sin(time.toFloat() * tau / 5.5f)
     fun advance(by: Double, you: Float, agent: Float, youBands: FloatArray? = null, agentBands: FloatArray? = null, connected: Boolean) {
@@ -291,7 +196,7 @@ class DotScopeSimulation {
             instant = FloatArray(grid.count * 2); core = FloatArray(grid.count * 2); head = FloatArray(grid.count * 2); tail = FloatArray(grid.count * 2); lit = FloatArray(grid.count * 4)
             rasterDistances = FloatArray(grid.rows); rasterNearest = IntArray(grid.rows)
         }
-        val scan = scan(grid.width); buildTraces(grid, scan, samples)
+        buildTraces(grid, samples)
         val hb = beamEvery * stepDuration.toFloat()
         for (k in 0..1) {
             for (s in 0 until samples) {
@@ -304,22 +209,22 @@ class DotScopeSimulation {
                 brightness[k][s] *= 1 - dwell + dwell * lingering
             }
         }
-        raster(grid, samples, if (scan.decay < 1) 1f else Float.MAX_VALUE)
-        val headKeep = if (decays) exp(-hb / (headDecay * scan.decay)) else 1f
-        val tailKeep = if (decays) exp(-hb / (tailDecay * scan.decay)) else 1f
+        raster(grid, samples)
+        val headKeep = if (decays) exp(-hb / headDecay) else 1f
+        val tailKeep = if (decays) exp(-hb / tailDecay) else 1f
         for (n in 0 until grid.count) {
             var now = 0f; var total = 0f
             for (k in 0..1) {
                 val m = n * 2 + k
                 head[m] = max(head[m] * headKeep, core[m]); tail[m] = max(tail[m] * tailKeep, core[m])
-                val light = max(instant[m], max(head[m], tailBrightness * scan.tail * tail[m]))
+                val light = max(instant[m], max(head[m], tailBrightness * tail[m]))
                 lit[n * 4 + k] = light; now += instant[m]; total += light
             }
             lit[n * 4 + 2] = min(1f, now / max(total, 1e-4f))
         }
         primed = true
     }
-    private fun raster(grid: DotScopeGrid, samples: Int, coreLimit: Float) {
+    private fun raster(grid: DotScopeGrid, samples: Int) {
         val dx = 1f / subsamples
         val distances = rasterDistances; val nearest = rasterNearest
         for (k in 0..1) {
@@ -344,33 +249,32 @@ class DotScopeSimulation {
                     val best = distances[j]; val bright = brightness[nearest[j]]
                     val m = (j * grid.columns + i) * 2 + k; val onBeam = exp(-best / 0.25f)
                     instant[m] = min(1.2f, onBeam + 0.5f * exp(-sqrt(best) / 0.8f)) * bright
-                    core[m] = min(coreLimit, onBeam * bright)
+                    core[m] = onBeam * bright
                 }
             }
         }
     }
-    private fun buildTraces(grid: DotScopeGrid, scan: Scan, samples: Int) {
-        val width = if (visibleBar.y > 0) visibleBar.y else grid.width; val offset = if (visibleBar.y > 0) visibleBar.x else 0f
+    private fun buildTraces(grid: DotScopeGrid, samples: Int) {
+        val width = grid.width
         val mid = (grid.rows - 1) / 2f; val half = mid - 0.55f
-        val rest = (0.55f + 0.35f * breath) * (0.4f + 0.6f * live) * scan.helix
+        val rest = (0.55f + 0.35f * breath) * (0.4f + 0.6f * live)
         val leftInset = windowInsets.x; val rightInset = windowInsets.y
-        val leftCalm = leftInset + if (reachesLeadingEdge) 12f else flatten
-        val rightCalm = rightInset + if (reachesLeadingEdge) 12f else flatten
+        val leftCalm = leftInset + flatten
+        val rightCalm = rightInset + flatten
         for (k in 0..1) {
             val f = traces[k]; val sign = if (k == 0) 1 else -1
-            val delayInset = if (k == 0 && reachesLeadingEdge) leftInset else windowInset
+            val delayInset = windowInset
             for (s in 0 until samples) {
-                val x = grid.columnX(s.toFloat() / subsamples) - offset; val envelope = scan.envelope(x)
+                val x = grid.columnX(s.toFloat() / subsamples)
                 val own = if (k == 0) x else width - x; val xn = own / width
                 val ends = min(smoothstep(leftInset, leftCalm, x), smoothstep(rightInset, rightCalm, width - x))
                 val reach = 1 - 0.8f * smoothstep(100f, width - 16, own); val delay = max(0f, own - delayInset) / velocity
                 val a = past(f, delay, 0); var spread = 0f
                 for (c in 0..3) spread += past(f, delay, 1 + c) * sin(tau * spatial[c] * xn - f.phases[c])
-                val helix = (rest + envelope.swell + half * 0.55f * a * reach) * sin(tau * helix * (x / width) - carrier)
-                val y = half * tanh((helix + half * 0.7f * spread * reach) / half) * ends * envelope.amp
+                val helix = (rest + half * 0.55f * a * reach) * sin(tau * helix * (x / width) - carrier)
+                val y = half * tanh((helix + half * 0.7f * spread * reach) / half) * ends
                 ys[k][s] = mid - sign * y
-                val spatial = (0.3f + 0.7f * min(1f, a * 1.8f)) * (0.3f + 0.7f * (1 - smoothstep(110f, width - 6, own))) * (0.45f + 0.55f * ends)
-                brightness[k][s] = spatial * envelope.amp + 0.36f * max(0f, envelope.bright - envelope.amp)
+                brightness[k][s] = (0.3f + 0.7f * min(1f, a * 1.8f)) * (0.3f + 0.7f * (1 - smoothstep(110f, width - 6, own))) * (0.45f + 0.55f * ends)
             }
         }
     }

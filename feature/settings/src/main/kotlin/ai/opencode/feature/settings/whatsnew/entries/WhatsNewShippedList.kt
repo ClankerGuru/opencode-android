@@ -11,6 +11,8 @@ import ai.opencode.feature.settings.whatsnew.WhatsNewShipped
 /** Every shipped entry, newest first: by day, then by `NN` (higher is newer). */
 internal val whatsNewShippedEntries: List<WhatsNewEntry> by lazy {
     listOf(
+        WhatsNewShipped.renameClearButton,
+        WhatsNewShipped.serverVoice,
         WhatsNewShipped.serverAddresses,
         WhatsNewShipped.scrollingUnsticks,
         WhatsNewShipped.replyTextSelection,
@@ -45,7 +47,6 @@ internal val whatsNewShippedEntries: List<WhatsNewEntry> by lazy {
         WhatsNewShipped.composerTextSelection,
         WhatsNewShipped.welcomePreview,
         WhatsNewShipped.firstPairingReadySession,
-        WhatsNewShipped.voiceProviderPage,
         WhatsNewShipped.inboxSidebarExperiment,
         WhatsNewShipped.drawerDragFollowsFinger,
         WhatsNewShipped.steadierRoundTrip,
@@ -102,7 +103,6 @@ internal val whatsNewShippedEntries: List<WhatsNewEntry> by lazy {
         WhatsNewShipped.callTraySwitchContinuity,
         WhatsNewShipped.drawerSessionAlignment,
         WhatsNewShipped.returnNewlineDefault,
-        WhatsNewShipped.serverVoiceExperiment,
         WhatsNewShipped.markdownStreamsSmoothly,
         WhatsNewShipped.callTrayDocksInDrawer,
         WhatsNewShipped.scrawlFasterStart,

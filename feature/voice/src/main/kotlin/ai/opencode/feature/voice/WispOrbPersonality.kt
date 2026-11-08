@@ -225,8 +225,6 @@ class WispAttentiveSim {
         }
     }
 
-    val isActive: Boolean get() = mix.x > 1e-3f || abs(mix.v) > 5e-3f
-
     private val blink: Float
         get() {
             val a = blinkAge
@@ -336,8 +334,6 @@ class WispFidgetSim {
             val offset = ponderBase + WispVec2(0.032f * sin(1.45f * clock), 0.024f * sin(1.05f * clock + 0.7f))
             return offset to w
         }
-
-    val isActive: Boolean get() = mix.x > 1e-3f || abs(mix.v) > 5e-3f || ponder.x > 1e-3f || abs(ponder.v) > 5e-3f
 
     /**
      * Kind (0 off, 1 bounce, 2 aurora) and envelope, then the beat's shape: bounce (pos x, y,

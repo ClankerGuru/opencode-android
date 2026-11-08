@@ -39,7 +39,7 @@ private fun <T> required(value: T?, message: String = "Expected a value"): T {
 }
 
 /**
- * Port of iOS `VoiceHapticTests.swift`: the call's haptics land with its sounds and its scanner.
+ * Port of iOS `VoiceHapticTests.swift`: the call's haptics land with its sounds and its sweep.
  * `patternsBecomeCorePatterns` is dropped: Core Haptics splits a pattern into players, while
  * Android's `VoiceHapticEngine` mixes every pattern into one vibrator waveform.
  */
@@ -61,16 +61,6 @@ class VoiceHapticTests {
         val peak = samples.maxOfOrNull { abs(it) } ?: 0f
         val index = samples.indexOfFirst { abs(it) >= 0.5f * peak }.coerceAtLeast(0)
         return index / PCM.sampleRate
-    }
-
-    /** The first time on a 0.1 ms grid at which `crossed` holds for the scanner. */
-    private fun firstTime(upTo: Double = 1.0, crossed: (Double) -> Boolean): Double? {
-        var t = 0.0
-        while (t <= upTo) {
-            if (crossed(t)) return t
-            t += 0.0001
-        }
-        return null
     }
 
     // MARK: Sounds
@@ -143,22 +133,19 @@ class VoiceHapticTests {
 
     // MARK: Connect
 
-    @Test fun bloomArrivalsMatchTheScannersFronts() {
+    @Test fun bloomArrivalsMatchTheSweepPositions() {
         for (width in widths) {
             for ((origin, overshoot) in origins.map { it to 0f } + launches) {
                 val arrivals = Scan.bloomArrivals(origin = origin, overshoot = overshoot, width = width)
                 val x0 = Scan.beamX(progress = origin, width = width) + overshoot
                 val edge = DotScopeSimulation.windowInset
-                val start = DotScopeSimulation.TransitionOrigin(progress = origin, overshoot = overshoot)
-                val mute = required(firstTime { t ->
-                    val scan = Scan(stage = DotScopeSimulation.Stage.live, elapsed = t.toFloat(), width = width, origin = start)
-                    x0 - scan.reach <= edge
-                })
-                val end = required(firstTime { t ->
-                    Scan(stage = DotScopeSimulation.Stage.live, elapsed = t.toFloat(), width = width, origin = start).front >= width - edge
-                })
-                assertTrue("Mute at $width/$origin/$overshoot", abs(arrivals.mute.toDouble() - mute) < 0.002)
-                assertTrue("End at $width/$origin/$overshoot", abs(arrivals.end.toDouble() - end) < 0.002)
+                val span = width + 20
+                // Each front unfolds with `passPosition`: it reaches its edge when that function
+                // has covered the distance to it.
+                val toMute = ((x0 - edge) / span).coerceIn(0f, 1f)
+                val toEnd = ((width - edge - x0) / span).coerceIn(0f, 1f)
+                assertTrue("Mute at $width/$origin/$overshoot", abs(Scan.passPosition(arrivals.mute / Scan.bloomDuration) - toMute) < 0.002f)
+                assertTrue("End at $width/$origin/$overshoot", abs(Scan.passPosition(arrivals.end / Scan.bloomDuration) - toEnd) < 0.002f)
             }
         }
     }
@@ -228,11 +215,9 @@ class VoiceHapticTests {
                     assertEquals(0.0, arrival, 0.0)
                     continue
                 }
-                val start = DotScopeSimulation.TransitionOrigin(progress = origin, overshoot = overshoot)
-                val reached = required(firstTime { t ->
-                    Scan(stage = DotScopeSimulation.Stage.ending, elapsed = t.toFloat(), width = width, drawn = drawn, origin = start).front >= target
-                })
-                assertTrue("$width/$drawn/$origin/$overshoot", abs(arrival - reached) < 0.002)
+                val start = if (drawn) Scan.endingStart else Scan.beamX(progress = origin, width = width) + overshoot
+                val covered = ((target - start) / (width - Scan.endingStop - start)).coerceIn(0f, 1f)
+                assertTrue("$width/$drawn/$origin/$overshoot", abs(Scan.passPosition(arrival.toFloat() / Scan.endingPass) - covered) < 0.002f)
                 // It lands while the pulse is still lit.
                 assertTrue(arrival < 0.5)
                 val pattern = VoiceHapticDesign.hangUp(drawn = drawn, origin = origin, overshoot = overshoot, width = width)

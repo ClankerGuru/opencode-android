@@ -433,7 +433,7 @@ object WispOrbCells {
         return 0f
     }
 
-    /** `special_field_light`: ignition spiral and pour, result rings, confirm, error, and the personalities. */
+    /** `special_field_light`: ignition spiral and pour, confirm, and the personalities. */
     internal fun specialLight(u: U, rm: Boolean, n: V3, r: Float, breath: Float, bodyWave: Float): Float {
         var light = 0f
         val cometMix = u.y(S.mixA)
@@ -462,28 +462,11 @@ object WispOrbCells {
             }
             light += swirlMix * swirl * (1f - u.w(S.phosphor))
         }
-        val pulseMix = u.x(S.mixB)
-        if (rm) {
-            light += pulseMix * 0.40f * bump(r - 0.45f, 0.25f)
-        } else {
-            var sum = 0f
-            for (i in 0 until 3) {
-                val slot = S.pulseRings + i
-                if (u.y(slot) > 1e-3f) sum += u.y(slot) * bump(r - u.x(slot), 0.12f + 0.07f * u.x(slot))
-                if (u.w(slot) > 1e-3f) sum += u.w(slot) * bump(r - u.z(slot), 0.12f + 0.07f * u.z(slot))
-            }
-            light += 0.92f * min(sum, 1.35f) + pulseMix * 0.16f * bump(r, 0.26f)
-        }
-        val confirm = u.y(S.mixB)
+        val confirm = u.x(S.mixB)
         if (confirm > 0.005f) {
             val pulse = if (rm) 0.5f else 0.5f + 0.5f * sin(u.x(S.clock) * TAU * 0.75f)
             val alert = 0.48f * bump(r - 0.76f, 0.16f) + (0.20f + 0.18f * pulse) * (0.4f + 0.6f * bodyWave)
             light += confirm * alert
-        }
-        val error = u.z(S.mixB)
-        if (error > 0.005f) {
-            val calm = 0.16f + 0.10f * breath
-            light += error * calm * (0.5f + 0.5f * bodyWave)
         }
         return light + idleLight(u, n) + attentiveLight(u, n) + fidgetLight(u, n)
     }
@@ -632,7 +615,7 @@ object WispOrbCells {
         val sleepMix = u.x(S.mixA)
         val cometMix = u.y(S.mixA)
         val thinkMix = u.z(S.mixA)
-        val mutedMix = u.w(S.mixB)
+        val mutedMix = u.y(S.mixB)
         val contrast = u.x(S.tuneA)
         val brightness = u.y(S.tuneA)
         val response = u.z(S.tuneA)

@@ -15,7 +15,7 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 // The pieces `WispOrbSim` steps at 240 Hz: a one-for-one port of Wisp's `wisp-orb` crate
-// (voice.rs, mode.rs, power.rs, coupling.rs, choreo.rs, pulse.rs), by way of iOS
+// (voice.rs, mode.rs, power.rs, coupling.rs, choreo.rs), by way of iOS
 // `WispOrbParts.swift`. Names and constants follow the Rust (and the Swift) so the three can be
 // read side by side.
 
@@ -38,11 +38,11 @@ object WispOrb {
     const val tau: Float = (2 * PI).toFloat()
 }
 
-/** Wisp's `OrbState`. */
+/** Wisp's `OrbState`, without the two the phone never shows (Pulsing's beacon rings and Error's red wash). */
 enum class WispOrbState {
-    sleeping, connecting, listening, speaking, bothSpeaking, thinking, confirming, error, pulsing;
+    sleeping, connecting, listening, speaking, bothSpeaking, thinking, confirming;
 
-    val isRest: Boolean get() = this == sleeping || this == pulsing
+    val isRest: Boolean get() = this == sleeping
 }
 
 /** How the dot sphere hands motion from one state to the next. Wisp ships Harmonic Twist; Voice Carry is the other coupled medium. */
@@ -288,14 +288,12 @@ data class WispModeMix(
     var sleep: Float = 0f,
     var comet: Float = 0f,
     var think: Float = 0f,
-    var pulse: Float = 0f,
     var confirm: Float = 0f,
-    var error: Float = 0f,
     var live: Float = 0f,
     var muted: Float = 0f,
     var uGain: Float = 0f,
     var aGain: Float = 0f,
-    val vel: FloatArray = FloatArray(10),
+    val vel: FloatArray = FloatArray(8),
 ) {
     fun follow(target: WispModeMix, reduceMotion: Boolean, h: Float) {
         if (reduceMotion) {
@@ -308,9 +306,7 @@ data class WispModeMix(
             sleep = ease(sleep, target.sleep)
             comet = ease(comet, target.comet)
             think = ease(think, target.think)
-            pulse = ease(pulse, target.pulse)
             confirm = ease(confirm, target.confirm)
-            error = ease(error, target.error)
             live = ease(live, target.live)
             uGain = ease(uGain, target.uGain)
             aGain = ease(aGain, target.aGain)
@@ -330,22 +326,11 @@ data class WispModeMix(
         sleep = spring(sleep, 0, target.sleep, 0.38f)
         comet = spring(comet, 1, target.comet, 0.34f)
         think = spring(think, 2, target.think, 0.34f)
-        pulse = spring(pulse, 3, target.pulse, 0.34f)
-        confirm = spring(confirm, 4, target.confirm, 0.30f)
-        error = spring(error, 5, target.error, 0.34f)
-        muted = spring(muted, 6, target.muted, 0.30f)
-        live = spring(live, 7, target.live, 0.36f)
-        uGain = spring(uGain, 8, target.uGain, 0.32f)
-        aGain = spring(aGain, 9, target.aGain, 0.32f)
-    }
-
-    fun isSettling(target: WispModeMix): Boolean {
-        val pairs = listOf(
-            sleep to target.sleep, comet to target.comet, think to target.think, pulse to target.pulse,
-            confirm to target.confirm, error to target.error, muted to target.muted, live to target.live,
-            uGain to target.uGain, aGain to target.aGain,
-        )
-        return pairs.any { abs(it.first - it.second) > 8e-3f } || vel.any { abs(it) > 1e-2f }
+        confirm = spring(confirm, 3, target.confirm, 0.30f)
+        muted = spring(muted, 4, target.muted, 0.30f)
+        live = spring(live, 5, target.live, 0.36f)
+        uGain = spring(uGain, 6, target.uGain, 0.32f)
+        aGain = spring(aGain, 7, target.aGain, 0.32f)
     }
 
     val activeGate: Float get() = wispClamp(0.25f + 0.75f * live, 0f, 1f)
@@ -362,21 +347,20 @@ data class WispModeMix(
         return user * uGain to agent * aGain
     }
 
-    fun copy(): WispModeMix = WispModeMix(sleep, comet, think, pulse, confirm, error, live, muted, uGain, aGain, vel.copyOf())
+    fun copy(): WispModeMix = WispModeMix(sleep, comet, think, confirm, live, muted, uGain, aGain, vel.copyOf())
 
     override fun equals(other: Any?): Boolean = other is WispModeMix &&
-        sleep == other.sleep && comet == other.comet && think == other.think && pulse == other.pulse &&
-        confirm == other.confirm && error == other.error && live == other.live && muted == other.muted &&
+        sleep == other.sleep && comet == other.comet && think == other.think &&
+        confirm == other.confirm && live == other.live && muted == other.muted &&
         uGain == other.uGain && aGain == other.aGain && vel.contentEquals(other.vel)
 
-    override fun hashCode(): Int = listOf(sleep, comet, think, pulse, confirm, error, live, muted, uGain, aGain).hashCode() * 31 +
+    override fun hashCode(): Int = listOf(sleep, comet, think, confirm, live, muted, uGain, aGain).hashCode() * 31 +
         vel.contentHashCode()
 
     companion object {
         fun gains(state: WispOrbState): Pair<Float, Float> = when (state) {
             WispOrbState.sleeping -> 0.38f to 0.08f
-            WispOrbState.error -> 0.16f to 0.08f
-            WispOrbState.connecting, WispOrbState.pulsing -> 0.25f to 0.25f
+            WispOrbState.connecting -> 0.25f to 0.25f
             WispOrbState.listening -> 1.0f to 0.35f
             WispOrbState.speaking -> 0.35f to 1.0f
             WispOrbState.bothSpeaking -> 1.0f to 1.0f
@@ -391,9 +375,7 @@ data class WispModeMix(
                 sleep = on(WispOrbState.sleeping),
                 comet = on(WispOrbState.connecting),
                 think = on(WispOrbState.thinking),
-                pulse = on(WispOrbState.pulsing),
                 confirm = on(WispOrbState.confirming),
-                error = on(WispOrbState.error),
                 live = if (state in liveStates) 1f else 0f,
                 muted = if (muted) 1f else 0f,
                 uGain = u,
@@ -416,9 +398,7 @@ data class WispModeMix(
                     wispMix3(WispVec3(0.93f, 0.96f, 1.00f), WispVec3(0.94f, 0.89f, 1.00f), running)
             WispOrbState.speaking -> WispVec3(0.44f, 0.91f, 0.68f) to WispVec3(0.99f, 0.93f, 0.72f)
             WispOrbState.bothSpeaking -> WispVec3(0.56f, 0.92f, 0.82f) to WispVec3(0.99f, 0.96f, 0.82f)
-            WispOrbState.pulsing -> WispVec3(0.72f, 0.88f, 0.68f) to WispVec3(0.99f, 0.95f, 0.80f)
             WispOrbState.confirming -> WispVec3(0.96f, 0.35f, 0.28f) to WispVec3(1.00f, 0.78f, 0.60f)
-            WispOrbState.error -> WispVec3(0.84f, 0.38f, 0.45f) to WispVec3(0.96f, 0.70f, 0.74f)
         }
     }
 }
@@ -481,10 +461,6 @@ class WispPowerSim {
             if (coolEmber < 1e-3f) coolEmber = 0f
         }
     }
-    fun isAnimating(state: WispOrbState, restScale: Float): Boolean =
-        wakeAge != null || sleepAge != null || coolEmber > 0.012f ||
-            abs(scale.x - targetScale(state, restScale)) > 1e-3f || abs(scale.v) > 2e-3f
-
     /** (scale, wake age, sleep age, cool ember); ages are -1 when idle. */
     fun frame(reduceMotion: Boolean): FloatArray {
         val s = wispClamp(scale.x, 0.5f, 1.08f)
@@ -803,14 +779,6 @@ class WispChoreoSim {
         for (i in 0 until 2) ringPhases[i] = wispEuclid(ringPhases[i] + h * ringRates[i], WispOrb.tau)
     }
 
-    fun isAnimating(thinking: Boolean, running: Boolean): Boolean {
-        if (!thinking) return false
-        val g = desired(running)
-        val x = floatArrayOf(wDelegate.x, wReason.x, wScan.x, wSpark.x)
-        val v = floatArrayOf(wDelegate.v, wReason.v, wScan.v, wSpark.v)
-        return (0 until 4).any { abs(x[it] - g[it]) > 4e-3f } || v.any { abs(it) > 1e-2f }
-    }
-
     /** Normalised weights (delegate, reason, scan, spark). */
     val weights: FloatArray
         get() {
@@ -837,71 +805,5 @@ class WispChoreoSim {
         val orbitRates = floatArrayOf(1.85f, 1.48f)
         val sparkRates = floatArrayOf(1.65f, 2.05f, 2.42f)
         val ringRates = floatArrayOf(1.28f, 0.88f)
-    }
-}
-
-// Pulse rings
-
-/** Stacked result rings (`PulseRings`); the beacon rings ride `Pulsing`. */
-class WispPulseRings {
-    val ages = FloatArray(count) { -1f }
-    val ambient = BooleanArray(count)
-    var sinceEmit = 1e3f
-
-    fun emit(ambient: Boolean) {
-        var slot = ages.indexOfFirst { it < 0 }.takeIf { it >= 0 }
-        if (slot == null) {
-            slot = ages.indices.filter { ages[it] / duration > 0.75f }.maxByOrNull { ages[it] }
-        }
-        val i = slot ?: return
-        ages[i] = 0f
-        this.ambient[i] = ambient
-        sinceEmit = 0f
-    }
-
-    fun tick(h: Float, pulsing: Boolean) {
-        for (i in ages.indices) {
-            if (ages[i] < 0) continue
-            ages[i] += h
-            if (ages[i] >= duration) ages[i] = -1f
-        }
-        sinceEmit = min(sinceEmit + h, 1e3f)
-        if (pulsing && sinceEmit >= ambientCadence) emit(ambient = true)
-    }
-
-    val active: Boolean get() = ages.any { it >= 0 }
-
-    /** Per ring (radius, envelope with beacon rings already scaled by `pulseMix`), interleaved. */
-    fun frame(pulseMix: Float): FloatArray {
-        val out = FloatArray(count * 2)
-        for (i in 0 until count) {
-            val age = ages[i]
-            if (age < 0) continue
-            val u = wispClamp(age / duration, 0f, 1f)
-            val gain = if (ambient[i]) ambientGain else 1f
-            val env = gain * wispSmoothstep(0f, 0.14f, u) * (1 - wispSmoothstep(0.38f, 1f, u))
-            out[i * 2] = 0.96f * (1 - (1 - u) * (1 - u))
-            out[i * 2 + 1] = if (ambient[i]) env * pulseMix else env
-        }
-        return out
-    }
-
-    /** `PulseFrame::glow`: extra halo while arriving results travel. */
-    val glow: Float
-        get() {
-            var g = 0f
-            for (i in 0 until count) {
-                if (ages[i] < 0 || ambient[i]) continue
-                val u = wispClamp(ages[i] / duration, 0f, 1f)
-                g += wispSmoothstep(0f, 0.14f, u) * (1 - wispSmoothstep(0.38f, 1f, u))
-            }
-            return 0.20f * min(g, 1.5f)
-        }
-
-    companion object {
-        const val count = 6
-        const val duration: Float = 1.65f
-        const val ambientCadence: Float = 1.35f
-        const val ambientGain: Float = 0.78f
     }
 }

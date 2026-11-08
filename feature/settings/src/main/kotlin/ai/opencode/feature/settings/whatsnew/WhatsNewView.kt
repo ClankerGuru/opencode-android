@@ -1,6 +1,5 @@
 package ai.opencode.feature.settings.whatsnew
 
-import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.SharedKeys
@@ -430,8 +429,7 @@ private fun rememberWhatsNewVoiceAvailable(server: OpenCodeServer?): Boolean {
     val engine by remember { shared(VoiceSharedKeys.voiceEngine).flow }.collectAsState()
     val provider by remember { shared(VoiceSharedKeys.serverVoiceProvider).flow }.collectAsState()
     val support by remember { shared(VoiceSharedKeys.serverVoiceSupportByServer).flow }.collectAsState()
-    val serverVoice by remember { shared(ExperimentalFeature.serverVoice.key).flow }.collectAsState()
-    return remember(server, enabled, openAIKey, xaiKey, engine, provider, support, serverVoice) {
+    return remember(server, enabled, openAIKey, xaiKey, engine, provider, support) {
         whatsNewVoiceAvailable(server)
     }
 }

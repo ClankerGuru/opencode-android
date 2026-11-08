@@ -5,7 +5,6 @@ import ai.opencode.feature.voice.DotScopeSimulation.Stage
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -13,14 +12,12 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /**
- * Port of iOS `DotScopeSimulationTests.swift`. Dropped: the five `MTKView`/`UIHostingController`
- * probes (`coveredScopeCannotReconfigureSharedRenderer`, `scopeResumesAfterSwiftUIOpacityHandoff`,
- * `coveredScopeDrawMeasurement`, `coveredScopeEnvironmentPausesMetalDisplayLink`,
+ * Port of iOS `DotScopeSimulationTests.swift`. Dropped: the three `MTKView`/`UIHostingController`
+ * probes (`coveredScopeDrawMeasurement`, `coveredScopeEnvironmentPausesMetalDisplayLink`,
  * `browserAndCatchUpPauseScopesAndUnhideRedraws`): they drive UIKit windows and Metal display
  * links, which have no JVM equivalent (Android draws the scope with AGSL in Compose).
  */
@@ -130,45 +127,6 @@ class DotScopeSimulationTests {
         assertTrue(simulation.glow.x < 0.1f)
     }
 
-    @Test fun scannerConnectsDrawsAndSweepsOut() {
-        // Connecting: one beam on a flat line; only dots near it are bright.
-        val simulation = DotScopeSimulation()
-        simulation.setStage(Stage.connecting)
-        repeat(30) { simulation.advance(by = 1.0 / 60, you = 0f, agent = 0f, connected = false) }
-        val connecting = simulation.scan(grid.width)
-        assertEquals(0f, connecting.helix)
-        assertTrue(connecting.envelope(connecting.front).bright > 2)
-        assertTrue(connecting.envelope(connecting.front + 60).bright < 0.1f)
-
-        // Live: the draw sweep crosses the bar and leaves the whole braid lit.
-        simulation.setStage(Stage.live)
-        repeat(60) { simulation.advance(by = 1.0 / 60, you = 0f, agent = 0f, connected = true) }
-        val live = simulation.scan(grid.width)
-        assertEquals(1f, live.envelope(grid.width - 1).reveal)
-        assertEquals(1f, live.presence)
-
-        // Ending: the beam heads toward End, erasing behind it, and the scope is gone by the exit's end.
-        simulation.setStage(Stage.ending)
-        repeat(15) { simulation.advance(by = 1.0 / 60, you = 0f, agent = 0f, connected = false) }
-        val ending = simulation.scan(grid.width)
-        assertTrue("What the beam passed is gone", ending.envelope(ending.front - 40).reveal < 0.01f)
-        assertTrue("Ahead of it the braid remains", ending.envelope(ending.front + 60).reveal > 0.99f)
-        repeat((DotScopeSimulation.exitDuration * 60).toInt() + 2) { simulation.advance(by = 1.0 / 60, you = 0f, agent = 0f, connected = false) }
-        assertEquals(0f, simulation.scan(grid.width).presence)
-    }
-
-    @Test fun hangingUpWhileConnectingSweepsOnlyTheBeam() {
-        val simulation = DotScopeSimulation()
-        simulation.setStage(Stage.connecting)
-        repeat(20) { simulation.advance(by = 1.0 / 60, you = 0f, agent = 0f, connected = false) }
-        simulation.setStage(Stage.ending)
-        repeat(6) { simulation.advance(by = 1.0 / 60, you = 0f, agent = 0f, connected = false) }
-        val ending = simulation.scan(grid.width)
-        assertEquals("No braid appears just to be erased", 0f, ending.helix)
-        assertTrue(ending.envelope(ending.front + 60).reveal < 0.01f)
-        assertTrue("The beam itself sweeps out", ending.envelope(ending.front).reveal > 0.9f)
-    }
-
     @Test fun soundSchedulerPingsOnceAfterALateWake() {
         val scheduler = DotScopeSimulation.SoundScheduler()
         scheduler.setStage(Stage.connecting)
@@ -267,153 +225,27 @@ class DotScopeSimulationTests {
         assertFalse(field(lows).contentEquals(field(highs)))
     }
 
-    @Test fun stageTransitionsAreContinuousAcrossPassPhases() {
-        val beamStep = DotScopeSimulation.stepDuration * 2 // 120 Hz beam cadence
-        // Leaving the call button, launching toward Mute, settling into Mute's
-        // turnaround, mid-pass going right, and mid-pass going left.
-        val connectTimes = listOf(0.02, 0.08, 0.26, 0.50, 0.76, 1.30)
-        val buffer = FloatArray(grid.count * 4)
-        val windows = FloatArray(grid.columns) { col ->
-            val x = grid.columnX(col.toFloat())
-            val t = min(1f, max(0f, (min(x, grid.width - x) - DotScopeSimulation.windowInset) / DotScopeSimulation.windowFade))
-            t * t * (3 - 2 * t)
-        }
-
-        fun renderPeakLight(simulation: DotScopeSimulation): Float {
-            simulation.render(grid, buffer)
-            var best = 0f
-            for (col in 0 until grid.columns) {
-                val win = windows[col]
-                for (row in 0 until grid.rows) {
-                    val v = (row * grid.columns + col) * 4
-                    best = max(best, max(buffer[v], buffer[v + 1]) * win)
-                }
-            }
-            return best
-        }
-
-        for (connectAt in connectTimes) {
-            val simulation = DotScopeSimulation()
-            simulation.setStage(Stage.connecting)
-            val connectSteps = max(1, (connectAt / beamStep).roundToInt())
-            var previousLight = renderPeakLight(simulation)
-            var previousScan = simulation.scan(grid.width)
-
-            repeat(connectSteps) {
-                simulation.advance(by = beamStep, you = 0f, agent = 0f, connected = false)
-                val currentScan = simulation.scan(grid.width)
-                val currentLight = renderPeakLight(simulation)
-                assertTrue("Connecting beam jumped at ${connectAt}s", abs(currentScan.front - previousScan.front) <= 10)
-                assertTrue("Connecting pulse head jumped at ${connectAt}s", abs(currentScan.head - previousScan.head) <= 0.15f)
-                assertTrue("Connecting peak light jumped at ${connectAt}s: $previousLight → $currentLight (front ${currentScan.front})", abs(currentLight - previousLight) <= 0.25f)
-                previousScan = currentScan
-                previousLight = currentLight
-            }
-
-            // Instant of connecting → live: zero discontinuity in front, head, grid, or envelope.
-            val beforeConnect = simulation.scan(grid.width)
-            simulation.setStage(Stage.live)
-            val atConnect = simulation.scan(grid.width)
-            assertTrue("Connect front jumped from ${beforeConnect.front} to ${atConnect.front}", abs(atConnect.front - beforeConnect.front) < 1e-3f)
-            assertTrue("Connect head jumped from ${beforeConnect.head} to ${atConnect.head}", abs(atConnect.head - beforeConnect.head) < 1e-3f)
-            assertTrue("Connect grid jumped from ${beforeConnect.grid} to ${atConnect.grid}", abs(atConnect.grid - beforeConnect.grid) < 1e-3f)
-            for (col in 0 until grid.columns) {
-                val x = grid.columnX(col.toFloat())
-                val e0 = beforeConnect.envelope(x)
-                val e1 = atConnect.envelope(x)
-                assertTrue(abs(e0.amp - e1.amp) < 1e-4f)
-                assertTrue(abs(e0.reveal - e1.reveal) < 1e-4f)
-                assertTrue(abs(e0.bright - e1.bright) < 1e-4f)
-                assertTrue(abs(e0.swell - e1.swell) < 1e-4f)
-            }
-
-            // Step through the live bloom and into settled live; verify every 120 Hz step is smooth.
-            repeat(80) {
-                simulation.advance(by = beamStep, you = 0.25f, agent = 0.2f, connected = true)
-                val currentScan = simulation.scan(grid.width)
-                val currentLight = renderPeakLight(simulation)
-                assertTrue("Live bloom front jumped at ${connectAt}s", abs(currentScan.front - previousScan.front) <= 12)
-                assertTrue("Live bloom head jumped at ${connectAt}s", abs(currentScan.head - previousScan.head) <= 0.15f)
-                assertTrue("Live bloom peak light jumped at ${connectAt}s: $previousLight → $currentLight", abs(currentLight - previousLight) <= 0.25f)
-                previousScan = currentScan
-                previousLight = currentLight
-            }
-
-            // Instant of live → ending: zero discontinuity in envelope across the visible window.
-            val beforeEnd = simulation.scan(grid.width)
-            simulation.setStage(Stage.ending)
-            val atEnd = simulation.scan(grid.width)
-            assertTrue(abs(atEnd.grid - beforeEnd.grid) < 1e-3f)
-            assertTrue(abs(atEnd.presence - beforeEnd.presence) < 1e-3f)
-            for (col in 0 until grid.columns) {
-                val x = grid.columnX(col.toFloat())
-                val e0 = beforeEnd.envelope(x)
-                val e1 = atEnd.envelope(x)
-                assertTrue(abs(e0.amp - e1.amp) < 1e-4f)
-                assertTrue(abs(e0.reveal - e1.reveal) < 1e-4f)
-                assertTrue(abs(e0.bright - e1.bright) < 1e-4f)
-            }
-
-            // Step through the ending sweep to exitDuration; verify no per-step jump.
-            previousScan = atEnd
-            repeat((DotScopeSimulation.exitDuration / beamStep).roundToInt()) {
-                simulation.advance(by = beamStep, you = 0f, agent = 0f, connected = false)
-                val currentScan = simulation.scan(grid.width)
-                val currentLight = renderPeakLight(simulation)
-                assertTrue("Ending sweep front jumped", abs(currentScan.front - previousScan.front) <= 12)
-                assertTrue("Ending peak light jumped", abs(currentLight - previousLight) <= 0.35f)
-                previousScan = currentScan
-                previousLight = currentLight
-            }
-
-            // Also verify connecting → ending directly from this pass phase has zero jump.
-            val preConnect = DotScopeSimulation()
-            preConnect.setStage(Stage.connecting)
-            repeat(connectSteps) { preConnect.advance(by = beamStep, you = 0f, agent = 0f, connected = false) }
-            var prevPreLight = renderPeakLight(preConnect)
-            val beforeAbort = preConnect.scan(grid.width)
-            preConnect.setStage(Stage.ending)
-            val atAbort = preConnect.scan(grid.width)
-            assertTrue("Connecting→ending front jumped from ${beforeAbort.front} to ${atAbort.front}", abs(atAbort.front - beforeAbort.front) < 1e-3f)
-            assertTrue("Connecting→ending head jumped from ${beforeAbort.head} to ${atAbort.head}", abs(atAbort.head - beforeAbort.head) < 1e-3f)
-            var prevAbortScan = atAbort
-            repeat((DotScopeSimulation.exitDuration / beamStep).roundToInt()) {
-                preConnect.advance(by = beamStep, you = 0f, agent = 0f, connected = false)
-                val curAbortScan = preConnect.scan(grid.width)
-                val curPreLight = renderPeakLight(preConnect)
-                assertTrue("Connecting→ending sweep must move monotonically toward End", curAbortScan.front >= prevAbortScan.front - 1e-3f)
-                assertTrue(abs(curAbortScan.front - prevAbortScan.front) <= 12)
-                assertTrue(abs(curPreLight - prevPreLight) <= 0.35f)
-                prevAbortScan = curAbortScan
-                prevPreLight = curPreLight
-            }
-        }
-    }
-
     @Test fun connectingPassPingsLineUpWithBeamTurnarounds() {
-        val simulation = DotScopeSimulation()
         val scheduler = DotScopeSimulation.SoundScheduler()
-        simulation.setStage(Stage.connecting)
         scheduler.setStage(Stage.connecting)
 
         val leftEdge = DotScopeSimulation.Scan.edgeInset
         val rightEdge = grid.width - DotScopeSimulation.Scan.edgeInset
         // The beam starts on the call button, at End's end of the bar, and heads for Mute.
-        val start = simulation.scan(grid.width)
-        assertTrue(abs(start.front - (grid.width - DotScopeSimulation.Scan.launchInset)) < 0.5f)
+        assertTrue(abs(front(elapsed = 0f) - (grid.width - DotScopeSimulation.Scan.launchInset)) < 0.5f)
         data class Emitted(val cue: Cue, val front: Float, val time: Double)
         val emitted = mutableListOf<Emitted>()
         val midPassHeads = mutableListOf<Float>()
 
         val steps = (2.3 / DotScopeSimulation.stepDuration).roundToInt()
         for (step in 1..steps) {
-            simulation.advance(by = DotScopeSimulation.stepDuration, you = 0f, agent = 0f, connected = false)
             scheduler.advance(by = DotScopeSimulation.stepDuration)
-            val scan = simulation.scan(grid.width)
-            for (cue in scheduler.poll()) emitted += Emitted(cue, scan.front, step * DotScopeSimulation.stepDuration)
-            val pass = scan.elapsed / DotScopeSimulation.Scan.sweepPass
+            val elapsed = (step * DotScopeSimulation.stepDuration).toFloat()
+            val beam = DotScopeSimulation.Scan.connectingBeam(elapsed)
+            for (cue in scheduler.poll()) emitted += Emitted(cue, front(elapsed), step * DotScopeSimulation.stepDuration)
+            val pass = elapsed / DotScopeSimulation.Scan.sweepPass
             val along = pass - floor(pass)
-            if (abs(along - 0.5f) < 0.01f) midPassHeads += scan.head
+            if (abs(along - 0.5f) < 0.01f) midPassHeads += beam.head
         }
 
         assertEquals(listOf(Cue.sweepRight, Cue.sweepLeft, Cue.sweepRight, Cue.sweepLeft), emitted.map { it.cue })
@@ -428,25 +260,19 @@ class DotScopeSimulationTests {
     }
 
     /**
-     * The scope's first frames after the call button's tap, drawn as
-     * `DotScopeRenderer` does: synced to the call's connecting clock (which
-     * runs from the tap), then stepped by the frame's duration.
+     * Where the connecting beam's front is [elapsed] seconds into the call, in points: what the
+     * call's cue and haptic timings are placed against.
      */
-    private fun connectingFronts(firstFrameAt: Double, frames: Int): List<Float> {
-        val simulation = DotScopeSimulation()
-        val frame = 1.0 / 60
-        return (0 until frames).map { n ->
-            val step = if (n == 0) 0.0 else frame
-            simulation.setStage(Stage.connecting, elapsed = firstFrameAt + n * frame - step)
-            simulation.advance(by = step, you = 0f, agent = 0f, connected = false)
-            simulation.scan(grid.width).front
-        }
+    private fun front(elapsed: Float): Float {
+        val beam = DotScopeSimulation.Scan.connectingBeam(elapsed)
+        return DotScopeSimulation.Scan.beamX(progress = beam.progress, width = grid.width) + beam.overshoot
     }
 
     /** iOS `@Test(arguments: [0.0, 1.0 / 60, 2.0 / 60])`. */
     @Test fun theBeamLeavesTheCallButtonFromTheFirstFrame() {
         for (delay in listOf(0.0, 1.0 / 60, 2.0 / 60)) {
-            val fronts = connectingFronts(firstFrameAt = delay, frames = 7)
+            val frame = 1.0 / 60
+            val fronts = (0 until 7).map { n -> front((delay + n * frame).toFloat()) }
             val button = grid.width - DotScopeSimulation.Scan.launchInset
             assertTrue("It starts at the call button: $fronts", fronts[0] <= button + 0.01f && fronts[0] > button - 35)
             for ((a, b) in fronts.zipWithNext()) {
@@ -457,55 +283,5 @@ class DotScopeSimulationTests {
             val window = grid.width - DotScopeSimulation.windowInset - DotScopeSimulation.windowFade / 2
             assertTrue("$fronts", fronts[5] < window)
         }
-    }
-
-    @Test fun trayModeReachesLeadingEdgeAndHonoursVisibleBarWidth() {
-        val simulation = DotScopeSimulation()
-        simulation.setStage(Stage.connecting)
-        repeat(33) { simulation.advance(by = 1.0 / 60, you = 0f, agent = 0f, connected = false) }
-
-        val defaultScan = simulation.scan(grid.width)
-        // iOS copies the value; the Kotlin simulation is a class, and `simulation` isn't used again.
-        val traySim = simulation
-        traySim.windowInsets = ScopeVector2(0f, 108f)
-        traySim.reachesLeadingEdge = true
-        traySim.visibleBar = ScopeVector2(0f, grid.width)
-        val trayScan = traySim.scan(grid.width)
-        assertTrue(abs(defaultScan.front - DotScopeSimulation.Scan.edgeInset) < 1.5f)
-        assertTrue("Tray scanner reaches the left cap (14 pt) since Mute is on the right", abs(trayScan.front - 14) < 1.5f)
-
-        // When pinned in the narrower drawer, scan operates in the visible bar's coordinate space (0…narrowedWidth).
-        val narrowedWidth = 280f
-        traySim.visibleBar = ScopeVector2(grid.width - narrowedWidth, narrowedWidth)
-        val narrowedScan = traySim.scan(grid.width)
-        assertEquals(narrowedWidth, narrowedScan.width)
-        assertTrue(abs(narrowedScan.front - 14) < 1.5f)
-
-        // Live voices light dots near the left cap when reachesLeadingEdge is enabled.
-        val trayLive = DotScopeSimulation()
-        trayLive.setStage(Stage.live)
-        trayLive.windowInsets = ScopeVector2(0f, 108f)
-        trayLive.reachesLeadingEdge = true
-        trayLive.visibleBar = ScopeVector2(0f, grid.width)
-
-        val defaultLive = DotScopeSimulation()
-        defaultLive.setStage(Stage.live)
-        for (n in 0 until 90) {
-            trayLive.advance(by = 1.0 / 60, you = 0.35f + 0.6f * syllable(n), agent = 0f, connected = true)
-            defaultLive.advance(by = 1.0 / 60, you = 0.35f + 0.6f * syllable(n), agent = 0f, connected = true)
-        }
-        val defaultBuffer = FloatArray(grid.count * 4)
-        val trayBuffer = FloatArray(grid.count * 4)
-        defaultLive.render(grid, defaultBuffer)
-        trayLive.render(grid, trayBuffer)
-        val leftColumn = 6 // x ≈ 22 pt, well inside the left cap where Mute used to sit
-        var defaultLeftSwing = 0f
-        var trayLeftSwing = 0f
-        val mid = (grid.rows - 1) / 2f
-        for (row in 0 until grid.rows) {
-            if (defaultBuffer[(row * grid.columns + leftColumn) * 4] > 0.35f) defaultLeftSwing = max(defaultLeftSwing, abs(row - mid))
-            if (trayBuffer[(row * grid.columns + leftColumn) * 4] > 0.35f) trayLeftSwing = max(trayLeftSwing, abs(row - mid))
-        }
-        assertTrue("Tray live waveform reaches into the left cap (x ≈ 22 pt)", trayLeftSwing > defaultLeftSwing + 1)
     }
 }

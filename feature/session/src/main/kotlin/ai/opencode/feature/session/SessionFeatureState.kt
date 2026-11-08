@@ -7,7 +7,6 @@ import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.composer.ComposerAttachmentsFeature
 import ai.opencode.feature.composer.ComposerFileAttachment
 import ai.opencode.feature.composer.DictationFeature
-import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import ai.opencode.feature.composer.SharedLocation
 import ai.opencode.feature.transcript.TranscriptEntry
@@ -319,18 +318,17 @@ fun State.Companion.peekText(markdown: String): String {
 // region Voice
 
 /**
- * Voice is an opt-in Advanced feature and requires the user's own key for the chosen engine unless
- * Server Voice is active on a supporting server.
+ * Voice is an opt-in feature (Settings → Voice): calls go through a server that brokers them, or
+ * the user's own key for the chosen engine; without either, the call button stays hidden.
  */
 val State.voiceRoute: VoiceRoute
     get() {
         val hasOpenAIKey = !openAIAPIKey.value.isNullOrBlank()
         val broker = VoiceBroker(
-            serverVoice = ExperimentalFeature.serverVoice.isActive(serverVoiceExperiment.value),
             choice = voiceServer.value,
             provider = serverVoiceProvider.value,
             connected = server,
-            saved = { VoiceFeature.savedServers },
+            saved = VoiceFeature.savedServers,
             readiness = VoiceReadiness(
                 answers = voiceModelsByServer.value,
                 support = serverVoiceSupportByServer.value,

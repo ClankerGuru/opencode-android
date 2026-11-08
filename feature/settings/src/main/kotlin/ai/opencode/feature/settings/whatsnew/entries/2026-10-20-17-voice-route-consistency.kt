@@ -10,5 +10,5 @@ internal val WhatsNewShipped.voiceRouteConsistency: WhatsNewEntry
         day = "2026-10-20",
         title = "Voice Connection Fixes",
         symbol = "phone",
-        summary = "Grok keeps using your xAI key with Server Voice on, and Gemini identifies itself correctly.",
+        summary = "Grok keeps using your xAI key when your server runs calls, and Gemini identifies itself correctly.",
     )

@@ -6,10 +6,7 @@ import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.TestClock
 import ai.opencode.core.dependencies.UuidClient
 import ai.opencode.core.dependencies.asContextElement
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.sharing.SharedKeys
-import ai.opencode.core.sharing.experimental
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeSession
 import kotlinx.coroutines.channels.Channel
@@ -31,8 +28,8 @@ class VoiceRouteTests {
 
     /**
      * 192 combinations. Expected precedence is tabulated independently of the resolver:
-     * Grok always phone; active Gemini always server; supported/undetermined Server Voice
-     * owns remaining OpenAI; confirmed 404 falls back.
+     * Grok always phone; active Gemini always server; a broker whose support is
+     * supported/undetermined owns remaining OpenAI; confirmed 404 falls back.
      */
     @Test fun completePrecedenceTable() {
         var count = 0
@@ -76,7 +73,6 @@ class VoiceRouteTests {
         shared.set(VoiceSharedKeys.voiceEngine, VoiceEngine.gptLive)
         shared.set(SharedKeys.openAIAPIKey, null)
         shared.set(SharedKeys.xaiAPIKey, null)
-        shared.set(experimental(ExperimentalFeature.serverVoice), false)
         shared.set(VoiceSharedKeys.serverVoiceProvider, ServerVoiceProvider.openAI)
         shared.set(VoiceSharedKeys.voiceServerChoice, VoiceServerChoice.Automatic)
         shared.set(VoiceSharedKeys.serverVoiceSupportByServer, emptyMap())
@@ -104,7 +100,6 @@ class VoiceRouteTests {
         }
         try {
             val store = voiceTestStore(shared, { state }) {
-                this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.serverVoice))
                 this[DateClient] = DateClient.constant(Instant.ofEpochSecond(100))
                 this[UuidClient] = UuidClient { logID }
                 this[VoiceCallLogClient] = VoiceCallLogClient(recorder = recorder)
@@ -178,7 +173,6 @@ class VoiceRouteTests {
             .copy(usesDelegator = true, activeRoute = VoiceRoute.PhoneKey(VoiceEngine.gptLive))
         var updates = 0
         val store = voiceTestStore(shared, { state }) {
-            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.serverVoice))
             this[VoiceWorkClient] = testVoiceWork()
             this[VoiceCallClient] = testVoiceCall(
                 retarget = { },
@@ -198,13 +192,13 @@ class VoiceRouteTests {
     private fun hangingUpDuringProbeOrPreflightNeverStartsTheCall(probing: Boolean) = runTest {
         val shared = preserveSettings()
         shared.set(SharedKeys.openAIAPIKey, "test-phone")
+        if (!probing) shared.set(VoiceSharedKeys.voiceServerChoice, VoiceServerChoice.Phone)
         val clock = TestClock()
         val entered = Channel<Unit>(Channel.UNLIMITED)
         val state = shared.read { VoiceFeature.State(server, session) }
         val store = voiceTestStore(shared, { state }) {
             this[DateClient] = DateClient.constant(Instant.ofEpochSecond(100))
             this[Clock] = clock
-            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(if (probing) setOf(ExperimentalFeature.serverVoice) else emptySet())
             this[VoiceWorkClient] = testVoiceWork()
             this[ServerVoiceClient] = ServerVoiceClient(
                 checkSupport = {
@@ -229,7 +223,7 @@ class VoiceRouteTests {
                 startedTarget = state.target,
                 activeRoute = if (probing) VoiceRoute.serverOpenAI(VoiceRoute.OpenAI.gptLive) else VoiceRoute.PhoneKey(VoiceEngine.gptLive),
                 activeVoice = CallVoice.marin,
-                diagnosesFailure = probing,
+                diagnosesFailure = true,
                 callPlace = if (probing) VoiceCallPlace("Localhost", VoiceProviderOption.Brand.openAI) else null,
                 // Android: the call's ongoing notification, started with the call.
                 callPresenceID = UUID(0, 0),

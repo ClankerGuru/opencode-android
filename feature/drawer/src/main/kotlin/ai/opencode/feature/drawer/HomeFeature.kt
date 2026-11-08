@@ -34,8 +34,6 @@ import ai.opencode.feature.system.notifications.NotificationPermission
 import ai.opencode.feature.system.share.ReceivedShare
 import ai.opencode.feature.settings.HomeSettingsFeature
 import ai.opencode.feature.system.liveactivity.SessionLiveActivity
-import ai.opencode.core.sharing.ExperimentalFeatures
-import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.feature.voice.VoiceSharedKeys
 import ai.opencode.feature.voice.VoiceEngine
 import ai.opencode.feature.settings.SettingsFeature
@@ -502,12 +500,11 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         /**
          * The pages a call's card opens Settings at (iOS `SettingsView`'s `voicePage` and
          * `VoiceSettingsView`'s `opensPage`, which push on appearing): Voice, then Voice Provider
-         * (with Your Account over it) when Server Voice's provider row stands in for the key row.
+         * (with Your Account over it) when the provider row stands in for the key row (not Grok).
          */
         private fun voiceSettingsPath(voicePage: VoiceSettingsPage?): List<SettingsPage> {
             voicePage ?: return emptyList()
-            val showsProviderRow = dependency(ExperimentalFeatures)(ExperimentalFeature.serverVoice) &&
-                shared(VoiceSharedKeys.voiceEngine).value != VoiceEngine.grok
+            val showsProviderRow = shared(VoiceSharedKeys.voiceEngine).value != VoiceEngine.grok
             if (!showsProviderRow || voicePage == VoiceSettingsPage.voice) return listOf(SettingsPage.Voice)
             return listOf(SettingsPage.Voice, SettingsPage.VoiceProvider(opensAccount = voicePage == VoiceSettingsPage.account))
         }

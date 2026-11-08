@@ -61,12 +61,12 @@ class AllExperimentsTests {
     /** On turns on every experiment in the pane, except the ones that ask for a permission or share data, and runs what each switch does. */
     @Test fun onTurnsOnEveryExperimentThatJoinsAll() = runTest {
         val shared = SettingsTestShared()
-        shared.set(allExperimentsSkips(ExperimentalFeature.serverVoice), true)
+        shared.set(allExperimentsSkips(ExperimentalFeature.inboxSidebar), true)
         val log = Locked(listOf<String>())
         val store = store(shared, log)
         store.send(HomeSettingsFeature.Action.AllExperimentsChanged(true))
         store.finish()
-        val left = setOf(ExperimentalFeature.backgroundCallIntent, ExperimentalFeature.shareScreenWithAgents, ExperimentalFeature.serverVoice)
+        val left = setOf(ExperimentalFeature.backgroundCallIntent, ExperimentalFeature.shareScreenWithAgents, ExperimentalFeature.inboxSidebar)
         for (feature in listed) {
             assertEquals("$feature", feature !in left, shared.on(feature))
         }

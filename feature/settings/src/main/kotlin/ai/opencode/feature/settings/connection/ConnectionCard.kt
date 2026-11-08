@@ -4,6 +4,7 @@ import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.observe
+import ai.opencode.core.ui.AlertTextFields
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
@@ -657,6 +658,7 @@ fun ServerPage(store: SettingsStore) {
                         value = nameDraft,
                         onValueChange = { nameDraft = it },
                         placeholder = { Text(current.friendlyName) },
+                        trailingIcon = AlertTextFields.clearButton(nameDraft) { nameDraft = "" },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                         modifier = Modifier.fillMaxWidth().padding(top = 12.dp),

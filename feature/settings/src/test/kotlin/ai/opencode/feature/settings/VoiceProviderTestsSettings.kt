@@ -1,9 +1,7 @@
 package ai.opencode.feature.settings
 
-import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.SharedStore
-import ai.opencode.core.sharing.experimental
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.voice.ServerVoiceClient
@@ -43,7 +41,6 @@ class VoiceProviderTestsSettings {
     private fun SettingsTestShared.save(servers: List<OpenCodeServer>, choice: VoiceServerChoice = VoiceServerChoice.Automatic) {
         set(ServerSharedKeys.savedServers, servers)
         set(ServerSharedKeys.savedServer, server)
-        set(experimental(ExperimentalFeature.serverVoice), true)
         set(VoiceSharedKeys.voiceServerChoice, choice)
     }
 
@@ -130,10 +127,11 @@ class VoiceProviderTestsSettings {
             assertEquals(listOf("My Mac"), settings.providerCatalog.unavailable.map { it.title })
         }
 
-        shared.set(experimental(ExperimentalFeature.serverVoice), false)
+        // Grok runs only on this phone's xAI key: its key row, no provider row.
+        shared.set(VoiceSharedKeys.voiceEngine, VoiceEngine.grok)
         shared.read {
             assertFalse(settings.showsProviderRow)
-            assertEquals("OpenAI · GPT-Live", settings.modelRowValue)
+            assertEquals("xAI · ${VoiceEngine.grok.title}", settings.modelRowValue)
         }
     }
 }

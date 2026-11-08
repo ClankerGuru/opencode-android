@@ -714,9 +714,10 @@ fun VoiceCallEnded(store: VoiceStoreOf, modifier: Modifier = Modifier) {
 }
 
 /**
- * Shown above the composer when the call couldn't connect. With Server Voice, the provider that
- * couldn't start it, one sentence and one fix ([VoiceProviderFailureCard]); otherwise the error as
- * it came, with Check API Key (or Open Settings when the microphone was denied) and Try Again.
+ * Shown above the composer when the call couldn't connect: the provider that couldn't start it,
+ * one sentence and one fix ([VoiceProviderFailureCard]); for Grok, which only runs on this phone's
+ * xAI key, the error as it came, with Check API Key (or Open Settings when the microphone was
+ * denied) and Try Again.
  */
 @Composable
 fun VoiceCallFailure(store: VoiceStoreOf, message: String, modifier: Modifier = Modifier) {

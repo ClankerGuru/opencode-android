@@ -132,7 +132,7 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
         /** Whether [supportServer] supports `POST /api/experimental/voice/session`. */
         val serverVoiceSupport: ServerVoiceSupport = ServerVoiceSupport.unknown,
         /**
-         * The saved server that brokered the last Server Voice start, when it
+         * The saved server that brokered the last server-brokered start, when it
          * wasn't the call's own (Settings › Voice › Voice Server).
          */
         val serverVoiceBroker: OpenCodeServer? = null,
@@ -170,12 +170,12 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
         val sessionDelegator: VoiceSessionDelegator.State = VoiceSessionDelegator.State(),
         /**
          * The server brokering the call, named while it connects and when it
-         * fails (the Server Voice experiment). Null on this phone.
+         * fails. Null on this phone.
          */
         val callPlace: VoiceCallPlace? = null,
         /**
-         * A failed start says why and offers the one fix (the Server Voice
-         * experiment); otherwise its card shows the error as it came.
+         * A failed start says why and offers the one fix; a Grok call's card
+         * shows the error as it came, with Check API Key for its xAI key.
          */
         val diagnosesFailure: Boolean = false,
         /** Pure state machine tracking delegated session prompts and their outcomes. */
@@ -844,7 +844,7 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
                 )
                 VoiceCallFix.chooseProvider -> Reduced(
                     state,
-                    Effect.send(Action.Delegate(DelegateAction.OpenVoiceSettings(if (state.diagnosesFailure) VoiceSettingsPage.provider else VoiceSettingsPage.voice))),
+                    Effect.send(Action.Delegate(DelegateAction.OpenVoiceSettings(VoiceSettingsPage.provider))),
                 )
                 VoiceCallFix.updateOpenCode -> {
                     val opener = dependency(VoiceCallFixClient)

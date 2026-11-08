@@ -6,8 +6,6 @@ import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.ImmediateClock
 import ai.opencode.core.dependencies.TestClock
 import ai.opencode.core.dependencies.UuidClient
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.SharedStore
 import ai.opencode.core.sharing.shared
@@ -162,7 +160,7 @@ class ServerVoiceTests {
     @Test fun serverVoiceErrorMappingFormatsMissingServerKeyAnd404Fallback() {
         val notFound = ServerVoiceError.fromHTTPResponse(statusCode = 404, data = "Not Found".toByteArray())
         assertEquals(ServerVoiceError.UnsupportedRoute, notFound)
-        assertEquals("This server doesn’t support server voice yet", notFound.errorDescription)
+        assertEquals("This server needs a newer OpenCode for voice calls", notFound.errorDescription)
 
         val missingOpenAIKeyBody = """
             {
@@ -195,20 +193,6 @@ class ServerVoiceTests {
         )
     }
 
-    @Test fun flagOffRequiresPhoneAPIKeyExactlyLikeMain() = runBlocking {
-        val shared = resetSharedVoiceState()
-        val state = shared.run { VoiceFeature.State(server, session) }
-        val store = TestStore(state, VoiceFeature(), detachedScope(coroutineContext)) {
-            this[SharedStore] = shared.store
-            this[ExperimentalFeatures] = ExperimentalFeatures { false }
-        }
-
-        store.send(VoiceFeature.Action.Start) {
-            it.withPhase(VoiceFeature.State.Phase.Failed("Add your OpenAI API key in Settings to use Voice."))
-        }
-        store.finish()
-    }
-
     /** iOS's `withDependencies` for the Server Voice starts; Android adds the presence ID. */
     private fun serverVoiceDependencies(
         shared: SpeechTestShared,
@@ -216,10 +200,8 @@ class ServerVoiceTests {
         start: suspend (String, RealtimeSessionConfig) -> kotlinx.coroutines.flow.Flow<VoiceCallEvent>,
         end: suspend () -> Unit = {},
         serverVoice: ServerVoiceClient? = null,
-        experimental: ExperimentalFeatures = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.serverVoice)),
     ): ai.opencode.core.dependencies.DependencyValues.Builder.() -> Unit = {
         this[SharedStore] = shared.store
-        this[ExperimentalFeatures] = experimental
         this[DateClient] = DateClient.constant(Instant.ofEpochSecond(at))
         this[UuidClient] = UuidClient.incrementing()
         // The call's start cue and its ongoing-notification linger read the clock.
@@ -930,14 +912,15 @@ class ServerVoiceTests {
     }
 
     /**
-     * On the phone's own key (Server Voice off) GPT-Live keeps client
-     * delegation and the phone's delegator, as on main.
+     * On the phone's own key (This Phone) GPT-Live keeps client delegation
+     * and the phone's delegator.
      */
     @Test fun phoneKeyCallsKeepClientDelegationAndThePhoneDelegator() = runBlocking {
         val shared = resetSharedVoiceState()
         val configs = Locked(listOf<RealtimeSessionConfig>())
         val stream = Channel<VoiceCallEvent>(Channel.UNLIMITED)
         val state = shared.run {
+            shared(VoiceSharedKeys.voiceServerChoice).set(VoiceServerChoice.Phone)
             shared(SharedKeys.openAIAPIKey).set("sk-phone")
             shared(SharedKeys.verifiedVoiceKeyFingerprint).set(VoiceKeyFingerprint.make(key = "sk-phone", model = VoiceEngine.gptLive.modelID))
             VoiceFeature.State(server, session)
@@ -954,7 +937,6 @@ class ServerVoiceTests {
                     stream.consumeAsFlow()
                 },
                 end = { stream.close() },
-                experimental = ExperimentalFeatures { false },
             ).invoke(this)
             this[VoiceDelegatorClient] = VoiceDelegatorClient(isEnabled = true) { _, _, _ -> throw OpenCodeClientError("unused") }
         }
@@ -964,6 +946,7 @@ class ServerVoiceTests {
                 startedTarget = startedTarget(),
                 activeVoice = CallVoice.marin,
                 usesDelegator = true,
+                diagnosesFailure = true,
                 callPresenceID = presenceID,
             )
         }

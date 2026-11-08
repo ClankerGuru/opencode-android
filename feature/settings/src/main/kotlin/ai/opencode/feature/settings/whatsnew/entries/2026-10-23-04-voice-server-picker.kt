@@ -10,5 +10,5 @@ internal val WhatsNewShipped.voiceServerPicker: WhatsNewEntry
         day = "2026-10-23",
         title = "Choose a Voice Server",
         symbol = "server.rack",
-        summary = "With Server Voice on, Settings › Voice › Voice Provider picks which saved server your calls go through, or your own OpenAI account on this phone.",
+        summary = "In Settings › Voice › Voice Provider, choose which saved server your calls go through, or your own OpenAI account on this phone.",
     )

@@ -197,8 +197,7 @@ fun VoiceConnectingCaption(place: VoiceCallPlace, text: String, modifier: Modifi
 }
 
 /**
- * A failed call's card (the Server Voice experiment): the provider that couldn't start it,
- * badged, one sentence, and the one button that fixes it.
+ * A failed call's card: the provider that couldn't start it, badged, one sentence, and the one button that fixes it.
  *
  * @param brand who ran the call; null on this phone, or a server that couldn't say.
  */

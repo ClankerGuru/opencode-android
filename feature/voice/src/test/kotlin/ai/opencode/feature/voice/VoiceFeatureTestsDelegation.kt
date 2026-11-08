@@ -5,6 +5,7 @@ import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.ImmediateClock
 import ai.opencode.core.dependencies.TestClock
+import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.TestStore
 import ai.opencode.feature.voice.VoiceFeature.Action
 import ai.opencode.feature.voice.VoiceFeature.State
@@ -58,6 +59,8 @@ class VoiceFeatureTestsDelegation {
         }
         store.exhaustive = false
         store.setAPIKey(apiKey)
+        // These cover calls on this phone's key; Automatic would try the server first.
+        store.withDependencies { shared(VoiceSharedKeys.voiceServerChoice).set(VoiceServerChoice.Phone) }
         return store
     }
 

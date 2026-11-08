@@ -163,10 +163,6 @@ class TuningStore(
     fun unregister(prefix: String, excluding: String? = null) =
         unregisterWhere { it.startsWith(prefix) && (excluding == null || !it.startsWith(excluding)) }
 
-    fun unregister(keys: Set<String>) {
-        if (keys.isNotEmpty()) unregisterWhere { it in keys }
-    }
-
     private fun unregisterWhere(predicate: (String) -> Boolean) {
         val removed = synchronized(lock) {
             val matching = state.order.filter(predicate)

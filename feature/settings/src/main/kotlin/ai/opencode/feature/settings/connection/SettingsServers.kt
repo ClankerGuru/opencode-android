@@ -1,6 +1,7 @@
 package ai.opencode.feature.settings.connection
 
 import ai.opencode.core.sharing.shared
+import ai.opencode.core.ui.AlertTextFields
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
@@ -131,6 +132,7 @@ fun SettingsServersSection(
                         value = nameDraft,
                         onValueChange = { nameDraft = it },
                         placeholder = { Text(server.friendlyName) },
+                        trailingIcon = AlertTextFields.clearButton(nameDraft) { nameDraft = "" },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                         modifier = Modifier.fillMaxWidth().padding(top = 12.dp),

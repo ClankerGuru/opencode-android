@@ -92,7 +92,7 @@ data class RealtimeSessionConfig(
     val isAtEar: Boolean = false,
     /** The server brokering the session through `POST /api/experimental/voice/session`. */
     val serverVoice: OpenCodeServer? = null,
-    /** Provider choice when Server Voice is enabled. */
+    /** The provider the broker runs, while a server brokers the session. */
     val provider: ServerVoiceProvider = ServerVoiceProvider.openAI,
     /**
      * GPT-Live: who runs its delegations (Server Voice runs the delegator on

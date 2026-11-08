@@ -24,7 +24,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.security.MessageDigest
 
-/** Which voice provider new calls use when Server Voice is enabled. */
+/** Which voice provider new calls use when a server brokers them. */
 @Serializable
 enum class ServerVoiceProvider(val rawValue: String) {
     @SerialName("openai") openAI("openai"),
@@ -262,7 +262,7 @@ sealed class ServerVoiceError(message: String) : Exception(message) {
     override fun fillInStackTrace(): Throwable = this
 
     companion object {
-        const val unsupportedServerNotice = "This server doesn’t support server voice yet"
+        const val unsupportedServerNotice = "This server needs a newer OpenCode for voice calls"
 
         fun fromHTTPResponse(statusCode: Int, data: ByteArray): ServerVoiceError {
             if (statusCode == 404) return UnsupportedRoute

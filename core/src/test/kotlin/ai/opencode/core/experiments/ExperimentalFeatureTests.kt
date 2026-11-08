@@ -95,7 +95,7 @@ class ExperimentalFeatureTests {
         )
         assertEquals(
             listOf(
-                ExperimentalFeature.serverVoice, ExperimentalFeature.backgroundCallIntent, ExperimentalFeature.voiceSessionDelegator,
+                ExperimentalFeature.backgroundCallIntent, ExperimentalFeature.voiceSessionDelegator,
                 ExperimentalFeature.shareScreenWithAgents,
             ),
             ExperimentalGroup.calls.features,
@@ -115,10 +115,10 @@ class ExperimentalFeatureTests {
             "session-switcher", "server-title-switch",
             "composer-autocomplete", "server-flow", "plus-menu-sheet", "project-icons",
             "floating-call", "call-tray", "image-link-previews", "living-orb", "new-messages-divider",
-            "open-links-from-calls", "audio-in-calls", "server-details",
+            "open-links-from-calls", "audio-in-calls", "server-details", "server-voice",
         )
         val leftovers = listOf(
-            "experimental-all-saved-living-orb", "experimental-all-skip-image-link-previews",
+            "experimental-all-saved-living-orb", "experimental-all-skip-image-link-previews", "experimental-all-saved-server-voice",
             "call-style-migrated-living-orb", "call-style-migrated-orb-default",
         )
         withFreshStorage {

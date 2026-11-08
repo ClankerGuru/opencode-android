@@ -48,7 +48,6 @@ internal object VoiceSessionDelegatorTestSupport {
         shared.set(VoiceSharedKeys.voiceEngine, VoiceEngine.gptLive)
         shared.set(SharedKeys.openAIAPIKey, null)
         shared.set(SharedKeys.xaiAPIKey, null)
-        shared.set(experimental(ExperimentalFeature.serverVoice), false)
         shared.set(VoiceSharedKeys.serverVoiceProvider, ServerVoiceProvider.openAI)
         shared.set(VoiceSharedKeys.voiceServerChoice, VoiceServerChoice.Automatic)
         shared.set(VoiceSharedKeys.serverVoiceSupportByServer, emptyMap())

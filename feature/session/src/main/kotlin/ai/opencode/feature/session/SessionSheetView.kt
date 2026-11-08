@@ -5,6 +5,7 @@ import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.collectState
+import ai.opencode.core.ui.AlertTextFields
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
@@ -910,6 +911,9 @@ fun SessionActionPresentations(sheet: StoreOf<SessionSheetFeature.State, Session
                     value = state.renameDraft,
                     onValueChange = { sheet.send(SessionSheetFeature.Action.RenameDraftChanged(it)) },
                     placeholder = { Text("Title") },
+                    trailingIcon = AlertTextFields.clearButton(state.renameDraft) {
+                        sheet.send(SessionSheetFeature.Action.RenameDraftChanged(""))
+                    },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { sheet.send(SessionSheetFeature.Action.RenameSubmitted) }),

@@ -74,7 +74,7 @@ class HomeSettingsFeature : Reducer<HomeSettingsFeature.State, HomeSettingsFeatu
         data class VoiceServerChanged(val choice: VoiceServerChoice) : Action
         /** Settings › Voice › Delegator (OpenCode Session Delegator). */
         data class VoiceDelegatorChoiceChanged(val choice: VoiceDelegatorChoice) : Action
-        /** Asks the server that brokers Server Voice calls whether it offers them. */
+        /** Asks the server that brokers calls whether it offers the voice routes. */
         data object CheckServerVoiceSupport : Action
         data class ServerVoiceSupportLoaded(val serverID: String, val support: ServerVoiceSupport) : Action
         /**
@@ -112,10 +112,6 @@ class HomeSettingsFeature : Reducer<HomeSettingsFeature.State, HomeSettingsFeatu
      * Activity switched off (`HomeFeatureSettings`).
      */
     private fun experimentalFeatureApplied(feature: ExperimentalFeature, on: Boolean): Effect<Action> {
-        if (feature == ExperimentalFeature.serverVoice) {
-            if (!ExperimentalFeature.serverVoice.isActive(on)) return Effect.none()
-            return Effect.send(Action.CheckServerVoiceSupport)
-        }
         if (feature == ExperimentalFeature.soundEffects) {
             if (ExperimentalFeature.soundEffects.isActive(on)) soundEffects.prepare()
         }
@@ -159,7 +155,6 @@ class HomeSettingsFeature : Reducer<HomeSettingsFeature.State, HomeSettingsFeatu
             is Action.VoiceServerChanged -> setShared(VoiceSharedKeys.voiceServerChoice, action.choice)
             is Action.VoiceDelegatorChoiceChanged -> setShared(VoiceSharedKeys.voiceDelegatorChoice, action.choice)
             Action.CheckServerVoiceSupport -> {
-                // Sent only while Server Voice is on.
                 val choice = shared(VoiceSharedKeys.voiceServerChoice)
                 if (choice.value == VoiceServerChoice.Connected) choice.update { it.pinningConnected(state.server) }
                 val provider = shared(VoiceSharedKeys.serverVoiceProvider).value
@@ -170,11 +165,10 @@ class HomeSettingsFeature : Reducer<HomeSettingsFeature.State, HomeSettingsFeatu
                     engine = shared(VoiceSharedKeys.voiceEngine).value,
                 )
                 val pick = VoiceBroker(
-                    serverVoice = true,
                     choice = choice.value,
                     provider = provider,
                     connected = state.server,
-                    saved = { VoiceFeature.savedServers },
+                    saved = VoiceFeature.savedServers,
                     readiness = readiness,
                 )
                 // iOS's Home always has a server; Android's state can be empty before one connects.

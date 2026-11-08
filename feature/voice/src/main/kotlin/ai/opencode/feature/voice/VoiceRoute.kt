@@ -162,14 +162,13 @@ sealed interface VoiceKeySource {
  * tools stay on its own server.
  */
 class VoiceBroker(
-    serverVoice: Boolean,
     choice: VoiceServerChoice,
     provider: ServerVoiceProvider = ServerVoiceProvider.openAI,
     connected: OpenCodeServer?,
-    saved: () -> List<OpenCodeServer>,
+    saved: List<OpenCodeServer>,
     readiness: VoiceReadiness = VoiceReadiness(),
 ) {
-    /** Server Voice brokers new calls: it's on, and the pick is a server. */
+    /** A server brokers new calls: the pick, or Automatic's choice, is a server. */
     val isEnabled: Boolean
 
     /** The server that brokers, picked or chosen automatically. Null while nothing brokers. */
@@ -182,40 +181,32 @@ class VoiceBroker(
     val provider: ServerVoiceProvider
 
     init {
-        if (!serverVoice) {
+        val pick = VoicePick.resolve(choice, provider, connected, saved, readiness)
+        if (pick.place == VoiceProviderOption.Place.Phone) {
             isEnabled = false
             server = null
-            isAutomatic = choice == VoiceServerChoice.Automatic
-            this.provider = provider
         } else {
-            val pick = VoicePick.resolve(choice, provider, connected, saved(), readiness)
-            if (pick.place == VoiceProviderOption.Place.Phone) {
-                isEnabled = false
-                server = null
-            } else {
-                isEnabled = true
-                server = pick.server ?: connected
-            }
-            isAutomatic = pick.isAutomatic
-            this.provider = pick.provider
+            isEnabled = true
+            server = pick.server ?: connected
         }
+        isAutomatic = pick.isAutomatic
+        this.provider = pick.provider
     }
 
     companion object {
         /** The broker and the readiness it was resolved with (iOS `resolve(…)` returning a tuple). */
         fun resolve(
-            serverVoice: Boolean,
             choice: VoiceServerChoice,
             provider: ServerVoiceProvider = ServerVoiceProvider.openAI,
             connected: OpenCodeServer?,
-            saved: () -> List<OpenCodeServer>,
+            saved: List<OpenCodeServer>,
             answers: Map<String, ServerVoiceModelsAnswer>,
             support: Map<String, ServerVoiceSupport>,
             hasOpenAIKey: Boolean,
             engine: VoiceEngine,
         ): Pair<VoiceBroker, VoiceReadiness> {
             val readiness = VoiceReadiness(answers = answers, support = support, hasPhoneKey = hasOpenAIKey, engine = engine)
-            val broker = VoiceBroker(serverVoice, choice, provider, connected, saved, readiness)
+            val broker = VoiceBroker(choice, provider, connected, saved, readiness)
             return broker to readiness
         }
     }

@@ -1,6 +1,5 @@
 package ai.opencode.feature.settings
 
-import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.cancellable
 import ai.opencode.feature.voice.ServerVoiceModels
@@ -13,8 +12,8 @@ import ai.opencode.feature.voice.VoiceReadiness
 import ai.opencode.feature.voice.VoiceRoute
 import ai.opencode.server.OpenCodeServer
 
-// Port of iOS `Settings/VoiceServerPicker.swift`: Settings › Voice › Voice Provider (the Server
-// Voice experiment), which provider calls use. Automatic by default (the connected server, this
+// Port of iOS `Settings/VoiceServerPicker.swift`: Settings › Voice › Voice Provider, which
+// provider calls use. Automatic by default (the connected server, this
 // phone's key, then another saved server that's ready), or one picked. The rows themselves are
 // on the Voice Provider page (`VoiceProviderPage.kt`).
 
@@ -33,11 +32,10 @@ val VoiceSettingsFeature.State.readiness: VoiceReadiness
 
 val VoiceSettingsFeature.State.broker: VoiceBroker
     get() = VoiceBroker(
-        serverVoice = ExperimentalFeature.serverVoice.isActive(serverVoiceExperiment),
         choice = voiceServer,
         provider = serverVoiceProvider,
         connected = connectedServer,
-        saved = { savedServers + listOfNotNull(savedServer) },
+        saved = savedServers + listOfNotNull(savedServer),
         readiness = readiness,
     )
 
@@ -83,9 +81,7 @@ val VoiceSettingsFeature.State.keySource: VoiceKeySource
  */
 internal fun VoiceSettingsFeature.checkVoiceServers(
     servers: List<OpenCodeServer>,
-    state: VoiceSettingsFeature.State,
 ): Effect<VoiceSettingsFeature.Action> {
-    if (!ExperimentalFeature.serverVoice.isActive(state.serverVoiceExperiment)) return Effect.none()
     val client = serverVoice
     return Effect.merge(servers.map { server ->
         val epoch = VoiceModelsCache.epoch(server.persistenceID)

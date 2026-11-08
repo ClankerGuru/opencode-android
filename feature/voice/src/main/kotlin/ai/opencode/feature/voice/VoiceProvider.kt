@@ -189,8 +189,8 @@ data class VoiceProviderOption(
 }
 
 /**
- * Settings › Voice › Voice Provider (the Server Voice experiment): which provider calls use,
- * chosen automatically or picked, and the rest.
+ * Settings › Voice › Voice Provider: which provider calls use, chosen automatically or picked,
+ * and the rest.
  */
 class VoiceProviderCatalog(
     choice: VoiceServerChoice,

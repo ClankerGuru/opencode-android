@@ -77,7 +77,7 @@ float3 cellColour(float i, float j) { return float3(cells.eval(float2(2.0 * i + 
 
 // `RimLight::shade`: the Fresnel band inside the limb and the specular hairline.
 float4 rimShade(float4 res, float2 pt, float rPt, float dist, float aa) {
-  float live = 1.0 - mixB.w;
+  float live = 1.0 - mixB.y;
   if (live <= 1e-3 || dist < -2.6 - aa || dist > 0.45 + aa) return res;
   float radius = grid.z;
   float pitch = grid.y;
@@ -142,7 +142,7 @@ half4 main(float2 position) {
   float rPt = sqrt(r2);
   float dist = deepInside ? -3.0 : rPt - radius;
   float shape = deepInside ? 1.0 : coverage(dist, aa);
-  float3 plate = mix3(mix3(float3(15.0, 16.0, 20.0) / 255.0, float3(44.0, 16.0, 18.0) / 255.0, mixB.y * 0.65), MUTED_PLATE, mixB.w);
+  float3 plate = mix3(mix3(float3(15.0, 16.0, 20.0) / 255.0, float3(44.0, 16.0, 18.0) / 255.0, mixB.x * 0.65), MUTED_PLATE, mixB.y);
   if (shape > 0.0) res = composite(res, plate, 0.94 * shape);
 
   if (shape > 0.0) {
@@ -189,9 +189,9 @@ half4 main(float2 position) {
   }
 
   if (!deepInside && dist <= 0.45 + aa) res = rimShade(res, pt, rPt, dist, aa);
-  if (!deepInside && mixB.w > 1e-3) {
+  if (!deepInside && mixB.y > 1e-3) {
     float muteCov = coverage(abs(dist) - 0.75, aa);
-    if (muteCov > 0.0) res = composite(res, MUTED_RIM, 0.55 * mixB.w * muteCov);
+    if (muteCov > 0.0) res = composite(res, MUTED_RIM, 0.55 * mixB.y * muteCov);
   }
 
   // A grown orb feathers into the glass around it and fades above its bottom.

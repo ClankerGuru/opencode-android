@@ -5,11 +5,8 @@ import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.TestClock
 import ai.opencode.core.dependencies.UuidClient
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.SharedStore
-import ai.opencode.core.sharing.experimental
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.TestStore
 import ai.opencode.server.OpenCodeServer
@@ -61,11 +58,10 @@ class VoiceProviderTests {
     /** iOS resets the process-wide shared values; each test here gets a fresh in-memory store. */
     private fun reset(): SpeechTestShared = SpeechTestShared()
 
-    /** `server` connected, `servers` saved, Server Voice on, `choice` stored. */
+    /** `server` connected, `servers` saved, `choice` stored. */
     private fun SpeechTestShared.save(servers: List<OpenCodeServer>, choice: VoiceServerChoice = VoiceServerChoice.Automatic) = run {
         shared(ServerSharedKeys.savedServers).set(servers)
         shared(ServerSharedKeys.savedServer).set(server)
-        shared(experimental(ExperimentalFeature.serverVoice)).set(true)
         shared(VoiceSharedKeys.voiceServerChoice).set(choice)
     }
 
@@ -94,7 +90,6 @@ class VoiceProviderTests {
         preflight: RealtimePreflightClient? = null,
     ): DependencyValues.Builder.() -> Unit = {
         this[SharedStore] = shared.store
-        this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.serverVoice))
         this[DateClient] = DateClient.constant(Instant.ofEpochSecond(at))
         // Android: the call's ongoing-notification ID and the start cue's clock.
         this[UuidClient] = UuidClient.incrementing()
@@ -530,8 +525,8 @@ class VoiceProviderTests {
 
     /**
      * The card's button opens the page that fixes it: Your OpenAI Account for
-     * this phone's key, Voice Provider for a server's failure, and Settings ›
-     * Voice with Server Voice off. Update OpenCode opens the download page.
+     * this phone's key and Voice Provider for a server's failure. Update
+     * OpenCode opens the download page.
      */
     @Test fun theFixButtonOpensThePageThatFixesIt() = runBlocking {
         val shared = reset()
@@ -555,11 +550,14 @@ class VoiceProviderTests {
         effects.cancel()
     }
 
-    /** Server Voice off: the card's Check API Key opens Settings › Voice. */
-    @Test fun withServerVoiceOffTheFixOpensVoiceSettings() = runBlocking {
+    /**
+     * A Grok call's plain card: Check API Key opens Settings › Voice, where
+     * its xAI key lives.
+     */
+    @Test fun aGrokFailureOpensVoiceSettings() = runBlocking {
         val shared = reset()
         val state = shared.run { VoiceFeature.State(server, session) }
-            .withPhase(VoiceFeature.State.Phase.Failed("Add your OpenAI API key in Settings to use Voice."))
+            .withPhase(VoiceFeature.State.Phase.Failed("Add your xAI API key in Settings to use Voice."))
         val effects = detachedScope(coroutineContext)
         val store = TestStore(state, VoiceFeature(), effects) { this[SharedStore] = shared.store }
         assertNull(store.state.failureDiagnosis)

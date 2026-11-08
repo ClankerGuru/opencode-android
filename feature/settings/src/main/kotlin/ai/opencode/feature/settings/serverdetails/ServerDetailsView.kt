@@ -5,6 +5,7 @@ import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.collectState
 import ai.opencode.core.store.scope
+import ai.opencode.core.ui.AlertTextFields
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
@@ -208,6 +209,7 @@ private fun CodeAlert(instructions: String, send: (ServerDetailsFeature.Action) 
                     value = code,
                     onValueChange = { code = it },
                     label = { Text("Code") },
+                    trailingIcon = AlertTextFields.clearButton(code) { code = "" },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
                 )
