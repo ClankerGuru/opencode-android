@@ -69,7 +69,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import android.view.accessibility.AccessibilityManager
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -97,6 +99,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalGraphicsContext
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -210,6 +213,7 @@ private fun TranscriptListContent(
     val controller = remember { TranscriptListController(listState, scope, disclosure, behavior, selection) }
     val density = LocalDensity.current
     val reduceMotion = rememberReduceMotion()
+    val touchExploration = rememberTouchExploration()
     val currentSend by rememberUpdatedState(send)
     val currentShowsJump by rememberUpdatedState(onShowsJumpButtonChanged)
 
@@ -220,6 +224,7 @@ private fun TranscriptListContent(
     controller.density = density.density
     controller.frameDuration = ai.opencode.core.motion.rememberFrameDurationSeconds()
     controller.reduceMotion = reduceMotion
+    controller.touchExploration = touchExploration
     controller.isShowingToReader = resumed.isAtLeast(Lifecycle.State.RESUMED)
     controller.sendLanding = ai.opencode.feature.transcript.user.LocalSendLanding.current
     controller.flingBehavior = ScrollableDefaults.flingBehavior()
@@ -644,6 +649,21 @@ private fun GrowingRow(controller: TranscriptListController, key: String, modifi
     ) {
         content()
     }
+}
+
+@Composable
+private fun rememberTouchExploration(): Boolean {
+    val context = LocalContext.current
+    val manager = remember(context) { context.getSystemService(AccessibilityManager::class.java) }
+    var enabled by remember(manager) { mutableStateOf(manager?.isTouchExplorationEnabled == true) }
+    DisposableEffect(manager) {
+        if (manager == null) return@DisposableEffect onDispose {}
+        val listener = AccessibilityManager.TouchExplorationStateChangeListener { enabled = it }
+        enabled = manager.isTouchExplorationEnabled
+        manager.addTouchExplorationStateChangeListener(listener)
+        onDispose { manager.removeTouchExplorationStateChangeListener(listener) }
+    }
+    return enabled
 }
 
 /** Until the session supplies its Working line (activity orb + title), a quiet label. */
