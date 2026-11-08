@@ -13,6 +13,7 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.RollingNumberAlignment
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.accessibilityFocusRequest
 import ai.opencode.core.ui.highContrastForeground
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -47,8 +48,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -104,8 +107,17 @@ fun CatchUpChrome(
                     modifier = Modifier
                         .graphicsLayer { alpha = 1f - finishedProgress }
                         .then(
-                            if (finished) Modifier.clearAndSetSemantics {}
-                            else Modifier.semantics { heading() },
+                            if (finished) {
+                                Modifier.clearAndSetSemantics {}
+                            } else {
+                                Modifier.semantics {
+                                    heading()
+                                    // TalkBack reads each new count as a card goes or comes back, so Keep
+                                    // Unread, Mark as Read and Undo answer; the focus stays on the button
+                                    // pressed, as VoiceOver's does.
+                                    liveRegion = LiveRegionMode.Polite
+                                }
+                            },
                         ),
                 )
                 Row(
@@ -118,6 +130,8 @@ fun CatchUpChrome(
                         symbol = SFSymbol.ChevronBackward,
                         contentDescription = "Leave Catch Up",
                         onClick = onExit,
+                        // The stage opens on its first element, as VoiceOver does on a screen change.
+                        modifier = Modifier.accessibilityFocusRequest(Unit),
                         style = OpenCodeIconButtonStyle.Circle,
                     )
                     Spacer(Modifier.weight(1f))
