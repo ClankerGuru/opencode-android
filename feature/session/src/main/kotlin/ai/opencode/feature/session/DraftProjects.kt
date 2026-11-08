@@ -146,16 +146,21 @@ data class DraftProjectOrder(
  * slide-and-fade (iOS blur-replace) when it changes; a cross-fade under Reduce Motion.
  */
 @Composable
-fun ProjectHeaderSubtitle(project: String, modifier: Modifier = Modifier, content: @Composable (String) -> Unit = { Text(it) }) {
+fun ProjectHeaderSubtitle(
+    project: String,
+    modifier: Modifier = Modifier,
+    animates: Boolean = true,
+    content: @Composable (String) -> Unit = { Text(it) },
+) {
     val reducedMotion = rememberReduceMotion()
     AnimatedContent(
         targetState = project,
         modifier = modifier,
         transitionSpec = {
-            if (reducedMotion) {
-                fadeIn(Motion.easeInOut(ProjectPickerTunables.reducedFade)) togetherWith fadeOut(Motion.easeInOut(ProjectPickerTunables.reducedFade))
-            } else {
-                (slideInVertically(ProjectPickerTunables.subtitle.spec()) { it / 2 } + fadeIn(ProjectPickerTunables.subtitle.spec())) togetherWith
+            when {
+                !animates -> (fadeIn(tween(0)) togetherWith fadeOut(tween(0))) using null
+                reducedMotion -> fadeIn(Motion.easeInOut(ProjectPickerTunables.reducedFade)) togetherWith fadeOut(Motion.easeInOut(ProjectPickerTunables.reducedFade))
+                else -> (slideInVertically(ProjectPickerTunables.subtitle.spec()) { it / 2 } + fadeIn(ProjectPickerTunables.subtitle.spec())) togetherWith
                     (slideOutVertically(ProjectPickerTunables.subtitle.spec()) { -it / 2 } + fadeOut(ProjectPickerTunables.subtitle.spec()))
             }
         },

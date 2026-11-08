@@ -796,7 +796,7 @@ fun SyncingSessionTitle(
         transitionSpec = {
             val spec = titleSmooth
             when {
-                !animates -> fadeIn(tween(0)) togetherWith fadeOut(tween(0))
+                !animates -> (fadeIn(tween(0)) togetherWith fadeOut(tween(0))) using null
                 reducedMotion -> fadeIn(Motion.reducedFadeSpec()) togetherWith fadeOut(Motion.reducedFadeSpec())
                 // `.blurReplace(.upUp)`: both move up.
                 else -> (fadeIn(spec.spec()) + slideInVertically(spec.spec()) { it / 3 }) togetherWith

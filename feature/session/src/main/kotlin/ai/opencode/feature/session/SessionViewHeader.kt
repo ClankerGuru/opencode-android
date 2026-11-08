@@ -355,7 +355,7 @@ private fun HeaderTitle(
             Column(
                 Modifier
                     // The header doesn't carry the screen's transactions: the capsule animates its own width.
-                    .animateContentSize(if (reducedMotion || !animates) snap() else capsuleSmooth.spec())
+                    .then(if (!reducedMotion && animates) Modifier.animateContentSize(capsuleSmooth.spec()) else Modifier)
                     .heightIn(min = headerButtonSize)
                     .padding(horizontal = 8.dp, vertical = if (isAccessibilityFontScale(fontScale)) 8.dp else 3.dp),
                 horizontalAlignment = Alignment.Start,
@@ -388,7 +388,7 @@ private fun HeaderTitle(
                             maxLines = 1,
                         )
                     } else {
-                        ProjectHeaderSubtitle(shown) {
+                        ProjectHeaderSubtitle(shown, animates = animates) {
                             Text(
                                 it,
                                 style = MaterialTheme.typography.labelMedium,
