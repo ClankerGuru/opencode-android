@@ -1078,9 +1078,12 @@ private fun HiddenUnderComposerPanel(covered: Boolean, modifier: Modifier = Modi
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun SessionComposerEnv.DraftProjectsOverlay(modifier: Modifier) {
-    // The list leaving (smooth 0.38 s), and folding down to its chosen row and back.
+    // The list leaving when a draft's own first send creates its session (smooth 0.38 s); switching
+    // to another existing session or Catch Up card swaps at once so the draft list never ghosts over it.
+    val state = store.state
+    val animatesExit = !host.isCatchUpCard && (state.session == null || state.session.id == state.draftBecameSessionID)
     val enter = if (reducedMotion) fadeIn(Motion.easeInOut(0.2)) else fadeIn(MotionSpring(0.38).spec())
-    val exit = if (reducedMotion) fadeOut(Motion.easeInOut(0.2)) else fadeOut(MotionSpring(0.38).spec())
+    val exit = if (!animatesExit) ExitTransition.None else if (reducedMotion) fadeOut(Motion.easeInOut(0.2)) else fadeOut(MotionSpring(0.38).spec())
     // A zero-height edge at the area's top that the list stands on, a stack's spacing above.
     Box(
         modifier
