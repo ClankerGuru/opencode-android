@@ -157,6 +157,8 @@ fun SessionView(
     onBack: (() -> Unit)? = null,
     onCatchUpOpen: (() -> Unit)? = null,
     hostedCall: VoiceStoreOf? = null,
+    /** Inert Catch Up preview behind the active card: renders visible chrome/transcript only, without sheet/picker prewarms. */
+    isInertPreview: Boolean = false,
 ) {
     val scrollEdgeBridge = rememberSaveable(saver = SessionScrollEdgeBridge.Saver) { SessionScrollEdgeBridge() }
     val backgroundWorkAnchor = rememberBackgroundWorkAnchor()
@@ -184,14 +186,20 @@ fun SessionView(
     )
     val resolvedHeader = remember(headerEnvironment) { HeaderBlurTunables.resolved(headerEnvironment) }
 
-    SessionLifecycle(store)
-    SessionVoiceLabTriggers(store, isEnabled = onCatchUpOpen == null)
+    if (!isInertPreview) {
+        SessionLifecycle(store)
+        SessionVoiceLabTriggers(store, isEnabled = onCatchUpOpen == null)
+    }
     val callStore = store.rememberCallStore(hostedCall)
     val ownsCall by store.observe { it.voice != null }
-    SessionCallTasks(store, callStore, hasCall = ownsCall || hostedCall != null)
+    if (!isInertPreview) {
+        SessionCallTasks(store, callStore, hasCall = ownsCall || hostedCall != null)
+    }
     val isCovered by store.observe { it.isCovered }
     // iOS `floatingCallCoverage(sessionLifecycle)`: what the Living Orb's card covers gives way.
-    SessionFloatingCallCoverage(store, callStore, composerHost, photoSheet)
+    if (!isInertPreview) {
+        SessionFloatingCallCoverage(store, callStore, composerHost, photoSheet)
+    }
     // iOS `clearOverClientToolCard()`: an agent's screen request or link came up, so the keyboard
     // and the composer's panels would stand over its card.
     val holdsClientToolCard by remember(callStore) { callStore?.let { call -> call.states.map { it.holdsClientToolCard } } ?: flowOf(false) }
@@ -247,8 +255,10 @@ fun SessionView(
         composerHost.headerHeight = headerHeight
         if (composerHost.pendingAttachmentsRow == null) composerHost.pendingAttachmentsRow = { expanded -> SessionPendingAttachments(store, composerHost.sendTransition.images, expanded) }
     }
-    SessionPermissionPrompts(isCovered)
-    SessionPhotoSheetEnvironment(photoSheet, store, composerHost, importer, headerHeight, rootOffset)
+    if (!isInertPreview) {
+        SessionPermissionPrompts(isCovered)
+        SessionPhotoSheetEnvironment(photoSheet, store, composerHost, importer, headerHeight, rootOffset)
+    }
 
     SessionMediaHost {
     CompositionLocalProvider(
@@ -282,13 +292,19 @@ fun SessionView(
                 composerHost.dismissComposerKeyboard()
                 if (photoSheet.attachmentMenu != AttachmentMenuPhase.Closed) photoSheet.closeAttachmentMenu()
             },
+            // TalkBack reads the header, then the transcript, then the background-work capsule, then
+            // the composer, as VoiceOver reads iOS's top overlay first and the rest top to bottom: the
+            // header draws over the transcript, so it came after it (QA P-06). The group is the
+            // presentation's, not the screen's, so the capsule drawn over the screen sits in it by
+            // its place above the composer (iOS `SessionView+Composer.swift:209-241`), not after
+            // everything (QA AB-02).
             // iOS: the + menu is an `.isModal` container in its own window, so VoiceOver reaches
             // nothing beneath it. TalkBack has no modal, so the screen under it (the + too) hides.
-            modifier = if (photoSheet.plusMenuIsOpen) Modifier.clearAndSetSemantics {} else Modifier,
+            modifier = Modifier
+                .semantics { isTraversalGroup = true }
+                .then(if (photoSheet.plusMenuIsOpen) Modifier.clearAndSetSemantics {} else Modifier),
         ) {
-            // TalkBack reads the header, then the transcript, then the composer, as VoiceOver reads
-            // iOS's top overlay first; the header draws over the transcript, so it came after it.
-            Box(Modifier.fillMaxSize().background(colors.canvas).semantics { isTraversalGroup = true }) {
+            Box(Modifier.fillMaxSize().background(colors.canvas)) {
                 ComposedAfterComposer {
                     // Read while measuring, after the header has laid out: the first frame rests the
                     // transcript under the header's real height, not the default's.
@@ -315,7 +331,9 @@ fun SessionView(
                 )
                 // Behind the composer, so its × stays reachable: a tap anywhere else or a downward
                 // drag dismisses the menu, or Composer Autocomplete's suggestions.
-                SessionComposerDismissArea(store, composerHost)
+                if (!isInertPreview) {
+                    SessionComposerDismissArea(store, composerHost)
+                }
                 SessionHeaderControls(
                     store = store,
                     listContext = listContext,
@@ -332,7 +350,9 @@ fun SessionView(
                         },
                 )
                 // One Picker's surface grows out of the composer, over the transcript and under the composer.
-                SessionOnePickerBackdrop(composerHost, Modifier.matchParentSize())
+                if (!isInertPreview) {
+                    SessionOnePickerBackdrop(composerHost, Modifier.matchParentSize())
+                }
                 val statusBar = WindowInsets.statusBarsIgnoringVisibility.inContainer()
                 Column(
                     Modifier
@@ -376,21 +396,27 @@ fun SessionView(
                     SessionCallCards(callStore)
                     SessionComposer(store, Modifier.modelPanelsComposer(composerHost), callStore = callStore)
                 }
-                // A send's words fly from the field into its bubble, over both.
-                SessionSendFlightOverlay(composerHost, scrollEdgeBridge, Modifier.matchParentSize())
-                // Its photos fly into their slots above the words (iOS installs the copies in the window).
-                SentImageFlightOverlay(composerHost.sendTransition.images, Modifier.matchParentSize())
-                RequestPanelRoomProbe(composerHost, Modifier.matchParentSize())
-                SessionModelPickerOverlays(store, headerHeight)
+                if (!isInertPreview) {
+                    // A send's words fly from the field into its bubble, over both.
+                    SessionSendFlightOverlay(composerHost, scrollEdgeBridge, Modifier.matchParentSize())
+                    // Its photos fly into their slots above the words (iOS installs the copies in the window).
+                    SentImageFlightOverlay(composerHost.sendTransition.images, Modifier.matchParentSize())
+                    RequestPanelRoomProbe(composerHost, Modifier.matchParentSize())
+                    SessionModelPickerOverlays(store, headerHeight)
+                }
             }
         }
-        SessionAttachmentMenu(store, composerHost, importer, photoSheet)
-        RecentPhotoPeekOverlay(photoSheet.recentPeek, photoSheet.library, photoSheet.flights, Modifier.matchParentSize())
-        PhotoFlightCanvas(photoSheet.flights, Modifier.matchParentSize())
+        if (!isInertPreview) {
+            SessionAttachmentMenu(store, composerHost, importer, photoSheet)
+            RecentPhotoPeekOverlay(photoSheet.recentPeek, photoSheet.library, photoSheet.flights, Modifier.matchParentSize())
+            PhotoFlightCanvas(photoSheet.flights, Modifier.matchParentSize())
         }
-        SessionSheets(store, listContext)
-        LocationErrorAlert(store)
-        SessionAttachmentAlerts(importer)
+        }
+        if (!isInertPreview) {
+            SessionSheets(store, listContext)
+            LocationErrorAlert(store)
+            SessionAttachmentAlerts(importer)
+        }
     }
     }
 }
@@ -893,7 +919,7 @@ private fun SessionSheets(store: StoreOf<State, Action>, listContext: SessionLis
                     ) {
                         AgentActivityGlyph(
                             AgentActivitySource.Subagent(activity),
-                            Modifier.semantics { contentDescription = "Status"; stateDescription = status.text },
+                            Modifier.clearAndSetSemantics { contentDescription = "Status"; stateDescription = status.text },
                             size = size,
                         )
                     }

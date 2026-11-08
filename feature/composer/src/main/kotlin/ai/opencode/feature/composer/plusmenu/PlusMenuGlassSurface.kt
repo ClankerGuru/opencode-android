@@ -5,6 +5,8 @@ import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.touch.TouchRecovery
 import ai.opencode.core.touch.rememberTouchRecovery
+import ai.opencode.core.ui.AccessibilityFocusRequest
+import ai.opencode.core.ui.rememberAccessibilityFocusRequest
 import ai.opencode.feature.composer.AttachmentMenuAnchors
 import ai.opencode.feature.composer.AttachmentMenuItem
 import ai.opencode.feature.composer.AttachmentMenuMetrics
@@ -298,7 +300,7 @@ private fun PlusMenuWindowContent(
                     menuWidth = with(density) { menu.width.toDp() },
                     reduceMotion = reduceMotion,
                     // Once its rows have arrived, TalkBack's focus moves onto the top one.
-                    focusRequest = if (isOpen && expanded.value > 0.99f) generation else null,
+                    focusRequest = rememberAccessibilityFocusRequest(if (isOpen && expanded.value > 0.99f) generation else null),
                     onChoose = onChoose,
                     onPaste = onPaste,
                     modifier = Modifier
@@ -344,7 +346,7 @@ fun PlusMenuRowsHost(
     isDragging: Boolean = false,
     menuWidth: androidx.compose.ui.unit.Dp? = null,
     reduceMotion: Boolean = rememberReduceMotion(),
-    focusRequest: Any? = null,
+    focusRequest: AccessibilityFocusRequest? = null,
 ) {
     AttachmentMenuRows(
         items = items,

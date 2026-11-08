@@ -16,7 +16,9 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.ThemeSharedKeys
+import ai.opencode.core.ui.AccessibilityFocusRequest
 import ai.opencode.core.ui.accessibilityFocusRequest
+import ai.opencode.core.ui.rememberAccessibilityFocusRequest
 import ai.opencode.feature.settings.connection.ConnectionCard
 import ai.opencode.feature.settings.connection.ServerPage
 import ai.opencode.feature.settings.onboarding.OnboardingPlaygroundView
@@ -64,6 +66,8 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
@@ -232,7 +236,7 @@ fun SettingsPageScaffold(
                                 title,
                                 modifier = Modifier
                                     .graphicsLayer { this.alpha = alpha }
-                                    .then(if (titleVisible) Modifier else Modifier.clearAndSetSemantics {}),
+                                    .then(if (titleVisible) Modifier.semantics { heading() } else Modifier.clearAndSetSemantics {}),
                             )
                         },
                         navigationIcon = back,
@@ -242,7 +246,7 @@ fun SettingsPageScaffold(
                     )
                 } else {
                     LargeFlexibleTopAppBar(
-                        title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() }) },
                         navigationIcon = back,
                         actions = actions,
                         scrollBehavior = scrollBehavior,
@@ -343,16 +347,21 @@ private fun SettingsRootPage(store: SettingsStore) {
  * QA U-02: when NavigationStack pops a page, VoiceOver goes back to the row that pushed it;
  * TalkBack landed on Back instead. A page remembers which of its rows pushed the page above it
  * ([opened]), and once it's the top page again that row takes TalkBack's focus back ([on], `:core`'s
- * `accessibilityFocusRequest`, a no-op without touch exploration). The row is forgotten soon after,
- * so the list scrolling it away and back doesn't move the focus again.
+ * `accessibilityFocusRequest`, a no-op without touch exploration). The request is spent by that
+ * move, so the list scrolling the row away and back doesn't move the focus again (QA W-05), and the
+ * row is forgotten soon after, so a later return that no row started doesn't land on it.
  */
 @Stable
-internal class SettingsReturnFocus(private val opener: MutableState<String?>, private val returning: String?) {
+internal class SettingsReturnFocus(
+    private val opener: MutableState<String?>,
+    private val returning: String?,
+    private val focus: AccessibilityFocusRequest?,
+) {
     fun opened(page: SettingsPage) {
         opener.value = page.toString()
     }
 
-    fun request(page: SettingsPage): Any? = page.toString().takeIf { it == returning }
+    fun request(page: SettingsPage): AccessibilityFocusRequest? = focus.takeIf { page.toString() == returning }
 
     fun on(page: SettingsPage): Modifier = Modifier.accessibilityFocusRequest(request(page))
 }
@@ -368,7 +377,8 @@ internal fun rememberSettingsReturnFocus(store: SettingsStore, page: SettingsPag
         delay(SETTINGS_RETURN_FOCUS_HOLD_MS)
         opener.value = null
     }
-    return remember(opener, returning) { SettingsReturnFocus(opener, returning) }
+    val focus = rememberAccessibilityFocusRequest(returning)
+    return remember(opener, returning, focus) { SettingsReturnFocus(opener, returning, focus) }
 }
 
 /** How long a returning row keeps its focus request: well past the two frames it waits before moving TalkBack. */

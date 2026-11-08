@@ -2,6 +2,7 @@ package ai.opencode.feature.drawer.catchup
 
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.ui.AccessibilityFocusRequest
 import ai.opencode.core.ui.OpenCodeIconButton
 import ai.opencode.core.ui.OpenCodeIconButtonStyle
 import ai.opencode.core.ui.OpenCodeMinTapTarget
@@ -13,6 +14,7 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.RollingNumberAlignment
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.accessibilityFocusRequest
 import ai.opencode.core.ui.highContrastForeground
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -83,6 +85,8 @@ fun CatchUpChrome(
     val finished = remaining == 0
     val spec = if (reducedMotion) Motion.easeOut<Float>(0.2) else Motion.easeOut(0.22)
     val finishedProgress by animateFloatAsState(if (finished) 1f else 0f, spec, label = "CatchUpChromeFinish")
+    // One move per stage the chrome is composed for.
+    val openFocus = remember { AccessibilityFocusRequest() }
 
     Box(modifier.fillMaxSize()) {
         CatchUpDriftFieldView(isFinished = finished, modifier = Modifier.fillMaxSize())
@@ -118,6 +122,8 @@ fun CatchUpChrome(
                         symbol = SFSymbol.ChevronBackward,
                         contentDescription = "Leave Catch Up",
                         onClick = onExit,
+                        // The stage opens on its first element, as VoiceOver does on a screen change.
+                        modifier = Modifier.accessibilityFocusRequest(openFocus),
                         style = OpenCodeIconButtonStyle.Circle,
                     )
                     Spacer(Modifier.weight(1f))

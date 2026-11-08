@@ -15,6 +15,7 @@ import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.core.store.scope
+import ai.opencode.core.ui.LocalAccessibilityFocusMoves
 import ai.opencode.core.ui.OpenCodeIconButton
 import ai.opencode.core.ui.OpenCodeIconButtonStyle
 import ai.opencode.core.ui.OpenCodeTheme
@@ -26,6 +27,7 @@ import ai.opencode.feature.drawer.catchup.CatchUpStageProxy
 import ai.opencode.feature.drawer.container.DrawerKeyboard
 import ai.opencode.feature.drawer.container.SessionDrawerContainer
 import ai.opencode.feature.drawer.container.SidebarMetrics
+import ai.opencode.feature.drawer.container.clearAndMergeSemantics
 import ai.opencode.feature.drawer.container.rememberSessionDrawerController
 import ai.opencode.feature.drawer.motion.DrawerButton
 import ai.opencode.feature.drawer.motion.rememberDrawerKeyboardHold
@@ -96,7 +98,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
@@ -532,12 +533,16 @@ private fun CatchUpPreviewCard(store: StoreOf<HomeFeature.State, HomeFeature.Act
     DisposableEffect(previews) { onDispose { previews.close() } }
     val preview = previews.store(session, home)
     SideEffect { previews.commit() }
-    SessionView(
-        preview,
-        Modifier.fillMaxSize().clearAndSetSemantics {},
-        listContext = remember(session, revision) { home.sessionListContext(session) },
-        onCatchUpOpen = {},
-    )
+    // A picture of the next session: nothing in it moves TalkBack's focus (QA W-05).
+    CompositionLocalProvider(LocalAccessibilityFocusMoves provides false) {
+        SessionView(
+            preview,
+            Modifier.fillMaxSize().clearAndMergeSemantics(),
+            listContext = remember(session, revision) { home.sessionListContext(session) },
+            onCatchUpOpen = {},
+            isInertPreview = true,
+        )
+    }
 }
 
 /**

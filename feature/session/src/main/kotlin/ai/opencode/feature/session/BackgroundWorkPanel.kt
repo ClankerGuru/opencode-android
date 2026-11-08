@@ -19,6 +19,9 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.AccessibilityFocusRequest
+import ai.opencode.core.ui.accessibilityFocusRequest
+import ai.opencode.core.ui.rememberAccessibilityFocusRequest
 import ai.opencode.feature.transcript.list.TranscriptBorrowedDrag
 import ai.opencode.feature.transcript.list.passesDragsToTranscript
 import ai.opencode.feature.voice.VoiceLabEnvironment
@@ -106,6 +109,7 @@ import androidx.compose.ui.node.GlobalPositionAwareModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -469,6 +473,9 @@ fun BackgroundWorkPresentation(
     // A session that opens on running work shows its capsule at once.
     var capsuleShown by remember { mutableStateOf(hasWork) }
     var capsuleMounted by remember { mutableStateOf(hasWork) }
+    // TalkBack's way back to the capsule once the panel has folded into it (iOS: the modal panel ends on the capsule's button).
+    var capsuleFocus by remember { mutableStateOf<Int?>(null) }
+    val capsuleFocusRequest = rememberAccessibilityFocusRequest(capsuleFocus)
     // 0 = the capsule's bounds, 1 = the panel's.
     val progress = remember { Animatable(0f) }
     val capsuleAlpha = remember { Animatable(if (hasWork) 1f else 0f) }
@@ -620,7 +627,10 @@ fun BackgroundWorkPresentation(
                 if (current == motion && !latestPresented && stage == BackgroundWorkStage.capsule) {
                     stage = BackgroundWorkStage.closed
                     dragController.reset()
-                    if (!latestCovered && latestHasWork) setCapsuleShown(true, animated = false)
+                    if (!latestCovered && latestHasWork) {
+                        setCapsuleShown(true, animated = false)
+                        capsuleFocus = current
+                    }
                 }
             } catch (_: CancellationException) {
             }
@@ -828,6 +838,7 @@ fun BackgroundWorkPresentation(
                     Modifier
                         .fillMaxSize()
                         .graphicsLayer { alpha = 1f - progress.value }
+                        .accessibilityFocusRequest(capsuleFocusRequest)
                         .then(
                             // iOS draws the capsule's button only while its glass is up (`capsuleShown`):
                             // a capsule fading with the work, or gone, takes no touch.
@@ -894,6 +905,8 @@ fun BackgroundWorkPresentation(
                         probe = probe,
                         scrollState = scrollState,
                         isLive = rowsOpen,
+                        // Landed open, TalkBack moves into the panel (iOS `.isModal` once settled).
+                        focusRequest = rememberAccessibilityFocusRequest(if (settled && !hidden) motion else null),
                         onContentHeight = ::measured,
                         onOpenSubagent = { id ->
                             if (!dragController.drag.isDragging) {
@@ -943,6 +956,7 @@ private fun <T> OnChange(value: T, action: (old: T, new: T) -> Unit) {
  * @param probe where the shells' output is read, for their glyphs.
  * @param scrollState the list's scroll position; scrolls once the rows outgrow the panel.
  * @param isLive the orbs, shell glyphs and clocks run. A hidden measuring copy holds still.
+ * @param focusRequest moves TalkBack's focus onto the first row's section header, once.
  * @param onContentHeight the rows' natural height in dp, whenever it changes.
  */
 @Composable
@@ -956,12 +970,13 @@ fun BackgroundWorkPanel(
     probe: ShellGlyphProbe? = null,
     scrollState: ScrollState = rememberScrollState(),
     isLive: Boolean = true,
+    focusRequest: AccessibilityFocusRequest? = null,
     onContentHeight: (Float) -> Unit = {},
 ) {
     val density = LocalDensity.current
     Box(modifier.fillMaxWidth().verticalScroll(scrollState)) {
         BackgroundWorkRows(
-            agents, waitingSessionIDs, shells, probe, isLive, onOpenSubagent, onOpenShell,
+            agents, waitingSessionIDs, shells, probe, isLive, focusRequest, onOpenSubagent, onOpenShell,
             Modifier.onSizeChanged { onContentHeight(it.height / density.density) },
         )
     }
@@ -974,13 +989,14 @@ private fun BackgroundWorkRows(
     shells: List<OpenCodeShell>,
     probe: ShellGlyphProbe?,
     isLive: Boolean,
+    focusRequest: AccessibilityFocusRequest?,
     onOpenSubagent: (String) -> Unit,
     onOpenShell: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier.fillMaxWidth().padding(vertical = 10.dp)) {
         if (agents.isNotEmpty()) {
-            SectionHeader("Subagents")
+            SectionHeader("Subagents", Modifier.accessibilityFocusRequest(focusRequest))
             for (agent in agents) {
                 androidx.compose.runtime.key(agent.id) {
                     BackgroundWorkRow(
@@ -1003,7 +1019,7 @@ private fun BackgroundWorkRows(
             HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 6.dp), color = OpenCodeTheme.colors.border)
         }
         if (shells.isNotEmpty()) {
-            SectionHeader("Shells")
+            SectionHeader("Shells", if (agents.isEmpty()) Modifier.accessibilityFocusRequest(focusRequest) else Modifier)
             for (shell in shells) {
                 androidx.compose.runtime.key(shell.id) {
                     BackgroundWorkRow(
@@ -1024,12 +1040,12 @@ private fun BackgroundWorkRows(
 }
 
 @Composable
-private fun SectionHeader(title: String) {
+private fun SectionHeader(title: String, modifier: Modifier = Modifier) {
     Text(
         title,
         style = OpenCodeTextStyles.footnote.copy(fontWeight = FontWeight.SemiBold),
         color = OpenCodeTheme.colors.secondaryText,
-        modifier = Modifier
+        modifier = modifier
             .padding(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 2.dp)
             .semantics { heading() },
     )
@@ -1054,7 +1070,7 @@ private fun BackgroundWorkRow(
             // lifts a soft highlight there).
             .padding(horizontal = 8.dp)
             .clip(RoundedCornerShape(16.dp))
-            .clickable(onClickLabel = accessibilityHint, onClick = onTap)
+            .clickable(role = Role.Button, onClickLabel = accessibilityHint, onClick = onTap)
             .semantics(mergeDescendants = true) {
                 contentDescription = title
                 onClick(label = accessibilityHint) { onTap(); true }
@@ -1072,12 +1088,14 @@ private fun BackgroundWorkRow(
             modifier = Modifier.weight(1f).clearAndSetSemantics { },
         )
         if (startedAt != null) {
-            ShellElapsedTime(
-                since = startedAt,
-                isPaused = !isLive,
-                style = OpenCodeTextStyles.subheadline.copy(fontFeatureSettings = "tnum"),
-                color = OpenCodeTheme.colors.secondaryText,
-            )
+            Box(Modifier.clearAndSetSemantics { }) {
+                ShellElapsedTime(
+                    since = startedAt,
+                    isPaused = !isLive,
+                    style = OpenCodeTextStyles.subheadline.copy(fontFeatureSettings = "tnum"),
+                    color = OpenCodeTheme.colors.secondaryText,
+                )
+            }
         }
         OpenCodeIcon(SFSymbol.ChevronRight, contentDescription = null, size = 16.dp, tint = OpenCodeTheme.colors.tertiaryText)
     }

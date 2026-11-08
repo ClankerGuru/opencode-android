@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -172,7 +173,7 @@ fun ThemesSettingsView(store: SettingsStore) {
         containerColor = colors.groupedCanvas,
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Themes", style = OpenCodeTextStyles.headline) },
+                title = { Text("Themes", style = OpenCodeTextStyles.headline, modifier = Modifier.semantics { heading() }) },
                 navigationIcon = {
                     IconButton(onClick = { store.send(SettingsFeature.Action.BackTapped) }) {
                         OpenCodeIcon(SFSymbol.ChevronBackward, contentDescription = "Back")

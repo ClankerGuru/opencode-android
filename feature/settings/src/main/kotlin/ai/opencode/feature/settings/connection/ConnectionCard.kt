@@ -10,8 +10,11 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.RollingNumberAlignment
 import ai.opencode.core.ui.RollingNumberStyle
+import ai.opencode.core.ui.AccessibilityFocusRequest
+import ai.opencode.core.ui.AccessibilityFocusTarget
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.accessibilityFocusRequest
+import ai.opencode.core.ui.accessibilityFocusTarget
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.settings.ConnectionStatus
 import ai.opencode.feature.settings.SettingsButtonRow
@@ -97,6 +100,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
 import java.util.WeakHashMap
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 /** iOS `HomeFeature.State.credentialsRejectedStatus`: the HTTP status a refused sign-in comes back with. */
@@ -153,8 +157,8 @@ fun ConnectionCard(
     modifier: Modifier = Modifier,
     /** Called as the card opens the server page, before it's pushed. */
     onOpen: () -> Unit = {},
-    /** Each new non-null value moves TalkBack's focus onto the card (`accessibilityFocusRequest`). */
-    focusRequest: Any? = null,
+    /** Moves TalkBack's focus onto the card once (`accessibilityFocusRequest`). */
+    focusRequest: AccessibilityFocusRequest? = null,
 ) {
     val server by store.observe { it.server }
     val status by store.observe { it.connectionStatus }
@@ -181,7 +185,7 @@ fun ConnectionCard(
 private fun ConnectionCardContent(
     monitor: ConnectionMonitor,
     onOpen: () -> Unit,
-    focusRequest: Any?,
+    focusRequest: AccessibilityFocusRequest?,
     onRetry: () -> Unit,
     onEditServer: () -> Unit,
     modifier: Modifier = Modifier,
@@ -199,7 +203,8 @@ private fun ConnectionCardContent(
     // changing value unspoken. TalkBack re-reads the focused card whenever anything it speaks changes
     // (state, label or a merged child), so the card speaks the status word, not the live milliseconds:
     // a new word is still read; the number stays on screen and on the server page's Status row.
-    val accessibilityValue = listOf(presentation.spokenWord, monitor.server.host, monitor.route.rawValue).joinToString(", ")
+    val accessibilityValue = listOf(rememberSettledSpokenWord(presentation.spokenWord), monitor.server.host, monitor.route.rawValue)
+        .joinToString(", ")
 
     // Where the inline action sits: reserved after the status, the real button drawn over the card
     // (outside its click and its merged semantics), as iOS's `RetryReservation`.
@@ -449,6 +454,28 @@ data class ConnectionStatusPresentation(
     }
 }
 
+/** How long a status word holds before TalkBack is given it (see [rememberSettledSpokenWord]). */
+private const val SPOKEN_STATUS_SETTLE_MS = 500L
+
+/**
+ * [word] once it has held for [SPOKEN_STATUS_SETTLE_MS]; until then the word before it. Android
+ * divergence (iOS's VoiceOver leaves a focused element's value changes unspoken): TalkBack speaks
+ * each new word on a focused node, and a dropped server passes through Reconnecting for a moment
+ * (~150 ms) on its way to Offline. TalkBack read both changes after the second, so "Offline, …"
+ * was spoken twice (QA F-62); a word that doesn't last isn't given to it. The screen still shows
+ * every word at once.
+ */
+@Composable
+private fun rememberSettledSpokenWord(word: String): String {
+    var settled by remember { mutableStateOf(word) }
+    LaunchedEffect(word) {
+        if (word == settled) return@LaunchedEffect
+        delay(SPOKEN_STATUS_SETTLE_MS)
+        settled = word
+    }
+    return settled
+}
+
 /** The status colour: red for an alert, else secondary. */
 @Composable
 private fun ConnectionStatusPresentation.foreground(): Color =
@@ -696,13 +723,31 @@ fun ServerPage(store: SettingsStore) {
     }
 }
 
-/** The page's Status row (iOS `LabeledContent("Status")`): glyph, then the word and round trip. */
+/**
+ * The page's Status row (iOS `LabeledContent("Status")`): glyph, then the word and round trip.
+ *
+ * Android divergence: iOS's value is the word and the live round trip, and VoiceOver reads it as
+ * it is when the row is reached but leaves its changes unspoken. TalkBack re-reads a focused node
+ * whenever what it speaks changes, so it read the row again on every check (QA F-61). The spoken
+ * round trip follows the live one while TalkBack is elsewhere, so the row still reads the current
+ * number when reached, and holds while TalkBack is on it; a new status word (settled, as the
+ * card's) is still read. The screen updates on every check.
+ */
 @Composable
 private fun StatusRow(presentation: ConnectionStatusPresentation) {
     val color = presentation.foreground()
-    SettingsRowFrame(Modifier.clearAndSetSemantics {
+    val word = rememberSettledSpokenWord(presentation.spokenWord)
+    val focus = remember { AccessibilityFocusTarget() }
+    val spoken = remember { SpokenStatus() }
+    val live = if (word == presentation.spokenWord) presentation.spokenStatus else word
+    if (spoken.word != word || !focus.isFocused) {
+        spoken.word = word
+        spoken.text = live
+    }
+    val text = spoken.text
+    SettingsRowFrame(Modifier.accessibilityFocusTarget(focus).clearAndSetSemantics {
         contentDescription = "Status"
-        stateDescription = presentation.spokenStatus
+        stateDescription = text
     }) {
         LabeledContent("Status", Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -723,6 +768,12 @@ private fun StatusRow(presentation: ConnectionStatusPresentation) {
             }
         }
     }
+}
+
+/** What the Status row last gave TalkBack, and the status word it was for; read and written while it composes. */
+private class SpokenStatus {
+    var word: String? = null
+    var text: String = ""
 }
 
 /**
