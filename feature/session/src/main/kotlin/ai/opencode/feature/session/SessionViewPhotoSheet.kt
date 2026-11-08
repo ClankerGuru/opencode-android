@@ -6,6 +6,9 @@ import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.AccessibilityFocusRequest
+import ai.opencode.core.ui.accessibilityFocusRequest
+import ai.opencode.core.ui.rememberAccessibilityFocusRequest
 import ai.opencode.core.ui.inContainer
 import ai.opencode.feature.composer.AttachmentMenuMetrics
 import ai.opencode.feature.composer.AttachmentMenuPhase
@@ -49,6 +52,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -153,6 +157,10 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
      */
     val plusMenuRests: Boolean
         get() = attachmentMenu == AttachmentMenuPhase.Closed && !morph.isShown && !recentPeek.isShown && !camera.expanded
+
+    /** iOS `PlusMenuGlassSurface(isOpen:)`: the + menu's own surface shows its rows (not handed to the photo sheet). */
+    val plusMenuIsOpen: Boolean
+        get() = attachmentMenu == AttachmentMenuPhase.Menu && (!morph.isShown || menuTakesBack)
 
     internal var env = Env()
 
@@ -475,7 +483,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
     fun addLibraryPhotos(ids: List<String>) {
         val importer = env.importer ?: return
         val batch = UUID.randomUUID()
-        val picks = ids.take(AttachmentPickerButton.MAX_PHOTO_SELECTION).map { PhotoFlights.Pick(it, UUID.randomUUID()) }
+        val picks = ids.take(AttachmentPickerButton.maxPhotoSelection(plusMenu = true)).map { PhotoFlights.Pick(it, UUID.randomUUID()) }
         val flies = usesPlusMenuSheet && !reducedMotion && picks.isNotEmpty()
         val rest = if (morph.isOpening && restoresFocus) restingComposer else null
         if (picks.isEmpty()) {
@@ -658,6 +666,7 @@ private fun PhotoSheetBody(state: SessionPhotoSheetState) {
             }
         }
     }
+    val contentArrived by remember(state) { derivedStateOf { state.morph.content.value > 0.99f } }
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             PhotoSheetGrabber(
@@ -665,6 +674,9 @@ private fun PhotoSheetBody(state: SessionPhotoSheetState) {
                 onDrag = state::dragPhotoSheet,
                 onDragEnded = { predicted, velocity -> state.settlePhotoSheet(predicted, velocity) },
                 onToggle = state::togglePhotoSheetExpand,
+                // TalkBack's focus moves into the sheet once its content has arrived, onto its
+                // first element, as it does into a system bottom sheet (it was on the menu's row).
+                focusRequest = rememberAccessibilityFocusRequest(if (state.morph.isOpening && contentArrived) state.morph.generation else null),
             )
             Box(Modifier.weight(1f).fillMaxWidth().nestedScroll(connection)) {
                 PlusPhotoSheetContent(
@@ -697,6 +709,7 @@ private fun PhotoSheetGrabber(
     onDrag: (Float) -> Unit,
     onDragEnded: (predicted: Float, velocity: Float) -> Unit,
     onToggle: () -> Unit,
+    focusRequest: AccessibilityFocusRequest? = null,
 ) {
     val density = LocalDensity.current.density
     val currentDrag by rememberUpdatedState(onDrag)
@@ -725,6 +738,8 @@ private fun PhotoSheetGrabber(
                 }
             }
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onToggle)
+            // Ahead of the clearing below, which would drop its marker.
+            .accessibilityFocusRequest(focusRequest)
             .clearAndSetSemantics {
                 contentDescription = "Sheet Grabber"
                 stateDescription = if (isExpanded) "Full" else "Half"

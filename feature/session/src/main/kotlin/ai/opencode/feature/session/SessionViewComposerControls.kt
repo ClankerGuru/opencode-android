@@ -14,8 +14,10 @@ import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.accessibilityFocusRequest
 import ai.opencode.core.ui.excludedFromDrawerPan
 import ai.opencode.core.ui.openCodeTapTarget
+import ai.opencode.core.ui.rememberAccessibilityFocusRequest
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.composer.AttachmentMenuPhase
 import ai.opencode.feature.composer.AttachmentPickerButton
@@ -46,8 +48,13 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -73,6 +80,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlin.math.min
+import kotlinx.coroutines.delay
 
 // Port of iOS `Session/SessionView+ComposerControls.swift`: the composer's leading and trailing
 // controls, the request bar's controls, the mic's hold-to-dictate wiring and the dictation row.
@@ -104,7 +112,8 @@ internal fun SessionComposerEnv.ComposerLeadingControls(expanded: Boolean, recor
         AttachmentButton()
         val chips = @Composable {
             Row(horizontalArrangement = Arrangement.spacedBy(ComposerTunables.leadingSpacing.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (agentSelection) AgentButton()
+                // The composer survives a server switch; the new detail needs its own chip mount to request agents.
+                if (agentSelection) key(s.taskIdentity) { AgentButton() }
                 ModelButton(enabled = expanded && !recording)
             }
         }
@@ -174,9 +183,11 @@ private fun SessionComposerEnv.ModelButton(enabled: Boolean) {
                 onClick = {
                     if (!enabled) return@ModelPickerChip
                     if (composerTextTakesDoubleTap()) return@ModelPickerChip
-                    // Put away under any picker sheet (iOS 07b2f5f8), or a row's level menu raises the
-                    // composer's keyboard over the sheet.
-                    if (host.messageFieldFocused) dismissKeyboard()
+                    // iOS `openModelPickerFromChip`: put away under the picker sheet (iOS 07b2f5f8), or a
+                    // row's level menu raises the composer's keyboard over it, and handed back as it closes.
+                    val focused = host.messageFieldFocused
+                    host.modelPanels?.sheetRestoresFocus = focused
+                    if (focused) dismissKeyboard()
                     store.send(Action.ModelButtonTapped)
                 },
                 targetDrop = ComposerLayoutMetrics.pickerTargetDrop.dp,
@@ -260,8 +271,8 @@ internal fun SessionComposerEnv.AnswerLeadingControls(bar: RequestBar, recording
                                         // iOS `accessibilityHint`: TalkBack's click label.
                                         onClickLabel = when {
                                             draftEmpty -> "Type or dictate your own answer"
-                                            bar.isCustom -> "Sets your words aside"
-                                            else -> "Answers with your words"
+                                            bar.isCustom -> "Set your words aside"
+                                            else -> "Answer with your words"
                                         },
                                     ) {
                                         if (s.draft.isBlank()) focus() else store.send(Action.requestCustomMarkTapped)
@@ -300,11 +311,11 @@ internal fun SessionComposerEnv.AnswerTrailingControls(bar: RequestBar) {
                     Modifier
                         .padding(end = 5.dp)
                         .heightIn(min = 48.dp)
-                        .clickable(role = Role.Button, onClickLabel = if (s.draft.isNotEmpty()) "Tells the agent what to do instead" else null) {
+                        .clickable(role = Role.Button, onClickLabel = if (s.draft.isNotEmpty()) "Tell the agent what to do instead" else null) {
                             dismissKeyboard()
                             store.send(Action.SendTapped)
                         }
-                        .semantics(mergeDescendants = true) {
+                        .clearAndSetSemantics {
                             contentDescription = bar.verb.title
                             testTag = if (bar.verb == RequestBar.Verb.Deny) "request-deny" else "request-decline"
                         },
@@ -437,7 +448,7 @@ private fun SessionComposerEnv.HoldToDictate(label: String, content: @Composable
 internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl) {
     val steers = s.isRunning && control == ComposerTrailingControl.Send(enabled = true)
     val visualOffset = (ComposerTunables.innerHorizontal + (44 - ComposerTunables.buttonDiameter) / 2) - ComposerTunables.trailingGap
-    val disabled = (host.isImportingAttachments && control == ComposerTrailingControl.Send(enabled = true)) ||
+    val disabled = (host.isImportingImages && control == ComposerTrailingControl.Send(enabled = true)) ||
         (control is ComposerTrailingControl.Send && !control.enabled)
     val accessibilityLabel = when {
         s.isWaitingForUploads -> "Sending after uploads finish"
@@ -446,6 +457,29 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
     }
     // iOS `persistentSend`: New Plus Menu's Send stays put, dimmed while there's nothing to send.
     val persistentSend = control is ComposerTrailingControl.Send
+    // QA AF-01: VoiceOver stays in the trailing slot when the Send just pressed turns into Stop, or
+    // the Stop into Send: iOS swaps the control inside one slot whose accessibility element keeps
+    // its frame (SessionView+ComposerControls.swift:400-447). Here each control is its own node,
+    // so TalkBack lost its focus with the pressed one and fell back to the screen's first element
+    // ("Open sessions"); the control that replaces it within a few seconds takes it instead.
+    val kind = when (control) {
+        ComposerTrailingControl.Stop -> true
+        is ComposerTrailingControl.Send -> false
+        else -> null
+    }
+    var follows by remember { mutableIntStateOf(0) }
+    var following by remember { mutableStateOf(false) }
+    LaunchedEffect(kind) {
+        val press = host.trailingPress ?: return@LaunchedEffect
+        if (kind == null || press.first == kind) return@LaunchedEffect
+        host.trailingPress = null
+        if (System.nanoTime() - press.second > TRAILING_FOCUS_FOLLOW_NANOS) return@LaunchedEffect
+        follows += 1
+        following = true
+        delay(1_000)
+        following = false
+    }
+    val followFocus = rememberAccessibilityFocusRequest(follows.takeIf { following })
     val label: @Composable () -> Unit = {
         if (persistentSend) {
             ComposerSendLabel(
@@ -470,7 +504,7 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
         )
         }
     }
-    val semantics = Modifier.semantics(mergeDescendants = true) {
+    val semantics = Modifier.accessibilityFocusRequest(followFocus).semantics(mergeDescendants = true) {
         contentDescription = accessibilityLabel
         testTag = control.accessibilityLabel
         if (control == ComposerTrailingControl.Stop && s.isInterrupting) stateDescription = "Stopping"
@@ -486,7 +520,7 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
                 onSend = { sendMessage(if (it == ai.opencode.server.model.OpenCodeDelivery.Queue) Action.QueueTapped else Action.SendTapped) },
                 enabled = !disabled,
                 // iOS `accessibilityHint` “Steers at the next step. Touch and hold to queue after this response.”
-                clickLabel = "Steers at the next step",
+                clickLabel = "Steer at the next step",
                 longClickLabel = "Queue after this response",
             ) { menuModifier ->
                 Box(menuModifier.openCodeTapTarget(accessibility = false).then(semantics), contentAlignment = Alignment.Center) { label() }
@@ -494,7 +528,10 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
             control == ComposerTrailingControl.Mic -> HoldToDictate(label = "Dictate message") { label() }
             control == ComposerTrailingControl.Stop -> ComposerStopButton(
                 holdStartsCall = holdingStopStartsCall,
-                onStop = { store.send(Action.InterruptTapped) },
+                onStop = {
+                    host.trailingPress = true to System.nanoTime()
+                    store.send(Action.InterruptTapped)
+                },
                 onHold = { store.send(Action.StopLongPressed) },
                 modifier = semantics,
             ) { label() }
@@ -515,7 +552,10 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
                         interactionSource = remember { MutableInteractionSource() },
                         indication = ripple(bounded = false, radius = 22.dp),
                         role = Role.Button,
-                    ) { sendMessage() }
+                    ) {
+                        host.trailingPress = false to System.nanoTime()
+                        sendMessage()
+                    }
                     .openCodeTapTarget(accessibility = false)
                     .then(semantics),
                 contentAlignment = Alignment.Center,
@@ -548,7 +588,7 @@ internal fun SessionComposerEnv.DictationTrailingControls(controls: ComposerCont
                 glyphSize = 12.dp,
             )
         }
-        val sendEnabled = !controls.isFinishing && canSend && !host.isImportingAttachments
+        val sendEnabled = !controls.isFinishing && canSend && !host.isImportingImages
         Box(
             Modifier
                 .clickable(enabled = sendEnabled, role = Role.Button) {
@@ -568,3 +608,6 @@ internal fun SessionComposerEnv.DictationTrailingControls(controls: ComposerCont
         }
     }
 }
+
+/** How long a pressed Send or Stop waits for the control that replaces it to take TalkBack's focus (QA AF-01). */
+private const val TRAILING_FOCUS_FOLLOW_NANOS = 10_000_000_000L
