@@ -14,12 +14,14 @@ import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.node.CompositionLocalConsumerModifierNode
 import androidx.compose.ui.node.DrawModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
+import androidx.compose.ui.node.currentValueOf
 import androidx.compose.ui.node.invalidateDraw
+import androidx.compose.ui.platform.LocalGraphicsContext
 
 /**
  * How a new row arrives (iOS `RowEntrance.Style`). `Settling`: a quiet row landing among rows
@@ -73,16 +75,57 @@ object RowEntrance {
     }
 }
 
-/** Applies a row's entrance pose while [entrance] is non-null (read in the draw phase only). */
-fun Modifier.rowEntrance(entrance: () -> Pair<Float, RowEntranceStyle>?): Modifier = graphicsLayer {
-    val current = entrance()
-    if (current == null) {
-        alpha = 1f
-        translationY = 0f
-    } else {
+/**
+ * Applies a row's entrance pose while [entrance] is non-null, in a pure [DrawModifierNode] rather
+ * than `Modifier.graphicsLayer`: `BlockGraphicsLayerModifier` implements `SemanticsModifierNode`
+ * and reports `translationY` changes as layout bounds updates, which would turn every `LazyColumn`
+ * item root into its own unmerged semantics node and fan out scroll content-change events per row.
+ */
+fun Modifier.rowEntrance(entrance: () -> Pair<Float, RowEntranceStyle>?): Modifier =
+    this then RowEntranceElement(entrance)
+
+private data class RowEntranceElement(val entrance: () -> Pair<Float, RowEntranceStyle>?) :
+    ModifierNodeElement<RowEntranceNode>() {
+    override fun create() = RowEntranceNode(entrance)
+    override fun update(node: RowEntranceNode) {
+        node.entrance = entrance
+    }
+}
+
+private class RowEntranceNode(var entrance: () -> Pair<Float, RowEntranceStyle>?) :
+    Modifier.Node(), DrawModifierNode, CompositionLocalConsumerModifierNode {
+    private var layer: GraphicsLayer? = null
+    private var layerOwner: GraphicsContext? = null
+
+    override fun ContentDrawScope.draw() {
+        val current = entrance()
+        if (current == null || size.width <= 0f || size.height <= 0f) {
+            dropLayer()
+            drawContent()
+            return
+        }
+        val graphics = currentValueOf(LocalGraphicsContext)
+        if (layerOwner !== graphics) dropLayer()
+        val activeLayer = layer ?: graphics.createGraphicsLayer().also {
+            layer = it
+            layerOwner = graphics
+        }
         val (opacity, rise) = RowEntrance.pose(current.first, current.second)
-        alpha = opacity
-        translationY = rise * density
+        activeLayer.alpha = opacity
+        activeLayer.translationY = rise * density
+        activeLayer.record { this@draw.drawContent() }
+        drawLayer(activeLayer)
+    }
+
+    override fun onReset() = dropLayer()
+
+    override fun onDetach() = dropLayer()
+
+    private fun dropLayer() {
+        val existing = layer ?: return
+        layer = null
+        layerOwner?.releaseGraphicsLayer(existing)
+        layerOwner = null
     }
 }
 

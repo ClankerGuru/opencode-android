@@ -90,6 +90,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
@@ -609,24 +610,33 @@ private fun GrowingRow(controller: TranscriptListController, key: String, modifi
     Box(
         modifier
             .rowEntrance { controller.entrance(key) }
-            // Outside the layout below, so the clip and soft edge sit at the reported (growing) height.
-            .graphicsLayer { clip = controller.isClipping(key) }
+            // Drawn in a pure draw modifier (not `graphicsLayer`, which adds a semantics node to
+            // every LazyColumn item root and multiplies scroll subtree events per visible row),
+            // outside `topAnchoredRow` so the clip and soft edge sit at the reported height.
             .drawWithContent {
-                drawContent()
+                val clips = controller.isClipping(key)
                 val edge = controller.softEdge(key) * density
-                if (edge > 0.5f) {
-                    // The soft edge only ever brightens what it covers (iOS growth mask): the row
-                    // fades into the transcript's canvas behind it. Drawn over, not punched out
-                    // (DstOut), which needs an offscreen layer chosen in the same frame; a layer
-                    // still on Auto the frame growth starts showed the cut as a black band.
-                    drawRect(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(canvas.copy(alpha = 0f), canvas),
-                            startY = size.height - edge,
-                            endY = size.height,
-                        ),
-                        topLeft = Offset(0f, size.height - edge),
-                    )
+                fun drawRow() {
+                    this@drawWithContent.drawContent()
+                    if (edge > 0.5f) {
+                        // The soft edge only ever brightens what it covers (iOS growth mask): the row
+                        // fades into the transcript's canvas behind it. Drawn over, not punched out
+                        // (DstOut), which needs an offscreen layer chosen in the same frame; a layer
+                        // still on Auto the frame growth starts showed the cut as a black band.
+                        this@drawWithContent.drawRect(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(canvas.copy(alpha = 0f), canvas),
+                                startY = size.height - edge,
+                                endY = size.height,
+                            ),
+                            topLeft = Offset(0f, size.height - edge),
+                        )
+                    }
+                }
+                if (clips) {
+                    clipRect(0f, 0f, size.width, size.height) { drawRow() }
+                } else {
+                    drawRow()
                 }
             }
             .topAnchoredRow(controller, key),
