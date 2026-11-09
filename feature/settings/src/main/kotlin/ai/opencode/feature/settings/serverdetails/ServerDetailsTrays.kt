@@ -65,7 +65,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -310,7 +310,7 @@ private fun MCPServerTray(
                     ) {
                         Text(
                             error,
-                            style = OpenCodeTextStyles.footnote.copy(fontFamily = FontFamily.Monospace),
+                            style = OpenCodeTextStyles.footnote.copy(fontFamily = OpenCodeFonts.monospace),
                             color = OpenCodeTheme.colors.text,
                         )
                     }
@@ -329,7 +329,7 @@ private fun MCPServerTray(
                 Spacer(Modifier.weight(1f))
                 Text(
                     mcp.name,
-                    style = OpenCodeTextStyles.subheadline.copy(fontFamily = FontFamily.Monospace),
+                    style = OpenCodeTextStyles.subheadline.copy(fontFamily = OpenCodeFonts.monospace),
                     color = OpenCodeTheme.colors.secondaryText,
                 )
             }
@@ -459,7 +459,7 @@ private fun SkillsTray(skills: List<OpenCodeAutocompleteSkill>, close: () -> Uni
                     ) {
                         Text(
                             skill.name,
-                            style = SettingsText.title.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium),
+                            style = SettingsText.title.copy(fontFamily = OpenCodeFonts.monospace, fontWeight = FontWeight.Medium),
                             color = OpenCodeTheme.colors.text,
                         )
                         val description = skill.description

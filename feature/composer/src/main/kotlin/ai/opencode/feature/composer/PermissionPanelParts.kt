@@ -34,7 +34,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
@@ -98,9 +98,9 @@ object RequestTunables {
 /** iOS `TranscriptMetrics` fonts and corner the request panel borrows (the transcript module sits beside this one). */
 internal object RequestTranscriptMetrics {
     /** `TranscriptMetrics.toolFont`: footnote, monospaced. */
-    val toolFont: TextStyle get() = OpenCodeTextStyles.footnote.copy(fontFamily = FontFamily.Monospace)
+    val toolFont: TextStyle get() = OpenCodeTextStyles.footnote.copy(fontFamily = OpenCodeFonts.monospace)
     /** `TranscriptMetrics.codeFont`: subheadline, monospaced. */
-    val codeFont: TextStyle get() = OpenCodeTextStyles.subheadline.copy(fontFamily = FontFamily.Monospace)
+    val codeFont: TextStyle get() = OpenCodeTextStyles.subheadline.copy(fontFamily = OpenCodeFonts.monospace)
     /** `TranscriptMetrics.controlCornerRadius`. */
     val controlCornerRadius = 10.dp
     /** `TranscriptBandStyle.verticalPadding`: from a hairline to the content's first line box. */

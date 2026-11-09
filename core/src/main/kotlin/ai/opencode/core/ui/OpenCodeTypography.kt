@@ -11,13 +11,41 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 
-/** Font families. Everything is the system sans (Roboto / the device font); iOS uses SF. */
+/**
+ * Font families. This branch uses the OpenCode desktop's fonts: Inter (variable) for UI text and
+ * IBM Plex Mono for code and tool output (`packages/ui` `--font-family-sans` / `-mono`). Both are
+ * OFL-1.1 (`docs/licenses/`).
+ */
 object OpenCodeFonts {
-    /** The platform sans-serif, the Android counterpart of SF Pro. */
-    val system: FontFamily = FontFamily.Default
+    /**
+     * Inter at the desktop's weights: Normal → 440 (`--font-weight-regular`), Medium → 530
+     * (`--font-weight-medium`), SemiBold → 600, Bold → 670 (`--font-weight-bold`).
+     */
+    @OptIn(ExperimentalTextApi::class)
+    val system: FontFamily = FontFamily(
+        listOf(
+            FontWeight.Light to 340,
+            FontWeight.Normal to 440,
+            FontWeight.Medium to 530,
+            FontWeight.SemiBold to 600,
+            FontWeight.Bold to 670,
+            FontWeight.ExtraBold to 760,
+        ).map { (weight, axis) ->
+            Font(
+                R.font.inter,
+                weight = weight,
+                variationSettings = FontVariation.Settings(FontVariation.weight(axis)),
+            )
+        },
+    )
 
-    /** Monospace for code (iOS: SF Mono via `.monospaced()`). */
-    val monospace: FontFamily = FontFamily.Monospace
+    /** IBM Plex Mono for code, tool output and paths (desktop `--font-family-mono`). */
+    val monospace: FontFamily = FontFamily(
+        Font(R.font.plex_mono_regular, FontWeight.Normal),
+        Font(R.font.plex_mono_medium, FontWeight.Medium),
+        Font(R.font.plex_mono_semibold, FontWeight.SemiBold),
+        Font(R.font.plex_mono_semibold, FontWeight.Bold),
+    )
 
     /**
      * Berkeley Mono (variable), only for onboarding's brand marks, exactly as iOS restricts
@@ -36,43 +64,46 @@ object OpenCodeFonts {
 }
 
 /**
- * iOS Dynamic Type text styles at the default size (Large), in sp. iOS points and Android
- * dp are within 2 % physically (163 vs 160 per inch), so the sizes port 1:1 and keep iOS's
- * relative scale; sp also follows the system font scale like Dynamic Type.
+ * The text styles under iOS's Dynamic Type names (so ported views still say `.footnote`), sized
+ * to the OpenCode desktop scale. sp follows the system font scale like Dynamic Type.
  *
  * Use these by name when porting a view that says `.font(.footnote)`; Material components
  * pick them up through [OpenCodeTypography]'s role mapping.
  */
 object OpenCodeTextStyles {
-    private fun style(size: Int, lineHeight: Int, weight: FontWeight = FontWeight.Normal) = TextStyle(
+    private fun style(size: Int, lineHeight: Int, weight: FontWeight = FontWeight.Normal, tracking: Double = 0.0) = TextStyle(
         fontFamily = OpenCodeFonts.system,
         fontWeight = weight,
         fontSize = size.sp,
         lineHeight = lineHeight.sp,
-        letterSpacing = TextUnit.Unspecified,
+        letterSpacing = if (tracking == 0.0) TextUnit.Unspecified else tracking.sp,
     )
 
-    /** `.largeTitle` 34/41. */
-    val largeTitle = style(34, 41)
-    /** `.title` (title1) 28/34. */
-    val title1 = style(28, 34)
-    /** `.title2` 22/28. */
-    val title2 = style(22, 28)
-    /** `.title3` 20/25. */
-    val title3 = style(20, 25)
-    /** `.headline` 17/22 semibold. */
-    val headline = style(17, 22, FontWeight.SemiBold)
-    /** `.body` 17/22. */
-    val body = style(17, 22)
-    /** `.callout` 16/21. */
-    val callout = style(16, 21)
-    /** `.subheadline` 15/20. */
-    val subheadline = style(15, 20)
-    /** `.footnote` 13/18. */
+    // The desktop scale (13/14/16/20 px at weights 440/530/670) stretched for a phone held
+    // closer than a monitor: body text one step up (15 sp), titles medium-weight and tightly
+    // tracked like the desktop's `text-16/20-medium`. Everything stays in sp, so font scaling works.
+
+    /** `.largeTitle`: 28/34 medium. */
+    val largeTitle = style(28, 34, FontWeight.Medium, -0.4)
+    /** `.title` (title1): 24/30 medium. */
+    val title1 = style(24, 30, FontWeight.Medium, -0.32)
+    /** `.title2`: 20/26 medium (desktop `text-20-medium`). */
+    val title2 = style(20, 26, FontWeight.Medium, -0.32)
+    /** `.title3`: 18/24 medium. */
+    val title3 = style(18, 24, FontWeight.Medium, -0.16)
+    /** `.headline`: 16/22 medium (desktop `text-16-medium`). */
+    val headline = style(16, 22, FontWeight.Medium, -0.16)
+    /** `.body`: 15/23 (desktop markdown 14 px / 160 %). */
+    val body = style(15, 23)
+    /** `.callout`: 15/21. */
+    val callout = style(15, 21)
+    /** `.subheadline`: 14/20 (desktop `text-14`). */
+    val subheadline = style(14, 20)
+    /** `.footnote`: 13/18 (desktop `text-12`, 13 px). */
     val footnote = style(13, 18)
-    /** `.caption` (caption1) 12/16. */
+    /** `.caption` (caption1): 12/16. */
     val caption1 = style(12, 16)
-    /** `.caption2` 11/13. */
+    /** `.caption2`: 11/13. */
     val caption2 = style(11, 13)
 }
 
@@ -104,11 +135,11 @@ val OpenCodeTypography: Typography = with(OpenCodeTextStyles) {
         headlineSmall = title3,
         titleLarge = title3,
         titleMedium = headline,
-        titleSmall = subheadline.copy(fontWeight = FontWeight.SemiBold),
+        titleSmall = subheadline.copy(fontWeight = FontWeight.Medium),
         bodyLarge = body,
         bodyMedium = subheadline,
         bodySmall = footnote,
-        labelLarge = body.copy(fontWeight = FontWeight.SemiBold),
+        labelLarge = subheadline.copy(fontWeight = FontWeight.Medium),
         labelMedium = caption1.copy(fontWeight = FontWeight.Medium),
         labelSmall = caption2.copy(fontWeight = FontWeight.Medium),
     )

@@ -63,7 +63,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
@@ -420,7 +420,7 @@ private const val PreviewMaxFontScale = 19f / 17f
 @Composable
 private fun ImitationTranscriptPreview(theme: AppTheme, isDark: Boolean) {
     val v = rememberThemeDefinition(theme).variant(isDark)
-    val mono = FontFamily.Monospace
+    val mono = OpenCodeFonts.monospace
     Column(
         Modifier
             .fillMaxWidth()

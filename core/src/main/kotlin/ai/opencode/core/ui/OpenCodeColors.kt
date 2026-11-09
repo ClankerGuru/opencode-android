@@ -214,7 +214,8 @@ fun OpenCodeColors.toColorScheme(): ColorScheme {
         onSurface = textRgba.color,
         surfaceVariant = v.userBubble.color,
         onSurfaceVariant = secondary.color,
-        surfaceTint = accent.color,
+        // Flat surfaces (desktop): no tonal-elevation tint; depth comes from hairlines.
+        surfaceTint = Color.Transparent,
         inverseSurface = v.text.color,
         inverseOnSurface = canvas.color,
         error = error.color,

@@ -62,7 +62,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTag
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -414,7 +414,7 @@ private fun WelcomeCommand(command: String, onCopy: (String) -> Unit) {
     ) {
         Text(
             command,
-            style = OpenCodeTextStyles.callout.copy(fontFamily = FontFamily.Monospace),
+            style = OpenCodeTextStyles.callout.copy(fontFamily = OpenCodeFonts.monospace),
             modifier = Modifier.weight(1f),
         )
         OpenCodeIcon(

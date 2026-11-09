@@ -86,7 +86,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.drawText
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
@@ -612,7 +612,7 @@ private fun ReplayEvents(log: VoiceCallLog, playback: VoiceCallReplayPlayback, r
                             Box(Modifier.width(3.dp).fillMaxHeight().background(event.color))
                             Text(
                                 event.text,
-                                style = OpenCodeTextStyles.caption1.copy(fontFamily = FontFamily.Monospace),
+                                style = OpenCodeTextStyles.caption1.copy(fontFamily = OpenCodeFonts.monospace),
                                 color = OpenCodeTheme.colors.text,
                                 modifier = Modifier.padding(8.dp),
                             )

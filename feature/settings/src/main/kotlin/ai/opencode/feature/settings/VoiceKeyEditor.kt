@@ -25,7 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -58,7 +58,7 @@ internal fun VoiceKeyEditor(state: VoiceSettingsFeature.State, voice: VoiceStore
                 singleLine = true,
                 visualTransformation = if (state.revealsKey) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false),
-                textStyle = if (state.revealsKey) OpenCodeTextStyles.subheadline.copy(fontFamily = FontFamily.Monospace) else SettingsText.title,
+                textStyle = if (state.revealsKey) OpenCodeTextStyles.subheadline.copy(fontFamily = OpenCodeFonts.monospace) else SettingsText.title,
                 trailingIcon = {
                     Box(
                         Modifier

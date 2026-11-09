@@ -101,7 +101,7 @@ import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
@@ -347,7 +347,7 @@ private fun paragraph(source: String): Paragraph {
                 false -> {
                     val code = match.groupValues[1]
                     AgentFileReference.fromInlineCode(code)?.let { files += it }
-                    withStyle(SpanStyle(fontFamily = FontFamily.Monospace)) { append(code) }
+                    withStyle(SpanStyle(fontFamily = OpenCodeFonts.monospace)) { append(code) }
                     runs += LinkTextRun(code, isCode = true)
                 }
                 null -> {
@@ -407,7 +407,7 @@ private fun LabReply(
                     is Piece.Code -> if (piece.language == "mermaid") {
                         if (section == null || section == "mermaid") MermaidDiagramCard(piece.source, onPreview = { presenter?.presentImage(it) })
                     } else if (section == null) {
-                        Text(piece.source, style = OpenCodeTextStyles.footnote.copy(fontFamily = FontFamily.Monospace), color = OpenCodeTheme.colors.text)
+                        Text(piece.source, style = OpenCodeTextStyles.footnote.copy(fontFamily = OpenCodeFonts.monospace), color = OpenCodeTheme.colors.text)
                     }
                     is Piece.Prose -> {
                         paragraph ?: continue

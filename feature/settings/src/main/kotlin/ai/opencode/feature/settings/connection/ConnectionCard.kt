@@ -90,7 +90,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
@@ -340,7 +340,7 @@ private fun CardText(
 @Composable
 private fun CardAddress(monitor: ConnectionMonitor, stacked: Boolean) {
     val color = OpenCodeTheme.colors.tertiaryText
-    val mono = OpenCodeTextStyles.caption1.copy(fontFamily = FontFamily.Monospace)
+    val mono = OpenCodeTextStyles.caption1.copy(fontFamily = OpenCodeFonts.monospace)
     val caption = OpenCodeTextStyles.caption1
     if (stacked) {
         Column(Modifier.padding(top = 1.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -642,7 +642,7 @@ fun ServerPage(store: SettingsStore) {
                         SelectionContainer {
                             Text(
                                 monitor.server.host,
-                                style = SettingsText.title.copy(fontFamily = FontFamily.Monospace),
+                                style = SettingsText.title.copy(fontFamily = OpenCodeFonts.monospace),
                                 color = OpenCodeTheme.colors.secondaryText,
                                 maxLines = 1,
                                 overflow = TextOverflow.MiddleEllipsis,

@@ -1,8 +1,10 @@
 package ai.opencode.core.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
@@ -11,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -20,12 +23,15 @@ enum class OpenCodeButtonRole { Normal, Destructive }
 
 object OpenCodeButtonDefaults {
     /**
-     * Height every peer button shares (iOS `.controlSize(.large)` ≈ 50 pt). Hierarchy comes
-     * from style, never size.
+     * Height every peer button shares: the 48 dp touch target (denser than iOS's 50 pt `.large`,
+     * still well above the desktop's 32 px). Hierarchy comes from style, never size.
      */
-    val height: Dp = 52.dp
+    val height: Dp = 48.dp
 
-    val contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)
+    val contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
+
+    /** The desktop's button radius (`--radius-md`-ish 8 at phone size), not a capsule. */
+    val shape: Shape = RoundedCornerShape(OpenCodeRadius.fill)
 }
 
 /**
@@ -55,6 +61,7 @@ fun OpenCodePrimaryButton(
         onClick = onClick,
         modifier = modifier.heightIn(min = OpenCodeButtonDefaults.height),
         enabled = enabled,
+        shape = OpenCodeButtonDefaults.shape,
         colors = colors,
         contentPadding = OpenCodeButtonDefaults.contentPadding,
         content = content,
@@ -84,15 +91,19 @@ fun OpenCodeSecondaryButton(
     role: OpenCodeButtonRole = OpenCodeButtonRole.Normal,
     content: @Composable RowScope.() -> Unit,
 ) {
+    // Desktop neutral button: the base surface with a hairline, not a tonal fill.
+    val container = MaterialTheme.colorScheme.surface
     val colors = if (role == OpenCodeButtonRole.Destructive) {
-        ButtonDefaults.filledTonalButtonColors(contentColor = OpenCodeTheme.colors.destructive)
+        ButtonDefaults.filledTonalButtonColors(containerColor = container, contentColor = OpenCodeTheme.colors.destructive)
     } else {
-        ButtonDefaults.filledTonalButtonColors()
+        ButtonDefaults.filledTonalButtonColors(containerColor = container, contentColor = OpenCodeTheme.colors.text)
     }
     FilledTonalButton(
         onClick = onClick,
         modifier = modifier.heightIn(min = OpenCodeButtonDefaults.height),
         enabled = enabled,
+        shape = OpenCodeButtonDefaults.shape,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)),
         colors = colors,
         contentPadding = OpenCodeButtonDefaults.contentPadding,
         content = content,

@@ -73,7 +73,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -219,7 +219,7 @@ private fun Toolbar(state: ShellOutputFeature.State, onClose: () -> Unit, send: 
         Spacer(Modifier.width(48.dp))
         Text(
             state.shell.title,
-            style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace),
+            style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold, fontFamily = OpenCodeFonts.monospace),
             color = OpenCodeTheme.colors.text,
             maxLines = 1,
             overflow = TextOverflow.MiddleEllipsis,
@@ -412,7 +412,7 @@ private fun ShellOutputTextView(text: String, startCursor: Int, isFollowing: Boo
             else listState.animateScrollToItem(lines.size - 1, Int.MAX_VALUE / 2)
         }
     }
-    val style = OpenCodeTextStyles.footnote.copy(fontFamily = FontFamily.Monospace, fontSize = 13.sp, color = OpenCodeTheme.colors.text)
+    val style = OpenCodeTextStyles.footnote.copy(fontFamily = OpenCodeFonts.monospace, fontSize = 13.sp, color = OpenCodeTheme.colors.text)
     SelectionContainer {
         LazyColumn(
             state = listState,

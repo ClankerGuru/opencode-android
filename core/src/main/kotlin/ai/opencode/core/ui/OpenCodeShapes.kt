@@ -9,27 +9,27 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Corner radii the iOS app uses (surveyed from its `cornerRadius:` / `.rect(cornerRadius:)`
- * call sites). iOS draws `.continuous` (squircle) corners; Compose's rounded corners are
- * circular, which reads the same at these sizes.
+ * Corner radii, on this branch the OpenCode desktop's (`--radius-sm` 4, `-md` 6, `-lg` 8,
+ * `-xl` 10, the 12 px dock), keeping the iOS role names so call sites are unchanged. Sheets
+ * keep a larger 16 dp top radius so they still read as Android sheets.
  */
 object OpenCodeRadius {
-    /** Tiny marks: inline code, checkbox insets (6). */
-    val xs: Dp = 6.dp
-    /** Small fills and thumbnails (10). */
-    val sm: Dp = 10.dp
-    /** Tertiary-fill fields and rows (`tertiarySystemFill` boxes, 14). */
-    val fill: Dp = 14.dp
-    /** Inline controls and trays (16). */
-    val control: Dp = 16.dp
-    /** Cards and glass cards (server list, error report, 20). */
-    val card: Dp = 20.dp
-    /** Attachment chips, clipped media, settings tiles (22). */
-    val tile: Dp = 22.dp
-    /** Large panels: connect, server details, What's New cards (26). */
-    val panel: Dp = 26.dp
-    /** Sheets, scanner frame, model list, voice panel (28). */
-    val sheet: Dp = 28.dp
+    /** Tiny marks: inline code, checkbox insets (desktop 4). */
+    val xs: Dp = 4.dp
+    /** Small fills and thumbnails (desktop 6). */
+    val sm: Dp = 6.dp
+    /** Tertiary-fill fields and rows (`tertiarySystemFill` boxes, desktop 8). */
+    val fill: Dp = 8.dp
+    /** Inline controls and trays (desktop 8). */
+    val control: Dp = 8.dp
+    /** Cards and glass cards (server list, error report, desktop 10). */
+    val card: Dp = 10.dp
+    /** Attachment chips, clipped media, settings tiles (desktop 10). */
+    val tile: Dp = 10.dp
+    /** Large panels: connect, server details, What's New cards (desktop dock 12). */
+    val panel: Dp = 12.dp
+    /** Sheets, scanner frame, model list, voice panel (16). */
+    val sheet: Dp = 16.dp
 }
 
 /** Shapes for the iOS forms: capsules and circles stay capsules and circles. */
@@ -46,8 +46,8 @@ object OpenCodeShape {
 }
 
 /**
- * Material shape scale from the iOS radii: extraSmall 6, small 10, medium 14, large 20,
- * extraLarge 28. Material components read these (menus small, cards medium, dialogs and
+ * Material shape scale from the desktop radii: extraSmall 4, small 6, medium 8, large 10,
+ * extraLarge 16. Material components read these (menus small, cards medium, dialogs and
  * sheets extraLarge).
  */
 val OpenCodeShapes = Shapes(

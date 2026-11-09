@@ -604,7 +604,7 @@ private fun formatted(message: String): AnnotatedString = buildAnnotatedString {
         return@buildAnnotatedString
     }
     parts.forEachIndexed { index, part ->
-        if (index % 2 == 1) withStyle(SpanStyle(fontFamily = FontFamily.Monospace)) { append(part) } else append(part)
+        if (index % 2 == 1) withStyle(SpanStyle(fontFamily = OpenCodeFonts.monospace)) { append(part) } else append(part)
     }
 }
 

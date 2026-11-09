@@ -49,7 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
@@ -246,7 +246,7 @@ fun ModelVisibilitySettingsView(store: SettingsStore) {
                 ) {
                     stale.all.forEach { id ->
                         SettingsRowFrame {
-                            Text(id, style = OpenCodeTextStyles.subheadline.copy(fontFamily = FontFamily.Monospace), color = OpenCodeTheme.colors.secondaryText)
+                            Text(id, style = OpenCodeTextStyles.subheadline.copy(fontFamily = OpenCodeFonts.monospace), color = OpenCodeTheme.colors.secondaryText)
                         }
                         SettingsDivider()
                     }
