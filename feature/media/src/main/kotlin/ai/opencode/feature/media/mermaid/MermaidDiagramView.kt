@@ -8,6 +8,7 @@ import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.drawerPanHorizontalScroller
 import android.graphics.Bitmap
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -282,7 +283,8 @@ private fun MermaidCode(source: String, modifier: Modifier = Modifier) {
     val highlighted = remember(source, palette) { SyntaxHighlighter.highlight(source, "mermaid", palette) }
     Column(modifier.fillMaxWidth().background(OpenCodeTheme.colors.codeBand)) {
         HorizontalDivider(thickness = 0.5.dp, color = OpenCodeTheme.colors.border)
-        Box(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = TranscriptMetrics.contentGutter, vertical = 12.dp)) {
+        val scroll = rememberScrollState()
+        Box(Modifier.drawerPanHorizontalScroller(scroll).horizontalScroll(scroll).padding(horizontal = TranscriptMetrics.contentGutter, vertical = 12.dp)) {
             SelectionContainer {
                 Text(highlighted, style = codeStyle(), color = OpenCodeTheme.colors.text)
             }

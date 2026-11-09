@@ -4,6 +4,7 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconSize
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.drawerPanHorizontalScroller
 import ai.opencode.server.model.AgentFileReference
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
@@ -116,7 +118,12 @@ fun FileAttachmentDetail(text: String, modifier: Modifier = Modifier, color: Col
 @Composable
 fun AgentFileCards(files: List<AgentFileReference>, onOpen: (AgentFileReference) -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(TranscriptMetrics.cardCornerRadius)
-    LazyRow(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(TranscriptMetrics.clustered)) {
+    val listState = rememberLazyListState()
+    LazyRow(
+        modifier.fillMaxWidth().drawerPanHorizontalScroller({ listState.canScrollBackward }, { listState.canScrollForward }),
+        state = listState,
+        horizontalArrangement = Arrangement.spacedBy(TranscriptMetrics.clustered),
+    ) {
         items(files, key = { it.path }) { file ->
             FileAttachmentCard(
                 name = file.name,

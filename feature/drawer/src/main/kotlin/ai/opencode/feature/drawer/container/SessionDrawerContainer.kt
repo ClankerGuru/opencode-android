@@ -196,6 +196,35 @@ fun SessionDrawerContainer(
     val sheet by rememberUpdatedState(isSheetPresented)
     val currentCatchUp by rememberUpdatedState(catchUp)
 
+    // Android only (QA FB-07; iOS has no system back): Back on the shut card opens the session
+    // list, as the drawer button does, instead of leaving the app; Back on a list Back opened
+    // leaves it. Registered before the card composes, so the session's own handlers (menus,
+    // sheets, selection, a pushed subagent) still take Back first. Predictive back pulls the
+    // card part of the way open; a button or TalkBack back opens it at once.
+    var openedByBack by remember { mutableStateOf(false) }
+    LaunchedEffect(motion.isPresented) { if (!motion.isPresented) openedByBack = false }
+    PredictiveBackHandler(
+        enabled = !isSheetPresented && catchUp == null && sidebarShown == null && !isContentPushed && !motion.isPresented,
+    ) { progress ->
+        openedByBack = true
+        var began = false
+        try {
+            progress.collect { event ->
+                if (!began) {
+                    controller.panBegan()
+                    motion.beginDrag()
+                    began = true
+                }
+                motion.drag(event.progress * motion.width * DrawerMotionTunables.BACK_PREVIEW_TRAVEL)
+            }
+            if (began) motion.endBackOpen() else onPresentationChanged(true)
+        } catch (cancelled: CancellationException) {
+            openedByBack = false
+            if (began) motion.cancelDrag()
+            throw cancelled
+        }
+    }
+
     val cardLayer = rememberGraphicsLayer()
     val chromeLayer = rememberGraphicsLayer()
     // One composed session moves between the full-screen card and Catch Up's stack, so entering
@@ -619,13 +648,14 @@ fun SessionDrawerContainer(
             }
         }
 
-        // Back: Catch Up exits; an open drawer closes (a pushed subagent's own back sits beneath).
+        // Back: Catch Up exits; an open drawer closes (a pushed subagent's own back sits beneath),
+        // unless Back opened it (above): then Back leaves the app.
         // Under Settings neither does: Back closes Settings, not what waits beneath it.
         BackHandler(enabled = !sheet && catchUp != null) { currentCatchUp?.onExit?.invoke() }
         // Android only: predictive back pulls the card part of the way shut with the gesture
         // (DrawerMotionTunables.BACK_PREVIEW_TRAVEL); the commit closes it from there, a cancel
         // springs it open again. A button or TalkBack back closes it at once, as before.
-        PredictiveBackHandler(enabled = !sheet && catchUp == null && motion.isPresented) { progress ->
+        PredictiveBackHandler(enabled = !sheet && catchUp == null && motion.isPresented && !openedByBack) { progress ->
             var began = false
             try {
                 progress.collect { event ->
