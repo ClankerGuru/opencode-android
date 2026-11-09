@@ -437,7 +437,17 @@ private fun CopyCommand(command: String, onCopy: (String) -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(command, modifier = Modifier.weight(1f, fill = false), style = OpenCodeTextStyles.callout.copy(fontFamily = OpenCodeFonts.berkeleyMono, fontSize = OpenCodeTextStyles.subheadline.fontSize))
+            Text(
+                command,
+                modifier = Modifier.weight(1f, fill = false),
+                // Berkeley Mono's contextual alternates join `//` and `--` into ligatures that
+                // read as `https: //`; a command to retype is drawn as typed.
+                style = OpenCodeTextStyles.callout.copy(
+                    fontFamily = OpenCodeFonts.berkeleyMono,
+                    fontSize = OpenCodeTextStyles.subheadline.fontSize,
+                    fontFeatureSettings = "calt 0",
+                ),
+            )
             OpenCodeIcon(
                 if (copied) SFSymbol.Checkmark else SFSymbol.SquareOnSquare,
                 contentDescription = null,
