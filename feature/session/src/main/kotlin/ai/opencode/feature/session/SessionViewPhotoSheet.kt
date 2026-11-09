@@ -191,6 +191,22 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         return composerTop - max(lift - bar, 0f)
     }
 
+    /**
+     * Where the sheet rests when it opens over a raised keyboard (dp). iOS draws the sheet over the
+     * keys in its keyboard-down shape (`photoSheetCoversKeys`); an Android app can't draw over the
+     * keyboard, so the keyboard goes down as the sheet opens and the sheet takes that same shape:
+     * the composer's top once it has dropped to the navigation bar, lifted as with no keyboard.
+     */
+    private fun composerSheetTopWithKeyboardDown(composer: Rect): Float {
+        val d = env.density
+        val drop = max(env.imeBottomPx / d - env.navigationBottomPx / d, 0f)
+        val minLift = max(ComposerMorphTunables.leastLift, ModelPickerTunables.mediumMax - max(composer.height / d, 56f)).toFloat()
+        return composer.top / d + drop - minLift
+    }
+
+    /** The software keyboard is up (iOS's `software` test: taller than 120 dp). */
+    private val keyboardIsUp: Boolean get() = env.imeBottomPx / env.density > 120
+
     private fun composerAnchor(): Rect = env.host?.attachmentAnchors?.composer ?: Rect.Zero
 
     private fun withMeasuredDetent(): PlusPhotoSheetDetent {
@@ -221,7 +237,12 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         library.resetClosingPicks()
         menuTakesBack = false
         flights.cancelAll()
-        val compactTop = composerSheetTop(host.attachmentAnchors.composer)
+        val coversKeys = keyboardIsUp
+        val compactTop = if (coversKeys) {
+            composerSheetTopWithKeyboardDown(host.attachmentAnchors.composer)
+        } else {
+            composerSheetTop(host.attachmentAnchors.composer)
+        }
         if (!morph.isOpening) source = menu
         detent = PlusPhotoSheetDetent().also { it.open(compactTop, ceiling) }
         snapTop(compactTop)
@@ -238,8 +259,8 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
             open,
             contentDelay = ComposerMorphTunables.photoContentDelay,
             prepare = {},
-            // The keyboard stays up: the sheet rests on it (iOS d82670c2).
-            launch = {},
+            // The keyboard goes down under the growing sheet; closing or Back brings it back ([restoresFocus]).
+            launch = { if (coversKeys) host.dismissComposerKeyboard() },
             opened = {},
         )
     }

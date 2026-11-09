@@ -1,6 +1,5 @@
 package ai.opencode.feature.composer
 
-import ai.opencode.core.motion.MotionSpring
 
 /**
  * iOS `PickerTunables` (Picker Interactions Lab): the photo picker's knobs at their shipped
@@ -13,7 +12,4 @@ object PickerTunables {
 
     /** The grabber floats on the photos' top row, the grid inset evenly from the glass (off: its own band above the grid). */
     const val PHOTO_GRABBER_OVER_GRID = true
-
-    /** The photo sheet's Add label (count and width) as picks change and the sheet expands. */
-    val photoAdd = MotionSpring(0.3, 0.0)
 }

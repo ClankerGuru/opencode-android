@@ -135,7 +135,6 @@ object PlusMenuTunables {
     const val PEEK_BLUR = 10f
     const val PEEK_DIM = 0f
     const val PEEK_FEATHER = 56f
-    const val ALL_PHOTOS_PADDING = 18f
     const val VIDEO_BADGE_INSET = 6f
     const val VIDEO_BADGE_RADIUS = 6f
     const val VIDEO_BADGE_OPACITY = 0.58
@@ -146,6 +145,9 @@ object PlusMenuTunables {
     const val LIMIT_DIM = 0.5
     const val SELECTION_BADGE_SIZE = 24f
     const val SELECTION_BADGE_INSET = 6f
+    /** A picked photo draws this far inside its tile, rounded (dp): the system photo picker's selection. */
+    const val SELECTED_TILE_INSET = 10f
+    const val SELECTED_TILE_RADIUS = 12f
     /** How far the menu's foot sits below the composer's (iOS overlaps the keys in its own window). */
     const val MENU_DROP = 80f
     /** The menu's width, × the screen's. */

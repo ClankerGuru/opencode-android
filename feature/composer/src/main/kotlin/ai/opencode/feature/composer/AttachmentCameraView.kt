@@ -19,6 +19,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
 import android.net.Uri
 import android.provider.Settings
 import android.view.Surface
@@ -27,6 +28,7 @@ import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.compose.CameraXViewfinder
 import androidx.camera.core.Camera
+import androidx.camera.core.CameraInfo
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.CameraState
 import androidx.camera.core.FocusMeteringAction
@@ -81,6 +83,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -126,6 +129,7 @@ import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
+import kotlin.math.round
 import kotlin.math.roundToInt
 
 /**
@@ -441,10 +445,13 @@ fun AttachmentCameraControls(
             ) {
                 CameraCircleButton(symbol = SFSymbol.Xmark, label = "Close camera", onClick = onClose)
                 Spacer(Modifier.weight(1f))
+                // Android camera apps' shutter size (iOS: 58 pt). The face is sized after the tap
+                // target, which measures what follows it with no minimum: an empty Box sized before
+                // it drew only its 5 dp padding.
                 Box(
                     Modifier
-                        .size(58.dp)
                         .alpha(inert)
+                        .clip(CircleShape)
                         .clickable(enabled = canCapture, role = Role.Button, onClick = onShutter)
                         .openCodeTapTarget()
                         .clearAndSetSemantics {
@@ -453,8 +460,9 @@ fun AttachmentCameraControls(
                             if (!canCapture) disabled()
                             onClick { onShutter(); true }
                         }
-                        .border(2.dp, Color.White, CircleShape)
-                        .padding(5.dp)
+                        .size(SHUTTER_SIZE)
+                        .border(3.dp, Color.White, CircleShape)
+                        .padding(6.dp)
                         .background(Color.White, CircleShape),
                 )
                 Spacer(Modifier.weight(1f))
@@ -469,6 +477,7 @@ fun AttachmentCameraControls(
 }
 
 private val CameraYellow = Color(0xFFFFD60A)
+private val SHUTTER_SIZE = 72.dp
 
 /** iOS `openCodeGlassCircle(tint: .black.opacity(0.3))` over the preview. */
 @Composable
@@ -895,20 +904,25 @@ private class AttachmentCaptureSession(
 
     private fun bind(cameras: ProcessCameraProvider, owner: LifecycleOwner, at: CameraDeviceDescription.Position): Boolean {
         camera?.cameraInfo?.cameraState?.removeObserver(stateListener)
-        return try {
+        val bound = try {
             cameras.unbind(preview, output)
-            val bound = cameras.bindToLifecycle(owner, selector(at), preview, output)
-            camera = bound
-            position = at
-            interrupted = false
-            bound.cameraInfo.cameraState.observeForever(stateListener)
-            prepare(bound)
-            true
+            cameras.bindToLifecycle(owner, selector(at), preview, output)
         } catch (error: Exception) {
             AppLog.app.error { "Camera bind failed: ${error::class.java.simpleName}" }
             camera = null
-            false
+            return false
         }
+        camera = bound
+        position = at
+        interrupted = false
+        bound.cameraInfo.cameraState.observeForever(stateListener)
+        // The camera is running: a lens or zoom query that fails only costs its lens buttons.
+        try {
+            prepare(bound)
+        } catch (error: Exception) {
+            AppLog.app.error { "Camera prepare failed: ${error::class.java.simpleName}" }
+        }
+        return true
     }
 
     fun stop() {
@@ -1074,10 +1088,11 @@ private class AttachmentCaptureSession(
             switchOver.add(1.0 / ratioBase)
         }
         lenses.add(CameraDeviceDescription.Lens.Wide)
-        val tele = runCatching { info.physicalCameraInfos }.getOrDefault(emptySet())
-            .map { it.intrinsicZoomRatio.toDouble() }
-            .filter { it >= TELEPHOTO_MIN_RATIO && it <= maxRatio }
-            .minOrNull()
+        var tele: Double? = null
+        for (ratio in physicalZoomRatios(info)) {
+            if (ratio < TELEPHOTO_MIN_RATIO || ratio > maxRatio) continue
+            if (tele == null || ratio < tele) tele = ratio
+        }
         if (tele != null) {
             lenses.add(CameraDeviceDescription.Lens.Telephoto)
             switchOver.add(tele / ratioBase)
@@ -1095,6 +1110,48 @@ private class AttachmentCaptureSession(
             maxZoom = maxRatio / ratioBase,
             nativeCropFactors = crops,
         )
+    }
+
+    /**
+     * Each physical lens's zoom relative to the main lens. CameraX can't say for a physical camera
+     * on every device (its adapter throws `UnsupportedOperationException` on Samsung's logical
+     * camera), so Camera2's focal lengths stand in, and no answer means no telephoto button.
+     */
+    private fun physicalZoomRatios(info: CameraInfo): List<Double> {
+        val ratios = mutableListOf<Double>()
+        for (physical in runCatching { info.physicalCameraInfos }.getOrDefault(emptySet())) {
+            val ratio = runCatching { physical.intrinsicZoomRatio.toDouble() }.getOrNull() ?: continue
+            ratios.add(ratio)
+        }
+        if (ratios.isNotEmpty()) return ratios
+        return focalLengthZoomRatios(info)
+    }
+
+    @OptIn(ExperimentalCamera2Interop::class)
+    private fun focalLengthZoomRatios(info: CameraInfo): List<Double> {
+        val manager = context.getSystemService(CameraManager::class.java) ?: return emptyList()
+        val logicalID = runCatching { Camera2CameraInfo.from(info).cameraId }.getOrNull() ?: return emptyList()
+        val logical = runCatching { manager.getCameraCharacteristics(logicalID) }.getOrNull() ?: return emptyList()
+        val main = equivalentFocalLength(logical) ?: return emptyList()
+        val ratios = mutableListOf<Double>()
+        for (id in logical.physicalCameraIds) {
+            val physical = runCatching { manager.getCameraCharacteristics(id) }.getOrNull() ?: continue
+            val focal = equivalentFocalLength(physical) ?: continue
+            val ratio = focal / main
+            // Focal lengths only approximate a lens's zoom (a 3× telephoto measures about 2.7):
+            // a telephoto takes its nominal whole number, as the phone's own camera labels it.
+            ratios.add(if (ratio >= TELEPHOTO_MIN_RATIO) round(ratio) else ratio)
+        }
+        return ratios
+    }
+
+    /** Focal length over the sensor's diagonal: lenses compare by it whatever their sensor size. */
+    private fun equivalentFocalLength(characteristics: CameraCharacteristics): Double? {
+        val focal = characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)?.firstOrNull() ?: return null
+        val size = characteristics.get(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE) ?: return null
+        val diagonal = hypot(size.width, size.height)
+        if (diagonal <= 0f) return null
+        return focal.toDouble() / diagonal
     }
 
     private fun reportReadiness() {
