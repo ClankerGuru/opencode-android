@@ -3,7 +3,6 @@ package ai.opencode.feature.drawer.motion
 import ai.opencode.core.ui.OpenCodeSurfaces
 import androidx.compose.foundation.shape.RoundedCornerShape
 import ai.opencode.core.ui.OpenCodeRadius
-import androidx.compose.foundation.BorderStroke
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
@@ -13,7 +12,6 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeMinTapTarget
 import ai.opencode.feature.drawer.style.DrawerMetrics
 import ai.opencode.feature.drawer.style.DrawerTunables
-import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
@@ -285,10 +283,11 @@ private fun SearchCapsule(
     val leading by animateFloatAsState(leadingPadding.value, DrawerSearchPillDefaults.morph.spec(), label = "search-leading")
     val trailing by animateFloatAsState(trailingPadding.value, DrawerSearchPillDefaults.morph.spec(), label = "search-trailing")
     Surface(
-        // The desktop's search control: the neutral button fill, hairline ring, small radius.
-        shape = OpenCodeShape.control,
-        color = OpenCodeSurfaces.neutralFill,
-        border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
+        // The drawer's floating control, as its footer buttons: popover fill, hairline ring, soft shadow.
+        shape = RoundedCornerShape(OpenCodeRadius.panel),
+        color = OpenCodeSurfaces.color,
+        border = OpenCodeSurfaces.border,
+        shadowElevation = OpenCodeSurfaces.raisedShadow,
         contentColor = OpenCodeTheme.colors.text,
         modifier = modifier
             .height(size)
@@ -334,9 +333,10 @@ private fun SearchCapsule(
 @Composable
 private fun CancelButton(size: Dp, enabled: Boolean = true, onClick: () -> Unit) {
     Surface(
-        shape = RoundedCornerShape(OpenCodeRadius.card),
-        color = OpenCodeSurfaces.neutralFill,
-        border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
+        shape = RoundedCornerShape(OpenCodeRadius.panel),
+        color = OpenCodeSurfaces.color,
+        border = OpenCodeSurfaces.border,
+        shadowElevation = OpenCodeSurfaces.raisedShadow,
         contentColor = OpenCodeTheme.colors.text,
         modifier = Modifier
             .size(size)

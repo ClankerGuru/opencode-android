@@ -72,6 +72,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.HorizontalAlignmentLine
@@ -141,8 +142,6 @@ object ComposerTunables {
     const val pillGap = 10f
     /** New Plus Menu: the attachment tiles sit this far from the surface's top and leading edges (f0670c5d). */
     const val attachmentInset = 19f
-    /** New Plus Menu's Send while the composer is empty (iOS `emptySendOpacity`). */
-    const val emptySendOpacity = 0.3f
     /** New Plus Menu's Send crossfade between empty and ready, in seconds (iOS `sendFade`). */
     const val sendFade = 0.15
     /** New Plus Menu: the attachment row's height change as the location card arrives or leaves. */
@@ -885,28 +884,27 @@ fun Modifier.horizontalScrollEdgeFade(state: LazyListState, width: Dp = 20.dp, i
 }
 
 /**
- * iOS `ComposerSendLabel`: New Plus Menu's one fixed Send. The enabled disc and arrow are composited
- * before dimming, so the arrow stays its colour as the empty button fades to [ComposerTunables.emptySendOpacity].
+ * iOS `ComposerSendLabel`: New Plus Menu's one fixed Send. Empty, it's a neutral face
+ * ([OpenCodeSurfaces.neutralFill]) with a secondary arrow, so it stays legible on the white
+ * composer, and fades to the send colours as text arrives (iOS dims the disc to 0.3 instead).
  */
 @Composable
 fun ComposerSendLabel(enabled: Boolean, showsProgress: Boolean, visualOffsetX: Float, modifier: Modifier = Modifier) {
     val reduceMotion = rememberReduceMotion()
-    val alpha by animateFloatAsState(
-        if (enabled) 1f else ComposerTunables.emptySendOpacity,
+    val progress by animateFloatAsState(
+        if (enabled) 1f else 0f,
         if (reduceMotion) snap() else tween((ComposerTunables.sendFade * 1000).toInt(), easing = FastOutSlowInEasing),
-        label = "sendLabelAlpha",
+        label = "sendLabelProgress",
     )
+    val colors = OpenCodeTheme.colors
     ComposerControlLabel(
         systemImage = "arrow.up",
         showsProgress = showsProgress,
-        foreground = OpenCodeTheme.colors.sendButtonForeground,
-        background = OpenCodeTheme.colors.sendButtonBackground,
+        foreground = lerp(colors.secondaryText, colors.sendButtonForeground, progress),
+        background = lerp(OpenCodeSurfaces.neutralFill, colors.sendButtonBackground, progress),
         visualOffsetX = visualOffsetX,
         faceDiameter = ComposerTunables.sendDiameter,
         glyphSize = 20.dp,
-        modifier = modifier.graphicsLayer {
-            this.alpha = alpha
-            compositingStrategy = CompositingStrategy.ModulateAlpha
-        },
+        modifier = modifier,
     )
 }

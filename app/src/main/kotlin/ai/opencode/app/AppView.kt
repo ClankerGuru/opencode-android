@@ -372,8 +372,11 @@ private fun PairingActionButton(
     )
 }
 
-/** The pairing buttons' label: the desktop's medium-weight button text at phone size. */
-private val PairingActionLabel get() = OpenCodeTextStyles.callout.copy(fontWeight = FontWeight.Medium)
+/**
+ * The pairing buttons' label. Semibold, a step above the desktop's medium button text: on these
+ * full-width buttons, the screen's two main actions, medium read as softer than the copy above.
+ */
+private val PairingActionLabel get() = OpenCodeTextStyles.callout.copy(fontWeight = FontWeight.SemiBold)
 
 /** What a new user needs on their computer before the scan can work. */
 @Composable

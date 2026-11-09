@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings.connection
 
+import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.ui.OpenCodeTextField
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.motion.Motion
@@ -107,9 +108,12 @@ import kotlin.math.roundToInt
 /** iOS `HomeFeature.State.credentialsRejectedStatus`: the HTTP status a refused sign-in comes back with. */
 const val credentialsRejectedStatus = 401
 
-/** The card's geometry (iOS `ConnectionCard.cornerRadius`, `boxInset`, `textInset`). */
+/**
+ * The card's geometry (iOS `ConnectionCard.cornerRadius`, `boxInset`, `textInset`). On this branch
+ * the card takes the Settings groups' desktop card radius, so it reads as one of them.
+ */
 private object ConnectionCardMetrics {
-    val cornerRadius = 26.dp
+    val cornerRadius = OpenCodeRadius.card
     /** The scope box's inset from the card. */
     val boxInset = 6.dp
     /** The text column's inset from the box. */
@@ -222,6 +226,7 @@ private fun ConnectionCardContent(
                 .fillMaxWidth()
                 .clip(cardShape)
                 .background(colors.groupedCard)
+                .border(1.dp, colors.border, cardShape)
                 .clickable(interactionSource = interaction, indication = ripple(), role = Role.Button, onClick = onOpen)
                 // Ahead of the clearing below, which would drop its marker.
                 .accessibilityFocusRequest(focusRequest)

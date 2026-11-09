@@ -69,11 +69,23 @@ object OpenCodeSurfaces {
 }
 
 /**
- * The floating fill for these colours: the canvas in light (desktop popovers are white), the
- * code band in dark (one step above the canvas). The System theme keeps Material's container.
+ * The floating fill for these colours: the canvas in light (desktop popovers are white), a raised
+ * step above the canvas in dark ([darkFloatingFill]). The System theme keeps its code band.
  */
 val OpenCodeColors.floating: Color
-    get() = if (isDark) codeBand.copy(alpha = 1f) else canvas
+    get() = when {
+        !isDark -> canvas
+        theme == AppTheme.System -> codeBand.copy(alpha = 1f)
+        else -> variant.darkFloatingFill().color
+    }
+
+/**
+ * Dark floating fill: the code band lifted about a third of the way to the user bubble (brand
+ * `#1C1C1C` → `#222222` on the `#161616` canvas), so the composer, request cards, menus and
+ * panels read as raised, as the desktop's `#1C1C1C` does over its `#101010` background.
+ */
+internal fun ThemeVariant.darkFloatingFill(): ThemeRGBA =
+    codeBand.composited(canvas).mixedInOklab(userBubble.composited(canvas), 0.35)
 
 /** A hairline ring in [shape] (desktop `0 0 0 1px border-base`). */
 @Composable

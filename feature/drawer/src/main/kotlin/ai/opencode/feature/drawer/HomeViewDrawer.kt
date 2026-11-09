@@ -3,7 +3,6 @@ package ai.opencode.feature.drawer
 import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.ui.OpenCodeRadius
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.BorderStroke
 import ai.opencode.feature.drawer.style.drawerCanvas
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.experiments.key
@@ -464,10 +463,12 @@ private fun DrawerNewSessionButton(enabled: Boolean, onClick: () -> Unit) {
     val rise = DrawerTunables.footerGlyphRise.value * glyph / 17f
     val tint = if (enabled) colors.text else colors.tertiaryText
     Surface(
-        // The desktop's neutral button: base surface, hairline ring, small radius.
-        shape = RoundedCornerShape(OpenCodeRadius.fill),
-        color = OpenCodeSurfaces.neutralFill,
-        border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
+        // The desktop's floating control: the popover fill, hairline ring and a soft shadow, at the
+        // floating panels' radius so the tall footer buttons don't read as keys.
+        shape = RoundedCornerShape(OpenCodeRadius.panel),
+        color = OpenCodeSurfaces.color,
+        border = OpenCodeSurfaces.border,
+        shadowElevation = OpenCodeSurfaces.raisedShadow,
         contentColor = tint,
         modifier = Modifier
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
@@ -550,9 +551,10 @@ private fun DrawerFooterTrailing(
             }
         }
         Surface(
-            shape = RoundedCornerShape(OpenCodeRadius.fill),
-            color = OpenCodeSurfaces.neutralFill,
-            border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
+            shape = RoundedCornerShape(OpenCodeRadius.panel),
+            color = OpenCodeSurfaces.color,
+            border = OpenCodeSurfaces.border,
+            shadowElevation = OpenCodeSurfaces.raisedShadow,
             contentColor = OpenCodeTheme.colors.text,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {

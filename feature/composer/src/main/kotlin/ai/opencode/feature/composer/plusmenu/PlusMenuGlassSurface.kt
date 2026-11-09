@@ -6,6 +6,7 @@ import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.touch.TouchRecovery
 import ai.opencode.core.touch.rememberTouchRecovery
 import ai.opencode.core.ui.AccessibilityFocusRequest
+import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.ui.rememberAccessibilityFocusRequest
 import ai.opencode.feature.composer.AttachmentMenuAnchors
 import ai.opencode.feature.composer.AttachmentMenuItem
@@ -27,7 +28,6 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -284,9 +284,10 @@ private fun PlusMenuWindowContent(
                     } else Modifier.clearAndSetSemantics {},
                 ),
             shape = shape,
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            tonalElevation = 3.dp,
-            shadowElevation = 6.dp,
+            // The desktop popover: the floating fill, a hairline ring and its small shadow.
+            color = OpenCodeSurfaces.color,
+            shadowElevation = OpenCodeSurfaces.popoverShadow,
+            border = OpenCodeSurfaces.border,
         ) {
             Box(contentAlignment = Alignment.TopStart) {
                 // Carry the rows with the growing surface: cropping full-size rows with the frame

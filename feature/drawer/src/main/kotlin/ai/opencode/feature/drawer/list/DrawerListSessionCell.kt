@@ -392,7 +392,7 @@ fun DrawerListSessionCell(
                         SFSymbol.CircleFill,
                         contentDescription = null,
                         size = (11 * density.fontScale).dp,
-                        tint = if (row.indicator == Indicator.attention) DrawerListSessionCell.attentionColor(colors.isDark) else colors.accent,
+                        tint = if (row.indicator == Indicator.attention) DrawerListSessionCell.attentionColor(colors.isDark) else colors.signal,
                         modifier = Modifier.graphicsLayer { alpha = dotAlpha },
                     )
                 }

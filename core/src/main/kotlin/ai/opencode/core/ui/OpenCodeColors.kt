@@ -61,6 +61,11 @@ class OpenCodeColors(
     val sendButtonBackground: Color,
     val sendButtonForeground: Color,
     val link: Color,
+    /**
+     * Unread and new-item indicators (drawer dots, Catch Up). The desktop draws its unread dot
+     * in `--v2-background-bg-accent` (blue), not the neutral [accent]; this is the theme's link blue.
+     */
+    val signal: Color,
     val syntaxKeyword: Color,
     val syntaxString: Color,
     val syntaxNumber: Color,
@@ -72,6 +77,11 @@ class OpenCodeColors(
     val diffRemovedText: Color,
     /** Destructive roles only (iOS `systemRed`: delete, end call). */
     val destructive: Color,
+    /**
+     * Failure text and glyphs (a failed tool, a run error): the desktop's `--v2-state-fg-danger`,
+     * deeper than [destructive] in light and softer in dark. Not for fills behind white labels.
+     */
+    val danger: Color,
     private val bodyTextResolver: (Double) -> Color,
 ) {
     /**
@@ -131,6 +141,7 @@ class OpenCodeColors(
                 sendButtonBackground = (if (system) label else v.accent).color,
                 sendButtonForeground = (if (system) v.canvas else v.accent.highContrastForeground).color,
                 link = v.link.color,
+                signal = v.link.color,
                 syntaxKeyword = v.syntaxKeyword.color,
                 syntaxString = v.syntaxString.color,
                 syntaxNumber = v.syntaxNumber.color,
@@ -141,6 +152,7 @@ class OpenCodeColors(
                 diffAddedText = (if (system) label else v.diffAddedText).color,
                 diffRemovedText = (if (system) label else v.diffRemovedText).color,
                 destructive = SystemColors.red(isDark).color,
+                danger = (if (system) SystemColors.red(isDark) else v.diffRemovedText).color,
                 bodyTextResolver = bodyResolver,
             )
         }
@@ -169,7 +181,7 @@ internal object SystemColors {
  * | secondaryContainer / onSecondaryContainer | surfaceStrong (secondary buttons) / text |
  * | tertiary / onTertiary | link / white (System) or the link's high-contrast foreground (themes) |
  * | background, surface, surfaceContainerLowest | canvas |
- * | surfaceContainerLow, surfaceContainer | System: canvasWeak / canvasWeak ↔ userBubble midpoint; curated themes: the desktop's floating surface ([floating]: canvas in light, codeBand in dark), so sheets, menus and tooltips are flat floating panels |
+ * | surfaceContainerLow, surfaceContainer | System: canvasWeak / canvasWeak ↔ userBubble midpoint; curated themes: the desktop's floating surface ([floating]: canvas in light, a raised step above the canvas in dark), so sheets, menus and tooltips are flat floating panels |
  * | surfaceContainerHigh, surfaceVariant | userBubble |
  * | surfaceContainerHighest | surfaceStrong |
  * | onSurface / onSurfaceVariant | text / secondary text |
@@ -190,7 +202,7 @@ fun OpenCodeColors.toColorScheme(): ColorScheme {
     val error = if (system) SystemColors.red(isDark) else v.diffRemovedText
     val container = v.canvasWeak.mixedInOklab(v.userBubble, 0.5)
     // Desktop floating surfaces (sheets, menus, popovers): white in light, a step up in dark.
-    val floatingSurface = if (isDark) v.codeBand.composited(canvas) else canvas
+    val floatingSurface = if (isDark) v.darkFloatingFill() else canvas
     val primaryContainer = canvas.mixedInOklab(accent, 0.22)
     val errorContainer = (if (system) SystemColors.red(isDark).withAlpha(0.14) else v.glassDiffRemovedFill).composited(canvas)
     val surfaceBright = if (isDark) v.surfaceStrong else canvas
