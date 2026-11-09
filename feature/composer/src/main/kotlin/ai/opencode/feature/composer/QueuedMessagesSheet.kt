@@ -1,5 +1,7 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.ui.OpenCodeSheetDefaults
+import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
@@ -108,6 +110,8 @@ fun QueuedMessagesSheet(
         onDismissRequest = onClose,
         sheetState = sheetState,
         containerColor = OpenCodeTheme.colors.groupedCanvas,
+        dragHandle = { OpenCodeSheetHandle() },
+        shape = OpenCodeSheetDefaults.shape,
     ) {
         Column(
             Modifier
