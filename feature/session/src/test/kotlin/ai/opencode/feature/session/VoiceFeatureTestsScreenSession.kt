@@ -472,7 +472,7 @@ class VoiceFeatureTestsScreenSession {
         val model = OpenCodeModelRef(id = "fixture-model", providerID = "fixture")
         val project = OpenCodeProject(id = "p", name = "project", directory = "/project")
         val state = h.state {
-            State.draft(server = server, draftProject = project, projects = listOf(project), inheritedModel = model)
+            State.draft(server = server, draftProject = project, projects = listOf(project)).copy(currentModel = model)
                 .copy(voice = live(VoiceFeature.State(server, draftDirectory = "/project", model = model)))
         }
         val store = h.store(state) {
@@ -521,7 +521,7 @@ class VoiceFeatureTestsScreenSession {
 
         val project = OpenCodeProject(id = "p", name = "project", directory = "/project")
         val state = h.state {
-            State.draft(server = server, draftProject = project, projects = listOf(project), inheritedModel = model)
+            State.draft(server = server, draftProject = project, projects = listOf(project)).copy(currentModel = model)
                 .copy(voice = live(VoiceFeature.State(server, draftDirectory = "/project", model = model)))
         }
         val completed = LockIsolated(listOf<String>())

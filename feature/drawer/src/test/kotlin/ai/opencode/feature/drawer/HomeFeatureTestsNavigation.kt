@@ -480,7 +480,7 @@ class HomeFeatureTestsNavigation {
                 store.send(Action.NewSessionTapped) {
                     h.state { it.rememberingSession() }.copy(
                         detailGeneration = 3,
-                        sessionDetail = h.state { SessionFeature.State.draft(server, draftProject = null, projects = emptyList(), inheritedModel = null, navigationID = 3) }
+                        sessionDetail = h.state { SessionFeature.State.draft(server, draftProject = null, projects = emptyList(), navigationID = 3) }
                             .withRequestsConnectionIsAvailable(false),
                     )
                 }

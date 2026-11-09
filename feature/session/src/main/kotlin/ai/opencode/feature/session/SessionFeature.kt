@@ -474,7 +474,6 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
                 server: OpenCodeServer,
                 draftProject: OpenCodeProject?,
                 projects: List<OpenCodeProject>,
-                inheritedModel: OpenCodeModelRef? = null,
                 navigationID: Int = 0,
                 visit: Int? = null,
             ): State = State(
@@ -488,8 +487,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
                 isLoading = false,
                 // A draft has no history to page; the flag stays true once created.
                 earlierHistory = EarlierHistory.Exhausted,
-                // The server's own default resolution is unreliable, so new sessions inherit the model you last used.
-                currentModel = inheritedModel,
+                // The model comes with the catalog: the server's default
+                // (`OpenCodeModelCatalog.newSessionModel`).
             )
 
             internal fun shellToolStatuses(items: List<OpenCodeTranscriptItem>): Map<String, OpenCodeToolCall.Status> {

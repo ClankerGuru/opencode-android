@@ -565,10 +565,6 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
                 return projects.sortedByDescending { lastUsed[it.id] ?: Instant.MIN }
             }
 
-        /** The model a new session inherits: the newest session's (iOS `lastUsedModel`). */
-        val lastUsedModel: OpenCodeModelRef?
-            get() = sessions.firstOrNull { it.model != null }?.model
-
         companion object {
             /**
              * iOS `init(server:snapshot:loaded:)`: the cached or loaded list, the transcript cache
@@ -1038,7 +1034,6 @@ fun HomeFeature.State.makeDraft(directory: String? = null, reason: String = "you
         server = s.server,
         draftProject = directory?.let { OpenCodeProject.folder(it, projects) } ?: projects.firstOrNull(),
         projects = projects,
-        inheritedModel = s.lastUsedModel,
         navigationID = transition.navID,
         visit = transition.visit,
     )
@@ -1059,10 +1054,9 @@ fun HomeFeature.State.openingDraft(directory: String? = null, reason: String = "
 }
 
 /**
- * The server has [model] for [sessionID]: the list's copy says so, so a new session started now
- * inherits it. Its snapshot (a session visited before) and a pick waiting for its screen follow:
- * a pick it matches no longer waits, and an explicit switch ([replacesPick], the voice
- * delegator's) replaces any.
+ * The server has [model] for [sessionID]: the list's copy says so. Its snapshot (a session
+ * visited before) and a pick waiting for its screen follow: a pick it matches no longer waits,
+ * and an explicit switch ([replacesPick], the voice delegator's) replaces any.
  */
 fun HomeFeature.State.notingModel(model: OpenCodeModelRef, sessionID: String, replacesPick: Boolean = false): HomeFeature.State {
     var s = updatingSession(sessionID) { it.copy(model = model) }

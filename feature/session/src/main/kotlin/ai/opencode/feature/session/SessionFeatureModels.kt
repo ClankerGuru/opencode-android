@@ -61,7 +61,16 @@ internal fun SessionFeature.reduceModelsAndFamily(state: State, action: Action):
             if (pending != null && next.models.isNotEmpty() && !SessionFeature.catalog(next.models, offers = pending)) {
                 next = next.copy(pendingModel = null, currentModel = next.session?.model ?: catalog.defaultModel?.ref)
             }
-            if (next.currentModel == null) next = next.copy(currentModel = catalog.defaultModel?.ref)
+            // A draft starts on the server's default at the level last picked for it; until the
+            // catalog lands it has none, and a send leaves the choice to the server.
+            if (next.currentModel == null) {
+                val model = if (next.session == null) {
+                    catalog.newSessionModel(next.modelVariants.value)
+                } else {
+                    catalog.defaultModel?.ref
+                }
+                next = next.copy(currentModel = model)
+            }
             Reduced(next)
         } else {
             var next = state.copy(isLoadingModels = false)

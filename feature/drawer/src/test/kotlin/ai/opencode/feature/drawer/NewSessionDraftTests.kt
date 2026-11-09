@@ -115,8 +115,8 @@ class NewSessionDraftTests {
         val home = HomeFeature.State(server, OpenCodeHomeSnapshot(projects = listOf(projects[0], projects[1]), sessions = listOf(prior), activeSessionIDs = emptySet()))
         val initialIdentity = home.sessionDetail?.taskIdentity
         assertEquals(SessionFeature.State.TaskIdentity(serverID = server.persistenceID, visit = 1, sessionID = null), initialIdentity)
-        assertEquals("Cirrus 4", home.sessionDetail?.currentModelName)
-        assertNull(home.sessionDetail?.currentLevelScale)
+        assertNull("Not the prior session’s model: the server’s default comes with the catalog", home.sessionDetail?.currentModel)
+        assertEquals("Model", home.sessionDetail?.currentModelName)
 
         val store = TestStore(home, HomeFeature(), this) {
             this[OpenCodeClient] = noSends(OpenCodeClient.testValue).copy(modelCatalog = { _, _ -> catalog })
@@ -127,7 +127,7 @@ class NewSessionDraftTests {
             store.receive(
                 { it == HomeFeature.Action.detail(SessionFeature.Action.ModelsResponse(Result.success(catalog))) },
                 "modelsResponse.success",
-            ) { it.detail { d -> d.copy(isLoadingModels = false, models = listOf(model)) } }
+            ) { it.detail { d -> d.copy(isLoadingModels = false, models = listOf(model), currentModel = model.ref) } }
             assertEquals(ModelDisplayNames(listOf(model)), store.state.sessionDetail?.modelDisplayNamesByServer?.value?.get(server.persistenceID))
             assertEquals("Cirrus 4", store.state.sessionDetail?.currentModelName)
             assertNotNull(store.state.sessionDetail?.currentLevelScale)
@@ -135,7 +135,7 @@ class NewSessionDraftTests {
         // Built with the store's dependencies: the screen's `Shared` values are its store's references.
         fun draft(project: OpenCodeProject, listed: List<OpenCodeProject>, navigationID: Int) = store.withDependencies {
             SessionFeature.State.draft(
-                server = server, draftProject = project, projects = listed, inheritedModel = model.ref("high"), navigationID = navigationID,
+                server = server, draftProject = project, projects = listed, navigationID = navigationID,
             )
         }
 

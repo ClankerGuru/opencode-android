@@ -1,15 +1,18 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionFrameAction
+import ai.opencode.core.motion.MotionRole
+import ai.opencode.core.motion.MotionRubberBand
+import ai.opencode.core.motion.MotionTunables
 import ai.opencode.core.motion.MotionTick
 import ai.opencode.core.motion.SpringSolver
+import ai.opencode.core.motion.retarget
 import ai.opencode.core.motion.motionFrameLoop
 import ai.opencode.core.motion.rememberFrameDurationSeconds
 import ai.opencode.core.tuning.AnimationTimeScale
 import ai.opencode.core.tuning.Tunable
 import ai.opencode.core.tuning.TunableSpring
-import ai.opencode.core.tuning.TuningPreset
-import ai.opencode.core.tuning.TuningPresets
 import ai.opencode.core.tuning.TuningStore
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -58,34 +61,12 @@ object FloatingCallStageTunables {
     val flickSpeed = Tunable("call.stage.flickSpeed", "Flick skips a stage above (pt/s)", default = 450.0, range = 150.0..1500.0, step = 25.0)
     val projection = Tunable("call.stage.projection", "Release projection (s)", default = 0.18, range = 0.0..0.5, step = 0.01)
 
-    val open = TunableSpring("call.stage.open", "Grow spring", duration = 0.45, bounce = 0.0)
-    val close = TunableSpring("call.stage.close", "Shrink spring", duration = 0.4, bounce = 0.0)
-
-    /** Back into the call button. Its bounce never goes above 0: the shape lands without passing the button. */
-    val land = TunableSpring("call.stage.land", "Hang-up flight", duration = 0.38, bounce = 0.0)
-
-    val feels: TuningPresets by lazy {
-        TuningPresets(
-            "call.stage.feel", "Stage feel",
-            listOf(
-                TuningPreset("Default"),
-                TuningPreset("Calm", open.duration.preset(0.55), close.duration.preset(0.5), land.duration.preset(0.6)),
-                TuningPreset("Morph", open.duration.preset(0.42), open.bounce.preset(0.14), close.duration.preset(0.38), close.bounce.preset(0.06), land.duration.preset(0.45)),
-                TuningPreset("Snappy", open.duration.preset(0.35), close.duration.preset(0.3), land.duration.preset(0.38)),
-            ),
-        )
-    }
-
     fun register(store: TuningStore = TuningStore.shared) {
-        store.register(feels)
         store.register(covers)
         store.register(coverHeight, coverInset)
         store.register(cardWidth, cardHeight, fullTop, margin, cardRadius, fullRadius)
         store.register(cardBloomY, cardBloomRadius, fullBloomY, fullBloomRadius)
         store.register(cardFill, sheetFill, dim, rubberBand, flickSpeed, projection)
-        store.register(open)
-        store.register(close)
-        store.register(land)
     }
 }
 
@@ -193,11 +174,11 @@ class FloatingCallConnectMotion {
 
     private data class Event(val at: Double, val what: Pending)
 
-    private var x = SpringSolver.of(duration = 0.5)
-    private var y = SpringSolver.of(duration = 0.5)
-    private var width = SpringSolver.of(duration = 0.5)
-    private var height = SpringSolver.of(duration = 0.5)
-    private var reveal = SpringSolver.of(duration = 0.22)
+    private var x = SpringSolver(FloatingCallConnectTunables.lift.spring)
+    private var y = SpringSolver(FloatingCallConnectTunables.lift.spring)
+    private var width = SpringSolver(FloatingCallConnectTunables.grow.spring)
+    private var height = SpringSolver(FloatingCallConnectTunables.grow.spring)
+    private var reveal = SpringSolver(FloatingCallConnectTunables.reveal.spring)
     private var pending: MutableList<Event> = mutableListOf()
     private var lifted = false
     private var grown = false
@@ -252,7 +233,7 @@ class FloatingCallConnectMotion {
             if (rest.width <= 0) return
             x = spring(rest.center.x.toDouble()); y = spring(rest.center.y.toDouble())
             width = spring(rest.width.toDouble()); height = spring(rest.height.toDouble())
-            reveal = SpringSolver.of(duration = 0.22, value = 0.0)
+            reveal = SpringSolver(FloatingCallConnectTunables.reveal.spring, value = 0.0)
             lifted = true; grown = true; pending = mutableListOf()
             active = true
         }
@@ -431,6 +412,9 @@ data class FloatingCallStageGeometry(
     private val screenWidth: Double get() = screen.width.toDouble()
     private val screenHeight: Double get() = screen.height.toDouble()
 
+    /** How a drag past the sheet stretches. */
+    private val stretch: MotionRubberBand get() = MotionRubberBand(dimension = 100.0, coefficient = rubberBand)
+
     /** The card, clamped to the screen: above the composer, on the orb's side. */
     val cardFrame: Rect
         get() {
@@ -457,11 +441,14 @@ data class FloatingCallStageGeometry(
     /**
      * How far up from the orb a drag has carried the shape at [progress]: the finger's travel.
      * With the orb resting below the card it's how far the top edge has risen, so the finger
-     * holds the edge.
+     * holds the edge. Past the sheet it's the travel that stretches this far, so a finger
+     * catching the shape on its way back holds it where it's drawn.
      */
     fun lift(progress: Double): Double {
         val spans = spans
-        return if (progress <= 1) progress * spans.card else spans.card + (progress - 1) * spans.full
+        if (progress <= 1) return progress * spans.card
+        if (progress <= 2) return spans.card + (progress - 1) * spans.full
+        return spans.card + spans.full + stretch.excess(forStretch = (progress - 2) * spans.full)
     }
 
     /** The progress [lift] points of travel give, rubber-banding past the sheet. */
@@ -469,9 +456,7 @@ data class FloatingCallStageGeometry(
         val spans = spans
         if (atLift <= spans.card) return max(0.0, atLift / spans.card)
         if (atLift <= spans.card + spans.full) return 1 + (atLift - spans.card) / spans.full
-        val over = atLift - spans.card - spans.full
-        val band = (1 - 1 / (over * rubberBand / 100 + 1)) * 100
-        return 2 + band / spans.full
+        return 2 + stretch.stretch(atLift - spans.card - spans.full) / spans.full
     }
 
     /**
@@ -558,7 +543,11 @@ data class FloatingCallStageGeometry(
             }
         }
         val span = if (progress <= 1) spans.card else spans.full
-        return Settled(FloatingCallStage.entries.getOrNull(near) ?: FloatingCallStage.orb, -velocity / span)
+        // Past the sheet the shape moves slower than the finger: it carries the speed it's
+        // drawn moving.
+        var drawn = velocity
+        if (progress > 2) drawn = velocity * stretch.slope(stretch.excess(forStretch = (progress - 2) * spans.full))
+        return Settled(FloatingCallStage.entries.getOrNull(near) ?: FloatingCallStage.orb, -drawn / span)
     }
 
     private fun clamp(value: Double, low: Double = 0.0, high: Double = 1.0): Double = min(high, max(low, value))
@@ -612,8 +601,8 @@ class FloatingCallStageMotion {
 
     private var reduced: Reduced? by mutableStateOf(null)
     private var reducedTime = 0.0
-    private var spring = SpringSolver.of(duration = 0.45, positionEpsilon = 0.0005, velocityEpsilon = 0.005)
-    private val offsets = List(4) { SpringSolver.of(duration = 0.5, positionEpsilon = 0.05, velocityEpsilon = 1.0) }
+    private var spring = SpringSolver(Motion.surface, value = 0.0, target = 0.0, positionEpsilon = 0.0005, velocityEpsilon = 0.005)
+    private val offsets = List(4) { SpringSolver(Motion.flight, value = 0.0, target = 0.0, positionEpsilon = 0.05, velocityEpsilon = 1.0) }
     private var fadesOnLanding by mutableStateOf(false)
 
     /** Where the landing is now: the call button, read each frame. */
@@ -632,8 +621,12 @@ class FloatingCallStageMotion {
         return rect(base.center.x + offset[0] - width / 2, base.center.y + offset[1] - height / 2, width, height)
     }
 
-    /** Grows or shrinks to [stage]. Without a [velocity] it keeps the speed it has, so a retarget mid-flight carries on from where it is. */
-    fun animate(stage: FloatingCallStage, velocity: Double? = null, reduceMotion: Boolean) {
+    /**
+     * Grows on [Motion.surface] or shrinks on [Motion.panelClose] to [stage] (a let-go drag
+     * passes [Motion.release]). Without a [velocity] it keeps the speed it has, so a retarget
+     * mid-flight carries on from where it is.
+     */
+    fun animate(stage: FloatingCallStage, velocity: Double? = null, role: MotionRole? = null, reduceMotion: Boolean) {
         if (landing != null) return
         target = stage
         if (reduceMotion) {
@@ -641,9 +634,8 @@ class FloatingCallStageMotion {
             return
         }
         val goal = stage.ordinal.toDouble()
-        val tuned = if (goal > progress) FloatingCallStageTunables.open else FloatingCallStageTunables.close
         spring.value = progress
-        spring.retarget(goal, tuned.spring, preservingVelocity = velocity)
+        spring.retarget(goal, role ?: (if (goal > progress) Motion.surface else Motion.panelClose), preservingVelocity = velocity)
         link.start()
     }
 
@@ -683,7 +675,7 @@ class FloatingCallStageMotion {
         if (!isDragging) return
         isDragging = false
         anchor = null
-        animate(stage, velocity, reduceMotion)
+        animate(stage, velocity, role = Motion.release, reduceMotion = reduceMotion)
     }
 
     /**
@@ -724,9 +716,11 @@ class FloatingCallStageMotion {
             return
         }
         fadesOnLanding = fades
-        val tuned = FloatingCallStageTunables.land
-        val duration = tuned.duration.value
-        val bounce = min(0.0, tuned.bounce.value)
+        // Tuned or not, `flight`'s bounce stays at 0 or less here: the shape lands without
+        // passing the button.
+        val flight = Motion.flight.curve()
+        val duration = flight.duration
+        val bounce = min(0.0, flight.bounce)
         val omega = 2 * PI / max(0.01, duration)
         for (index in offsets.indices) {
             offsets[index].value = from[index]
@@ -737,7 +731,7 @@ class FloatingCallStageMotion {
             offsets[index].retarget(0.0, preservingVelocity = speed, duration = duration, bounce = bounce)
         }
         spring.value = progress
-        spring.retarget(0.0, FloatingCallStageTunables.close.spring)
+        spring.retarget(0.0, role = Motion.panelClose)
         if (runs) link.start()
     }
 
@@ -758,7 +752,7 @@ class FloatingCallStageMotion {
         if (reduced != null) {
             // Reduce Motion: no travel. It fades out, changes while hidden, and fades back in; a
             // hang-up just fades.
-            reducedTime = min(1.0, reducedTime + dt / (if (reduced == Reduced.stage) 0.3 else 0.2))
+            reducedTime = min(1.0, reducedTime + dt / max(0.01, Motion.reduced.curve().duration))
             if (reduced == Reduced.stage) {
                 if (reducedTime >= 0.5) updateProgress(target.ordinal.toDouble())
                 updateOpacity(abs(1 - 2 * reducedTime))
@@ -812,10 +806,10 @@ class FloatingCallStageMotion {
                 settled = settled && step.isSettled
             }
             if (next != offset) offset = next
-            val fade = max(0.0, content - dt / 0.12)
+            val fade = max(0.0, content - dt / max(0.01, MotionTunables.swapOutDuration.value))
             if (fade != content) content = fade
             if (fadesOnLanding) {
-                val duration = max(0.05, FloatingCallStageTunables.land.duration.value)
+                val duration = max(0.05, Motion.flight.curve().duration)
                 updateOpacity(max(0.0, opacity - dt / duration))
             }
             if (settled) hasLanded = true else busy = true

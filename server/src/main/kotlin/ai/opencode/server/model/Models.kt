@@ -189,7 +189,34 @@ object ModelVariant {
     }.map { it.value }
 }
 
-data class OpenCodeModelCatalog(val models: List<OpenCodeModel>, val defaultModel: OpenCodeModel?)
+data class OpenCodeModelCatalog(val models: List<OpenCodeModel>, val defaultModel: OpenCodeModel?) {
+    /**
+     * iOS `OpenCodeModelCatalog.newSessionModel(levels:)` (`ModelLevelScale.swift`): the model a
+     * new session starts on: the server's default (`model` in the person's OpenCode config), at
+     * the level last picked for it, since the default carries no variant. Null when the server
+     * names none.
+     */
+    fun newSessionModel(levels: Map<String, String>): OpenCodeModelRef? {
+        val named = defaultModel ?: return null
+        val model = models.model(named.ref) ?: named
+        return model.ref(model.savedLevel(levels))
+    }
+}
+
+/**
+ * iOS `OpenCodeModel.savedLevel(in:)` (`ModelLevelScale.swift`): the level last picked for this
+ * model (`modelVariants`, by [OpenCodeModel.id]), while the model still offers it; null is its
+ * default. Lives here, not beside `ModelLevelScale` in `:feature:composer`, because the voice
+ * delegator reads it too. A model with only `"default"` isn't adjustable
+ * (`ModelLevelScale.isAdjustable`).
+ */
+fun OpenCodeModel.savedLevel(saved: Map<String, String>): String? {
+    val isAdjustable = variants.any { it != "default" }
+    if (!isAdjustable) return null
+    val level = saved[id] ?: return null
+    if (level == "default" || level !in variants) return null
+    return level
+}
 
 @Serializable
 data class OpenCodeSession(

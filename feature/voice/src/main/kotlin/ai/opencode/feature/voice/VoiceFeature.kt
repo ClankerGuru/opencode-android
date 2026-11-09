@@ -348,6 +348,9 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
 
         /** Read by the delegator's model tools: the picker's favorites. */
         val favoriteModelIDs: Set<String> get() = shared(SharedKeys.favoriteModelIDs).value
+
+        /** Read by `create_session`: the level last picked for each model. */
+        val modelVariants: Map<String, String> get() = shared(SharedKeys.modelVariants).value
         val transcripts: Map<String, VoiceTranscriptRecord> get() = shared(VoiceSharedKeys.voiceTranscripts).value
 
         /** Null on a draft, which has nothing to remember yet. */

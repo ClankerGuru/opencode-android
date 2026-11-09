@@ -223,6 +223,7 @@ internal fun VoiceFeature.delegateToDelegator(
         captureScreenshot = voiceScreenshot.capture,
         appLog = VoiceAppLog::recentLines,
         favoriteModelIDs = next.favoriteModelIDs,
+        modelVariants = next.modelVariants,
     )
     val viewingText = delegatorContext(next, otherRequests = maxOf(0, next.delegatorWork.size - 1))
     val text = VoiceDelegator.requestText(viewing = viewingText, conversation = next.tail.lines, request = request)

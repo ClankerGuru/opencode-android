@@ -124,6 +124,11 @@ class VoiceDelegatorWorkspace(
         val appLog: () -> List<String> = { emptyList() },
         /** The model picker's favorites (`OpenCodeModel.id`), listed first. */
         val favoriteModelIDs: Set<String> = emptySet(),
+        /**
+         * The picker's remembered level per model (`modelVariants`), applied to
+         * the server's default model when a session starts on it.
+         */
+        val modelVariants: Map<String, String> = emptyMap(),
         /** How long a tool may take; tests shorten it. */
         val latency: Latency = Latency.standard,
     )
@@ -141,7 +146,7 @@ class VoiceDelegatorWorkspace(
         val total: Duration = 30.seconds,
         /**
          * Enrichment a tool can do without: remote search when the drawer
-         * already matched, the newest session's model, a fresh read of a
+         * already matched, the server's default model, a fresh read of a
          * session just created.
          */
         val optional: Duration = 1_500.milliseconds,
@@ -719,11 +724,11 @@ class VoiceDelegatorWorkspace(
 
     private suspend fun createSession(arguments: JsonObject, server: OpenCodeServer): String {
         // One budget for the whole call. Creating and sending are required, and
-        // so is a model the user chose; the newest session's model and a
+        // so is a model the user chose; the server's default model and a
         // fresh read are extras.
         val budget = RetryBudget(start.latency.total)
         val directory = string(arguments, "directory")
-        val model = newSessionModel(budget)
+        val model = newSessionModel(directory, budget)
         var sessionID = dependency(ServerIDClient).sessionID()
         val draftSessionID = start.draftSessionID
         if (!usedDraftSessionID && draftSessionID != null && directory == start.draftDirectory) {
@@ -1096,23 +1101,17 @@ class VoiceDelegatorWorkspace(
 
     /**
      * The model a session this request creates starts with, as a typed new
-     * session's: the draft's on a draft, otherwise the newest session's. The
-     * server's own default falls back to the catalog head, which may be a
-     * provider the user doesn't use.
-     * `chosen` when the user picked it (the draft's), so it must be applied;
-     * the newest session's is a best guess, read only briefly.
+     * session's: the draft's on a draft, otherwise the server's default
+     * (`OpenCodeModelCatalog.newSessionModel`), or null to leave it to the server.
+     * `chosen` for the draft's, which the user sees on its model button, so
+     * it must be applied; the default only adds a remembered level, read briefly.
      */
-    private suspend fun newSessionModel(budget: RetryBudget): NewSessionModel? {
+    private suspend fun newSessionModel(directory: String, budget: RetryBudget): NewSessionModel? {
         val draft = draftModel
         if (viewing == null && draft != null) return NewSessionModel(draft, chosen = true)
-        val board = start.board()
-        val sessions: List<OpenCodeSession> = if (board != null && board.isLive) {
-            board.sessions
-        } else {
-            val server = start.server
-            budget.optional(start.latency.optional) { client.homeSnapshot(server).sessions } ?: board?.sessions ?: emptyList()
-        }
-        val model = sessions.firstOrNull { it.model != null }?.model ?: return null
+        val server = start.server
+        val catalog = budget.optional(start.latency.optional) { client.modelCatalog(server, directory) } ?: return null
+        val model = catalog.newSessionModel(start.modelVariants) ?: return null
         return NewSessionModel(model, chosen = false)
     }
 

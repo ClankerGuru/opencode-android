@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
@@ -27,7 +28,6 @@ import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -228,13 +228,9 @@ data class ComposerExpansion(
     val ridesKeyboard: Boolean = false,
 ) {
     companion object {
-        /** Between rests, like a sheet's detents: quick, barely bouncing (`modelPicker.glass.rest`). */
-        val detentSpring = MotionSpring(0.42, 0.06)
-
         /**
-         * The surface growing out of the bar and shrinking back, like the call's transcript:
-         * unbouncy, quicker to close (`modelPicker.glass.open` / `.close`). Under Reduce Motion
-         * the surface doesn't grow (`null`): it cross-fades.
+         * The surface growing out of the bar and folding back (`modelPicker.glass.open` /
+         * `.close`). Under Reduce Motion the surface doesn't grow (`null`): it cross-fades.
          */
         fun animation(opening: Boolean, reduceMotion: Boolean): MotionSpring? {
             if (reduceMotion) return null
@@ -373,15 +369,19 @@ fun ComposerSurface(
         }
         if (exp != null && !toggled && exp.isOpen) {
             // Anything else that moves an open surface (a rest chosen, a finger let go, the bar
-            // moving under it) springs there, never jumps; a settle carries the finger's speed.
+            // moving under it) settles there on release, never jumps; a settle carries the
+            // finger's speed, and Reduce Motion eases there.
             var velocity = 0f
             if (exp.settle != motion.settle) {
                 motion.settle = exp.settle
                 val distance = target - reach.value
                 velocity = if (abs(distance) > 1) (exp.settleVelocity / distance).coerceIn(-12f, 12f) * distance else 0f
             }
-            if (reduceMotion) return@LaunchedEffect reach.snapTo(target)
-            reach.animateTo(target, ComposerExpansion.detentSpring.spec(), initialVelocity = velocity)
+            reach.animateTo(
+                target,
+                Motion.release.animation(reduceMotion = reduceMotion),
+                initialVelocity = Motion.release.initialVelocity(velocity, reduceMotion),
+            )
             return@LaunchedEffect
         }
         val animation = if (exp == null) null else ComposerExpansion.animation(opening = target > 0, reduceMotion = reduceMotion)
@@ -409,7 +409,7 @@ fun ComposerSurface(
     val reducedReach by animateFloatAsState(if (expansionOpen) 1_000f else 0f, Motion.reducedFadeSpec(), label = "reducedReach")
     val dim by animateFloatAsState(
         if (expansionOpen) (if (isDark) ComposerExpansion.dimDark else ComposerExpansion.dimLight) else 0f,
-        tween(250, easing = Motion.EaseInOut),
+        Motion.dim.animation(reduceMotion = reduceMotion),
         label = "expansionDim",
     )
     val surfaceColor = VoiceCallSurfaceDefaults.color
@@ -593,7 +593,7 @@ private class BottomRevealShape(private val height: Float, private val cornerRad
 /**
  * What sits above the composer (the pills, the background-work capsule, a draft's projects)
  * hides while a panel grown out of the composer (the model list, the level picker) stands over
- * it: gone as the surface grows over it, and back only once the surface has shrunk below it.
+ * it: gone as the surface grows over it, and back on the frame the surface starts folding.
  */
 fun Modifier.hiddenUnderComposerPanel(isHidden: Boolean): Modifier = this then HiddenElement(isHidden, HiddenKind.composerPanel)
 
@@ -634,10 +634,9 @@ private class HiddenNode(var isHidden: Boolean, var kind: HiddenKind) :
     private fun spec(hiding: Boolean): AnimationSpec<Float> {
         val context = currentValueOf(LocalContext)
         val reduceMotion = Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
-        if (reduceMotion) return Motion.reducedFadeSpec()
-        // Opening, the surface reaches the pill row within a few frames, so what's there fades
-        // out about as fast; closing, the surface passes back below it 0.15 s into its fold.
-        return if (hiding) tween(140, easing = Motion.EaseOut) else tween(200, delayMillis = 150, easing = Motion.EaseInOut)
+        // A swap with the surface: out as it starts to grow, in as it starts to fold, on the same
+        // frame, never waiting for it.
+        return Motion.swap.animation(if (hiding) MotionPhase.Exit else MotionPhase.Enter, reduceMotion)
     }
 
     override fun androidx.compose.ui.layout.MeasureScope.measure(measurable: androidx.compose.ui.layout.Measurable, constraints: Constraints): androidx.compose.ui.layout.MeasureResult {

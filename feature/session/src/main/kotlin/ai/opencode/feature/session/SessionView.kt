@@ -409,7 +409,7 @@ private fun OrbClearance(
     val reducedMotion = rememberReduceMotion()
     val orbClearance by animateFloatAsState(
         orbRoom,
-        if (reducedMotion) Motion.easeInOut(0.2) else FloatingCallTunables.follow.spec(),
+        Motion.layout.animation(reduceMotion = reducedMotion),
         label = "orbClearance",
     )
     SideEffect { host.orbClearance = orbClearance }

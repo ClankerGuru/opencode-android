@@ -3,8 +3,8 @@ package ai.opencode.feature.voice
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.motion.AmbientRate
 import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
@@ -14,7 +14,6 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.snap
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -295,12 +294,17 @@ fun VoiceCallReplayView(log: VoiceCallLog, onBack: () -> Unit, modifier: Modifie
     val reduceMotion = rememberReduceMotion()
     val playback = remember(log) { VoiceCallReplayPlayback(log.duration) }
 
-    // The playhead runs while playing (iOS `TimelineView(.animation(paused: !playing))`).
+    // The playhead runs at 60 Hz while playing (iOS `TimelineView(.animation(minimumInterval:
+    // AmbientRate.foreground.minimumInterval, paused: !playing))`).
     LaunchedEffect(playback, playback.playing) {
         if (!playback.playing) return@LaunchedEffect
+        var last = 0L
         while (true) {
             withFrameNanos { nanos ->
-                playback.tick(nanos)
+                if (last == 0L || (nanos - last) / 1e9 >= AmbientRate.Foreground.minimumInterval - 0.001) {
+                    last = nanos
+                    playback.tick(nanos)
+                }
             }
         }
     }
@@ -580,9 +584,9 @@ private fun ReplayEvents(log: VoiceCallLog, playback: VoiceCallReplayPlayback, r
                     Modifier
                         .fillMaxWidth()
                         .animateItem(
-                            fadeInSpec = if (reduceMotion) snap() else MotionSpring(0.25).spec(),
-                            placementSpec = if (reduceMotion) snap() else MotionSpring(0.25).spec(),
-                            fadeOutSpec = if (reduceMotion) snap() else MotionSpring(0.25).spec(),
+                            fadeInSpec = Motion.layout.animation(reduceMotion = reduceMotion),
+                            placementSpec = Motion.layout.animation(reduceMotion = reduceMotion),
+                            fadeOutSpec = Motion.layout.animation(reduceMotion = reduceMotion),
                         )
                         .clickable { playback.seek(event.t) }
                         .heightIn(min = 48.dp)

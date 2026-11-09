@@ -492,11 +492,11 @@ class VoiceModelToolsTests {
         draftModel: OpenCodeModelRef? = null,
         viewingModel: OpenCodeModelRef? = null,
         favorites: Set<String> = emptySet(),
+        defaultModel: OpenCodeModel? = null,
+        levels: Map<String, String> = emptyMap(),
     ): VoiceDelegatorWorkspace {
-        val catalog = catalog
+        val catalog = OpenCodeModelCatalog(models = catalog.models, defaultModel = defaultModel)
         val sessions = listOf(fable, docs)
-        // Newest first, as the server lists them; the newest has no model yet.
-        val newestFirst = listOf(docs, fable)
         val client = OpenCodeClient.testValue.copy(
             modelCatalog = { _, _ -> catalog },
             getSession = { _, id -> sessions.firstOrNull { it.id == id } ?: throw OpenCodeClientError("No session $id") },
@@ -511,7 +511,6 @@ class VoiceModelToolsTests {
                 calls.switched.update { it + "prompt $id" }
                 "msg_${calls.prompts.value.size}"
             },
-            homeSnapshot = { OpenCodeHomeSnapshot(projects = emptyList(), sessions = newestFirst, activeSessionIDs = emptySet()) },
         )
         return VoiceDelegatorWorkspace(
             client = client,
@@ -525,6 +524,7 @@ class VoiceModelToolsTests {
                 transcriptDelta = emptyList(),
                 explained = emptySet(),
                 favoriteModelIDs = favorites,
+                modelVariants = levels,
             ),
             effects = VoiceDelegatorWorkspace.Effects(
                 open = {},
@@ -682,16 +682,33 @@ class VoiceModelToolsTests {
         assertEquals(listOf("ses_new openai/gpt-5.5 low"), calls.switched.value)
     }
 
-    @Test fun aSessionCreatedFromASessionStartsWithTheLastUsedModel() = runBlocking {
-        // Not the server's default, which falls back to the catalog head: a
-        // typed new session inherits the newest session's model.
+    @Test fun aSessionCreatedFromASessionStartsOnTheServersDefaultModel() = runBlocking {
+        // Not the newest session's model (Fable's GPT-5.4 High): the server's
+        // default, at the level last picked for it.
         val calls = Calls()
-        obj(workspace(calls, viewing = docs), "create_session", """{"directory":"/Users/kit/website"}""")
-        assertEquals(listOf("ses_new openai/gpt-5.4 high"), calls.switched.value)
+        val opus = catalog.models[2]
+        val create = """{"directory":"/Users/kit/website"}"""
+        obj(workspace(calls, viewing = docs, defaultModel = opus, levels = mapOf(opus.id to "max")), "create_session", create)
+        assertEquals(listOf("ses_new anthropic/claude-opus-4-6 max"), calls.switched.value)
+
+        // Nothing remembered for it: the model's own default level.
+        obj(workspace(calls, viewing = docs, defaultModel = opus), "create_session", create)
+        assertEquals("ses_new anthropic/claude-opus-4-6 -", calls.switched.value.last())
 
         // A draft model left over from before the call moved to a session is not used.
-        val opus = OpenCodeModelRef(id = "claude-opus-4-6", providerID = "anthropic", variant = "max")
-        obj(workspace(calls, viewing = docs, draftModel = opus), "create_session", """{"directory":"/Users/kit/website"}""")
-        assertEquals(listOf("ses_new openai/gpt-5.4 high", "ses_new openai/gpt-5.4 high"), calls.switched.value)
+        val gpt = OpenCodeModelRef(id = "gpt-5.5", providerID = "openai", variant = "xhigh")
+        obj(workspace(calls, viewing = docs, draftModel = gpt, defaultModel = opus), "create_session", create)
+        assertEquals("ses_new anthropic/claude-opus-4-6 -", calls.switched.value.last())
+
+        // A server that names no default picks the model itself.
+        obj(workspace(calls, viewing = docs), "create_session", create)
+        assertEquals(3, calls.switched.value.size)
+    }
+
+    @Test fun aDraftWhoseModelHasntLoadedStartsOnTheServersDefault() = runBlocking {
+        val calls = Calls()
+        val opus = catalog.models[2]
+        obj(workspace(calls, viewing = null, defaultModel = opus, levels = mapOf(opus.id to "max")), "create_session", """{"directory":"/Users/kit/opencode-ios"}""")
+        assertEquals(listOf("ses_new anthropic/claude-opus-4-6 max"), calls.switched.value)
     }
 }
