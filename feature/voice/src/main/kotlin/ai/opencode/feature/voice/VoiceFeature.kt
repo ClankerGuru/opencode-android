@@ -1508,7 +1508,7 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
                 Effect.cancel(CancelID.CallCommands),
                 Effect.run<Action> {
                     try {
-                        service.update(after)
+                        updatePresence(service, after)
                         clock.sleep(endedLinger)
                     } finally {
                         withContext(NonCancellable) { stopPresence(service, after.callID) }
@@ -1516,7 +1516,17 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
                 }.cancellable(CancelID.PresenceLinger, cancelInFlight = true),
             )
         }
-        return Effect.run { service.update(after) }
+        return Effect.run { updatePresence(service, after) }
+    }
+
+    private suspend fun updatePresence(service: VoiceCallServiceClient, state: VoiceCallServiceState) {
+        try {
+            service.update(state)
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            AppLog.voice.error("Call notification failed to update: ${error::class.java.simpleName}")
+        }
     }
 
     private suspend fun stopPresence(service: VoiceCallServiceClient, id: UUID) {
