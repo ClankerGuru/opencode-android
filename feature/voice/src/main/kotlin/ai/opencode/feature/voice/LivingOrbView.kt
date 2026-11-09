@@ -2,8 +2,6 @@ package ai.opencode.feature.voice
 
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.tuning.AnimationTimeScale
-import ai.opencode.core.ui.OpenCodeColors
-import ai.opencode.core.ui.OpenCodeTheme
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.graphics.BitmapShader
@@ -24,7 +22,6 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -105,8 +102,8 @@ data class LivingOrbBloom(
  *
  * Android: an AGSL [RuntimeShader] drawn by a Compose [Canvas]; a `withFrameNanos` loop steps the
  * plain-object [WispOrbRenderer] only while it shows (not [isHidden], lifecycle resumed: iOS
- * `scenePhase == .active`). Under Reduce Motion it draws once whenever its inputs change. The lens
- * takes its colours from [WispOrbPalette].
+ * `scenePhase == .active`). Under Reduce Motion it draws once whenever its inputs change. Wisp's
+ * glass looks the same in light and dark.
  *
  * @param isHidden faded out behind the panel: no drawing.
  */
@@ -121,18 +118,15 @@ fun LivingOrbView(config: LivingOrbConfig, modifier: Modifier = Modifier, isHidd
     var size by remember { mutableStateOf(IntSize.Zero) }
     var frame by remember { mutableIntStateOf(0) }
     val currentConfig by rememberUpdatedState(config)
-    val palette = WispOrbPalette.of(OpenCodeTheme.colors)
-    val currentPalette by rememberUpdatedState(palette)
 
     fun configure() {
         renderer.config = currentConfig
-        renderer.palette = currentPalette
         renderer.tuning = WispOrbTuning.current
         renderer.isStill = reduceMotion
     }
 
     val isPaused = isHidden || !lifecycle.isAtLeast(Lifecycle.State.RESUMED)
-    LaunchedEffect(renderer, isPaused, reduceMotion, size, density, if (reduceMotion) config else Unit, if (reduceMotion) palette else Unit) {
+    LaunchedEffect(renderer, isPaused, reduceMotion, size, density, if (reduceMotion) config else Unit) {
         if (size.width <= 0 || size.height <= 0) return@LaunchedEffect
         renderer.resetClock()
         if (isPaused) return@LaunchedEffect
@@ -157,21 +151,6 @@ fun LivingOrbView(config: LivingOrbConfig, modifier: Modifier = Modifier, isHidd
         @Suppress("UNUSED_EXPRESSION") frame
         val brush = renderer.brush ?: return@Canvas
         drawRect(brush)
-    }
-}
-
-/**
- * The colours the lens is drawn in. iOS's glass is a blue-black disc; here it is a neutral
- * graphite (the desktop's dark canvas family) in both modes, a dark speaker grille set on the call
- * card. Its shadow is lighter on light themes, where the card is pale.
- */
-data class WispOrbPalette(val plate: Color, val shadow: Float) {
-    companion object {
-        val graphite = Color(0xFF141415)
-        val fallback = WispOrbPalette(plate = graphite, shadow = 0.42f)
-
-        fun of(colors: OpenCodeColors): WispOrbPalette =
-            WispOrbPalette(plate = graphite, shadow = if (colors.isDark) 0.42f else 0.30f)
     }
 }
 
@@ -202,7 +181,6 @@ class WispOrbRenderer private constructor() {
     private val levels = VoiceAudioLevels.shared
 
     var config = LivingOrbConfig(mood = FloatingCallMood.live, isMuted = false, isSpeaking = false)
-    var palette = WispOrbPalette.fallback
     var tuning = WispOrbTuning()
     var isStill = false
 
@@ -271,8 +249,6 @@ class WispOrbRenderer private constructor() {
             val o = slot * 4
             shader.setFloatUniform(name, uniforms.data[o], uniforms.data[o + 1], uniforms.data[o + 2], uniforms.data[o + 3])
         }
-        val p = palette
-        shader.setFloatUniform("plate", p.plate.red, p.plate.green, p.plate.blue, p.shadow)
         if (brush == null) brush = ShaderBrush(shader)
         return true
     }
