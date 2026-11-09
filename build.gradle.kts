@@ -12,6 +12,8 @@ val prepareRobolectricSdks = tasks.register<Sync>("prepareRobolectricSdks") {
 
 subprojects {
     tasks.withType<Test>().configureEach {
+        // Local runs enforce wall-clock budgets; don't reuse CI results for those runs.
+        inputs.property("ci", providers.environmentVariable("CI").orElse("false"))
         if (configurations.getByName("testImplementation").dependencies.any { it.group == "org.robolectric" && it.name == "robolectric" }) {
             inputs.files(prepareRobolectricSdks).withPathSensitivity(PathSensitivity.RELATIVE)
             systemProperty("robolectric.offline", "true")
