@@ -69,7 +69,8 @@ class MarkdownStyle(
         1 -> tuning.h1Size
         2 -> tuning.h2Size
         3 -> tuning.h3Size
-        else -> 17f
+        // Deeper headings stay at H3's desktop size (iOS: `.headline` 17).
+        else -> 15f
     }
 
     fun headingWeight(level: Int): FontWeight = when (level) {

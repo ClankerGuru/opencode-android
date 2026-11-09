@@ -25,6 +25,11 @@ class OpenCodeColors(
     val theme: AppTheme,
     val isDark: Boolean,
     val highContrast: Boolean,
+    /**
+     * Hairlines draw in the strong border colour: Increase Contrast or Android's high-contrast
+     * text setting (desktop hairlines are under 3:1 against the canvas).
+     */
+    val strongBorders: Boolean,
     /** The raw palette, for swatches (`swatchCanvas`, `swatchRing`, `swatchAccent`) and contrast checks. */
     val variant: ThemeVariant,
     /** Plain backgrounds (iOS `systemBackground`). */
@@ -87,7 +92,7 @@ class OpenCodeColors(
          * this uses their concrete values (the [ThemePalette.system] reference palette plus the
          * UIKit-only fills below).
          */
-        fun resolve(theme: AppTheme, isDark: Boolean, highContrast: Boolean = false): OpenCodeColors {
+        fun resolve(theme: AppTheme, isDark: Boolean, highContrast: Boolean = false, strongBorders: Boolean = highContrast): OpenCodeColors {
             val v = ThemePalette.definition(theme).variant(isDark)
             val system = theme == AppTheme.System
             val label = v.text
@@ -104,6 +109,7 @@ class OpenCodeColors(
                 theme = theme,
                 isDark = isDark,
                 highContrast = highContrast,
+                strongBorders = strongBorders || highContrast,
                 variant = v,
                 canvas = v.canvas.color,
                 groupedCanvas = (if (isDark) v.canvas else v.canvasWeak).color,
@@ -120,7 +126,7 @@ class OpenCodeColors(
                 secondaryText = (if (!system && highContrast) v.text else v.textWeak).color,
                 tertiaryText = (if (!system && highContrast) v.textWeak else v.textTertiary).color,
                 defaultBodyText = bodyResolver(0.92),
-                border = (if (!system && highContrast) v.borderStrong else v.border).color,
+                border = (if ((!system && highContrast) || strongBorders) v.borderStrong else v.border).color,
                 accent = v.accent.color,
                 sendButtonBackground = (if (system) label else v.accent).color,
                 sendButtonForeground = (if (system) v.canvas else v.accent.highContrastForeground).color,
@@ -181,7 +187,7 @@ fun OpenCodeColors.toColorScheme(): ColorScheme {
     val textRgba = if (!system && highContrast) v.textStrong else v.text
     val secondary = (if (!system && highContrast) v.text else v.textWeak).composited(canvas)
     val outline = v.borderStrong.composited(canvas)
-    val outlineVariant = (if (!system && highContrast) v.borderStrong else v.border).composited(canvas)
+    val outlineVariant = (if ((!system && highContrast) || strongBorders) v.borderStrong else v.border).composited(canvas)
     val error = if (system) SystemColors.red(isDark) else v.diffRemovedText
     val container = v.canvasWeak.mixedInOklab(v.userBubble, 0.5)
     val primaryContainer = canvas.mixedInOklab(accent, 0.22)

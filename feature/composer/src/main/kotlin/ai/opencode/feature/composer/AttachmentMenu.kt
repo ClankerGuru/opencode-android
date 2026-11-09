@@ -886,7 +886,7 @@ private fun AttachmentMenuPanel(
         shape = shape,
         color = panelColor(),
         // The desktop popover: flat fill, hairline ring, soft shadow (`--shadow-md`).
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)),
+        border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
         shadowElevation = 4.dp,
     ) {
         Box(Modifier.fillMaxSize().clip(shape)) { content() }

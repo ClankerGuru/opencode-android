@@ -320,7 +320,7 @@ private fun PairingActionsButtons(store: StoreOf<AppFeature.State, AppFeature.Ac
             onClick = { store.send(AppFeature.Action.AddServerTapped) },
             container = MaterialTheme.colorScheme.surface,
             content = colors.text,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)),
+            border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
         ) { Text("Enter a Server Manually", style = PairingActionLabel, textAlign = TextAlign.Center) }
         PairingActionButton(
             onClick = { store.send(AppFeature.Action.ScanPairingCodeTapped) },

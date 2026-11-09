@@ -157,7 +157,7 @@ object VoiceCallSurfaceDefaults {
 
     /** The dock's hairline ring (`--v2-border-border-base`). */
     val border: Color
-        @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)
+        @Composable @ReadOnlyComposable get() = OpenCodeTheme.colors.border
 
     /** `UIColor.tertiarySystemFill`: Mute's soft disc. */
     val tertiaryFill: Color

@@ -71,7 +71,7 @@ object DynamicSystemTheme {
     }
 
     /** The app's semantic colours for the System theme, read from the wallpaper's [scheme]. */
-    fun colors(scheme: ColorScheme, isDark: Boolean, highContrast: Boolean): OpenCodeColors {
+    fun colors(scheme: ColorScheme, isDark: Boolean, highContrast: Boolean, strongBorders: Boolean = highContrast): OpenCodeColors {
         val fixed = ThemePalette.system.variant(isDark)
         val onSurface = scheme.onSurface
         val bodyResolver: (Double) -> Color = { tone ->
@@ -81,11 +81,12 @@ object DynamicSystemTheme {
                 onSurface.copy(alpha = tone.toFloat())
             }
         }
-        val border = if (highContrast) scheme.outline else scheme.outlineVariant
+        val border = if (highContrast || strongBorders) scheme.outline else scheme.outlineVariant
         return OpenCodeColors(
             theme = AppTheme.System,
             isDark = isDark,
             highContrast = highContrast,
+            strongBorders = strongBorders || highContrast,
             variant = variant(scheme, fixed),
             canvas = scheme.surface,
             groupedCanvas = scheme.surfaceContainer,

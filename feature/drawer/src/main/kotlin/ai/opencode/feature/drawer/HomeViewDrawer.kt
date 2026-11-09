@@ -466,7 +466,7 @@ private fun DrawerNewSessionButton(enabled: Boolean, onClick: () -> Unit) {
         // The desktop's neutral button: base surface, hairline ring, small radius.
         shape = RoundedCornerShape(OpenCodeRadius.fill),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)),
+        border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
         contentColor = tint,
         modifier = Modifier
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
@@ -551,7 +551,7 @@ private fun DrawerFooterTrailing(
         Surface(
             shape = RoundedCornerShape(OpenCodeRadius.fill),
             color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)),
+            border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
             contentColor = OpenCodeTheme.colors.text,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {

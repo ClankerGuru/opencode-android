@@ -9,9 +9,13 @@ package ai.opencode.core.ui
  * Desktop token → field:
  * canvas `bg-base`, canvasWeak `bg-deep` (sidebar), codeBand `bg-layer-01`, userBubble
  * `bg-layer-02`, surfaceStrong `bg-layer-03`, text/strong `text-base`, textWeak `text-muted`,
- * textTertiary `text-faint` (darkened in light mode to pass WCAG AA), border `border-base`
- * (flattened), borderStrong `border-strong`, link `text-accent`, syntax `--syntax-*`, diff
- * `--v2-state-*-success/danger`.
+ * textTertiary `text-faint`, border `border-base` (flattened), borderStrong `border-strong`,
+ * link `text-accent`, syntax `--syntax-*`, diff `--v2-state-*-success/danger`.
+ *
+ * Light-mode divergences from the desktop, each darkened just enough for WCAG AA (4.5:1) on the
+ * fills it sits on (white, `#FAFAFA` code/drawer, `#EEEEEE` inline code): textTertiary `#808080`
+ * → `#6E6E6E`, link `#3B5CF6` → `#3A5BF6`, syntax keyword `#C83D8B` → `#C83B8A`, syntax string
+ * `#198B43` → `#188540`, diff-added text `#198B43` → `#17813E`. Dark mode is the desktop's.
  */
 internal object BrandPalette {
     private fun hex(value: String, alpha: Double = 1.0): ThemeRGBA {
@@ -32,13 +36,13 @@ internal object BrandPalette {
             bodyText = hex("#242424"),
             textStrong = hex("#0A0A0A"),
             textWeak = hex("#5C5C5C"),
-            textTertiary = hex("#767676"),
+            textTertiary = hex("#6E6E6E"),
             border = hex("#E6E6E6"),
             borderStrong = hex("#CCCCCC"),
             accent = hex("#242424"),
-            link = hex("#3B5CF6"),
-            syntaxKeyword = hex("#C83D8B"),
-            syntaxString = hex("#198B43"),
+            link = hex("#3A5BF6"),
+            syntaxKeyword = hex("#C83B8A"),
+            syntaxString = hex("#188540"),
             syntaxNumber = hex("#007B80"),
             syntaxComment = hex("#5C5C5C"),
             syntaxType = hex("#5230C2"),
@@ -46,10 +50,10 @@ internal object BrandPalette {
             diffRemovedFill = hex("#FCECEB"),
             glassDiffAddedFill = hex("#198B43", 0.12),
             glassDiffRemovedFill = hex("#B82D35", 0.10),
-            diffAddedText = hex("#198B43"),
+            diffAddedText = hex("#17813E"),
             diffRemovedText = hex("#B82D35"),
             swatchCanvas = hex("#FFFFFF"),
-            swatchRing = hex("#DBDBDB"),
+            swatchRing = hex("#C7C7C7"),
             swatchAccent = hex("#242424"),
         ),
         dark = ThemeVariant(

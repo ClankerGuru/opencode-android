@@ -103,7 +103,7 @@ fun OpenCodeSecondaryButton(
         modifier = modifier.heightIn(min = OpenCodeButtonDefaults.height),
         enabled = enabled,
         shape = OpenCodeButtonDefaults.shape,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)),
+        border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
         colors = colors,
         contentPadding = OpenCodeButtonDefaults.contentPadding,
         content = content,

@@ -84,9 +84,17 @@ class ThemePaletteTests {
             if (theme == AppTheme.System) continue
             val def = ThemePalette.definition(theme)
 
-            // Dark swatch accent dot sits at L ~= 0.78; light swatch accent dot sits at L ~= 0.52.
-            assertTrue("${theme.title} dark swatchAccent L=${def.dark.swatchAccent.oklch.first}", abs(def.dark.swatchAccent.oklch.first - 0.78) < 0.015)
-            assertTrue("${theme.title} light swatchAccent L=${def.light.swatchAccent.oklch.first}", abs(def.light.swatchAccent.oklch.first - 0.52) < 0.015)
+            if (theme == AppTheme.OpenCode) {
+                // Android diverges from iOS on purpose here: the OpenCode theme is the desktop's
+                // palette (BrandPalette), whose accent is the monochrome contrast fill, so its
+                // swatch dot is near-black in light and near-white in dark.
+                assertTrue("${theme.title} dark swatchAccent L=${def.dark.swatchAccent.oklch.first}", def.dark.swatchAccent.oklch.first > 0.85)
+                assertTrue("${theme.title} light swatchAccent L=${def.light.swatchAccent.oklch.first}", def.light.swatchAccent.oklch.first < 0.35)
+            } else {
+                // Dark swatch accent dot sits at L ~= 0.78; light swatch accent dot sits at L ~= 0.52.
+                assertTrue("${theme.title} dark swatchAccent L=${def.dark.swatchAccent.oklch.first}", abs(def.dark.swatchAccent.oklch.first - 0.78) < 0.015)
+                assertTrue("${theme.title} light swatchAccent L=${def.light.swatchAccent.oklch.first}", abs(def.light.swatchAccent.oklch.first - 0.52) < 0.015)
+            }
 
             // Swatch ring maintains a crisp perceptual lightness step from swatchCanvas, and the
             // three ThemeSwatchTile palette dots (swatchCanvas, swatchAccent, syntaxKeyword) are distinct.
