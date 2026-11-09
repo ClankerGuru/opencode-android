@@ -89,15 +89,15 @@ internal fun WelcomePhone(frame: WelcomeFrame, pairing: Float, reduced: Boolean,
         PhoneStatusBar()
         Box(
             Modifier
-                .offset(x = ((WelcomePhone.size.width - 140) / 2).dp, y = (WelcomePhone.size.height - 13).dp)
-                .size(140.dp, 5.dp)
-                .background(Color.White.copy(alpha = 0.85f), CircleShape),
+                .offset(x = ((WelcomePhone.size.width - 108) / 2).dp, y = (WelcomePhone.size.height - 12).dp)
+                .size(108.dp, 4.dp)
+                .background(Color.White.copy(alpha = 0.8f), CircleShape),
         )
     }
 }
 
 internal object WelcomePhone {
-    /** The phone's logical screen (iPhone 17 Pro Max). */
+    /** The phone's logical screen (iOS draws an iPhone 17 Pro Max at the same size). */
     val size = Size(440f, 956f)
 
     /** The composer's bottom edge, above the home indicator. */
@@ -138,37 +138,52 @@ internal object WelcomePhone {
     }
 }
 
+/**
+ * An Android status bar (iOS draws the iPhone's: centred time, Dynamic Island): the time on the
+ * left, a centred punch-hole camera, and Wi-Fi, signal and battery on the right.
+ */
 @Composable
 private fun PhoneStatusBar() {
-    Box(Modifier.fillMaxWidth()) {
-        Text("9:41", style = TextStyle(fontSize = 16.5.sp, fontWeight = FontWeight.SemiBold), color = Color.White, modifier = Modifier.offset(y = 19.dp).width(146.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+    Box(Modifier.fillMaxWidth().height(44.dp)) {
+        Text(
+            "9:30",
+            style = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Medium),
+            color = Color.White,
+            modifier = Modifier.align(Alignment.CenterStart).padding(start = 28.dp),
+        )
         Box(
             Modifier
-                .offset(x = ((WelcomePhone.size.width - 120) / 2).dp, y = 12.dp)
-                .size(120.dp, 34.dp)
+                .align(Alignment.Center)
+                .size(22.dp)
                 .background(Color.Black, CircleShape)
-                .border(0.5.dp, Color.White.copy(alpha = 0.08f), CircleShape),
+                .border(0.75.dp, Color.White.copy(alpha = 0.1f), CircleShape),
         )
         Row(
-            Modifier.offset(y = 20.dp).width((WelcomePhone.size.width - 30).dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End),
+            Modifier.align(Alignment.CenterEnd).padding(end = 26.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Signal bars and a full battery, drawn (no Material Symbol matches the system glyphs).
-            Canvas(Modifier.size(18.dp, 12.dp)) {
-                val bar = size.width / 5.5f
-                for (index in 0 until 4) {
-                    val h = size.height * (0.4f + 0.2f * index)
-                    drawRoundRect(Color.White, Offset(index * bar * 1.5f, size.height - h), Size(bar, h), androidx.compose.ui.geometry.CornerRadius(bar / 3))
-                }
+            OpenCodeIcon("wifi", null, size = 16.dp, tint = Color.White)
+            // Cellular signal as Android draws it: a filled right triangle.
+            Canvas(Modifier.size(14.dp, 14.dp)) {
+                val triangle = Path()
+                triangle.moveTo(size.width, 0f)
+                triangle.lineTo(size.width, size.height)
+                triangle.lineTo(0f, size.height)
+                triangle.close()
+                drawPath(triangle, Color.White)
             }
-            OpenCodeIcon("wifi", null, size = 17.dp, tint = Color.White)
-            Canvas(Modifier.size(27.dp, 13.dp)) {
-                val body = Size(size.width - 2.5.dp.toPx(), size.height)
-                drawRoundRect(Color.White.copy(alpha = 0.4f), Offset.Zero, body, androidx.compose.ui.geometry.CornerRadius(4.dp.toPx()), style = Stroke(1.dp.toPx()))
-                val inset = 2.dp.toPx()
-                drawRoundRect(Color.White, Offset(inset, inset), Size(body.width - 2 * inset, body.height - 2 * inset), androidx.compose.ui.geometry.CornerRadius(2.5.dp.toPx()))
-                drawRoundRect(Color.White.copy(alpha = 0.4f), Offset(body.width + 1.dp.toPx(), size.height * 0.33f), Size(1.5.dp.toPx(), size.height * 0.34f), androidx.compose.ui.geometry.CornerRadius(1.dp.toPx()))
+            // A full battery: a rounded body with a small cap on the right.
+            Canvas(Modifier.size(24.dp, 12.dp)) {
+                val cap = 2.dp.toPx()
+                val body = Size(size.width - cap - 1.dp.toPx(), size.height)
+                drawRoundRect(Color.White, Offset.Zero, body, androidx.compose.ui.geometry.CornerRadius(3.5.dp.toPx()))
+                drawRoundRect(
+                    Color.White.copy(alpha = 0.6f),
+                    Offset(body.width + 1.dp.toPx(), size.height * 0.3f),
+                    Size(cap, size.height * 0.4f),
+                    androidx.compose.ui.geometry.CornerRadius(1.dp.toPx()),
+                )
             }
         }
     }
