@@ -9,6 +9,8 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeSecondaryButton
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.accessibilityFocusRequest
+import ai.opencode.core.ui.rememberAccessibilityFocusRequest
 import ai.opencode.core.ui.rememberAppAppearance
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -44,6 +46,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -112,6 +116,10 @@ fun PairingScannerView(
         cameraAccess = camera.authorization()
     }
 
+    // VoiceOver starts on the navigation title, a header (iOS `.navigationTitle`), and comes back to
+    // it once the camera prompt is answered; TalkBack would start on Cancel (QA OB-B-04).
+    val titleFocus = rememberAccessibilityFocusRequest(cameraAccess)
+
     val appearance = rememberAppAppearance()
     OpenCodeTheme(theme = appearance.theme, appearance = AppearanceColorScheme.Dark) {
         Scaffold(
@@ -119,7 +127,13 @@ fun PairingScannerView(
             containerColor = Color.Black,
             topBar = {
                 CenterAlignedTopAppBar(
-                    title = { Text("Scan Pairing Code", style = OpenCodeTextStyles.headline) },
+                    title = {
+                        Text(
+                            "Scan Pairing Code",
+                            style = OpenCodeTextStyles.headline,
+                            modifier = Modifier.accessibilityFocusRequest(titleFocus).semantics { heading() },
+                        )
+                    },
                     navigationIcon = { TextButton(onClick = onCancel) { Text("Cancel") } },
                     actions = {
                         if (isCameraAvailable && !isAccessDenied) {
