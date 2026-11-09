@@ -3,6 +3,7 @@ package ai.opencode.feature.system.intents
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Process
 
@@ -49,10 +50,11 @@ class AppActionActivity : Activity() {
          * referrer) names Google's assistant, that UID owns the package, and it's signed with
          * Google's key. The system shares the launching app only when it opts in
          * (`ActivityOptions.setShareIdentityEnabled`); otherwise this is false, and the launch
-         * gets the path the user confirms.
+         * gets the path the user confirms. On Android 14 always require that confirmation.
          */
         fun isVerifiedAssistant(activity: Activity): Boolean =
-            isVerifiedAssistant(activity.launchedFromPackage, activity.launchedFromUid, activity.packageManager)
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM &&
+                isVerifiedAssistant(activity.launchedFromPackage, activity.launchedFromUid, activity.packageManager)
 
         internal fun isVerifiedAssistant(launchedFromPackage: String?, launchedFromUid: Int, packages: PackageManager): Boolean {
             val certificate = assistants[launchedFromPackage ?: return false] ?: return false

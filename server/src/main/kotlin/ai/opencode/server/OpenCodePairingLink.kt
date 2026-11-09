@@ -87,6 +87,33 @@ data class OpenCodePairingLink(
             return decodeDeepLink(trimmed) ?: decodePairPage(trimmed) ?: decodeLink(trimmed)
         }
 
+        /**
+         * [decode], or else the pairing link in text as people copy it (QA FB-02): wrapped across
+         * lines by a terminal (`opencode pair --remote`'s 88-character link plus its indent passes
+         * 80 columns, and the TUI's `/pair` box is 29 wide), inside the command's whole output or a
+         * sentence, or with brackets or punctuation around it. Every link in it with the first
+         * one's code becomes one link with all their addresses (the TUI lists one per address).
+         * For pasted, scanned and typed text; opened URLs are exact ([decode]). iOS decodes only
+         * the trimmed text.
+         */
+        fun decodeCopied(text: String): OpenCodePairingLink? {
+            decode(text)?.let { return it }
+            // A wrapped link goes on after the line break and the next line's indent; a blank line
+            // or a line starting another link ends it. Taken first, so a code cut by the wrap isn't
+            // read short from the first line.
+            val unwrapped = text.replace(wrapBreak, "")
+            val links = copiedLinks(unwrapped).ifEmpty { copiedLinks(text) }
+            val first = links.firstOrNull() ?: return null
+            val origins = links.filter { it.code == first.code }.flatMap { it.candidateOrigins }.distinct()
+            return OpenCodePairingLink(origins[0], first.code, origins.drop(1))
+        }
+
+        private val wrapBreak = Regex("""[ \t]*\r?\n[ \t]*(?![ \t]*\r?\n|(?i:https?|opencode(?:-ios)?)://)""")
+        private val copiedLink = Regex("""(?i)(?:https?|opencode(?:-ios)?)://[^\s<>"'`()\[\]{}]+""")
+
+        private fun copiedLinks(text: String): List<OpenCodePairingLink> =
+            copiedLink.findAll(text).mapNotNull { decode(it.value.trimEnd('.', ',', ';', ':', '!', '?')) }.toList()
+
         /** Whether [text] is `https://opencode.ai/pair`, even with a malformed fragment. */
         fun isPairPage(text: String): Boolean {
             val parts = UrlParts.parse(text.trimmedWhitespace()) ?: return false

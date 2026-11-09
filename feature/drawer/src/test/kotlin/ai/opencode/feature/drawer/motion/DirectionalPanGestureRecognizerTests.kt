@@ -594,6 +594,22 @@ class SessionDrawerSettleTests {
         assertEquals(listOf(true, false), harness.settled)
     }
 
+    /** Android only (QA FB-07): predictive back on the shut card pulls it part way open; the commit opens it from there. */
+    @Test
+    fun aBackGestureOpensTheShutDrawerFromWhereItLeftTheCard() = runTest {
+        val harness = Harness(this)
+        harness.beginDrag()
+        harness.drag(330f * DrawerMotionTunables.BACK_PREVIEW_TRAVEL)
+        assertEquals(0, harness.commits)
+        harness.motion.endBackOpen()
+        assertEquals("The commit plays the snap once, short of halfway or not", 1, harness.commits)
+        assertEquals(listOf(true), harness.presentations)
+        harness.waitForSettle()
+        assertTrue(harness.motion.isPresented)
+        assertEquals(330f, harness.motion.offset)
+        assertEquals(listOf(true), harness.settled)
+    }
+
     @Test
     fun rapidReversalsNeverDoubleFire() = runTest {
         val harness = Harness(this)
