@@ -233,7 +233,8 @@ object PlusMenuTunables {
     const val MENU_DROP = 80f
     /** The menu's width, × the screen's. */
     const val MENU_WIDTH = 0.63f
-    const val MENU_RADIUS = 28f
+    /** The open menu's corners: the desktop popover radius (`OpenCodeRadius.card`), as on the session’s ⋮ menu. */
+    const val MENU_RADIUS = 10f
     const val MENU_ROW_HEIGHT = 56f
     /** The menu's leading edge in from the composer's. */
     const val MENU_INSET = 0f
