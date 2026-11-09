@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.ui.OpenCodeTextField
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeSwitch
 import ai.opencode.core.ui.openCodeHairline
@@ -63,7 +64,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -911,10 +911,10 @@ fun SessionActionPresentations(sheet: StoreOf<SessionSheetFeature.State, Session
             onDismissRequest = { sheet.send(SessionSheetFeature.Action.IsRenamingChanged(false)) },
             title = { Text("Rename Session") },
             text = {
-                OutlinedTextField(
+                OpenCodeTextField(
                     value = state.renameDraft,
                     onValueChange = { sheet.send(SessionSheetFeature.Action.RenameDraftChanged(it)) },
-                    placeholder = { Text("Title") },
+                    placeholder = "Title",
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { sheet.send(SessionSheetFeature.Action.RenameSubmitted) }),

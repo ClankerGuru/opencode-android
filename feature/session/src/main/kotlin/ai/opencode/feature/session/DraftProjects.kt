@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.ui.OpenCodeSearchField
 import ai.opencode.core.ui.OpenCodeSheetDefaults
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeShape
@@ -52,8 +53,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -697,18 +696,10 @@ private fun SheetTitleBar(
 
 @Composable
 private fun SearchField(value: String, onValueChange: (String) -> Unit) {
-    TextField(
+    OpenCodeSearchField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = { Text("Search") },
-        leadingIcon = { OpenCodeIcon(SFSymbol.Magnifyingglass, contentDescription = null, size = 20.dp) },
-        singleLine = true,
-        shape = RoundedCornerShape(8.dp),
-        colors = TextFieldDefaults.colors(
-            focusedIndicatorColor = Color.Transparent,
-            unfocusedIndicatorColor = Color.Transparent,
-            disabledIndicatorColor = Color.Transparent,
-        ),
+        placeholder = "Search",
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
     )
 }

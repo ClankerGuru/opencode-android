@@ -2,6 +2,9 @@
 
 package ai.opencode.feature.composer.modelpicker
 
+import androidx.compose.ui.focus.onFocusChanged
+import ai.opencode.core.ui.openCodeFieldContainer
+import ai.opencode.core.ui.OpenCodeTextFieldDefaults
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconSize
@@ -411,7 +414,7 @@ fun ModelPickerChip(
 }
 
 /**
- * A magnifier, the placeholder, and a Clear button while there's text, in a tertiary-fill capsule:
+ * A magnifier, the placeholder, and a Clear button while there's text, in the text field's container:
  * the Today picker's search (iOS `ModelSearchCapsuleField`, deleted with Grow from Composer in
  * 0fbb99f8; iOS's Today picker uses `.searchable`).
  */
@@ -451,30 +454,33 @@ internal fun ModelSearchCapsuleField(
         onTextChange(it)
     }
     val textColor = OpenCodeTheme.colors.text
+    val fieldColors = OpenCodeTextFieldDefaults.colors()
+    var isFocused by remember { mutableStateOf(false) }
     Row(
         modifier
             .fillMaxWidth()
             .heightIn(min = minHeight.dp)
-            .background(OpenCodeTheme.colors.inlineCodeFill, CircleShape)
+            .openCodeFieldContainer(isFocused = isFocused)
             .padding(start = leadingPadding, end = if (input.isEmpty()) emptyTrailingPadding else clearTrailingPadding),
         horizontalArrangement = Arrangement.spacedBy(spacing),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        OpenCodeIcon(SFSymbol.Magnifyingglass, null, size = 20.dp, tint = OpenCodeTheme.colors.secondaryText)
+        OpenCodeIcon(SFSymbol.Magnifyingglass, null, size = OpenCodeTextFieldDefaults.iconSize, tint = fieldColors.icon)
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-            if (input.isEmpty()) Text(placeholder, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.secondaryText, maxLines = 1)
+            if (input.isEmpty()) Text(placeholder, style = OpenCodeTextFieldDefaults.textStyle, color = fieldColors.placeholder, maxLines = 1)
             BasicTextField(
                 value = input,
                 onValueChange = changeText,
                 singleLine = true,
-                textStyle = OpenCodeTextStyles.body.copy(color = textColor),
-                cursorBrush = SolidColor(OpenCodeTheme.colors.accent),
+                textStyle = OpenCodeTextFieldDefaults.textStyle.copy(color = textColor),
+                cursorBrush = SolidColor(fieldColors.cursor),
                 // Autocorrection stays on: its suggestions keep the keyboard the message field's height.
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, imeAction = imeAction),
                 keyboardActions = KeyboardActions(onAny = { onSubmit() }),
                 modifier = Modifier
                     .fillMaxWidth()
                     .let { if (focusRequester != null) it.focusRequester(focusRequester) else it }
+                    .onFocusChanged { isFocused = it.isFocused }
                     .semantics { contentDescription = placeholder }
                     .testTag("model-search"),
             )

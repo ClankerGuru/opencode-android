@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings.serverdetails
 
+import ai.opencode.core.ui.OpenCodeSearchField
 import ai.opencode.core.ui.OpenCodeSheetDefaults
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeRadius
@@ -51,7 +52,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -436,13 +436,10 @@ private fun SkillsTray(skills: List<OpenCodeAutocompleteSkill>, close: () -> Uni
     }
     Column(Modifier.fillMaxSize()) {
         TrayHeader("Skills", "${skills.size} on this server", close)
-        OutlinedTextField(
+        OpenCodeSearchField(
             value = query,
             onValueChange = { query = it },
-            placeholder = { Text("Search Skills") },
-            leadingIcon = { OpenCodeIcon(SFSymbol.Magnifyingglass, contentDescription = null) },
-            singleLine = true,
-            shape = CircleShape,
+            placeholder = "Search Skills",
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
         )
         if (shown.isEmpty()) {

@@ -1,5 +1,6 @@
 package ai.opencode.feature.system.share
 
+import ai.opencode.core.ui.OpenCodeSearchField
 import ai.opencode.core.ui.OpenCodeSheetDefaults
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeRadius
@@ -981,30 +982,12 @@ private fun ShareSessionSearch(
             )
             Text("Sessions", style = OpenCodeTextStyles.headline, modifier = Modifier.align(Alignment.Center))
         }
-        Surface(
+        OpenCodeSearchField(
+            value = query,
+            onValueChange = { query = it },
+            placeholder = "Search",
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            shape = OpenCodeShape.fill,
-            color = colors.inlineCodeFill,
-        ) {
-            Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                OpenCodeIcon(SFSymbol.Magnifyingglass, contentDescription = null, size = OpenCodeIconSize.small, tint = colors.secondaryText)
-                Spacer(Modifier.width(8.dp))
-                BasicTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    singleLine = true,
-                    textStyle = OpenCodeTextStyles.body.copy(color = colors.text),
-                    cursorBrush = SolidColor(colors.accent),
-                    modifier = Modifier.weight(1f),
-                    decorationBox = { inner ->
-                        Box {
-                            if (query.isEmpty()) Text("Search", style = OpenCodeTextStyles.body, color = colors.tertiaryText)
-                            inner()
-                        }
-                    },
-                )
-            }
-        }
+        )
         val pinned = matches(state.targets?.pinned ?: emptyList(), query)
         val recents = matches(state.targets?.recents ?: emptyList(), query)
         LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(bottom = 24.dp)) {

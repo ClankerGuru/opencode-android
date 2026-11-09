@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings.connection
 
+import ai.opencode.core.ui.OpenCodeTextField
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTheme
@@ -29,7 +30,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -127,10 +127,10 @@ fun SettingsServersSection(
             text = {
                 Column {
                     Text("Only this ${ai.opencode.core.ui.ThisDevice.name} uses the name. Leave it blank to use the computer’s.")
-                    OutlinedTextField(
+                    OpenCodeTextField(
                         value = nameDraft,
                         onValueChange = { nameDraft = it },
-                        placeholder = { Text(server.friendlyName) },
+                        placeholder = server.friendlyName,
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                         modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
