@@ -1,5 +1,6 @@
 package ai.opencode.devtools.traces
 
+import ai.opencode.core.ui.OpenCodeSwitchDefaults
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
@@ -187,7 +188,7 @@ private fun ScreenshotToggle(isOn: Boolean, enabled: Boolean, onChange: (Boolean
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("Include Screenshot", style = OpenCodeTextStyles.body, modifier = Modifier.weight(1f))
-            Switch(checked = isOn, onCheckedChange = null, enabled = enabled)
+            Switch(checked = isOn, onCheckedChange = null, enabled = enabled, colors = OpenCodeSwitchDefaults.colors())
         }
     }
 }

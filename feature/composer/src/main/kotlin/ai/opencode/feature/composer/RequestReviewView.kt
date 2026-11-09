@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.ui.OpenCodeSwitchDefaults
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
@@ -223,6 +224,7 @@ private fun FormField(
                         checked = answers[field.key] == OpenCodeFormValue.Boolean(true),
                         onCheckedChange = { set(OpenCodeFormValue.Boolean(it)) },
                         enabled = enabled,
+                        colors = OpenCodeSwitchDefaults.colors(),
                     )
                 }
             }

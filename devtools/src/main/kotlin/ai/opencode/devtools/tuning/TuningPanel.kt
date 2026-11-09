@@ -1,5 +1,6 @@
 package ai.opencode.devtools.tuning
 
+import ai.opencode.core.ui.OpenCodeSwitchDefaults
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
@@ -751,6 +752,7 @@ private fun TunableRow(descriptor: TunableDescriptor, override: TuneValue?, set:
                     checked = (current as? TuneValue.Bool)?.value ?: false,
                     onCheckedChange = { set(TuneValue.Bool(it)) },
                     modifier = Modifier.semantics { contentDescription = descriptor.label },
+                    colors = OpenCodeSwitchDefaults.colors(),
                 )
                 if (isChanged) ValueText("Reset", true) { set(null) }
             }

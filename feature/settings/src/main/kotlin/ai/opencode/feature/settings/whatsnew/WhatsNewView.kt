@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings.whatsnew
 
+import ai.opencode.core.ui.OpenCodeSwitchDefaults
 import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.experiments.key
@@ -189,7 +190,7 @@ private fun WhatsNewOptionsMenu(isButtonEnabled: Boolean, onEnabledChange: (Bool
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
                 text = { Text("Show in Drawer") },
-                trailingIcon = { Switch(checked = isButtonEnabled, onCheckedChange = null) },
+                trailingIcon = { Switch(checked = isButtonEnabled, onCheckedChange = null, colors = OpenCodeSwitchDefaults.colors()) },
                 onClick = { onEnabledChange(!isButtonEnabled) },
                 modifier = Modifier.semantics { toggleableState = ToggleableState(isButtonEnabled) },
             )

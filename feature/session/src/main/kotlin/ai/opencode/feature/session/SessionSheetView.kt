@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.ui.OpenCodeSwitchDefaults
 import ai.opencode.core.ui.openCodeHairline
 import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.dependencies.dependency
@@ -826,7 +827,7 @@ private fun AlwaysNotifyCard(isOn: Boolean, isPending: Boolean, onToggle: (Boole
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("Always Notify", style = OpenCodeTextStyles.callout, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
-            Switch(checked = isOn, onCheckedChange = null, enabled = !isPending)
+            Switch(checked = isOn, onCheckedChange = null, enabled = !isPending, colors = OpenCodeSwitchDefaults.colors())
         }
         Text(
             "Notify this $device whenever a reply finishes, even ones you didn’t send from here.",

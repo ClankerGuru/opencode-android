@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings
 
+import ai.opencode.core.ui.OpenCodeSwitchDefaults
 import ai.opencode.core.ui.OpenCodeTextStyles
 import androidx.compose.ui.text.font.FontWeight
 import ai.opencode.core.ui.OpenCodeTypography
@@ -312,6 +313,7 @@ fun SettingsToggleRow(
             } else {
                 null
             },
+            colors = OpenCodeSwitchDefaults.colors(),
         )
     }
 }

@@ -4,7 +4,10 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
+import androidx.compose.material3.SwitchColors
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Modifier
@@ -91,4 +94,23 @@ fun OpenCodeAlertDialog(
         tonalElevation = 0.dp,
         properties = properties,
     )
+}
+
+/**
+ * Switch colours for the curated themes. Material draws an off switch's border and thumb in
+ * `outline` (the desktop's `border-strong`, under 2:1 on cards); here they are [OpenCodeColors.tertiaryText],
+ * at least 3:1 against every surface a switch sits on and its own track (WCAG 1.4.11): light
+ * `#6E6E6E` 4.4–5.1:1, dark `#8A8A8A` 3.3–5.2:1. The System theme keeps Material's colours.
+ */
+object OpenCodeSwitchDefaults {
+    @Composable
+    fun colors(): SwitchColors {
+        val colors = OpenCodeTheme.colors
+        if (colors.theme == AppTheme.System) return SwitchDefaults.colors()
+        return SwitchDefaults.colors(
+            uncheckedThumbColor = colors.tertiaryText,
+            uncheckedBorderColor = colors.tertiaryText,
+            uncheckedIconColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        )
+    }
 }

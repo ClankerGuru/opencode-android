@@ -1,5 +1,6 @@
 package ai.opencode.devtools
 
+import ai.opencode.core.ui.OpenCodeSwitchDefaults
 import ai.opencode.core.diagnostics.DiagnosticsEvent
 import ai.opencode.core.diagnostics.MotionWatchEvent
 import ai.opencode.core.store.StoreOf
@@ -306,7 +307,7 @@ private fun SwitchRow(
             Text(title, style = MaterialTheme.typography.bodyLarge, color = if (enabled) MaterialTheme.colorScheme.onSurface else OpenCodeTheme.colors.secondaryText)
             if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = OpenCodeTheme.colors.secondaryText)
         }
-        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
+        Switch(checked = checked, onCheckedChange = null, enabled = enabled, colors = OpenCodeSwitchDefaults.colors())
     }
 }
 
