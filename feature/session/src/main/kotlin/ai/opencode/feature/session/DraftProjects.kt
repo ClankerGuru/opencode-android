@@ -242,7 +242,7 @@ fun DraftProjectList(
                 Box(
                     Modifier
                         .alpha(highlightAlpha)
-                        .background(OpenCodeTheme.colors.text.copy(alpha = 0.06f), RoundedCornerShape(50)),
+                        .background(OpenCodeTheme.colors.text.copy(alpha = 0.06f), RoundedCornerShape(8.dp)),
                 )
             },
         ) {
@@ -308,7 +308,7 @@ private fun DraftProjectRow(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
-            .background(OpenCodeTheme.colors.text.copy(alpha = 0.06f * highlight), RoundedCornerShape(50))
+            .background(OpenCodeTheme.colors.text.copy(alpha = 0.06f * highlight), RoundedCornerShape(8.dp))
             // A hidden row has no pointer node at all: a disabled one would still be hit and end
             // the search, eating taps meant for the chosen row folded under it.
             .then(if (takesTouches) Modifier.clickable(role = Role.Button, onClickLabel = hint, onClick = onClick) else Modifier)
@@ -695,7 +695,7 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
         placeholder = { Text("Search") },
         leadingIcon = { OpenCodeIcon(SFSymbol.Magnifyingglass, contentDescription = null, size = 20.dp) },
         singleLine = true,
-        shape = RoundedCornerShape(50),
+        shape = RoundedCornerShape(8.dp),
         colors = TextFieldDefaults.colors(
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent,

@@ -1,5 +1,9 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.core.ui.OpenCodeRadius
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
+import ai.opencode.feature.drawer.style.drawerCanvas
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.rememberReduceMotion
@@ -9,7 +13,6 @@ import ai.opencode.core.store.observe
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconButton
 import ai.opencode.core.ui.OpenCodeIconButtonStyle
-import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
@@ -230,7 +233,7 @@ fun HomeDrawer(
     Box(
         modifier
             .fillMaxSize()
-            .background(colors.canvas)
+            .background(colors.drawerCanvas)
             // TalkBack reads top to bottom, as VoiceOver reads iOS's header inset, list and bottom
             // bar: the title and search, the list, then New Session and Settings. The bands lie
             // over the full-height list, so without an order TalkBack read the controls first.
@@ -460,8 +463,10 @@ private fun DrawerNewSessionButton(enabled: Boolean, onClick: () -> Unit) {
     val rise = DrawerTunables.footerGlyphRise.value * glyph / 17f
     val tint = if (enabled) colors.text else colors.tertiaryText
     Surface(
-        shape = OpenCodeShape.capsule,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        // The desktop's neutral button: base surface, hairline ring, small radius.
+        shape = RoundedCornerShape(OpenCodeRadius.fill),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)),
         contentColor = tint,
         modifier = Modifier
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
@@ -490,7 +495,7 @@ private fun DrawerNewSessionButton(enabled: Boolean, onClick: () -> Unit) {
             )
             Text(
                 "New Session",
-                style = OpenCodeTextStyles.body.copy(fontWeight = FontWeight.SemiBold),
+                style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium),
                 color = tint,
                 maxLines = 1,
             )
@@ -544,8 +549,9 @@ private fun DrawerFooterTrailing(
             }
         }
         Surface(
-            shape = OpenCodeShape.capsule,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(OpenCodeRadius.fill),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)),
             contentColor = OpenCodeTheme.colors.text,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
