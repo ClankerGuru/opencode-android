@@ -103,7 +103,7 @@ internal fun pasteProblem(text: String): String? {
 
 /** Exchange a one-time pairing link for a token, then connect normally. */
 internal fun validatePairing(text: String): Result<OpenCodePairingLink> {
-    val link = OpenCodePairingLink.decode(text)
+    val link = OpenCodePairingLink.decodeCopied(text)
         ?: return Result.failure(OpenCodeClientError(AppFeature.invalidPairingCodeMessage))
     // `opencode pair` reports whatever the service is bound to. If that's only loopback, no
     // amount of retrying will help — say so precisely.

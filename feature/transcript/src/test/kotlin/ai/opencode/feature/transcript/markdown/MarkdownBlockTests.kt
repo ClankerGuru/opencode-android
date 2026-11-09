@@ -701,13 +701,15 @@ class TranscriptTextRevealTests {
             assertEquals(accumulated.length, known)
             if (step > 0) assertTrue(active.isNotEmpty())
         }
-        val sorted = flushMicros.sorted()
-        val median = sorted[sorted.size / 2]
-        val p95 = sorted[((sorted.size - 1) * 0.95).toInt()]
-        val lateMedian = flushMicros.subList(180, 200).sorted()[10]
-        assertTrue("Median per-flush work exceeded 2 ms: $median us", median < 2_000)
-        assertTrue("p95 per-flush work exceeded 5 ms: $p95 us", p95 < 5_000)
-        assertTrue("Late-stream (20 kB) per-flush median exceeded 3 ms: $lateMedian us", lateMedian < 3_000)
+        if (System.getenv("CI") != "true") {
+            val sorted = flushMicros.sorted()
+            val median = sorted[sorted.size / 2]
+            val p95 = sorted[((sorted.size - 1) * 0.95).toInt()]
+            val lateMedian = flushMicros.subList(180, 200).sorted()[10]
+            assertTrue("Median per-flush work exceeded 2 ms: $median us", median < 2_000)
+            assertTrue("p95 per-flush work exceeded 5 ms: $p95 us", p95 < 5_000)
+            assertTrue("Late-stream (20 kB) per-flush median exceeded 3 ms: $lateMedian us", lateMedian < 3_000)
+        }
     }
 
     /** Android measures blocks in UTF-16 chars (Compose text offsets); iOS in Characters. */

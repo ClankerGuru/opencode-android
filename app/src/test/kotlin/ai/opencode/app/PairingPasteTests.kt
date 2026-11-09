@@ -3,6 +3,7 @@ package ai.opencode.app
 import ai.opencode.core.dependencies.PasteboardClient
 import ai.opencode.core.testing.TestIsolationRule
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
@@ -32,5 +33,14 @@ class PairingPasteTests {
         store.send(AppFeature.Action.ScanPairingCodeTapped) { it.copy(pasteError = null, isScanningPairingCode = true) }
         store.finish()
         effects.skipInFlightEffects()
+    }
+
+    /** QA FB-02 (Android only): the link as a terminal wraps it, or inside the command's whole output, pastes. */
+    @Test
+    fun copiedPairingLinkPastes() {
+        val link = "https://abc.opentunnel.xyz/auth/connect/Ab3_x-9QAb3_x-9QAb3_x-"
+        assertNull(pasteProblem(link.take(50) + "\n" + link.drop(50)))
+        assertNull(pasteProblem("\n  Open a link to connect. Links work once and expire in 5 minutes.\n\n  $link\n\n"))
+        assertEquals("That isn’t a pairing link", pasteProblem("see https://example.com/docs."))
     }
 }
