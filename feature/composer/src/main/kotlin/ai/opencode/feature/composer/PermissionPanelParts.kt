@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.ui.openCodeHairline
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.BorderStroke
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -232,7 +233,8 @@ private fun PermissionBand(text: String) {
 private fun DiffPreview(patch: String, modifier: Modifier = Modifier) {
     val colors = OpenCodeTheme.colors
     val lines = remember(patch) { DiffPreviewLines.lines(patch) }
-    Column(modifier.clip(RoundedCornerShape(RequestTranscriptMetrics.controlCornerRadius))) {
+    // The desktop diff block: a hairline ring around the lines.
+    Column(modifier.clip(RoundedCornerShape(RequestTranscriptMetrics.controlCornerRadius)).openCodeHairline(RoundedCornerShape(RequestTranscriptMetrics.controlCornerRadius))) {
         for (line in lines) {
             val (foreground, fill) = when (line.kind) {
                 DiffPreviewLines.Kind.Added -> colors.diffAddedText to colors.diffAddedFill

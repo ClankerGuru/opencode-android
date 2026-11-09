@@ -1,5 +1,7 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.ui.openCodeHairline
+import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.motionBlurReveal
@@ -670,10 +672,11 @@ fun ComposerPillLabel(
                 .padding(vertical = 5.dp)
                 .clip(OpenCodeShape.control)
                 .indication(interactions, ripple()),
+            // The desktop's floating chip: flat fill, hairline ring, a small raised shadow.
             shape = OpenCodeShape.control,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            tonalElevation = 2.dp,
-            shadowElevation = 2.dp,
+            color = OpenCodeSurfaces.color,
+            border = OpenCodeSurfaces.border,
+            shadowElevation = OpenCodeSurfaces.raisedShadow,
         ) {
             ComposerPillContent(title = title, rolls = rolls, leading = leading)
         }
@@ -779,9 +782,11 @@ fun JumpToLatestPill(
                     Box(
                         Modifier
                             .size(34.dp)
-                            .shadow(2.dp, OpenCodeShape.circle)
-                            .clip(OpenCodeShape.circle)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            // The desktop's floating icon button: rounded square, hairline ring.
+                            .shadow(OpenCodeSurfaces.raisedShadow, OpenCodeShape.control)
+                            .clip(OpenCodeShape.control)
+                            .background(OpenCodeSurfaces.color)
+                            .openCodeHairline(OpenCodeShape.control)
                             .indication(interactions, ripple()),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -813,15 +818,15 @@ fun ComposerBanner(
     iconTint: Color = OpenCodeTheme.colors.secondaryText,
     detail: String? = null,
 ) {
-    // The pressed radius must fit even the minimum-height banner.
-    val radius = OpenCodeShapeGeometry.radius(28f, 52f)
+    // The composer's (desktop dock's) radius, clamped to fit even the minimum-height banner.
+    val radius = OpenCodeShapeGeometry.radius(ComposerTunables.cornerRadius, 52f)
     Surface(
         onClick = onClick,
         modifier = modifier.fillMaxWidth().heightIn(min = 52.dp),
         shape = RoundedCornerShape(radius.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 2.dp,
-        shadowElevation = 2.dp,
+        color = OpenCodeSurfaces.color,
+        border = OpenCodeSurfaces.border,
+        shadowElevation = OpenCodeSurfaces.raisedShadow,
     ) {
         Row(
             Modifier.padding(horizontal = 18.dp, vertical = 8.dp),

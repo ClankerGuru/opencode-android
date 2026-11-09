@@ -1,5 +1,7 @@
 package ai.opencode.feature.drawer.motion
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+import ai.opencode.core.ui.OpenCodeRadius
 import androidx.compose.foundation.BorderStroke
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
@@ -331,8 +333,9 @@ private fun SearchCapsule(
 @Composable
 private fun CancelButton(size: Dp, enabled: Boolean = true, onClick: () -> Unit) {
     Surface(
-        shape = OpenCodeShape.circle,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(OpenCodeRadius.card),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
         contentColor = OpenCodeTheme.colors.text,
         modifier = Modifier
             .size(size)

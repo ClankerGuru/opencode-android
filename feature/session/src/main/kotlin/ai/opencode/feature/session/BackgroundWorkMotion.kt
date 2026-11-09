@@ -88,7 +88,8 @@ object BackgroundWorkMotion {
     val resize: MotionSpring get() = BackgroundWorkTunables.resize
 
     const val capsuleInset: Float = 5f
-    const val panelRadius: Float = 28f
+    /** The desktop dock's 12 (iOS's glass is 28): the capsule is a 34 dp chip with 12 dp corners. */
+    const val panelRadius: Float = 12f
 }
 
 /**

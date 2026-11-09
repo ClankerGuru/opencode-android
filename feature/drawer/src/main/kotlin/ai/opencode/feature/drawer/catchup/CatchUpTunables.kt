@@ -57,8 +57,8 @@ object CatchUpTunables {
     const val revealFraction = 0.78f
 
     // Card
-    /** Card corner radius. */
-    const val cornerRadius = 40f
+    /** Card corner radius (the desktop's 16 for large panels; iOS follows the screen's 40). */
+    const val cornerRadius = 16f
     /** Drag rotation (rad). */
     const val dragRotation = 0.16f
     /** Card side inset. */
