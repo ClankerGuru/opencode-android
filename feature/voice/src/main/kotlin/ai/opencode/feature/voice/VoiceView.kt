@@ -67,6 +67,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
@@ -134,8 +136,8 @@ object ComposerMetrics {
     /** `composer.size.barHeight`. */
     const val barHeight = 56f
 
-    /** `composer.size.cornerRadius`. */
-    const val cornerRadius = 28f
+    /** `composer.size.cornerRadius`; on this branch the desktop dock's 12. */
+    const val cornerRadius = 12f
 
     /** `composer.spacing.innerHorizontal`. */
     const val innerHorizontal = 6f
@@ -146,9 +148,16 @@ object ComposerMetrics {
  * imitation.
  */
 object VoiceCallSurfaceDefaults {
-    /** The composer capsule and the call's cards. */
+    /**
+     * The composer and the call's cards: the desktop dock's raised surface
+     * (`--surface-raised-stronger-non-alpha`, white in light, a step above the canvas in dark).
+     */
     val color: Color
-        @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.surfaceContainerHigh
+        @Composable @ReadOnlyComposable get() = OpenCodeTheme.colors.let { if (it.isDark) it.codeBand else it.canvas }
+
+    /** The dock's hairline ring (`--v2-border-border-base`). */
+    val border: Color
+        @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)
 
     /** `UIColor.tertiarySystemFill`: Mute's soft disc. */
     val tertiaryFill: Color
@@ -165,20 +174,29 @@ object VoiceCallSurfaceDefaults {
         @Composable @ReadOnlyComposable get() = OpenCodeTheme.colors.destructive
 }
 
-/** A call surface: tonal fill with a soft shadow (iOS `openCodeGlass(in:)`). */
-fun Modifier.callSurface(shape: Shape, color: Color): Modifier = graphicsLayer {
+/**
+ * A call surface: the desktop dock's flat fill, a hairline [border] and a small raised shadow
+ * (`--v2-elevation-raised`), instead of iOS glass.
+ */
+fun Modifier.callSurface(shape: Shape, color: Color, border: Color = Color.Unspecified): Modifier = graphicsLayer {
     this.shape = shape
-    shadowElevation = 3.dp.toPx()
-    clip = false
-}.background(color, shape)
-
-/** Animated geometry is observed by the layer/draw scopes, never by composition. */
-private fun Modifier.callSurface(shape: () -> Shape, color: Color): Modifier = graphicsLayer {
-    this.shape = shape()
-    shadowElevation = 3.dp.toPx()
+    shadowElevation = 1.5.dp.toPx()
     clip = false
 }.drawBehind {
-    drawOutline(shape().createOutline(size, layoutDirection, this), color)
+    val outline = shape.createOutline(size, layoutDirection, this)
+    drawOutline(outline, color)
+    if (border.isSpecified) drawOutline(outline, border, style = Stroke(1.dp.toPx()))
+}
+
+/** Animated geometry is observed by the layer/draw scopes, never by composition. */
+private fun Modifier.callSurface(shape: () -> Shape, color: Color, border: Color = Color.Unspecified): Modifier = graphicsLayer {
+    this.shape = shape()
+    shadowElevation = 1.5.dp.toPx()
+    clip = false
+}.drawBehind {
+    val outline = shape().createOutline(size, layoutDirection, this)
+    drawOutline(outline, color)
+    if (border.isSpecified) drawOutline(outline, border, style = Stroke(1.dp.toPx()))
 }
 
 /** Touches on this element and its children are dropped (iOS `.allowsHitTesting(false)` over content that shouldn't act). */
@@ -413,6 +431,7 @@ fun ComposerSurface(
         label = "expansionDim",
     )
     val surfaceColor = VoiceCallSurfaceDefaults.color
+    val surfaceBorder = VoiceCallSurfaceDefaults.border
     val cornerRadius = ComposerMetrics.cornerRadius
     val showsExpansion = activeExpansion?.isShown == true || (activeExpansion != null && expansionReach > 0)
     val glassFullAlpha by animateFloatAsState(if (surfaceExpanded) 1f else 0f, Motion.reducedFadeSpec(), label = "surfaceFull")
@@ -441,11 +460,11 @@ fun ComposerSurface(
                         Modifier
                             .fillMaxSize()
                             .graphicsLayer { alpha = 1f - glassFullAlpha }
-                            .callSurface({ TopInsetRect(extent(), cornerRadius) }, surfaceColor),
+                            .callSurface({ TopInsetRect(extent(), cornerRadius) }, surfaceColor, surfaceBorder),
                     )
-                    Box(Modifier.fillMaxSize().graphicsLayer { alpha = glassFullAlpha }.callSurface(RoundedCornerShape(cornerRadius.dp), surfaceColor))
+                    Box(Modifier.fillMaxSize().graphicsLayer { alpha = glassFullAlpha }.callSurface(RoundedCornerShape(cornerRadius.dp), surfaceColor, surfaceBorder))
                 } else {
-                    Box(Modifier.fillMaxSize().callSurface({ TopInsetRect(unrevealed(), cornerRadius) }, surfaceColor))
+                    Box(Modifier.fillMaxSize().callSurface({ TopInsetRect(unrevealed(), cornerRadius) }, surfaceColor, surfaceBorder))
                 }
             }
             Box(

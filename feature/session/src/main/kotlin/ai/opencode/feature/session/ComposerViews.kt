@@ -117,7 +117,8 @@ enum class ComposerTextStyle(val rawValue: String) {
  */
 object ComposerTunables {
     const val barHeight = 56f
-    const val cornerRadius = 28f
+    /** The desktop dock's 12 (iOS's capsule is 28). */
+    const val cornerRadius = 12f
     val textStyle = ComposerTextStyle.body
 
     const val horizontalMargin = 20f
@@ -610,7 +611,8 @@ fun ComposerControlLabel(
         modifier
             .offset(x = visualOffsetX.dp)
             .size(diameter.dp)
-            .background(background, OpenCodeShape.circle),
+            // The desktop's submit button: a rounded square, not a circle.
+            .background(background, RoundedCornerShape(8.dp)),
         contentAlignment = Alignment.Center,
     ) {
         if (showsProgress) {
