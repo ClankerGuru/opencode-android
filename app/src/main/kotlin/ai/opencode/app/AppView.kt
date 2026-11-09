@@ -18,6 +18,8 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.ThisDevice
+import ai.opencode.core.ui.accessibilityFocusRequest
+import ai.opencode.core.ui.rememberAccessibilityFocusRequest
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.HomeView
 import ai.opencode.feature.media.MediaFeature
@@ -64,6 +66,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -646,9 +649,16 @@ private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>)
     val isConnectDisabled = state.connectionProgressLabel != null || state.serverURL.isBlank() || state.headerProblem != null
     val attempt = state.errorContext?.attempt
     LaunchedEffect(attempt) { if (attempt != null) scroll.animateScrollTo(0) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // TalkBack starts on the title, not the scrim or the drag handle, as VoiceOver starts in
+    // iOS's navigation bar: one move once the sheet has opened, after TalkBack's own first focus
+    // in the new window, which would otherwise land after it.
+    var hasOpened by remember { mutableStateOf(false) }
+    LaunchedEffect(sheetState.currentValue) { if (sheetState.currentValue == SheetValue.Expanded) hasOpened = true }
+    val titleFocus = rememberAccessibilityFocusRequest(Unit.takeIf { hasOpened })
     ModalBottomSheet(
         onDismissRequest = { store.send(AppFeature.Action.CancelEditingTapped) },
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = sheetState,
     ) {
         // Its password and headers, out of problem reports and voice screenshots.
         HidesFromScreenshots()
@@ -657,7 +667,7 @@ private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>)
                 if (state.editingSavedServer == null) "New Server" else "Edit Server",
                 style = OpenCodeTextStyles.headline,
                 color = OpenCodeTheme.colors.text,
-                modifier = Modifier.semantics { heading() },
+                modifier = Modifier.accessibilityFocusRequest(titleFocus).semantics { heading() },
             )
             TextButton(
                 onClick = { store.send(AppFeature.Action.CancelEditingTapped) },
