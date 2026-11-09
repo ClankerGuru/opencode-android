@@ -81,8 +81,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
@@ -427,9 +430,12 @@ private fun CopyCommand(command: String, onCopy: (String) -> Unit) {
         },
         shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        // The label stands in for the visible command (cleared below), read once as a button
+        // (iOS `.accessibilityLabel("Copy \(command)")` on a `Button`).
         modifier = Modifier.heightIn(min = 48.dp).semantics {
             contentDescription = "Copy $command"
             stateDescription = if (copied) "Copied" else ""
+            role = Role.Button
         },
     ) {
         Row(
@@ -439,7 +445,7 @@ private fun CopyCommand(command: String, onCopy: (String) -> Unit) {
         ) {
             Text(
                 command,
-                modifier = Modifier.weight(1f, fill = false),
+                modifier = Modifier.weight(1f, fill = false).clearAndSetSemantics {},
                 // Berkeley Mono's contextual alternates join `//` and `--` into ligatures that
                 // read as `https: //`; a command to retype is drawn as typed.
                 style = OpenCodeTextStyles.callout.copy(
