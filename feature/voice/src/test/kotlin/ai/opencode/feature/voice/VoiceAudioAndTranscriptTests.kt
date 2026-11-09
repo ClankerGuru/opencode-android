@@ -703,6 +703,70 @@ class VoiceAudioRecoveryTests {
         call.stop()
         assertTrue(call.events.toList().isEmpty())
     }
+
+    @Test fun configurationChangeAndAtEarFailuresNeverCrashEngineScope() = engineTest {
+        val owner = AudioSessionOwner(schedule = { _, _ -> })
+        val delegate = FakeVoiceAudioSession(emptyList())
+        var simulatedMode = android.media.AudioManager.MODE_IN_COMMUNICATION
+        var routeError: RuntimeException? = null
+        var routeObserver: (() -> Unit)? = null
+        val session = object : VoiceAudioSessionControlling by delegate {
+            override val mode: Int get() = simulatedMode
+            override fun route(atEar: Boolean, demo: Boolean) {
+                routeError?.let { throw it }
+                delegate.route(atEar, demo)
+            }
+            override fun observe(id: java.util.UUID, focus: (Int) -> Unit, route: () -> Unit) {
+                routeObserver = route
+            }
+            override fun unobserve(id: java.util.UUID) {
+                routeObserver = null
+            }
+        }
+        val engine = VoiceAudioEngine(
+            atEar = false, demo = false, clock = SettleClock, session = session, owner = owner,
+            note = { _, _ -> }, externalOwner = true, externalControl = FakeExternalAudioControl(delegate), lab = null,
+        )
+        val uncaught = java.util.Collections.synchronizedList(mutableListOf<Throwable>())
+        val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { _, error -> uncaught += error }
+        try {
+            val call = engine.start()
+            val triggerRoute = requireNotNull(routeObserver)
+
+            // 1. Mode changed to MODE_RINGTONE before audio-focus loss arrives, and Bluetooth/USB
+            // communication device disappeared mid-route: session.route throws IllegalArgumentException
+            // and session.activate throws VoiceAudioError.engineRejected on the engine's IO scope.
+            simulatedMode = android.media.AudioManager.MODE_RINGTONE
+            routeError = IllegalArgumentException("Invalid communication device")
+            delegate.onActivate = { throw VoiceAudioError.engineRejected("Activating call audio", "audio focus denied") }
+            delegate.clearEvents()
+            triggerRoute()
+            assertTrue(pollUntil { delegate.events.contains(Event.SetActive(true)) })
+            delay(40)
+            assertTrue("Uncaught on engine scope: $uncaught", uncaught.isEmpty())
+            assertTrue(engine.running)
+
+            // 2. RaiseToEar toggling while communication device is invalid does not crash caller.
+            call.setAtEar(true)
+            call.setAtEar(false)
+            assertTrue("Uncaught after setAtEar: $uncaught", uncaught.isEmpty())
+
+            // 3. Once the competing ringtone clears, the next route/mode notification restores communication mode.
+            routeError = null
+            delegate.onActivate = null
+            simulatedMode = android.media.AudioManager.MODE_NORMAL
+            delegate.clearEvents()
+            triggerRoute()
+            assertTrue(pollUntil { delegate.events.contains(Event.Route(false)) })
+            call.stop()
+            assertEquals(1, delegate.events.count { it == Event.Deactivated })
+            assertEquals(0, owner.activeCount)
+            assertEquals(listOf(VoiceAudioEvent.routeChanged), call.events.toList())
+        } finally {
+            Thread.setDefaultUncaughtExceptionHandler(previousHandler)
+        }
+    }
 }
 
 /**
