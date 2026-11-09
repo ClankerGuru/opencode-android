@@ -83,10 +83,10 @@ object OnePickerTunables {
     const val KEYBOARD_GAP = 6.0
 
     /** "Top corners" (16…48). */
-    const val TOP_RADIUS = 32.0
+    const val TOP_RADIUS = 16.0
 
     /** "Bottom corners" (16…56). */
-    const val BOTTOM_RADIUS = 46.0
+    const val BOTTOM_RADIUS = 16.0
 
     /** "Row height" (44…62). */
     const val ROW_HEIGHT = 50.0

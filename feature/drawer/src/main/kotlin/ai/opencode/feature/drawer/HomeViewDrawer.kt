@@ -82,7 +82,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
-import androidx.compose.material3.AlertDialog
+import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -430,7 +430,7 @@ private fun rowMenu(store: StoreOf<HomeFeature.State, HomeFeature.Action>, row: 
 fun HomeDeleteConfirmation(store: StoreOf<HomeFeature.State, HomeFeature.Action>) {
     val pending by store.observe { it.pendingDeletion }
     val session = pending ?: return
-    AlertDialog(
+    OpenCodeAlertDialog(
         onDismissRequest = { store.send(HomeFeature.Action.DeleteSessionCancelled) },
         title = { Text("Delete “" + session.title + "”?") },
         text = { Text("This removes the session from the server for all clients.") },

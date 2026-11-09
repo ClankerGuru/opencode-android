@@ -26,7 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
+import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -177,7 +177,7 @@ fun PairingScannerView(
             }
         }
         if (pasteFailed) {
-            AlertDialog(
+            OpenCodeAlertDialog(
                 onDismissRequest = { pasteFailed = false },
                 confirmButton = { TextButton(onClick = { pasteFailed = false }) { Text("OK") } },
                 title = { Text("Nothing to Paste") },

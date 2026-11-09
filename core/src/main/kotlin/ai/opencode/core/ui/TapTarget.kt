@@ -1,7 +1,9 @@
 package ai.opencode.core.ui
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -62,7 +64,11 @@ enum class OpenCodeIconButtonStyle {
     /** Bare glyph (toolbar icons; iOS plain buttons inside a shared glass bar). */
     Standard,
 
-    /** Tonal circle (iOS `openCodeGlassCircle`: a standalone round glass control). */
+    /**
+     * A standalone control (iOS `openCodeGlassCircle`). On this branch it is the desktop's
+     * neutral icon button: a rounded square on the base surface with a hairline ring, or a
+     * filled rounded square when tinted. The name is kept so call sites match iOS.
+     */
     Circle,
 }
 
@@ -95,16 +101,17 @@ fun OpenCodeIconButton(
             OpenCodeIcon(symbol, contentDescription = contentDescription, size = iconSize)
         }
         OpenCodeIconButtonStyle.Circle -> {
-            val container = tint ?: MaterialTheme.colorScheme.surfaceContainerHighest
-            FilledTonalIconButton(
+            val container = tint ?: MaterialTheme.colorScheme.surface
+            OutlinedIconButton(
                 onClick = onClick,
                 modifier = face,
                 enabled = enabled,
-                shape = OpenCodeShape.circle,
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                shape = RoundedCornerShape(OpenCodeRadius.card),
+                colors = IconButtonDefaults.outlinedIconButtonColors(
                     containerColor = container,
                     contentColor = tint?.highContrastForeground() ?: OpenCodeTheme.colors.text,
                 ),
+                border = if (tint == null) BorderStroke(1.dp, OpenCodeTheme.colors.border) else null,
             ) {
                 OpenCodeIcon(symbol, contentDescription = contentDescription, size = iconSize)
             }

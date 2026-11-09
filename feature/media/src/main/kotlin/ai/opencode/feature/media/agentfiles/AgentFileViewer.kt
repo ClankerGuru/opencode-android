@@ -42,7 +42,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
+import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -309,7 +309,7 @@ private fun AgentFilePageContent(
     }
 
     model.shareError?.let { error ->
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = { model.shareError = null },
             title = { Text("Couldn’t Share File") },
             text = { Text(error.detail) },

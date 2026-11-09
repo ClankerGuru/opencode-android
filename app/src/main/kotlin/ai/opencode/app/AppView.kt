@@ -69,7 +69,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
+import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -214,7 +214,7 @@ private fun AppAlerts(store: StoreOf<AppFeature.State, AppFeature.Action>) {
     systemActionError?.let { ErrorAlert("Couldn’t Open Session", it) { store.send(AppFeature.Action.SystemActionErrorDismissed) } }
     pairingError?.let { ErrorAlert("Couldn’t Pair with Server", it) { store.send(AppFeature.Action.PairingErrorDismissed) } }
     pendingPairing?.let { pending ->
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = { store.send(AppFeature.Action.PairingCancelled(pending.id)) },
             title = { Text(pending.title) },
             text = { Text(pending.message) },
@@ -226,7 +226,7 @@ private fun AppAlerts(store: StoreOf<AppFeature.State, AppFeature.Action>) {
 
 @Composable
 private fun ErrorAlert(title: String, message: String, onDismiss: () -> Unit) {
-    AlertDialog(
+    OpenCodeAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { Text(message) },
@@ -579,7 +579,7 @@ private fun SavedServerList(store: StoreOf<AppFeature.State, AppFeature.Action>,
         }
     }
     pendingRemoval?.let { server ->
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = { pendingRemoval = null },
             title = { Text("Remove ${server.displayName}?") },
             text = { Text("This forgets the address and password on this ${ThisDevice.name}. Sessions on the server are not affected.") },
@@ -895,14 +895,16 @@ private fun ConnectButton(label: String, inProgress: Boolean, enabled: Boolean, 
             disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             disabledContentColor = colors.secondaryText,
         ),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 12.dp),
-        modifier = modifier.fillMaxWidth().heightIn(min = 52.dp),
+        // The desktop's contrast button: small radius, medium label.
+        shape = RoundedCornerShape(OpenCodeRadius.fill),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+        modifier = modifier.fillMaxWidth().heightIn(min = 48.dp),
     ) {
         if (inProgress) {
             CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = colors.secondaryText)
             Spacer(Modifier.width(10.dp))
         }
-        Text(label, style = OpenCodeTextStyles.headline)
+        Text(label, style = PairingActionLabel)
         Spacer(Modifier.weight(1f))
         OpenCodeIcon(SFSymbol.ArrowRight, contentDescription = null)
     }

@@ -32,9 +32,16 @@ object OpenCodeRadius {
     val sheet: Dp = 16.dp
 }
 
-/** Shapes for the iOS forms: capsules and circles stay capsules and circles. */
+/**
+ * Shapes for the iOS forms. [capsule] and [circle] stay true capsules and circles (grabbers,
+ * dots, avatars); controls that iOS draws as glass capsules use [control], the desktop's small
+ * rounded rectangle.
+ */
 object OpenCodeShape {
     val capsule = RoundedCornerShape(percent = 50)
+
+    /** Buttons, pills and fields (desktop `--radius-md`/`-lg` at phone size). */
+    val control = RoundedCornerShape(OpenCodeRadius.fill)
     val circle = CircleShape
     val card = RoundedCornerShape(OpenCodeRadius.card)
     val panel = RoundedCornerShape(OpenCodeRadius.panel)
@@ -46,12 +53,13 @@ object OpenCodeShape {
 }
 
 /**
- * Material shape scale from the desktop radii: extraSmall 4, small 6, medium 8, large 10,
- * extraLarge 16. Material components read these (menus small, cards medium, dialogs and
+ * Material shape scale from the desktop radii: extraSmall 6, small 6, medium 8, large 10,
+ * extraLarge 16. Material components read these (text fields and menus extraSmall, dialogs and
  * sheets extraLarge).
  */
 val OpenCodeShapes = Shapes(
-    extraSmall = RoundedCornerShape(OpenCodeRadius.xs),
+    // Text fields and menus: the desktop's 6 px input and context-menu radius.
+    extraSmall = RoundedCornerShape(OpenCodeRadius.sm),
     small = RoundedCornerShape(OpenCodeRadius.sm),
     medium = RoundedCornerShape(OpenCodeRadius.fill),
     large = RoundedCornerShape(OpenCodeRadius.card),

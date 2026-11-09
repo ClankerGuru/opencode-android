@@ -1,5 +1,7 @@
 package ai.opencode.feature.composer.modelpicker
 
+import ai.opencode.core.ui.OpenCodeSurfaces
+import ai.opencode.core.ui.openCodeHairline
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticEffect
 import ai.opencode.core.ui.OpenCodeIcon
@@ -109,9 +111,12 @@ import kotlin.math.roundToInt
 // tunables default. Coordinates are dp in the overlay's own space (the session's root box).
 // The DEBUG-only probes (window space, glass, chip, composer, integrity readout) are n/a.
 
-/** One Picker's surface colour: the composer's (so the morph reads as one surface). */
+/**
+ * One Picker's surface colour: the composer's (so the morph reads as one surface), on this branch
+ * the desktop's floating surface with a hairline ring.
+ */
 object OnePickerSurfaceDefaults {
-    val color: Color @Composable get() = MaterialTheme.colorScheme.surfaceContainerHigh
+    val color: Color @Composable get() = OpenCodeSurfaces.color
 }
 
 /** iOS's swipe-to-favorite fill, `UIColor(red: 0.92, green: 0.68, blue: 0.10)`. */
@@ -141,8 +146,9 @@ fun OnePickerGlassBackdrop(controller: OnePickerController, modifier: Modifier =
                 .offset { IntOffset(rect.left.dp.roundToPx(), rect.top.dp.roundToPx()) }
                 .requiredSize(rect.width.dp, rect.height.dp)
                 .graphicsLayer { alpha = pose.glassOpacity.toFloat().coerceIn(0f, 1f) }
-                .shadow(3.dp, shape, clip = false)
-                .background(color, shape),
+                .shadow(OpenCodeSurfaces.popoverShadow, shape, clip = false)
+                .background(color, shape)
+                .openCodeHairline(shape),
         )
     }
 }

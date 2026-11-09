@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer.motion
 
+import androidx.compose.foundation.BorderStroke
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
@@ -281,8 +282,10 @@ private fun SearchCapsule(
     val leading by animateFloatAsState(leadingPadding.value, DrawerSearchPillDefaults.morph.spec(), label = "search-leading")
     val trailing by animateFloatAsState(trailingPadding.value, DrawerSearchPillDefaults.morph.spec(), label = "search-trailing")
     Surface(
-        shape = OpenCodeShape.capsule,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        // The desktop's search input: base surface, hairline ring, small radius.
+        shape = OpenCodeShape.control,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
         contentColor = OpenCodeTheme.colors.text,
         modifier = modifier
             .height(size)

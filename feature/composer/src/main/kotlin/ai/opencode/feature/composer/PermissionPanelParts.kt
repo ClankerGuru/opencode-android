@@ -1,5 +1,7 @@
 package ai.opencode.feature.composer
 
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.BorderStroke
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.server.model.OpenCodePermissionRequest
@@ -92,7 +94,7 @@ object RequestTunables {
     /** `requests.permission.labelHeight`: the action label's height (20…44); with the button's padding, a 48 dp target. */
     val labelHeight = 30.dp
     /** `requests.permission.buttonRadius`: the actions' corner radius (6…24), the card's family rather than a capsule. */
-    val buttonRadius = 14.dp
+    val buttonRadius = 8.dp
 }
 
 /** iOS `TranscriptMetrics` fonts and corner the request panel borrows (the transcript module sits beside this one). */
@@ -102,7 +104,7 @@ internal object RequestTranscriptMetrics {
     /** `TranscriptMetrics.codeFont`: subheadline, monospaced. */
     val codeFont: TextStyle get() = OpenCodeTextStyles.subheadline.copy(fontFamily = OpenCodeFonts.monospace)
     /** `TranscriptMetrics.controlCornerRadius`. */
-    val controlCornerRadius = 10.dp
+    val controlCornerRadius = 6.dp
     /** `TranscriptBandStyle.verticalPadding`: from a hairline to the content's first line box. */
     val bandVerticalPadding = 12.dp
 }
@@ -110,7 +112,7 @@ internal object RequestTranscriptMetrics {
 /**
  * A permission action (iOS `requestPermissionButtonShape()` inside the shared button
  * styles): normal height, its corners [RequestTunables.buttonRadius]. Primary is the
- * accent fill (Always Allow), secondary the neutral tonal one (Allow Once).
+ * accent fill (Always Allow), secondary the desktop's neutral hairline one (Allow Once).
  */
 @Composable
 internal fun RequestPermissionButton(
@@ -126,7 +128,13 @@ internal fun RequestPermissionButton(
     if (primary) {
         Button(onClick, sized, enabled, shape = shape, colors = ButtonDefaults.buttonColors(), contentPadding = padding, content = content)
     } else {
-        FilledTonalButton(onClick, sized, enabled, shape = shape, colors = ButtonDefaults.filledTonalButtonColors(), contentPadding = padding, content = content)
+        // The desktop's neutral button: base surface and a hairline, not a tonal fill.
+        FilledTonalButton(
+            onClick, sized, enabled, shape = shape,
+            colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = OpenCodeTheme.colors.text),
+            border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
+            contentPadding = padding, content = content,
+        )
     }
 }
 

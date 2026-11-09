@@ -36,7 +36,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.AlertDialog
+import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -182,7 +182,7 @@ fun ShellOutputView(
         }
     }
     if (state.isConfirmingStop) {
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = { store.send(ShellOutputFeature.Action.IsConfirmingStopChanged(false)) },
             title = { Text("Stop This Shell?") },
             text = { Text("The command ends now. The output shown here stays until you close it.") },

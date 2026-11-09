@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
@@ -1077,7 +1078,7 @@ private fun CardControls(
                 Row(
                     Modifier
                         .heightIn(min = header)
-                        .clip(RoundedCornerShape(percent = 50))
+                        .clip(OpenCodeShape.control)
                         .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                         .then(
                             if (interactive) {

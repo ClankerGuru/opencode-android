@@ -1,5 +1,7 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.ui.OpenCodeSurfaces
+import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
@@ -128,12 +130,12 @@ object RequestDockMetrics {
     val scrollFloor: Dp = 64.dp
     /** One edge for the caption, the question, the marks, and the bands. */
     val edge: Dp = 20.dp
-    /** The composer's glass, which the panel shares. */
-    val cornerRadius: Dp = 28.dp
+    /** The composer's surface, which the panel shares (the desktop dock's 12; iOS's glass is 28). */
+    val cornerRadius: Dp = 12.dp
     /** × is a circle centred on the glass's top-trailing corner arc, so its edge runs concentric with the glass's corner. */
     val closeSize: Dp = 34.dp
-    /** The header's row is centred on that arc too. */
-    val headerTop: Dp = cornerRadius - 22.dp
+    /** The header row's inset from the top (iOS centres it on the 28 pt corner arc: 6). */
+    val headerTop: Dp = 6.dp
     /** How far a request's content rises out of the bar as it arrives. */
     val rise: Dp = 28.dp
     /** The blur a request's content sharpens in from and blurs away to (iOS `.blur(radius: 8)`). */
@@ -537,10 +539,10 @@ private class DockScope(
     fun CloseButton(busy: Boolean) {
         val colors = OpenCodeTheme.colors
         val idle = dock.respondingRequestIDs.isEmpty()
-        // Its centre on the corner arc's: `cornerRadius` in from the edge.
+        // Where iOS centres it on the corner arc; the desktop's small corner keeps that place.
         Box(
             Modifier
-                .outset(end = RequestDockMetrics.edge - (RequestDockMetrics.cornerRadius - 22.dp))
+                .outset(end = RequestDockMetrics.edge - RequestDockMetrics.headerTop)
                 .size(48.dp)
                 // iOS hint “Tells the agent what’s in your answer instead”: TalkBack reads “Double-tap to tell…”.
                 .clickable(enabled = enabled && idle && !busy, onClickLabel = "Tell the agent what’s in your answer instead", role = Role.Button) {
@@ -553,7 +555,8 @@ private class DockScope(
             Box(
                 Modifier
                     .size(RequestDockMetrics.closeSize)
-                    .clip(OpenCodeShape.circle)
+                    // The desktop's ghost icon button: a small rounded square.
+                    .clip(RoundedCornerShape(OpenCodeRadius.fill))
                     .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                 contentAlignment = Alignment.Center,
             ) {
@@ -1068,7 +1071,12 @@ private class DockScope(
                             onDismissRequest = { state.scopeShownForID = null },
                             properties = PopupProperties(focusable = true),
                         ) {
-                            Surface(shape = OpenCodeShape.card, tonalElevation = 3.dp, shadowElevation = 8.dp) {
+                            Surface(
+                                shape = OpenCodeSurfaces.popoverShape,
+                                color = OpenCodeSurfaces.color,
+                                border = OpenCodeSurfaces.border,
+                                shadowElevation = OpenCodeSurfaces.popoverShadow,
+                            ) {
                                 PermissionScopeConfirm(save, confirm = {
                                     state.scopeShownForID = null
                                     state.sentAction = DockAction.Always

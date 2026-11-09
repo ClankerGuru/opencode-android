@@ -40,7 +40,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
+import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
@@ -198,7 +198,7 @@ fun ServerDetailsPage(store: SettingsStore) {
 @Composable
 private fun CodeAlert(instructions: String, send: (ServerDetailsFeature.Action) -> Unit) {
     var code by rememberSaveable { mutableStateOf("") }
-    AlertDialog(
+    OpenCodeAlertDialog(
         onDismissRequest = { send(ServerDetailsFeature.Action.CodeCancelled) },
         title = { Text("Paste the Code") },
         text = {

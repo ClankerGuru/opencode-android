@@ -169,8 +169,7 @@ internal object SystemColors {
  * | secondaryContainer / onSecondaryContainer | surfaceStrong (secondary buttons) / text |
  * | tertiary / onTertiary | link / white (System) or the link's high-contrast foreground (themes) |
  * | background, surface, surfaceContainerLowest | canvas |
- * | surfaceContainerLow | canvasWeak (grouped canvas, light) |
- * | surfaceContainer | canvasWeak ↔ userBubble midpoint |
+ * | surfaceContainerLow, surfaceContainer | System: canvasWeak / canvasWeak ↔ userBubble midpoint; curated themes: the desktop's floating surface ([floating]: canvas in light, codeBand in dark), so sheets, menus and tooltips are flat floating panels |
  * | surfaceContainerHigh, surfaceVariant | userBubble |
  * | surfaceContainerHighest | surfaceStrong |
  * | onSurface / onSurfaceVariant | text / secondary text |
@@ -190,6 +189,8 @@ fun OpenCodeColors.toColorScheme(): ColorScheme {
     val outlineVariant = (if ((!system && highContrast) || strongBorders) v.borderStrong else v.border).composited(canvas)
     val error = if (system) SystemColors.red(isDark) else v.diffRemovedText
     val container = v.canvasWeak.mixedInOklab(v.userBubble, 0.5)
+    // Desktop floating surfaces (sheets, menus, popovers): white in light, a step up in dark.
+    val floatingSurface = if (isDark) v.codeBand.composited(canvas) else canvas
     val primaryContainer = canvas.mixedInOklab(accent, 0.22)
     val errorContainer = (if (system) SystemColors.red(isDark).withAlpha(0.14) else v.glassDiffRemovedFill).composited(canvas)
     val surfaceBright = if (isDark) v.surfaceStrong else canvas
@@ -232,10 +233,10 @@ fun OpenCodeColors.toColorScheme(): ColorScheme {
         outlineVariant = outlineVariant.color,
         surfaceBright = surfaceBright.color,
         surfaceDim = surfaceDim.color,
-        surfaceContainer = container.color,
+        surfaceContainer = (if (system) container else floatingSurface).color,
         surfaceContainerHigh = v.userBubble.color,
         surfaceContainerHighest = v.surfaceStrong.color,
-        surfaceContainerLow = v.canvasWeak.color,
+        surfaceContainerLow = (if (system) v.canvasWeak else floatingSurface).color,
         surfaceContainerLowest = canvas.color,
         scrim = Color.Black,
     )

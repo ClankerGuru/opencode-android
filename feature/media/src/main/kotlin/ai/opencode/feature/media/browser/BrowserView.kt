@@ -271,7 +271,7 @@ private fun Bar(store: StoreOf<BrowserFeature.State, BrowserFeature.Action>, pag
     val isAsking = page?.isAsking == true
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         Surface(
-            shape = OpenCodeShape.capsule,
+            shape = OpenCodeShape.control,
             tonalElevation = 3.dp,
             shadowElevation = 2.dp,
             modifier = Modifier
@@ -464,7 +464,7 @@ private fun ReplyCapsule(
         BrowserReplyStatus.Working -> "Working"
     }
     Surface(
-        shape = OpenCodeShape.capsule,
+        shape = OpenCodeShape.control,
         tonalElevation = 3.dp,
         shadowElevation = 2.dp,
         modifier = Modifier

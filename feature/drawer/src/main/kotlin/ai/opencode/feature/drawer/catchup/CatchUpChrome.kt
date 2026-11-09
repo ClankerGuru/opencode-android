@@ -172,7 +172,7 @@ private fun CatchUpUndoButton(canUndo: Boolean, onClick: () -> Unit) {
     FilledTonalButton(
         onClick = onClick,
         enabled = canUndo,
-        shape = OpenCodeShape.capsule,
+        shape = OpenCodeShape.control,
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
         colors = ButtonDefaults.filledTonalButtonColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,

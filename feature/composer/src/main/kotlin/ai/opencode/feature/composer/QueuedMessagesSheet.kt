@@ -407,7 +407,7 @@ private fun QueuedRowActions(onCancel: () -> Unit, onSendNow: () -> Unit, modifi
         ) {
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.size(30.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape),
+                modifier = Modifier.size(30.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(8.dp)),
             ) {
                 OpenCodeIcon(SFSymbol.ArrowUp, contentDescription = null, size = OpenCodeIconSize.small, tint = OpenCodeTheme.colors.text)
             }

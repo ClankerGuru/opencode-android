@@ -72,7 +72,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
+import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -194,7 +194,7 @@ fun ShareView(state: ShareModel.State, actions: ShareActions) {
     }
 
     state.saveError?.let { error ->
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = actions.onDismissSaveError,
             title = { Text("Couldn’t Save for OpenCode") },
             text = { Text(error) },
@@ -710,7 +710,7 @@ private fun Chip(
     val foreground = if (selected) colors.canvas else colors.text
     Box(
         Modifier
-            .clip(OpenCodeShape.capsule)
+            .clip(OpenCodeShape.control)
             .clickable(onClickLabel = hint, role = Role.Button, onClick = onClick)
             .openCodeTapTarget(accessibility = false)
             .semantics {
@@ -723,7 +723,7 @@ private fun Chip(
             Modifier
                 .clearAndSetSemantics {}
                 .height(36.dp)
-                .background(container, OpenCodeShape.capsule)
+                .background(container, OpenCodeShape.control)
                 .padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(5.dp),

@@ -44,7 +44,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
+import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -217,7 +217,7 @@ fun VoiceCallLogList(
     }
 
     if (confirmingDeleteAll) {
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = { confirmingDeleteAll = false },
             title = { Text("Delete all voice calls?") },
             confirmButton = {

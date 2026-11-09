@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings.connection
 
+import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
@@ -61,7 +62,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.AlertDialog
+import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -585,7 +586,7 @@ private fun RetryLabel(
 ) {
     Box(
         modifier
-            .clip(RoundedCornerShape(50))
+            .clip(OpenCodeShape.control)
             .background(OpenCodeTheme.colors.text.copy(alpha = 0.11f))
             .indication(interaction, ripple())
             .height(30.dp)
@@ -696,7 +697,7 @@ fun ServerPage(store: SettingsStore) {
     }
 
     if (renaming) {
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = { renaming = false },
             title = { Text("Rename Server") },
             text = {

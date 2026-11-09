@@ -668,9 +668,9 @@ fun ComposerPillLabel(
             modifier = Modifier
                 .then(if (accessibilityLabel != null) Modifier.clearAndSetSemantics {} else Modifier)
                 .padding(vertical = 5.dp)
-                .clip(OpenCodeShape.capsule)
+                .clip(OpenCodeShape.control)
                 .indication(interactions, ripple()),
-            shape = OpenCodeShape.capsule,
+            shape = OpenCodeShape.control,
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = 2.dp,
             shadowElevation = 2.dp,

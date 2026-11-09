@@ -66,7 +66,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
+import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -406,7 +406,7 @@ fun rememberSessionAttachmentImporter(store: StoreOf<SessionFeature.State, Sessi
 fun SessionAttachmentAlerts(importer: SessionAttachmentImporter) {
     val error = importer.attachmentError
     if (error != null) {
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = { importer.attachmentError = null },
             title = { Text("Couldn’t Add Image") },
             text = { Text(error) },
@@ -415,7 +415,7 @@ fun SessionAttachmentAlerts(importer: SessionAttachmentImporter) {
     }
     val upload = importer.largeUpload
     if (upload != null) {
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = importer::cancelLargeUpload,
             title = { Text(upload.title) },
             text = { Text(upload.message) },

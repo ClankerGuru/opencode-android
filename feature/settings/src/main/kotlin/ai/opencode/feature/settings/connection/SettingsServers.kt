@@ -24,7 +24,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
+import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
@@ -121,7 +121,7 @@ fun SettingsServersSection(
     }
 
     renaming?.let { server ->
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = { renaming = null },
             title = { Text("Rename Server") },
             text = {
@@ -148,7 +148,7 @@ fun SettingsServersSection(
     }
 
     removing?.let { server ->
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = { removing = null },
             title = { Text("Remove ${server.friendlyName}?") },
             text = { Text("This forgets the address and password on this ${ai.opencode.core.ui.ThisDevice.name}. Sessions on the server are not affected.") },
