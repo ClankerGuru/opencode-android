@@ -233,7 +233,8 @@ fun SettingsRowFrame(
  */
 @Composable
 fun SettingsRowText(title: String, summary: String?, modifier: Modifier = Modifier) {
-    Column(modifier) {
+    // Inter's tight line height sets the summary right against the title without a small gap.
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(title, style = SettingsText.title, color = OpenCodeTheme.colors.text)
         if (summary != null) {
             Text(
