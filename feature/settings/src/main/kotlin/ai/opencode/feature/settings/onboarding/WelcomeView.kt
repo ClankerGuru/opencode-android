@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings.onboarding
 
+import ai.opencode.core.ui.OpenCodeSheetDefaults
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.draw.clip
@@ -328,6 +329,7 @@ private fun WelcomeOtherWays(pasteError: String?, send: (WelcomeFeature.Action) 
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
         dragHandle = { OpenCodeSheetHandle() },
+        shape = OpenCodeSheetDefaults.shape,
     ) {
         Column(
             Modifier

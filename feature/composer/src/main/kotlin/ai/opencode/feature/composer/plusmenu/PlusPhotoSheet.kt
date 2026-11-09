@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer.plusmenu
 
+import ai.opencode.core.ui.OpenCodeSheetDefaults
 import ai.opencode.core.ui.OpenCodeSheetHandleDefaults
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
@@ -603,6 +604,7 @@ fun PlusPhotoSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         dragHandle = { PlusPhotoSheetGrabber(isExpanded = isExpanded, onToggle = ::toggleExpand) },
+        shape = OpenCodeSheetDefaults.shape,
     ) {
         PhotoLibraryAccessHost()
         var hiddenBottom by remember { mutableFloatStateOf(0f) }

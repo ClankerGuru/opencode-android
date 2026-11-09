@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.ui.OpenCodeSheetDefaults
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import android.view.KeyEvent
 import android.view.Window
@@ -117,7 +118,14 @@ fun OpenCodeBottomSheet(
 ) {
     val presentations = LocalSheetPresentations.current
     if (presentations == null) {
-        ModalBottomSheet(onDismissRequest, modifier, sheetState, dragHandle = dragHandle, content = content)
+        ModalBottomSheet(
+            onDismissRequest,
+            modifier,
+            sheetState,
+            shape = OpenCodeSheetDefaults.shape,
+            dragHandle = dragHandle,
+            content = content,
+        )
         return
     }
     // Preserve the presenting session's dependencies, lifecycle and typography at the host.
@@ -175,6 +183,7 @@ private fun InWindowSheet(
             modifier = modifier.align(Alignment.TopCenter).consumeWindowInsets(offsetInsets),
             state = sheetState,
             onDismissRequest = onDismissRequest,
+            shape = OpenCodeSheetDefaults.shape,
             dragHandle = dragHandle,
             contentWindowInsets = { BottomSheetDefaults.modalWindowInsets },
             tonalElevation = 0.dp,

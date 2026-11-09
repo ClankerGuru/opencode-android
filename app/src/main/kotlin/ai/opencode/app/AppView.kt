@@ -1,5 +1,6 @@
 package ai.opencode.app
 
+import ai.opencode.core.ui.OpenCodeSheetDefaults
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeSurfaces
 import androidx.compose.ui.unit.sp
@@ -710,6 +711,7 @@ private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>)
         onDismissRequest = { store.send(AppFeature.Action.CancelEditingTapped) },
         sheetState = sheetState,
         dragHandle = { OpenCodeSheetHandle() },
+        shape = OpenCodeSheetDefaults.shape,
     ) {
         // Its password and headers, out of problem reports and voice screenshots.
         HidesFromScreenshots()

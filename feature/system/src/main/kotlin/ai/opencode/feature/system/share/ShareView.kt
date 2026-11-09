@@ -1,5 +1,6 @@
 package ai.opencode.feature.system.share
 
+import ai.opencode.core.ui.OpenCodeSheetDefaults
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.ui.OpenCodeSurfaces
@@ -968,6 +969,7 @@ private fun ShareSessionSearch(
         sheetState = sheetState,
         containerColor = colors.groupedCanvas,
         dragHandle = { OpenCodeSheetHandle() },
+        shape = OpenCodeSheetDefaults.shape,
     ) {
         Box(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
             OpenCodeIconButton(

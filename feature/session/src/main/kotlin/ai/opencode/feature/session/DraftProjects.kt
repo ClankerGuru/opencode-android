@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.ui.OpenCodeSheetDefaults
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.motion.transitionBlur
@@ -447,6 +448,7 @@ fun ProjectPickerSheet(
         onDismissRequest = onCancel,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = compactHeight),
         dragHandle = { OpenCodeSheetHandle() },
+        shape = OpenCodeSheetDefaults.shape,
     ) {
         val routes = folderBrowser?.let { browser -> browser.collectState().value.routes }.orEmpty()
         BackHandler(enabled = routes.isNotEmpty()) {
