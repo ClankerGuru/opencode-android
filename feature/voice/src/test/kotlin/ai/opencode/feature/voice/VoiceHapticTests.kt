@@ -420,6 +420,56 @@ class VoiceCallTeardownFrameworkTests {
             assertTrue(shadowOf(service).isStoppedBySelf)
         }
     }
+
+    @Test fun liveRTCAudioDeviceSurvivesDisposedRemoteAudioTracks() {
+        val app = RuntimeEnvironment.getApplication()
+        val device = LiveRTCAudioDevice(app, realtime = true) {}
+        try {
+            class DisposableAudioTrack(var disposed: Boolean = false) : org.webrtc.AudioTrack(1L) {
+                var volumes = 0
+                var sinksAdded = 0
+                var sinksRemoved = 0
+                private fun checkAlive() {
+                    if (disposed) throw IllegalStateException("MediaStreamTrack has been disposed.")
+                }
+                override fun setVolume(volume: Double) {
+                    checkAlive()
+                    volumes += 1
+                }
+                override fun addSink(sink: org.webrtc.AudioTrackSink) {
+                    checkAlive()
+                    sinksAdded += 1
+                }
+                override fun removeSink(sink: org.webrtc.AudioTrackSink) {
+                    checkAlive()
+                    sinksRemoved += 1
+                }
+            }
+
+            // 1. Track already disposed before onAddTrack hopped onto the RTC dispatcher.
+            val deadOnArrival = DisposableAudioTrack(disposed = true)
+            device.attach(deadOnArrival)
+            assertEquals(0, deadOnArrival.sinksAdded)
+
+            // 2. Live track attached, then disposed by WebRTC before speaker gain ramp / teardown.
+            val midCallDisposed = DisposableAudioTrack()
+            val healthy = DisposableAudioTrack()
+            device.attach(midCallDisposed)
+            device.attach(healthy)
+            assertEquals(1, midCallDisposed.sinksAdded)
+            assertEquals(1, healthy.sinksAdded)
+
+            midCallDisposed.disposed = true
+            device.setPlaybackVolume(0.5f)
+            assertEquals("Healthy track still receives speaker-ramp volume after peer track disposal", 2, healthy.volumes)
+
+            // 3. Disposing the remaining track right before shutDown's detachTracks never aborts teardown.
+            healthy.disposed = true
+            device.detachTracks()
+        } finally {
+            device.release()
+        }
+    }
 }
 
 /** The haptics engine double (iOS `VoiceHangUpEngineTests.Engine`). */

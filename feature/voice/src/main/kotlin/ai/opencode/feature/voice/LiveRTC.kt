@@ -1,6 +1,7 @@
 package ai.opencode.feature.voice
 
 import ai.opencode.core.dependencies.*
+import ai.opencode.core.log.AppLog
 import ai.opencode.server.OpenCodeTransport
 import android.content.Context
 import android.media.AudioFormat
@@ -130,7 +131,13 @@ data class VoiceRTCSetup(
  * serial dispatcher. Closing/disposal blocks native signaling, never its callback thread. */
 class VoiceRTCSession private constructor(private val setup: VoiceRTCSetup) {
     private val dispatcher = Dispatchers.IO.limitedParallelism(1)
-    private val scope = CoroutineScope(SupervisorJob() + dispatcher + DependencyValues.current.asContextElement())
+    private val scope = CoroutineScope(
+        SupervisorJob() + dispatcher + DependencyValues.current.asContextElement() + CoroutineExceptionHandler { _, error ->
+            if (error !is CancellationException) {
+                AppLog.voice.error("WebRTC session task failed (${error.javaClass.simpleName})")
+            }
+        },
+    )
     private val context = dependency(AppContext)
     private val clock = dependency(Clock)
     private val voiceCallLog = dependency(VoiceCallLogClient)
@@ -290,16 +297,19 @@ class VoiceRTCSession private constructor(private val setup: VoiceRTCSetup) {
     suspend fun sendJSON(data: ByteArray) = withContext(dispatcher) {
         requireOpen()
         val channel = channel
-        if (channel?.state() != DataChannel.State.OPEN || !channel.send(DataChannel.Buffer(ByteBuffer.wrap(data), false)))
-            throw RealtimeClientError.Closed("The voice connection is closed.")
+        val sent = runCatching {
+            channel?.state() == DataChannel.State.OPEN && channel.send(DataChannel.Buffer(ByteBuffer.wrap(data), false))
+        }.getOrDefault(false)
+        if (!sent) throw RealtimeClientError.Closed("The voice connection is closed.")
     }
 
     suspend fun close() = withContext(NonCancellable + dispatcher) {
         if (finished || closing) { shutdown.await(); return@withContext }
         closing = true
         val channel = channel
-        if (!remoteClosed && channel?.state() == DataChannel.State.OPEN && setup.closeMessage != null) {
-            if (!channel.send(DataChannel.Buffer(ByteBuffer.wrap(setup.closeMessage), false)))
+        if (!remoteClosed && setup.closeMessage != null && runCatching { channel?.state() == DataChannel.State.OPEN }.getOrDefault(false)) {
+            val sent = runCatching { channel?.send(DataChannel.Buffer(ByteBuffer.wrap(setup.closeMessage), false)) == true }.getOrDefault(false)
+            if (!sent)
                 VoiceControlSend.recordFailure("rtc.close", RealtimeClientError.Closed("The voice connection is closed."))
             val limit = scope.launch { clock.sleep(600.milliseconds); closedByServer.complete(Unit) }
             try { closedByServer.await() } finally { limit.cancel() }
@@ -313,18 +323,30 @@ class VoiceRTCSession private constructor(private val setup: VoiceRTCSetup) {
         opened.completeExceptionally(error ?: RealtimeClientError.Closed("The voice connection is closed."))
         gathered.complete(Unit); closedByServer.complete(Unit)
         disconnectTask?.cancel(); statsTask?.cancel()
-        networkCallback?.let { context.getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(it) }
-        networkCallback = null
         signals.close(error)
         try {
+            networkCallback?.let { cb ->
+                networkCallback = null
+                runCatching { context.getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(cb) }
+            }
             startTask?.takeIf { !it.isCompleted }?.cancelAndJoin()
             audioTask?.takeIf { !it.isCompleted }?.cancelAndJoin()
             device?.let { audioContext.detach(it) }
-            channel?.unregisterObserver(); channel?.close(); channel?.dispose(); channel = null
+            channel?.let { ch ->
+                channel = null
+                runCatching { ch.unregisterObserver() }
+                runCatching { ch.close() }
+                runCatching { ch.dispose() }
+            }
             device?.detachTracks()
-            peer?.close(); peer?.dispose(); peer = null
-            microphone?.dispose(); microphone = null; source?.dispose(); source = null
-            factory?.dispose(); factory = null
+            peer?.let { pc ->
+                peer = null
+                runCatching { pc.close() }
+                runCatching { pc.dispose() }
+            }
+            microphone?.let { mic -> microphone = null; runCatching { mic.dispose() } }
+            source?.let { src -> source = null; runCatching { src.dispose() } }
+            factory?.let { f -> factory = null; runCatching { f.dispose() } }
             device?.release()
             if (callAudioContext == null) audioContext.stop()
             audio = null
@@ -337,7 +359,8 @@ class VoiceRTCSession private constructor(private val setup: VoiceRTCSetup) {
             if (state == PeerConnection.IceGatheringState.COMPLETE) gathered.complete(Unit)
         }
         override fun onAddTrack(receiver: RtpReceiver, streams: Array<out MediaStream>) = callback {
-            (receiver.track() as? AudioTrack)?.let { device?.attach(it) }
+            val track = runCatching { receiver.track() as? AudioTrack }.getOrNull() ?: return@callback
+            device?.attach(track)
         }
         override fun onSignalingChange(state: PeerConnection.SignalingState) {}
         override fun onIceConnectionChange(state: PeerConnection.IceConnectionState) {}
@@ -346,13 +369,15 @@ class VoiceRTCSession private constructor(private val setup: VoiceRTCSetup) {
         override fun onIceCandidatesRemoved(candidates: Array<out IceCandidate>) {}
         override fun onAddStream(stream: MediaStream) {}
         override fun onRemoveStream(stream: MediaStream) {}
-        override fun onDataChannel(channel: DataChannel) { callback { channel.close(); channel.dispose() } }
+        override fun onDataChannel(channel: DataChannel) {
+            callback { runCatching { channel.close() }; runCatching { channel.dispose() } }
+        }
         override fun onRenegotiationNeeded() {}
     }
     private val channelObserver = object : DataChannel.Observer {
         override fun onBufferedAmountChange(previousAmount: Long) {}
         override fun onStateChange() = callback {
-            when (channel?.state()) {
+            when (runCatching { channel?.state() }.getOrNull()) {
                 DataChannel.State.OPEN -> {
                     note(String.format(Locale.US, "WebRTC event channel open at %.2f s", elapsed())); opened.complete(Unit)
                 }
@@ -399,7 +424,7 @@ class VoiceRTCSession private constructor(private val setup: VoiceRTCSetup) {
         }
     }
     private fun watchNetwork() {
-        val manager = context.getSystemService(ConnectivityManager::class.java)
+        val manager = context.getSystemService(ConnectivityManager::class.java) ?: return
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onCapabilitiesChanged(value: Network, capabilities: NetworkCapabilities) {
                 val transport = when {
@@ -417,8 +442,9 @@ class VoiceRTCSession private constructor(private val setup: VoiceRTCSetup) {
             }
             // Losing connectivity alone is not a change; the disconnect timer rides it out.
         }
-        manager.registerDefaultNetworkCallback(callback)
-        networkCallback = callback
+        runCatching { manager.registerDefaultNetworkCallback(callback) }
+            .onSuccess { networkCallback = callback }
+            .onFailure { AppLog.voice.notice("WebRTC network callback unavailable (${it.javaClass.simpleName})") }
     }
     private fun watchLink() {
         if (finished || statsTask != null) return
@@ -426,8 +452,10 @@ class VoiceRTCSession private constructor(private val setup: VoiceRTCSetup) {
             var tick = 0
             while (isActive) {
                 clock.sleep(1.seconds)
+                if (finished) break
                 val sample = statistics()?.let(LiveRTCLinkSample::from) ?: continue
-                watch.add(sample, channel?.bufferedAmount() ?: 0)?.let(::linkChanged)
+                val backlog = runCatching { channel?.bufferedAmount() ?: 0L }.getOrDefault(0L)
+                watch.add(sample, backlog)?.let(::linkChanged)
                 tick++
                 if (tick % 5 == 0) watch.summary()?.let(::note)
             }
@@ -435,9 +463,15 @@ class VoiceRTCSession private constructor(private val setup: VoiceRTCSetup) {
     }
     private suspend fun statistics(): RTCStatsReport? {
         val peer = peer ?: return null
-        return suspendCancellableCoroutine { continuation -> peer.getStats { report ->
-            if (continuation.isActive) continuation.resume(report)
-        } }
+        return suspendCancellableCoroutine { continuation ->
+            try {
+                peer.getStats { report ->
+                    if (continuation.isActive) continuation.resume(report)
+                }
+            } catch (_: IllegalStateException) {
+                if (continuation.isActive) continuation.resume(null)
+            }
+        }
     }
     private fun linkChanged(poor: Boolean) {
         if (finished || linkPoor == poor) return
@@ -643,13 +677,23 @@ class LiveRTCAudioDevice(
     internal fun activate() = synchronized(hardwareLock) {
         val enabled = synchronized(lock) { check(!released); active = true; !interrupted }
         module.setMicrophoneMute(muted || !enabled); module.setSpeakerMute(muteOutput)
-        peer?.setAudioRecording(enabled); peer?.setAudioPlayout(enabled)
+        runCatching { peer?.setAudioRecording(enabled) }
+        runCatching { peer?.setAudioPlayout(enabled) }
     }
     internal fun attach(track: AudioTrack) = synchronized(hardwareLock) {
-        if (!released && tracks.add(track)) { track.setVolume(volume.toDouble()); track.addSink(sink) }
+        if (!released && tracks.add(track)) {
+            val attached = runCatching {
+                track.setVolume(volume.toDouble())
+                track.addSink(sink)
+                true
+            }.getOrDefault(false)
+            if (!attached) tracks.remove(track)
+        }
     }
     internal fun detachTracks() = synchronized(hardwareLock) {
-        tracks.forEach { it.removeSink(sink) }; tracks.clear(); peer = null
+        tracks.forEach { track -> runCatching { track.removeSink(sink) } }
+        tracks.clear()
+        peer = null
     }
     internal fun observe(data: ByteArray) = synchronized(hardwareLock) {
         val resume = synchronized(lock) {
@@ -701,7 +745,13 @@ class LiveRTCAudioDevice(
     }
     override fun setPlaybackVolume(volume: Float) = synchronized(hardwareLock) {
         this.volume = volume
-        tracks.forEach { it.setVolume(volume.toDouble()) }
+        val iterator = tracks.iterator()
+        while (iterator.hasNext()) {
+            val track = iterator.next()
+            if (runCatching { track.setVolume(volume.toDouble()) }.isFailure) {
+                iterator.remove()
+            }
+        }
     }
     override fun flush() {
         synchronized(lock) { used = 0; hangover = 0; playing = false; flushed = realtime }
@@ -715,12 +765,16 @@ class LiveRTCAudioDevice(
         val enabled = synchronized(lock) { this.interrupted = interrupted; active && !interrupted }
         if (!released) {
             module.setMicrophoneMute(muted || interrupted)
-            peer?.setAudioRecording(enabled); peer?.setAudioPlayout(enabled)
+            runCatching { peer?.setAudioRecording(enabled) }
+            runCatching { peer?.setAudioPlayout(enabled) }
         }
     }
     override fun stop() = synchronized(hardwareLock) {
         synchronized(lock) { active = false }
-        if (!released) { peer?.setAudioRecording(false); peer?.setAudioPlayout(false) }
+        if (!released) {
+            runCatching { peer?.setAudioRecording(false) }
+            runCatching { peer?.setAudioPlayout(false) }
+        }
     }
     internal fun release() = synchronized(hardwareLock) {
         if (!released) {
