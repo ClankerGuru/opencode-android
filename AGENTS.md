@@ -21,10 +21,17 @@ testing once `PLAY_OPEN_TESTING` is on). `scheduled-release.yml` releases `main`
   still make sense so the two codebases diff side by side.
 - Track every iOS file in `docs/parity/<area>.md` (see [docs/parity/README.md](docs/parity/README.md))
   and update the row in the same commit.
-- Visuals are Android-native: Material 3 Expressive components and surfaces (Liquid Glass →
-  M3 surfaces/tonal elevation, SF Symbols → Material Symbols via `OpenCodeIcons`, SF → Roboto;
-  BerkeleyMono only for onboarding brand marks). No glass/blur imitation, no web views as the
-  app shell, no React Native/Flutter/KMP UI.
+- Visuals follow the OpenCode desktop design system (`packages/ui` in the opencode repo), not
+  iOS: Inter for UI text and IBM Plex Mono for code and tool output (bundled, OFL), the
+  desktop's type scale in sp, flat surfaces with hairline borders instead of tonal elevation
+  or glass, small radii (`OpenCodeRadius`, `OpenCodeShape.control`), the desktop palette as
+  the default theme (`BrandPalette`). Use `core/ui` tokens and `OpenCodeSurfaces`
+  (`OpenCodeAlertDialog`, floating fill + `openCodeHairline`) rather than raw Material
+  colours or capsules. Behaviour stays Android: Material components' structure, system back
+  and predictive back, sheets, IME, TalkBack semantics, ≥48 dp targets and font scaling.
+  Android looks different from iOS on purpose; behaviour, flows and copy still follow iOS.
+  SF Symbols → Material Symbols via `OpenCodeIcons`; BerkeleyMono only for the wordmark. No
+  glass/blur imitation, no web views as the app shell, no React Native/Flutter/KMP UI.
 
 ## Modules (fixed; never edit `settings.gradle.kts`)
 
@@ -87,14 +94,17 @@ already wired by its parent; keep those names.
   (composables). Same rules as iOS (answer the press; navigation and closing stay quiet).
 - Design system (`ai.opencode.core.ui`, `ai.opencode.core.motion`; details in
   `docs/parity/core-ui.md`): wrap roots in `OpenCodeAppTheme {}`; iOS semantic colours via
-  `OpenCodeTheme.colors.*`, M3 roles via `MaterialTheme.colorScheme`; iOS text styles via
-  `OpenCodeTextStyles.*` or `MaterialTheme.typography`; `OpenCodeShape`/`OpenCodeRadius`/
-  `OpenCodeSpacing`; iOS springs via `Motion.*.spec()` (respects reduce motion).
+  `OpenCodeTheme.colors.*` (`border` follows high contrast), M3 roles via
+  `MaterialTheme.colorScheme`; text styles under iOS names via `OpenCodeTextStyles.*` (desktop
+  sizes) or `MaterialTheme.typography`; `OpenCodeShape`/`OpenCodeRadius`/`OpenCodeSpacing`;
+  floating panels, dialogs and popovers via `OpenCodeSurfaces`; iOS springs via
+  `Motion.*.spec()` (respects reduce motion).
 - Icons: `OpenCodeIcon(SFSymbol.X, contentDescription)` or `OpenCodeIcon("sf.name", …)`. To add
   one: a line in `scripts/material-symbols.txt`, run `python3 scripts/fetch-material-symbols.py`,
   add the `SFSymbol` entry and the core-ui.md row (the coordinator commits shared files).
 - Buttons: `OpenCodePrimaryButton` (Next/Send), `OpenCodeSecondaryButton` (Back/Skip); red only
-  for destructive roles. Touch targets ≥ 48dp (`Modifier.openCodeTapTarget`, after `clickable`),
+  for destructive roles. A raw Material `Button` takes `shape = OpenCodeShape.control` (Material
+  defaults to a capsule); dialogs use `OpenCodeAlertDialog`. Touch targets ≥ 48dp (`Modifier.openCodeTapTarget`, after `clickable`),
   `OpenCodeIconButton` for icon controls.
 - Unfinished features stay behind Experimental, off by default, as on iOS.
 
