@@ -272,7 +272,8 @@ class BundledSoundEffectsAudio(
     private var current: MediaPlayer? = null
 
     private val attributes = AudioAttributes.Builder()
-        .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+        // AVAudioPlayer on .ambient follows media volume; the silent switch is separate.
+        .setUsage(AudioAttributes.USAGE_MEDIA)
         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
         .build()
 
