@@ -2,7 +2,6 @@ package ai.opencode.feature.composer.modelpicker
 
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionPhase
-import ai.opencode.core.motion.MotionSpring
 import androidx.compose.animation.core.FiniteAnimationSpec
 
 // Port of iOS `Composer/ModelPicker/ModelPickerTunables.swift` (split out of ModelPickerOverlays in 17a991b1).
@@ -18,7 +17,6 @@ import androidx.compose.animation.core.FiniteAnimationSpec
  * Picker's detents ([ModelListDetent]), the photo sheet and the call's composer expansion still read.
  */
 object ModelPickerTunables {
-    val restSpring = MotionSpring(0.42, 0.06)
     const val settle = 0.6
     const val dimDark = 0.35
     const val dimLight = 0.18
