@@ -139,10 +139,20 @@ private class QRCameraSession(private val once: Boolean, private val onScanned: 
     }
 }
 
-/** ZXing over a frame's luminance plane: QR codes only, as iOS's `metadataObjectTypes = [.qr]`. */
+/**
+ * ZXing over a frame's luminance plane: QR codes only, as iOS's `metadataObjectTypes = [.qr]`, in
+ * either polarity. AVFoundation also reads light-on-dark codes, which is how OpenCode Desktop draws
+ * its pairing code in dark mode and how `opencode pair` looks in a light-theme terminal; ZXing
+ * tries them only with `ALSO_INVERTED` (QA QR-01).
+ */
 private class QRDecoder {
     private val reader = MultiFormatReader().apply {
-        setHints(mapOf(DecodeHintType.POSSIBLE_FORMATS to listOf(BarcodeFormat.QR_CODE)))
+        setHints(
+            mapOf(
+                DecodeHintType.POSSIBLE_FORMATS to listOf(BarcodeFormat.QR_CODE),
+                DecodeHintType.ALSO_INVERTED to true,
+            ),
+        )
     }
     private var buffer = ByteArray(0)
 
