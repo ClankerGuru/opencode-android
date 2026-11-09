@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings.connection
 
+import ai.opencode.core.ui.OpenCodeTextField
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
@@ -64,7 +65,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ripple
@@ -703,10 +703,10 @@ fun ServerPage(store: SettingsStore) {
             text = {
                 Column {
                     Text("Only this ${ai.opencode.core.ui.ThisDevice.name} uses the name. Leave it blank for “${current.friendlyName}”.")
-                    OutlinedTextField(
+                    OpenCodeTextField(
                         value = nameDraft,
                         onValueChange = { nameDraft = it },
-                        placeholder = { Text(current.friendlyName) },
+                        placeholder = current.friendlyName,
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                         modifier = Modifier.fillMaxWidth().padding(top = 12.dp),

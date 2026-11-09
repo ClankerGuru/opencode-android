@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings.serverdetails
 
+import ai.opencode.core.ui.OpenCodeTextField
 import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.diagnostics.HidesFromScreenshots
 import ai.opencode.core.motion.MotionSpring
@@ -44,7 +45,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
@@ -205,10 +205,10 @@ private fun CodeAlert(instructions: String, send: (ServerDetailsFeature.Action) 
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (instructions.isNotEmpty()) Text(instructions)
-                OutlinedTextField(
+                OpenCodeTextField(
                     value = code,
                     onValueChange = { code = it },
-                    label = { Text("Code") },
+                    label = "Code",
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
                 )

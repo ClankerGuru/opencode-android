@@ -70,6 +70,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.isSpecified
+import androidx.compose.ui.graphics.lerp as lerpColor
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
@@ -159,6 +160,30 @@ object VoiceCallSurfaceDefaults {
     /** The dock's hairline ring (`--v2-border-border-base`). */
     val border: Color
         @Composable @ReadOnlyComposable get() = OpenCodeTheme.colors.border
+
+    /**
+     * The floating call's card and sheet: one step off the page in both modes (`#F3F3F3` on the
+     * light canvas, `#252525` on the dark), so the card reads as its own surface with its hairline
+     * and shadow. Mixed from the theme's canvas and text, so curated themes and Material You follow.
+     */
+    val card: Color
+        @Composable @ReadOnlyComposable get() = OpenCodeTheme.colors.let { lerpColor(it.canvas, it.text, if (it.isDark) 0.07f else 0.05f) }
+
+    /** The card's hairline, a little stronger than [border] so it holds on the tinted card. */
+    val cardBorder: Color
+        @Composable @ReadOnlyComposable get() = OpenCodeTheme.colors.let {
+            if (it.strongBorders) it.variant.borderStrong.color else lerpColor(it.canvas, it.text, if (it.isDark) 0.15f else 0.13f)
+        }
+
+    /** The card's controls: raised over the card (white in light, a step up in dark), worn with [controlBorder]. */
+    val controlFill: Color
+        @Composable @ReadOnlyComposable get() = OpenCodeTheme.colors.let { if (it.isDark) lerpColor(it.canvas, it.text, 0.13f) else it.canvas }
+
+    /** The controls' hairline. */
+    val controlBorder: Color
+        @Composable @ReadOnlyComposable get() = OpenCodeTheme.colors.let {
+            if (it.strongBorders) it.variant.borderStrong.color else lerpColor(it.canvas, it.text, if (it.isDark) 0.22f else 0.15f)
+        }
 
     /** `UIColor.tertiarySystemFill`: Mute's soft disc. */
     val tertiaryFill: Color

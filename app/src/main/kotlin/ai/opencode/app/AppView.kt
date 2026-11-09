@@ -1,5 +1,7 @@
 package ai.opencode.app
 
+import ai.opencode.core.ui.OpenCodeSheetDefaults
+import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeSurfaces
 import androidx.compose.ui.unit.sp
 import ai.opencode.core.ui.OpenCodeRadius
@@ -78,7 +80,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
+import ai.opencode.core.ui.OpenCodeTextField
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -708,6 +710,8 @@ private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>)
     ModalBottomSheet(
         onDismissRequest = { store.send(AppFeature.Action.CancelEditingTapped) },
         sheetState = sheetState,
+        dragHandle = { OpenCodeSheetHandle() },
+        shape = OpenCodeSheetDefaults.shape,
     ) {
         // Its password and headers, out of problem reports and voice screenshots.
         HidesFromScreenshots()
@@ -764,30 +768,30 @@ private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>)
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             state.errorMessage?.let { ConnectionErrorCard(store, it, announces = false) }
-            OutlinedTextField(
+            OpenCodeTextField(
                 value = state.serverName,
                 onValueChange = { store.send(AppFeature.Action.ServerNameChanged(it)) },
-                label = { Text("Name") },
+                label = "Name",
                 // Blank keeps the name the address gives, shown as the prompt.
-                placeholder = { Text(state.credentialNamePrompt) },
+                placeholder = state.credentialNamePrompt,
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, autoCorrectEnabled = false, imeAction = ImeAction.Next),
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
+            OpenCodeTextField(
                 value = state.serverURL,
                 onValueChange = { store.send(AppFeature.Action.ServerURLChanged(it)) },
-                label = { Text("Server address") },
-                placeholder = { Text("http://192.168.1.20:4096") },
+                label = "Server address",
+                placeholder = "http://192.168.1.20:4096",
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false, imeAction = ImeAction.Next),
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
+            OpenCodeTextField(
                 value = state.username,
                 onValueChange = { store.send(AppFeature.Action.UsernameChanged(it)) },
-                label = { Text("Username") },
-                placeholder = { Text("opencode") },
+                label = "Username",
+                placeholder = "opencode",
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Next),
                 modifier = Modifier.fillMaxWidth(),
@@ -799,15 +803,15 @@ private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>)
             // eye sits over it, outside the swap, so TalkBack's focus stays on it.
             Box {
                 androidx.compose.runtime.key(revealsPassword) {
-                    OutlinedTextField(
+                    OpenCodeTextField(
                         // Its own value, so the new field keeps the caret where it was.
                         value = if (passwordValue.text == state.password) passwordValue else TextFieldValue(state.password, TextRange(state.password.length)),
                         onValueChange = {
                             passwordValue = it
                             if (it.text != state.password) store.send(AppFeature.Action.PasswordChanged(it.text))
                         },
-                        label = { Text("Password") },
-                        placeholder = { Text("Password") },
+                        label = "Password",
+                        placeholder = "Password",
                         singleLine = true,
                         visualTransformation = if (revealsPassword) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(
@@ -828,8 +832,8 @@ private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>)
                             .onFocusChanged { isPasswordFocused = it.isFocused },
                     )
                 }
-                // The outlined field's 8 dp above its border is the label's.
-                Box(Modifier.matchParentSize().padding(top = 8.dp), contentAlignment = Alignment.CenterEnd) {
+                // The label sits above the field: the eye centres on the field's 48 dp row.
+                Box(Modifier.matchParentSize(), contentAlignment = Alignment.BottomEnd) {
                     OpenCodeIconButton(
                         symbol = if (revealsPassword) SFSymbol.EyeSlash else SFSymbol.Eye,
                         contentDescription = if (revealsPassword) "Hide Password" else "Show Password",
@@ -931,20 +935,20 @@ private fun HeaderFields(
         Text("Headers", style = OpenCodeTextStyles.caption1.copy(fontWeight = FontWeight.SemiBold), color = OpenCodeTheme.colors.secondaryText)
         headers.forEachIndexed { index, header ->
             val nameField: @Composable (Modifier) -> Unit = { modifier ->
-                OutlinedTextField(
+                OpenCodeTextField(
                     value = header.name,
                     onValueChange = { value -> update(index) { it.copy(name = value) } },
-                    placeholder = { Text("Name") },
+                    placeholder = "Name",
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Next),
                     modifier = modifier.semantics { contentDescription = "Header ${index + 1} name" },
                 )
             }
             val valueField: @Composable (Modifier) -> Unit = { modifier ->
-                OutlinedTextField(
+                OpenCodeTextField(
                     value = header.value,
                     onValueChange = { value -> update(index) { it.copy(value = value) } },
-                    placeholder = { Text("Value") },
+                    placeholder = "Value",
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Next),
                     modifier = modifier.semantics { contentDescription = "Header ${index + 1} value" },

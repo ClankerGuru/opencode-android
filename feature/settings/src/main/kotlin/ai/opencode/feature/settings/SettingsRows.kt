@@ -1,6 +1,6 @@
 package ai.opencode.feature.settings
 
-import ai.opencode.core.ui.OpenCodeSwitchDefaults
+import ai.opencode.core.ui.OpenCodeSwitch
 import ai.opencode.core.ui.OpenCodeTextStyles
 import androidx.compose.ui.text.font.FontWeight
 import ai.opencode.core.ui.OpenCodeTypography
@@ -32,8 +32,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
@@ -304,17 +302,7 @@ fun SettingsToggleRow(
     ) {
         if (symbol != null) SettingsIcon(symbol, tint)
         SettingsRowText(title, summary, Modifier.weight(1f))
-        Switch(
-            checked = checked,
-            onCheckedChange = null,
-            enabled = enabled,
-            thumbContent = if (checked) {
-                { OpenCodeIcon(SFSymbol.Checkmark, contentDescription = null, size = SwitchDefaults.IconSize) }
-            } else {
-                null
-            },
-            colors = OpenCodeSwitchDefaults.colors(),
-        )
+        OpenCodeSwitch(checked = checked, onCheckedChange = null, enabled = enabled)
     }
 }
 
