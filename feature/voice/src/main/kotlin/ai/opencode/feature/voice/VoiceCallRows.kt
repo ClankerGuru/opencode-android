@@ -1,5 +1,6 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconButton
@@ -102,7 +103,9 @@ fun VoiceCallRowsCard(store: VoiceStoreOf?, hidden: Boolean, reduceMotion: Boole
     AnimatedVisibility(visible = !live.isEmpty, modifier = modifier, enter = enter, exit = exit) {
         Surface(
             shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            // The desktop card: floating fill, hairline ring.
+            color = OpenCodeSurfaces.color,
+            border = OpenCodeSurfaces.border,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column {

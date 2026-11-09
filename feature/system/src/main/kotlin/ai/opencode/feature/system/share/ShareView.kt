@@ -1,5 +1,7 @@
 package ai.opencode.feature.system.share
 
+import ai.opencode.core.ui.OpenCodeRadius
+import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.motion.transitionBlur
 
 import ai.opencode.core.files.AttachmentFileType
@@ -527,7 +529,7 @@ private fun Images(images: List<ShareModel.SharedImage>, height: Dp) {
             bitmap = bitmap,
             contentDescription = "Image",
             contentScale = ContentScale.Fit,
-            modifier = Modifier.heightIn(max = height).clip(RoundedCornerShape(18.dp)),
+            modifier = Modifier.heightIn(max = height).clip(RoundedCornerShape(OpenCodeRadius.card)),
         )
     } else if (images.isNotEmpty()) {
         LazyRow(
@@ -540,7 +542,7 @@ private fun Images(images: List<ShareModel.SharedImage>, height: Dp) {
                     bitmap = bitmap,
                     contentDescription = "Image ${index + 1} of ${images.size}",
                     contentScale = ContentScale.Fit,
-                    modifier = Modifier.heightIn(max = minOf(height, 300.dp)).clip(RoundedCornerShape(16.dp)),
+                    modifier = Modifier.heightIn(max = minOf(height, 300.dp)).clip(RoundedCornerShape(OpenCodeRadius.card)),
                 )
             }
         }
@@ -552,7 +554,7 @@ private fun Card(modifier: Modifier = Modifier, content: @Composable () -> Unit)
     Box(
         modifier
             .fillMaxWidth()
-            .background(OpenCodeTheme.colors.userBubble, RoundedCornerShape(14.dp))
+            .background(OpenCodeTheme.colors.userBubble, RoundedCornerShape(OpenCodeRadius.card))
             .padding(14.dp),
     ) {
         content()
@@ -774,8 +776,10 @@ private fun MessageBar(state: ShareModel.State, actions: ShareActions, reduceMot
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(26.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        // The desktop dock: 12 dp corners, floating fill, hairline ring.
+        shape = RoundedCornerShape(OpenCodeRadius.panel),
+        color = OpenCodeSurfaces.color,
+        border = OpenCodeSurfaces.border,
         contentColor = colors.text,
     ) {
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {

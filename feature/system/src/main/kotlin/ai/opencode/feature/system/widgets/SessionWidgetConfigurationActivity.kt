@@ -1,5 +1,6 @@
 package ai.opencode.feature.system.widgets
 
+import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.feature.system.LeftToRight
 import ai.opencode.core.ui.OpenCodeAppTheme
 import ai.opencode.core.ui.OpenCodeIcon
@@ -115,12 +116,14 @@ private fun ChooseSessionView(directory: SessionDirectory, onChoose: (SessionEnt
     Box(Modifier.fillMaxSize().safeDrawingPadding().imePadding(), contentAlignment = Alignment.Center) {
         Surface(
             modifier = Modifier.padding(16.dp).widthIn(max = 560.dp).fillMaxWidth().heightIn(max = 640.dp),
-            shape = MaterialTheme.shapes.extraLarge,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            // The desktop dialog: floating fill, hairline ring, 12 dp corners, no tonal elevation.
+            shape = OpenCodeSurfaces.dialogShape,
+            color = OpenCodeSurfaces.color,
+            border = OpenCodeSurfaces.border,
             // Explicit: `contentColorFor` matches roles by value, and the container shares its
             // colour with a role whose content colour is dim (as Ask OpenCode's dialog).
             contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = 6.dp,
+            tonalElevation = 0.dp,
         ) {
             Column {
                 Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 8.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {

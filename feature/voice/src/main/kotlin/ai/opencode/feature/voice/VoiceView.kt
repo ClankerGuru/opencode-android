@@ -1,5 +1,6 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.motion.transitionBlurEffect
 
 import ai.opencode.core.ui.excludedFromDrawerPan
@@ -495,7 +496,7 @@ fun ComposerSurface(
                 Box(
                     Modifier
                         .layoutId(SurfaceSlot.expansion)
-                        .clip(RoundedCornerShape(28.dp))
+                        .clip(RoundedCornerShape(ComposerMetrics.cornerRadius.dp))
                         .drawWithContent {
                             // Records the reach as each frame of its animation draws.
                             val drawn = activeExpansion.drawn
@@ -702,11 +703,11 @@ private fun ViewThatFitsHorizontally(modifier: Modifier = Modifier, wide: @Compo
  */
 @Composable
 fun VoiceCallEnded(store: VoiceStoreOf, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(28.dp)
+    val shape = RoundedCornerShape(ComposerMetrics.cornerRadius.dp)
     Box(
         modifier
             .fillMaxWidth()
-            .callSurface(shape, VoiceCallSurfaceDefaults.color)
+            .callSurface(shape, VoiceCallSurfaceDefaults.color, VoiceCallSurfaceDefaults.border)
             .padding(start = 18.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
     ) {
         val title = @Composable { Text("Call Ended", style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold)) }
@@ -758,11 +759,11 @@ fun VoiceCallFailure(store: VoiceStoreOf, message: String, modifier: Modifier = 
 @Composable
 private fun VoiceCallFailurePlainCard(store: VoiceStoreOf, message: String, modifier: Modifier) {
     val isMicrophoneDenied = message == VoiceAudioError.microphoneDenied.message
-    val shape = RoundedCornerShape(22.dp)
+    val shape = RoundedCornerShape(OpenCodeRadius.card)
     Column(
         modifier
             .fillMaxWidth()
-            .callSurface(shape, VoiceCallSurfaceDefaults.color)
+            .callSurface(shape, VoiceCallSurfaceDefaults.color, VoiceCallSurfaceDefaults.border)
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
