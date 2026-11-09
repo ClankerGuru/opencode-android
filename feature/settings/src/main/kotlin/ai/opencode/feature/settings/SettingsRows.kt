@@ -1,5 +1,9 @@
 package ai.opencode.feature.settings
 
+import ai.opencode.core.ui.OpenCodeTextStyles
+import androidx.compose.ui.text.font.FontWeight
+import ai.opencode.core.ui.OpenCodeTypography
+import androidx.compose.foundation.BorderStroke
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.ui.OpenCodeTheme
@@ -39,10 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
@@ -54,7 +55,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 
 /**
  * Port of iOS `Settings/SettingsRows.swift` plus the inset-grouped `List`/`Section` chrome every
@@ -67,15 +67,18 @@ import androidx.compose.ui.zIndex
  * chevron, section headers are in the accent colour, and text uses Material's list sizes.
  */
 
-/** Material's list type scale (16 sp titles, 14 sp summaries); the app's own styles are iOS sizes. */
+/** Settings' type: the app's desktop-derived scale (this branch), not Material's default Roboto list sizes. */
 object SettingsText {
-    private val material = Typography()
-    val title: TextStyle = material.bodyLarge
-    val summary: TextStyle = material.bodyMedium
-    val header: TextStyle = material.titleSmall
+    /** Desktop list item: medium weight (`list.css` 530) at phone size. */
+    val title: TextStyle = OpenCodeTextStyles.callout.copy(fontWeight = FontWeight.Medium)
+    val summary: TextStyle = OpenCodeTextStyles.footnote
+    val header: TextStyle = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium)
 
-    /** Material's whole default scale, for the Settings top app bar's large title. */
-    val typography: Typography = material
+    /** The app's (Inter) scale, with a larger headline for the Settings top app bar's large title. */
+    val typography: Typography = OpenCodeTypography.copy(
+        headlineMedium = OpenCodeTextStyles.title1,
+        headlineLarge = OpenCodeTextStyles.largeTitle,
+    )
 }
 
 /** iOS system tints for [SettingsIcon] tiles (`Color.purple`, `.blue`, …), light and dark. */
@@ -173,9 +176,11 @@ fun SettingsSection(
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp).semantics { heading() },
             )
         }
+        // The desktop's card: flat fill inside a hairline border, small radius.
         Surface(
             color = OpenCodeTheme.colors.groupedCard,
             shape = RoundedCornerShape(OpenCodeRadius.card),
+            border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(content = rows)
@@ -191,61 +196,14 @@ fun SettingsSection(
 }
 
 /**
- * What parts two rows on a section card. iOS draws an inset hairline; Android leaves a 2 dp gap
- * of the page canvas and rounds the rows' inner corners by 4 dp, as Material 3 Expressive
- * segmented lists do. [inset] is kept so the call sites stay as on iOS, but every gap spans the
- * card. The gap draws over its neighbours (`zIndex`), so a row's ripple or highlight never
- * covers the rounded corners.
+ * What parts two rows on a section card: on this branch the desktop list's inset hairline (as
+ * iOS draws), replacing Material 3 Expressive's 2 dp segmented gap. [inset] is kept so the call
+ * sites stay as on iOS.
  */
 @Composable
 fun SettingsDivider(inset: Boolean = false) {
-    val canvas = OpenCodeTheme.colors.groupedCanvas
-    Spacer(
-        Modifier
-            .fillMaxWidth()
-            .height(SegmentGap)
-            .zIndex(1f)
-            .drawWithCache {
-                val corners = segmentCorners(size.width, size.height, SegmentInnerRadius.toPx())
-                onDrawBehind {
-                    drawRect(canvas)
-                    drawPath(corners, canvas)
-                }
-            },
-    )
-}
-
-private val SegmentGap = 2.dp
-private val SegmentInnerRadius = 4.dp
-
-/**
- * The canvas-coloured corners a gap of height [gap] fills in to round the rows beside it: the
- * row above's bottom corners and the row below's top corners. Each is the [radius] square in the
- * card's corner minus the quarter circle the rounded row keeps.
- */
-private fun segmentCorners(width: Float, gap: Float, radius: Float): Path {
-    val path = Path()
-    // Above the gap, start edge.
-    path.moveTo(0f, 0f)
-    path.lineTo(radius, 0f)
-    path.arcTo(Rect(0f, -2 * radius, 2 * radius, 0f), 90f, 90f, false)
-    path.close()
-    // Above the gap, end edge.
-    path.moveTo(width, 0f)
-    path.lineTo(width - radius, 0f)
-    path.arcTo(Rect(width - 2 * radius, -2 * radius, width, 0f), 90f, -90f, false)
-    path.close()
-    // Below the gap, start edge.
-    path.moveTo(0f, gap)
-    path.lineTo(radius, gap)
-    path.arcTo(Rect(0f, gap, 2 * radius, gap + 2 * radius), 270f, -90f, false)
-    path.close()
-    // Below the gap, end edge.
-    path.moveTo(width, gap)
-    path.lineTo(width - radius, gap)
-    path.arcTo(Rect(width - 2 * radius, gap, width, gap + 2 * radius), 270f, 90f, false)
-    path.close()
-    return path
+    // The desktop list's divider: a hairline inset 16 (`list.css`), not Material's segmented gap.
+    HorizontalDivider(Modifier.padding(start = 16.dp), thickness = 1.dp, color = OpenCodeTheme.colors.border)
 }
 
 /** A row's frame: full-width target, 16 dp sides, at least [SettingsRowMinHeight] tall, 16 dp between its parts. */
