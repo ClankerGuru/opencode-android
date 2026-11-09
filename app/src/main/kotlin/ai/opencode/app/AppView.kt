@@ -15,6 +15,7 @@ import ai.opencode.core.ui.OpenCodeFonts
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconButton
 import ai.opencode.core.ui.OpenCodeIconButtonStyle
+import ai.opencode.core.ui.OpenCodeMinTapTarget
 import ai.opencode.core.ui.OpenCodeSecondaryButton
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
@@ -91,6 +92,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -107,6 +111,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -115,6 +120,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -670,6 +676,11 @@ private fun ConnectionErrorCard(store: StoreOf<AppFeature.State, AppFeature.Acti
 private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>) {
     val state by store.observe { it }
     var revealsPassword by rememberSaveable { mutableStateOf(false) }
+    val passwordFocus = remember { FocusRequester() }
+    val eyeFocus = remember { FocusRequester() }
+    var isPasswordFocused by remember { mutableStateOf(false) }
+    var refocusesPassword by remember { mutableStateOf(false) }
+    var passwordValue by remember { mutableStateOf(TextFieldValue(state.password, TextRange(state.password.length))) }
     val scroll = rememberScrollState()
     val isConnectDisabled = state.connectionProgressLabel != null || state.serverURL.isBlank() || state.headerProblem != null
     val attempt = state.errorContext?.attempt
@@ -767,34 +778,64 @@ private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>)
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Next),
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
-                value = state.password,
-                onValueChange = { store.send(AppFeature.Action.PasswordChanged(it)) },
-                label = { Text("Password") },
-                placeholder = { Text("Password") },
-                singleLine = true,
-                visualTransformation = if (revealsPassword) VisualTransformation.None else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = if (revealsPassword) KeyboardType.Text else KeyboardType.Password,
-                    autoCorrectEnabled = false,
-                    imeAction = ImeAction.Go,
-                ),
-                keyboardActions = KeyboardActions(onGo = {
-                    if (!isConnectDisabled) {
-                        dismissKeyboard()
-                        store.send(AppFeature.Action.ConnectButtonTapped)
-                    }
-                }),
-                trailingIcon = {
+            // A new field each time the password is shown or hidden, as iOS swaps its SecureField
+            // for a TextField: Compose keeps a field's first password flag (foundation 1.12's
+            // `CoreTextFieldSemanticsModifierNode` never stores a new one), so TalkBack would
+            // read a shown password as hidden. Input focus carries over to the new field; the
+            // eye sits over it, outside the swap, so TalkBack's focus stays on it.
+            Box {
+                androidx.compose.runtime.key(revealsPassword) {
+                    OutlinedTextField(
+                        // Its own value, so the new field keeps the caret where it was.
+                        value = if (passwordValue.text == state.password) passwordValue else TextFieldValue(state.password, TextRange(state.password.length)),
+                        onValueChange = {
+                            passwordValue = it
+                            if (it.text != state.password) store.send(AppFeature.Action.PasswordChanged(it.text))
+                        },
+                        label = { Text("Password") },
+                        placeholder = { Text("Password") },
+                        singleLine = true,
+                        visualTransformation = if (revealsPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = if (revealsPassword) KeyboardType.Text else KeyboardType.Password,
+                            autoCorrectEnabled = false,
+                            imeAction = ImeAction.Go,
+                        ),
+                        keyboardActions = KeyboardActions(onGo = {
+                            if (!isConnectDisabled) {
+                                dismissKeyboard()
+                                store.send(AppFeature.Action.ConnectButtonTapped)
+                            }
+                        }),
+                        trailingIcon = { Spacer(Modifier.size(OpenCodeMinTapTarget)) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(passwordFocus)
+                            .onFocusChanged { isPasswordFocused = it.isFocused },
+                    )
+                }
+                // The outlined field's 8 dp above its border is the label's.
+                Box(Modifier.matchParentSize().padding(top = 8.dp), contentAlignment = Alignment.CenterEnd) {
                     OpenCodeIconButton(
                         symbol = if (revealsPassword) SFSymbol.EyeSlash else SFSymbol.Eye,
                         contentDescription = if (revealsPassword) "Hide Password" else "Show Password",
-                        onClick = { revealsPassword = !revealsPassword },
+                        onClick = {
+                            refocusesPassword = isPasswordFocused
+                            // Through the eye, where TalkBack's focus already is: the old field's focus
+                            // would otherwise fall to the drag handle, and TalkBack's with it.
+                            if (isPasswordFocused) eyeFocus.requestFocus()
+                            revealsPassword = !revealsPassword
+                        },
                         style = OpenCodeIconButtonStyle.Standard,
+                        modifier = Modifier.focusRequester(eyeFocus),
                     )
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
+                }
+            }
+            LaunchedEffect(revealsPassword) {
+                if (!refocusesPassword) return@LaunchedEffect
+                refocusesPassword = false
+                passwordFocus.requestFocus()
+            }
             HeaderFields(store, state.headers, state.headerProblem)
             ConnectButton(
                 label = state.connectionProgressLabel ?: if (state.editingSavedServer == null) "Connect" else "Save and connect",
