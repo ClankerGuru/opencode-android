@@ -2,6 +2,8 @@ package ai.opencode.feature.voice
 
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.tuning.AnimationTimeScale
+import ai.opencode.core.ui.OpenCodeColors
+import ai.opencode.core.ui.OpenCodeTheme
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.graphics.BitmapShader
@@ -22,6 +24,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -102,8 +105,8 @@ data class LivingOrbBloom(
  *
  * Android: an AGSL [RuntimeShader] drawn by a Compose [Canvas]; a `withFrameNanos` loop steps the
  * plain-object [WispOrbRenderer] only while it shows (not [isHidden], lifecycle resumed: iOS
- * `scenePhase == .active`). Under Reduce Motion it draws once whenever its inputs change. Wisp's
- * glass looks the same in light and dark.
+ * `scenePhase == .active`). Under Reduce Motion it draws once whenever its inputs change. The lens
+ * takes the theme's colours ([WispOrbPalette]), so it follows light, dark and Material You.
  *
  * @param isHidden faded out behind the panel: no drawing.
  */
@@ -118,15 +121,18 @@ fun LivingOrbView(config: LivingOrbConfig, modifier: Modifier = Modifier, isHidd
     var size by remember { mutableStateOf(IntSize.Zero) }
     var frame by remember { mutableIntStateOf(0) }
     val currentConfig by rememberUpdatedState(config)
+    val palette = WispOrbPalette.of(OpenCodeTheme.colors)
+    val currentPalette by rememberUpdatedState(palette)
 
     fun configure() {
         renderer.config = currentConfig
+        renderer.palette = currentPalette
         renderer.tuning = WispOrbTuning.current
         renderer.isStill = reduceMotion
     }
 
     val isPaused = isHidden || !lifecycle.isAtLeast(Lifecycle.State.RESUMED)
-    LaunchedEffect(renderer, isPaused, reduceMotion, size, density, if (reduceMotion) config else Unit) {
+    LaunchedEffect(renderer, isPaused, reduceMotion, size, density, if (reduceMotion) config else Unit, if (reduceMotion) palette else Unit) {
         if (size.width <= 0 || size.height <= 0) return@LaunchedEffect
         renderer.resetClock()
         if (isPaused) return@LaunchedEffect
@@ -151,6 +157,24 @@ fun LivingOrbView(config: LivingOrbConfig, modifier: Modifier = Modifier, isHidd
         @Suppress("UNUSED_EXPRESSION") frame
         val brush = renderer.brush ?: return@Canvas
         drawRect(brush)
+    }
+}
+
+/**
+ * The theme colours the lens is drawn in (desktop design system, not iOS glass): the plate is the
+ * desktop's inset surface (the canvas in dark, the code band in light), the rim its hairline and
+ * alert its red (mute ring, confirm tint).
+ */
+data class WispOrbPalette(val isDark: Boolean, val plate: Color, val hairline: Color, val alert: Color) {
+    companion object {
+        val fallback = WispOrbPalette(isDark = true, plate = Color(0xFF161616), hairline = Color(0xFF2D2D2D), alert = Color(0xFFF17471))
+
+        fun of(colors: OpenCodeColors): WispOrbPalette = WispOrbPalette(
+            isDark = colors.isDark,
+            plate = if (colors.isDark) colors.canvas else colors.codeBand,
+            hairline = colors.border,
+            alert = colors.destructive,
+        )
     }
 }
 
@@ -181,6 +205,7 @@ class WispOrbRenderer private constructor() {
     private val levels = VoiceAudioLevels.shared
 
     var config = LivingOrbConfig(mood = FloatingCallMood.live, isMuted = false, isSpeaking = false)
+    var palette = WispOrbPalette.fallback
     var tuning = WispOrbTuning()
     var isStill = false
 
@@ -249,6 +274,10 @@ class WispOrbRenderer private constructor() {
             val o = slot * 4
             shader.setFloatUniform(name, uniforms.data[o], uniforms.data[o + 1], uniforms.data[o + 2], uniforms.data[o + 3])
         }
+        val p = palette
+        shader.setFloatUniform("plate", p.plate.red, p.plate.green, p.plate.blue, if (p.isDark) 1f else 0f)
+        shader.setFloatUniform("hair", p.hairline.red, p.hairline.green, p.hairline.blue, 1f)
+        shader.setFloatUniform("alert", p.alert.red, p.alert.green, p.alert.blue, 1f)
         if (brush == null) brush = ShaderBrush(shader)
         return true
     }
