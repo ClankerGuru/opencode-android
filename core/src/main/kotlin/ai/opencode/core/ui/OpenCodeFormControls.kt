@@ -192,11 +192,11 @@ object OpenCodeSheetHandleDefaults {
 }
 
 /**
- * Bottom sheets' container shape: the desktop panel radius ([OpenCodeRadius.panel]) on the top
- * corners, squarer than Material's extra-large sheet corner.
+ * Bottom sheets' container shape: [OpenCodeRadius.sheet] (16 dp) on the top corners, squarer than
+ * Material's extra-large sheet corner.
  */
 object OpenCodeSheetDefaults {
-    val shape: Shape = RoundedCornerShape(topStart = OpenCodeRadius.panel, topEnd = OpenCodeRadius.panel)
+    val shape: Shape = RoundedCornerShape(topStart = OpenCodeRadius.sheet, topEnd = OpenCodeRadius.sheet)
 }
 
 /** [OpenCodeSwitch]'s geometry: the desktop switch's proportions at touch size. */

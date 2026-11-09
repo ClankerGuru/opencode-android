@@ -42,7 +42,7 @@ the OpenCode desktop design system (`packages/ui`, theme `oc-2`), not iOS's SF /
   `OpenCodeSheetHandle` is every bottom sheet's drag handle: the desktop resize handle's
   40 × 4 dp pill in `tertiaryText` over Material's `DragHandle` (its band and TalkBack
   actions stay); custom grabbers use `OpenCodeSheetHandleDefaults`. Sheets take
-  `OpenCodeSheetDefaults.shape` (12 dp top corners, the desktop panel radius).
+  `OpenCodeSheetDefaults.shape` (16 dp top corners, `OpenCodeRadius.sheet`).
   `OpenCodeTextField` / `OpenCodeSearchField` (`ui/OpenCodeTextField.kt`) are the desktop text
   input (`forms/text-input`) over `BasicTextField`: the label sits above the field (no floating
   label), placeholder shown while empty, 48 dp minimum height, 8 dp corners, 12 dp padding,
