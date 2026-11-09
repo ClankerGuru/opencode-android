@@ -1,11 +1,11 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.ui.OpenCodeSheetHandleDefaults
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.core.ui.OpenCodeShape
-import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.AccessibilityFocusRequest
 import ai.opencode.core.ui.accessibilityFocusRequest
 import ai.opencode.core.ui.rememberAccessibilityFocusRequest
@@ -752,8 +752,8 @@ private fun PhotoSheetGrabber(
         Box(
             Modifier
                 .padding(top = 7.dp)
-                .size(width = 36.dp, height = 5.dp)
-                .background(OpenCodeTheme.colors.tertiaryText, OpenCodeShape.capsule),
+                .size(width = OpenCodeSheetHandleDefaults.width, height = OpenCodeSheetHandleDefaults.height)
+                .background(OpenCodeSheetHandleDefaults.color, OpenCodeShape.capsule),
         )
     }
 }

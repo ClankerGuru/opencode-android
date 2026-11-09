@@ -33,6 +33,39 @@ the OpenCode desktop design system (`packages/ui`, theme `oc-2`), not iOS's SF /
   + small shadow; `OpenCodeAlertDialog` (desktop dialog over Material's `AlertDialog`).
 - Controls: buttons 48 dp, 8 dp corners; `OpenCodeSecondaryButton` is the neutral hairline
   button; `OpenCodeIconButton(style = Circle)` is a 10 dp rounded square with a hairline.
+  `OpenCodeSwitch` (`ui/OpenCodeFormControls.kt`) is the desktop switch (`forms/switch`): a
+  40 × 24 dp track and an 18 dp thumb with concentric corners (7 / 4 dp, 3 dp inset), no
+  checkmark, 150 ms slides, half opacity disabled, press widens the thumb (desktop hover).
+  Off is light like the desktop (quiet `surfaceContainerHighest` track, light thumb with a
+  faint edge); its outline (row colour 85 % of the way to `tertiaryText`, full under high
+  contrast) carries the 3:1 contrast. On is `primary` / `onPrimary`; System uses Material You.
+  `OpenCodeSheetHandle` is every bottom sheet's drag handle: the desktop resize handle's
+  40 × 4 dp pill in `tertiaryText` over Material's `DragHandle` (its band and TalkBack
+  actions stay); custom grabbers use `OpenCodeSheetHandleDefaults`. Sheets take
+  `OpenCodeSheetDefaults.shape` (12 dp top corners, the desktop panel radius).
+  `OpenCodeTextField` / `OpenCodeSearchField` (`ui/OpenCodeTextField.kt`) are the desktop text
+  input (`forms/text-input`) over `BasicTextField`: the label sits above the field (no floating
+  label), placeholder shown while empty, 48 dp minimum height, 8 dp corners, 12 dp padding,
+  callout text. Fill is white in light (with a 1 dp shadow, desktop `elevation-input`) and a
+  step above the sheet in dark; a 1 dp `outline` border (`tertiaryText` under high contrast).
+  Focus is a 1.5 dp `primary` ring, error a `error` ring plus a footnote note under the field
+  (TalkBack reads it via `error()`), disabled half opacity. Custom bare fields inside their own
+  containers (composer, drawer search, browser bar, share dock) keep their containers; the
+  model picker's search rows use `Modifier.openCodeFieldContainer`.
+- Call orb (`feature/voice` `WispOrbShaders`, `WispOrbPalette`): the desktop has no orb, so
+  the Wisp keeps iOS's simulation, dots, halos, glow, rim light and timings; only its plate is
+  a neutral graphite (#141415, a dark speaker grille in both themes) instead of iOS's
+  blue-black glass, and its drop shadow is lighter on light themes (0.30 vs 0.42).
+- Call card (`feature/voice` `FloatingCall`, `VoiceCallSurfaceDefaults`): one step off the
+  page (`card`: 5% toward the text colour in light, 6% in dark) with a hairline and a soft
+  20 dp shadow, so it separates from the canvas in both themes; the controls are 12 dp rounded
+  squares (`controlFill` + hairline, ink when on, theme red for End) instead of tonal circles.
+- Title bars (`ui/OpenCodeTopBar.kt`, Android-only): the desktop's settings/session header
+  instead of Material's `TopAppBar`s: flat canvas, 52 dp row, headline title (start or
+  centred), bare back arrow (`OpenCodeTopBarBackButton`), 1 dp bottom hairline that fades in
+  once content scrolls under it (always shown without a scroll behaviour). `OpenCodeLargeTopBar`
+  is the large-title variant (title1 under the row; Material's `exitUntilCollapsed` behaviour
+  scrolls it away and fades the small title in), used by Settings pages.
 Paths below are relative to `core/src/main/kotlin/ai/opencode/core/`.
 
 ## Files
@@ -59,7 +92,8 @@ Paths below are relative to `core/src/main/kotlin/ai/opencode/core/`.
 - Shapes and spacing: `OpenCodeShape.control` for controls, `capsule/circle` for true capsules, `card/panel/sheet`, `OpenCodeRadius.*`, `OpenCodeSpacing.*`.
 - Surfaces: `OpenCodeSurfaces.color/border/dialogShape/popoverShape/raisedShadow/popoverShadow`, `Modifier.openCodeHairline(shape)`, `OpenCodeAlertDialog` instead of `AlertDialog`; Material `Button`s take `shape = OpenCodeShape.control`.
 - Motion: `Motion.<name>.spec()` / `.animation(reduceMotion)`, `Motion.easeOut(Motion.fadeStandard, …)`, `rememberReduceMotion()`, `SpringSolver` + `motionFrameLoop {}` for custom drivers, `PresenceGate`, `Modifier.motionBlurReveal`.
-- Controls: `OpenCodePrimaryButton` / `OpenCodeSecondaryButton` (`role = Destructive` for red), `OpenCodeIconButton(SFSymbol.X, "Label", onClick)`, `Modifier.openCodeTapTarget()` after `clickable`.
+- Title bars: `OpenCodeTopBar(title = { Text(...) }, navigation = { OpenCodeTopBarBackButton(onBack) }, actions = { ... }, centerTitle, scrollBehavior)` or `OpenCodeLargeTopBar("Title", TopAppBarDefaults.exitUntilCollapsedScrollBehavior())` instead of Material `TopAppBar`s; put the behaviour's `nestedScrollConnection` on the `Scaffold`.
+- Controls: `OpenCodePrimaryButton` / `OpenCodeSecondaryButton` (`role = Destructive` for red), `OpenCodeIconButton(SFSymbol.X, "Label", onClick)`, `Modifier.openCodeTapTarget()` after `clickable`; `OpenCodeSwitch(checked, onCheckedChange)` instead of Material's `Switch` (pass `null` when the row is the toggleable); sheets take `dragHandle = { OpenCodeSheetHandle() }` and `shape = OpenCodeSheetDefaults.shape` (both the default in `OpenCodeBottomSheet`); `OpenCodeTextField(value, onValueChange, label = "…", placeholder = "…")` and `OpenCodeSearchField` instead of Material's `OutlinedTextField` / `TextField`.
 - Icons: `OpenCodeIcon(SFSymbol.ArrowUpCircleFill, contentDescription)` or `OpenCodeIcon("arrow.up", …)` / `sfSymbol(name)` for names held as strings. New icon: add a line to `scripts/material-symbols.txt`, run `python3 scripts/fetch-material-symbols.py`, add the `SFSymbol` entry and a row below.
 - TalkBack focus (`ui/AccessibilityFocus.kt`, moved down from `:feature:composer`'s `AttachmentMenu.kt`; one helper where VoiceOver moves by itself): `Modifier.accessibilityFocusRequest(request)` moves TalkBack's focus onto the element once per `AccessibilityFocusRequest` (after a window on top hands focus back); a request is spent by its move, so a recomposition, a remount or a session moved into Catch Up's stack never replays it (QA W-05); `rememberAccessibilityFocusRequest(event)` makes a new one for each new non-null `event`; `LocalAccessibilityFocusMoves` false (Catch Up's inert preview card) turns every move off; a move refused because the element isn't in the accessibility tree yet (fading in) tries again each frame for up to 1 s (QA AF-02: Catch Up's Leave was always refused and only TalkBack's own pick landed there); `Modifier.accessibilityFocusTarget(target)` + `AccessibilityFocusTarget.focus()` move it when the caller decides. Both mark their semantics node (ahead of any `clearAndSetSemantics`), find it in the view's tree and perform `ACTION_ACCESSIBILITY_FOCUS` through the view's accessibility node provider. Compose has no public accessibility-focus API and no public node → id mapping (`requireSemanticsInfo` is internal), so the tree comes from `RootForTest` in this one file.
 - Gallery: `DesignSystemGallery()` (`ui/DesignSystemGallery.kt`).

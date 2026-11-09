@@ -1,5 +1,8 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.ui.OpenCodeSearchField
+import ai.opencode.core.ui.OpenCodeSheetDefaults
+import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.motion.transitionBlur
 
@@ -50,8 +53,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -442,7 +443,12 @@ fun ProjectPickerSheet(
     // ignores detents and presents the sheet at full height; half of it there showed only the
     // title, the search and a row under the gesture bar (QA F-36).
     val compactHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() } < 480.dp
-    ModalBottomSheet(onDismissRequest = onCancel, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = compactHeight)) {
+    ModalBottomSheet(
+        onDismissRequest = onCancel,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = compactHeight),
+        dragHandle = { OpenCodeSheetHandle() },
+        shape = OpenCodeSheetDefaults.shape,
+    ) {
         val routes = folderBrowser?.let { browser -> browser.collectState().value.routes }.orEmpty()
         BackHandler(enabled = routes.isNotEmpty()) {
             folderBrowser?.send(FolderBrowserFeature.Action.RoutesChanged(routes.dropLast(1)))
@@ -690,18 +696,10 @@ private fun SheetTitleBar(
 
 @Composable
 private fun SearchField(value: String, onValueChange: (String) -> Unit) {
-    TextField(
+    OpenCodeSearchField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = { Text("Search") },
-        leadingIcon = { OpenCodeIcon(SFSymbol.Magnifyingglass, contentDescription = null, size = 20.dp) },
-        singleLine = true,
-        shape = RoundedCornerShape(8.dp),
-        colors = TextFieldDefaults.colors(
-            focusedIndicatorColor = Color.Transparent,
-            unfocusedIndicatorColor = Color.Transparent,
-            disabledIndicatorColor = Color.Transparent,
-        ),
+        placeholder = "Search",
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
     )
 }

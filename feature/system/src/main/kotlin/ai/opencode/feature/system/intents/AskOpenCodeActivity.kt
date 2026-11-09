@@ -1,5 +1,6 @@
 package ai.opencode.feature.system.intents
 
+import ai.opencode.core.ui.OpenCodeTextField
 import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.feature.system.LeftToRight
 import ai.opencode.feature.system.SessionDirectory
@@ -37,7 +38,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -235,11 +235,11 @@ private fun AskOpenCodeView(
                     return@Column
                 }
                 val focus = remember { FocusRequester() }
-                OutlinedTextField(
+                OpenCodeTextField(
                     value = state.message,
                     onValueChange = { text -> onUpdate { it.copy(message = text) } },
-                    label = { Text(AskOpenCodeIntent.MESSAGE_TITLE) },
-                    placeholder = { Text(AskOpenCodeIntent.REQUEST_VALUE_DIALOG) },
+                    label = AskOpenCodeIntent.MESSAGE_TITLE,
+                    placeholder = AskOpenCodeIntent.REQUEST_VALUE_DIALOG,
                     minLines = 2,
                     maxLines = 6,
                     enabled = !state.isSending,

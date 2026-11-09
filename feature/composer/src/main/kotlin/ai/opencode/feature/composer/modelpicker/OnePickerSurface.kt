@@ -1,5 +1,9 @@
 package ai.opencode.feature.composer.modelpicker
 
+import ai.opencode.core.ui.openCodeFieldContainer
+import ai.opencode.core.ui.OpenCodeTextFieldDefaults
+import ai.opencode.core.ui.OpenCodeShape
+import ai.opencode.core.ui.OpenCodeSheetHandleDefaults
 import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.ui.openCodeHairline
 import ai.opencode.core.haptics.Haptic
@@ -715,8 +719,8 @@ private fun OnePickerGrabber(
         Box(
             Modifier
                 .padding(top = 3.dp)
-                .size(36.dp, 5.dp)
-                .background(OpenCodeTheme.colors.tertiaryText, CircleShape),
+                .size(OpenCodeSheetHandleDefaults.width, OpenCodeSheetHandleDefaults.height)
+                .background(OpenCodeSheetHandleDefaults.color, OpenCodeShape.capsule),
         )
     }
 }
@@ -736,6 +740,7 @@ private fun OnePickerSearchBar(
     finishInteractiveDrag: (Double, Double) -> Unit,
 ) {
     val colors = OpenCodeTheme.colors
+    val fieldColors = OpenCodeTextFieldDefaults.colors()
     val density = LocalDensity.current
     val focusManager = LocalFocusManager.current
     val text = state.modelFilter
@@ -776,20 +781,20 @@ private fun OnePickerSearchBar(
                 .fillMaxWidth()
                 .padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 10.dp)
                 .height(44.dp)
-                .background(colors.inlineCodeFill, CircleShape)
+                .openCodeFieldContainer(isFocused = focused)
                 .padding(start = 10.dp, end = if (hasTrailing) 2.dp else 14.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            OpenCodeIcon(SFSymbol.Magnifyingglass, null, size = 20.dp, tint = colors.secondaryText)
+            OpenCodeIcon(SFSymbol.Magnifyingglass, null, size = OpenCodeTextFieldDefaults.iconSize, tint = fieldColors.icon)
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                if (text.isEmpty()) Text("Search Models", style = OpenCodeTextStyles.body, color = colors.secondaryText, maxLines = 1)
+                if (text.isEmpty()) Text("Search Models", style = OpenCodeTextFieldDefaults.textStyle, color = fieldColors.placeholder, maxLines = 1)
                 BasicTextField(
                     value = text,
                     onValueChange = { onEvent(ModelPickerEvent.FilterChanged(it)) },
                     singleLine = true,
-                    textStyle = OpenCodeTextStyles.body.copy(color = colors.text),
-                    cursorBrush = SolidColor(colors.accent),
+                    textStyle = OpenCodeTextFieldDefaults.textStyle.copy(color = colors.text),
+                    cursorBrush = SolidColor(fieldColors.cursor),
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Go),
                     keyboardActions = KeyboardActions(onAny = { onSubmit() }),
                     modifier = Modifier
