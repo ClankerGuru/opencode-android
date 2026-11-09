@@ -8,6 +8,7 @@ import ai.opencode.core.files.ComposerStagedFile
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
+import ai.opencode.core.ui.drawerPanHorizontalScroller
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.composer.AttachmentCameraView
 import ai.opencode.feature.composer.AttachmentMenuItem
@@ -576,6 +577,7 @@ fun PendingAttachmentsRow(
         modifier = Modifier
             // Edge to edge in the card, fading where photos run under its edges.
             .outsetHorizontally(inner)
+            .drawerPanHorizontalScroller({ listState.canScrollBackward }, { listState.canScrollForward })
             .horizontalScrollEdgeFade(listState, isEnabled = styled)
             .onGloballyPositioned { departing.row = it },
     ) {

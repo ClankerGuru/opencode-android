@@ -2,6 +2,7 @@ package ai.opencode.feature.transcript.markdown.ui
 
 import ai.opencode.core.ui.OpenCodeColors
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.drawerPanHorizontalScroller
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ScrollState
@@ -149,6 +150,7 @@ fun MarkdownBand(
         ) {
             Box(
                 Modifier
+                    .drawerPanHorizontalScroller(scroll)
                     .horizontalOverflowFade(scroll, width = 32.dp)
                     .horizontalScroll(scroll)
                     .padding(horizontal = TranscriptBandStyle.horizontalPadding),
