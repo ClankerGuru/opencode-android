@@ -112,6 +112,7 @@ Add a new library only with a one-line justification here.
   AVFoundation QR metadata output does; pure Java, no Play services (ML Kit would need them).
 - `androidx.media3:media3-exoplayer` (voice): plays an agent's audio on a call (iOS `CallAudioPlayer` uses AVAudioPlayerNode on the call's engine); ExoPlayer streams and decodes what MediaPlayer can't, on the call's voice-communication attributes.
 - `androidx.profileinstaller:profileinstaller` (app): installs the packaged app and library Baseline Profiles for ART compilation, including sideloaded builds.
+- `androidx.fragment:fragment` (app, constraint only): raises the fragment 1.1.0 that Firebase Messaging's Play services libraries pull in, which Google Play's SDK index flags as outdated; the app has no Fragments of its own.
 
 ## Check and run
 

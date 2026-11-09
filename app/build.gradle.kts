@@ -83,4 +83,9 @@ dependencies {
     testImplementation(testFixtures(project(":server")))
     // AppWideWorkTests: real window stores, whose sends need Android's main looper.
     testImplementation(libs.robolectric)
+    constraints {
+        implementation(libs.androidx.fragment) {
+            because("Firebase Messaging's Play services pull in fragment 1.1.0, which Google Play flags as outdated")
+        }
+    }
 }
