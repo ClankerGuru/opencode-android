@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings.onboarding
 
+import ai.opencode.core.ui.OpenCodeSheetHandle
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.draw.clip
 import ai.opencode.core.ui.openCodeHairline
@@ -326,6 +327,7 @@ private fun WelcomeOtherWays(pasteError: String?, send: (WelcomeFeature.Action) 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
+        dragHandle = { OpenCodeSheetHandle() },
     ) {
         Column(
             Modifier

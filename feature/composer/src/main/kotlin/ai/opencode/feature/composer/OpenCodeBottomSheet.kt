@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.ui.OpenCodeSheetHandle
 import android.view.KeyEvent
 import android.view.Window
 import androidx.activity.compose.BackHandler
@@ -111,7 +112,7 @@ fun OpenCodeBottomSheet(
     onDismissRequest: () -> Unit,
     sheetState: SheetState,
     modifier: Modifier = Modifier,
-    dragHandle: @Composable () -> Unit = { BottomSheetDefaults.DragHandle() },
+    dragHandle: @Composable () -> Unit = { OpenCodeSheetHandle() },
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val presentations = LocalSheetPresentations.current

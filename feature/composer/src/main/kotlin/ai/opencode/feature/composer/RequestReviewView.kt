@@ -1,6 +1,7 @@
 package ai.opencode.feature.composer
 
-import ai.opencode.core.ui.OpenCodeSwitchDefaults
+import ai.opencode.core.ui.OpenCodeSheetHandle
+import ai.opencode.core.ui.OpenCodeSwitch
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
@@ -35,7 +36,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -83,6 +83,7 @@ fun RequestReviewSheet(
         onDismissRequest = onClose,
         sheetState = sheetState,
         containerColor = OpenCodeTheme.colors.canvas,
+        dragHandle = { OpenCodeSheetHandle() },
     ) {
         RequestReviewView(dock, context, dismissMessage, send, onClose, onOpenURL)
     }
@@ -220,11 +221,10 @@ private fun FormField(
                 }
                 Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("Completed", style = OpenCodeTextStyles.body, color = colors.text, modifier = Modifier.weight(1f))
-                    Switch(
+                    OpenCodeSwitch(
                         checked = answers[field.key] == OpenCodeFormValue.Boolean(true),
                         onCheckedChange = { set(OpenCodeFormValue.Boolean(it)) },
                         enabled = enabled,
-                        colors = OpenCodeSwitchDefaults.colors(),
                     )
                 }
             }

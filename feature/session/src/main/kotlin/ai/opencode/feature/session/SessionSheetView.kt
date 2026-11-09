@@ -1,6 +1,7 @@
 package ai.opencode.feature.session
 
-import ai.opencode.core.ui.OpenCodeSwitchDefaults
+import ai.opencode.core.ui.OpenCodeSheetHandle
+import ai.opencode.core.ui.OpenCodeSwitch
 import ai.opencode.core.ui.openCodeHairline
 import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.dependencies.dependency
@@ -63,7 +64,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -78,7 +78,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.text.modifiers.TextAutoSizeLayoutScope
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.layout.layout
@@ -358,7 +357,7 @@ fun SessionSheetPrewarm(
                     AlwaysNotifyCard(isOn = false, isPending = false) { }
                     DeleteRow(enabled = true) { }
                     rememberModalBottomSheetState(skipPartiallyExpanded = true)
-                    BottomSheetDefaults.DragHandle()
+                    OpenCodeSheetHandle()
                 }
             }
         }
@@ -827,7 +826,7 @@ private fun AlwaysNotifyCard(isOn: Boolean, isPending: Boolean, onToggle: (Boole
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("Always Notify", style = OpenCodeTextStyles.callout, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
-            Switch(checked = isOn, onCheckedChange = null, enabled = !isPending, colors = OpenCodeSwitchDefaults.colors())
+            OpenCodeSwitch(checked = isOn, onCheckedChange = null, enabled = !isPending)
         }
         Text(
             "Notify this $device whenever a reply finishes, even ones you didn’t send from here.",

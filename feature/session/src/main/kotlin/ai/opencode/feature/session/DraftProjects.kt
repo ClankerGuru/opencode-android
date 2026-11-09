@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.motion.transitionBlur
 
@@ -442,7 +443,11 @@ fun ProjectPickerSheet(
     // ignores detents and presents the sheet at full height; half of it there showed only the
     // title, the search and a row under the gesture bar (QA F-36).
     val compactHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() } < 480.dp
-    ModalBottomSheet(onDismissRequest = onCancel, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = compactHeight)) {
+    ModalBottomSheet(
+        onDismissRequest = onCancel,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = compactHeight),
+        dragHandle = { OpenCodeSheetHandle() },
+    ) {
         val routes = folderBrowser?.let { browser -> browser.collectState().value.routes }.orEmpty()
         BackHandler(enabled = routes.isNotEmpty()) {
             folderBrowser?.send(FolderBrowserFeature.Action.RoutesChanged(routes.dropLast(1)))

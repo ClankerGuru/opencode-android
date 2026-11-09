@@ -2,6 +2,7 @@
 
 package ai.opencode.feature.composer.modelpicker
 
+import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconSize
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -200,7 +201,7 @@ fun ModelPickerDetentsSheet(
     OpenCodeBottomSheet(
         onDismissRequest = { currentOnClose() },
         sheetState = sheetState,
-        dragHandle = { Box(probe) { BottomSheetDefaults.DragHandle() } },
+        dragHandle = { Box(probe) { OpenCodeSheetHandle() } },
     ) {
         // UIKit lifts a medium sheet when Search brings up the keyboard. Keep that expanded
         // rest after the keyboard goes, but don't fight a subsequent drag back down.

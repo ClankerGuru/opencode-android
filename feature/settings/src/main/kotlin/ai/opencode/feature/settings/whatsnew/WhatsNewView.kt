@@ -1,6 +1,6 @@
 package ai.opencode.feature.settings.whatsnew
 
-import ai.opencode.core.ui.OpenCodeSwitchDefaults
+import ai.opencode.core.ui.OpenCodeSwitch
 import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.experiments.key
@@ -54,7 +54,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -190,7 +189,7 @@ private fun WhatsNewOptionsMenu(isButtonEnabled: Boolean, onEnabledChange: (Bool
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
                 text = { Text("Show in Drawer") },
-                trailingIcon = { Switch(checked = isButtonEnabled, onCheckedChange = null, colors = OpenCodeSwitchDefaults.colors()) },
+                trailingIcon = { OpenCodeSwitch(checked = isButtonEnabled, onCheckedChange = null) },
                 onClick = { onEnabledChange(!isButtonEnabled) },
                 modifier = Modifier.semantics { toggleableState = ToggleableState(isButtonEnabled) },
             )

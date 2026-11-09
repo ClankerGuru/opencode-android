@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings.serverdetails
 
+import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
@@ -96,6 +97,7 @@ internal fun ServerDetailsTray(
         onDismissRequest = { send(ServerDetailsFeature.Action.TrayChanged(null)) },
         sheetState = sheetState,
         containerColor = OpenCodeTheme.colors.groupedCanvas,
+        dragHandle = { OpenCodeSheetHandle() },
     ) {
         when (tray) {
             ServerDetailsFeature.Tray.Mcp -> MCPServersTray(state, send, close)

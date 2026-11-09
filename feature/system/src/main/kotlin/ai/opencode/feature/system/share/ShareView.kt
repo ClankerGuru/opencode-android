@@ -1,5 +1,6 @@
 package ai.opencode.feature.system.share
 
+import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.motion.transitionBlur
@@ -962,7 +963,12 @@ private fun ShareSessionSearch(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var query by rememberSaveable { mutableStateOf("") }
     val colors = OpenCodeTheme.colors
-    ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState, containerColor = colors.groupedCanvas) {
+    ModalBottomSheet(
+        onDismissRequest = onClose,
+        sheetState = sheetState,
+        containerColor = colors.groupedCanvas,
+        dragHandle = { OpenCodeSheetHandle() },
+    ) {
         Box(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
             OpenCodeIconButton(
                 symbol = SFSymbol.Xmark,

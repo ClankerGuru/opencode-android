@@ -1,5 +1,7 @@
 package ai.opencode.feature.composer.modelpicker
 
+import ai.opencode.core.ui.OpenCodeShape
+import ai.opencode.core.ui.OpenCodeSheetHandleDefaults
 import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.ui.openCodeHairline
 import ai.opencode.core.haptics.Haptic
@@ -715,8 +717,8 @@ private fun OnePickerGrabber(
         Box(
             Modifier
                 .padding(top = 3.dp)
-                .size(36.dp, 5.dp)
-                .background(OpenCodeTheme.colors.tertiaryText, CircleShape),
+                .size(OpenCodeSheetHandleDefaults.width, OpenCodeSheetHandleDefaults.height)
+                .background(OpenCodeSheetHandleDefaults.color, OpenCodeShape.capsule),
         )
     }
 }

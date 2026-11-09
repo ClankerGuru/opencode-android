@@ -1,5 +1,6 @@
 package ai.opencode.app
 
+import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeSurfaces
 import androidx.compose.ui.unit.sp
 import ai.opencode.core.ui.OpenCodeRadius
@@ -708,6 +709,7 @@ private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>)
     ModalBottomSheet(
         onDismissRequest = { store.send(AppFeature.Action.CancelEditingTapped) },
         sheetState = sheetState,
+        dragHandle = { OpenCodeSheetHandle() },
     ) {
         // Its password and headers, out of problem reports and voice screenshots.
         HidesFromScreenshots()
