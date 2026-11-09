@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.motion.transitionBlur
 
 import ai.opencode.core.motion.Motion
@@ -722,6 +723,6 @@ private fun Unavailable(symbol: SFSymbol, title: String, description: String? = 
         OpenCodeIcon(symbol, contentDescription = null, size = 48.dp, tint = OpenCodeTheme.colors.secondaryText)
         Text(title, style = OpenCodeTextStyles.title3.copy(fontWeight = FontWeight.Bold), color = OpenCodeTheme.colors.text, textAlign = TextAlign.Center)
         if (description != null) Text(description, style = OpenCodeTextStyles.callout, color = OpenCodeTheme.colors.secondaryText, textAlign = TextAlign.Center)
-        if (action != null) Button(onClick = action.second) { Text(action.first) }
+        if (action != null) Button(onClick = action.second, shape = OpenCodeShape.control) { Text(action.first) }
     }
 }

@@ -1,5 +1,7 @@
 package ai.opencode.feature.settings.onboarding
 
+import ai.opencode.core.ui.OpenCodeSurfaces
+import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
@@ -362,7 +364,7 @@ private fun OtherWaysSection(
         if (header != null) {
             Text(header, style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.secondaryText, modifier = Modifier.padding(horizontal = 16.dp).semantics { heading() })
         }
-        Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Surface(shape = RoundedCornerShape(OpenCodeRadius.card), color = OpenCodeSurfaces.color, border = OpenCodeSurfaces.border) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), content = content)
         }
         if (footer != null) {

@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings.servers
 
+import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.dependencies.PasteboardClient
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.ui.AppearanceColorScheme
@@ -269,6 +270,7 @@ private fun PasteButton(prominent: Boolean, onClick: () -> Unit, content: @Compo
             colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
             contentPadding = OpenCodeButtonDefaults.contentPadding,
             content = content,
+            shape = OpenCodeShape.control,
         )
     } else {
         OpenCodeSecondaryButton(onClick = onClick, modifier = Modifier.fillMaxWidth(), content = content)

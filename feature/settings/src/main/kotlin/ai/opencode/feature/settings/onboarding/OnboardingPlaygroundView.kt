@@ -1,5 +1,7 @@
 package ai.opencode.feature.settings.onboarding
 
+import ai.opencode.core.ui.OpenCodeRadius
+import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.motion.transitionBlurEffect
 
 import ai.opencode.core.diagnostics.HidesFromScreenshots
@@ -193,6 +195,7 @@ fun OnboardingPlaygroundView(
                             FilledTonalButton(
                                 onClick = { store.send(Action.ControlsHiddenChanged(false)) },
                                 modifier = Modifier.heightIn(min = 48.dp).widthIn(min = 64.dp),
+                                shape = OpenCodeShape.control,
                             ) {
                                 OpenCodeIcon(SFSymbol.ChevronUp, contentDescription = "Show Controls", size = OpenCodeIconSize.small)
                             }
@@ -685,7 +688,7 @@ private fun ApertureLayer(
     val shownTarget = phase == Phase.camera || phase == Phase.waiting
     val shown = animateFloatAsState(if (shownTarget) 1f else 0f, OnboardingMotion.layout(reduceMotion), label = "aperture")
     val waiting = animateFloatAsState(if (phase == Phase.waiting) 1f else 0f, OnboardingMotion.layout(reduceMotion), label = "found")
-    val shape = RoundedCornerShape(32.dp)
+    val shape = RoundedCornerShape(OpenCodeRadius.panel)
     val density = LocalDensity.current.density
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         Box(
@@ -796,7 +799,7 @@ private fun FirstSessionPage(
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = 52.dp)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(26.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(OpenCodeRadius.panel))
                     .padding(start = 18.dp, end = 8.dp)
                     .semantics(mergeDescendants = true) { contentDescription = "Message" },
                 verticalAlignment = Alignment.CenterVertically,
@@ -840,6 +843,7 @@ private fun PrimaryButton(title: String, active: Boolean, onClick: () -> Unit) {
             disabledContentColor = content,
         ),
         contentPadding = OpenCodeButtonDefaults.contentPadding,
+        shape = OpenCodeShape.control,
     ) { Text(title, style = OpenCodeTextStyles.headline) }
 }
 
@@ -852,6 +856,7 @@ private fun SecondaryButton(title: String, active: Boolean, onClick: () -> Unit)
         modifier = Modifier.fillMaxWidth().heightIn(min = OpenCodeButtonDefaults.height),
         colors = colors.copy(disabledContainerColor = colors.containerColor, disabledContentColor = colors.contentColor),
         contentPadding = OpenCodeButtonDefaults.contentPadding,
+        shape = OpenCodeShape.control,
     ) { Text(title, style = OpenCodeTextStyles.headline) }
 }
 

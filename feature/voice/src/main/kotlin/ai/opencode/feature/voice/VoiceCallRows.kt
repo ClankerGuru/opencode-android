@@ -1,5 +1,6 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.ui.OpenCodeIcon
@@ -166,6 +167,7 @@ private fun ScreenRequestRow(request: ClientToolCall, send: (VoiceFeature.Action
         Button(
             onClick = { send(VoiceFeature.Action.ScreenRequest(VoiceScreenRequestFeature.Action.ShareTapped)) },
             modifier = Modifier.semantics { testTag = "voice-screen-request-share" },
+            shape = OpenCodeShape.control,
         ) { Text("Share") }
     }
 }
@@ -195,6 +197,7 @@ private fun OpenLinkRow(request: ClientToolCall, send: (VoiceFeature.Action) -> 
         Button(
             onClick = { send(VoiceFeature.Action.OpenLink(VoiceOpenLinkFeature.Action.OpenTapped)) },
             modifier = Modifier.semantics { testTag = "voice-open-link-open" },
+            shape = OpenCodeShape.control,
         ) { Text("Open") }
     }
 }

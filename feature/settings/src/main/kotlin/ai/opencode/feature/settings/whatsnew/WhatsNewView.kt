@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings.whatsnew
 
+import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.rememberReduceMotion
@@ -308,7 +309,7 @@ fun WhatsNewDetailPage(store: SettingsStore, entryID: String) {
                     .padding(top = 8.dp)
                     .padding(horizontal = 20.dp)
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(26.dp))
+                    .clip(RoundedCornerShape(OpenCodeRadius.panel))
                     .background(OpenCodeTheme.colors.groupedCard)
                     .padding(6.dp),
             ) {
@@ -336,7 +337,7 @@ fun WhatsNewDetailPage(store: SettingsStore, entryID: String) {
                         .padding(horizontal = 20.dp)
                         .padding(top = 22.dp)
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(26.dp))
+                        .clip(RoundedCornerShape(OpenCodeRadius.panel))
                         .background(OpenCodeTheme.colors.groupedCard),
                 ) {
                     current.details.forEachIndexed { index, detail ->
@@ -520,7 +521,7 @@ private fun WhatsNewDotSymbol(symbol: String, tint: Color, modifier: Modifier = 
     }
     Box(
         modifier
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(OpenCodeRadius.card))
             .background(if (isDark) Color(0.04f, 0.04f, 0.04f) else Color(0.965f, 0.965f, 0.965f))
             .onSizeChanged { size = it },
     ) {

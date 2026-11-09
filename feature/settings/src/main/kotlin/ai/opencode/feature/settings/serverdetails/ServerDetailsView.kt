@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings.serverdetails
 
+import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.diagnostics.HidesFromScreenshots
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.store.StoreOf
@@ -342,7 +343,7 @@ private fun OverviewTile(
     content: @Composable () -> Unit,
 ) {
     // Android divergence: a ripple answers the press (iOS shrinks the tile to 98 %).
-    val shape = RoundedCornerShape(26.dp)
+    val shape = RoundedCornerShape(OpenCodeRadius.panel)
     Box(
         modifier
             .background(OpenCodeTheme.colors.groupedCard, shape)
@@ -401,7 +402,7 @@ internal fun ProblemBanner(
     val needsAuth = mcp.status is OpenCodeMCPServer.Status.NeedsAuth
     val brand = ServerBrand.mcp(mcp.name)
     val tone = mcp.status.tintColor()
-    val shape = RoundedCornerShape(22.dp)
+    val shape = RoundedCornerShape(OpenCodeRadius.card)
     Row(
         modifier
             .background(OpenCodeTheme.colors.groupedCard, shape)

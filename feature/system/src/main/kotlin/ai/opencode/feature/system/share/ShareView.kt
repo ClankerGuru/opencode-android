@@ -385,12 +385,12 @@ private fun Status(state: ShareModel.State, actions: ShareActions, reduceMotion:
             when (val current = shown[0]) {
                 is ShareModel.Phase.Failed -> {
                     Text(current.problem.message, style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.weight(1f))
-                    FilledTonalButton(onClick = actions.onSendLater) { Text("Send Later") }
-                    if (current.problem.canRetry) Button(onClick = actions.onSend) { Text("Try Again") }
+                    FilledTonalButton(onClick = actions.onSendLater, shape = OpenCodeShape.control) { Text("Send Later") }
+                    if (current.problem.canRetry) Button(onClick = actions.onSend, shape = OpenCodeShape.control) { Text("Try Again") }
                 }
                 else -> {
                     Text("Saved. Open OpenCode to continue", style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.weight(1f))
-                    Button(onClick = actions.onDone) { Text("Done") }
+                    Button(onClick = actions.onDone, shape = OpenCodeShape.control) { Text("Done") }
                 }
             }
         }

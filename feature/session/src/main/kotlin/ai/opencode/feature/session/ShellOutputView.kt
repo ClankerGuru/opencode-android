@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
@@ -481,6 +482,7 @@ private fun StatusBar(state: ShellOutputFeature.State, runningGlyph: @Composable
                     disabledContentColor = red.copy(alpha = 0.5f),
                 ),
                 modifier = Modifier.heightIn(min = 48.dp).testTag("shell-output-stop"),
+                shape = OpenCodeShape.control,
             ) {
                 if (state.isStopping) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                 else Text("Stop Shell")

@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings
 
+import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.diagnostics.HidesFromScreenshots
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -77,6 +78,7 @@ internal fun VoiceKeyEditor(state: VoiceSettingsFeature.State, voice: VoiceStore
             FilledTonalButton(
                 onClick = { voice.send(VoiceSettingsFeature.Action.VerifyKeyTapped) },
                 enabled = state.activeAPIKey.isNotEmpty() && !state.isCheckingKey,
+                shape = OpenCodeShape.control,
             ) { Text("Verify") }
         }
         if (stacked) {
