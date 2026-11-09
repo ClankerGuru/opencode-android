@@ -7,6 +7,13 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
+    <!-- Ask OpenCode hides other apps' overlays while its Send shows (setHideOverlayWindows). -->
+    <uses-permission android:name="android.permission.HIDE_OVERLAY_WINDOWS" />
+
+    <!-- The assistant AppActionActivity.isVerifiedAssistant checks the signature of. -->
+    <queries>
+        <package android:name="com.google.android.googlequicksearchbox" />
+    </queries>
 
     <application>
         <!-- Static shortcuts (New Session), App Actions capabilities and direct-share targets

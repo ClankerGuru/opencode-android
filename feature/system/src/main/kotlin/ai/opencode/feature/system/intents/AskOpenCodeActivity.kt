@@ -73,10 +73,16 @@ import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Ask OpenCode's door (iOS `AskOpenCodeIntent`, run by Siri or Shortcuts): a small dialog over
- * whatever is on screen that sends without opening the app. An App Action hands the message
- * in `EXTRA_TEXT` and it sends at once, as Siri does; otherwise it asks “What should OpenCode
- * do?”. Activities never show over the lock screen, so it needs an unlocked phone, as iOS's
- * `.requiresAuthentication`.
+ * whatever is on screen that sends without opening the app. When a verified assistant
+ * ([AppActionActivity.isVerifiedAssistant]) hands the message in `EXTRA_TEXT` it sends at
+ * once, as Siri does; any other app's text only fills the field, and Send needs a tap;
+ * without text it asks “What should OpenCode do?”. Activities never show over the lock
+ * screen, so it needs an unlocked phone, as iOS's `.requiresAuthentication`.
+ *
+ * iOS's intents can't be started by other apps; this activity can, so its Send can't be
+ * covered: other apps' overlays are hidden and obscured touches dropped while it shows, and it
+ * closes when anything else comes on top before the message is sent, so a caller can't put
+ * its own screen over the dialog and lift it as the user taps.
  */
 class AskOpenCodeActivity : ComponentActivity() {
     private val model: AskOpenCodeModel by viewModels()
@@ -89,7 +95,9 @@ class AskOpenCodeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        if (savedInstanceState == null) model.start(intent, sendsAtOnce = AppActionActivity.isAssistant(this))
+        window.setHideOverlayWindows(true)
+        window.decorView.filterTouchesWhenObscured = true
+        if (savedInstanceState == null) model.start(intent, sendsAtOnce = AppActionActivity.isVerifiedAssistant(this))
         setContent {
             OpenCodeAppTheme {
                 val state by model.state.collectAsStateWithLifecycle()
@@ -99,6 +107,12 @@ class AskOpenCodeActivity : ComponentActivity() {
         lifecycleScope.launch {
             model.state.collect { if (it.finished) finish() }
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Nothing sent yet: close rather than wait under whatever came on top.
+        if (!isChangingConfigurations && !model.state.value.isSending) model.cancel()
     }
 }
 
@@ -123,15 +137,17 @@ class AskOpenCodeModel : ViewModel() {
     private var sending: Job? = null
 
     /**
-     * [sendsAtOnce]: the message came from an assistant, which has already confirmed it (as
-     * Siri's parameter does). Any other app's text only fills the field, so nothing is sent
-     * on another app's say-so.
+     * [sendsAtOnce]: the message came from a verified assistant, which has already confirmed
+     * it (as Siri's parameter does), and may name the session. Any other app's text only fills
+     * the field and its session is ignored, so nothing is sent, or aimed, on another app's
+     * say-so.
      */
     fun start(intent: Intent, sendsAtOnce: Boolean) {
         val context = dependency(AppContext)
         val directory = SessionDirectory.loadOrEmpty(SessionDirectory.file(context.filesDir))
         val sessions = directory.suggestedSessionEntities()
         val chosen = intent.getStringExtra(SystemActionActivity.EXTRA_CONTROL_TARGET)
+            ?.takeIf { sendsAtOnce }
             ?.let { directory.sessionEntities(listOf(it)).firstOrNull() }
         val text = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
         mutableState.value = State(message = text, sessions = sessions, session = chosen ?: SessionQuery.defaultResult(directory))

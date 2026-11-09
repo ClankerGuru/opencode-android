@@ -2,7 +2,9 @@ package ai.opencode.feature.system.intents
 
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Process
 
 /**
  * The App Actions door (`actions.intent.OPEN_APP_FEATURE` in `shortcuts.xml`): the only
@@ -11,8 +13,8 @@ import android.os.Bundle
  * private to the app (shortcuts, tiles, widgets and notifications reach it through the app's
  * own identity). iOS runs its intents only from Siri and Shortcuts; here any app could send
  * this intent, so starting a call without the app showing (Start Voice Call in Background)
- * is kept to Assistant ([isAssistant]); from anything else it opens the app on the call,
- * where the call is seen.
+ * is kept to a verified assistant ([isVerifiedAssistant]); from anything else it opens the
+ * app on the call, where the call is seen.
  */
 class AppActionActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -23,21 +25,40 @@ class AppActionActivity : Activity() {
                 Intent(this, SystemActionActivity::class.java)
                     .setAction(SystemActionActivity.ACTION_SYSTEM)
                     .putExtra(SystemActionActivity.EXTRA_APP_FEATURE, feature)
-                    .putExtra(SystemActionActivity.EXTRA_FROM_ASSISTANT, isAssistant(this)),
+                    .putExtra(SystemActionActivity.EXTRA_FROM_ASSISTANT, isVerifiedAssistant(this)),
             )
         }
         finish()
     }
 
     companion object {
-        /** Google's assistants, which run App Actions. */
-        private val assistants = setOf("com.google.android.googlequicksearchbox", "com.google.android.apps.bard")
+        /**
+         * Google's assistant, which runs App Actions, by the SHA-256 of its signing certificate
+         * (Google's release key, read from the Google app on a Play emulator image). Gemini's
+         * app (`com.google.android.apps.bard`) is a stub that hands off to the Google app and
+         * ships under more than one key, so it isn't pinned.
+         */
+        private val assistants = mapOf(
+            "com.google.android.googlequicksearchbox" to
+                "f0fd6c5b410f25cb25c3b53346c8972fae30f8ee7411df910480ad6b2d60db83".hexToByteArray(),
+        )
 
         /**
-         * Whether the activity was started by an assistant, by the referrer the system records
-         * for the launch. A best-effort check: an app can name a referrer of its own.
+         * Whether a verified assistant started [activity]: the system's record of the launching
+         * app (`launchedFromPackage`/`launchedFromUid`, which a caller can't forge, unlike the
+         * referrer) names Google's assistant, that UID owns the package, and it's signed with
+         * Google's key. The system shares the launching app only when it opts in
+         * (`ActivityOptions.setShareIdentityEnabled`); otherwise this is false, and the launch
+         * gets the path the user confirms.
          */
-        fun isAssistant(activity: Activity): Boolean =
-            activity.referrer?.takeIf { it.scheme == "android-app" }?.host in assistants
+        fun isVerifiedAssistant(activity: Activity): Boolean =
+            isVerifiedAssistant(activity.launchedFromPackage, activity.launchedFromUid, activity.packageManager)
+
+        internal fun isVerifiedAssistant(launchedFromPackage: String?, launchedFromUid: Int, packages: PackageManager): Boolean {
+            val certificate = assistants[launchedFromPackage ?: return false] ?: return false
+            if (launchedFromUid == Process.INVALID_UID) return false
+            if (packages.getPackagesForUid(launchedFromUid)?.contains(launchedFromPackage) != true) return false
+            return packages.hasSigningCertificate(launchedFromUid, certificate, PackageManager.CERT_INPUT_SHA256)
+        }
     }
 }
