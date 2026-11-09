@@ -38,7 +38,8 @@
             android:taskAffinity=""
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
-        <!-- App Actions (OPEN_APP_FEATURE): Assistant starts it as itself; forwards the feature only. -->
+        <!-- App Actions (OPEN_APP_FEATURE): Assistant starts it as itself; forwards the feature and
+             whether the caller is a verified assistant (only then may it start a call). -->
         <activity
             android:name=".intents.AppActionActivity"
             android:excludeFromRecents="true"
