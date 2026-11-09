@@ -6,7 +6,8 @@ CI (`.github/workflows/android.yml`) runs `scripts/check.sh` on every PR and pus
 `main` only publishes the debug APK as the `main-latest` pre-release. As on iOS, releases go
 through GitHub Releases only: `gh release create "v$(scripts/version.sh <sha>)" --target
 "$(git rev-parse <sha>)" --generate-notes` ships to Google Play internal testing (and open
-testing once `PLAY_OPEN_TESTING` is on). Release only when Ryan asks
+testing once `PLAY_OPEN_TESTING` is on). `scheduled-release.yml` releases `main` at noon and
+6 p.m. Central, as on iOS; cut one by hand only when Ryan asks
 ([docs/releasing.md](docs/releasing.md)).
 
 ## The iOS app is the source of truth
