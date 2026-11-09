@@ -1,7 +1,6 @@
 package ai.opencode.feature.composer
 
 import ai.opencode.core.ui.OpenCodeSurfaces
-import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
@@ -33,7 +32,6 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -53,7 +51,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -552,12 +549,10 @@ private class DockScope(
                 .testTag("request-dismiss"),
             contentAlignment = Alignment.Center,
         ) {
+            // The desktop's ghost icon button: a bare glyph at rest (a filled square read as a
+            // second, heavier control beside the counter); the press ripple shows its target.
             Box(
-                Modifier
-                    .size(RequestDockMetrics.closeSize)
-                    // The desktop's ghost icon button: a small rounded square.
-                    .clip(RoundedCornerShape(OpenCodeRadius.fill))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                Modifier.size(RequestDockMetrics.closeSize),
                 contentAlignment = Alignment.Center,
             ) {
                 OpenCodeIcon(SFSymbol.Xmark, contentDescription = null, size = 16.dp, tint = colors.secondaryText)

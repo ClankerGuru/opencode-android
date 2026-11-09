@@ -4,6 +4,7 @@ import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.motion.transitionBlurEffect
 
 import ai.opencode.core.ui.excludedFromDrawerPan
+import ai.opencode.core.ui.floating
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import ai.opencode.core.dependencies.DateClient
@@ -154,7 +155,7 @@ object VoiceCallSurfaceDefaults {
      * (`--surface-raised-stronger-non-alpha`, white in light, a step above the canvas in dark).
      */
     val color: Color
-        @Composable @ReadOnlyComposable get() = OpenCodeTheme.colors.let { if (it.isDark) it.codeBand else it.canvas }
+        @Composable @ReadOnlyComposable get() = OpenCodeTheme.colors.floating
 
     /** The dock's hairline ring (`--v2-border-border-base`). */
     val border: Color

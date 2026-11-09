@@ -64,7 +64,7 @@ fun AgentActivityGlyph(state: AgentGlyphState, modifier: Modifier = Modifier) {
     Box(modifier.size(state.size), contentAlignment = Alignment.Center) {
         when {
             state.phase == AgentGlyphState.Phase.Failed ->
-                OpenCodeIcon("xmark.circle.fill", contentDescription = null, size = state.size * 0.85f, tint = colors.destructive)
+                OpenCodeIcon("xmark.circle.fill", contentDescription = null, size = state.size * 0.85f, tint = colors.danger)
             state.needsInput -> {
                 val pulse by rememberInfiniteTransition(label = "needsInput").animateFloat(
                     0.45f, 1f, infiniteRepeatable(tween(1100, easing = LinearEasing), RepeatMode.Reverse), label = "needsInput",
