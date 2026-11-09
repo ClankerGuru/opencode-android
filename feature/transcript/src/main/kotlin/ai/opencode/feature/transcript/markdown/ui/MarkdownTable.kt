@@ -18,9 +18,11 @@ import androidx.compose.ui.unit.dp
 /**
  * A table in the transcript's inset block (iOS `MarkdownTable`). Columns size to their content up
  * to 220 (iOS `CappedWidthLayout`: short cells keep their natural width, longer ones wrap). When
- * that's wider than the block, the columns shrink toward their longest word to fit it, as the
- * desktop's (browser) table layout does; only a table that can't fit that way scrolls. On iOS's
- * full-bleed band a scrolled-off column still peeked in; in the narrower block it hid entirely.
+ * that's wider than the block, the columns shrink to fit it, as the desktop's (browser) table
+ * layout does, but never below a readable floor (112, or the column's natural width if smaller,
+ * and never below its longest word). A table that still doesn't fit scrolls, with the next column
+ * peeking in under the edge fade. Unshrunk, a three-column table hid its last column entirely
+ * past the block's edge.
  * Rules under the header and between rows run the block's full width and stay put while the
  * columns scroll.
  *
@@ -80,19 +82,22 @@ fun MarkdownTable(
                 },
             ) { measurables, _ ->
                 val cap = 220.dp.roundToPx()
+                val floor = 112.dp.roundToPx()
                 val hSpacing = TranscriptMetrics.turn.roundToPx()
                 val vSpacing = TranscriptMetrics.bubbleVertical.roundToPx()
                 val rule = (0.5.dp).roundToPx().coerceAtLeast(1)
                 val rowCount = measurables.size / maxOf(columns, 1)
-                // Each column's natural width (its widest cell, capped) and its narrowest (its longest word).
+                // Each column's natural width (its widest cell, capped) and its narrowest: its longest
+                // word, and at least the readable floor, so a squeezed column never wraps word by word.
                 val widest = IntArray(columns)
                 val narrowest = IntArray(columns)
                 for ((index, measurable) in measurables.withIndex()) {
                     val column = index % maxOf(columns, 1)
                     val natural = minOf(measurable.maxIntrinsicWidth(Constraints.Infinity), cap)
                     val word = minOf(measurable.minIntrinsicWidth(Constraints.Infinity), natural)
+                    val readable = maxOf(word, minOf(natural, floor))
                     widest[column] = maxOf(widest[column], natural)
-                    narrowest[column] = maxOf(narrowest[column], word)
+                    narrowest[column] = maxOf(narrowest[column], readable)
                 }
                 val room = viewport.roundToPx() - hSpacing * (columns - 1).coerceAtLeast(0)
                 val widestTotal = widest.sum()
