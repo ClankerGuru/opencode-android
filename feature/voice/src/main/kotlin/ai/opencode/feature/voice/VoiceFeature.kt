@@ -1489,13 +1489,14 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
             }.cancellable(CancelID.CallCommands, cancelInFlight = true)
             val start = Effect.concatenate(
                 Effect.run<Action> { if (previous != null) withContext(NonCancellable) { stopPresence(service, previous) } },
-                Effect.run {
+                Effect.run { send ->
                     try {
                         service.start(after)
                     } catch (error: kotlinx.coroutines.CancellationException) {
                         throw error
                     } catch (error: Exception) {
                         AppLog.voice.error("Call notification failed to start: ${error::class.java.simpleName}")
+                        send(Action.CallCommand(VoiceCallCommands.Action.end))
                     }
                 },
             )
@@ -1516,18 +1517,23 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
                 }.cancellable(CancelID.PresenceLinger, cancelInFlight = true),
             )
         }
-        return Effect.run { updatePresence(service, after) }
+        return Effect.run { send ->
+            if (!updatePresence(service, after)) {
+                send(Action.CallCommand(VoiceCallCommands.Action.end))
+            }
+        }
     }
 
-    private suspend fun updatePresence(service: VoiceCallServiceClient, state: VoiceCallServiceState) {
+    private suspend fun updatePresence(service: VoiceCallServiceClient, state: VoiceCallServiceState): Boolean =
         try {
             service.update(state)
+            true
         } catch (error: kotlinx.coroutines.CancellationException) {
             throw error
         } catch (error: Exception) {
             AppLog.voice.error("Call notification failed to update: ${error::class.java.simpleName}")
+            false
         }
-    }
 
     private suspend fun stopPresence(service: VoiceCallServiceClient, id: UUID) {
         try {

@@ -6,10 +6,7 @@ import android.app.*
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.IBinder
-import androidx.core.content.PermissionChecker
 import androidx.core.net.toUri
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.ProcessLifecycleOwner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -61,17 +58,12 @@ class VoiceCallServiceClient(
         internal fun makeLive(
             context: android.content.Context,
             commands: VoiceCallCommands,
-            isInForeground: () -> Boolean = { ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) },
         ): VoiceCallServiceClient {
-            fun canStartMicrophoneFGS(): Boolean {
+            fun hasMicrophonePermission(): Boolean {
                 // Without the microphone permission the call fails on its own
                 // (microphoneDenied); a microphone service would throw instead.
-                if (PermissionChecker.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) != PermissionChecker.PERMISSION_GRANTED) {
+                if (context.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
                     AppLog.voice.notice("voice_call_service_skipped reason=microphone_denied")
-                    return false
-                }
-                if (!isInForeground()) {
-                    AppLog.voice.notice("voice_call_service_skipped reason=background")
                     return false
                 }
                 return true
@@ -89,7 +81,7 @@ class VoiceCallServiceClient(
             }
             return VoiceCallServiceClient(
                 start = { state -> withContext(Dispatchers.Main.immediate) {
-                    if (canStartMicrophoneFGS()) startForegroundNow(state)
+                    if (hasMicrophonePermission()) startForegroundNow(state)
                 } },
                 update = { state -> withContext(Dispatchers.Main.immediate) {
                     if (commands.isActive(state.callID)) {
@@ -99,7 +91,7 @@ class VoiceCallServiceClient(
                             commands.deactivate(state.callID)
                             AppLog.voice.error("Call notification failed to update: ${error.javaClass.simpleName}")
                         }
-                    } else if (state.phase != VoiceCallServiceState.Phase.ended && canStartMicrophoneFGS()) {
+                    } else if (state.phase != VoiceCallServiceState.Phase.ended && hasMicrophonePermission()) {
                         // First call after install: RECORD_AUDIO was granted after start() skipped admission.
                         startForegroundNow(state)
                     }
@@ -171,6 +163,7 @@ open class VoiceCallService : Service() {
                 }
                 if (foregroundStart || updated != state) {
                     if (!promoteForeground(updated)) {
+                        commands.send(id, VoiceCallCommands.Action.end)
                         commands.deactivate(id)
                         if (state == null && remainingStarts == 0) stopSelf(startId)
                         return START_NOT_STICKY
@@ -187,7 +180,7 @@ open class VoiceCallService : Service() {
     private fun promoteForeground(target: VoiceCallServiceState): Boolean {
         // A microphone service may only start with RECORD_AUDIO granted (API 34+ throws
         // SecurityException otherwise, or if WIU eligibility was lost before onStartCommand).
-        if (PermissionChecker.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO) != PermissionChecker.PERMISSION_GRANTED) {
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             AppLog.voice.notice("voice_call_service_skipped reason=microphone_denied")
             return false
         }

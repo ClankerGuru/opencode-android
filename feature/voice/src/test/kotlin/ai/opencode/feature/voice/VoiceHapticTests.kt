@@ -12,6 +12,7 @@ import android.os.VibratorManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.runBlocking
@@ -358,7 +359,7 @@ class VoiceCallTeardownFrameworkTests {
         val appShadow = shadowOf(app)
         appShadow.grantPermissions(Manifest.permission.RECORD_AUDIO)
         val commands = VoiceCallCommands()
-        val client = VoiceCallServiceClient.makeLive(app, commands, isInForeground = { true })
+        val client = VoiceCallServiceClient.makeLive(app, commands)
         val id = UUID.randomUUID()
 
         // Start and immediately stop before ActivityManager delivers onStartCommand:
@@ -383,41 +384,43 @@ class VoiceCallTeardownFrameworkTests {
         }
     }
 
-    @Test fun deniedOrBackgroundOrThrowingForegroundPromotionNeverCrashesCall() = runBlocking {
+    @Test fun postGrantPromotionAndRejectedForegroundPromotionEndCallCleanly() = runBlocking {
         val app = RuntimeEnvironment.getApplication()
         val appShadow = shadowOf(app)
         val commands = VoiceCallCommands()
-        var foreground = false
-        val client = VoiceCallServiceClient.makeLive(app, commands, isInForeground = { foreground })
+        val client = VoiceCallServiceClient.makeLive(app, commands)
         val id = UUID.randomUUID()
+        val received = Channel<VoiceCallCommands.Command>(Channel.UNLIMITED)
+        val collector = CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined).launch {
+            commands.events.collect { received.trySend(it) }
+        }
 
-        // 1. Without RECORD_AUDIO at start (first call after install), start() skips FGS admission.
-        foreground = true
-        appShadow.denyPermissions(Manifest.permission.RECORD_AUDIO)
-        client.start(VoiceCallServiceState(id, VoiceCallServiceState.Phase.connecting))
-        assertNull(appShadow.nextStartedService)
+        try {
+            // 1. Without RECORD_AUDIO at start (first call after install), start() skips FGS admission.
+            appShadow.denyPermissions(Manifest.permission.RECORD_AUDIO)
+            client.start(VoiceCallServiceState(id, VoiceCallServiceState.Phase.connecting))
+            assertNull(appShadow.nextStartedService)
 
-        // 2. While backgrounded even after RECORD_AUDIO is granted, update() skips FGS admission.
-        appShadow.grantPermissions(Manifest.permission.RECORD_AUDIO)
-        foreground = false
-        client.update(VoiceCallServiceState(id, VoiceCallServiceState.Phase.live))
-        assertNull(appShadow.nextStartedService)
+            // 2. Once RECORD_AUDIO is granted during start(), update() promotes via foregroundStart
+            // without gating on ProcessLifecycleOwner (so TileService / SystemActionActivity starts work).
+            appShadow.grantPermissions(Manifest.permission.RECORD_AUDIO)
+            client.update(VoiceCallServiceState(id, VoiceCallServiceState.Phase.live))
+            val startedIntent = required(appShadow.nextStartedService)
+            assertTrue(startedIntent.getBooleanExtra(VoiceCallService.FOREGROUND_START, false))
 
-        // 3. Back in foreground with RECORD_AUDIO granted, update() promotes via foregroundStart.
-        foreground = true
-        client.update(VoiceCallServiceState(id, VoiceCallServiceState.Phase.live))
-        val startedIntent = required(appShadow.nextStartedService)
-        assertTrue(startedIntent.getBooleanExtra(VoiceCallService.FOREGROUND_START, false))
-
-        // 4. Even if startForeground throws SecurityException inside onStartCommand, the service catches
-        // it, deactivates the call, and stops cleanly rather than crashing on the main thread.
-        withDependencies({ this[VoiceCallCommands] = commands }) {
-            val controller = Robolectric.buildService(RecordingVoiceCallService::class.java, startedIntent).create()
-            val service = controller.get()
-            service.promotionFailure = SecurityException("Simulated FGS microphone rejection")
-            service.onStartCommand(startedIntent, 0, 1)
-            assertFalse(commands.isActive(id))
-            assertTrue(shadowOf(service).isStoppedBySelf)
+            // 3. If the OS rejects microphone FGS promotion inside onStartCommand, the service catches
+            // it, emits an end command so the call never runs with a silenced mic, and stops cleanly.
+            withDependencies({ this[VoiceCallCommands] = commands }) {
+                val controller = Robolectric.buildService(RecordingVoiceCallService::class.java, startedIntent).create()
+                val service = controller.get()
+                service.promotionFailure = SecurityException("Simulated FGS microphone rejection")
+                service.onStartCommand(startedIntent, 0, 1)
+                assertFalse(commands.isActive(id))
+                assertTrue(shadowOf(service).isStoppedBySelf)
+                assertEquals(VoiceCallCommands.Command(id, VoiceCallCommands.Action.end), received.tryReceive().getOrNull())
+            }
+        } finally {
+            collector.cancel()
         }
     }
 
