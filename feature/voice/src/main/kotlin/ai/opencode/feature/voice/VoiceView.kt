@@ -182,7 +182,7 @@ object VoiceCallSurfaceDefaults {
     /** The controls' hairline. */
     val controlBorder: Color
         @Composable @ReadOnlyComposable get() = OpenCodeTheme.colors.let {
-            if (it.strongBorders) it.variant.borderStrong.color else lerpColor(it.canvas, it.text, if (it.isDark) 0.22f else 0.15f)
+            if (it.strongBorders) it.variant.borderStrong.color else lerpColor(it.canvas, it.text, if (it.isDark) 0.22f else 0.18f)
         }
 
     /** `UIColor.tertiarySystemFill`: Mute's soft disc. */

@@ -1598,16 +1598,19 @@ internal fun RowScope.FloatingCallControl(
             },
         contentAlignment = Alignment.Center,
     ) {
+        // iOS dims the whole control; here the glyph takes iOS's dim and the plate only part of
+        // it, so a control that isn't available still reads as a button on the light card.
+        val plateDim = 1f - (1f - dim) * 0.4f
         Box(
             Modifier
                 .size(diameter.dp)
-                .alpha(dim)
+                .alpha(plateDim)
                 .background(fill, shape)
                 .border(1.dp, edge, shape),
             contentAlignment = Alignment.Center,
         ) {
             Crossfade(symbol, animationSpec = Motion.easeOut(0.18), label = "floatingCallControlGlyph") { shown ->
-                OpenCodeIcon(shown, null, tint = tint, size = (diameter * 0.38f + 4).dp)
+                OpenCodeIcon(shown, null, tint = tint.copy(alpha = tint.alpha * dim / plateDim), size = (diameter * 0.38f + 4).dp)
             }
         }
     }
