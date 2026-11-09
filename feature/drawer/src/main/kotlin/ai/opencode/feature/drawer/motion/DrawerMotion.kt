@@ -650,6 +650,20 @@ class DrawerMotionState(
     }
 
     /**
+     * A predictive back gesture on the shut card committed (Android only, QA FB-07): the drawer
+     * opens from wherever the gesture left the card, as the drawer button opens it.
+     */
+    fun endBackOpen() {
+        if (consumeIgnoredEnd()) return
+        isDragging = false
+        val changed = !isPresented
+        presentedState.value = true
+        if (changed) callbacks.onCommitted()
+        callbacks.onPresentationChanged(true)
+        settle(width, animated = true)
+    }
+
+    /**
      * The drawer button opens it (plays [Callbacks.onCommitted]); a programmatic close is a row,
      * New Session, Catch Up or What’s New taking the card back, and stays quiet.
      */
