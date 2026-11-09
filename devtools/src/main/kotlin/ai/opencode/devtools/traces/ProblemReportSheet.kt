@@ -1,6 +1,5 @@
 package ai.opencode.devtools.traces
 
-import ai.opencode.core.ui.OpenCodeSwitchDefaults
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
@@ -8,6 +7,9 @@ import ai.opencode.core.store.observe
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconSize
 import ai.opencode.core.ui.OpenCodePrimaryButton
+import ai.opencode.core.ui.OpenCodeShape
+import ai.opencode.core.ui.OpenCodeSurfaces
+import ai.opencode.core.ui.OpenCodeSwitchDefaults
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
@@ -19,7 +21,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,8 +36,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
@@ -158,7 +159,7 @@ private fun NoteField(note: String, enabled: Boolean, onChange: (String) -> Unit
         minLines = 3,
         maxLines = 6,
         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-        shape = RoundedCornerShape(14.dp),
+        shape = OpenCodeShape.panel,
         colors = TextFieldDefaults.colors(
             focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -174,8 +175,9 @@ private fun NoteField(note: String, enabled: Boolean, onChange: (String) -> Unit
 @Composable
 private fun ScreenshotToggle(isOn: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
     Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        shape = OpenCodeShape.panel,
+        color = OpenCodeSurfaces.color,
+        border = OpenCodeSurfaces.border,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -216,8 +218,9 @@ private fun Footer(report: State.Report, send: (Action) -> Unit) {
         }
 
         State.Report.Phase.Sent -> Surface(
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            shape = OpenCodeShape.panel,
+            color = OpenCodeSurfaces.color,
+            border = OpenCodeSurfaces.border,
             modifier = Modifier.fillMaxWidth().testTag("problem-report-sent"),
         ) {
             Row(Modifier.padding(start = 14.dp), verticalAlignment = Alignment.CenterVertically) {
