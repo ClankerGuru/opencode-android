@@ -2,21 +2,19 @@ package ai.opencode.feature.voice
 
 /**
  * Port of `WispOrb.metal`'s raster, `wispOrbFragment` (the lens, its shadow, every lit LED, the
- * rim, mute ring, the bloom's feather and fade, and the dither), as an AGSL `RuntimeShader`.
+ * rim light, mute ring, the bloom's feather and fade, and the dither), as an AGSL `RuntimeShader`.
  *
  * Android: the `wispOrbCells` kernel runs on the CPU ([WispOrbCells.evaluate]); its cells arrive
  * here as a `2·columns × columns` RGBA_F16 bitmap bound with `RuntimeShader.setInputBuffer`
  * instead of Metal's `device WispOrbCell *`: pixel `2i` holds (dot radius, dot alpha, halo alpha,
- * 1) and pixel `2i + 1` the colour. The uniforms keep [WispOrbUniforms]' slots, one `float4` each.
- * AGSL loops need constant bounds, so the dot search walks a fixed 7 × 7 window and stops at its
- * reach (one or two cells at every tuning).
+ * 1) and pixel `2i + 1` the colour. The halo radius is the kernel's own rule (twice the dot's with a
+ * halo, else the dot's). The uniforms keep [WispOrbUniforms]' slots, one `float4` each. AGSL loops
+ * need constant bounds, so the dot search walks a fixed 7 × 7 window and stops at its reach (one or
+ * two cells at every tuning).
  *
- * Visual divergence (desktop design system, not iOS glass): the lens is a flat plate in the
- * theme's colours ([WispOrbPalette]) with a 1 dp hairline instead of the Fresnel rim and specular
- * line, the LEDs are the desktop spinner's rounded squares without halos, and the shadow is the
- * desktop's small raised one. In light themes the LEDs print as ink: each colour keeps its hue at a
- * darker, more saturated tone. The simulation, the kernel's per-LED values and every timing are
- * iOS's, unchanged.
+ * Visual divergence (desktop design system, docs/parity/core-ui.md): the plate is a neutral
+ * graphite from [WispOrbPalette] instead of iOS's blue-black, and its shadow is lighter on light
+ * themes. The dots, halos, glow, rim light and mute ring are iOS's.
  */
 object WispOrbShaders {
     /** The uniform slots the raster reads, by name. */
@@ -43,16 +41,14 @@ uniform float4 view;
 uniform float4 glow;
 uniform float4 clipRect;
 uniform float4 clipShape;
-// WispOrbPalette: plate (rgb, 1 in dark themes), hairline, alert.
+// WispOrbPalette: the plate's colour (rgb) and its shadow's strength (w).
 uniform float4 plate;
-uniform float4 hair;
-uniform float4 alert;
 
 const float WISP_BLEED = 10.0;
 const float3 USER_BASE = float3(0.60, 0.90, 0.98);
 const float3 AGENT_BASE = float3(0.44, 0.91, 0.68);
 const float3 MUTED_PLATE = float3(26.0 / 255.0, 14.0 / 255.0, 16.0 / 255.0);
-const float3 CONFIRM_PLATE = float3(44.0 / 255.0, 16.0 / 255.0, 18.0 / 255.0);
+const float3 MUTED_RIM = float3(248.0 / 255.0, 113.0 / 255.0, 113.0 / 255.0);
 
 float ws(float e0, float e1, float x) {
   float t = clamp((x - e0) / (e1 - e0), 0.0, 1.0);
@@ -81,43 +77,45 @@ float wispBox(float2 p, float4 box, float corner) {
   return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
 }
 
-// The desktop spinner's LED: a square of the dot's area with 24 % corners.
-float ledDistance(float2 d, float dotR) {
-  float h = 0.886 * dotR;
-  float r = 0.425 * dotR;
-  float2 q = abs(d) - h + r;
-  return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
-}
-
-bool darkPlate() { return plate.w > 0.5; }
-
-float luma(float3 rgb) { return dot(rgb, float3(0.2126, 0.7152, 0.0722)); }
-
-// A light theme prints the LEDs as ink: brighter light is darker ink, in the same hue with more
-// chroma. Near-white cores take the mode's hue, so a hot spot deepens instead of turning grey.
-float3 printed(float3 rgb) {
-  if (darkPlate()) return rgb;
-  float l = luma(rgb);
-  float3 chroma = mix3(rgb - l, tintBase.rgb - luma(tintBase.rgb), ws(0.86, 0.97, l));
-  return clamp(1.0 - 0.75 * l + 2.2 * chroma, 0.0, 1.0);
-}
-
 // (dot radius, dot alpha, halo alpha, 1)
 float4 cellGeo(float i, float j) { return float4(cells.eval(float2(2.0 * i + 0.5, j + 0.5))); }
 float3 cellColour(float i, float j) { return float3(cells.eval(float2(2.0 * i + 1.5, j + 0.5)).rgb); }
 
-// The hairline, leaning toward whoever speaks on their side (`RimLight`'s voice tint).
+// `RimLight::shade`: the Fresnel band inside the limb and the specular hairline.
 float4 rimShade(float4 res, float2 pt, float rPt, float dist, float aa) {
   float live = 1.0 - mixB.w;
-  if (live <= 1e-3) return res;
-  float hairCov = coverage(abs(dist + 0.5) - 0.5, aa);
-  if (hairCov <= 0.0) return res;
+  if (live <= 1e-3 || dist < -2.6 - aa || dist > 0.45 + aa) return res;
+  float radius = grid.z;
+  float pitch = grid.y;
+  float cols = grid.x;
+  float off = (cols - 1.0) * 0.5;
   float2 un = pt / max(rPt, 1e-3);
-  float3 base = hair.rgb;
-  float3 left = mix3(base, printed(USER_BASE), 0.75 * clamp(rim.x, 0.0, 1.0));
-  float3 right = mix3(base, printed(AGENT_BASE), 0.75 * clamp(rim.y, 0.0, 1.0));
+  float3 left = mix3(tintBase.rgb, USER_BASE, 0.75 * clamp(rim.x, 0.0, 1.0));
+  float3 right = mix3(tintBase.rgb, AGENT_BASE, 0.75 * clamp(rim.y, 0.0, 1.0));
   float3 side = mix3(left, right, ws(-0.55, 0.55, un.x));
-  return composite(res, side, hairCov * live);
+  float probe = max(radius - 3.2, 0.0);
+  float col = clamp(floor(un.x * probe / pitch + off + 0.5), 0.0, cols - 1.0);
+  float row = clamp(floor(un.y * probe / pitch + off + 0.5), 0.0, cols - 1.0);
+  float power = clamp(cellGeo(col, row).y / 0.96, 0.0, 1.0);
+  float3 wave = mix3(side, cellColour(col, row), 0.30 + 0.45 * power);
+
+  float along = -(0.55 * un.x + 0.83 * un.y);
+  float key = ws(-0.2, 1.0, along);
+  key *= key;
+  float bounce = 0.38 * ws(0.35, 1.0, -along);
+  float inside = coverage(dist, aa);
+  if (inside > 0.0) {
+    float depth = clamp(-dist / 2.6, 0.0, 1.0);
+    float fres = (1.0 - depth) * (1.0 - depth);
+    float a = fres * (0.06 + 0.26 * power + 0.10 * key + 0.08 * bounce);
+    res = composite(res, mix3(wave, float3(1.0), 0.16 + 0.22 * key), min(a, 0.92) * inside * live);
+  }
+  float hair = coverage(abs(dist) - 0.45, aa);
+  if (hair > 0.0) {
+    float a = 0.08 + 0.42 * key + 0.20 * bounce + 0.10 * power;
+    res = composite(res, mix3(wave, float3(1.0), 0.25 + 0.60 * key), a * hair * live);
+  }
+  return res;
 }
 
 half4 main(float2 position) {
@@ -128,43 +126,38 @@ half4 main(float2 position) {
   float pitch = grid.y;
   float cols = grid.x;
   float off = (cols - 1.0) * 0.5;
-  bool dark = darkPlate();
 
   float orbOuter = radius + WISP_BLEED;
   float shadowOuter = radius + WISP_BLEED - 0.2;
-  float shadowInner = max(radius - 6.0, 0.0);
-  float shadowAlpha = plate.w > 0.5 ? 0.32 : 0.12;
+  float shadowInner = max(radius - 14.4, 0.0);
   float r2 = dot(pt, pt);
-  float shDy = pt.y - 0.4 * glow.w;
+  float shDy = pt.y - glow.w;
   float shR2 = pt.x * pt.x + shDy * shDy;
   if (r2 > orbOuter * orbOuter && shR2 > shadowOuter * shadowOuter) return half4(0.0);
 
-  float lensInner = max(radius - 1.0 - aa, 0.0);
+  float lensInner = max(radius - 2.6 - aa, 0.0);
   bool deepInside = r2 <= lensInner * lensInner;
   float4 res = float4(0.0);
   if (shR2 < shadowInner * shadowInner) {
-    res.a = shadowAlpha;
+    res.a = plate.w;
   } else if (shR2 < shadowOuter * shadowOuter) {
     float shadowD = sqrt(shR2) - radius;
     float edgeFade = ws(WISP_BLEED - 0.2, WISP_BLEED - 4.2, shadowD);
-    res.a = shadowAlpha * (0.5 - 0.5 * fastTanh(shadowD / 1.6)) * edgeFade;
+    res.a = plate.w * (0.5 - 0.5 * fastTanh(shadowD / 4.8)) * edgeFade;
   }
   float rPt = sqrt(r2);
   float dist = deepInside ? -3.0 : rPt - radius;
   float shape = deepInside ? 1.0 : coverage(dist, aa);
-  float3 base = plate.rgb;
-  float3 confirmPlate = dark ? CONFIRM_PLATE : mix3(base, alert.rgb, 0.10);
-  float3 mutedPlate = dark ? MUTED_PLATE : mix3(base, alert.rgb, 0.08);
-  float3 lens = mix3(mix3(base, confirmPlate, mixB.y * 0.65), mutedPlate, mixB.w);
-  if (shape > 0.0) res = composite(res, lens, shape);
+  float3 lens = mix3(mix3(plate.rgb, float3(44.0, 16.0, 18.0) / 255.0, mixB.y * 0.65), MUTED_PLATE, mixB.w);
+  if (shape > 0.0) res = composite(res, lens, 0.94 * shape);
 
   if (shape > 0.0) {
-    float glowStrength = glow.x * (dark ? 0.6 : 0.35);
+    float glowStrength = glow.x;
     float glowReach = glow.y;
     if (glowStrength > 0.004 && r2 < glowReach * glowReach) {
       float gt = min(rPt / glowReach, 1.0);
       float3 glowMid = mix3(tintBase.rgb, tintCore.rgb, 0.5);
-      res = composite(res, printed(mix3(glowMid, tintBase.rgb, gt)), glowStrength * (1.0 - gt) * (1.0 - gt) * shape);
+      res = composite(res, mix3(glowMid, tintBase.rgb, gt), glowStrength * (1.0 - gt) * (1.0 - gt) * shape);
     }
     float reach = glow.z;
     float2 f = pt / pitch + off;
@@ -182,12 +175,20 @@ half4 main(float2 position) {
         float4 geo = cellGeo(i, j);
         float dotR = geo.x;
         float dotA = geo.y;
+        float haloA = geo.z;
         if (dotA <= 0.0) continue;
+        float haloR = haloA > 0.0 ? 2.0 * dotR : dotR;
         float dx = pt.x - (i - off) * pitch;
-        float maxR = 1.26 * dotR + aa;
-        if (dx * dx + dy * dy >= maxR * maxR) continue;
-        float3 colour = printed(cellColour(i, j));
-        float dc = coverage(ledDistance(float2(dx, dy), dotR), aa);
+        float maxR = haloR + aa;
+        float d2 = dx * dx + dy * dy;
+        if (d2 >= maxR * maxR) continue;
+        float3 colour = cellColour(i, j);
+        float fromCenter = sqrt(d2);
+        if (haloA > 0.0) {
+          float hc = coverage(fromCenter - haloR, aa);
+          if (hc > 0.0) res = composite(res, colour, haloA * shape * hc);
+        }
+        float dc = coverage(fromCenter - dotR, aa);
         if (dc > 0.0) res = composite(res, colour, dotA * shape * dc);
       }
     }
@@ -195,11 +196,11 @@ half4 main(float2 position) {
 
   if (!deepInside && dist <= 0.45 + aa) res = rimShade(res, pt, rPt, dist, aa);
   if (!deepInside && mixB.w > 1e-3) {
-    float muteCov = coverage(abs(dist + 0.75) - 0.75, aa);
-    if (muteCov > 0.0) res = composite(res, alert.rgb, 0.9 * mixB.w * muteCov);
+    float muteCov = coverage(abs(dist) - 0.75, aa);
+    if (muteCov > 0.0) res = composite(res, MUTED_RIM, 0.55 * mixB.w * muteCov);
   }
 
-  // A grown orb feathers into the surface around it and fades above its bottom.
+  // A grown orb feathers into the glass around it and fades above its bottom.
   if (clipShape.x >= 0.0) {
     float inside = -wispBox(position, clipRect, clipShape.x);
     res *= ws(0.0, max(clipShape.y, 1e-3), inside);

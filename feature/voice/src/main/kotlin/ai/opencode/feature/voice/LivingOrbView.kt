@@ -106,7 +106,7 @@ data class LivingOrbBloom(
  * Android: an AGSL [RuntimeShader] drawn by a Compose [Canvas]; a `withFrameNanos` loop steps the
  * plain-object [WispOrbRenderer] only while it shows (not [isHidden], lifecycle resumed: iOS
  * `scenePhase == .active`). Under Reduce Motion it draws once whenever its inputs change. The lens
- * takes the theme's colours ([WispOrbPalette]), so it follows light, dark and Material You.
+ * takes its colours from [WispOrbPalette].
  *
  * @param isHidden faded out behind the panel: no drawing.
  */
@@ -161,20 +161,17 @@ fun LivingOrbView(config: LivingOrbConfig, modifier: Modifier = Modifier, isHidd
 }
 
 /**
- * The theme colours the lens is drawn in (desktop design system, not iOS glass): the plate is the
- * desktop's inset surface (the canvas in dark, the code band in light), the rim its hairline and
- * alert its red (mute ring, confirm tint).
+ * The colours the lens is drawn in. iOS's glass is a blue-black disc; here it is a neutral
+ * graphite (the desktop's dark canvas family) in both modes, a dark speaker grille set on the call
+ * card. Its shadow is lighter on light themes, where the card is pale.
  */
-data class WispOrbPalette(val isDark: Boolean, val plate: Color, val hairline: Color, val alert: Color) {
+data class WispOrbPalette(val plate: Color, val shadow: Float) {
     companion object {
-        val fallback = WispOrbPalette(isDark = true, plate = Color(0xFF161616), hairline = Color(0xFF2D2D2D), alert = Color(0xFFF17471))
+        val graphite = Color(0xFF141415)
+        val fallback = WispOrbPalette(plate = graphite, shadow = 0.42f)
 
-        fun of(colors: OpenCodeColors): WispOrbPalette = WispOrbPalette(
-            isDark = colors.isDark,
-            plate = if (colors.isDark) colors.canvas else colors.codeBand,
-            hairline = colors.border,
-            alert = colors.destructive,
-        )
+        fun of(colors: OpenCodeColors): WispOrbPalette =
+            WispOrbPalette(plate = graphite, shadow = if (colors.isDark) 0.42f else 0.30f)
     }
 }
 
@@ -275,9 +272,7 @@ class WispOrbRenderer private constructor() {
             shader.setFloatUniform(name, uniforms.data[o], uniforms.data[o + 1], uniforms.data[o + 2], uniforms.data[o + 3])
         }
         val p = palette
-        shader.setFloatUniform("plate", p.plate.red, p.plate.green, p.plate.blue, if (p.isDark) 1f else 0f)
-        shader.setFloatUniform("hair", p.hairline.red, p.hairline.green, p.hairline.blue, 1f)
-        shader.setFloatUniform("alert", p.alert.red, p.alert.green, p.alert.blue, 1f)
+        shader.setFloatUniform("plate", p.plate.red, p.plate.green, p.plate.blue, p.shadow)
         if (brush == null) brush = ShaderBrush(shader)
         return true
     }
