@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.ui.OpenCodeTopBar
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticEffect
 import ai.opencode.core.ui.OpenCodeFonts
@@ -30,7 +31,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
@@ -38,7 +38,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -194,8 +193,8 @@ fun PastedTextViewer(
         modifier = modifier.semantics { testTag = "pasted-text-viewer" },
         containerColor = OpenCodeTheme.colors.canvas,
         topBar = {
-            CenterAlignedTopAppBar(
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = OpenCodeTheme.colors.canvas),
+            OpenCodeTopBar(
+                centerTitle = true,
                 title = {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -205,7 +204,7 @@ fun PastedTextViewer(
                         Text(summary.summary, style = OpenCodeTextStyles.caption1, color = OpenCodeTheme.colors.secondaryText)
                     }
                 },
-                navigationIcon = {
+                navigation = {
                     TextButton(onClick = onDone, modifier = Modifier.semantics { testTag = "pasted-text-done" }) { Text("Done") }
                 },
                 actions = {

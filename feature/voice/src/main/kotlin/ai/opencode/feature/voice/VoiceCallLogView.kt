@@ -1,5 +1,7 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.ui.OpenCodeTopBar
+import ai.opencode.core.ui.OpenCodeTopBarBackButton
 import ai.opencode.core.ui.appFormattingLocale
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -45,7 +47,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import ai.opencode.core.ui.OpenCodeAlertDialog
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -58,7 +59,6 @@ import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -138,11 +138,10 @@ fun VoiceCallLogList(
     Scaffold(
         modifier = modifier,
         topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("History", style = OpenCodeTextStyles.headline, modifier = Modifier.semantics { heading() }) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { OpenCodeIcon(SFSymbol.ChevronBackward, contentDescription = "Back") }
-                },
+            OpenCodeTopBar(
+                title = { Text("History", modifier = Modifier.semantics { heading() }) },
+                navigation = { OpenCodeTopBarBackButton(onClick = onBack) },
+                centerTitle = true,
                 actions = {
                     if (developerMode || logs.isNotEmpty()) {
                         Box {
@@ -177,7 +176,6 @@ fun VoiceCallLogList(
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             )
         },
     ) { padding ->
@@ -313,12 +311,10 @@ fun VoiceCallReplayView(log: VoiceCallLog, onBack: () -> Unit, modifier: Modifie
     Scaffold(
         modifier = modifier,
         topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(log.title, style = OpenCodeTextStyles.headline, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() }) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { OpenCodeIcon(SFSymbol.ChevronBackward, contentDescription = "Back") }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
+            OpenCodeTopBar(
+                title = { Text(log.title, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() }) },
+                navigation = { OpenCodeTopBarBackButton(onClick = onBack) },
+                centerTitle = true,
             )
         },
     ) { padding ->

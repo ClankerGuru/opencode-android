@@ -44,7 +44,8 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import ai.opencode.core.ui.OpenCodeTopBar
+import ai.opencode.core.ui.OpenCodeTopBarBackButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -99,11 +100,11 @@ fun DevToolsView(
     Scaffold(
         modifier = modifier,
         topBar = {
-            TopAppBar(
+            OpenCodeTopBar(
                 title = { Text(title, Modifier.semantics { heading() }) },
-                navigationIcon = {
+                navigation = {
                     val back = if (state.route != DevToolsFeature.Route.Main) ({ send(DevToolsFeature.Action.BackTapped) }) else onClose
-                    if (back != null) IconButton(onClick = back) { OpenCodeIcon(SFSymbol.ChevronBackward, "Back") }
+                    if (back != null) OpenCodeTopBarBackButton(onClick = back)
                 },
                 actions = { Actions(state, send) },
             )

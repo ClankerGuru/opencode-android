@@ -1,5 +1,6 @@
 package ai.opencode.feature.media
 
+import ai.opencode.core.ui.OpenCodeTopBar
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
@@ -43,7 +44,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import ai.opencode.core.ui.OpenCodeAlertDialog
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
@@ -53,7 +53,6 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -245,10 +244,13 @@ private fun AgentFilePageContent(
         modifier = modifier.fillMaxSize(),
         containerColor = background,
         topBar = {
-            CenterAlignedTopAppBar(
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = background),
+            OpenCodeTopBar(
+                containerColor = background,
+                centerTitle = true,
+                // Over a photo or video the bar is just its controls, as the media viewer's.
+                hairline = !reference.kind.isMedia,
                 title = { AgentFileTitle(reference.name, model.locationLabel) },
-                navigationIcon = {
+                navigation = {
                     if (isRoot) {
                         TextButton(onClick = onDone, modifier = Modifier.testTag("agent-file-done")) { Text("Done") }
                     } else {

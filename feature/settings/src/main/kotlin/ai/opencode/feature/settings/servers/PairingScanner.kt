@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings.servers
 
+import ai.opencode.core.ui.OpenCodeTopBar
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.dependencies.PasteboardClient
 import ai.opencode.core.dependencies.dependency
@@ -30,12 +31,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -127,7 +126,11 @@ fun PairingScannerView(
             modifier = modifier,
             containerColor = Color.Black,
             topBar = {
-                CenterAlignedTopAppBar(
+                OpenCodeTopBar(
+                    centerTitle = true,
+                    hairline = false,
+                    containerColor = Color.Black,
+                    contentColor = Color.White,
                     title = {
                         Text(
                             "Scan Pairing Code",
@@ -135,16 +138,12 @@ fun PairingScannerView(
                             modifier = Modifier.accessibilityFocusRequest(titleFocus).semantics { heading() },
                         )
                     },
-                    navigationIcon = { TextButton(onClick = onCancel) { Text("Cancel") } },
+                    navigation = { TextButton(onClick = onCancel) { Text("Cancel") } },
                     actions = {
                         if (isCameraAvailable && !isAccessDenied) {
                             TextButton(onClick = ::paste) { Text("Paste") }
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Black,
-                        titleContentColor = Color.White,
-                    ),
                 )
             },
         ) { padding ->
