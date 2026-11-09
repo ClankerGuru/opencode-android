@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.ui.openCodeHairline
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.BorderStroke
@@ -129,10 +130,10 @@ internal fun RequestPermissionButton(
     if (primary) {
         Button(onClick, sized, enabled, shape = shape, colors = ButtonDefaults.buttonColors(), contentPadding = padding, content = content)
     } else {
-        // The desktop's neutral button: base surface and a hairline, not a tonal fill.
+        // The desktop's neutral button: a light neutral fill and a hairline.
         FilledTonalButton(
             onClick, sized, enabled, shape = shape,
-            colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = OpenCodeTheme.colors.text),
+            colors = ButtonDefaults.filledTonalButtonColors(containerColor = OpenCodeSurfaces.neutralFill, contentColor = OpenCodeTheme.colors.text),
             border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
             contentPadding = padding, content = content,
         )

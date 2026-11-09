@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer.motion
 
+import ai.opencode.core.ui.OpenCodeSurfaces
 import androidx.compose.foundation.shape.RoundedCornerShape
 import ai.opencode.core.ui.OpenCodeRadius
 import androidx.compose.foundation.BorderStroke
@@ -284,9 +285,9 @@ private fun SearchCapsule(
     val leading by animateFloatAsState(leadingPadding.value, DrawerSearchPillDefaults.morph.spec(), label = "search-leading")
     val trailing by animateFloatAsState(trailingPadding.value, DrawerSearchPillDefaults.morph.spec(), label = "search-trailing")
     Surface(
-        // The desktop's search input: base surface, hairline ring, small radius.
+        // The desktop's search control: the neutral button fill, hairline ring, small radius.
         shape = OpenCodeShape.control,
-        color = MaterialTheme.colorScheme.surface,
+        color = OpenCodeSurfaces.neutralFill,
         border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
         contentColor = OpenCodeTheme.colors.text,
         modifier = modifier
@@ -334,7 +335,7 @@ private fun SearchCapsule(
 private fun CancelButton(size: Dp, enabled: Boolean = true, onClick: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(OpenCodeRadius.card),
-        color = MaterialTheme.colorScheme.surface,
+        color = OpenCodeSurfaces.neutralFill,
         border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
         contentColor = OpenCodeTheme.colors.text,
         modifier = Modifier

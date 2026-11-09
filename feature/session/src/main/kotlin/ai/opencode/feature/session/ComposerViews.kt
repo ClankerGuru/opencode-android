@@ -166,6 +166,8 @@ object ComposerTunables {
     const val queuedGlyphDrop = 1f
     const val plusScale = 17f
     const val buttonDiameter = 34f
+    /** Send's visible face, bigger than the other trailing controls (X feedback); its target stays 48. */
+    const val sendDiameter = 40f
     const val trailingGap = 11f
     const val micScale = 17f
     const val trailingSpacing = 4f
@@ -603,10 +605,12 @@ fun ComposerControlLabel(
     glyphSize: Dp = 18.dp,
     visualOffsetX: Float = 0f,
     glyphRise: Float = 0f,
+    faceDiameter: Float = ComposerTunables.buttonDiameter,
 ) {
     val reduceMotion = rememberReduceMotion()
     val fontScale = LocalDensity.current.fontScale
-    val diameter = min(34f * fontScale * (ComposerTunables.buttonDiameter / 34f), 44f)
+    // Grows with the font scale up to 44 (Send's bigger face up to 46), inside its 48 dp target.
+    val diameter = min(fontScale * faceDiameter, max(44f, faceDiameter + 6f))
     // Body grows 28/17 by Accessibility 1, where the glyph stops.
     val textScale = min(fontScale, 28f / 17f)
     Box(
@@ -898,6 +902,8 @@ fun ComposerSendLabel(enabled: Boolean, showsProgress: Boolean, visualOffsetX: F
         foreground = OpenCodeTheme.colors.sendButtonForeground,
         background = OpenCodeTheme.colors.sendButtonBackground,
         visualOffsetX = visualOffsetX,
+        faceDiameter = ComposerTunables.sendDiameter,
+        glyphSize = 20.dp,
         modifier = modifier.graphicsLayer {
             this.alpha = alpha
             compositingStrategy = CompositingStrategy.ModulateAlpha

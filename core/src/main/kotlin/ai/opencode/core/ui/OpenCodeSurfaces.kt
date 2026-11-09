@@ -47,6 +47,22 @@ object OpenCodeSurfaces {
     val color: Color
         @Composable @ReadOnlyComposable get() = OpenCodeTheme.colors.floating
 
+    /**
+     * Neutral and secondary buttons' fill: a light grey that reads as a button on the canvas in
+     * both modes (`surfaceContainerHighest`, the brand's `surfaceStrong` `#EEEEEE` / `#3A3A3A`;
+     * labels 15.6:1 / 9.9:1). Worn with the hairline.
+     */
+    val neutralFill: Color
+        @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.surfaceContainerHighest
+
+    /**
+     * Copy-command and terminal boxes, clearly set off from the canvas: the desktop's
+     * `--v2-background-bg-layer-03` in light (`#EEEEEE`) and its shell block's `bg-layer-02` in
+     * dark (`#2E2E2E`). Text on it is 15.6:1 / 11.6:1.
+     */
+    val commandFill: Color
+        @Composable @ReadOnlyComposable get() = OpenCodeTheme.colors.let { if (it.isDark) it.userBubble else it.variant.surfaceStrong.color }
+
     /** The floating surface's hairline. */
     val border: BorderStroke
         @Composable @ReadOnlyComposable get() = BorderStroke(hairline, OpenCodeTheme.colors.border)

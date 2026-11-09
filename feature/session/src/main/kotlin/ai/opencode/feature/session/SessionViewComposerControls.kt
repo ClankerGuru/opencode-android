@@ -604,6 +604,8 @@ internal fun SessionComposerEnv.DictationTrailingControls(controls: ComposerCont
                 showsProgress = false,
                 foreground = OpenCodeTheme.colors.sendButtonForeground,
                 background = OpenCodeTheme.colors.sendButtonBackground,
+                faceDiameter = ComposerTunables.sendDiameter,
+                glyphSize = 20.dp,
             )
         }
     }

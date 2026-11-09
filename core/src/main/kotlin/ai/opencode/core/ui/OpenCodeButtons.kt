@@ -91,8 +91,8 @@ fun OpenCodeSecondaryButton(
     role: OpenCodeButtonRole = OpenCodeButtonRole.Normal,
     content: @Composable RowScope.() -> Unit,
 ) {
-    // Desktop neutral button: the base surface with a hairline, not a tonal fill.
-    val container = MaterialTheme.colorScheme.surface
+    // Desktop neutral button: a light neutral fill with a hairline.
+    val container = OpenCodeSurfaces.neutralFill
     val colors = if (role == OpenCodeButtonRole.Destructive) {
         ButtonDefaults.filledTonalButtonColors(containerColor = container, contentColor = OpenCodeTheme.colors.destructive)
     } else {

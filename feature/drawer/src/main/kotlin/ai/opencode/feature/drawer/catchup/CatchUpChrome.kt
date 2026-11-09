@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer.catchup
 
+import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.AccessibilityFocusRequest
@@ -177,9 +178,9 @@ private fun CatchUpUndoButton(canUndo: Boolean, onClick: () -> Unit) {
         border = androidx.compose.foundation.BorderStroke(1.dp, OpenCodeTheme.colors.border),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
         colors = ButtonDefaults.filledTonalButtonColors(
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = OpenCodeSurfaces.neutralFill,
             contentColor = OpenCodeTheme.colors.text,
-            disabledContainerColor = MaterialTheme.colorScheme.surface,
+            disabledContainerColor = OpenCodeSurfaces.neutralFill,
             disabledContentColor = OpenCodeTheme.colors.tertiaryText,
         ),
         modifier = Modifier.heightIn(min = OpenCodeMinTapTarget).widthIn(min = OpenCodeMinTapTarget),

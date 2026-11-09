@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.ui.OpenCodeRadius
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.BorderStroke
@@ -465,7 +466,7 @@ private fun DrawerNewSessionButton(enabled: Boolean, onClick: () -> Unit) {
     Surface(
         // The desktop's neutral button: base surface, hairline ring, small radius.
         shape = RoundedCornerShape(OpenCodeRadius.fill),
-        color = MaterialTheme.colorScheme.surface,
+        color = OpenCodeSurfaces.neutralFill,
         border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
         contentColor = tint,
         modifier = Modifier
@@ -550,7 +551,7 @@ private fun DrawerFooterTrailing(
         }
         Surface(
             shape = RoundedCornerShape(OpenCodeRadius.fill),
-            color = MaterialTheme.colorScheme.surface,
+            color = OpenCodeSurfaces.neutralFill,
             border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
             contentColor = OpenCodeTheme.colors.text,
         ) {

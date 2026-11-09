@@ -1,5 +1,8 @@
 package ai.opencode.feature.settings.onboarding
 
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.clip
+import ai.opencode.core.ui.openCodeHairline
 import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.motion.MotionSpring
@@ -398,10 +401,15 @@ private fun WelcomeCommand(command: String, onCopy: (String) -> Unit) {
         delay(1_500)
         copied = false
     }
+    // The desktop's shell block: a clearly filled box with a hairline, as on the connection screen.
+    val shape = RoundedCornerShape(OpenCodeRadius.fill)
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
+            .clip(shape)
+            .background(OpenCodeSurfaces.commandFill, shape)
+            .openCodeHairline(shape)
             .clickable {
                 onCopy(command)
                 copied = true
@@ -414,6 +422,7 @@ private fun WelcomeCommand(command: String, onCopy: (String) -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        Spacer(Modifier.width(4.dp))
         Text(
             command,
             style = OpenCodeTextStyles.callout.copy(fontFamily = OpenCodeFonts.monospace),
@@ -425,6 +434,7 @@ private fun WelcomeCommand(command: String, onCopy: (String) -> Unit) {
             tint = OpenCodeTheme.colors.secondaryText,
             size = 16.dp,
         )
+        Spacer(Modifier.width(4.dp))
     }
 }
 

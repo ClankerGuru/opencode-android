@@ -1,5 +1,6 @@
 package ai.opencode.app
 
+import ai.opencode.core.ui.OpenCodeSurfaces
 import androidx.compose.ui.unit.sp
 import ai.opencode.core.ui.OpenCodeRadius
 import androidx.compose.foundation.BorderStroke
@@ -318,7 +319,7 @@ private fun PairingActionsButtons(store: StoreOf<AppFeature.State, AppFeature.Ac
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         PairingActionButton(
             onClick = { store.send(AppFeature.Action.AddServerTapped) },
-            container = MaterialTheme.colorScheme.surface,
+            container = OpenCodeSurfaces.neutralFill,
             content = colors.text,
             border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
         ) { Text("Enter a Server Manually", style = PairingActionLabel, textAlign = TextAlign.Center) }
@@ -464,9 +465,11 @@ private fun CopyCommand(command: String, onCopy: (String) -> Unit) {
             onCopy(command)
             copied = true
         },
-        // The desktop's code block: faint fill, hairline border.
+        // The desktop's shell block: a clearly filled box, hairline border.
         shape = RoundedCornerShape(OpenCodeRadius.fill),
-        color = OpenCodeTheme.colors.codeBand,
+        color = OpenCodeSurfaces.commandFill,
+        // Explicit: the fill matches `surfaceVariant`, whose content colour is the secondary text.
+        contentColor = OpenCodeTheme.colors.text,
         border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
         // The label stands in for the visible command (cleared below), read once as a button
         // (iOS `.accessibilityLabel("Copy \(command)")` on a `Button`).

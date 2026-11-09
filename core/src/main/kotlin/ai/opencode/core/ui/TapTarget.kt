@@ -101,7 +101,7 @@ fun OpenCodeIconButton(
             OpenCodeIcon(symbol, contentDescription = contentDescription, size = iconSize)
         }
         OpenCodeIconButtonStyle.Circle -> {
-            val container = tint ?: MaterialTheme.colorScheme.surface
+            val container = tint ?: OpenCodeSurfaces.neutralFill
             OutlinedIconButton(
                 onClick = onClick,
                 modifier = face,
