@@ -2,6 +2,7 @@ package ai.opencode.feature.system
 
 import ai.opencode.core.log.SystemActionOrigin
 import ai.opencode.core.testing.TestIsolationRule
+import ai.opencode.feature.system.intents.AppActionActivity
 import ai.opencode.feature.system.intents.ControlIntents
 import ai.opencode.feature.system.intents.OpenCodeControlKind
 import ai.opencode.feature.system.intents.SessionControlValue
@@ -14,6 +15,9 @@ import ai.opencode.feature.system.intents.projectEntities
 import ai.opencode.feature.system.intents.sessionEntities
 import ai.opencode.feature.system.intents.suggestedSessionEntities
 import ai.opencode.server.OpenCodeClient
+import android.content.Intent
+import android.net.Uri
+import android.os.Process
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeSession
@@ -33,7 +37,10 @@ import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.io.File
 import java.time.Instant
@@ -187,6 +194,33 @@ class SystemEntityQueryFrameworkTests {
         assertEquals("app", document.getPropertyString("description"))
         // No message text: only the title, the project, the link and its Open action.
         assertEquals(setOf("name", "description", "url", "potentialActions"), document.propertyNames)
+    }
+}
+
+/** Android only: App Actions and Ask OpenCode can be started by any app (iOS intents can't). */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
+class SystemCallerTests {
+    @get:Rule val isolation = TestIsolationRule()
+
+    private val assistant = "com.google.android.googlequicksearchbox"
+
+    @Test
+    fun aReferrerAloneIsNotAnAssistant() {
+        val spoofed = Intent().putExtra(Intent.EXTRA_REFERRER, Uri.parse("android-app://$assistant"))
+        val activity = Robolectric.buildActivity(AppActionActivity::class.java, spoofed).get()
+        assertEquals(assistant, activity.referrer?.host)
+        assertFalse(AppActionActivity.isVerifiedAssistant(activity))
+    }
+
+    @Test
+    fun onlyTheAssistantsOwnUidCounts() {
+        val packages = RuntimeEnvironment.getApplication().packageManager
+        shadowOf(packages).setPackagesForUid(10_123, "com.example.other")
+        assertFalse(AppActionActivity.isVerifiedAssistant(null, Process.INVALID_UID, packages))
+        assertFalse(AppActionActivity.isVerifiedAssistant(assistant, Process.INVALID_UID, packages))
+        assertFalse(AppActionActivity.isVerifiedAssistant("com.example.other", 10_123, packages))
+        assertFalse(AppActionActivity.isVerifiedAssistant(assistant, 10_123, packages))
     }
 }
 
