@@ -340,7 +340,7 @@ private fun SetupSteps(store: StoreOf<AppFeature.State, AppFeature.Action>) {
     val linkColor = OpenCodeTheme.colors.secondaryText
     Column {
         Text(
-            "On your computer, open OpenCode and go to Settings → Pairing, or type /pair in OpenCode in your terminal. Then scan the code with this ${ThisDevice.casualName}.",
+            "On your computer, open OpenCode and go to Settings → Pairing, or run opencode pair --remote in a terminal. Then scan the code with this ${ThisDevice.casualName}.",
             style = OpenCodeTextStyles.body,
             modifier = Modifier.padding(vertical = 16.dp),
         )
