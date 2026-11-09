@@ -11,7 +11,6 @@ import ai.opencode.feature.composer.AttachmentMenuMetrics
 import ai.opencode.feature.composer.AttachmentMenuMotion
 import ai.opencode.feature.composer.AttachmentMenuMeasure
 import ai.opencode.feature.composer.AttachmentMenuRows
-import ai.opencode.feature.composer.ComposerMorph
 import ai.opencode.feature.composer.PlusMenuTunables
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
@@ -54,7 +53,6 @@ import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.max
 import kotlin.math.min
@@ -215,11 +213,11 @@ private fun PlusMenuWindowContent(
             if (closing == generation) onRetired()
             return@LaunchedEffect
         }
-        launch { expanded.animateTo(0f, PlusMenuTunables.collapse.spec()) }
-        // A spring's tail would park the disc on the + for a beat; the glass leaves on arrival.
-        delay((ComposerMorph.wallSeconds(PlusMenuTunables.COLLAPSE_GLASS_OUT) * 1000).roundToInt().toLong())
+        // The fold is logically done once the disc reaches the + (a spring's tail would park it
+        // there for a beat); then the glass leaves on `microOut`.
+        expanded.animateTo(0f, Motion.panelClose.animation(visibilityThreshold = 0.01f))
         if (closing != generation) return@LaunchedEffect
-        glass.animateTo(0f, Motion.easeOut(PlusMenuTunables.COLLAPSE_FADE))
+        glass.animateTo(0f, Motion.microOut.animation(reduceMotion = false))
         if (closing == generation) onRetired()
     }
 

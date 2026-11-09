@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FiniteAnimationSpec
@@ -52,7 +53,7 @@ object DockedKeyboard {
 
     /**
      * iOS `DockedKeyboard.focusAnimation`: the keyboard's own spring
-     * ([ComposerMorphTunables.keyboard]) for what moves with it, or null (no animation) under
+     * (`Motion.keyboard`, [ComposerMorphTunables.keyboard]) for what moves with it, or null (no animation) under
      * Reduce Motion or while the card lays out without the keyboard (`excludesKeyboard`).
      */
     fun focusAnimation(reduceMotion: Boolean, excludesKeyboard: Boolean): FiniteAnimationSpec<Float>? =
@@ -62,7 +63,7 @@ object DockedKeyboard {
 /**
  * iOS `ComposerKeyboardStep`: the composer through a docked keyboard's unanimated height change
  * (the suggestion strip hiding, and showing again). The keys snap; the composer keeps its drawn
- * top in that frame, then glides after them on [ComposerTextInputTunables.lineGrowth], by as
+ * top in that frame, then glides after them on `Motion.layout`, by as
  * much as the keyboard's cover of its window changed. Another change on the way keeps its speed.
  */
 @Stable
@@ -82,7 +83,7 @@ class ComposerKeyboardStep {
             hold = spring.value
             // Starts on the next frame: the frame the keys snapped in can stall, and the composer holds through it.
             withFrameNanos { }
-            spring.animateTo(0f, ComposerTextInputTunables.lineGrowth.spec(), initialVelocity = velocity) { hold = value }
+            spring.animateTo(0f, Motion.layout.animation(), initialVelocity = velocity) { hold = value }
         }
     }
 

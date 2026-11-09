@@ -1,8 +1,8 @@
 package ai.opencode.feature.composer.modelpicker
 
-import ai.opencode.core.motion.transitionBlur
-
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionRollDirection
+import ai.opencode.core.motion.MotionTransition
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -11,27 +11,19 @@ import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.excludedFromDrawerPan
 import ai.opencode.core.ui.openCodeTapTarget
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -52,7 +44,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
@@ -110,7 +101,7 @@ fun OnePickerChip(
             .clickable(enabled = isEnabled, role = Role.Button) { onOpen() }
             .openCodeTapTarget()
             .heightIn(min = 48.dp)
-            .animateContentSize(if (animates) OnePickerTunables.chipWidth.animation(reduceMotion) else snap())
+            .animateContentSize(if (animates) Motion.layout.animation(reduceMotion = reduceMotion) else snap())
             .clearAndSetSemantics {
                 contentDescription = "Choose model"
                 stateDescription = value
@@ -198,9 +189,9 @@ object OnePickerChip {
 private val ChipTextStyle: TextStyle get() = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium)
 
 /**
- * iOS `ChipRollModifier`: the outgoing value rises 5 pt, shrinks to 0.96, blurs (2.5) and fades
- * as the next comes up from below (blur 2.0); under Reduce Motion only the opacity changes. Not
- * animated ([animates] false) the value is swapped at once.
+ * The incoming label rolls up from below on the frame the outgoing one rolls away
+ * (`motionRoll`), its width following on `layout`; under Reduce Motion, a cross-fade. Not
+ * animated ([animates] false: the picker is open) the value is swapped at once.
  */
 @Composable
 private fun <T> OnePickerChipRoll(
@@ -212,39 +203,20 @@ private fun <T> OnePickerChipRoll(
     content: @Composable (T) -> Unit,
 ) {
     val density = LocalDensity.current
-    val travel = with(density) { 5.dp.roundToPx() }
-    val roll: MotionSpring = OnePickerTunables.chipRoll
     AnimatedContent(
         targetState = target,
         modifier = modifier,
         transitionSpec = {
-            val size = SizeTransform(clip = false) { _, _ -> if (animates) OnePickerTunables.chipWidth.animation(reduceMotion) else snap() }
             if (!animates) {
-                (fadeIn(snap()) togetherWith fadeOut(snap())).using(size)
-            } else if (reduceMotion) {
-                (fadeIn(roll.animation(true)) togetherWith fadeOut(roll.animation(true))).using(size)
+                (fadeIn(snap()) togetherWith fadeOut(snap())).using(SizeTransform(clip = false) { _, _ -> snap() })
             } else {
-                val slide = roll.animation<IntOffset>(false)
-                val fade = roll.animation<Float>(false)
-                (
-                    (slideInVertically(slide) { travel } + scaleIn(fade, initialScale = 0.96f) + fadeIn(fade)) togetherWith
-                        (slideOutVertically(slide) { -travel } + scaleOut(fade, targetScale = 0.96f) + fadeOut(fade))
-                    ).using(size)
+                val size = SizeTransform(clip = false) { _, _ -> Motion.layout.animation(reduceMotion = reduceMotion) }
+                MotionTransition.roll(MotionRollDirection.Up, reduceMotion, density).content.using(size)
             }
         },
         contentAlignment = Alignment.CenterStart,
         label = label,
     ) { value ->
-        val blur by transition.animateFloat(
-            transitionSpec = { if (animates) roll.animation(reduceMotion) else snap() },
-            label = "$label-blur",
-        ) { phase ->
-            when {
-                reduceMotion || !animates || phase == EnterExitState.Visible -> 0f
-                phase == EnterExitState.PreEnter -> 2.0f
-                else -> 2.5f
-            }
-        }
-        Box(Modifier.transitionBlur { blur }) { content(value) }
+        content(value)
     }
 }

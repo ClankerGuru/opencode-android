@@ -1,7 +1,9 @@
 package ai.opencode.feature.composer
 
 import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionRole
+import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.motion.transitionBlur
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -87,15 +89,9 @@ enum class AttachmentMenuPhase {
  */
 object AttachmentMenuMotion {
     /** The surface grows up out of + while the + turns into a ×. */
-    fun <T> open(reduceMotion: Boolean): FiniteAnimationSpec<T> {
-        if (reduceMotion) return Motion.easeInOut(0.2)
-        return PlusMenuTunables.open.spec()
-    }
+    fun <T> open(reduceMotion: Boolean): FiniteAnimationSpec<T> = Motion.panelOpen.animation(reduceMotion = reduceMotion)
 
-    fun <T> close(reduceMotion: Boolean): FiniteAnimationSpec<T> {
-        if (reduceMotion) return Motion.easeInOut(0.2)
-        return PlusMenuTunables.close.spec()
-    }
+    fun <T> close(reduceMotion: Boolean): FiniteAnimationSpec<T> = Motion.panelClose.animation(reduceMotion = reduceMotion)
 }
 
 /** iOS `AttachmentMenuMetrics` (points → dp). */
@@ -118,19 +114,11 @@ object AttachmentMenuMetrics {
  * iOS backs them with live Tunables; here they are the baked defaults. Seconds and points.
  */
 object PlusMenuTunables {
-    const val FLIGHT_DURATION = 0.34
-    val open = MotionSpring(0.2, 0.14)
-    val close = MotionSpring(0.2, 0.0)
     const val MENU_BLUR = 3.5f
     const val MENU_SCALE = 0.96f
-    /** Each row's reveal starts this much (× open) after the one before. */
-    const val ROW_STAGGER = 0.02f
     /** A row's reveal spans this much of the open (× open). */
     const val ROW_SPAN = 0.65f
     const val HOLD_DURATION = 0.18
-    val peekOpen = MotionSpring(0.28, 0.14)
-    const val PEEK_CLOSE = 0.16
-    const val PEEK_STAGGER = 0.02
     /** iOS's peek backdrop blur (pt). Not drawn on Android, which dims the band with a scrim. */
     const val PEEK_BLUR = 10f
     const val PEEK_DIM = 0f
@@ -158,19 +146,15 @@ object PlusMenuTunables {
     const val MENU_INSET = 0f
 
     // iOS declares these in `PlusMenuGlassSurface.swift` (an extension of `PlusMenuTunables`).
-    // Measured from ChatGPT's iOS + menu at 60 fps: its glass shrinks to a +-sized disc on a
-    // critically damped ~0.3 s curve, the disc leaves within two frames at 250 ms, and its +
-    // fades in from inside the disc between 200 and 300 ms; these run at two thirds of that.
-    val collapse = MotionSpring(0.2, 0.0)
-    /** When the collapsed glass leaves the +, in seconds after close. */
-    const val COLLAPSE_GLASS_OUT = 0.2
+    // The fold measured from ChatGPT's iOS + menu at 60 fps: its glass shrinks to a +-sized disc
+    // on a critically damped curve, the disc leaves as it arrives, and its + fades in from inside
+    // the disc. The fold itself is `Motion.panelClose`; the disc leaves on `Motion.microOut`.
     /** The collapsing glass's size where it leaves, as a fraction of the + frame (1 leaves a +-sized disc, which reads as a pop). */
     const val COLLAPSE_END = 0.25f
-    const val COLLAPSE_FADE = 0.08
     /** The scale the + pops back from as the glass arrives (1 is a fade only). */
     const val PLUS_POP = 0.8
-    const val PLUS_POP_DELAY = 0.13
-    val plusPopSpring = MotionSpring(0.22, 0.45)
+    /** How far into the fold (× `Motion.panelClose`) the + starts popping back: the glass reaches it about two thirds of the way. */
+    const val PLUS_POP_LEAD = 0.65
 }
 
 // region Rows
@@ -258,9 +242,11 @@ private val AttachmentMenuRowHighlightRadius: Dp = AttachmentMenuMetrics.cornerR
 /** The system menus' highlight: a quiet fill concentric with the panel, for a press or a finger sliding over the row from +. */
 @Composable
 private fun AttachmentMenuRowLabel(item: AttachmentMenuItem, iconWidth: Dp, inset: Dp, height: Dp, isLit: Boolean, circularIcon: Boolean = false) {
+    val reduceMotion = rememberReduceMotion()
+    // The shared press: lit at once under the finger, let go on its exit.
     val lit by animateFloatAsState(
         if (isLit) 1f else 0f,
-        MotionSpring(if (isLit) 0.08 else 0.2).spec(),
+        Motion.press.animation(if (isLit) MotionPhase.Enter else MotionPhase.Exit, reduceMotion),
         label = "menu-row-highlight",
     )
     Row(
@@ -296,8 +282,11 @@ private fun AttachmentMenuRowLabel(item: AttachmentMenuItem, iconWidth: Dp, inse
  */
 fun Modifier.menuRowEntranceReveal(progress: Float, bottomIndex: Int, totalCount: Int, blur: Float, scale: Float): Modifier {
     val clamped = progress.coerceIn(0f, 1f)
-    val stagger = if (totalCount > 1) PlusMenuTunables.ROW_STAGGER else 0f
-    val delay = bottomIndex * stagger
+    // `Motion.staggerStep` apart (the group within `staggerCap`), as shares of the one open
+    // spring that carries every row.
+    val open = max(Motion.panelOpen.curve().duration, 0.01)
+    val stagger = if (totalCount > 1) (Motion.staggerStep / open).toFloat() else 0f
+    val delay = (MotionRole.staggerDelay(bottomIndex) / open).toFloat()
     val span = max(PlusMenuTunables.ROW_SPAN - max(totalCount - 1, 0) * stagger, 0.25f)
     val eased = attachmentMenuSmoothstep(delay, delay + span, clamped)
     val currentScale = scale + (1 - scale) * eased

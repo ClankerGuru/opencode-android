@@ -7,7 +7,7 @@ import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionRole
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionRubberBand
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconButton
@@ -31,7 +31,6 @@ import android.content.res.Configuration
 import android.content.res.Resources
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -512,10 +511,10 @@ data class PlusPhotoSheetDetent(
     }
 
     companion object {
+        /** UIKit's rubber band (`MotionRubberBand`), never more than [limit]. */
         fun rubberBand(excess: Float, limit: Float, factor: Float): Float {
             if (excess <= 0 || limit <= 0 || factor <= 0) return 0f
-            val scaled = excess * factor
-            return (limit * scaled) / (limit + scaled)
+            return MotionRubberBand(limit.toDouble(), factor.toDouble()).stretch(excess.toDouble()).toFloat()
         }
 
         fun normalizedInitialVelocity(velocity: Float, from: Float, to: Float): Float {
@@ -1127,10 +1126,11 @@ private fun PlusPhotoTile(
     }
     DisposableEffect(photo.id) { onDispose { flights.source(photo.id, null) } }
 
+    val reduceMotion = rememberReduceMotion()
+    // Gone at once as its photo takes off; back on the swap's fade once it lands.
     val alpha by animateFloatAsState(
         targetValue = if (inFlight) 0f else 1f,
-        // iOS `.smooth(duration: 0.25)`: a spring with no bounce.
-        animationSpec = if (inFlight) androidx.compose.animation.core.snap() else MotionSpring(0.25).spec(),
+        animationSpec = if (inFlight) androidx.compose.animation.core.snap() else Motion.swap.animation(reduceMotion = reduceMotion),
         label = "tile-in-flight",
     )
     // iOS `PhotoSelectionButtonStyle`: press feedback changes only overlays. A press only dims
@@ -1140,7 +1140,6 @@ private fun PlusPhotoTile(
     val interaction = remember { MutableInteractionSource() }
     val isPressed by interaction.collectIsPressedAsState()
     val dim = if (isPressed && !picked) PlusMenuTunables.SELECTION_DIM.toFloat() * 0.5f else 0f
-    val reduceMotion = rememberReduceMotion()
     val pickedInset by animateFloatAsState(
         targetValue = if (picked) 1f else 0f,
         animationSpec = MotionRole.MicroIn.animation(if (picked) MotionPhase.Enter else MotionPhase.Exit, reduceMotion),
@@ -1151,7 +1150,7 @@ private fun PlusPhotoTile(
     val full = !picked && !canPickMore
     val limitDim by animateFloatAsState(
         targetValue = if (full) PlusMenuTunables.LIMIT_DIM.toFloat() else 0f,
-        animationSpec = tween(200, easing = Motion.EaseOut),
+        animationSpec = Motion.swap.animation(if (full) MotionPhase.Enter else MotionPhase.Exit, reduceMotion),
         label = "tile-limit",
     )
     val washColor = MaterialTheme.colorScheme.background

@@ -1,5 +1,8 @@
 package ai.opencode.feature.composer.modelpicker
 
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionTunables
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -313,9 +316,10 @@ private fun OnePickerRowCell(item: OnePickerRowItem, actions: OnePickerListActio
     val bounce = remember { Animatable(1f) }
     var holds by remember { mutableIntStateOf(0) }
     LaunchedEffect(holds) {
+        // The shared press: down at once, let go on its release.
         if (holds == 0 || reduceMotion) return@LaunchedEffect
-        bounce.snapTo(0.98f)
-        bounce.animateTo(1f, OnePickerTunables.arcSpring.spec())
+        bounce.snapTo(MotionTunables.pressScale.value)
+        bounce.animateTo(1f, Motion.press.animation(MotionPhase.Exit, reduceMotion = false))
     }
     val toggleFavorite = { actions.onToggleFavorite(item.model) }
     // Android divergence: a ripple in the row's rounded inset answers the press (iOS tints it).

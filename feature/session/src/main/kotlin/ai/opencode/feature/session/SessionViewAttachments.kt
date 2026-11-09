@@ -6,6 +6,7 @@ import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.core.files.ComposerFileStaging
 import ai.opencode.core.files.ComposerStagedFile
 import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.ui.openCodeTapTarget
@@ -544,7 +545,7 @@ fun PendingAttachmentsRow(
     }
     val rowHeight by animateDpAsState(
         rowHeightTarget,
-        if (reduceMotion || !styled) snap() else ComposerTunables.attachmentResize.spec(),
+        if (!styled) snap() else Motion.layout.animation(if (showsLocation) MotionPhase.Enter else MotionPhase.Exit, reduceMotion),
         label = "attachmentRowHeight",
     )
     val listState = rememberLazyListState()
@@ -740,7 +741,7 @@ private class DepartingAttachments(private val graphics: GraphicsContext, privat
         val layer = layers.remove(key) ?: return
         val position = positions.remove(key)
         val spec: FiniteAnimationSpec<Float>? = when {
-            usesPlusMenuSheet -> AttachmentRemoval.animation(reduceMotion)
+            usesPlusMenuSheet -> AttachmentRemoval.exitAnimation(reduceMotion)
             reduceMotion -> null
             else -> tween(durationMillis = DEFAULT_EXIT_MILLIS, easing = EaseOut)
         }

@@ -1,12 +1,12 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.transitionBlur
 
 import ai.opencode.core.tuning.Tunable
 import ai.opencode.core.ui.LocalDrawerKeyboardSignals
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FiniteAnimationSpec
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
@@ -44,7 +44,6 @@ import androidx.compose.ui.unit.offset
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -56,9 +55,6 @@ object ComposerKeyboardTunables {
 
     /** iOS `ComposerTunables.keyboardChipBlur`: the controls' blur (dp) at the start of their reveal. */
     val keyboardChipBlur = Tunable("composer.keyboard.chipBlur", "Model reveal blur", default = 3f, range = 0.0..4.0, step = 0.25)
-
-    /** iOS `ComposerTunables.keyboardFade`: Reduce Motion's fade for the controls, in seconds. */
-    val keyboardFade = Tunable("composer.keyboard.fade", "Reduced motion fade", default = 0.18, range = 0.1..0.3, step = 0.01)
 }
 
 /**
@@ -293,7 +289,8 @@ data class ComposerSideMargins(val rest: Dp, val keyboard: Dp)
  * row's expansion, frame by frame (focus or a draft opening the row rises them too, rather than
  * appearing in place). Collapsed and settled they leave composition, and with it TalkBack; they
  * take touches and TalkBack only once the row is nearly open. [recording] fades them out for the
- * dictation bar on [fade]. Under Reduce Motion they only fade, over `keyboardFade`.
+ * dictation bar on [fade]. Under Reduce Motion they only fade, on `Motion.reduced`, and stay
+ * drawn until that fade completes.
  */
 @Composable
 fun ComposerKeyboardReveal(
@@ -304,18 +301,9 @@ fun ComposerKeyboardReveal(
     content: @Composable () -> Unit,
 ) {
     val pose = morph.pose
-    // Under Reduce Motion, collapsing: the controls are still fading out.
+    // Under Reduce Motion, collapsing: the controls are still fading out (iOS `leaving`),
+    // cleared when the fade completes rather than on a timer.
     var fadingOut by remember { mutableStateOf(false) }
-    val seenExpanded = remember { booleanArrayOf(pose.expanded) }
-    LaunchedEffect(pose.expanded) {
-        if (seenExpanded[0] == pose.expanded) return@LaunchedEffect
-        seenExpanded[0] = pose.expanded
-        fadingOut = pose.reducedMotion && !pose.expanded
-        if (fadingOut) {
-            delay((ComposerKeyboardTunables.keyboardFade.value * 1000).toLong())
-            fadingOut = false
-        }
-    }
     val open by remember(morph) { derivedStateOf { morph.expansion > 0f } }
     val nearlyOpen by remember(morph) { derivedStateOf { morph.expansion > 0.95f } }
     val animating by remember(morph) { derivedStateOf { morph.keyboard.isAnimating } }
@@ -325,12 +313,14 @@ fun ComposerKeyboardReveal(
     // Under Reduce Motion the expansion switches at once; the controls fade to it.
     val reducedAlpha = remember { Animatable(if (pose.expansion(morph.keyboard.progress) > 0f) 1f else 0f) }
     LaunchedEffect(pose.reducedMotion, pose.layoutExpanded) {
-        if (pose.reducedMotion) {
-            reducedAlpha.animateTo(
-                if (pose.layoutExpanded) 1f else 0f,
-                tween((ComposerKeyboardTunables.keyboardFade.value * 1000).roundToInt()),
-            )
+        if (!pose.reducedMotion) {
+            fadingOut = false
+            return@LaunchedEffect
         }
+        val shown = pose.layoutExpanded
+        fadingOut = !shown
+        reducedAlpha.animateTo(if (shown) 1f else 0f, Motion.reduced.animation(reduceMotion = true))
+        fadingOut = false
     }
     val interactive = pose.expanded && nearlyOpen && !recording
     // iOS `.allowsHitTesting(pose.expanded && progress > 0.95 && !recording)`. Shut, the field has

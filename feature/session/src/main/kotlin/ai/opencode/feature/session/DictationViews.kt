@@ -3,7 +3,9 @@ package ai.opencode.feature.session
 import ai.opencode.feature.composer.DictationDrag
 import ai.opencode.feature.composer.DictationHoldTracker
 import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionTunables
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeShape
@@ -218,35 +220,43 @@ val LocalDictationBarIsLeaving = compositionLocalOf { false }
 
 /**
  * iOS `DictationBarPresence` + `DictationBarTransition`: the bar and its hold layer fade (and scale
- * from 0.98) in where they sit; leaving is state, not a removal, so it fades out in place (fadeFast)
- * and stops taking touches. Remove it after [DictationBarPresenceDuration].
+ * from `swapScale`) in where they sit, with the composer's fold (`layout` closing); leaving is
+ * state, not a removal, so it fades out in place on `microOut` and stops taking touches, and
+ * [onLeft] runs once that fade has finished, to take it out of the tree. Locked again mid-fade,
+ * it comes back from where it is (on `microIn`) and stays.
  */
 @Composable
-fun DictationBarPresence(isLeaving: Boolean, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+fun DictationBarPresence(
+    isLeaving: Boolean,
+    modifier: Modifier = Modifier,
+    onLeft: () -> Unit = {},
+    content: @Composable () -> Unit,
+) {
     val reduceMotion = rememberReduceMotion()
     val presence = remember { Animatable(0f) }
+    val currentOnLeft by rememberUpdatedState(onLeft)
     LaunchedEffect(isLeaving) {
         val spec: FiniteAnimationSpec<Float> = when {
-            isLeaving -> Motion.easeOut(Motion.fadeFast, reduceMotion = reduceMotion)
-            reduceMotion -> Motion.reducedFadeSpec()
-            else -> MotionSpring(0.28).spec()
+            isLeaving -> Motion.microIn.animation(MotionPhase.Exit, reduceMotion)
+            presence.value == 0f -> Motion.layout.animation(MotionPhase.Exit, reduceMotion)
+            else -> Motion.microIn.animation(MotionPhase.Enter, reduceMotion)
         }
         presence.animateTo(if (isLeaving) 0f else 1f, spec)
+        // A cancelled fade (locked again) never gets here.
+        if (isLeaving) currentOnLeft()
     }
     val p = presence.value
+    val leftScale = MotionTunables.swapScale.value
     CompositionLocalProvider(LocalDictationBarIsLeaving provides isLeaving) {
         Box(
             modifier
                 .alpha(p.coerceIn(0f, 1f))
-                .scale(if (reduceMotion) 1f else 0.98f + 0.02f * p)
+                .scale(if (reduceMotion) 1f else leftScale + (1f - leftScale) * p)
                 // Leaving, it stops taking touches (it has none of its own once the bar unlocks) and leaves TalkBack.
                 .then(if (isLeaving) Modifier.clearAndSetSemantics { } else Modifier),
         ) { content() }
     }
 }
-
-/** iOS `DictationBarPresence.duration`: long enough for the fade (ms). */
-const val DictationBarPresenceDuration = 400L
 
 /**
  * iOS `DictationScopeBar`: recording takes the composer's control row: Cancel (the composer's own
@@ -297,7 +307,7 @@ fun DictationScopeBar(
     }
     val guidesAlpha by animateFloatAsState(
         if (p.guidesShown) 1f else 0f,
-        if (p.reducedMotion) Motion.easeInOut(0.2) else MotionSpring(0.3, 0.15).spec(),
+        Motion.microIn.animation(if (p.guidesShown) MotionPhase.Enter else MotionPhase.Exit, p.reducedMotion),
         label = "barGuides",
     )
     val scopeAlpha = if (p.cancelArmed) 0.28f else 1 - p.cancelProgress * 0.35f
@@ -506,7 +516,7 @@ fun DeliveryMenu(
 private fun DictationLockedReveal(isLocked: Boolean, reducedMotion: Boolean, content: @Composable () -> Unit) {
     val p by animateFloatAsState(
         if (isLocked) 1f else 0f,
-        if (reducedMotion) Motion.easeInOut(0.2) else MotionSpring(0.3, 0.2).spec(),
+        Motion.microIn.animation(if (isLocked) MotionPhase.Enter else MotionPhase.Exit, reducedMotion),
         label = "lockedReveal",
     )
     Box(Modifier.alpha(p.coerceIn(0f, 1f)).scale(if (reducedMotion) 1f else 0.6f + 0.4f * p)) { content() }
@@ -543,20 +553,27 @@ fun DictationHoldLayer(
     }
     LaunchedEffect(Unit) { DictationLatency.mark("hold_circle") }
     LaunchedEffect(p.guidesShown) { if (p.guidesShown) DictationLatency.mark("lock_target") }
-    val springs = { d: Double, b: Double -> if (p.reducedMotion) Motion.easeInOut<Float>(0.2) else MotionSpring(d, b).spec() }
-    val guides by animateFloatAsState(if (p.guidesShown) 1f else 0f, springs(0.3, 0.15), label = "holdGuides")
+    // Small things arrive on `microIn` and leave on `microOut`.
+    fun <T> micro(arriving: Boolean): FiniteAnimationSpec<T> =
+        Motion.microIn.animation(if (arriving) MotionPhase.Enter else MotionPhase.Exit, p.reducedMotion)
+    val guides by animateFloatAsState(if (p.guidesShown) 1f else 0f, micro(p.guidesShown), label = "holdGuides")
+    // Locked or sent, the circle and the target leave where they are.
     val shown = !p.isLocked && !p.isSentFromHold && !p.isLeaving
-    val circleAlpha by animateFloatAsState(if (shown) 1f else 0f, springs(0.34, 0.1), label = "holdCircleAlpha")
+    val circleAlpha by animateFloatAsState(if (shown) 1f else 0f, micro(shown), label = "holdCircleAlpha")
     val circleScale by animateFloatAsState(
         if (p.reducedMotion || shown) 1f else if (p.isSentFromHold) 0.5f else 0.8f,
-        springs(0.34, 0.1),
+        micro(shown),
         label = "holdCircleScale",
     )
-    val sentRise by animateFloatAsState(if (p.isSentFromHold && !p.reducedMotion) -36f else 0f, springs(0.25, 0.0), label = "holdSentRise")
+    val sentRise by animateFloatAsState(
+        if (p.isSentFromHold && !p.reducedMotion) -36f else 0f,
+        Motion.swap.animation(reduceMotion = p.reducedMotion),
+        label = "holdSentRise",
+    )
     val grown = p.showsGrownCircle
     val circleDiameter by animateFloatAsState(
         if (grown) DictationBarPose.holdDiameter else min(34f * density.fontScale, 44f),
-        springs(0.3, 0.15),
+        micro(grown),
         label = "holdCircleSize",
     )
     val follow = p.follow
@@ -564,7 +581,7 @@ fun DictationHoldLayer(
     val followY by animateFloatAsState(follow.y, if (p.reducedMotion) tween(0) else MotionSpring(0.18).spec(), label = "followY")
     val armedFill by animateFloatAsState(
         if (p.lockArmed) 1f else 0f,
-        if (p.reducedMotion) Motion.easeInOut(0.15) else MotionSpring(0.22, 0.25).spec(),
+        micro(p.lockArmed),
         label = "lockArmed",
     )
     // The mic's centre (dp, in this layer); before it's measured, the bar's trailing slot.

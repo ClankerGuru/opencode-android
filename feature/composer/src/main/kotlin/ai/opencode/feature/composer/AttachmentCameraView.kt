@@ -4,7 +4,9 @@ import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticEffect
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionReduce
+import ai.opencode.core.motion.MotionTransition
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeShape
@@ -43,9 +45,6 @@ import androidx.camera.viewfinder.compose.MutableCoordinateTransformer
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -381,6 +380,7 @@ fun AttachmentCameraControls(
     onLens: (CameraZoomModel.Preset) -> Unit = {},
 ) {
     val inert = if (canCapture) 1f else 0.35f
+    val reduceMotion = rememberReduceMotion()
     CompositionLocalProvider(LocalContentColor provides Color.White) {
         Column(modifier.fillMaxSize()) {
             Row(
@@ -405,8 +405,8 @@ fun AttachmentCameraControls(
                 Spacer(Modifier.weight(1f))
                 AnimatedVisibility(
                     visible = isFocusLocked,
-                    enter = fadeIn(Motion.easeOut(0.2)),
-                    exit = fadeOut(Motion.easeOut(0.2)),
+                    enter = MotionTransition.micro(reduceMotion).enter,
+                    exit = MotionTransition.micro(reduceMotion).exit,
                 ) {
                     Text(
                         "AE/AF Lock",
@@ -534,8 +534,7 @@ private fun AttachmentLensPicker(
             val isActive = preset == active
             val side by animateFloatAsState(
                 targetValue = if (isActive) 38f else 30f,
-                // SwiftUI `.snappy(duration: 0.2)`: bounce 0.15.
-                animationSpec = if (reduceMotion) tween(0) else MotionSpring(0.2, 0.15).spec(),
+                animationSpec = Motion.microIn.animation(reduceMotion = reduceMotion),
                 label = "lens-side",
             )
             Box(
@@ -587,17 +586,14 @@ fun AttachmentFocusIndicator(mark: AttachmentFocusMark?) {
     LaunchedEffect(mark?.id) {
         if (mark != null) {
             shown = mark
-            if (reduceMotion) {
-                scale.snapTo(1f)
-                alpha.animateTo(1f, Motion.easeOut(0.15))
-            } else {
-                scale.snapTo(1.4f)
-                alpha.snapTo(0f)
-                launch { alpha.animateTo(1f, MotionSpring(0.3, 0.0).spec()) }
-                scale.animateTo(1f, MotionSpring(0.3, 0.0).spec())
-            }
+            // In from a larger square; out as a plain fade. Under Reduce Motion it only fades.
+            val enter = Motion.microIn.animation<Float>(MotionPhase.Enter, reduceMotion)
+            scale.snapTo(MotionReduce.scale(1.4f, reduceMotion))
+            alpha.snapTo(0f)
+            launch { alpha.animateTo(1f, enter) }
+            scale.animateTo(1f, enter)
         } else if (shown != null) {
-            alpha.animateTo(0f, if (reduceMotion) Motion.easeOut(0.15) else MotionSpring(0.3, 0.0).spec())
+            alpha.animateTo(0f, Motion.microIn.animation(MotionPhase.Exit, reduceMotion))
             shown = null
         }
     }

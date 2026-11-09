@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.motion.Motion
 import ai.opencode.core.haptics.HapticsClient
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -166,9 +167,10 @@ class AttachmentMenuPressTests {
         assertEquals(listOf("selection"), log)
     }
 
-    @Test fun theMenuUsesItsTunedHoldAndSprings() {
+    @Test fun theMenuUsesItsTunedHoldAndThePanelRoles() {
         assertEquals(PlusMenuTunables.HOLD_DURATION.seconds, AttachmentPickerButton.holdDuration)
-        assertEquals(PlusMenuTunables.open.spec<Float>(), AttachmentMenuMotion.open<Float>(reduceMotion = false))
-        assertEquals(PlusMenuTunables.close.spec<Float>(), AttachmentMenuMotion.close<Float>(reduceMotion = false))
+        assertEquals(Motion.panelOpen.animation<Float>(), AttachmentMenuMotion.open<Float>(reduceMotion = false))
+        assertEquals(Motion.panelClose.animation<Float>(), AttachmentMenuMotion.close<Float>(reduceMotion = false))
+        assertEquals(Motion.reduced.animation<Float>(reduceMotion = true), AttachmentMenuMotion.close<Float>(reduceMotion = true))
     }
 }

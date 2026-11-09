@@ -3,7 +3,9 @@ package ai.opencode.feature.session
 import ai.opencode.core.motion.transitionBlur
 
 import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionRollDirection
+import ai.opencode.core.motion.MotionTransition
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.collectState
@@ -17,13 +19,10 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -87,9 +86,6 @@ import kotlin.math.roundToInt
 
 /** iOS `ProjectPickerTunables`: the shipped defaults (developer tuning isn't ported). */
 object ProjectPickerTunables {
-    val selection = MotionSpring(duration = 0.25, bounce = 0.0)
-    val subtitle = MotionSpring(duration = 0.25, bounce = 0.0)
-    const val reducedFade = 0.18
     val rowInset = 16.dp
     val rowPadding = 10.dp
     val pathGap = 4.dp
@@ -149,16 +145,13 @@ data class DraftProjectOrder(
 @Composable
 fun ProjectHeaderSubtitle(project: String, modifier: Modifier = Modifier, content: @Composable (String) -> Unit = { Text(it) }) {
     val reducedMotion = rememberReduceMotion()
+    val density = LocalDensity.current
     AnimatedContent(
         targetState = project,
         modifier = modifier,
         transitionSpec = {
-            if (reducedMotion) {
-                fadeIn(Motion.easeInOut(ProjectPickerTunables.reducedFade)) togetherWith fadeOut(Motion.easeInOut(ProjectPickerTunables.reducedFade))
-            } else {
-                (slideInVertically(ProjectPickerTunables.subtitle.spec()) { it / 2 } + fadeIn(ProjectPickerTunables.subtitle.spec())) togetherWith
-                    (slideOutVertically(ProjectPickerTunables.subtitle.spec()) { -it / 2 } + fadeOut(ProjectPickerTunables.subtitle.spec()))
-            }
+            // iOS `.titleRoll` on `Motion.swap`.
+            MotionTransition.roll(MotionRollDirection.Up, reducedMotion, density).content
         },
         label = "projectHeaderSubtitle",
     ) { content(it) }
@@ -203,7 +196,7 @@ fun DraftProjectList(
     // Under Reduce Motion the folded and full lists are separate views that cross-fade.
     val fold by animateFloatAsState(
         targetValue = if (isComposing) 1f else 0f,
-        animationSpec = if (reducedMotion) tween(0) else ProjectPickerTunables.selection.spec(),
+        animationSpec = if (reducedMotion) snap() else Motion.layout.animation(if (isComposing) MotionPhase.Exit else MotionPhase.Enter),
         label = "draftProjectFold",
     )
     // iOS `matchedGeometryEffect(id: "chosen")`: one highlight that slides between rows. Its
@@ -214,17 +207,17 @@ fun DraftProjectList(
     LaunchedEffect(chosenIndex, isComposing, reducedMotion) {
         val target = chosenIndex ?: return@LaunchedEffect
         if (isComposing || reducedMotion || !highlightShown) highlightIndex.snapTo(target.toFloat())
-        else highlightIndex.animateTo(target.toFloat(), ProjectPickerTunables.selection.spec())
+        else highlightIndex.animateTo(target.toFloat(), Motion.layout.animation())
     }
     LaunchedEffect(chosenIndex != null) { highlightShown = chosenIndex != null }
     val highlightAlpha by animateFloatAsState(
         targetValue = if (chosenIndex != null) 1f else 0f,
-        animationSpec = if (isComposing) snap() else ProjectPickerTunables.selection.spec(),
+        animationSpec = if (isComposing) snap() else Motion.layout.animation(reduceMotion = reducedMotion),
         label = "draftProjectHighlightAlpha",
     )
     AnimatedContent(
         targetState = reducedMotion && isComposing,
-        transitionSpec = { fadeIn(Motion.easeInOut(ProjectPickerTunables.reducedFade)) togetherWith fadeOut(Motion.easeInOut(ProjectPickerTunables.reducedFade)) },
+        transitionSpec = { fadeIn(Motion.reduced.animation(reduceMotion = true)) togetherWith fadeOut(Motion.reduced.animation(reduceMotion = true)) },
         label = "draftProjectsReduced",
         modifier = modifier.testTag("draft-projects"),
     ) { onlyKept ->
@@ -285,8 +278,8 @@ private fun isChosen(project: OpenCodeProject, chosen: OpenCodeProject?): Boolea
 
 @Composable
 private fun DraftProjectRow(title: String, symbol: SFSymbol, chosen: Boolean, ownHighlight: Boolean, iconWidth: androidx.compose.ui.unit.Dp, hint: String?, onClick: () -> Unit, tag: String) {
-    // Reduce Motion: the row's own highlight cross-fades in place (iOS easeInOut reducedFade).
-    val highlight by animateFloatAsState(if (chosen && ownHighlight) 1f else 0f, Motion.easeInOut(ProjectPickerTunables.reducedFade), label = "draftProjectHighlight")
+    // Reduce Motion: the row's own highlight cross-fades in place (iOS `layout`, the reduced fade).
+    val highlight by animateFloatAsState(if (chosen && ownHighlight) 1f else 0f, Motion.reduced.animation(reduceMotion = true), label = "draftProjectHighlight")
     Row(
         Modifier
             .fillMaxWidth()
@@ -324,7 +317,8 @@ private fun DraftProjectRow(title: String, symbol: SFSymbol, chosen: Boolean, ow
 private fun DraftProjectFade(isHidden: Boolean, reducedMotion: Boolean, content: @Composable () -> Unit) {
     val alpha by animateFloatAsState(
         targetValue = if (isHidden) 0f else 1f,
-        animationSpec = if (isHidden) Motion.easeOut(0.16) else Motion.easeOut(0.26, delaySeconds = 0.08),
+        animationSpec = if (isHidden) Motion.swap.animation(MotionPhase.Exit, reducedMotion)
+        else Motion.swap.animation(reduceMotion = reducedMotion, delaySeconds = Motion.contentDelay),
         label = "draftProjectFade",
     )
     val blur = if (reducedMotion) 0f else (1f - alpha) * 6f

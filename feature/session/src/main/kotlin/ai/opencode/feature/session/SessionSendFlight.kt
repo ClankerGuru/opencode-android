@@ -270,8 +270,9 @@ internal class SessionSendFlights(
         fading += send
         scope.launch {
             try {
-                // iOS: 0.4 s critically damped spring into the pill; a plain 0.18 s ease-out fade otherwise.
-                send.progress.animateTo(1f, if (pill != null) MotionSpring(0.4).spec() else Motion.easeOut(0.18))
+                // iOS: into the pill on the flight's duration (critically damped); a micro fade otherwise.
+                val spec = if (pill != null) MotionSpring(Motion.flight.curve().duration).spec<Float>() else Motion.microOut.animation(reduceMotion = false)
+                send.progress.animateTo(1f, spec)
             } finally {
                 fading -= send
             }

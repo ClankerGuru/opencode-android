@@ -2,7 +2,8 @@ package ai.opencode.feature.composer.plusmenu
 
 import ai.opencode.core.motion.MotionFrameAction
 import ai.opencode.core.tuning.AnimationTimeScale
-import ai.opencode.feature.composer.PlusMenuTunables
+import ai.opencode.core.motion.Motion
+import androidx.compose.animation.core.FiniteAnimationSpec
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.SpringSolver
 import ai.opencode.core.motion.motionFrameLoop
@@ -53,7 +54,7 @@ import kotlin.math.roundToInt
  */
 object PhotoFlightTunables {
     /** The flight's spring (duration and bounce; bounce 0 never overshoots). `composer.flight`. */
-    val spring = MotionSpring(duration = 0.52, bounce = 0.0)
+    val spring = MotionSpring(duration = 0.34, bounce = 0.0)
 
     /** Between one photo leaving and the next. `composer.flight.stagger`. */
     const val stagger = 0.05
@@ -61,14 +62,11 @@ object PhotoFlightTunables {
     /** The rise leads the sideways travel by this much, so the path bows into a gentle arc (1 is a straight line). `composer.flight.arc`. */
     const val arc = 1.45
 
-    /** A photo whose attachment never arrives softens away on this. `composer.flight.exit`. */
-    val exit = MotionSpring(duration = 0.22, bounce = 0.0)
-
     /** The composer grows (and its row reflows) on this; a flight lands only once its slot has been still this long. `composer.flight.rowSettle`. */
     const val rowSettle = 0.3
 
-    /** The composer growing to make room for the photos, and its row reflowing. `composer.flight.row`. */
-    val row = MotionSpring(duration = 0.3, bounce = 0.0)
+    /** The composer growing to make room for the photos, and its row reflowing, on `Motion.layout`. */
+    fun <T> rowAnimation(): FiniteAnimationSpec<T> = Motion.layout.animation()
 
     /** Progress (0–1) along the flight at which the corner × badge starts appearing. `composer.flight.closeStart`. */
     const val closeStart = 0.2f
@@ -400,10 +398,11 @@ class PhotoFlights {
     /** One frame of the loop; returns whether to keep running. iOS `tick(_:)`. */
     internal fun tick(rawDt: Double): Boolean {
         val dt = min(rawDt, 1.0 / 40)
-        val params = SpringSolver.parameters(PlusMenuTunables.FLIGHT_DURATION, PhotoFlightTunables.spring.bounce)
+        val params = SpringSolver.parameters(PhotoFlightTunables.spring.duration, PhotoFlightTunables.spring.bounce)
         val omega = params.omega
         val zeta = params.zeta
-        val exitParams = SpringSolver.parameters(PhotoFlightTunables.exit.duration, PhotoFlightTunables.exit.bounce)
+        // A photo whose attachment never arrives softens away on `microOut`.
+        val exitParams = Motion.microOut.curve().springParameters
         val lead = PhotoFlightTunables.arc
         val geometryTime = now()
         val (shift, offset) = aim(geometryTime)

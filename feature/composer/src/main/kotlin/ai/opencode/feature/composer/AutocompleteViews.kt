@@ -454,9 +454,14 @@ private fun AutocompleteListWindow(
                     val start = down.position.point()
                     while (true) {
                         val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        val change = event.changes.firstOrNull { it.id == down.id }
+                        if (change == null) {
+                            controller.endScroll()
+                            break
+                        }
                         val location = change.position.point()
                         if (!change.pressed) {
+                            controller.endScroll()
                             val tap = tracker.end(start, location)
                             if (tap != null) {
                                 AutocompleteTouchTracker.selectableRow(tap, controller.currentFrame.rows)?.let { currentOnSelect(it) }

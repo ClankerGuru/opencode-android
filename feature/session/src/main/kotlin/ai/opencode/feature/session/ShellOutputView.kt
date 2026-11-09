@@ -1,6 +1,6 @@
 package ai.opencode.feature.session
 
-import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionTransition
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.collectState
@@ -13,10 +13,6 @@ import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.composer.OpenCodeBottomSheet
 import ai.opencode.server.model.OpenCodeShell
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -446,8 +442,9 @@ private fun JumpToLatest(visible: Boolean, modifier: Modifier, onClick: () -> Un
     AnimatedVisibility(
         visible = visible,
         modifier = modifier.padding(16.dp),
-        enter = if (reduceMotion) fadeIn(Motion.reducedFadeSpec()) else fadeIn() + scaleIn(initialScale = 0.8f),
-        exit = if (reduceMotion) fadeOut(Motion.reducedFadeSpec()) else fadeOut() + scaleOut(targetScale = 0.8f),
+        // iOS `.motionMicroTransition()`.
+        enter = MotionTransition.micro(reduceMotion).enter,
+        exit = MotionTransition.micro(reduceMotion).exit,
     ) {
         OpenCodeIconButton(
             SFSymbol.ArrowDown,

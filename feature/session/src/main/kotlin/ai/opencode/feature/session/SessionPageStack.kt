@@ -99,7 +99,7 @@ class SessionStackPage(
  * TalkBack and their own back handlers are parked on an inert dispatcher, so only the top screen
  * handles system back.
  *
- * Under Reduce Motion pushes and pops cross-fade (0.25 s) instead of sliding.
+ * Under Reduce Motion pushes and pops cross-fade (`Motion.reduced`) instead of sliding.
  *
  * @param pages the screens over the root, bottom first. New ids push (the last with the push
  *   motion), missing ids pop (the top with the pop motion), and pages that stay take the new
@@ -277,8 +277,6 @@ private fun sharedAxisAlpha(distance: Float, incoming: Boolean): Float {
 /** What moves the top page: a push, a pop, or a back gesture (drag, then its settle). */
 internal enum class StackTransition { Push, Pop, Back }
 
-/** iOS `UIView.animate(withDuration: 0.25)`: Reduce Motion's push/pop cross-fade. */
-private const val REDUCED_FADE_SECONDS = 0.25
 
 private const val ROOT_KEY = "ai.opencode.session.stack.root"
 
@@ -580,7 +578,8 @@ internal class SessionPageStackMotion(
         job = scope.launch {
             motionFrameLoop(frameDurationSeconds = frameDuration) { tick ->
                 elapsed += tick.dt
-                val t = min(elapsed / REDUCED_FADE_SECONDS, 1.0).toFloat()
+                // iOS `Motion.reduced.animate(reduceMotion: true)`.
+                val t = min(elapsed / Motion.reduced.curve(reduceMotion = true).duration, 1.0).toFloat()
                 topAlpha = from + (to - from) * Motion.EaseInOut.transform(t)
                 if (t >= 1f) {
                     job = null

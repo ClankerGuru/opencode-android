@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.SpringSolver
 import kotlin.math.PI
 import kotlin.math.abs
@@ -17,8 +18,9 @@ data class AutocompleteSpring(
     var x: Double = 0.0,
     var v: Double = 0.0,
     var t: Double = x,
-    var duration: Double = 0.3,
-    var bounce: Double = 0.0,
+    // At rest; each `to` brings its role's duration and bounce.
+    var duration: Double = Motion.layout.curve().duration,
+    var bounce: Double = Motion.layout.curve().bounce,
     var lead: Double = 1.0,
 ) {
     constructor(initial: Double) : this(x = initial, t = initial)

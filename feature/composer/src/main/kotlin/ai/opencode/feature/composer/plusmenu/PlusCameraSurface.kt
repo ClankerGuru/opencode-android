@@ -1,7 +1,7 @@
 package ai.opencode.feature.composer.plusmenu
 
 import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.feature.composer.AttachmentCameraView
 import ai.opencode.feature.composer.ComposerMorphTunables
@@ -86,12 +86,6 @@ class PlusCameraPresentation {
 
 /** iOS `PlusCameraTunables` (keys `composer.camera.*`). */
 object PlusCameraTunables {
-    /** `composer.camera.expand`. */
-    val expand = MotionSpring(duration = 0.38, bounce = 0.0)
-
-    /** `composer.camera.collapse`. */
-    val collapse = MotionSpring(duration = 0.28, bounce = 0.0)
-
     /** `composer.camera.captureInset` (dp): the shutter flight's inset. */
     const val captureInset = 20f
 
@@ -131,11 +125,8 @@ fun PlusCameraSurface(
     LaunchedEffect(sheetIsOpen) { if (!sheetIsOpen) presentation.expanded = false }
     LaunchedEffect(active) {
         val target = if (active) 1f else 0f
-        val spec = when {
-            reduceMotion -> Motion.easeInOut<Float>(0.18)
-            active -> PlusCameraTunables.expand.spec()
-            else -> PlusCameraTunables.collapse.spec()
-        }
+        val phase = if (active) MotionPhase.Enter else MotionPhase.Exit
+        val spec = Motion.panelOpen.animation<Float>(phase, reduceMotion)
         if (!sheetIsOpen) progress.snapTo(target) else progress.animateTo(target, spec)
     }
 

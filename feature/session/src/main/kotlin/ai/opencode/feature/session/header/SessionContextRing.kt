@@ -1,10 +1,9 @@
 package ai.opencode.feature.session.header
 
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeTheme
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.snap
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
@@ -45,8 +44,8 @@ fun SessionContextRing(
     val clamped = fraction.coerceIn(0.0, 1.0).toFloat()
     val animated by animateFloatAsState(
         targetValue = clamped,
-        // SwiftUI `.smooth(duration: 0.45)`; no animation under Reduce Motion.
-        animationSpec = if (reduceMotion) snap() else ringSpring.spec(),
+        // iOS `Motion.layout`; the reduced fade under Reduce Motion.
+        animationSpec = Motion.layout.animation(reduceMotion = reduceMotion),
         label = "contextRing",
     )
     val track = colors.text.copy(alpha = (if (colors.highContrast) trackOpacity * 2 else trackOpacity).toFloat().coerceIn(0f, 1f))
@@ -67,7 +66,6 @@ fun SessionContextRing(
     }
 }
 
-private val ringSpring = MotionSpring(0.45, 0.0)
 
 /**
  * The context gauge around the header's More button. Android divergence: iOS draws a bare arc
@@ -81,7 +79,7 @@ fun SessionContextGauge(fraction: Double, modifier: Modifier = Modifier) {
     val colors = OpenCodeTheme.colors
     val animated by animateFloatAsState(
         targetValue = fraction.coerceIn(0.0, 1.0).toFloat(),
-        animationSpec = if (reduceMotion) snap() else ringSpring.spec(),
+        animationSpec = Motion.layout.animation(reduceMotion = reduceMotion),
         label = "contextGauge",
     )
     CircularProgressIndicator(

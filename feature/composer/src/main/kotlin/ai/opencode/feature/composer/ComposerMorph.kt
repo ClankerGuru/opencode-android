@@ -1,13 +1,10 @@
 package ai.opencode.feature.composer
 
 import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.tuning.AnimationTimeScale
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -31,8 +28,6 @@ import kotlinx.coroutines.launch
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
-import kotlin.math.roundToInt
-import kotlin.math.sqrt
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -43,16 +38,6 @@ import kotlin.time.Duration.Companion.milliseconds
  * Tuning Panel registration and the Plus Menu Sheet descriptor lists are n/a.
  */
 object ComposerMorphTunables {
-    /** Kit's morph spring (chip to panel), open and close. */
-    val open = MotionSpring(0.42, 0.12)
-    val close = MotionSpring(0.36, 0.0)
-    /** As snappy as the + menu's open (Kit: “fast openings are nice”). */
-    val photoOpen = MotionSpring(0.2, 0.0)
-    val photoReturn = MotionSpring(0.22, 0.0)
-    /** Back: the sheet folding onto the menu (Kit: “it could be a little faster”). */
-    val photoBack = MotionSpring(0.18, 0.0)
-    /** Back from the expanded sheet travels three times as far: at 0.18 s it jumped to the menu in a frame or two. */
-    val photoBackExpanded = MotionSpring(0.3, 0.0)
     /** Where a sheet folding into the composer gives its glass up (progress 1 → 0): on the tap it vanished and left the photos as a ghost. */
     const val photoGlassOut = 0.35
     /** How far (dp) a pull down past compact brings the composer back up under it. */
@@ -60,14 +45,8 @@ object ComposerMorphTunables {
     const val photoContentDelay = 0.0
     const val photoBackdropBlur = 0.0
     const val photoBackdropDim = 0.0
-    /** How long a close stays drawn, to let its spring land. */
-    const val settle = 0.42
     /** Going from narrow to wide, the width leads the height. */
     const val widthLead = 1.6
-    /** The content keeps its own clock: it arrives a beat after the glass starts to grow and leaves faster than it came. */
-    val contentIn = MotionSpring(0.36, 0.0)
-    const val contentDelay = 0.05
-    val contentOut = MotionSpring(0.28, 0.0)
     /** What it grows out of (the + menu's rows) dissolves into a blur this strong (dp) as the content arrives, and grows this much with the glass. */
     const val outgoingBlur = 10.0
     const val outgoingGrowth = 0.12
@@ -107,28 +86,13 @@ object ComposerMorphTunables {
     /** `composer.morph.photoComposerSink`. */
     const val composerSink = 28.0
 
-    /** iOS `animation(opening:reduceMotion:)`: Reduce Motion is a 0.2 s ease-in-out. */
-    fun animation(opening: Boolean, reduceMotion: Boolean): FiniteAnimationSpec<Float> =
-        if (reduceMotion) tween(200, easing = Motion.EaseInOut) else (if (opening) open else close).spec()
-
     /**
-     * iOS `DockedKeyboard.animation` (`interpolatingSpring(mass: 1, stiffness: 555.0265, damping:
-     * 47.118)`, critically damped): the curve the morph's bottom edge rides when a keyboard
-     * leaves or returns beneath it, and a rest that follows a keyboard switching on or off.
-     * While the IME itself animates, the rest reads `WindowInsets.ime` frame by frame instead.
+     * iOS `DockedKeyboard.animation`, now [Motion.keyboard]: the curve the morph's bottom edge
+     * rides when a keyboard leaves or returns beneath it, and a rest that follows a keyboard
+     * switching on or off. While the IME itself animates, the rest reads `WindowInsets.ime`
+     * frame by frame instead.
      */
-    fun keyboard(): FiniteAnimationSpec<Float> {
-        // Slow motion scales time: stiffness × s² (as `MotionSpring.spec`).
-        val scale = AnimationTimeScale.shared.observedScale.toFloat()
-        return spring(dampingRatio = (47.118 / (2 * sqrt(555.0265))).toFloat(), stiffness = 555.0265f * scale * scale)
-    }
-
-    /**
-     * iOS `.interpolatingSpring(duration: photoOpen.duration, bounce: photoOpen.bounce,
-     * initialVelocity:)` as `settlePhotoSheet` builds it: duration ≥ 0.05, bounce in ±0.95.
-     */
-    fun photoSettle(): FiniteAnimationSpec<Float> =
-        MotionSpring(max(photoOpen.duration, 0.05), photoOpen.bounce.coerceIn(-0.95, 0.95)).spec()
+    fun keyboard(): FiniteAnimationSpec<Float> = Motion.keyboard.animation()
 }
 
 /**
@@ -159,7 +123,6 @@ class ComposerMorph(private val scope: CoroutineScope) {
     /** Open, its fold starting on the next turn ([launchThenFold]). */
     var foldPending by mutableStateOf(false)
         private set
-    private var settleTask: Job? = null
     private var dragTask: Job? = null
 
     val isOpen: Boolean get() = phase == Phase.Open
@@ -171,7 +134,6 @@ class ComposerMorph(private val scope: CoroutineScope) {
     /** Open at once, with no growth. */
     fun open() {
         generation += 1
-        settleTask?.cancel()
         foldPending = false
         phase = Phase.Open
         scope.launch { progress.snapTo(1f); bottomProgress.snapTo(1f); content.snapTo(1f) }
@@ -180,13 +142,13 @@ class ComposerMorph(private val scope: CoroutineScope) {
     /** Opens on [animation], its bottom edge on [edge] if given. */
     private fun open(animation: FiniteAnimationSpec<Float>, edge: FiniteAnimationSpec<Float>?, contentDelay: Double?) {
         generation += 1
-        settleTask?.cancel()
         phase = Phase.Open
         scope.launch { progress.animateTo(1f, animation) }
         scope.launch { bottomProgress.animateTo(1f, edge ?: animation) }
-        // The delay is part of the spec, so a fold that starts meanwhile retargets it (as a
-        // later `withAnimation` does on iOS) instead of a pending arrival landing after it.
-        val arrival = ComposerMorphTunables.contentIn.animation<Float>(reduceMotion = false, delaySeconds = contentDelay ?: ComposerMorphTunables.contentDelay)
+        // Its content arrives a beat after the glass starts to grow, on the same role. The delay
+        // is part of the spec, so a fold that starts meanwhile retargets it (as a later
+        // `withAnimation` does on iOS) instead of a pending arrival landing after it.
+        val arrival = Motion.panelOpen.animation<Float>(delaySeconds = contentDelay ?: Motion.contentDelay)
         scope.launch { content.animateTo(1f, arrival) }
     }
 
@@ -212,7 +174,6 @@ class ComposerMorph(private val scope: CoroutineScope) {
             return opened()
         }
         generation += 1
-        settleTask?.cancel()
         // Where it stands and rests is set, not animated from where it was.
         phase = Phase.Armed
         prepare()
@@ -239,7 +200,7 @@ class ComposerMorph(private val scope: CoroutineScope) {
     ) {
         foldPending = false
         if (phase == Phase.Open && content.value > 0f && !contentFollowsFold) {
-            scope.launch { content.animateTo(0f, ComposerMorphTunables.contentOut.spec()) }
+            scope.launch { content.animateTo(0f, Motion.panelClose.animation()) }
         }
         animateDrag(0f, animation)
         close(reduceMotion, movesEdge = edge == null, animation = animation, onFinished = completion)
@@ -249,13 +210,15 @@ class ComposerMorph(private val scope: CoroutineScope) {
     /**
      * Folds in two steps, like [armThenOpen]: [launch] runs in the tap (a keyboard coming back
      * lays the screen out again), and the fold starts on the next frame, after that commit.
-     * Reopened meanwhile, it stays open.
+     * Reopened meanwhile, it stays open. [landed] runs once the fold's spring is done, while the
+     * morph is still closing, unless it reopened, closed or reset since.
      */
     fun launchThenFold(
         animation: FiniteAnimationSpec<Float>,
         reduceMotion: Boolean,
         launch: () -> Unit,
         edge: () -> FiniteAnimationSpec<Float>?,
+        landed: () -> Unit = {},
     ) {
         if (foldPending) return
         if (phase != Phase.Open) {
@@ -264,22 +227,26 @@ class ComposerMorph(private val scope: CoroutineScope) {
         }
         generation += 1
         foldPending = true
-        scope.launch { content.animateTo(0f, ComposerMorphTunables.contentOut.spec()) }
+        scope.launch { content.animateTo(0f, Motion.panelClose.animation()) }
         launch()
         after(1.milliseconds) {
             if (!foldPending) return@after
-            fold(animation, edge(), reduceMotion)
+            val folding = generation + 1
+            fold(animation, edge(), reduceMotion) {
+                if (generation == folding && phase == Phase.Closing) landed()
+            }
         }
     }
 
     /**
-     * Shrinks back into its source, drawn until its spring lands. Armed, it hadn't grown: it's
-     * gone at once. Without [animation] the glass snaps (iOS: a close outside `withAnimation`).
+     * Shrinks back into its source on [animation] ([Motion.panelClose] unless given), drawn until
+     * its spring lands (iOS: until Core Animation reports the fold removed). Armed, it hadn't
+     * grown: it's gone at once. A null [animation] snaps (iOS: a close outside `withAnimation`).
      */
     fun close(
         reduceMotion: Boolean,
         movesEdge: Boolean = true,
-        animation: FiniteAnimationSpec<Float>? = null,
+        animation: FiniteAnimationSpec<Float>? = Motion.panelClose.animation(reduceMotion = reduceMotion),
         onFinished: (() -> Unit)? = null,
     ) {
         if (phase == Phase.Armed) return reset().also { onFinished?.invoke() }
@@ -288,36 +255,31 @@ class ComposerMorph(private val scope: CoroutineScope) {
         // Its pending fold's turn is dropped by the bump above: the flag goes too.
         foldPending = false
         phase = Phase.Closing
+        val closing = generation
         scope.launch {
             try {
                 if (animation != null) progress.animateTo(0f, animation) else progress.snapTo(0f)
             } finally {
                 onFinished?.invoke()
             }
+            // The fold has landed: unless it reopened, closed again or reset since, it stops
+            // being drawn (`PresenceGate`'s rule, on the morph's generation).
+            endClose(closing)
         }
         if (movesEdge) scope.launch { if (animation != null) bottomProgress.animateTo(0f, animation) else bottomProgress.snapTo(0f) }
         if (animation == null) scope.launch { content.snapTo(0f) }
-        val rawSettle = if (reduceMotion) 0.22 else maxOf(
-            ComposerMorphTunables.settle,
-            ComposerMorphTunables.close.duration * 1.45,
-            ComposerMorphTunables.photoReturn.duration * 1.45,
-        )
-        settleTask?.cancel()
-        settleTask = scope.launch {
-            delay((AnimationTimeScale.shared.wallSeconds(rawSettle) * 1000).roundToInt().toLong())
-            if (phase != Phase.Closing) return@launch
-            phase = Phase.Closed
-            drag = 0f
-            progress.snapTo(0f)
-            bottomProgress.snapTo(0f)
-            content.snapTo(0f)
-        }
+    }
+
+    private fun endClose(closing: Int) {
+        if (closing != generation || phase != Phase.Closing) return
+        phase = Phase.Closed
+        drag = 0f
+        scope.launch { progress.snapTo(0f); bottomProgress.snapTo(0f); content.snapTo(0f) }
     }
 
     /** Gone at once, with no shrink (a session switch, a call, a request). */
     fun reset() {
         generation += 1
-        settleTask?.cancel()
         dragTask?.cancel()
         foldPending = false
         phase = Phase.Closed

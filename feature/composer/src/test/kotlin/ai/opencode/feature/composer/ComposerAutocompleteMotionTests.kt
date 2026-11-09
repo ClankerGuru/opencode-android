@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.motion.Motion
 import ai.opencode.server.model.OpenCodeAutocompleteSkill
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -7,6 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 /**
@@ -39,7 +41,7 @@ class ComposerAutocompleteMotionTests {
 
     // Search motion
 
-    @Test fun searchUpdatesCommitAtOnceAndSettleWithinAboutTwoHundredMilliseconds() {
+    @Test fun searchUpdatesCommitAtOnceAndSettleOnTheCollapseRole() {
         val simulation = AutocompleteSimulation(AutocompleteParameters())
         val all = listOf("kit-motion", "puckett", "plain-prose", "effect", "solidjs").map(::skill)
         sync(simulation, all, query = "")
@@ -49,10 +51,38 @@ class ComposerAutocompleteMotionTests {
         assertNull("A keystroke's results commit at once, never queued", simulation.pendingCommitAt)
         assertEquals(listOf(all[1].id, all[2].id), simulation.rows.filter { it.isEntering }.map { it.id })
 
-        settle(simulation, seconds = 0.2)
+        // Typing stays crisp: the reflow is `Motion.collapse`, settled within twice its duration.
+        settle(simulation, seconds = 2 * Motion.collapse.curve().duration)
         val frame = simulation.frame(composerWidth = width)
-        assertTrue("Height settles to 2 rows within 200 ms: ${frame.listHeight}", abs(frame.listHeight - 80) < 1)
+        assertTrue("Height settles to 2 rows on the collapse role: ${frame.listHeight}", abs(frame.listHeight - 80) < 1)
         assertTrue("Search rows never blur or scale", frame.rows.all { it.blur == 0.0 && it.scale == 1.0 })
+    }
+
+    @Test fun aListPulledPastItsEndRubberBandsAndSpringsHome() {
+        val simulation = AutocompleteSimulation(AutocompleteParameters())
+        val all = (0 until 12).map { skill("row-$it") }
+        sync(simulation, all, query = "")
+        settle(simulation, seconds = 1.0)
+
+        simulation.scroll(-60.0, width - 24)
+        val first = simulation.overscroll.x
+        assertTrue("Past the end the list gives less than the finger moved: $first", first < 0 && first > -60)
+        assertEquals(0.0, simulation.scrollOffset, 0.0)
+        simulation.scroll(-60.0, width - 24)
+        assertTrue(simulation.overscroll.x < first && abs(simulation.overscroll.x - first) < abs(first))
+
+        simulation.endScroll()
+        assertEquals(0.0, simulation.scrollExcess, 0.0)
+        settle(simulation, seconds = 1.0)
+        assertTrue(abs(simulation.overscroll.x) < 0.01)
+    }
+
+    @Test fun reduceMotionHoldsTheListAtItsEnd() {
+        val simulation = AutocompleteSimulation(AutocompleteParameters(reducedMotion = true))
+        sync(simulation, (0 until 12).map { skill("row-$it") }, query = "")
+        settle(simulation, seconds = 1.0)
+        simulation.scroll(-60.0, width - 24)
+        assertTrue(simulation.overscroll.x == 0.0 && simulation.scrollOffset == 0.0)
     }
 
     @Test fun resultsArrivingMidAnimationRetargetInsteadOfQueueing() {
@@ -71,7 +101,7 @@ class ComposerAutocompleteMotionTests {
         assertTrue("Retargeting never jumps the height", abs(afterRetarget - midHeight) < 1.5)
 
         var previous = afterRetarget
-        repeat(30) {
+        repeat(ceil(2 * Motion.collapse.curve().duration / dt).toInt()) {
             simulation.step(dt = dt, composerWidth = width)
             val height = simulation.frame(composerWidth = width).listHeight
             assertTrue("Height eases straight to the new target with no overshoot", height <= previous + 0.01)

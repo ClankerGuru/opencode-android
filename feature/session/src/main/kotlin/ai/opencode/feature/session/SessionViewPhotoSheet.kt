@@ -1,6 +1,7 @@
 package ai.opencode.feature.session
 
 import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
@@ -29,7 +30,6 @@ import ai.opencode.feature.composer.plusmenu.RecentPhotoPeek
 import android.graphics.BitmapFactory
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FiniteAnimationSpec
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -87,8 +87,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlin.math.max
-import kotlin.math.roundToInt
-import kotlin.time.Duration.Companion.milliseconds
 
 // Port of iOS `Session/SessionView+PhotoSheet.swift`. The New Plus Menu (graduated in iOS p217):
 // the menu's surface grows into the composer's photo sheet (`PlusPhotoSheet` inside
@@ -254,7 +252,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         restingComposer = if (hadKeyboard) composerOnScreen else null
         // The menu itself doesn't give the keyboard back: the sheet does.
         attachmentMenuRestoresFocus = false
-        val open = if (reducedMotion) Motion.easeInOut(0.2) else ComposerMorphTunables.photoOpen.spec<Float>()
+        val open = Motion.panelOpen.animation<Float>(reduceMotion = reducedMotion)
         morph.armThenOpen(
             open,
             contentDelay = ComposerMorphTunables.photoContentDelay,
@@ -286,12 +284,10 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
             is PlusPhotoSheetDetent.Settlement.Stay -> {
                 val from = top.value + morph.drag
                 detent = next
-                if (reducedMotion) {
-                    springTop(settlement.top, Motion.easeInOut(0.2))
-                } else {
-                    // iOS's normalized velocity is a fraction of the distance per second.
-                    springTop(settlement.top, ComposerMorphTunables.photoOpen.spec(), settlement.initialVelocity * (settlement.top - from))
-                }
+                // The release spring carries the finger's speed; iOS's normalized velocity is a
+                // fraction of the distance per second.
+                val velocity = Motion.release.initialVelocity(settlement.initialVelocity, reducedMotion)
+                springTop(settlement.top, Motion.release.animation(reduceMotion = reducedMotion), velocity * (settlement.top - from))
             }
         }
     }
@@ -302,7 +298,8 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         val next = withMeasuredDetent()
         next.toggle()
         detent = next
-        springTop(next.top, if (reducedMotion) Motion.easeInOut(0.2) else ComposerMorphTunables.photoOpen.spec())
+        val phase = if (next.isExpanded) MotionPhase.Enter else MotionPhase.Exit
+        springTop(next.top, Motion.layout.animation(phase, reducedMotion))
     }
 
     /** iOS `backFromPhotoSheet()`: the sheet folds onto the menu, which comes back with the keyboard if it was up. */
@@ -315,35 +312,25 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         attachmentMenuRestoresFocus = restores
         foldsToComposer = false
         camera.expanded = false
-        val back = if (detent.isExpanded) ComposerMorphTunables.photoBackExpanded else ComposerMorphTunables.photoBack
-        val animation: FiniteAnimationSpec<Float> = if (reducedMotion) tween(200, easing = Motion.EaseInOut) else back.spec()
         landsOn = source.takeIf { it != Rect.Zero }
-        // The hand-back is timed from just before the fold starts, on the next turn (iOS `Task`),
-        // after the fold has taken the morph's generation.
         morph.launchThenFold(
-            animation,
+            Motion.panelClose.animation(reduceMotion = reducedMotion),
             reducedMotion,
             launch = { if (restores) raiseMessageKeyboard() },
-            edge = {
-                scope.launch { handMenuBackOnLanding(back.duration) }
-                null
-            },
+            edge = { null },
+            landed = { handMenuBackOnLanding() },
         )
     }
 
     /**
-     * iOS `handMenuBackOnLanding(seconds:)`: the menu takes its glass back as the fold lands, not at
-     * the morph's longer generic settle; until then the menu stays handed off and the card sat
-     * under the returning keyboard. One frame: the menu draws as the sheet goes.
+     * iOS `handMenuBackOnLanding()`: the menu takes its glass back as the fold lands, in that
+     * frame; until then the menu stays handed off and the card sits under the returning
+     * keyboard. One frame: the menu draws as the sheet goes.
      */
-    private fun handMenuBackOnLanding(duration: Double) {
-        val seconds = if (reducedMotion) 0.22 else duration * 1.6
-        val delay = (ComposerMorph.wallSeconds(seconds) * 1000).roundToInt().milliseconds
-        morph.after(delay) {
-            if (morph.phase != ComposerMorph.Phase.Closing || foldsToComposer) return@after
-            menuTakesBack = true
-            morph.reset()
-        }
+    private fun handMenuBackOnLanding() {
+        if (foldsToComposer) return
+        menuTakesBack = true
+        morph.reset()
     }
 
     /** iOS `raiseMessageKeyboard()`: the message field takes the keyboard back with the menu still up. */
@@ -369,7 +356,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         camera.expanded = false
         attachmentMenu = AttachmentMenuPhase.Closed
         if (restores) env.host?.focusComposer()
-        morph.fold(if (reducedMotion) Motion.easeInOut(0.2) else ComposerMorphTunables.photoReturn.spec(), reduceMotion = reducedMotion)
+        morph.fold(Motion.panelClose.animation(reduceMotion = reducedMotion), reduceMotion = reducedMotion)
     }
 
     /** iOS `foldPhotoSheet()`: dismissed downward where something else closed the menu. */
@@ -380,7 +367,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         foldsToComposer = true
         landsOn = null
         camera.expanded = false
-        morph.fold(if (reducedMotion) Motion.easeInOut(0.2) else ComposerMorphTunables.photoReturn.spec(), reduceMotion = reducedMotion)
+        morph.fold(Motion.panelClose.animation(reduceMotion = reducedMotion), reduceMotion = reducedMotion)
     }
 
     private fun foldDragIntoTop() {

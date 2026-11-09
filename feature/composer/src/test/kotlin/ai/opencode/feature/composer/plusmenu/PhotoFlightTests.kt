@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer.plusmenu
 
+import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.SpringSolver
 import ai.opencode.feature.composer.ComposerImageImporter
 import ai.opencode.feature.composer.ComposerImageSource
@@ -1192,7 +1193,7 @@ class PhotoFlightTests {
 
         // Tap Back (`backFromPhotoSheet`): morph enters `Closing` for 551 ms while `menuShown`
         // (`attachmentMenu == .menu`) remains true and `dismissesDown` is false.
-        morph.fold(ComposerMorphTunables.close.spec(), reduceMotion = false)
+        morph.fold(Motion.panelClose.animation(), reduceMotion = false)
         assertEquals(ComposerMorph.Phase.Closing, morph.phase)
         assertTrue(morph.isShown)
         assertFalse(morph.isOpening)
@@ -1211,7 +1212,7 @@ class PhotoFlightTests {
         var launched = false
         var opened = false
         morph.armThenOpen(
-            ComposerMorphTunables.photoOpen.spec(),
+            Motion.panelOpen.animation(),
             prepare = { prepared = true },
             launch = { launched = true },
             opened = { opened = true },
@@ -1230,7 +1231,7 @@ class PhotoFlightTests {
         morph.open()
 
         // 1. Back puts the morph into back-to-menu `Closing` (`morph.isShown`, `dismissesDown == false`, `menuShown`).
-        morph.fold(ComposerMorphTunables.close.spec(), reduceMotion = false)
+        morph.fold(Motion.panelClose.animation(), reduceMotion = false)
         assertEquals(ComposerMorph.Phase.Closing, morph.phase)
         val duringBack = ComposerMorphGeometry.unifiedMenuState(menuShown = true, morph = morph, dismissesDown = false)
         assertTrue(duringBack.closingToMenu)
@@ -1264,7 +1265,7 @@ class PhotoFlightTests {
 
         // 1. Dismissing the sheet (`closePhotoSheet`) sets `menuShown = false` and
         // `dismissesDown = true` while `morph` enters `Closing` (`morph.isShown`).
-        morph.fold(ComposerMorphTunables.photoReturn.spec(), reduceMotion = false)
+        morph.fold(Motion.panelClose.animation(), reduceMotion = false)
         assertEquals(ComposerMorph.Phase.Closing, morph.phase)
         assertTrue(morph.isShown)
         assertFalse(morph.isOpening)
@@ -1317,7 +1318,7 @@ class PhotoFlightTests {
         camera.expanded = true
         assertTrue(camera.shouldActivateCamera(sheetIsOpen = sheet.isOpen))
 
-        sheet.fold(ComposerMorphTunables.photoReturn.spec(), reduceMotion = false)
+        sheet.fold(Motion.panelClose.animation(), reduceMotion = false)
         assertTrue(sheet.isShown)
         assertFalse(sheet.isOpen)
         assertFalse(camera.shouldActivateCamera(sheetIsOpen = sheet.isOpen))

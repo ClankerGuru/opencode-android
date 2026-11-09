@@ -1,7 +1,7 @@
 package ai.opencode.feature.composer.modelpicker
 
 import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.SpringSolver
+import ai.opencode.core.motion.MotionTunables
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -35,7 +35,7 @@ class OnePickerMotion(pose: OnePickerSimulation.FramePose) {
  *   [stepFrame] on Compose's frame clock until it answers [FrameAction.Stop].
  * - UIKit's `keyboardWillChangeFrame` observer becomes the surface calling
  *   [handleKeyboardFrameChange] with the IME's target frame; Android has no keyboard curve to
- *   probe, so the keyboard ride is iOS's fallback spring (`OnePickerTunables.keyboardRide`).
+ *   probe, so the keyboard ride is iOS's fallback spring (`Motion.keyboard`).
  * - Presentation-layer probes (composer, docked keyboard) are the injected [composerRectSource]
  *   and [keyboardFrameSource].
  * - n/a: `OnePickerPerfProbe`, the `-lab-glass-trace` integrity monitor (`OnePickerIntegrityMonitor`,
@@ -207,12 +207,12 @@ class OnePickerController {
 
     private fun launchSimulation() {
         simulation.launchOpen(
-            openDuration = OnePickerTunables.open.duration,
-            openBounce = OnePickerTunables.open.bounce,
-            widthDuration = OnePickerTunables.openWidth.duration,
-            bottomDuration = OnePickerTunables.keyboardRide.duration,
-            contentDuration = OnePickerTunables.contentIn.duration,
-            reduceFadeDuration = Motion.reducedFade,
+            openDuration = Motion.panelOpen.curve().duration,
+            openBounce = Motion.panelOpen.curve().bounce,
+            widthDuration = OnePickerTiming.widthDuration,
+            bottomDuration = Motion.keyboard.curve().duration,
+            contentDuration = Motion.panelOpen.curve().duration,
+            reduceFadeDuration = MotionTunables.reducedDuration.value,
         )
         syncPoseWithoutAnimation()
         wantsFrames = true
@@ -232,9 +232,9 @@ class OnePickerController {
         awaitsKeyboardCloseSync = matchingKeyboardSpring
         closeSyncWaitElapsed = 0.0
         val closeDuration = if (matchingKeyboardSpring) {
-            OnePickerTunables.keyboardRide.duration
+            Motion.keyboard.curve().duration
         } else {
-            OnePickerTunables.close.duration
+            Motion.panelClose.curve().duration
         }
         val holdBottomForRisingKeys = matchingKeyboardSpring &&
             !keepsKeyboard &&
@@ -245,8 +245,8 @@ class OnePickerController {
             keepsKeyboard = keepsKeyboard,
             holdBottomUntilKeyboardSync = holdBottomForRisingKeys,
             closeDuration = closeDuration,
-            contentOutDuration = OnePickerTunables.contentOut.duration,
-            reduceFadeDuration = Motion.reducedFade,
+            contentOutDuration = Motion.panelClose.curve().duration,
+            reduceFadeDuration = MotionTunables.reducedDuration.value,
         )
         syncPoseWithoutAnimation()
         if (simulation.phase == OnePickerSimulation.Phase.Closed) {
@@ -264,9 +264,9 @@ class OnePickerController {
         if (simulation.phase != OnePickerSimulation.Phase.Closing) return
         awaitsKeyboardCloseSync = matchingKeyboardSpring
         val closeDuration = if (matchingKeyboardSpring) {
-            OnePickerTunables.keyboardRide.duration
+            Motion.keyboard.curve().duration
         } else {
-            OnePickerTunables.close.duration
+            Motion.panelClose.curve().duration
         }
         simulation.retargetClose(destinationRect, keepsKeyboard = keepsKeyboard, closeDuration = closeDuration)
         syncPoseWithoutAnimation()
@@ -293,7 +293,7 @@ class OnePickerController {
 
     fun chooseDetent(next: ModelListDetent) {
         if (!simulation.isOpen || next == simulation.detent) return
-        simulation.setDetent(next, duration = OnePickerTunables.detent.duration, bounce = OnePickerTunables.detent.bounce)
+        simulation.setDetent(next, duration = Motion.layout.curve().duration, bounce = Motion.layout.curve().bounce)
         pose = simulation.drawnFrame()
         wantsFrames = true
     }
@@ -319,8 +319,8 @@ class OnePickerController {
     private fun settleDragAtDetent() {
         simulation.setDetent(
             simulation.detent,
-            duration = OnePickerTunables.detent.duration,
-            bounce = OnePickerTunables.detent.bounce,
+            duration = Motion.release.curve().duration,
+            bounce = Motion.release.curve().bounce,
         )
         pose = simulation.drawnFrame()
         wantsFrames = true
@@ -358,10 +358,11 @@ class OnePickerController {
             vy = velocityY,
             dragCloses = OnePickerTunables.DRAG_CLOSES,
             throwCloses = OnePickerTunables.THROW_CLOSES,
-            detentDuration = OnePickerTunables.detent.duration,
-            detentBounce = OnePickerTunables.detent.bounce,
-            closeDuration = OnePickerTunables.close.duration,
-            contentOutDuration = OnePickerTunables.contentOut.duration,
+            // Let go, it settles at a rest on the release spring, carrying the finger's speed.
+            detentDuration = Motion.release.curve().duration,
+            detentBounce = Motion.release.curve().bounce,
+            closeDuration = Motion.panelClose.curve().duration,
+            contentOutDuration = Motion.panelClose.curve().duration,
             destinationRect = destinationRect,
             keepsKeyboard = keepsKeyboard,
         )
@@ -388,7 +389,7 @@ class OnePickerController {
         if (updated == simulation.metrics) return
         simulation.metrics = updated
         if (simulation.isOpen && !simulation.isDragging) {
-            simulation.setDetent(simulation.detent, duration = OnePickerTunables.detent.duration, bounce = 0.0)
+            simulation.setDetent(simulation.detent, duration = Motion.layout.curve().duration, bounce = Motion.layout.curve().bounce)
             wantsFrames = true
         }
         syncObservedPhase()
@@ -413,7 +414,7 @@ class OnePickerController {
                 simulation.retargetClose(
                     fallbackDest,
                     keepsKeyboard = false,
-                    closeDuration = OnePickerTunables.keyboardRide.duration,
+                    closeDuration = Motion.keyboard.curve().duration,
                 )
             }
         }
@@ -460,7 +461,7 @@ class OnePickerController {
         onDidSettleClosed?.invoke()
     }
 
-    fun dismissDockedKeyboardTracking(rideDuration: Double = 0.267) {
+    fun dismissDockedKeyboardTracking(rideDuration: Double = Motion.keyboard.curve().duration) {
         searchFocused = false
         if (!simulation.isOpen) return
         simulation.updateKeyboardTop(null, rideDuration = rideDuration)
@@ -471,10 +472,10 @@ class OnePickerController {
     /**
      * The keyboard is moving to [endScreenFrame] (null or off screen: leaving). Only retargets
      * the springs; the next frame draws. iOS reads the keyboard's curve off a probe view; Android
-     * rides `OnePickerTunables.keyboardRide`, iOS's fallback.
+     * rides `Motion.keyboard`, iOS's fallback.
      */
     fun handleKeyboardFrameChange(endScreenFrame: Rect?) {
-        val ride = SpringSolver.parameters(OnePickerTunables.keyboardRide.duration, OnePickerTunables.keyboardRide.bounce)
+        val ride = Motion.keyboard.curve().springParameters
         val omega = ride.omega
         val zeta = ride.zeta
         if (simulation.phase == OnePickerSimulation.Phase.Closing && awaitsKeyboardCloseSync) {
@@ -483,7 +484,7 @@ class OnePickerController {
             simulation.retargetClose(
                 simulation.metrics.sourceRect,
                 keepsKeyboard = simulation.metrics.keyboardTop != null,
-                closeDuration = OnePickerTunables.keyboardRide.duration,
+                closeDuration = Motion.keyboard.curve().duration,
                 omega = omega,
                 zeta = zeta,
             )
@@ -498,12 +499,12 @@ class OnePickerController {
         if (!simulation.isOpen) return
         val end = endScreenFrame
         if (end == null || end.height <= 80f || end.top >= screenHeight - 60 || !searchFocused) {
-            simulation.updateKeyboardTop(null, OnePickerTunables.keyboardRide.duration, omega, zeta)
+            simulation.updateKeyboardTop(null, Motion.keyboard.curve().duration, omega, zeta)
             wantsFrames = true
             return
         }
         val topInSpace = (end.top + windowFrameInSpace.top).toDouble()
-        simulation.updateKeyboardTop(topInSpace, OnePickerTunables.keyboardRide.duration, omega, zeta)
+        simulation.updateKeyboardTop(topInSpace, Motion.keyboard.curve().duration, omega, zeta)
         wantsFrames = true
     }
 
@@ -531,7 +532,7 @@ class OnePickerController {
         simulation.retargetClose(
             destination,
             keepsKeyboard = false,
-            closeDuration = OnePickerTunables.keyboardRide.duration,
+            closeDuration = Motion.keyboard.curve().duration,
             omega = omega,
             zeta = zeta,
         )

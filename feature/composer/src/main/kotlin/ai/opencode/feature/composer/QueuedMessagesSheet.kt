@@ -2,6 +2,7 @@ package ai.opencode.feature.composer
 
 import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconSize
@@ -112,7 +113,7 @@ fun QueuedMessagesSheet(
         Column(
             Modifier
                 .heightIn(max = QueuedMessagesSheetMetrics.maximumHeight(screenHeight))
-                .animateContentSize(animationSpec = QueuedMessagesSheetMetrics.snappy.animation(reduceMotion)),
+                .animateContentSize(animationSpec = Motion.layout.animation(reduceMotion = reduceMotion)),
         ) {
             Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
                 Text(
@@ -143,8 +144,8 @@ fun QueuedMessagesSheet(
                     contentPadding = PaddingValues(top = QueuedMessagesSheetMetrics.listTop, bottom = QueuedMessagesSheetMetrics.listBottom),
                 ) {
                     itemsIndexed(messages, key = { _, input -> input.id }) { index, input ->
-                        // iOS `.animation(reducedMotion ? nil : .snappy, value: ids)`.
-                        Column(if (reduceMotion) Modifier else Modifier.animateItem(placementSpec = QueuedMessagesSheetMetrics.snappy.spec(IntOffset.VisibilityThreshold))) {
+                        // iOS `.animation(Motion.layout.animation(reduceMotion:), value: ids)`.
+                        Column(if (reduceMotion) Modifier else Modifier.animateItem(placementSpec = Motion.layout.animation(visibilityThreshold = IntOffset.VisibilityThreshold))) {
                             QueuedMessageRow(
                                 input = input,
                                 number = index + 1,
@@ -172,8 +173,6 @@ object QueuedMessagesSheetMetrics {
     /** What a row is taken to be before it has been measured (iOS 76 pt). */
     val estimatedRowHeight = 76.dp
 
-    /** SwiftUI `.snappy` (duration 0.5, extra bounce 0.15): the list and the row's expansion. */
-    val snappy = ai.opencode.core.motion.MotionSpring(0.5, 0.15)
 
     /** Just short of the full sheet: past it, the rows scroll. */
     fun maximumHeight(screenHeight: androidx.compose.ui.unit.Dp) = maxOf(screenHeight - 110.dp, 320.dp)
@@ -314,7 +313,10 @@ fun QueuedMessageRow(
                                 maxLines = if (expanded) Int.MAX_VALUE else 2,
                                 overflow = TextOverflow.Ellipsis,
                                 onTextLayout = { if (!expanded) overflows = it.hasVisualOverflow },
-                                modifier = Modifier.fillMaxWidth().animateContentSize(QueuedMessagesSheetMetrics.snappy.animation(reduceMotion)),
+                                // Opens on `layout`, closes on `collapse`.
+                                modifier = Modifier.fillMaxWidth().animateContentSize(
+                                    Motion.layout.animation(if (expanded) MotionPhase.Enter else MotionPhase.Exit, reduceMotion),
+                                ),
                             )
                         }
                     }

@@ -1,6 +1,7 @@
 package ai.opencode.feature.composer
 
 import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.feature.composer.modelpicker.ModelPickerTunables
 import ai.opencode.feature.composer.plusmenu.PhotoFlights
@@ -13,8 +14,6 @@ import ai.opencode.feature.composer.plusmenu.PlusPhotoSheetDetent
 import ai.opencode.feature.composer.plusmenu.PlusPhotoSheetFoot
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FiniteAnimationSpec
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
@@ -134,7 +133,7 @@ fun ComposerMorphPhotoSheet(
         landsOn = null
         scope.launch { displayTop.snapTo(next.top) }
         val edge = if (currentHadKeyboard && !reduceMotion) ComposerMorphTunables.keyboard() else null
-        val animation: FiniteAnimationSpec<Float> = if (reduceMotion) tween(200, easing = Motion.EaseInOut) else ComposerMorphTunables.photoOpen.spec()
+        val animation = Motion.panelOpen.animation<Float>(reduceMotion = reduceMotion)
         // The session already gave the keyboard up as Photos was chosen.
         morph.armThenOpen(animation, edge, ComposerMorphTunables.photoContentDelay, prepare = {}, launch = {}, opened = {})
     }
@@ -147,9 +146,7 @@ fun ComposerMorphPhotoSheet(
         foldsToComposer = false
         camera.expanded = false
         landsOn = if (source == Rect.Zero) null else source
-        val back = if (detent.isExpanded) ComposerMorphTunables.photoBackExpanded else ComposerMorphTunables.photoBack
-        val animation: FiniteAnimationSpec<Float> = if (reduceMotion) tween(200, easing = Motion.EaseInOut) else back.spec()
-        morph.fold(animation, reduceMotion = reduceMotion)
+        morph.fold(Motion.panelClose.animation(reduceMotion = reduceMotion), reduceMotion = reduceMotion)
     }
 
     /** iOS `closePhotoSheet` / `foldPhotoSheet`: slides down and fades out while the composer rises back. */
@@ -167,8 +164,7 @@ fun ComposerMorphPhotoSheet(
         // The sheet scales into the + and fades, keeping its content sharp.
         landsOn = anchors.seed.takeIf { it != Rect.Zero }
         camera.expanded = false
-        val animation: FiniteAnimationSpec<Float> = if (reduceMotion) tween(200, easing = Motion.EaseInOut) else ComposerMorphTunables.photoReturn.spec()
-        morph.fold(animation, reduceMotion = reduceMotion)
+        morph.fold(Motion.panelClose.animation(reduceMotion = reduceMotion), reduceMotion = reduceMotion)
     }
 
     fun dragSheet(translation: Float) {
@@ -189,8 +185,8 @@ fun ComposerMorphPhotoSheet(
             }
             is PlusPhotoSheetDetent.Settlement.Stay -> {
                 detent = next
-                val v0 = settlement.initialVelocity
-                val spec: FiniteAnimationSpec<Float> = if (reduceMotion) tween(200, easing = Motion.EaseInOut) else ComposerMorphTunables.photoSettle()
+                val spec = Motion.release.animation<Float>(reduceMotion = reduceMotion)
+                val v0 = Motion.release.initialVelocity(settlement.initialVelocity, reduceMotion)
                 // Each value continues at the finger's speed toward its own end (iOS's normalized initialVelocity).
                 scope.launch { displayTop.animateTo(next.top, spec, initialVelocity = v0 * (next.top - displayTop.value)) }
                 morph.animateDrag(0f, spec, initialVelocity = v0 * (0f - morph.drag))
@@ -203,7 +199,8 @@ fun ComposerMorphPhotoSheet(
         val next = refreshDetentBounds()
         next.toggle()
         detent = next
-        val spec: FiniteAnimationSpec<Float> = if (reduceMotion) tween(200, easing = Motion.EaseInOut) else ComposerMorphTunables.photoOpen.spec()
+        val phase = if (next.isExpanded) MotionPhase.Enter else MotionPhase.Exit
+        val spec = Motion.layout.animation<Float>(phase, reduceMotion)
         scope.launch { displayTop.animateTo(next.top, spec) }
         morph.animateDrag(0f, spec)
     }

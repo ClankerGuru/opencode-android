@@ -12,9 +12,8 @@ class TuningTests {
         store.setEnabled(true)
         assertEquals(6f, store.value(ComposerKeyboardTunables.keyboardChipTravel))
         assertEquals(3f, store.value(ComposerKeyboardTunables.keyboardChipBlur))
-        assertEquals(0.18, store.value(ComposerKeyboardTunables.keyboardFade), 0.0)
         assertEquals(
-            listOf("composer.keyboard.chipTravel", "composer.keyboard.chipBlur", "composer.keyboard.fade"),
+            listOf("composer.keyboard.chipTravel", "composer.keyboard.chipBlur"),
             store.descriptors.map { it.key },
         )
         assertTrue(store.descriptors.all { it.group == "composer" })

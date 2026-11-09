@@ -8,6 +8,8 @@ import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionFrameAction
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionTransition
 import ai.opencode.core.motion.motionFrameLoop
 import ai.opencode.core.motion.rememberFrameDurationSeconds
 import ai.opencode.core.motion.rememberReduceMotion
@@ -30,9 +32,7 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -306,7 +306,7 @@ fun BackgroundWorkCounts(agents: Int, shells: Int, modifier: Modifier = Modifier
     if (agents > 0 && agents != lastAgents) lastAgents = agents
     if (shells > 0 && shells != lastShells) lastShells = shells
     if (reduceMotion) {
-        Crossfade(BackgroundWorkSummary.summary(agents, shells), modifier, animationSpec = Motion.reducedFadeSpec(), label = "BackgroundWorkCounts") {
+        Crossfade(BackgroundWorkSummary.summary(agents, shells), modifier, animationSpec = BackgroundWorkMotion.fade(), label = "BackgroundWorkCounts") {
             Text(it, style = countsStyle, maxLines = 1, softWrap = false)
         }
         return
@@ -328,17 +328,17 @@ private fun CountGroup(count: Int, noun: String) {
 }
 
 /**
- * Opens to its own width or closes to none, clipped to it, fading and blurring as it goes:
- * quickly out, so what the clip crosses is already faint, and in a little behind the opening.
+ * Opens to its own width or closes to none, clipped to it, fading and blurring as it goes on
+ * `swap`: quickly out, so what the clip crosses is already faint, and in a little behind the opening.
  */
 @Composable
 private fun Opening(isOpen: Boolean, content: @Composable () -> Unit) {
-    val resize = BackgroundWorkMotion.resize
     AnimatedVisibility(
         visible = isOpen,
-        enter = expandHorizontally(resize.spec(), expandFrom = Alignment.Start) +
-            fadeIn(tween(durationMillis = 280, delayMillis = 40, easing = EaseOut)),
-        exit = shrinkHorizontally(resize.spec(), shrinkTowards = Alignment.Start) + fadeOut(tween(durationMillis = 140, easing = EaseOut)),
+        enter = expandHorizontally(BackgroundWorkMotion.resize(), expandFrom = Alignment.Start) +
+            fadeIn(Motion.swap.animation(MotionPhase.Enter)),
+        exit = shrinkHorizontally(BackgroundWorkMotion.resize(), shrinkTowards = Alignment.Start) +
+            fadeOut(Motion.swap.animation(MotionPhase.Exit)),
     ) {
         Box(Modifier.blurringWith(this)) { content() }
     }
@@ -369,18 +369,18 @@ fun BackgroundWorkGlyph(
     // Swapped in place as subagents come and go, like the words beside it. The disc's dot field
     // sits a little high in its frame: dropped, it is concentric with the capsule's end (OC-477).
     Row(modifier.offset(y = BackgroundWorkTunables.orbGlyphNudgeY.dp), horizontalArrangement = Arrangement.spacedBy(BackgroundWorkTunables.pairGap.dp)) {
-        AnimatedVisibility(agents.isNotEmpty(), enter = fadeIn(Motion.reducedFadeSpec()), exit = fadeOut(Motion.reducedFadeSpec())) {
+        // iOS `.motionSwapTransition()`.
+        val swap = MotionTransition.swap(reduceMotion)
+        AnimatedVisibility(agents.isNotEmpty(), enter = swap.enter, exit = swap.exit) {
             AgentActivityGlyph(
                 source = AgentActivitySource.summary(agents, emptyList(), waiting),
-                modifier = if (reduceMotion) Modifier else Modifier.blurringWith(this),
                 isPaused = isPaused,
             )
         }
-        AnimatedVisibility(shells.isNotEmpty(), enter = fadeIn(Motion.reducedFadeSpec()), exit = fadeOut(Motion.reducedFadeSpec())) {
+        AnimatedVisibility(shells.isNotEmpty(), enter = swap.enter, exit = swap.exit) {
             val ids = shells.map { it.id }
             ShellGlyph(
                 shellIDs = ids,
-                modifier = if (reduceMotion) Modifier else Modifier.blurringWith(this),
                 key = "capsule|" + ids.joinToString(","),
                 probe = probe,
                 isPaused = isPaused,
@@ -453,6 +453,7 @@ fun BackgroundWorkPresentation(
     val frameDuration = rememberFrameDurationSeconds()
     val haptics = remember { dependency(HapticsClient) }
     val dragController = remember { BackgroundWorkDragController(haptics) }
+    dragController.reduceMotion = reduceMotion
     val scrollState = rememberScrollState()
 
     var stage by remember { mutableStateOf(BackgroundWorkStage.closed) }
@@ -510,7 +511,9 @@ fun BackgroundWorkPresentation(
         capsuleShown = shown
         scope.launch {
             try {
-                if (animated) capsuleAlpha.animateTo(if (shown) 1f else 0f, Motion.reducedFadeSpec()) else capsuleAlpha.snapTo(if (shown) 1f else 0f)
+                // The capsule's surface arrives on `microIn` and dematerializes on `microOut`.
+                val spec = if (shown) Motion.microIn.animation<Float>(reduceMotion = reduceMotion) else Motion.microOut.animation(reduceMotion = reduceMotion)
+                if (animated) capsuleAlpha.animateTo(if (shown) 1f else 0f, spec) else capsuleAlpha.snapTo(if (shown) 1f else 0f)
                 completion?.invoke()
             } catch (_: CancellationException) {
             }
@@ -519,16 +522,17 @@ fun BackgroundWorkPresentation(
 
     fun displayedContentHeight(): Float? = contentHeight?.let { if (contentHeightAnim.isRunning) contentHeightAnim.value else it }
 
-    // The rows' height. Open, a change (work starting or ending) moves the panel's top on the morph spring.
+    // The rows' height. Open, a change (work starting or ending) moves the panel's top on `layout`.
     fun measured(height: Float) {
         if (height == contentHeight) return
-        val animate = stage == BackgroundWorkStage.panel && !reduceMotion && contentHeight != null
+        val animate = stage == BackgroundWorkStage.panel && contentHeight != null
+        val grows = height > (contentHeight ?: 0f)
         val from = displayedContentHeight() ?: height
         contentHeight = height
         scope.launch {
             if (animate) {
                 contentHeightAnim.snapTo(from)
-                contentHeightAnim.animateTo(height, BackgroundWorkMotion.morph.spec())
+                contentHeightAnim.animateTo(height, Motion.layout.animation(if (grows) MotionPhase.Enter else MotionPhase.Exit, reduceMotion))
             } else {
                 contentHeightAnim.snapTo(height)
             }
@@ -566,7 +570,7 @@ fun BackgroundWorkPresentation(
         stage = BackgroundWorkStage.panel
         scope.launch {
             try {
-                progress.animateTo(1f, BackgroundWorkMotion.of(reduceMotion))
+                progress.animateTo(1f, BackgroundWorkMotion.morph(opening = true, reduceMotion = reduceMotion))
                 if (current == motion && latestPresented && stage == BackgroundWorkStage.panel) settled = true
             } catch (_: CancellationException) {
             }
@@ -577,7 +581,7 @@ fun BackgroundWorkPresentation(
     fun dismissCapsule() {
         motion += 1
         val current = motion
-        setCapsuleShown(false, animated = !reduceMotion) {
+        setCapsuleShown(false, animated = true) {
             if (current == motion && !latestHasWork) capsuleMounted = false
         }
     }
@@ -598,8 +602,8 @@ fun BackgroundWorkPresentation(
             capsuleShown = false
             scope.launch {
                 try {
-                    launch { capsuleAlpha.animateTo(0f, Motion.reducedFadeSpec()) }
-                    progress.animateTo(0f, Motion.reducedFadeSpec())
+                    launch { capsuleAlpha.animateTo(0f, Motion.microOut.animation(reduceMotion = reduceMotion)) }
+                    progress.animateTo(0f, Motion.microOut.animation(reduceMotion = reduceMotion))
                     if (current == motion && !latestPresented && stage == BackgroundWorkStage.capsule) {
                         stage = BackgroundWorkStage.closed
                         dragController.reset()
@@ -665,7 +669,7 @@ fun BackgroundWorkPresentation(
                 scope.launch { progress.snapTo(0f) }
             }
             capsuleMounted = true
-            setCapsuleShown(true, animated = !reduceMotion)
+            setCapsuleShown(true, animated = true)
         } else if (latestPresented) {
             // The presented change closes it.
             onPresentedChange(false)
@@ -725,7 +729,7 @@ fun BackgroundWorkPresentation(
         val (rowAgents, rowShells) = rows
 
         // Scrim.
-        val scrimAlpha by androidx.compose.animation.core.animateFloatAsState(if (isPanel) 1f else 0f, Motion.reducedFadeSpec(), label = "scrim")
+        val scrimAlpha by androidx.compose.animation.core.animateFloatAsState(if (isPanel) 1f else 0f, Motion.dim.animation(if (isPanel) MotionPhase.Enter else MotionPhase.Exit, reduceMotion), label = "scrim")
         Box(
             Modifier
                 .fillMaxSize()

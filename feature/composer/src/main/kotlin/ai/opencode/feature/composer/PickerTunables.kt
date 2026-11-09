@@ -1,6 +1,5 @@
 package ai.opencode.feature.composer
 
-
 /**
  * iOS `PickerTunables` (Picker Interactions Lab): the photo picker's knobs at their shipped
  * defaults. The lab's catalogue size and presets are Tuning Panel controls, which Android

@@ -2,6 +2,7 @@ package ai.opencode.feature.composer.modelpicker
 
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticEffect
+import ai.opencode.core.motion.Motion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
@@ -650,7 +651,7 @@ private fun OnePickerPanelContent(
                     onEvent = onEvent,
                     onHideKeyboard = {
                         focusManager.clearFocus()
-                        controller.dismissDockedKeyboardTracking(OnePickerTunables.keyboardRide.duration)
+                        controller.dismissDockedKeyboardTracking(Motion.keyboard.curve().duration)
                         onHideKeyboard()
                     },
                     onSubmit = {
@@ -819,7 +820,7 @@ private fun OnePickerSearchBar(
                 onChange = { translation ->
                     if (focused && translation.y > 24 && !sheetDragging) {
                         focusManager.clearFocus()
-                        controller.dismissDockedKeyboardTracking(OnePickerTunables.keyboardRide.duration)
+                        controller.dismissDockedKeyboardTracking(Motion.keyboard.curve().duration)
                     } else if (!focused && !isSheetFallback && translation.y > 4) {
                         if (!sheetDragging) {
                             sheetDragging = true

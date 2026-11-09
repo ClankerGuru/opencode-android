@@ -128,6 +128,12 @@ class AutocompleteMotionController {
         updateCurrentFrame()
     }
 
+    /** The finger let go: a list held past its end springs home (iOS `endScroll`). */
+    fun endScroll() {
+        simulation.endScroll()
+        if (simulation.isAnimating) needsFrames = true
+    }
+
     /** Steps one frame of [dt] seconds; returns whether more frames are needed (iOS `tick`). */
     fun tick(dt: Double): Boolean {
         // Keep in-flight chip targets synced with the text field's live layout.

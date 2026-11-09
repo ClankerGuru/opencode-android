@@ -1,6 +1,8 @@
 package ai.opencode.feature.session
 
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionTransition
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
@@ -8,17 +10,9 @@ import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.FastOutLinearInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.VisibilityThreshold
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -46,7 +40,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -57,10 +50,8 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import kotlin.math.roundToInt
 
 /**
  * Server Flow's tunables (iOS `ServerFlowTunables`, `OpenCode/Drawer/ServerFlow.swift`), moved
@@ -80,12 +71,6 @@ object ServerFlowTunables {
     const val titleTravel = 22f
     const val listTravel = 28f
     const val blur = 2f
-    /** The pill's palette: it enters rising, scaled and blurred, and leaves quicker. */
-    const val enter = 0.3
-    const val leave = 0.24
-    const val rise = 6f
-    const val scale = 0.94f
-    const val enterBlur = 4f
     /**
      * How long a reconnect stays quiet before “Reconnecting…” shows (s; the pill and the drawer
      * title), so the first connect at launch, a return to the app and a quick reconnect never
@@ -245,28 +230,27 @@ fun ServerConnectionPill(
 }
 
 /**
- * iOS `ServerConnectionPill.transition(reducedMotion:)`: the palette's motion. It rises in,
- * scaled, and leaves quicker; a cross-fade under Reduce Motion. [density] converts the rise. (iOS's blur has no
- * enter/exit transition here; the rise and scale carry it.)
+ * iOS `.motionMicroTransition()` on the pill, with its room in the composer's column
+ * (`composerColumnAnimation`): the room opens on `layout` and closes on `collapse`, so the
+ * composer's top, and the transcript riding it, move with the pill instead of jumping its height
+ * in one frame. Under Reduce Motion it cross-fades.
  */
-class ServerConnectionPillTransition(private val density: Float) {
+object ServerConnectionPillTransition {
     fun enter(reducedMotion: Boolean): EnterTransition {
-        val ms = (ServerFlowTunables.enter * 1000).roundToInt()
-        // The pill's room grows on the enter spring in either mode (iOS 812b9ab5): the composer's top,
-        // and the transcript riding it, move with the pill instead of jumping its height in one frame.
-        val room = expandVertically(MotionSpring(ServerFlowTunables.enter).spec(IntSize.VisibilityThreshold), Alignment.Bottom, clip = false)
-        if (reducedMotion) return room + fadeIn(tween(ms, easing = LinearOutSlowInEasing))
-        val spring = MotionSpring(ServerFlowTunables.enter)
-        return room + fadeIn(spring.spec()) +
-            scaleIn(spring.spec(), initialScale = ServerFlowTunables.scale, transformOrigin = TransformOrigin(0.5f, 1f)) +
-            slideInVertically(spring.spec(IntOffset.VisibilityThreshold)) { (ServerFlowTunables.rise * density).roundToInt() }
+        val room = expandVertically(
+            Motion.layout.animation(MotionPhase.Enter, reducedMotion, visibilityThreshold = IntSize.VisibilityThreshold),
+            Alignment.Bottom,
+            clip = false,
+        )
+        return room + MotionTransition.micro(reducedMotion).enter
     }
 
     fun exit(reducedMotion: Boolean): ExitTransition {
-        val ms = (ServerFlowTunables.leave * 1000).roundToInt()
-        val room = shrinkVertically(MotionSpring(ServerFlowTunables.enter).spec(IntSize.VisibilityThreshold), Alignment.Bottom, clip = false)
-        if (reducedMotion) return room + fadeOut(tween(ms, easing = FastOutLinearInEasing))
-        return room + fadeOut(tween(ms, easing = FastOutLinearInEasing)) +
-            scaleOut(tween(ms, easing = FastOutLinearInEasing), targetScale = ServerFlowTunables.scale, transformOrigin = TransformOrigin(0.5f, 1f))
+        val room = shrinkVertically(
+            Motion.layout.animation(MotionPhase.Exit, reducedMotion, visibilityThreshold = IntSize.VisibilityThreshold),
+            Alignment.Bottom,
+            clip = false,
+        )
+        return room + MotionTransition.micro(reducedMotion).exit
     }
 }

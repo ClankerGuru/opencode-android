@@ -6,6 +6,9 @@ import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticEffect
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
@@ -19,8 +22,6 @@ import android.graphics.Point
 import android.view.View
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -460,6 +461,7 @@ fun LinkMenu(
     var pressed by remember { mutableStateOf<Path?>(null) }
     val pressAlpha = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
+    val reduceMotion = rememberReduceMotion()
     val colors = OpenCodeTheme.colors
     val pressColor = colors.text.copy(alpha = if (colors.isDark) 0.16f else 0.1f)
     val liftFill = MaterialTheme.colorScheme.surface
@@ -536,7 +538,7 @@ fun LinkMenu(
                             }
                         }
                     }
-                    if (pressAlpha.value > 0f) scope.launch { pressAlpha.animateTo(0f, tween(180, easing = LinearEasing)) }
+                    if (pressAlpha.value > 0f) scope.launch { pressAlpha.animateTo(0f, Motion.swap.animation(MotionPhase.Exit, reduceMotion)) }
                 }
             },
     ) {

@@ -9,6 +9,7 @@ import ai.opencode.core.experiments.key
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticEffect
 import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.PresentationAction
@@ -409,7 +410,7 @@ private fun OrbClearance(
     val reducedMotion = rememberReduceMotion()
     val orbClearance by animateFloatAsState(
         orbRoom,
-        Motion.layout.animation(reduceMotion = reducedMotion),
+        Motion.layout.animation(if (orbRoom > 0f) MotionPhase.Enter else MotionPhase.Exit, reducedMotion),
         label = "orbClearance",
     )
     SideEffect { host.orbClearance = orbClearance }

@@ -220,18 +220,26 @@ data class MotionTransition(val enter: EnterTransition, val exit: ExitTransition
             )
         }
 
-        /** Rolls like a counter: in from [MotionTunables.rollDistance] away, out the other way, on layout. */
-        fun roll(direction: MotionRollDirection, reduceMotion: Boolean, density: Density): MotionTransition {
+        /**
+         * Rolls like a counter: in from [MotionTunables.rollDistance] away, out the other way, on
+         * [role] (layout by default; a title roll, iOS `.titleRoll`, passes `Motion.swap`).
+         */
+        fun roll(
+            direction: MotionRollDirection,
+            reduceMotion: Boolean,
+            density: Density,
+            role: MotionRole = Motion.layout,
+        ): MotionTransition {
             if (reduceMotion) return reduced()
             val sign = if (direction == MotionRollDirection.Up) 1 else -1
             val distance = with(density) { MotionTunables.rollDistance.value.roundToPx() } * sign
             val swapPose = MotionPose.swap
-            val enter = fadeIn(Motion.layout.animation(MotionPhase.Enter)) +
-                scaleIn(Motion.layout.animation(MotionPhase.Enter), initialScale = swapPose.scale) +
-                slideInVertically(Motion.layout.animation(MotionPhase.Enter)) { distance }
-            val exit = fadeOut(Motion.layout.animation(MotionPhase.Enter)) +
-                scaleOut(Motion.layout.animation(MotionPhase.Enter), targetScale = swapPose.scale) +
-                slideOutVertically(Motion.layout.animation(MotionPhase.Enter)) { -distance }
+            val enter = fadeIn(role.animation(MotionPhase.Enter)) +
+                scaleIn(role.animation(MotionPhase.Enter), initialScale = swapPose.scale) +
+                slideInVertically(role.animation(MotionPhase.Enter)) { distance }
+            val exit = fadeOut(role.animation(MotionPhase.Enter)) +
+                scaleOut(role.animation(MotionPhase.Enter), targetScale = swapPose.scale) +
+                slideOutVertically(role.animation(MotionPhase.Enter)) { -distance }
             return MotionTransition(enter, exit)
         }
 

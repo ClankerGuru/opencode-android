@@ -1,5 +1,6 @@
 package ai.opencode.feature.session.header
 
+import ai.opencode.core.motion.AmbientClock
 import ai.opencode.core.motion.rememberReduceMotion
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,7 +36,6 @@ enum class TitleLoadingStyle { Breathing, Shimmer, Phosphor, Wave }
 object TitleLoadingTunables {
     val STYLE = TitleLoadingStyle.Breathing
     const val MIN_OPACITY = 0.45
-    const val PERIOD = 1.7
     const val SWEEP_PERIOD = 1.45
     const val REPLAY_SECONDS = 4.0
 }
@@ -149,8 +149,8 @@ data class TitleBreath(
     }
 
     companion object {
-        /** Seconds per breath. */
-        const val PERIOD = TitleLoadingTunables.PERIOD
+        /** Seconds per breath: the app's one breath ([AmbientClock]). */
+        val PERIOD: Double get() = AmbientClock.breathPeriod
 
         /** How far a breath dims: full down to 45 %. */
         const val DEPTH = 1 - TitleLoadingTunables.MIN_OPACITY

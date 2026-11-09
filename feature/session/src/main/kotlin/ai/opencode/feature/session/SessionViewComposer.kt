@@ -2,7 +2,9 @@ package ai.opencode.feature.session
 
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionTransition
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.shared
@@ -68,14 +70,12 @@ import ai.opencode.server.model.OpenCodeQueuedInput
 import ai.opencode.server.model.PastedText
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -535,21 +535,13 @@ fun SessionComposer(
             view.heldComposerPresentation = null
         }
     }
-    // The leaving bar is removed once its fade has finished.
-    val leaving = snapshot.dictationHold == null && view.dictationRetention.leavingHold(snapshot.taskIdentity) != null
-    LaunchedEffect(snapshot.taskIdentity, leaving) {
-        if (!leaving) return@LaunchedEffect
-        delay(DictationBarPresenceDuration)
-        if (store.state.dictationHold == null) view.dictationRetention = view.dictationRetention.copy(leavingHold = null)
-    }
-    // The fold takes 0.28 s (0.2 s under Reduce Motion): controls hidden under the bar leave once it settles.
+    // Controls the row hides leave once the fold has landed ([dictationFoldLanded]); until then,
+    // a recording that changed on this screen has no settled state.
     val recording = snapshot.dictationHold != null
     LaunchedEffect(snapshot.taskIdentity, recording) {
         val settled = view.dictationRetention.settledRecording(recording, snapshot.taskIdentity)
         if (recording == settled) return@LaunchedEffect
         view.setSettledRecording(null, snapshot)
-        delay(320)
-        view.setSettledRecording(recording, snapshot)
     }
 
     env.ComposerArea(modifier)
@@ -579,6 +571,36 @@ private fun chipLevelLabel(state: SessionFeature.State): String? {
     val level = state.currentModel?.variant?.takeIf { it != "default" } ?: return "Default"
     return ai.opencode.server.model.ModelVariant.label(level)
 }
+
+/**
+ * iOS `dictationFoldLanded(recording:)`: the fold toward [recording] has landed, so the controls it
+ * hides leave, unless the recording changed again meanwhile.
+ */
+internal fun SessionComposerEnv.dictationFoldLanded(recording: Boolean) {
+    val current = store.state
+    if ((current.dictationHold != null) != recording) return
+    if (view.dictationRetention.settledRecording(recording, current.taskIdentity) == recording) return
+    view.setSettledRecording(recording, s)
+}
+
+/** iOS `dictationBarLeft()`: the last recording's bar has faded out, so it leaves the tree. */
+internal fun SessionComposerEnv.dictationBarLeft() {
+    if (store.state.dictationHold != null) return
+    if (view.dictationRetention.leavingHold == null) return
+    view.dictationRetention = view.dictationRetention.copy(leavingHold = null)
+}
+
+/**
+ * iOS `composerColumnAnimation(opening:)`: a row joining or leaving the composer's column (the
+ * pill row, the connection pill, a draft's projects): its height and the column's top move on one
+ * spring, `layout` opening and `collapse` closing. Reduce Motion fades.
+ */
+internal fun <T> SessionComposerEnv.composerColumnAnimation(opening: Boolean, visibilityThreshold: T? = null): FiniteAnimationSpec<T> =
+    Motion.layout.animation(if (opening) MotionPhase.Enter else MotionPhase.Exit, reducedMotion, visibilityThreshold = visibilityThreshold)
+
+/** iOS `dictationFoldAnimation(recording:)`: the composer folds (`layout` closing) and opens again (`layout`). */
+internal fun <T> SessionComposerEnv.dictationFoldAnimation(recording: Boolean): FiniteAnimationSpec<T> =
+    Motion.layout.animation(if (recording) MotionPhase.Exit else MotionPhase.Enter, reducedMotion)
 
 internal fun SessionComposerViewState.setSettledRecording(value: Boolean?, s: ComposerSnapshot) {
     val recording = s.isPreparingDictation || s.isDictating || s.dictationHold != null
@@ -913,19 +935,28 @@ private fun SessionComposerEnv.ComposerAreaContent(modifier: Modifier) {
             // riding it, on the row's own curve; at once, Working jumped a row's height in one frame.
             AnimatedVisibility(
                 visible = s.hasBackgroundWork || s.queuedMessages.isNotEmpty(),
-                enter = if (reducedMotion) EnterTransition.None else expandVertically(MotionSpring(PILL_ROW_SECONDS).spec(IntSize.VisibilityThreshold), Alignment.Bottom, clip = false),
-                exit = if (reducedMotion) ExitTransition.None else shrinkVertically(MotionSpring(PILL_ROW_SECONDS).spec(IntSize.VisibilityThreshold), Alignment.Bottom, clip = false),
+                enter = expandVertically(composerColumnAnimation(opening = true, IntSize.VisibilityThreshold), Alignment.Bottom, clip = false),
+                exit = shrinkVertically(composerColumnAnimation(opening = false, IntSize.VisibilityThreshold), Alignment.Bottom, clip = false),
             ) {
                 HiddenUnderComposerPanel(host.composerPanelCovers) { ComposerPills() }
             }
             val error = s.settledRequestLoadError
-            if (error != null) {
+            // The last error stays drawn while the banner leaves.
+            var shownError by remember { mutableStateOf(error) }
+            if (error != null) shownError = error
+            AnimatedVisibility(
+                visible = error != null,
+                enter = expandVertically(composerColumnAnimation(opening = true, IntSize.VisibilityThreshold), Alignment.Bottom, clip = false) +
+                    MotionTransition.micro(reducedMotion).enter,
+                exit = shrinkVertically(composerColumnAnimation(opening = false, IntSize.VisibilityThreshold), Alignment.Bottom, clip = false) +
+                    MotionTransition.micro(reducedMotion).exit,
+            ) {
                 HiddenUnderComposerPanel(host.composerPanelCovers) {
                     ComposerBanner(
                         symbol = SFSymbol.ExclamationmarkTriangleFill,
                         iconTint = androidx.compose.ui.graphics.Color(0xFFFF9500),
                         title = "Couldn’t Load Requests",
-                        detail = error,
+                        detail = shownError.orEmpty(),
                         action = "Retry",
                         onClick = { store.send(Action.refreshRequestsTapped) },
                         modifier = Modifier.semantics { testTag = "request-load-error" },
@@ -987,8 +1018,7 @@ private fun SessionComposerEnv.ServerConnection() {
     // The last notice stays drawn while the pill leaves.
     var shown by remember { mutableStateOf(connection) }
     if (connection != null) shown = connection
-    val density = LocalDensity.current.density
-    val transition = remember(density) { ServerConnectionPillTransition(density) }
+    val transition = ServerConnectionPillTransition
     AnimatedVisibility(
         visible = connection != null,
         enter = transition.enter(reducedMotion),
@@ -1010,9 +1040,9 @@ private fun HiddenUnderComposerPanel(covered: Boolean, modifier: Modifier = Modi
 
 @Composable
 private fun SessionComposerEnv.DraftProjectsOverlay(modifier: Modifier) {
-    // The list leaving (smooth 0.38 s), and folding down to its chosen row and back.
-    val enter = if (reducedMotion) fadeIn(Motion.easeInOut(0.2)) else fadeIn(MotionSpring(0.38).spec())
-    val exit = if (reducedMotion) fadeOut(Motion.easeInOut(0.2)) else fadeOut(MotionSpring(0.38).spec())
+    // The list arriving and leaving with the composer's column (`layout` opening, `collapse` closing).
+    val enter = fadeIn(composerColumnAnimation(opening = true))
+    val exit = fadeOut(composerColumnAnimation(opening = false))
     // A zero-height edge at the area's top that the list stands on, a stack's spacing above.
     Box(
         modifier
@@ -1101,8 +1131,8 @@ private fun SessionComposerEnv.QueuedActivity(hasQueued: Boolean) {
     DisposableEffect(Unit) { onDispose { host.queuedPillFrame = null } }
     AnimatedVisibility(
         visible = hasQueued,
-        enter = if (reducedMotion) fadeIn(Motion.easeInOut(0.2)) else scaleIn(MotionSpring(0.35, 0.15).spec(), initialScale = 0.92f) + fadeIn(MotionSpring(0.35, 0.15).spec()),
-        exit = if (reducedMotion) fadeOut(Motion.easeInOut(0.2)) else slideOutVertically(MotionSpring(0.35, 0.15).spec()) { -it } + fadeOut(MotionSpring(0.35, 0.15).spec()),
+        enter = if (reducedMotion) fadeIn(composerColumnAnimation(opening = true)) else scaleIn(composerColumnAnimation(opening = true), initialScale = 0.92f) + fadeIn(composerColumnAnimation(opening = true)),
+        exit = if (reducedMotion) fadeOut(composerColumnAnimation(opening = false)) else slideOutVertically(composerColumnAnimation(opening = false)) { -it } + fadeOut(composerColumnAnimation(opening = false)),
     ) {
         ComposerPillLabel(
             title = "$count queued",
@@ -1251,7 +1281,7 @@ private fun SessionComposerEnv.RequestPanelPresence() {
         if (reducedMotion || view.requestPanelShown.value <= 0.5f) {
             view.requestPanelReveal.snapTo(1f)
         } else {
-            view.requestPanelReveal.animateTo(1f, RequestPanelReveal.glass(opening = true))
+            view.requestPanelReveal.animateTo(1f, RequestPanelReveal.animation(opening = true, reducedMotion = false))
         }
     }
     var seenIdentity by remember { mutableStateOf(s.taskIdentity) }
@@ -1264,34 +1294,41 @@ private fun SessionComposerEnv.RequestPanelPresence() {
 
 /**
  * iOS `requestPanelLeft()`: the request left (answered, withdrawn, or a call took the composer's
- * place). The surface folds over the panel (under Reduce Motion it lingers while the panel fades);
- * 350 ms later the room goes in one step, and 350 ms after that the panel's height is forgotten,
- * so the next request grows from nothing.
+ * place). The surface folds over the panel on `panelOpen`'s exit (under Reduce Motion it lingers
+ * while the panel fades on the reduced role); once the fold lands, [requestPanelFolded] lets the
+ * room go.
  */
 private fun SessionComposerEnv.requestPanelLeft() {
     view.requestPanelLeaveJob?.cancel()
     if (!holdsRequestPanelRoom && !lingersRequestPanel && activeRequestPanelHeight(null) <= 0f) return
     val leaving = s.taskIdentity
     view.requestPanelIdentity = leaving
-    if (reducedMotion) {
-        view.requestPanelLingers = true
-    } else {
-        scope.launch { view.requestPanelReveal.animateTo(0f, RequestPanelReveal.glass(opening = false)) }
-    }
-    // No request docked again (iOS `!docksRequest`, read now), same screen.
-    fun stillLeaving() = !store.state.isAnsweringRequest && view.requestPanelIdentity == leaving
+    if (reducedMotion) view.requestPanelLingers = true
+    val reduced = reducedMotion
+    // Cancelled when a request docks again or the screen changes.
     view.requestPanelLeaveJob = scope.launch {
-        delay(350)
-        if (!stillLeaving()) return@launch
-        view.requestPanelLingers = false
-        view.requestPanelReveal.snapTo(0f)
-        // Folded and faded: the room goes in one step, so the surface and its frame never part mid-animation.
-        view.requestRoomHeld = false
-        delay(350)
-        if (!stillLeaving()) return@launch
-        view.requestPanelHeight = 0f
-        view.requestPanelShown.snapTo(0f)
+        if (reduced) {
+            delay(Motion.millis(Motion.reduced.curve(reduceMotion = true).duration).toLong())
+        } else {
+            view.requestPanelReveal.animateTo(0f, RequestPanelReveal.animation(opening = false, reducedMotion = false))
+        }
+        requestPanelFolded(leaving)
     }
+}
+
+/**
+ * iOS `requestPanelFolded(fold:)`: the leaving request's fold has landed. Unless another request
+ * docked (iOS `!docksRequest`, read now) or the screen changed meanwhile, its room goes in one
+ * step, so the surface and its frame never part mid-animation, and its height is forgotten, so
+ * the next request grows from nothing.
+ */
+private suspend fun SessionComposerEnv.requestPanelFolded(leaving: SessionFeature.State.TaskIdentity?) {
+    if (store.state.isAnsweringRequest || view.requestPanelIdentity != leaving) return
+    view.requestPanelLingers = false
+    view.requestPanelReveal.snapTo(0f)
+    view.requestRoomHeld = false
+    view.requestPanelHeight = 0f
+    view.requestPanelShown.snapTo(0f)
 }
 
 /** iOS `resetRequestPanel()`: another screen in place keeps nothing of the last one's panel. */
@@ -1357,10 +1394,10 @@ private fun SessionComposerEnv.ComposerSurface(
                     },
             ) { Composer() }
         }
-        // The drop highlight: decoration, taking no touches (iOS accent stroke, 2 pt, easeOut 0.15 s).
+        // The drop highlight: decoration, taking no touches (iOS accent stroke, 2 pt, on swap).
         val dropAlpha by animateFloatAsState(
             if (view.isImageDropTargeted) 1f else 0f,
-            if (reducedMotion) snap() else tween(150, easing = Motion.EaseOut),
+            Motion.swap.animation(if (view.isImageDropTargeted) MotionPhase.Enter else MotionPhase.Exit, reducedMotion),
             label = "composerDropTarget",
         )
         if (dropAlpha > 0f) {
@@ -1381,7 +1418,11 @@ private fun SessionComposerEnv.ComposerSurface(
         // Above the surface, so its edge never crosses the hold circle.
         val hold = shownDictationHold
         if (hold != null) {
-            DictationBarPresence(isLeaving = s.dictationHold == null, modifier = Modifier.matchParentSize()) {
+            DictationBarPresence(
+                isLeaving = s.dictationHold == null,
+                modifier = Modifier.matchParentSize(),
+                onLeft = { dictationBarLeft() },
+            ) {
                 DictationHoldLayer(
                     pose = dictationPose(hold),
                     micFrame = view.dictationMicFrame,
@@ -1480,6 +1521,7 @@ private fun SessionComposerEnv.RequestPanelContent(isShown: Boolean, cap: Float?
                 }
                 val eases = env.view.requestPanelEasing.eases(height, currentCap, keyboardUp = env.messageFieldFocused)
                 val wasZero = env.view.requestPanelHeight == 0f
+                val grows = height > env.view.requestPanelHeight
                 val requestID = env.store.state.dockRequestID
                 // Permission columns already animate their own height. Applying a second
                 // spring here makes the surface trail the caption and clip it mid-expansion.
@@ -1490,9 +1532,12 @@ private fun SessionComposerEnv.RequestPanelContent(isShown: Boolean, cap: Float?
                 env.scope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
                     when {
                         env.reducedMotion || !eases -> env.view.requestPanelShown.snapTo(height)
-                        wasZero -> env.view.requestPanelShown.animateTo(height, RequestPanelReveal.glass(opening = true))
+                        wasZero -> env.view.requestPanelShown.animateTo(height, RequestPanelReveal.animation(opening = true, reducedMotion = false))
                         followsColumn -> env.view.requestPanelShown.snapTo(height)
-                        else -> env.view.requestPanelShown.animateTo(height, MotionSpring(0.3).spec())
+                        else -> env.view.requestPanelShown.animateTo(
+                            height,
+                            Motion.layout.animation(if (grows) MotionPhase.Enter else MotionPhase.Exit),
+                        )
                     }
                     if (followsColumn && !env.reducedMotion) {
                         // The surface reports only the bar's size, so child remeasurement
@@ -1599,16 +1644,18 @@ private fun SessionComposerEnv.Composer() {
     val bar = s.requestBar
     val density = LocalDensity.current
     // Dictating folds the composer to its control row: the edge glides down over what's above it.
+    // Controls the row hides leave once the fold has landed: its own completion, so slow motion
+    // and a reversal mid-fold hold them.
     val fold by animateFloatAsState(
         if (recording) 1f else 0f,
-        // Under Reduce Motion the height changes at once and only opacity fades.
-        if (reducedMotion) tween(0) else MotionSpring(0.28).spec(),
+        dictationFoldAnimation(recording),
         label = "composerFold",
+        finishedListener = { dictationFoldLanded(recording = it == 1f) },
     )
     val rowAlpha by animateFloatAsState(
         if (recording) 0f else 1f,
-        if (recording) Motion.easeOut(Motion.fadeFast, reduceMotion = reducedMotion)
-        else Motion.easeOut(Motion.fadeStandard, if (reducedMotion) 0.0 else Motion.contentDelay, reducedMotion),
+        if (recording) Motion.swap.animation(MotionPhase.Exit, reducedMotion)
+        else Motion.swap.animation(reduceMotion = reducedMotion, delaySeconds = Motion.contentDelay),
         label = "composerRowFade",
     )
     val bodyLine = with(density) { OpenCodeTextStyles.body.lineHeight.toDp().value }
@@ -1628,7 +1675,7 @@ private fun SessionComposerEnv.Composer() {
     LaunchedEffect(flights, heldByFlights) { if (heldByFlights) flights?.revealHeldRow() }
     LaunchedEffect(holdsRow) {
         if (holdsRow) rowReveal.snapTo(0f)
-        else if (rowReveal.value < 1f) rowReveal.animateTo(1f, PhotoFlightTunables.row.spec())
+        else if (rowReveal.value < 1f) rowReveal.animateTo(1f, PhotoFlightTunables.rowAnimation())
     }
     val attachmentReveal = if (holdsRow) 0f else rowReveal.value
     val current by rememberUpdatedState(this)
@@ -1731,7 +1778,11 @@ private fun SessionComposerEnv.Composer() {
                 )
                 val hold = shownDictationHold
                 if (hold != null) {
-                    DictationBarPresence(isLeaving = !recording, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
+                    DictationBarPresence(
+                        isLeaving = !recording,
+                        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+                        onLeft = { dictationBarLeft() },
+                    ) {
                         var barOrigin by remember { mutableStateOf(Offset.Zero) }
                         val mic = view.dictationMicFrame
                         val micCenter = if (mic == Rect.Zero || view.dictationBarFrame == Rect.Zero) {
@@ -1808,7 +1859,7 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
         val imagesSending = host.sendTransition.images.isSending
         val placeholderAlpha by animateFloatAsState(
             if (imagesSending) 0f else 1f,
-            if (imagesSending) snap() else Motion.reducedFadeSpec(),
+            if (imagesSending) snap() else Motion.swap.animation(reduceMotion = reducedMotion),
             label = "composer-placeholder",
         )
         if (s.draftShape.isEmpty) {
@@ -1897,4 +1948,3 @@ private fun SessionComposerEnv.onDraftEdited(
 // endregion
 
 /** iOS `.snappy(duration: 0.35)`, without its overshoot: a bounce here bounced the transcript. */
-private const val PILL_ROW_SECONDS = 0.35

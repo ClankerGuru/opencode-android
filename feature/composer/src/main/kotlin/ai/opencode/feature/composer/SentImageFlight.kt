@@ -7,7 +7,8 @@ import ai.opencode.feature.media.SendImageTunables
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import android.graphics.BitmapFactory
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
+import ai.opencode.core.motion.MotionTunables
+import ai.opencode.core.motion.rememberReduceMotion
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -218,7 +219,7 @@ class SentImageFlight {
 
     /**
      * Reveals the live row under exactly landed copies, then fades the copies over
-     * `Motion.reducedFade`. Returns whether the hand-off is complete.
+     * `MotionTunables.reducedDuration`. Returns whether the hand-off is complete.
      */
     fun handOff(itemID: String, now: Double): Boolean {
         val flight = flights[itemID] ?: return true
@@ -229,7 +230,7 @@ class SentImageFlight {
         if (!landed) return false
         val start = flight.handoffStarted ?: now
         flight.handoffStarted = start
-        val progress = min(1.0, (now - start) / Motion.reducedFade).toFloat()
+        val progress = min(1.0, (now - start) / MotionTunables.reducedDuration.value).toFloat()
         flight.hidesContent = false
         for (tile in flight.tiles) tile.alpha = 1 - progress
         frameTick++
@@ -322,12 +323,13 @@ fun Modifier.sentImageDeparture(flight: SentImageFlight): Modifier =
 @Composable
 fun SentImageFlightOverlay(flight: SentImageFlight, modifier: Modifier = Modifier) {
     val dissolve = remember { Animatable(1f) }
+    val reduceMotion = rememberReduceMotion()
     val generation = flight.dissolveGeneration
     LaunchedEffect(generation) {
         if (generation == 0) return@LaunchedEffect
         val tiles = flight.dissolvingTiles
         dissolve.snapTo(1f)
-        dissolve.animateTo(0f, tween((Motion.reducedFade * 1000).toInt()))
+        dissolve.animateTo(0f, Motion.microOut.animation(reduceMotion = reduceMotion))
         flight.dissolved(tiles)
         dissolve.snapTo(1f)
     }
