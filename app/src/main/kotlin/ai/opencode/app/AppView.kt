@@ -1,5 +1,8 @@
 package ai.opencode.app
 
+import androidx.compose.ui.unit.sp
+import ai.opencode.core.ui.OpenCodeRadius
+import androidx.compose.foundation.BorderStroke
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.diagnostics.HidesFromScreenshots
 import ai.opencode.core.experiments.key
@@ -315,9 +318,10 @@ private fun PairingActionsButtons(store: StoreOf<AppFeature.State, AppFeature.Ac
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         PairingActionButton(
             onClick = { store.send(AppFeature.Action.AddServerTapped) },
-            container = MaterialTheme.colorScheme.surfaceContainerHighest,
+            container = MaterialTheme.colorScheme.surface,
             content = colors.text,
-        ) { Text("Enter a Server Manually", style = OpenCodeTextStyles.headline, textAlign = TextAlign.Center) }
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)),
+        ) { Text("Enter a Server Manually", style = PairingActionLabel, textAlign = TextAlign.Center) }
         PairingActionButton(
             onClick = { store.send(AppFeature.Action.ScanPairingCodeTapped) },
             enabled = progress == null,
@@ -327,11 +331,11 @@ private fun PairingActionsButtons(store: StoreOf<AppFeature.State, AppFeature.Ac
             if (progress != null) {
                 CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = colors.canvas)
                 Spacer(Modifier.width(10.dp))
-                Text(progress!!, style = OpenCodeTextStyles.headline)
+                Text(progress!!, style = PairingActionLabel)
             } else {
-                OpenCodeIcon(SFSymbol.QrcodeViewfinder, contentDescription = null)
-                Spacer(Modifier.width(10.dp))
-                Text("Scan Pairing Code", style = OpenCodeTextStyles.headline, textAlign = TextAlign.Center)
+                OpenCodeIcon(SFSymbol.QrcodeViewfinder, contentDescription = null, size = 18.dp)
+                Spacer(Modifier.width(8.dp))
+                Text("Scan Pairing Code", style = PairingActionLabel, textAlign = TextAlign.Center)
             }
         }
     }
@@ -343,12 +347,15 @@ private fun PairingActionButton(
     container: Color,
     content: Color,
     enabled: Boolean = true,
+    border: BorderStroke? = null,
     label: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
 ) {
     Button(
         onClick = onClick,
         enabled = enabled,
-        shape = RoundedCornerShape(16.dp),
+        // The desktop's button: small radius, not a 16 dp card.
+        shape = RoundedCornerShape(OpenCodeRadius.fill),
+        border = border,
         colors = ButtonDefaults.buttonColors(
             containerColor = container,
             contentColor = content,
@@ -357,10 +364,13 @@ private fun PairingActionButton(
             disabledContentColor = content,
         ),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
         content = label,
     )
 }
+
+/** The pairing buttons' label: the desktop's medium-weight button text at phone size. */
+private val PairingActionLabel get() = OpenCodeTextStyles.callout.copy(fontWeight = FontWeight.Medium)
 
 /** What a new user needs on their computer before the scan can work. */
 @Composable
@@ -454,8 +464,10 @@ private fun CopyCommand(command: String, onCopy: (String) -> Unit) {
             onCopy(command)
             copied = true
         },
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        // The desktop's code block: faint fill, hairline border.
+        shape = RoundedCornerShape(OpenCodeRadius.fill),
+        color = OpenCodeTheme.colors.codeBand,
+        border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
         // The label stands in for the visible command (cleared below), read once as a button
         // (iOS `.accessibilityLabel("Copy \(command)")` on a `Button`).
         modifier = Modifier.heightIn(min = 48.dp).semantics {
@@ -472,11 +484,10 @@ private fun CopyCommand(command: String, onCopy: (String) -> Unit) {
             Text(
                 command,
                 modifier = Modifier.weight(1f, fill = false).clearAndSetSemantics {},
-                // Berkeley Mono's contextual alternates join `//` and `--` into ligatures that
-                // read as `https: //`; a command to retype is drawn as typed.
-                style = OpenCodeTextStyles.callout.copy(
-                    fontFamily = OpenCodeFonts.berkeleyMono,
-                    fontSize = OpenCodeTextStyles.subheadline.fontSize,
+                // The desktop's mono; no contextual alternates, so a command to retype is drawn as typed.
+                style = OpenCodeTextStyles.footnote.copy(
+                    fontFamily = OpenCodeFonts.monospace,
+                    lineHeight = 20.sp,
                     fontFeatureSettings = "calt 0",
                 ),
             )
