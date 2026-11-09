@@ -279,7 +279,7 @@ fun DrawerWhatsNewButton(action: () -> Unit, onHide: () -> Unit, modifier: Modif
                 SFSymbol.CircleFill,
                 contentDescription = null,
                 size = (11 * LocalDensity.current.fontScale).dp,
-                tint = OpenCodeTheme.colors.accent,
+                tint = OpenCodeTheme.colors.signal,
                 modifier = Modifier.height(18.dp),
             )
         }

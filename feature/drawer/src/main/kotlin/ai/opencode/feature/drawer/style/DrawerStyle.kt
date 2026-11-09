@@ -452,7 +452,7 @@ fun DrawerShortcutLabel(
                 sfName = systemImage,
                 contentDescription = null,
                 size = OpenCodeIconSize.medium * symbolScale,
-                tint = OpenCodeTheme.colors.accent,
+                tint = OpenCodeTheme.colors.signal,
             )
         }
         ProvideTextStyle(DrawerTunables.rowFont.font) {
