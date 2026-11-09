@@ -11,10 +11,6 @@ package ai.opencode.feature.voice
  * halo, else the dot's). The uniforms keep [WispOrbUniforms]' slots, one `float4` each. AGSL loops
  * need constant bounds, so the dot search walks a fixed 7 × 7 window and stops at its reach (one or
  * two cells at every tuning).
- *
- * Visual divergence (desktop design system, docs/parity/core-ui.md): the plate is a neutral
- * graphite from [WispOrbPalette] instead of iOS's blue-black, and its shadow is lighter on light
- * themes. The dots, halos, glow, rim light and mute ring are iOS's.
  */
 object WispOrbShaders {
     /** The uniform slots the raster reads, by name. */
@@ -41,8 +37,6 @@ uniform float4 view;
 uniform float4 glow;
 uniform float4 clipRect;
 uniform float4 clipShape;
-// WispOrbPalette: the plate's colour (rgb) and its shadow's strength (w).
-uniform float4 plate;
 
 const float WISP_BLEED = 10.0;
 const float3 USER_BASE = float3(0.60, 0.90, 0.98);
@@ -139,17 +133,17 @@ half4 main(float2 position) {
   bool deepInside = r2 <= lensInner * lensInner;
   float4 res = float4(0.0);
   if (shR2 < shadowInner * shadowInner) {
-    res.a = plate.w;
+    res.a = 0.42;
   } else if (shR2 < shadowOuter * shadowOuter) {
     float shadowD = sqrt(shR2) - radius;
     float edgeFade = ws(WISP_BLEED - 0.2, WISP_BLEED - 4.2, shadowD);
-    res.a = plate.w * (0.5 - 0.5 * fastTanh(shadowD / 4.8)) * edgeFade;
+    res.a = 0.42 * (0.5 - 0.5 * fastTanh(shadowD / 4.8)) * edgeFade;
   }
   float rPt = sqrt(r2);
   float dist = deepInside ? -3.0 : rPt - radius;
   float shape = deepInside ? 1.0 : coverage(dist, aa);
-  float3 lens = mix3(mix3(plate.rgb, float3(44.0, 16.0, 18.0) / 255.0, mixB.y * 0.65), MUTED_PLATE, mixB.w);
-  if (shape > 0.0) res = composite(res, lens, 0.94 * shape);
+  float3 plate = mix3(mix3(float3(15.0, 16.0, 20.0) / 255.0, float3(44.0, 16.0, 18.0) / 255.0, mixB.y * 0.65), MUTED_PLATE, mixB.w);
+  if (shape > 0.0) res = composite(res, plate, 0.94 * shape);
 
   if (shape > 0.0) {
     float glowStrength = glow.x;

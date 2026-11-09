@@ -52,10 +52,8 @@ the OpenCode desktop design system (`packages/ui`, theme `oc-2`), not iOS's SF /
   (TalkBack reads it via `error()`), disabled half opacity. Custom bare fields inside their own
   containers (composer, drawer search, browser bar, share dock) keep their containers; the
   model picker's search rows use `Modifier.openCodeFieldContainer`.
-- Call orb (`feature/voice` `WispOrbShaders`, `WispOrbPalette`): the desktop has no orb, so
-  the Wisp keeps iOS's simulation, dots, halos, glow, rim light and timings; only its plate is
-  a neutral graphite (#141415, a dark speaker grille in both themes) instead of iOS's
-  blue-black glass, and its drop shadow is lighter on light themes (0.30 vs 0.42).
+- Call orb (`feature/voice` `LivingOrbView`, `WispOrbShaders`): unchanged from iOS (the
+  desktop has no orb), so it keeps iOS's blue-black glass, dots, glow and shadow on the call card.
 - Call card (`feature/voice` `FloatingCall`, `VoiceCallSurfaceDefaults`): one step off the
   page (`card`: 5% toward the text colour in light, 6% in dark) with a hairline and a soft
   20 dp shadow, so it separates from the canvas in both themes; the controls are 12 dp rounded
