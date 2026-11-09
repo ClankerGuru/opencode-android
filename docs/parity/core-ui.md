@@ -29,6 +29,12 @@ the OpenCode desktop design system (`packages/ui`, theme `oc-2`), not iOS's SF /
   + small shadow; `OpenCodeAlertDialog` (desktop dialog over Material's `AlertDialog`).
 - Controls: buttons 48 dp, 8 dp corners; `OpenCodeSecondaryButton` is the neutral hairline
   button; `OpenCodeIconButton(style = Circle)` is a 10 dp rounded square with a hairline.
+- Title bars (`ui/OpenCodeTopBar.kt`, Android-only): the desktop's settings/session header
+  instead of Material's `TopAppBar`s: flat canvas, 52 dp row, headline title (start or
+  centred), bare back arrow (`OpenCodeTopBarBackButton`), 1 dp bottom hairline that fades in
+  once content scrolls under it (always shown without a scroll behaviour). `OpenCodeLargeTopBar`
+  is the large-title variant (title1 under the row; Material's `exitUntilCollapsed` behaviour
+  scrolls it away and fades the small title in), used by Settings pages.
 Paths below are relative to `core/src/main/kotlin/ai/opencode/core/`.
 
 ## Files
@@ -55,6 +61,7 @@ Paths below are relative to `core/src/main/kotlin/ai/opencode/core/`.
 - Shapes and spacing: `OpenCodeShape.control` for controls, `capsule/circle` for true capsules, `card/panel/sheet`, `OpenCodeRadius.*`, `OpenCodeSpacing.*`.
 - Surfaces: `OpenCodeSurfaces.color/border/dialogShape/popoverShape/raisedShadow/popoverShadow`, `Modifier.openCodeHairline(shape)`, `OpenCodeAlertDialog` instead of `AlertDialog`; Material `Button`s take `shape = OpenCodeShape.control`.
 - Motion: `Motion.<name>.spec()` / `.animation(reduceMotion)`, `Motion.easeOut(Motion.fadeStandard, …)`, `rememberReduceMotion()`, `SpringSolver` + `motionFrameLoop {}` for custom drivers, `PresenceGate`, `Modifier.motionBlurReveal`.
+- Title bars: `OpenCodeTopBar(title = { Text(...) }, navigation = { OpenCodeTopBarBackButton(onBack) }, actions = { ... }, centerTitle, scrollBehavior)` or `OpenCodeLargeTopBar("Title", TopAppBarDefaults.exitUntilCollapsedScrollBehavior())` instead of Material `TopAppBar`s; put the behaviour's `nestedScrollConnection` on the `Scaffold`.
 - Controls: `OpenCodePrimaryButton` / `OpenCodeSecondaryButton` (`role = Destructive` for red), `OpenCodeIconButton(SFSymbol.X, "Label", onClick)`, `Modifier.openCodeTapTarget()` after `clickable`.
 - Icons: `OpenCodeIcon(SFSymbol.ArrowUpCircleFill, contentDescription)` or `OpenCodeIcon("arrow.up", …)` / `sfSymbol(name)` for names held as strings. New icon: add a line to `scripts/material-symbols.txt`, run `python3 scripts/fetch-material-symbols.py`, add the `SFSymbol` entry and a row below.
 - TalkBack focus (`ui/AccessibilityFocus.kt`, moved down from `:feature:composer`'s `AttachmentMenu.kt`; one helper where VoiceOver moves by itself): `Modifier.accessibilityFocusRequest(request)` moves TalkBack's focus onto the element once per `AccessibilityFocusRequest` (after a window on top hands focus back); a request is spent by its move, so a recomposition, a remount or a session moved into Catch Up's stack never replays it (QA W-05); `rememberAccessibilityFocusRequest(event)` makes a new one for each new non-null `event`; `LocalAccessibilityFocusMoves` false (Catch Up's inert preview card) turns every move off; a move refused because the element isn't in the accessibility tree yet (fading in) tries again each frame for up to 1 s (QA AF-02: Catch Up's Leave was always refused and only TalkBack's own pick landed there); `Modifier.accessibilityFocusTarget(target)` + `AccessibilityFocusTarget.focus()` move it when the caller decides. Both mark their semantics node (ahead of any `clearAndSetSemantics`), find it in the view's tree and perform `ACTION_ACCESSIBILITY_FOCUS` through the view's accessibility node provider. Compose has no public accessibility-focus API and no public node → id mapping (`requireSemanticsInfo` is internal), so the tree comes from `RootForTest` in this one file.
