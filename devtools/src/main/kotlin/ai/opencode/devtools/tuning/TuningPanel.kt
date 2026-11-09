@@ -1,18 +1,21 @@
 package ai.opencode.devtools.tuning
 
-import ai.opencode.core.ui.OpenCodeSwitchDefaults
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.collectState
+import ai.opencode.core.tuning.TunableDescriptor
 import ai.opencode.core.tuning.TuneKind
 import ai.opencode.core.tuning.TuneValue
-import ai.opencode.core.tuning.TunableDescriptor
 import ai.opencode.core.tuning.TuningStore
 import ai.opencode.core.tuning.TuningTitle
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconSize
+import ai.opencode.core.ui.OpenCodeShape
+import ai.opencode.core.ui.OpenCodeSurfaces
+import ai.opencode.core.ui.OpenCodeSwitchDefaults
+import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
@@ -29,7 +32,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -45,6 +48,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.offset
@@ -54,19 +58,21 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.foundation.text.BasicText
-import androidx.compose.foundation.text.TextAutoSize
-import androidx.compose.ui.unit.sp
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
@@ -93,19 +99,12 @@ import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.selected
-import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.background
-import ai.opencode.core.ui.OpenCodeTextStyles
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
@@ -114,6 +113,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlin.math.PI
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
@@ -413,10 +413,10 @@ private fun PanelForm(
     val title = if (state.showsAll) "All" else tuning.context.displayTitle
     Surface(
         modifier = modifier.semantics { contentDescription = "Tuning Panel" },
-        shape = RoundedCornerShape(20.dp),
-        tonalElevation = 6.dp,
-        shadowElevation = 8.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = OpenCodeShape.panel,
+        color = OpenCodeSurfaces.color,
+        shadowElevation = 6.dp,
+        border = OpenCodeSurfaces.border,
     ) {
         Column(Modifier.width(width).heightIn(max = maxHeight)) {
             PanelHeader(store, state, title, changed, groups, drag)
@@ -517,10 +517,10 @@ private fun TuningPill(state: TuningFeature.State, expand: () -> Unit, modifier:
         contentAlignment = Alignment.Center,
     ) {
         Surface(
-            shape = CircleShape,
-            tonalElevation = 6.dp,
-            shadowElevation = 8.dp,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            shape = OpenCodeShape.control,
+            color = OpenCodeSurfaces.color,
+            shadowElevation = 6.dp,
+            border = OpenCodeSurfaces.border,
         ) {
             Row(
                 Modifier.height(34.dp).padding(horizontal = 12.dp),
@@ -559,11 +559,10 @@ private fun TuningTab(side: TuningPlacement.Side, pullOut: () -> Unit, modifier:
     ) {
         Surface(
             modifier = Modifier.size(TuningPlacementLayout.TAB_GLASS_WIDTH.dp, TuningPlacementLayout.TabSize.height.dp),
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            tonalElevation = 6.dp,
-            shadowElevation = 8.dp,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            shape = OpenCodeShape.control,
+            color = OpenCodeSurfaces.color,
+            shadowElevation = 6.dp,
+            border = OpenCodeSurfaces.border,
         ) {
             Box(contentAlignment = Alignment.Center) {
                 OpenCodeIcon(

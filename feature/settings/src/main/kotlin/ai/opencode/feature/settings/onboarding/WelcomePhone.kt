@@ -51,12 +51,14 @@ import kotlin.math.min
 
 private fun body(weight: FontWeight = FontWeight.Normal) = TextStyle(fontSize = 17.sp, lineHeight = 22.sp, fontWeight = weight)
 
-private val phoneText = Color.White
+private val phoneText = WelcomeInk.hex(0xEDEDED)
 private val phoneSecondary = WelcomeInk.label2
 private val phoneTertiary = WelcomeInk.label3
-/** The app's dark tonal surfaces standing in for iOS glass. */
-private val phoneSurface = WelcomeInk.hex(0x232326)
-private val phoneSurfaceHigh = WelcomeInk.hex(0x2C2C30)
+/** The app's dark canvas, composer surface, bubble fill and hairline (the desktop palette, as the session draws them). */
+private val phoneCanvas = WelcomeInk.hex(0x161616)
+private val phoneSurface = WelcomeInk.hex(0x1C1C1C)
+private val phoneSurfaceHigh = WelcomeInk.hex(0x2E2E2E)
+private val phoneHairline = WelcomeInk.hex(0x2D2D2D)
 
 /**
  * The phone's screen: this app's session in dark mode, at a logical 440 × 956 scaled into the
@@ -66,7 +68,7 @@ private val phoneSurfaceHigh = WelcomeInk.hex(0x2C2C30)
  */
 @Composable
 internal fun WelcomePhone(frame: WelcomeFrame, pairing: Float, reduced: Boolean, voice: WelcomeVoice, wall: Double, targets: WelcomeTargets?) {
-    Box(Modifier.requiredSize(WelcomePhone.size.width.dp, WelcomePhone.size.height.dp).background(Color.Black)) {
+    Box(Modifier.requiredSize(WelcomePhone.size.width.dp, WelcomePhone.size.height.dp).background(phoneCanvas)) {
         Box(Modifier.fillMaxSize().alpha(1 - pairing).welcomeBlur(if (reduced) 0f else 3f * pairing)) {
             Box(Modifier.fillMaxSize().alpha(frame.transcript.toFloat()).welcomeBlur(if (reduced || frame.loopBlur < 0.05) 0f else frame.loopBlur.toFloat())) {
                 PhoneTranscript(frame, reduced, wall, targets)
@@ -110,10 +112,10 @@ internal object WelcomePhone {
     const val GUTTER = 16f
     const val FLOW_HALF = 8f
 
-    /** The screenshot tile's corners (iOS `JustifiedImageRows.cornerRadius`). */
-    const val TILE_RADIUS = 14f
+    /** The screenshot tile's corners: the desktop card's 10 (iOS `JustifiedImageRows.cornerRadius` 14). */
+    const val TILE_RADIUS = 10f
 
-    /** The session header's circles (iOS `HeaderBlurTunables.buttonSize`). */
+    /** The session header's buttons (iOS `HeaderBlurTunables.buttonSize`). */
     const val BUTTON = 44f
 
     /** The composer's metrics (iOS `ComposerTunables`, `DictationBarPose.slot`). */
@@ -122,7 +124,8 @@ internal object WelcomePhone {
     const val INNER_VERTICAL = 6f
     const val TEXT_LEADING = 52f
     const val EXPANDED_TEXT_LEADING = 10f
-    const val CORNER = 26f
+    /** The composer's corners: the desktop dock's 12 (iOS 26). */
+    const val CORNER = 12f
     const val SLOT = 48f
 
     /** The agent's calls so far: reads, the browser, the edit, the screenshot (iOS `tools`). */
@@ -171,37 +174,31 @@ private fun PhoneStatusBar() {
     }
 }
 
-/** The session header's parts: the drawer and More circles and the title capsule (iOS `header`; Material surfaces for glass). */
+/**
+ * The session header as this app draws it on the desktop palette (iOS `header` has glass circles
+ * and a title capsule): the drawer and More icons on the canvas, the title and project beside them.
+ */
 @Composable
 private fun PhoneHeader(frame: WelcomeFrame) {
     val size = WelcomePhone.BUTTON
-    Box(Modifier.offset(y = WelcomePhone.HEADER_TOP.dp).fillMaxWidth().height(size.dp), contentAlignment = Alignment.Center) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(size.dp).background(phoneSurface, CircleShape), contentAlignment = Alignment.Center) {
-                OpenCodeIcon("line.3.horizontal", null, size = 20.dp, tint = phoneText)
-            }
-            Spacer(Modifier.weight(1f))
-            Box(Modifier.size(size.dp).background(phoneSurface, CircleShape), contentAlignment = Alignment.Center) {
-                OpenCodeIcon("ellipsis", null, size = 20.dp, tint = phoneText)
-            }
+    Row(
+        Modifier.offset(y = WelcomePhone.HEADER_TOP.dp).fillMaxWidth().height(size.dp).padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(size.dp), contentAlignment = Alignment.Center) {
+            OpenCodeIcon("line.3.horizontal", null, size = 22.dp, tint = phoneText)
         }
-        Column(
-            Modifier
-                .heightIn(min = size.dp)
-                .widthIn(max = 260.dp)
-                .background(phoneSurface, CircleShape)
-                .padding(horizontal = 18.dp, vertical = 3.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
+        Column(Modifier.weight(1f).padding(start = 8.dp), verticalArrangement = Arrangement.Center) {
             WelcomeStack(
                 labels = listOf("New Session", WelcomeStory.TITLE),
                 weights = if (frame.named) listOf(0.0, 1.0) else listOf(1.0, 0.0),
-                style = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
+                style = TextStyle(fontSize = 17.sp, lineHeight = 21.sp, fontWeight = FontWeight.Medium),
                 color = phoneText,
-                alignment = Alignment.Center,
             )
-            Text(WelcomeStory.PROJECT, style = TextStyle(fontSize = 12.sp), color = phoneText.copy(alpha = 0.75f), maxLines = 1)
+            Text(WelcomeStory.PROJECT, style = TextStyle(fontSize = 13.sp, lineHeight = 16.sp), color = phoneSecondary, maxLines = 1)
+        }
+        Box(Modifier.size(size.dp), contentAlignment = Alignment.Center) {
+            OpenCodeIcon("ellipsis", null, size = 20.dp, tint = phoneText)
         }
     }
 }
@@ -268,7 +265,7 @@ private fun UserBubble(text: String, modifier: Modifier) {
             color = phoneText,
             modifier = Modifier
                 .widthIn(max = 320.dp)
-                .background(phoneSurfaceHigh, RoundedCornerShape(20.dp))
+                .background(phoneSurfaceHigh, RoundedCornerShape(10.dp))
                 .padding(horizontal = 14.dp, vertical = 9.dp),
         )
     }
@@ -325,6 +322,7 @@ private fun PhoneComposer(frame: WelcomeFrame, reduced: Boolean, voice: WelcomeV
             Modifier
                 .width(width.dp)
                 .background(phoneSurface, RoundedCornerShape(WelcomePhone.CORNER.dp))
+                .border(1.dp, phoneHairline, RoundedCornerShape(WelcomePhone.CORNER.dp))
                 .padding(horizontal = WelcomePhone.INNER.dp, vertical = WelcomePhone.INNER_VERTICAL.dp),
         ) {
             Box(Modifier.fillMaxWidth().height(line.dp).alpha((frame.draft * frame.lines).toFloat()).clip(androidx.compose.ui.graphics.RectangleShape), contentAlignment = Alignment.BottomStart) {
@@ -343,7 +341,7 @@ private fun PhoneComposer(frame: WelcomeFrame, reduced: Boolean, voice: WelcomeV
                         Box(
                             Modifier
                                 .size(34.dp)
-                                .background(Color.White.copy(alpha = 0.12f * dictation), CircleShape)
+                                .background(Color.White.copy(alpha = 0.12f * dictation), RoundedCornerShape(8.dp))
                                 .graphicsLayer { rotationZ = 45 * dictation },
                             contentAlignment = Alignment.Center,
                         ) { OpenCodeIcon("plus", null, size = 22.dp, tint = phoneText) }
@@ -369,7 +367,7 @@ private fun PhoneComposer(frame: WelcomeFrame, reduced: Boolean, voice: WelcomeV
                             },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Box(Modifier.requiredSize(34.dp).background(Color.White, CircleShape), contentAlignment = Alignment.Center) {
+                        Box(Modifier.requiredSize(34.dp).background(Color.White, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
                             Box(Modifier.size(11.dp).background(Color.Black, RoundedCornerShape(2.dp)))
                         }
                     }
@@ -435,12 +433,12 @@ private fun PhoneScanner(modifier: Modifier) {
                 drawContent()
             },
     ) {
-        Box(Modifier.offset(16.dp, WelcomePhone.HEADER_TOP.dp).size(WelcomePhone.BUTTON.dp).background(phoneSurface, CircleShape), contentAlignment = Alignment.Center) {
+        Box(Modifier.offset(16.dp, WelcomePhone.HEADER_TOP.dp).size(WelcomePhone.BUTTON.dp).background(phoneSurface, RoundedCornerShape(10.dp)).border(1.dp, phoneHairline, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
             OpenCodeIcon("xmark", null, size = 18.dp, tint = phoneText)
         }
         Box(Modifier.offset(90.dp, 330.dp).size(260.dp), contentAlignment = Alignment.Center) {
             Canvas(Modifier.fillMaxSize()) {
-                drawPath(WelcomeViewfinderCorners.path(Rect(Offset.Zero, size), 24.dp.toPx()), Color.White, style = Stroke(4.dp.toPx(), cap = StrokeCap.Round))
+                drawPath(WelcomeViewfinderCorners.path(Rect(Offset.Zero, size), 12.dp.toPx()), Color.White, style = Stroke(2.5.dp.toPx(), cap = StrokeCap.Round))
             }
             Box(
                 Modifier

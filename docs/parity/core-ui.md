@@ -62,6 +62,12 @@ the OpenCode desktop design system (`packages/ui`, theme `oc-2`), not iOS's SF /
   once content scrolls under it (always shown without a scroll behaviour). `OpenCodeLargeTopBar`
   is the large-title variant (title1 under the row; Material's `exitUntilCollapsed` behaviour
   scrolls it away and fades the small title in), used by Settings pages.
+- Camera screens (pairing scanner, composer camera) are always dark and keep the phone-camera
+  conventions where the desktop's shapes look worse over a live photo: round translucent
+  controls with a faint white hairline, a rounded-square viewfinder (16 dp, white stroke, scene
+  dimmed outside it). Their bars, panels and hint text use the desktop tokens.
+- Welcome illustration: the phone mock depicts the restyled Android app (flat header, desktop
+  greys, hairline composer) rather than the iOS app's glass chrome.
 Paths below are relative to `core/src/main/kotlin/ai/opencode/core/`.
 
 ## Files
