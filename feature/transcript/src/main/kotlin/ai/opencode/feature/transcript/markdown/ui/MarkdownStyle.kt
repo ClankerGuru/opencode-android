@@ -73,7 +73,7 @@ class MarkdownStyle(
     }
 
     fun headingWeight(level: Int): FontWeight = when (level) {
-        1 -> FontWeight.Bold
+        1 -> FontWeight.SemiBold
         2 -> FontWeight.SemiBold
         3 -> tuning.h3Weight
         else -> FontWeight.SemiBold
@@ -116,12 +116,12 @@ class MarkdownStyle(
         val listIndent: Dp = 20.dp
 
         /** The default body size, for surfaces without a tuning snapshot (display math). */
-        val bodyTextSize: TextUnit = 17.sp
+        val bodyTextSize: TextUnit = 15.sp
 
         /** iOS `TranscriptMetrics.codeFont` (`.subheadline.monospaced()`) with `codeLeading` (3) between lines. */
-        fun codeTextStyle(codeLeading: Float = 3f): TextStyle = OpenCodeTextStyles.subheadline.copy(
+        fun codeTextStyle(codeLeading: Float = 3f): TextStyle = OpenCodeTextStyles.footnote.copy(
             fontFamily = OpenCodeFonts.monospace,
-            lineHeight = (20f + codeLeading).sp,
+            lineHeight = (18f + codeLeading).sp,
             lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Proportional, LineHeightStyle.Trim.Both),
             lineBreak = LineBreak.Simple,
             hyphens = Hyphens.None,
