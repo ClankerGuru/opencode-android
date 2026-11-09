@@ -49,10 +49,10 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -249,8 +249,9 @@ private fun PairingViewfinder(modifier: Modifier = Modifier) {
 }
 
 /**
- * The viewfinder: one rounded square with the desktop's sheet radius, and the scene outside it dimmed
- * slightly so the window reads on any scene.
+ * The viewfinder: four bold corner marks around a window with the desktop's sheet radius, and the
+ * scene outside the window dimmed. The marks sit just outside the window, on the dimmed scene, so
+ * they stay legible over bright scenes.
  */
 private fun DrawScope.drawViewfinder(color: Color) {
     val radius = OpenCodeRadius.sheet.toPx()
@@ -259,15 +260,34 @@ private fun DrawScope.drawViewfinder(color: Color) {
         addRect(Rect(-size.width * 8, -size.height * 8, size.width * 9, size.height * 9))
         addRoundRect(RoundRect(Rect(Offset.Zero, size), CornerRadius(radius)))
     }
-    drawPath(dim, Color.Black.copy(alpha = 0.35f))
-    val stroke = 3.dp.toPx()
-    drawRoundRect(
-        color = color,
-        topLeft = Offset(stroke / 2, stroke / 2),
-        size = Size(size.width - stroke, size.height - stroke),
-        cornerRadius = CornerRadius(radius - stroke / 2),
-        style = Stroke(width = stroke),
-    )
+    drawPath(dim, Color.Black.copy(alpha = 0.4f))
+
+    val stroke = 5.dp.toPx()
+    val arm = 44.dp.toPx()
+    // The stroke's centre line runs half a stroke outside the window edge.
+    val left = -stroke / 2
+    val top = -stroke / 2
+    val right = size.width + stroke / 2
+    val bottom = size.height + stroke / 2
+    val r = radius + stroke / 2
+    val corners = Path()
+    // Top left
+    corners.moveTo(left, top + arm)
+    corners.arcTo(Rect(left, top, left + 2 * r, top + 2 * r), 180f, 90f, false)
+    corners.lineTo(left + arm, top)
+    // Top right
+    corners.moveTo(right - arm, top)
+    corners.arcTo(Rect(right - 2 * r, top, right, top + 2 * r), 270f, 90f, false)
+    corners.lineTo(right, top + arm)
+    // Bottom right
+    corners.moveTo(right, bottom - arm)
+    corners.arcTo(Rect(right - 2 * r, bottom - 2 * r, right, bottom), 0f, 90f, false)
+    corners.lineTo(right - arm, bottom)
+    // Bottom left
+    corners.moveTo(left + arm, bottom)
+    corners.arcTo(Rect(left, bottom - 2 * r, left + 2 * r, bottom), 90f, 90f, false)
+    corners.lineTo(left, bottom - arm)
+    drawPath(corners, color, style = Stroke(width = stroke, cap = StrokeCap.Round))
 }
 
 @Composable

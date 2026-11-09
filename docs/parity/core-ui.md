@@ -66,8 +66,8 @@ the OpenCode desktop design system (`packages/ui`, theme `oc-2`), not iOS's SF /
   scrolls it away and fades the small title in), used by Settings pages.
 - Camera screens (pairing scanner, composer camera) are always dark and keep the phone-camera
   conventions where the desktop's shapes look worse over a live photo: round translucent
-  controls with a faint white hairline, a rounded-square viewfinder (16 dp, white stroke, scene
-  dimmed outside it). Their bars, panels and hint text use the desktop tokens.
+  controls with a faint white hairline, and four bold round-capped viewfinder corners (5 dp,
+  44 dp arms, following the 16 dp window radius just outside the window, scene dimmed outside it). Their bars, panels and hint text use the desktop tokens.
 - Welcome illustration: the phone mock depicts the restyled Android app (flat header, desktop
   greys, hairline composer) rather than the iOS app's glass chrome.
 Paths below are relative to `core/src/main/kotlin/ai/opencode/core/`.

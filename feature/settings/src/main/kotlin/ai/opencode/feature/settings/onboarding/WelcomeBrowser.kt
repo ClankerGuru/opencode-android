@@ -47,7 +47,7 @@ private fun mono(size: Float, weight: FontWeight = FontWeight.Normal) =
  * The OpenCode website (`opencode.ai`) in dark mode, as the laptop's browser shows it on
  * `localhost:3000` (iOS `WelcomeSitePage`): warm dark canvas, architectural grid rails, the pixel
  * wordmark, monospace hero, install command, and the platform CTA that [grow] expands from a
- * modest desktop chip (0) into a full-width “Download for iPhone” button (1).
+ * modest desktop chip (0) into a full-width “Download for Android” button (1).
  */
 @Composable
 internal fun WelcomeSitePage(modifier: Modifier = Modifier, grow: Double = 1.0, sheen: Double = 0.0) {
@@ -162,7 +162,7 @@ private fun CtaButton(grow: Double, sheen: Double) {
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp).alpha(afterIn), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             OpenCodeIcon("platter.filled.top.iphone", null, size = 10.5.dp, tint = WelcomeSitePage.canvas)
-            Text("Download for iPhone", fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold, color = WelcomeSitePage.canvas, maxLines = 1, softWrap = false)
+            Text("Download for Android", fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold, color = WelcomeSitePage.canvas, maxLines = 1, softWrap = false)
             Spacer(Modifier.weight(1f))
             Text(
                 "couch-ready →",

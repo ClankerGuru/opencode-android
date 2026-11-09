@@ -50,7 +50,7 @@ val TuningContext.Companion.welcome: TuningContext get() = TuningContext("welcom
 /**
  * The story the scene tells, as times in story seconds (iOS `WelcomeStory`): the person dictates
  * a task on the phone and sends it; OpenCode on the laptop reads the repo, opens OpenCode's own
- * dark-mode site in a browser, edits `Hero.tsx`, watches the “Download for iPhone” button spring
+ * dark-mode site in a browser, edits `Hero.tsx`, watches the “Download for Android” button spring
  * open and takes a screenshot; the screenshot and reply land on the phone; the person dictates
  * “Ship it” and the laptop runs `git push`. Every frame is a pure function of time, so the loop
  * never accumulates state and Reduce Motion draws the proof moment.
@@ -212,10 +212,10 @@ data class WelcomeStory(
     }
 
     companion object {
-        const val PROMPT = "Add an iPhone download button and show me"
+        const val PROMPT = "Add an Android download button and show me"
         const val SHIP_IT = "Ship it"
-        const val REPLY = "Done: added the Download for iPhone button to `Hero.tsx` on the home page."
-        const val TITLE = "Download for iPhone"
+        const val REPLY = "Done: added the Download for Android button to `Hero.tsx` on the home page."
+        const val TITLE = "Download for Android"
         const val PROJECT = "opencode"
         val PROMPT_WORDS = words(PROMPT)
         val SHIP_WORDS = words(SHIP_IT)
