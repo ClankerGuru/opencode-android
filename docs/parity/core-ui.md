@@ -17,9 +17,13 @@ the OpenCode desktop design system (`packages/ui`, theme `oc-2`), not iOS's SF /
 - Colour: `AppTheme.OpenCode` is `BrandPalette` (desktop v2 neutrals, monochrome contrast
   accent, blue links; five light values darkened just enough for WCAG AA) and is the default
   theme. Curated themes keep their palettes; System is Material You. For curated themes
-  `surfaceContainerLow`/`surfaceContainer` are the desktop floating surface (canvas in light,
-  code band in dark) and `surfaceTint` is transparent, so Material sheets, menus and
-  tooltips are flat. `OpenCodeColors.strongBorders`: hairlines use `borderStrong` under
+  `surfaceContainerLow`/`surfaceContainer` are the desktop floating surface (canvas in light;
+  in dark the code band lifted a third of the way to the user bubble, `darkFloatingFill`, about
+  `#222222` in `BrandPalette`) and `surfaceTint` is transparent, so Material sheets, menus and
+  tooltips are flat. `OpenCodeColors.signal` (the link blue; desktop `--v2-background-bg-accent`)
+  colours unread and new-item marks, since the brand `accent` is neutral; `OpenCodeColors.danger`
+  (`diffRemovedText`, desktop `--v2-state-fg-danger`) colours failure text and glyphs, while
+  `destructive` stays systemRed for destructive actions and fills. `OpenCodeColors.strongBorders`: hairlines use `borderStrong` under
   Increase Contrast or Android's High contrast text (`rememberHighContrastText`).
 - Shapes: `OpenCodeRadius` xs 4, sm 6, fill/control 8, card/tile 10, panel 12, sheet 16;
   Material `Shapes` extraSmall 6, small 6, medium 8, large 10, extraLarge 16;
