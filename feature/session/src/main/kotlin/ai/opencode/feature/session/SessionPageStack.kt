@@ -11,6 +11,8 @@ import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.touch.TouchRecovery
 import ai.opencode.core.touch.rememberTouchRecovery
 import ai.opencode.core.ui.BackSwipeRules
+import ai.opencode.core.ui.DrawerPanExclusion
+import ai.opencode.core.ui.LocalDrawerPanExclusion
 import ai.opencode.core.ui.OpenCodeTheme
 import androidx.activity.BackEventCompat
 import androidx.activity.OnBackPressedDispatcher
@@ -26,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
@@ -40,12 +43,15 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.input.pointer.util.addPointerInputChange
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -181,13 +187,23 @@ fun SessionPageStack(
     val density = LocalDensity.current
     val canvas = OpenCodeTheme.colors.canvas
     val panEnabled by rememberUpdatedState(enabled)
+    val drawerExclusion = LocalDrawerPanExclusion.current
+    val pageScrollers = remember { HashMap<Any, PageHorizontalScrollers>() }
+    val stackCoordinates = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    val topScrollerClaims: (Offset) -> Boolean = { point ->
+        val stack = stackCoordinates[0]
+        val topKey: Any = motion.pages.lastOrNull()?.id ?: ROOT_KEY
+        val scrollers = pageScrollers[topKey]
+        stack != null && scrollers != null && scrollers.claimsBackSwipe(stack, point)
+    }
 
     Box(
         modifier
             .clipToBounds()
             .onSizeChanged { motion.width = with(density) { it.width.toDp().value } }
+            .onGloballyPositioned { stackCoordinates[0] = it }
             .pointerInput(motion, rtl) {
-                backPan(motion, rtl) { panEnabled }
+                backPan(motion, rtl, topScrollerClaims) { panEnabled }
             },
     ) {
         val count = mounted.size + 1
@@ -196,6 +212,13 @@ fun SessionPageStack(
             val stateKey: Any = page?.id ?: ROOT_KEY
             key(stateKey) {
                 val isTop = index == count - 1
+                val scrollers = remember(drawerExclusion) { PageHorizontalScrollers(drawerExclusion) }
+                DisposableEffect(scrollers) {
+                    pageScrollers[stateKey] = scrollers
+                    onDispose {
+                        if (pageScrollers[stateKey] === scrollers) pageScrollers.remove(stateKey)
+                    }
+                }
                 val isBeneath = index == count - 2
                 val visible = isTop || (isBeneath && motion.beneathShown)
                 val semantics = when {
@@ -252,7 +275,7 @@ fun SessionPageStack(
                 ) {
                     val owner = if (isTop) realOwner else inertOwner
                     val provided = if (owner != null) arrayOf(LocalOnBackPressedDispatcherOwner provides owner) else emptyArray()
-                    CompositionLocalProvider(*provided) {
+                    CompositionLocalProvider(LocalDrawerPanExclusion provides scrollers, *provided) {
                         holder.SaveableStateProvider(stateKey) {
                             if (page == null) root() else content(page)
                         }
@@ -274,6 +297,45 @@ private fun sharedAxisAlpha(distance: Float, incoming: Boolean): Float {
     return alpha.coerceIn(0f, 1f)
 }
 
+/**
+ * One page's horizontal scrollers (code, tables, attachments), also passed on to the drawer's
+ * regions: the back pan leaves a rightward drag to a scroller on the top page that can still
+ * scroll back toward its start (iOS `BackSwipeRules.scrollerClaims`). Covered pages stay laid
+ * out under the top one, so each page keeps its own.
+ */
+private class PageHorizontalScrollers(private val drawer: DrawerPanExclusion?) : DrawerPanExclusion {
+    private class Scroller(val coordinates: LayoutCoordinates, val canScrollBackward: () -> Boolean)
+
+    private val scrollers = HashMap<Any, Scroller>()
+
+    override fun updateExclusion(id: Any, coordinates: LayoutCoordinates?) {
+        drawer?.updateExclusion(id, coordinates)
+    }
+
+    override fun updateHorizontalScroller(
+        id: Any,
+        coordinates: LayoutCoordinates?,
+        canScrollBackward: () -> Boolean,
+        canScrollForward: () -> Boolean,
+    ) {
+        drawer?.updateHorizontalScroller(id, coordinates, canScrollBackward, canScrollForward)
+        if (coordinates == null) scrollers.remove(id) else scrollers[id] = Scroller(coordinates, canScrollBackward)
+    }
+
+    /** Whether a scroller under [point] (px in [stack]) can still scroll back toward its start. */
+    fun claimsBackSwipe(stack: LayoutCoordinates, point: Offset): Boolean {
+        if (!stack.isAttached) return false
+        for (scroller in scrollers.values) {
+            val region = scroller.coordinates
+            if (!region.isAttached) continue
+            val local = region.localPositionOf(stack, point)
+            val inside = local.x >= 0 && local.y >= 0 && local.x < region.size.width && local.y < region.size.height
+            if (inside && scroller.canScrollBackward()) return true
+        }
+        return false
+    }
+}
+
 /** What moves the top page: a push, a pop, or a back gesture (drag, then its settle). */
 internal enum class StackTransition { Push, Pop, Back }
 
@@ -282,14 +344,16 @@ private const val ROOT_KEY = "ai.opencode.session.stack.root"
 
 /**
  * The rightward back pan over a pushed page (iOS `BackPanGestureRecognizer`), from anywhere,
- * under [BackSwipeRules]: an edge touch always takes it; elsewhere a drag already claimed by
- * content under the finger (a horizontal scroller, a slider) or begun after a rest keeps doing
- * that. It watches after the content (main pass) until it chooses, then takes the touch (initial
+ * under [BackSwipeRules]: an edge touch always takes it; elsewhere a touch on a horizontal
+ * scroller that can still scroll back ([scrollerClaims], decided at touch-down as iOS does), a
+ * drag already claimed by content under the finger (a slider), or one begun after a rest keeps
+ * doing that. It watches after the content (main pass) until it chooses, then takes the touch (initial
  * pass, consuming), so content under the finger lets go.
  */
 private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.backPan(
     motion: SessionPageStackMotion,
     rtl: Boolean,
+    scrollerClaims: (Offset) -> Boolean,
     enabled: () -> Boolean,
 ) {
     val direction = if (rtl) -1f else 1f
@@ -301,7 +365,7 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.backPan(
         val decisionPx = BackSwipeRules.decisionDistance.toPx()
         val tracker = VelocityTracker()
         tracker.addPointerInputChange(down)
-        var claimed = down.isConsumed
+        var claimed = down.isConsumed || scrollerClaims(down.position)
         while (true) {
             val event = awaitPointerEvent(PointerEventPass.Main)
             val change = event.changes.firstOrNull { it.id == down.id } ?: return@awaitEachGesture

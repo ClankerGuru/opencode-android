@@ -69,7 +69,6 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.addOutline
@@ -319,25 +318,37 @@ private fun UserBubbleFoldView(
         contents = listOf(
             {
                 Box(
-                    Modifier
-                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                        .drawWithContent {
+                    Modifier.drawWithContent {
+                        if (!folds[0] || currentFold.isExpanded) {
                             drawContent()
-                            if (folds[0] && !currentFold.isExpanded) {
-                                val end = metrics.folded
-                                val start = max(0f, end - fadePx)
-                                drawRect(
-                                    Brush.verticalGradient(
-                                        0f to Color.Black,
-                                        (start / end) to Color.Black,
-                                        1f to Color.Transparent,
-                                        startY = 0f,
-                                        endY = end,
-                                    ),
-                                    blendMode = BlendMode.DstIn,
-                                )
-                            }
-                        },
+                            return@drawWithContent
+                        }
+                        // The fade masks a layer only as tall as the folded text. A layer as tall
+                        // as the whole text can be bigger than the GPU's largest texture; Android
+                        // then draws it without the layer, and the mask erases the window to black.
+                        val end = metrics.folded
+                        val start = max(0f, end - fadePx)
+                        val shown = Rect(0f, 0f, size.width, end)
+                        drawIntoCanvas { canvas ->
+                            canvas.save()
+                            canvas.clipRect(shown)
+                            canvas.saveLayer(shown, Paint())
+                            drawContent()
+                            drawRect(
+                                Brush.verticalGradient(
+                                    0f to Color.Black,
+                                    (start / end) to Color.Black,
+                                    1f to Color.Transparent,
+                                    startY = 0f,
+                                    endY = end,
+                                ),
+                                size = shown.size,
+                                blendMode = BlendMode.DstIn,
+                            )
+                            canvas.restore()
+                            canvas.restore()
+                        }
+                    },
                 ) { content() }
             },
             {
