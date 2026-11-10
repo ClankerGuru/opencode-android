@@ -25,6 +25,12 @@ the OpenCode desktop design system (`packages/ui`, theme `oc-2`), not iOS's SF /
   (`diffRemovedText`, desktop `--v2-state-fg-danger`) colours failure text and glyphs, while
   `destructive` stays systemRed for destructive actions and fills. `OpenCodeColors.strongBorders`: hairlines use `borderStrong` under
   Increase Contrast or Android's High contrast text (`rememberHighContrastText`).
+  Desktop accents for controls (`DesktopAccent`, exact `theme.css` hex): `selection`
+  (`--v2-background-bg-accent` `#3B5CF6`, white `onSelection`) fills on switches,
+  radio/check marks and slider tracks (segmented controls stay neutral, as on the desktop); `focusRing` (`--v2-border-border-focus`
+  `#7698FD`) is the text field focus border; `rowDivider` (`--v2-border-border-base`, black or
+  white at 10 %) parts rows in a card. Named themes use their own accent (contrast-picked
+  foreground), System the dynamic primary. Primary buttons stay neutral.
 - Shapes: `OpenCodeRadius` xs 4, sm 6, fill/control 8, card/tile 10, panel 12, sheet 16;
   Material `Shapes` extraSmall 6, small 6, medium 8, large 10, extraLarge 16;
   `OpenCodeShape.control` (8) for buttons, pills and fields; capsule/circle only for true
@@ -38,7 +44,7 @@ the OpenCode desktop design system (`packages/ui`, theme `oc-2`), not iOS's SF /
   checkmark, 150 ms slides, half opacity disabled, press widens the thumb (desktop hover).
   Off is light like the desktop (quiet `surfaceContainerHighest` track, light thumb with a
   faint edge); its outline (row colour 85 % of the way to `tertiaryText`, full under high
-  contrast) carries the 3:1 contrast. On is `primary` / `onPrimary`; System uses Material You.
+  contrast) carries the 3:1 contrast. On is `selection` / `onSelection`; System uses Material You.
   `OpenCodeSheetHandle` is every bottom sheet's drag handle: the desktop resize handle's
   40 × 4 dp pill in `tertiaryText` over Material's `DragHandle` (its band and TalkBack
   actions stay); custom grabbers use `OpenCodeSheetHandleDefaults`. Sheets take
