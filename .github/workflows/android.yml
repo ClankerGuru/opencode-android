@@ -24,6 +24,10 @@ jobs:
   check:
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 60
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
     env:
       OC_VERSION_CODE: ${{ github.run_number }}
     steps:
@@ -66,12 +70,29 @@ jobs:
           path: opencode-android-${{ env.OC_VERSION_SUFFIX }}.apk
           retention-days: 30
 
+      - name: Configure AWS credentials
+        if: github.ref_type == 'tag'
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::604439173067:role/github/opencode-android-release
+          role-session-name: opencode-android-${{ github.run_id }}
+          aws-region: us-east-1
+
+      - name: Fetch the release secrets
+        if: github.ref_type == 'tag'
+        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        with:
+          secret-ids: |
+            ANDROID_UPLOAD_KEYSTORE_BASE64,opencode-android/release/ANDROID_UPLOAD_KEYSTORE_BASE64
+            ANDROID_UPLOAD_KEYSTORE_PASSWORD,opencode-android/release/ANDROID_UPLOAD_KEYSTORE_PASSWORD
+          parse-json-secrets: false
+
       - name: Build the Play release bundle
         if: github.ref_type == 'tag'
         env:
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
-          OC_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
-          OC_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          KEYSTORE_BASE64: ${{ env.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          OC_UPLOAD_KEYSTORE_PASSWORD: ${{ env.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          OC_UPLOAD_KEY_ALIAS: ${{ vars.ANDROID_UPLOAD_KEY_ALIAS }}
         run: |
           if [ -z "$KEYSTORE_BASE64" ]; then
             echo "::notice::No Play upload key secrets; skipping the release bundle."
@@ -140,11 +161,27 @@ jobs:
     needs: check
     if: github.ref_type == 'tag'
     runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
     concurrency:
       group: play-internal
-    env:
-      PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
     steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::604439173067:role/github/opencode-android-release
+          role-session-name: opencode-android-play-${{ github.run_id }}
+          aws-region: us-east-1
+
+      - name: Fetch the Play service account
+        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        with:
+          secret-ids: |
+            PLAY_SERVICE_ACCOUNT_JSON,opencode-android/release/PLAY_SERVICE_ACCOUNT_JSON
+          parse-json-secrets: false
+
       - name: Short SHA
         run: |
           echo "SHORT=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
@@ -165,7 +202,7 @@ jobs:
         if: env.SHIP == 'true'
         uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
         with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          serviceAccountJsonPlainText: ${{ env.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: ai.opencode.mobilecode
           releaseFiles: opencode-android-${{ env.SHORT }}.aab
           mappingFile: opencode-android-${{ env.SHORT }}-mapping.txt
