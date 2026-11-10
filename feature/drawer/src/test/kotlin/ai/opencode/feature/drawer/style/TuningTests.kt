@@ -51,7 +51,8 @@ class DrawerSpacingTests {
         // Android diverges from iOS on purpose: the drawer follows the OpenCode desktop sidebar
         // (6 dp row radius, 14 sp subheadline rows). Everything else is iOS's.
         val shipped: List<Triple<String, Dp, Float>> = listOf(
-            Triple("drawer.row.height", DrawerTunables.rowHeight, 44f),
+            // Android: 48 dp rows, the platform's minimum touch target (iOS 44 pt).
+            Triple("drawer.row.height", DrawerTunables.rowHeight, 48f),
             Triple("drawer.row.gap", DrawerTunables.rowGap, 0f),
             Triple("drawer.row.edge", DrawerTunables.rowEdge, 10f),
             Triple("drawer.row.textInset", DrawerTunables.textInset, 10f),
@@ -102,7 +103,7 @@ class DrawerSpacingTests {
         assertEquals(12.dp, DrawerMetrics.trailingInset)
         assertEquals(20.dp, DrawerMetrics.leadingEdge)
         assertEquals(6.dp, DrawerMetrics.rowCornerRadius)
-        assertEquals(44.dp, DrawerMetrics.rowHeight)
+        assertEquals(48.dp, DrawerMetrics.rowHeight)
     }
 
     @Test

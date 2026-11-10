@@ -221,8 +221,8 @@ object DrawerTunables {
     }
 
     // Spacing (DrawerStyle.swift). The leading edge is derived (`rowEdge + textInset`).
-    /** Row height. */
-    val rowHeight: Dp = 44.dp
+    /** Row height: Android's 48 dp minimum touch target (iOS 44 pt); rows touch, so the row is the target. */
+    val rowHeight: Dp = 48.dp
     /** Gap between rows. */
     val rowGap: Dp = 0.dp
     /** Highlight from the sides. */

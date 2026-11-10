@@ -10,6 +10,7 @@ import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.RollingNumberAlignment
 import ai.opencode.core.ui.RollingNumberStyle
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.drawer.style.DrawerMetrics
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -303,7 +304,7 @@ fun DrawerCatchUpFinishedLabel(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 44.dp)
+            .heightIn(min = DrawerMetrics.rowHeight)
             .clip(shape)
             .drawBehind {
                 val frame = frameState.value
