@@ -5,14 +5,19 @@ Pushing `main` doesn't release to Play. Push and release only when Ryan asks or 
 
 ## Cutting a release
 
-From a green `main` commit:
+`.github/workflows/scheduled-release.yml` releases `main` at noon and 6 p.m. Central, as iOS
+does, unless `main` already has a `v*` tag or its commit hasn't passed `android.yml` on `main`
+(a run still going waits for the next release time). A tag created with the workflow's token
+doesn't start other workflows, so it then runs `android.yml` on the tag itself. Run it now with
+`gh workflow run scheduled-release.yml -R anomalyco/opencode-android`. Every release reaches
+open testers, so cut one by hand only for an urgent fix, from a green `main` commit:
 
 ```sh
 gh release create "v$(scripts/version.sh <sha>)" --target "$(git rev-parse <sha>)" --generate-notes
 ```
 
-(`--target` needs the full SHA.) The `v*` tag starts `.github/workflows/android.yml`, which,
-after `scripts/check.sh` passes:
+(`--target` needs the full SHA.) The `v*` tag starts `.github/workflows/android.yml`, which
+skips `scripts/check.sh` when that commit already passed on `main` (otherwise runs it first), then:
 
 1. **Google Play internal testing.** Builds `:app:bundleRelease` signed with the Play upload key
    and uploads it to the internal testing track (`play` job), released to every tester at

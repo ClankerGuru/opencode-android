@@ -6,7 +6,8 @@ CI (`.github/workflows/android.yml`) runs `scripts/check.sh` on every PR and pus
 `main` only publishes the debug APK as the `main-latest` pre-release. As on iOS, releases go
 through GitHub Releases only: `gh release create "v$(scripts/version.sh <sha>)" --target
 "$(git rev-parse <sha>)" --generate-notes` ships to Google Play internal testing (and open
-testing once `PLAY_OPEN_TESTING` is on). Release only when Ryan asks
+testing once `PLAY_OPEN_TESTING` is on). `scheduled-release.yml` releases `main` at noon and
+6 p.m. Central, as on iOS; cut one by hand only when Ryan asks
 ([docs/releasing.md](docs/releasing.md)).
 
 ## The iOS app is the source of truth
@@ -20,10 +21,17 @@ testing once `PLAY_OPEN_TESTING` is on). Release only when Ryan asks
   still make sense so the two codebases diff side by side.
 - Track every iOS file in `docs/parity/<area>.md` (see [docs/parity/README.md](docs/parity/README.md))
   and update the row in the same commit.
-- Visuals are Android-native: Material 3 Expressive components and surfaces (Liquid Glass →
-  M3 surfaces/tonal elevation, SF Symbols → Material Symbols via `OpenCodeIcons`, SF → Roboto;
-  BerkeleyMono only for onboarding brand marks). No glass/blur imitation, no web views as the
-  app shell, no React Native/Flutter/KMP UI.
+- Visuals follow the OpenCode desktop design system (`packages/ui` in the opencode repo), not
+  iOS: Inter for UI text and IBM Plex Mono for code and tool output (bundled, OFL), the
+  desktop's type scale in sp, flat surfaces with hairline borders instead of tonal elevation
+  or glass, small radii (`OpenCodeRadius`, `OpenCodeShape.control`), the desktop palette as
+  the default theme (`BrandPalette`). Use `core/ui` tokens and `OpenCodeSurfaces`
+  (`OpenCodeAlertDialog`, floating fill + `openCodeHairline`) rather than raw Material
+  colours or capsules. Behaviour stays Android: Material components' structure, system back
+  and predictive back, sheets, IME, TalkBack semantics, ≥48 dp targets and font scaling.
+  Android looks different from iOS on purpose; behaviour, flows and copy still follow iOS.
+  SF Symbols → Material Symbols via `OpenCodeIcons`; BerkeleyMono only for the wordmark. No
+  glass/blur imitation, no web views as the app shell, no React Native/Flutter/KMP UI.
 
 ## Modules (fixed; never edit `settings.gradle.kts`)
 
@@ -86,14 +94,17 @@ already wired by its parent; keep those names.
   (composables). Same rules as iOS (answer the press; navigation and closing stay quiet).
 - Design system (`ai.opencode.core.ui`, `ai.opencode.core.motion`; details in
   `docs/parity/core-ui.md`): wrap roots in `OpenCodeAppTheme {}`; iOS semantic colours via
-  `OpenCodeTheme.colors.*`, M3 roles via `MaterialTheme.colorScheme`; iOS text styles via
-  `OpenCodeTextStyles.*` or `MaterialTheme.typography`; `OpenCodeShape`/`OpenCodeRadius`/
-  `OpenCodeSpacing`; iOS springs via `Motion.*.spec()` (respects reduce motion).
+  `OpenCodeTheme.colors.*` (`border` follows high contrast), M3 roles via
+  `MaterialTheme.colorScheme`; text styles under iOS names via `OpenCodeTextStyles.*` (desktop
+  sizes) or `MaterialTheme.typography`; `OpenCodeShape`/`OpenCodeRadius`/`OpenCodeSpacing`;
+  floating panels, dialogs and popovers via `OpenCodeSurfaces`; iOS springs via
+  `Motion.*.spec()` (respects reduce motion).
 - Icons: `OpenCodeIcon(SFSymbol.X, contentDescription)` or `OpenCodeIcon("sf.name", …)`. To add
   one: a line in `scripts/material-symbols.txt`, run `python3 scripts/fetch-material-symbols.py`,
   add the `SFSymbol` entry and the core-ui.md row (the coordinator commits shared files).
 - Buttons: `OpenCodePrimaryButton` (Next/Send), `OpenCodeSecondaryButton` (Back/Skip); red only
-  for destructive roles. Touch targets ≥ 48dp (`Modifier.openCodeTapTarget`, after `clickable`),
+  for destructive roles. A raw Material `Button` takes `shape = OpenCodeShape.control` (Material
+  defaults to a capsule); dialogs use `OpenCodeAlertDialog`. Touch targets ≥ 48dp (`Modifier.openCodeTapTarget`, after `clickable`),
   `OpenCodeIconButton` for icon controls.
 - Unfinished features stay behind Experimental, off by default, as on iOS.
 
@@ -111,6 +122,7 @@ Add a new library only with a one-line justification here.
   AVFoundation QR metadata output does; pure Java, no Play services (ML Kit would need them).
 - `androidx.media3:media3-exoplayer` (voice): plays an agent's audio on a call (iOS `CallAudioPlayer` uses AVAudioPlayerNode on the call's engine); ExoPlayer streams and decodes what MediaPlayer can't, on the call's voice-communication attributes.
 - `androidx.profileinstaller:profileinstaller` (app): installs the packaged app and library Baseline Profiles for ART compilation, including sideloaded builds.
+- `androidx.fragment:fragment` (app, constraint only): raises the fragment 1.1.0 that Firebase Messaging's Play services libraries pull in, which Google Play's SDK index flags as outdated; the app has no Fragments of its own.
 
 ## Check and run
 

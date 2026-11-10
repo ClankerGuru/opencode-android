@@ -1,5 +1,7 @@
 package ai.opencode.feature.settings
 
+import ai.opencode.core.ui.OpenCodeTextField
+import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.diagnostics.HidesFromScreenshots
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -17,7 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -25,7 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -44,7 +45,7 @@ internal fun VoiceKeyEditor(state: VoiceSettingsFeature.State, voice: VoiceStore
     HidesFromScreenshots()
     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         val keyInput = @Composable { fieldModifier: Modifier ->
-            OutlinedTextField(
+            OpenCodeTextField(
                 value = key,
                 onValueChange = { value ->
                     voice.send(VoiceSettingsFeature.Action.ApiKeyEdited(value))
@@ -54,11 +55,11 @@ internal fun VoiceKeyEditor(state: VoiceSettingsFeature.State, voice: VoiceStore
                         VoiceProvider.xAI -> settings(HomeSettingsFeature.Action.XaiAPIKeyChanged(saved))
                     }
                 },
-                placeholder = { Text(provider.keyPlaceholder) },
+                placeholder = provider.keyPlaceholder,
                 singleLine = true,
                 visualTransformation = if (state.revealsKey) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false),
-                textStyle = if (state.revealsKey) OpenCodeTextStyles.subheadline.copy(fontFamily = FontFamily.Monospace) else SettingsText.title,
+                textStyle = if (state.revealsKey) OpenCodeTextStyles.subheadline.copy(fontFamily = OpenCodeFonts.monospace) else SettingsText.title,
                 trailingIcon = {
                     Box(
                         Modifier
@@ -77,6 +78,7 @@ internal fun VoiceKeyEditor(state: VoiceSettingsFeature.State, voice: VoiceStore
             FilledTonalButton(
                 onClick = { voice.send(VoiceSettingsFeature.Action.VerifyKeyTapped) },
                 enabled = state.activeAPIKey.isNotEmpty() && !state.isCheckingKey,
+                shape = OpenCodeShape.control,
             ) { Text("Verify") }
         }
         if (stacked) {

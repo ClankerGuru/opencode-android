@@ -24,21 +24,21 @@ object TranscriptMetrics {
     val compact: Dp = 4.dp
     val clustered: Dp = 8.dp
     /** `transcript.bubble.verticalPadding` default. */
-    val bubbleVertical: Dp = 10.dp
+    val bubbleVertical: Dp = 8.dp
     val standard: Dp = 12.dp
     /** `transcript.row.contentGutter` default. */
     val contentGutter: Dp = 16.dp
     val turn: Dp = 20.dp
 
     /** `transcript.bubble.cornerRadius` default. */
-    val bubbleCornerRadius: Dp = 18.dp
+    val bubbleCornerRadius: Dp = 10.dp
     /** Content surfaces: code, tables, cards, and images (`transcript.card.cornerRadius` default). */
-    val cardCornerRadius: Dp = 14.dp
+    val cardCornerRadius: Dp = 8.dp
     /** Controls inside sheets and cards: choices and fields. */
-    val controlCornerRadius: Dp = 10.dp
+    val controlCornerRadius: Dp = 6.dp
 
     /** `transcript.bubble.maxFraction` default. */
-    const val maximumUserBubbleFraction: Float = 0.78f
+    const val maximumUserBubbleFraction: Float = 0.82f
 
     /** The widest the transcript and composer grow, gutters included (tablets centre at it). */
     val readableColumnWidth: Dp = 720.dp

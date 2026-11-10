@@ -306,7 +306,7 @@ internal fun SessionComposerEnv.AnswerTrailingControls(bar: RequestBar) {
                         Modifier
                             .widthIn(min = 64.dp)
                             .heightIn(min = 34.dp)
-                            .background(OpenCodeTheme.colors.variant.surfaceStrong.color, OpenCodeShape.capsule)
+                            .background(OpenCodeTheme.colors.variant.surfaceStrong.color, OpenCodeShape.control)
                             .padding(horizontal = 14.dp),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -585,6 +585,8 @@ internal fun SessionComposerEnv.DictationTrailingControls(controls: ComposerCont
                 showsProgress = false,
                 foreground = OpenCodeTheme.colors.sendButtonForeground,
                 background = OpenCodeTheme.colors.sendButtonBackground,
+                faceDiameter = ComposerTunables.sendDiameter,
+                glyphSize = 20.dp,
             )
         }
     }

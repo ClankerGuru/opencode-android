@@ -13,6 +13,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.graphics.Bitmap
+import android.os.Build
 import android.window.BackEvent
 import android.window.OnBackAnimationCallback
 import android.window.OnBackInvokedCallback
@@ -1691,7 +1692,10 @@ internal fun MediaPredictiveBackHandler(
     val currentOnInvoked by rememberUpdatedState(onInvoked)
     DisposableEffect(activity, enabled) {
         if (!enabled) return@DisposableEffect onDispose { }
-        val callback = object : OnBackAnimationCallback {
+        // Android 13 reports no gesture progress to apps, so back there only dismisses.
+        val callback = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            OnBackInvokedCallback { currentOnInvoked() }
+        } else object : OnBackAnimationCallback {
             override fun onBackStarted(backEvent: BackEvent) {
                 currentOnStarted()
             }

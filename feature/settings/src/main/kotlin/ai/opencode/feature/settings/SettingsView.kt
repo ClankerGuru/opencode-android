@@ -12,10 +12,11 @@ import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.core.store.scope
-import ai.opencode.core.ui.OpenCodeIcon
+import ai.opencode.core.ui.OpenCodeLargeTopBar
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
-import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.OpenCodeTopBar
+import ai.opencode.core.ui.OpenCodeTopBarBackButton
 import ai.opencode.core.ui.ThemeSharedKeys
 import ai.opencode.core.ui.AccessibilityFocusRequest
 import ai.opencode.core.ui.accessibilityFocusRequest
@@ -43,13 +44,9 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -186,13 +183,13 @@ private fun OnboardingPlaygroundPresentation(store: SettingsStore) {
  * One Settings page's chrome (iOS `List` + inline `navigationTitle` + Back): a Back control
  * (“Back” closes Settings at the root, pops otherwise) and a list of grouped rows.
  *
- * Android divergence: the bar is Material 3 Expressive's large flexible top app bar, whose
- * start-aligned title collapses into the bar as the list scrolls, and the page sets text in
+ * Android divergence: the bar is the desktop title bar ([OpenCodeLargeTopBar]): a start-aligned
+ * large title that scrolls up into the bar as the list scrolls, and the page sets text in
  * Material's own type scale ([SettingsText.typography]) rather than iOS's 17 pt body. A page
  * that draws its own title ([titleVisible] false, as What's New's entry page does) keeps the
  * small bar, its title fading in over 0.15 s once the page's title scrolls under it.
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsPageScaffold(
     title: String,
@@ -208,16 +205,13 @@ fun SettingsPageScaffold(
     content: LazyListScope.() -> Unit,
 ) {
     val canvas = OpenCodeTheme.colors.groupedCanvas
-    val barColors = TopAppBarDefaults.topAppBarColors(containerColor = canvas, scrolledContainerColor = canvas)
     val scrollBehavior = if (drawsOwnTitle) {
         TopAppBarDefaults.pinnedScrollBehavior()
     } else {
         TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     }
     val back: @Composable () -> Unit = {
-        IconButton(onClick = { store.send(SettingsFeature.Action.BackTapped) }) {
-            OpenCodeIcon(SFSymbol.ChevronBackward, contentDescription = "Back")
-        }
+        OpenCodeTopBarBackButton(onClick = { store.send(SettingsFeature.Action.BackTapped) })
     }
     MaterialTheme(
         colorScheme = MaterialTheme.colorScheme,
@@ -230,30 +224,32 @@ fun SettingsPageScaffold(
             containerColor = canvas,
             topBar = {
                 if (drawsOwnTitle) {
-                    TopAppBar(
+                    OpenCodeTopBar(
                         title = {
                             val reduceMotion = rememberReduceMotion()
                             val phase = if (titleVisible) MotionPhase.Enter else MotionPhase.Exit
                             val alpha by animateFloatAsState(if (titleVisible) 1f else 0f, MotionRole.Swap.animation(phase, reduceMotion), label = "settings-title")
                             Text(
                                 title,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier
                                     .graphicsLayer { this.alpha = alpha }
                                     .then(if (titleVisible) Modifier.semantics { heading() } else Modifier.clearAndSetSemantics {}),
                             )
                         },
-                        navigationIcon = back,
+                        navigation = back,
                         actions = actions,
                         scrollBehavior = scrollBehavior,
-                        colors = barColors,
+                        containerColor = canvas,
                     )
                 } else {
-                    LargeFlexibleTopAppBar(
-                        title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() }) },
-                        navigationIcon = back,
-                        actions = actions,
+                    OpenCodeLargeTopBar(
+                        title = title,
                         scrollBehavior = scrollBehavior,
-                        colors = barColors,
+                        navigation = back,
+                        actions = actions,
+                        containerColor = canvas,
                     )
                 }
             },

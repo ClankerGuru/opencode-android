@@ -2,6 +2,7 @@ package ai.opencode.feature.drawer.style
 
 import ai.opencode.core.tuning.Tunable
 import ai.opencode.core.tuning.TuningStore
+import ai.opencode.core.ui.AppTheme
 import ai.opencode.core.ui.OpenCodeColors
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconSize
@@ -231,9 +232,9 @@ object DrawerTunables {
     /** Status inside the highlight. */
     val trailingInset: Dp = 12.dp
     /** Highlight corner radius. */
-    val rowCornerRadius: Dp = 10.dp
+    val rowCornerRadius: Dp = 6.dp
     /** Row text. */
-    val rowFont: DrawerTextStyle = DrawerTextStyle.Body
+    val rowFont: DrawerTextStyle = DrawerTextStyle.Subheadline
     /** Room above a header. */
     val sectionAbove: Dp = 18.dp
     /** Header height. */
@@ -434,7 +435,7 @@ fun DrawerShortcutLabel(
                 sfName = systemImage,
                 contentDescription = null,
                 size = OpenCodeIconSize.medium * symbolScale,
-                tint = OpenCodeTheme.colors.accent,
+                tint = OpenCodeTheme.colors.signal,
             )
         }
         ProvideTextStyle(DrawerTunables.rowFont.font) {
@@ -603,3 +604,10 @@ val DrawerRowShape: RoundedCornerShape get() = RoundedCornerShape(DrawerMetrics.
 
 /** iOS XXXL body (23 pt) over Large (17 pt): where shortcut symbols stop growing. */
 internal const val XXXL_FONT_SCALE = 23f / 17f
+
+/**
+ * The drawer's canvas: the desktop sidebar's `--v2-background-bg-deep`, a step off the session's
+ * canvas. The System theme keeps the plain canvas (its dynamic colours have no such step).
+ */
+val OpenCodeColors.drawerCanvas: Color
+    get() = if (theme == AppTheme.System) canvas else variant.canvasWeak.color

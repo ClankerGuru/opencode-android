@@ -1,5 +1,12 @@
 package ai.opencode.feature.system.widgets
 
+import ai.opencode.core.sharing.shared
+import ai.opencode.core.ui.AppTheme
+import ai.opencode.core.ui.OpenCodeColors
+import ai.opencode.core.ui.ThemeSharedKeys
+import ai.opencode.core.ui.toColorScheme
+import androidx.glance.color.ColorProviders
+import androidx.glance.material3.ColorProviders as MaterialColorProviders
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.system.ControlDirectoryStore
@@ -19,6 +26,8 @@ import android.service.quicksettings.TileService
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.service.quicksettings.PendingIntentActivityWrapper
+import androidx.core.service.quicksettings.TileServiceCompat
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.glance.ColorFilter
@@ -122,8 +131,9 @@ abstract class OpenCodeTileService : TileService() {
     override fun onClick() {
         super.onClick()
         val intent = OpenCodeControls.intent(this, kind, null)
-        val pending = PendingIntent.getActivity(this, kind.hashCode(), intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        startActivityAndCollapse(pending)
+        // A PendingIntent on Android 14+, the Intent itself on 13 (its only form there).
+        val pending = PendingIntentActivityWrapper(this, kind.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT, false)
+        TileServiceCompat.startActivityAndCollapse(this, pending)
     }
 }
 
@@ -166,7 +176,7 @@ abstract class OpenCodeControlWidget : GlanceAppWidget() {
             val preferences = currentState<Preferences>()
             val entity = OpenCodeControls.chosenEntity(preferences)
             val value = SessionControlValue.of(entity, directory)
-            GlanceTheme {
+            GlanceTheme(colors = widgetColors()) {
                 ControlButton(
                     symbol = symbol(value),
                     title = title(value),
@@ -221,12 +231,27 @@ class NewSessionWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = NewSessionWidget()
 }
 
+/**
+ * The app's theme for widgets: the chosen curated theme's colours (the OpenCode desktop palette by
+ * default), or the wallpaper's dynamic colours for System. Read when the widget renders.
+ */
+@Composable
+private fun widgetColors(): ColorProviders {
+    val theme = shared(ThemeSharedKeys.appTheme).value
+    if (theme == AppTheme.System) return GlanceTheme.colors
+    return MaterialColorProviders(
+        light = OpenCodeColors.resolve(theme, isDark = false).toColorScheme(),
+        dark = OpenCodeColors.resolve(theme, isDark = true).toColorScheme(),
+    )
+}
+
 @Composable
 private fun ControlButton(symbol: SFSymbol, title: String, detail: String?, description: String, intent: Intent) {
     Row(
         modifier = GlanceModifier.fillMaxSize()
             .background(GlanceTheme.colors.secondaryContainer)
-            .cornerRadius(28.dp)
+            // The desktop dock's 12 dp corners (iOS's control is a 28 pt capsule).
+            .cornerRadius(12.dp)
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .clickable(actionStartActivity(intent))
             .semantics { contentDescription = description },

@@ -1,5 +1,9 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.ui.OpenCodeSurfaces
+import ai.opencode.core.ui.openCodeHairline
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.BorderStroke
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.server.model.OpenCodePermissionRequest
@@ -34,7 +38,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
@@ -92,17 +96,17 @@ object RequestTunables {
     /** `requests.permission.labelHeight`: the action label's height (20…44); with the button's padding, a 48 dp target. */
     val labelHeight = 30.dp
     /** `requests.permission.buttonRadius`: the actions' corner radius (6…24), the card's family rather than a capsule. */
-    val buttonRadius = 14.dp
+    val buttonRadius = 8.dp
 }
 
 /** iOS `TranscriptMetrics` fonts and corner the request panel borrows (the transcript module sits beside this one). */
 internal object RequestTranscriptMetrics {
     /** `TranscriptMetrics.toolFont`: footnote, monospaced. */
-    val toolFont: TextStyle get() = OpenCodeTextStyles.footnote.copy(fontFamily = FontFamily.Monospace)
+    val toolFont: TextStyle get() = OpenCodeTextStyles.footnote.copy(fontFamily = OpenCodeFonts.monospace)
     /** `TranscriptMetrics.codeFont`: subheadline, monospaced. */
-    val codeFont: TextStyle get() = OpenCodeTextStyles.subheadline.copy(fontFamily = FontFamily.Monospace)
+    val codeFont: TextStyle get() = OpenCodeTextStyles.subheadline.copy(fontFamily = OpenCodeFonts.monospace)
     /** `TranscriptMetrics.controlCornerRadius`. */
-    val controlCornerRadius = 10.dp
+    val controlCornerRadius = 6.dp
     /** `TranscriptBandStyle.verticalPadding`: from a hairline to the content's first line box. */
     val bandVerticalPadding = 12.dp
 }
@@ -110,7 +114,7 @@ internal object RequestTranscriptMetrics {
 /**
  * A permission action (iOS `requestPermissionButtonShape()` inside the shared button
  * styles): normal height, its corners [RequestTunables.buttonRadius]. Primary is the
- * accent fill (Always Allow), secondary the neutral tonal one (Allow Once).
+ * accent fill (Always Allow), secondary the desktop's neutral hairline one (Allow Once).
  */
 @Composable
 internal fun RequestPermissionButton(
@@ -126,7 +130,13 @@ internal fun RequestPermissionButton(
     if (primary) {
         Button(onClick, sized, enabled, shape = shape, colors = ButtonDefaults.buttonColors(), contentPadding = padding, content = content)
     } else {
-        FilledTonalButton(onClick, sized, enabled, shape = shape, colors = ButtonDefaults.filledTonalButtonColors(), contentPadding = padding, content = content)
+        // The desktop's neutral button: a light neutral fill and a hairline.
+        FilledTonalButton(
+            onClick, sized, enabled, shape = shape,
+            colors = ButtonDefaults.filledTonalButtonColors(containerColor = OpenCodeSurfaces.neutralFill, contentColor = OpenCodeTheme.colors.text),
+            border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
+            contentPadding = padding, content = content,
+        )
     }
 }
 
@@ -224,7 +234,8 @@ private fun PermissionBand(text: String) {
 private fun DiffPreview(patch: String, modifier: Modifier = Modifier) {
     val colors = OpenCodeTheme.colors
     val lines = remember(patch) { DiffPreviewLines.lines(patch) }
-    Column(modifier.clip(RoundedCornerShape(RequestTranscriptMetrics.controlCornerRadius))) {
+    // The desktop diff block: a hairline ring around the lines.
+    Column(modifier.clip(RoundedCornerShape(RequestTranscriptMetrics.controlCornerRadius)).openCodeHairline(RoundedCornerShape(RequestTranscriptMetrics.controlCornerRadius))) {
         for (line in lines) {
             val (foreground, fill) = when (line.kind) {
                 DiffPreviewLines.Kind.Added -> colors.diffAddedText to colors.diffAddedFill

@@ -1,5 +1,11 @@
 package ai.opencode.feature.composer.modelpicker
 
+import ai.opencode.core.ui.openCodeFieldContainer
+import ai.opencode.core.ui.OpenCodeTextFieldDefaults
+import ai.opencode.core.ui.OpenCodeShape
+import ai.opencode.core.ui.OpenCodeSheetHandleDefaults
+import ai.opencode.core.ui.OpenCodeSurfaces
+import ai.opencode.core.ui.openCodeHairline
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticEffect
 import ai.opencode.core.motion.Motion
@@ -111,9 +117,12 @@ import kotlinx.coroutines.delay
 // tunables default. Coordinates are dp in the overlay's own space (the session's root box).
 // The DEBUG-only probes (window space, glass, chip, composer, integrity readout) are n/a.
 
-/** One Picker's surface colour: the composer's (so the morph reads as one surface). */
+/**
+ * One Picker's surface colour: the composer's (so the morph reads as one surface), on this branch
+ * the desktop's floating surface with a hairline ring.
+ */
 object OnePickerSurfaceDefaults {
-    val color: Color @Composable get() = MaterialTheme.colorScheme.surfaceContainerHigh
+    val color: Color @Composable get() = OpenCodeSurfaces.color
 }
 
 /** iOS's swipe-to-favorite fill, `UIColor(red: 0.92, green: 0.68, blue: 0.10)`. */
@@ -143,8 +152,9 @@ fun OnePickerGlassBackdrop(controller: OnePickerController, modifier: Modifier =
                 .offset { IntOffset(rect.left.dp.roundToPx(), rect.top.dp.roundToPx()) }
                 .requiredSize(rect.width.dp, rect.height.dp)
                 .graphicsLayer { alpha = pose.glassOpacity.toFloat().coerceIn(0f, 1f) }
-                .shadow(3.dp, shape, clip = false)
-                .background(color, shape),
+                .shadow(OpenCodeSurfaces.popoverShadow, shape, clip = false)
+                .background(color, shape)
+                .openCodeHairline(shape),
         )
     }
 }
@@ -783,8 +793,8 @@ private fun OnePickerGrabber(
         Box(
             Modifier
                 .padding(top = 3.dp)
-                .size(36.dp, 5.dp)
-                .background(OpenCodeTheme.colors.tertiaryText, CircleShape),
+                .size(OpenCodeSheetHandleDefaults.width, OpenCodeSheetHandleDefaults.height)
+                .background(OpenCodeSheetHandleDefaults.color, OpenCodeShape.capsule),
         )
     }
 }
@@ -804,6 +814,7 @@ private fun OnePickerSearchBar(
     finishInteractiveDrag: (Double, Double) -> Unit,
 ) {
     val colors = OpenCodeTheme.colors
+    val fieldColors = OpenCodeTextFieldDefaults.colors()
     val density = LocalDensity.current
     val focusManager = LocalFocusManager.current
     val text = state.modelFilter
@@ -844,20 +855,20 @@ private fun OnePickerSearchBar(
                 .fillMaxWidth()
                 .padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 10.dp)
                 .height(44.dp)
-                .background(colors.inlineCodeFill, CircleShape)
+                .openCodeFieldContainer(isFocused = focused)
                 .padding(start = 10.dp, end = if (hasTrailing) 2.dp else 14.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            OpenCodeIcon(SFSymbol.Magnifyingglass, null, size = 20.dp, tint = colors.secondaryText)
+            OpenCodeIcon(SFSymbol.Magnifyingglass, null, size = OpenCodeTextFieldDefaults.iconSize, tint = fieldColors.icon)
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                if (text.isEmpty()) Text("Search Models", style = OpenCodeTextStyles.body, color = colors.secondaryText, maxLines = 1)
+                if (text.isEmpty()) Text("Search Models", style = OpenCodeTextFieldDefaults.textStyle, color = fieldColors.placeholder, maxLines = 1)
                 BasicTextField(
                     value = text,
                     onValueChange = { onEvent(ModelPickerEvent.FilterChanged(it)) },
                     singleLine = true,
-                    textStyle = OpenCodeTextStyles.body.copy(color = colors.text),
-                    cursorBrush = SolidColor(colors.accent),
+                    textStyle = OpenCodeTextFieldDefaults.textStyle.copy(color = colors.text),
+                    cursorBrush = SolidColor(fieldColors.cursor),
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Go),
                     keyboardActions = KeyboardActions(onAny = { onSubmit() }),
                     modifier = Modifier

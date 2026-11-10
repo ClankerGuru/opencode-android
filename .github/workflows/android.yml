@@ -3,7 +3,8 @@
 # (sideloading). Releases go through GitHub Releases only, as on iOS: a `v*` tag (from
 # `gh release create`) builds the release AAB signed with the Play upload key, ships it to
 # Google Play's internal testing track, then promotes it to open testing once the
-# PLAY_OPEN_TESTING repo variable is `true` (docs/releasing.md).
+# PLAY_OPEN_TESTING repo variable is `true` (docs/releasing.md). A tag whose commit already
+# passed on main skips scripts/check.sh and only builds the release bundle.
 name: Android
 
 on:
@@ -24,51 +25,92 @@ jobs:
   check:
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 60
+    environment: release
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
     env:
       OC_VERSION_CODE: ${{ github.run_number }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Stamp the build
         run: |
           echo "OC_VERSION_SUFFIX=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_ENV"
           if [ "$GITHUB_REF_TYPE" = tag ]; then echo "OC_VERSION_NAME=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"; fi
 
-      - uses: actions/setup-java@v4
+      # A release tag's commit was already checked by its push to main, so don't check it twice.
+      # A tag on a commit main never passed (e.g. one cut by hand) still runs the full check.
+      - name: Skip the check if main already passed this commit
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          status=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow android.yml --branch main --event push --commit "$GITHUB_SHA" --json conclusion --jq '.[0].conclusion')
+          if [ "$status" = success ]; then
+            echo "::notice::main already passed $GITHUB_SHA; skipping scripts/check.sh."
+            echo "ALREADY_CHECKED=true" >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: 17
 
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
         with:
           packages: platform-tools
 
       - name: Install the SDK platform and build tools
         run: yes | sdkmanager "platforms;android-37.0" "build-tools;37.0.0" > /dev/null
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
         with:
           # Only main writes the cache, so pull requests can't evict it.
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
+      - name: Prefer Google's Maven Central mirror
+        run: install -Dm644 .github/gradle/maven-mirror.init.gradle.kts "${GRADLE_USER_HOME:-$HOME/.gradle}/init.d/maven-mirror.init.gradle.kts"
+
       - name: Check (assemble, lint, unit tests)
+        if: env.ALREADY_CHECKED != 'true'
         run: scripts/check.sh
 
       - name: Name the APK
+        if: env.ALREADY_CHECKED != 'true'
         run: cp app/build/outputs/apk/debug/app-debug.apk "opencode-android-${OC_VERSION_SUFFIX}.apk"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: env.ALREADY_CHECKED != 'true'
         with:
           name: opencode-android-${{ env.OC_VERSION_SUFFIX }}
           path: opencode-android-${{ env.OC_VERSION_SUFFIX }}.apk
           retention-days: 30
 
+      - name: Configure AWS credentials
+        if: github.ref_type == 'tag'
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::604439173067:role/github/opencode-android-release
+          role-session-name: opencode-android-${{ github.run_id }}
+          aws-region: us-east-1
+
+      - name: Fetch the release secrets
+        if: github.ref_type == 'tag'
+        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        with:
+          secret-ids: |
+            ANDROID_UPLOAD_KEYSTORE_BASE64,opencode-android/release/ANDROID_UPLOAD_KEYSTORE_BASE64
+            ANDROID_UPLOAD_KEYSTORE_PASSWORD,opencode-android/release/ANDROID_UPLOAD_KEYSTORE_PASSWORD
+          parse-json-secrets: false
+
       - name: Build the Play release bundle
         if: github.ref_type == 'tag'
         env:
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
-          OC_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
-          OC_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          KEYSTORE_BASE64: ${{ env.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          OC_UPLOAD_KEYSTORE_PASSWORD: ${{ env.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          OC_UPLOAD_KEY_ALIAS: ${{ vars.ANDROID_UPLOAD_KEY_ALIAS }}
         run: |
           if [ -z "$KEYSTORE_BASE64" ]; then
             echo "::notice::No Play upload key secrets; skipping the release bundle."
@@ -82,7 +124,7 @@ jobs:
           # R8 renames classes in release; Play needs the mapping to show readable crash traces.
           cp app/build/outputs/mapping/release/mapping.txt "opencode-android-${OC_VERSION_SUFFIX}-mapping.txt"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: github.ref_type == 'tag'
         with:
           name: opencode-android-aab-${{ env.OC_VERSION_SUFFIX }}
@@ -92,7 +134,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: failure()
         with:
           name: reports-${{ env.OC_VERSION_SUFFIX }}
@@ -116,7 +158,7 @@ jobs:
       - name: Short SHA
         run: echo "SHORT=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: opencode-android-${{ env.SHORT }}
 
@@ -137,11 +179,27 @@ jobs:
     needs: check
     if: github.ref_type == 'tag'
     runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
     concurrency:
       group: play-internal
-    env:
-      PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
     steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::604439173067:role/github/opencode-android-release
+          role-session-name: opencode-android-play-${{ github.run_id }}
+          aws-region: us-east-1
+
+      - name: Fetch the Play service account
+        uses: aws-actions/aws-secretsmanager-get-secrets@2297f9a879480a9e3af9b293ed15c70caf8e1c88 # v3.0.2
+        with:
+          secret-ids: |
+            PLAY_SERVICE_ACCOUNT_JSON,opencode-android/release/PLAY_SERVICE_ACCOUNT_JSON
+          parse-json-secrets: false
+
       - name: Short SHA
         run: |
           echo "SHORT=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
@@ -153,16 +211,16 @@ jobs:
             echo "SHIP=true" >> "$GITHUB_ENV"
           fi
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         if: env.SHIP == 'true'
         with:
           name: opencode-android-aab-${{ env.SHORT }}
 
       - name: Upload to Google Play internal testing
         if: env.SHIP == 'true'
-        uses: r0adkll/upload-google-play@v1
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
         with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          serviceAccountJsonPlainText: ${{ env.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: ai.opencode.mobilecode
           releaseFiles: opencode-android-${{ env.SHORT }}.aab
           mappingFile: opencode-android-${{ env.SHORT }}-mapping.txt
@@ -170,7 +228,7 @@ jobs:
           track: internal
           status: completed
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         if: env.SHIP == 'true'
         with:
           path: source

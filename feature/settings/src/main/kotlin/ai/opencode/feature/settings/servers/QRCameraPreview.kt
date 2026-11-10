@@ -1,12 +1,15 @@
 package ai.opencode.feature.settings.servers
 
 import android.content.Context
+import android.util.Size
 import androidx.camera.compose.CameraXViewfinder
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.core.SurfaceRequest
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.lifecycle.awaitInstance
 import androidx.compose.foundation.background
@@ -102,6 +105,14 @@ private class QRCameraSession(private val once: Boolean, private val onScanned: 
         val mainExecutor = ContextCompat.getMainExecutor(context)
         val decoder = QRDecoder()
         val analysis = ImageAnalysis.Builder()
+            // iOS reads codes from its capture session's default `.high` preset (1080p). CameraX
+            // analyses 640x480 by default, where a code must fill over a quarter of the frame to
+            // read, so pairing worked only up close (QA FB-01). 1080 rows, 4:3 like the preview.
+            .setResolutionSelector(
+                ResolutionSelector.Builder()
+                    .setResolutionStrategy(ResolutionStrategy(Size(1440, 1080), ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER))
+                    .build(),
+            )
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .build()
             .also { analysis ->
@@ -139,10 +150,20 @@ private class QRCameraSession(private val once: Boolean, private val onScanned: 
     }
 }
 
-/** ZXing over a frame's luminance plane: QR codes only, as iOS's `metadataObjectTypes = [.qr]`. */
+/**
+ * ZXing over a frame's luminance plane: QR codes only, as iOS's `metadataObjectTypes = [.qr]`, in
+ * either polarity. AVFoundation also reads light-on-dark codes, which is how OpenCode Desktop draws
+ * its pairing code in dark mode and how `opencode pair` looks in a light-theme terminal; ZXing
+ * tries them only with `ALSO_INVERTED` (QA QR-01).
+ */
 private class QRDecoder {
     private val reader = MultiFormatReader().apply {
-        setHints(mapOf(DecodeHintType.POSSIBLE_FORMATS to listOf(BarcodeFormat.QR_CODE)))
+        setHints(
+            mapOf(
+                DecodeHintType.POSSIBLE_FORMATS to listOf(BarcodeFormat.QR_CODE),
+                DecodeHintType.ALSO_INVERTED to true,
+            ),
+        )
     }
     private var buffer = ByteArray(0)
 

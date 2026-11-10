@@ -20,7 +20,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
@@ -34,10 +34,10 @@ import kotlin.math.roundToInt
 /** iOS `TranscriptMetrics` fonts (`codeFont`, `toolFont`, `metaFont`). */
 object TranscriptFonts {
     /** Markdown code blocks and request commands: one mono family, sized to sit beside 17 pt body text. */
-    val codeFont: TextStyle = OpenCodeTextStyles.subheadline.copy(fontFamily = FontFamily.Monospace)
+    val codeFont: TextStyle = OpenCodeTextStyles.subheadline.copy(fontFamily = OpenCodeFonts.monospace)
 
     /** Denser tool commands, arguments, and output (the desktop app's 13 pt). */
-    val toolFont: TextStyle = OpenCodeTextStyles.footnote.copy(fontFamily = FontFamily.Monospace)
+    val toolFont: TextStyle = OpenCodeTextStyles.footnote.copy(fontFamily = OpenCodeFonts.monospace)
 
     /** Used N, answered question rows, and Working (`metaSize`; 17 pt body by default). */
     @Composable

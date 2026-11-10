@@ -1,5 +1,6 @@
 package ai.opencode.feature.media
 
+import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
@@ -564,7 +565,7 @@ fun TranscriptImageViewer(
                 modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 16.dp),
             ) {
                 Surface(
-                    shape = RoundedCornerShape(percent = 50),
+                    shape = OpenCodeShape.control,
                     color = MaterialTheme.colorScheme.surfaceContainerHighest,
                     contentColor = Color.White,
                 ) {

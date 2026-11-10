@@ -75,6 +75,39 @@ class AppFeatureTests {
         assertEquals(true, OpenCodePairingLink.decode("http://127.0.0.1:4096/auth/connect/code")?.isLoopback)
     }
 
+    /** QA FB-02 (Android only; iOS decodes the trimmed text): pairing links as people copy them. */
+    @Test
+    fun copiedPairingLinksDecode() {
+        val link = "https://abcdefghijklmnop.qrstuvwxyz12.opentunnel.xyz/auth/connect/Ab3_x-9QAb3_x-9QAb3_x-"
+        val expected = OpenCodePairingLink.decode(link)!!
+        val line = "  $link"
+        for (copy in listOf(
+            line.take(80) + "\n" + line.drop(80), // an 80-column terminal's wrap, inside the code
+            link.chunked(29).joinToString("\n  "), // the TUI's /pair box
+            link.take(50) + "\r\n" + link.drop(50),
+            "\n  Open a link to connect. Links work once and expire in 5 minutes.\n\n$line\n\n  Over SSH? Forward the port.\n",
+            "Pair with: $link (expires in 5 min)",
+            "$link.",
+            "<$link>",
+            "\"$link\"",
+            "[link]($link)",
+        )) {
+            assertEquals(copy, expected, OpenCodePairingLink.decodeCopied(copy))
+        }
+        // The TUI lists one link per address: one link with every address; loopback is never redeemed.
+        val listed = OpenCodePairingLink.decodeCopied("Links\nhttp://127.0.0.1:4096/auth/connect/Ab3_x-9QAb3_x-9QAb3_x-\n$link")
+        assertEquals(listOf("http://127.0.0.1:4096", expected.origin), listed?.candidateOrigins)
+        assertEquals(listOf(expected.origin), listed?.redeemOrigins)
+        for (text in listOf(
+            "hello",
+            "see https://example.com/docs.",
+            "https://box.example/auth/connect/code?next=/",
+            "https://evil.example/?u=https://box.example/auth/connect/code",
+        )) {
+            assertNull(text, OpenCodePairingLink.decodeCopied(text))
+        }
+    }
+
     @Test
     fun rejectsMalformedPairingLinks() {
         for (link in listOf(

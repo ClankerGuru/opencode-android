@@ -470,7 +470,8 @@ private class CatchUpCardSurfaceNode(
         activeLayer.setRoundRectOutline(Offset.Zero, size, cornerRadius.toPx())
         activeLayer.clip = true
         if (shadow) {
-            activeLayer.shadowElevation = 16.dp.toPx()
+            // The desktop overlay elevation: softer than Material's 16 dp lift.
+            activeLayer.shadowElevation = 8.dp.toPx()
             activeLayer.ambientShadowColor = FlyingShadowColor
             activeLayer.spotShadowColor = FlyingShadowColor
         } else {

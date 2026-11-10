@@ -1,5 +1,7 @@
 package ai.opencode.feature.settings.whatsnew
 
+import ai.opencode.core.ui.OpenCodeSwitch
+import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.AmbientClock
 import ai.opencode.core.motion.AmbientRate
@@ -53,7 +55,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -184,7 +185,7 @@ private fun WhatsNewOptionsMenu(isButtonEnabled: Boolean, onEnabledChange: (Bool
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
                 text = { Text("Show in Drawer") },
-                trailingIcon = { Switch(checked = isButtonEnabled, onCheckedChange = null) },
+                trailingIcon = { OpenCodeSwitch(checked = isButtonEnabled, onCheckedChange = null) },
                 onClick = { onEnabledChange(!isButtonEnabled) },
                 modifier = Modifier.semantics { toggleableState = ToggleableState(isButtonEnabled) },
             )
@@ -304,7 +305,7 @@ fun WhatsNewDetailPage(store: SettingsStore, entryID: String) {
                     .padding(top = 8.dp)
                     .padding(horizontal = 20.dp)
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(26.dp))
+                    .clip(RoundedCornerShape(OpenCodeRadius.panel))
                     .background(OpenCodeTheme.colors.groupedCard)
                     .padding(6.dp),
             ) {
@@ -332,7 +333,7 @@ fun WhatsNewDetailPage(store: SettingsStore, entryID: String) {
                         .padding(horizontal = 20.dp)
                         .padding(top = 22.dp)
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(26.dp))
+                        .clip(RoundedCornerShape(OpenCodeRadius.panel))
                         .background(OpenCodeTheme.colors.groupedCard),
                 ) {
                     current.details.forEachIndexed { index, detail ->
@@ -501,7 +502,7 @@ private fun WhatsNewDotSymbol(symbol: String, tint: Color, modifier: Modifier = 
         val phase = if (sample.isSettled) null else AmbientClock.phase(AmbientClock.mediaTime(), SWEEP_PERIOD).toFloat()
         Box(
             modifier
-                .clip(RoundedCornerShape(20.dp))
+                .clip(RoundedCornerShape(OpenCodeRadius.card))
                 .background(if (isDark) Color(0.04f, 0.04f, 0.04f) else Color(0.965f, 0.965f, 0.965f))
                 .onSizeChanged { size = it },
         ) {

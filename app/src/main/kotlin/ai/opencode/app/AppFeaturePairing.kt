@@ -66,7 +66,7 @@ internal fun landPairing(arrival: PairingArrival?, server: OpenCodeServer, asked
 
 /** A pasted or scanned code, as a target to redeem, or as the reason it isn't one. */
 internal fun validatePairing(text: String): Result<OpenCodePairingLink> {
-    val link = OpenCodePairingLink.decode(text)
+    val link = OpenCodePairingLink.decodeCopied(text)
         ?: return Result.failure(OpenCodeClientError(invalidPairingCodeMessage))
     // `opencode pair` reports whatever the service is bound to. If that's only loopback, no
     // amount of retrying will help — say so precisely.

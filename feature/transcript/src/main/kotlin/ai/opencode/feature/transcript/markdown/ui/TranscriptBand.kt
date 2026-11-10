@@ -6,7 +6,6 @@ import ai.opencode.core.motion.MotionTunables
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.feature.media.TranscriptMetrics
-import ai.opencode.feature.transcript.LocalTranscriptLayoutTuning
 import ai.opencode.feature.transcript.rows.DisclosureMotion
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -29,8 +28,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
@@ -158,26 +159,28 @@ fun TranscriptBand(
 ) {
     val colors = OpenCodeTheme.colors
     val reduceMotion = rememberReduceMotion()
-    val gutter = LocalTranscriptLayoutTuning.current.contentGutter.dp
     val hairline = with(LocalDensity.current) { 1f.toDp() }
     val rise = with(LocalDensity.current) { 6.dp.toPx() }
     Box(
         modifier
-            .bleedHorizontal(gutter)
             .fillMaxWidth()
             .drawBehind {
                 val r = reveal()
                 if (r <= 0.001f) return@drawBehind
                 val grow = if (reduceMotion) 1f else r
                 val px = hairline.toPx()
-                val height = maxOf(size.height * grow, px)
+                val height = maxOf(size.height * grow, 2 * px)
                 val alpha = r
-                drawRect(colors.border.copy(alpha = colors.border.alpha * alpha), Offset.Zero, Size(size.width, px))
-                drawRect(
+                val radius = CornerRadius(TranscriptBandStyle.cornerRadius.toPx())
+                // The desktop's inset block, drawn down to the band's growing edge.
+                drawRoundRect(
                     TranscriptBandStyle.fill(colors).copy(alpha = TranscriptBandStyle.fill(colors).alpha * alpha),
-                    Offset(0f, px), Size(size.width, maxOf(0f, height - 2 * px)),
+                    Offset.Zero, Size(size.width, height), radius,
                 )
-                drawRect(colors.border.copy(alpha = colors.border.alpha * alpha), Offset(0f, maxOf(0f, height - px)), Size(size.width, px))
+                drawRoundRect(
+                    colors.border.copy(alpha = colors.border.alpha * alpha),
+                    Offset(px / 2, px / 2), Size(size.width - px, height - px), radius, style = Stroke(px),
+                )
             }
             .drawWithContent {
                 val r = reveal()
@@ -185,8 +188,8 @@ fun TranscriptBand(
                 // The mask: drawn only as far as the band's edge.
                 clipRect(bottom = size.height * grow) { this@drawWithContent.drawContent() }
             }
-            .padding(vertical = hairline)
-            .padding(horizontal = gutter, vertical = verticalPadding),
+            .padding(hairline)
+            .padding(horizontal = TranscriptBandStyle.horizontalPadding, vertical = verticalPadding),
     ) {
         Box(
             Modifier.graphicsLayer {

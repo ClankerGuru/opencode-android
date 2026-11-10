@@ -34,7 +34,7 @@ import kotlin.math.max
  * - iOS's progressive blur ([SessionHeaderStyle.Resolved.AppBlur], and the iOS 27 system edge,
  *   which Android resolves to the same app path) is the M3 top app bar's scrolled state: once
  *   content scrolls under the header, the bar from the top of the screen to the bottom of the
- *   header row fills with `surfaceContainer`, with a hard bottom edge and no soft tail (a fading
+ *   header row fills with the canvas over a hairline (the desktop title bar), with no soft tail (a fading
  *   tail left text showing through it). The fill fades in and out on the theme's effects spring,
  *   as `TopAppBar`'s container colour does.
  * - The wash ([SessionHeaderStyle.Appearance]) is the canvas colour at its opacity through the same
@@ -66,7 +66,9 @@ fun SessionHeaderBackdrop(
     if (backdrop == null && appBlur == null) return
     val scheme = MaterialTheme.colorScheme
     val canvas = OpenCodeTheme.colors.canvas
-    val scrim = scheme.surfaceContainer
+    // The desktop's title bar: the pane's own canvas over a hairline, not a tonal fill.
+    val scrim = canvas
+    val hairline = OpenCodeTheme.colors.border
     val material = when (backdrop?.blur) {
         SessionHeaderStyle.Blur.UltraThin -> scheme.surfaceContainerLow
         SessionHeaderStyle.Blur.Thin -> scheme.surfaceContainer
@@ -100,6 +102,8 @@ fun SessionHeaderBackdrop(
                 val barAlpha = if (barAnimates) bar.value else barTarget()
                 if (barAlpha > 0) {
                     drawRect(color = scrim, size = Size(size.width, barHeight.dp.toPx()), alpha = barAlpha)
+                    val px = 1.dp.toPx()
+                    drawRect(color = hairline, topLeft = androidx.compose.ui.geometry.Offset(0f, barHeight.dp.toPx() - px), size = Size(size.width, px), alpha = barAlpha)
                 }
                 if (backdrop != null) {
                     val revealed = backdrop.revealed(scrolledUnderHeader()).toFloat()

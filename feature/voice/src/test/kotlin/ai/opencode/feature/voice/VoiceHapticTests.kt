@@ -3,12 +3,16 @@ package ai.opencode.feature.voice
 import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.TestClock
 import ai.opencode.core.dependencies.asContextElement
+import ai.opencode.core.dependencies.withDependencies
 import ai.opencode.feature.voice.DotScopeSimulation.Cue
 import ai.opencode.feature.voice.DotScopeSimulation.Scan
+import android.Manifest
+import android.app.Notification
 import android.os.VibratorManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.runBlocking
@@ -22,6 +26,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
@@ -322,6 +327,136 @@ class VoiceCallTeardownFrameworkTests {
         engine.endCall()
         engine.finish()
         assertTrue(vibrator.isCancelled)
+    }
+
+    class RecordingVoiceCallService : VoiceCallService() {
+        var promotions = 0
+        var promotionFailure: RuntimeException? = null
+        override fun startMicrophoneForeground(notification: Notification) {
+            promotionFailure?.let { throw it }
+            promotions += 1
+            super.startMicrophoneForeground(notification)
+        }
+    }
+
+    @Test fun rapidStartAndStopSatisfiesForegroundContractBeforeStopping() = runBlocking {
+        val app = RuntimeEnvironment.getApplication()
+        val appShadow = shadowOf(app)
+        appShadow.grantPermissions(Manifest.permission.RECORD_AUDIO)
+        val commands = VoiceCallCommands()
+        val client = VoiceCallServiceClient.makeLive(app, commands)
+        val id = UUID.randomUUID()
+
+        // Start and immediately stop before ActivityManager delivers onStartCommand:
+        // stop() must NOT call stopService while startForegroundService is still queued,
+        // or Android throws ForegroundServiceDidNotStartInTimeException.
+        client.start(VoiceCallServiceState(id, VoiceCallServiceState.Phase.connecting))
+        client.stop(id)
+        assertNull("stopService while FGS start is pending crashes with ForegroundServiceDidNotStartInTimeException", appShadow.nextStoppedService)
+        assertTrue(commands.hasPendingForegroundStart)
+
+        val startedIntent = required(appShadow.nextStartedService)
+        assertTrue(startedIntent.getBooleanExtra(VoiceCallService.FOREGROUND_START, false))
+
+        withDependencies({ this[VoiceCallCommands] = commands }) {
+            val controller = Robolectric.buildService(RecordingVoiceCallService::class.java, startedIntent).create()
+            val service = controller.get()
+            service.onStartCommand(startedIntent, 0, 1)
+            assertEquals("Must call startForeground once to satisfy ActivityManager before stopping", 1, service.promotions)
+            assertFalse(commands.hasPendingForegroundStart)
+            assertTrue(shadowOf(service).isForegroundStopped)
+            assertTrue(shadowOf(service).isStoppedBySelf)
+        }
+    }
+
+    @Test fun postGrantPromotionAndRejectedForegroundPromotionEndCallCleanly() = runBlocking {
+        val app = RuntimeEnvironment.getApplication()
+        val appShadow = shadowOf(app)
+        val commands = VoiceCallCommands()
+        val client = VoiceCallServiceClient.makeLive(app, commands)
+        val id = UUID.randomUUID()
+        val received = Channel<VoiceCallCommands.Command>(Channel.UNLIMITED)
+        val collector = CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined).launch {
+            commands.events.collect { received.trySend(it) }
+        }
+
+        try {
+            // 1. Without RECORD_AUDIO at start (first call after install), start() skips FGS admission.
+            appShadow.denyPermissions(Manifest.permission.RECORD_AUDIO)
+            client.start(VoiceCallServiceState(id, VoiceCallServiceState.Phase.connecting))
+            assertNull(appShadow.nextStartedService)
+
+            // 2. Once RECORD_AUDIO is granted during start(), update() promotes via foregroundStart
+            // without gating on ProcessLifecycleOwner (so TileService / SystemActionActivity starts work).
+            appShadow.grantPermissions(Manifest.permission.RECORD_AUDIO)
+            client.update(VoiceCallServiceState(id, VoiceCallServiceState.Phase.live))
+            val startedIntent = required(appShadow.nextStartedService)
+            assertTrue(startedIntent.getBooleanExtra(VoiceCallService.FOREGROUND_START, false))
+
+            // 3. If the OS rejects microphone FGS promotion inside onStartCommand, the service catches
+            // it, emits an end command so the call never runs with a silenced mic, and stops cleanly.
+            withDependencies({ this[VoiceCallCommands] = commands }) {
+                val controller = Robolectric.buildService(RecordingVoiceCallService::class.java, startedIntent).create()
+                val service = controller.get()
+                service.promotionFailure = SecurityException("Simulated FGS microphone rejection")
+                service.onStartCommand(startedIntent, 0, 1)
+                assertFalse(commands.isActive(id))
+                assertTrue(shadowOf(service).isStoppedBySelf)
+                assertEquals(VoiceCallCommands.Command(id, VoiceCallCommands.Action.end), received.tryReceive().getOrNull())
+            }
+        } finally {
+            collector.cancel()
+        }
+    }
+
+    @Test fun liveRTCAudioDeviceSurvivesDisposedRemoteAudioTracks() {
+        val app = RuntimeEnvironment.getApplication()
+        val device = LiveRTCAudioDevice(app, realtime = true) {}
+        try {
+            class DisposableAudioTrack(var disposed: Boolean = false) : org.webrtc.AudioTrack(1L) {
+                var volumes = 0
+                var sinksAdded = 0
+                var sinksRemoved = 0
+                private fun checkAlive() {
+                    if (disposed) throw IllegalStateException("MediaStreamTrack has been disposed.")
+                }
+                override fun setVolume(volume: Double) {
+                    checkAlive()
+                    volumes += 1
+                }
+                override fun addSink(sink: org.webrtc.AudioTrackSink) {
+                    checkAlive()
+                    sinksAdded += 1
+                }
+                override fun removeSink(sink: org.webrtc.AudioTrackSink) {
+                    checkAlive()
+                    sinksRemoved += 1
+                }
+            }
+
+            // 1. Track already disposed before onAddTrack hopped onto the RTC dispatcher.
+            val deadOnArrival = DisposableAudioTrack(disposed = true)
+            device.attach(deadOnArrival)
+            assertEquals(0, deadOnArrival.sinksAdded)
+
+            // 2. Live track attached, then disposed by WebRTC before speaker gain ramp / teardown.
+            val midCallDisposed = DisposableAudioTrack()
+            val healthy = DisposableAudioTrack()
+            device.attach(midCallDisposed)
+            device.attach(healthy)
+            assertEquals(1, midCallDisposed.sinksAdded)
+            assertEquals(1, healthy.sinksAdded)
+
+            midCallDisposed.disposed = true
+            device.setPlaybackVolume(0.5f)
+            assertEquals("Healthy track still receives speaker-ramp volume after peer track disposal", 2, healthy.volumes)
+
+            // 3. Disposing the remaining track right before shutDown's detachTracks never aborts teardown.
+            healthy.disposed = true
+            device.detachTracks()
+        } finally {
+            device.release()
+        }
     }
 }
 

@@ -48,13 +48,15 @@ class DrawerSpacingTests {
     /** What the drawer ships: D-66's Sidebar Grey spacing. */
     @Test
     fun defaultsAreWhatShipped() {
+        // Android diverges from iOS on purpose: the drawer follows the OpenCode desktop sidebar
+        // (6 dp row radius, 14 sp subheadline rows). Everything else is iOS's.
         val shipped: List<Triple<String, Dp, Float>> = listOf(
             Triple("drawer.row.height", DrawerTunables.rowHeight, 44f),
             Triple("drawer.row.gap", DrawerTunables.rowGap, 0f),
             Triple("drawer.row.edge", DrawerTunables.rowEdge, 10f),
             Triple("drawer.row.textInset", DrawerTunables.textInset, 10f),
             Triple("drawer.row.trailingInset", DrawerTunables.trailingInset, 12f),
-            Triple("drawer.row.cornerRadius", DrawerTunables.rowCornerRadius, 10f),
+            Triple("drawer.row.cornerRadius", DrawerTunables.rowCornerRadius, 6f),
             Triple("drawer.section.above", DrawerTunables.sectionAbove, 18f),
             Triple("drawer.section.height", DrawerTunables.sectionHeight, 34f),
             Triple("drawer.section.below", DrawerTunables.sectionBelow, 4f),
@@ -82,7 +84,7 @@ class DrawerSpacingTests {
         assertEquals(DrawerEdgeCurve.Smoothstep, DrawerTunables.bottomBlurCurve)
         assertEquals(DrawerEdgeStyle.Soft, DrawerTunables.bottomEdge)
         assertEquals(DrawerBottomEdgeMode.System, DrawerTunables.bottomMode)
-        assertEquals(DrawerTextStyle.Body, DrawerTunables.rowFont)
+        assertEquals(DrawerTextStyle.Subheadline, DrawerTunables.rowFont)
         // D-66 Sidebar Grey: headline secondary headers and a title-size title,
         // with D-51's medium unread and waiting rows, read rows at 86% and a
         // 15 pt Catch Up count.
@@ -99,7 +101,7 @@ class DrawerSpacingTests {
         assertEquals(10.dp, DrawerMetrics.textInset)
         assertEquals(12.dp, DrawerMetrics.trailingInset)
         assertEquals(20.dp, DrawerMetrics.leadingEdge)
-        assertEquals(10.dp, DrawerMetrics.rowCornerRadius)
+        assertEquals(6.dp, DrawerMetrics.rowCornerRadius)
         assertEquals(44.dp, DrawerMetrics.rowHeight)
     }
 

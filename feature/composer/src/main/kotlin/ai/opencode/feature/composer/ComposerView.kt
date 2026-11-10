@@ -7,6 +7,7 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.drawerPanHorizontalScroller
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.server.model.PastedText
 import androidx.compose.ui.graphics.asImageBitmap
@@ -270,10 +271,12 @@ private fun SendButton(enabled: Boolean, label: String, onClick: () -> Unit) {
 private fun AttachmentsRow(state: ComposerFeature.State, send: (ComposerFeature.Action) -> Unit) {
     val attachments = state.attachments
     if (!attachments.hasContent && !attachments.isLocating) return
+    val scroll = rememberScrollState()
     Row(
         Modifier
             .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
+            .drawerPanHorizontalScroller(scroll)
+            .horizontalScroll(scroll)
             .padding(start = 12.dp, end = 12.dp, top = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {

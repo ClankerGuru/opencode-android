@@ -1,5 +1,7 @@
 package ai.opencode.feature.settings.serverdetails
 
+import ai.opencode.core.ui.OpenCodeTextField
+import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.diagnostics.HidesFromScreenshots
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionRole
@@ -43,10 +45,9 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
+import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
@@ -77,7 +78,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.foundation.text.KeyboardOptions
@@ -202,16 +203,16 @@ fun ServerDetailsPage(store: SettingsStore) {
 @Composable
 private fun CodeAlert(instructions: String, send: (ServerDetailsFeature.Action) -> Unit) {
     var code by rememberSaveable { mutableStateOf("") }
-    AlertDialog(
+    OpenCodeAlertDialog(
         onDismissRequest = { send(ServerDetailsFeature.Action.CodeCancelled) },
         title = { Text("Paste the Code") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (instructions.isNotEmpty()) Text(instructions)
-                OutlinedTextField(
+                OpenCodeTextField(
                     value = code,
                     onValueChange = { code = it },
-                    label = { Text("Code") },
+                    label = "Code",
                     trailingIcon = AlertTextFields.clearButton(code) { code = "" },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
@@ -327,7 +328,7 @@ private fun SkillsTile(skills: List<OpenCodeAutocompleteSkill>, onTap: () -> Uni
                 skills.take(2).forEach { skill ->
                     Text(
                         skill.name,
-                        style = OpenCodeTextStyles.caption1.copy(fontFamily = FontFamily.Monospace),
+                        style = OpenCodeTextStyles.caption1.copy(fontFamily = OpenCodeFonts.monospace),
                         color = OpenCodeTheme.colors.secondaryText,
                         maxLines = 1,
                         softWrap = false,
@@ -349,7 +350,7 @@ private fun OverviewTile(
     content: @Composable () -> Unit,
 ) {
     // Android divergence: a ripple answers the press (iOS shrinks the tile to 98 %).
-    val shape = RoundedCornerShape(26.dp)
+    val shape = RoundedCornerShape(OpenCodeRadius.panel)
     Box(
         modifier
             .background(OpenCodeTheme.colors.groupedCard, shape)
@@ -408,7 +409,7 @@ internal fun ProblemBanner(
     val needsAuth = mcp.status is OpenCodeMCPServer.Status.NeedsAuth
     val brand = ServerBrand.mcp(mcp.name)
     val tone = mcp.status.tintColor()
-    val shape = RoundedCornerShape(22.dp)
+    val shape = RoundedCornerShape(OpenCodeRadius.card)
     Row(
         modifier
             .background(OpenCodeTheme.colors.groupedCard, shape)

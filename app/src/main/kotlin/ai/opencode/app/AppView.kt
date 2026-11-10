@@ -1,5 +1,12 @@
 package ai.opencode.app
 
+import ai.opencode.core.ui.OpenCodeSheetDefaults
+import ai.opencode.core.ui.OpenCodeSheetHandle
+import ai.opencode.core.ui.OpenCodeSurfaces
+import androidx.compose.ui.unit.sp
+import ai.opencode.core.ui.OpenCodeRadius
+import androidx.compose.foundation.BorderStroke
+import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.diagnostics.HidesFromScreenshots
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.MotionRole
@@ -10,18 +17,24 @@ import ai.opencode.core.store.Store
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.core.store.rememberScope
+import ai.opencode.core.ui.AccessibilityFocusTarget
 import ai.opencode.core.ui.OpenCodeAppTheme
 import ai.opencode.core.ui.OpenCodeFonts
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconButton
 import ai.opencode.core.ui.OpenCodeIconButtonStyle
+import ai.opencode.core.ui.OpenCodeMinTapTarget
 import ai.opencode.core.ui.OpenCodeSecondaryButton
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.ThisDevice
+import ai.opencode.core.ui.accessibilityFocusRequest
+import ai.opencode.core.ui.accessibilityFocusTarget
+import ai.opencode.core.ui.rememberAccessibilityFocusRequest
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.HomeView
+import ai.opencode.feature.drawer.notices.AccessibilityAnnouncer
 import ai.opencode.feature.media.MediaFeature
 import ai.opencode.feature.media.MediaView
 import ai.opencode.feature.settings.onboarding.WelcomeFeature
@@ -41,10 +54,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -53,12 +68,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
+import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -66,7 +83,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
+import ai.opencode.core.ui.OpenCodeTextField
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -77,20 +95,32 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -99,6 +129,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -109,6 +140,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 
 /**
  * The phone's client tools (iOS `AppView.clientTools`): links and audio always, the screen while
@@ -188,7 +220,7 @@ private fun AppAlerts(store: StoreOf<AppFeature.State, AppFeature.Action>) {
     systemActionError?.let { ErrorAlert("Couldn’t Open Session", it) { store.send(AppFeature.Action.SystemActionErrorDismissed) } }
     pairingError?.let { ErrorAlert("Couldn’t Pair with Server", it) { store.send(AppFeature.Action.PairingErrorDismissed) } }
     pendingPairing?.let { pending ->
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = { store.send(AppFeature.Action.PairingCancelled(pending.id)) },
             title = { Text(pending.title) },
             text = { Text(pending.message) },
@@ -200,7 +232,7 @@ private fun AppAlerts(store: StoreOf<AppFeature.State, AppFeature.Action>) {
 
 @Composable
 private fun ErrorAlert(title: String, message: String, onDismiss: () -> Unit) {
-    AlertDialog(
+    OpenCodeAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { Text(message) },
@@ -221,6 +253,7 @@ private fun systemOrange(): Color = if (OpenCodeTheme.colors.isDark) Color(0xFFF
 private fun ConnectionView(store: StoreOf<AppFeature.State, AppFeature.Action>) {
     val savedServers by store.observe { it.savedServers.value }
     val errorMessage by store.observe { it.errorMessage }
+    val errorAttempt by store.observe { it.errorContext?.attempt }
     val returnServer by store.observe { it.returnServer }
     val progress by store.observe { it.connectionProgressLabel }
     val accessibilitySize = isAccessibilitySize()
@@ -265,7 +298,8 @@ private fun ConnectionView(store: StoreOf<AppFeature.State, AppFeature.Action>) 
                         color = OpenCodeTheme.colors.secondaryText,
                     )
                 }
-                errorMessage?.let { ConnectionErrorCard(store, it) }
+                // New nodes for each attempt, so a repeated failure is announced again.
+                errorMessage?.let { androidx.compose.runtime.key(errorAttempt) { ConnectionErrorCard(store, it, announces = true) } }
                 if (savedServers.isEmpty()) SetupSteps(store) else SavedServerList(store, savedServers)
                 if (accessibilitySize) PairingActionsButtons(store)
             }
@@ -290,9 +324,10 @@ private fun PairingActionsButtons(store: StoreOf<AppFeature.State, AppFeature.Ac
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         PairingActionButton(
             onClick = { store.send(AppFeature.Action.AddServerTapped) },
-            container = MaterialTheme.colorScheme.surfaceContainerHighest,
+            container = OpenCodeSurfaces.neutralFill,
             content = colors.text,
-        ) { Text("Enter a Server Manually", style = OpenCodeTextStyles.headline, textAlign = TextAlign.Center) }
+            border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
+        ) { Text("Enter a Server Manually", style = PairingActionLabel, textAlign = TextAlign.Center) }
         PairingActionButton(
             onClick = { store.send(AppFeature.Action.ScanPairingCodeTapped) },
             enabled = progress == null,
@@ -302,11 +337,11 @@ private fun PairingActionsButtons(store: StoreOf<AppFeature.State, AppFeature.Ac
             if (progress != null) {
                 CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = colors.canvas)
                 Spacer(Modifier.width(10.dp))
-                Text(progress!!, style = OpenCodeTextStyles.headline)
+                Text(progress!!, style = PairingActionLabel)
             } else {
-                OpenCodeIcon(SFSymbol.QrcodeViewfinder, contentDescription = null)
-                Spacer(Modifier.width(10.dp))
-                Text("Scan Pairing Code", style = OpenCodeTextStyles.headline, textAlign = TextAlign.Center)
+                OpenCodeIcon(SFSymbol.QrcodeViewfinder, contentDescription = null, size = 18.dp)
+                Spacer(Modifier.width(8.dp))
+                Text("Scan Pairing Code", style = PairingActionLabel, textAlign = TextAlign.Center)
             }
         }
     }
@@ -318,12 +353,15 @@ private fun PairingActionButton(
     container: Color,
     content: Color,
     enabled: Boolean = true,
+    border: BorderStroke? = null,
     label: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
 ) {
     Button(
         onClick = onClick,
         enabled = enabled,
-        shape = RoundedCornerShape(16.dp),
+        // The desktop's button: small radius, not a 16 dp card.
+        shape = RoundedCornerShape(OpenCodeRadius.fill),
+        border = border,
         colors = ButtonDefaults.buttonColors(
             containerColor = container,
             contentColor = content,
@@ -332,10 +370,16 @@ private fun PairingActionButton(
             disabledContentColor = content,
         ),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
         content = label,
     )
 }
+
+/**
+ * The pairing buttons' label. Semibold, a step above the desktop's medium button text: on these
+ * full-width buttons, the screen's two main actions, medium read as softer than the copy above.
+ */
+private val PairingActionLabel get() = OpenCodeTextStyles.callout.copy(fontWeight = FontWeight.SemiBold)
 
 /** What a new user needs on their computer before the scan can work. */
 @Composable
@@ -343,7 +387,7 @@ private fun SetupSteps(store: StoreOf<AppFeature.State, AppFeature.Action>) {
     val linkColor = OpenCodeTheme.colors.secondaryText
     Column {
         Text(
-            "On your computer, open OpenCode and go to Settings → Pairing, or type /pair in OpenCode in your terminal. Then scan the code with this ${ThisDevice.casualName}.",
+            "On your computer, open OpenCode and go to Settings → Pairing, or run opencode pair --remote in a terminal. Then scan the code with this ${ThisDevice.casualName}.",
             style = OpenCodeTextStyles.body,
             modifier = Modifier.padding(vertical = 16.dp),
         )
@@ -391,7 +435,8 @@ private fun PasteRow(store: StoreOf<AppFeature.State, AppFeature.Action>) {
             pasteError ?: "Or copy the link it prints, then",
             style = OpenCodeTextStyles.footnote,
             color = if (pasteError != null) systemOrange() else OpenCodeTheme.colors.secondaryText,
-            modifier = modifier,
+            // Paste's failure replaces the prompt and is read out; the prompt itself isn't.
+            modifier = modifier.semantics { if (pasteError != null) liveRegion = LiveRegionMode.Polite },
         )
     }
     val button: @Composable () -> Unit = {
@@ -430,11 +475,18 @@ private fun CopyCommand(command: String, onCopy: (String) -> Unit) {
             onCopy(command)
             copied = true
         },
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        // The desktop's shell block: a clearly filled box, hairline border.
+        shape = RoundedCornerShape(OpenCodeRadius.fill),
+        color = OpenCodeSurfaces.commandFill,
+        // Explicit: the fill matches `surfaceVariant`, whose content colour is the secondary text.
+        contentColor = OpenCodeTheme.colors.text,
+        border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
+        // The label stands in for the visible command (cleared below), read once as a button
+        // (iOS `.accessibilityLabel("Copy \(command)")` on a `Button`).
         modifier = Modifier.heightIn(min = 48.dp).semantics {
             contentDescription = "Copy $command"
             stateDescription = if (copied) "Copied" else ""
+            role = Role.Button
         },
     ) {
         Row(
@@ -442,7 +494,16 @@ private fun CopyCommand(command: String, onCopy: (String) -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(command, modifier = Modifier.weight(1f, fill = false), style = OpenCodeTextStyles.callout.copy(fontFamily = OpenCodeFonts.berkeleyMono, fontSize = OpenCodeTextStyles.subheadline.fontSize))
+            Text(
+                command,
+                modifier = Modifier.weight(1f, fill = false).clearAndSetSemantics {},
+                // The desktop's mono; no contextual alternates, so a command to retype is drawn as typed.
+                style = OpenCodeTextStyles.footnote.copy(
+                    fontFamily = OpenCodeFonts.monospace,
+                    lineHeight = 20.sp,
+                    fontFeatureSettings = "calt 0",
+                ),
+            )
             // The copied checkmark swaps in and back on the swap role (a cross-fade under reduce motion).
             Crossfade(copied, animationSpec = MotionRole.Swap.animation(reduceMotion = reduceMotion), label = "copy-command") { isCopied ->
                 OpenCodeIcon(
@@ -534,7 +595,7 @@ private fun SavedServerList(store: StoreOf<AppFeature.State, AppFeature.Action>,
         }
     }
     pendingRemoval?.let { server ->
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = { pendingRemoval = null },
             title = { Text("Remove ${server.displayName}?") },
             text = { Text("This forgets the address and password on this ${ThisDevice.name}. Sessions on the server are not affected.") },
@@ -570,21 +631,29 @@ private fun formatted(message: String): AnnotatedString = buildAnnotatedString {
         return@buildAnnotatedString
     }
     parts.forEachIndexed { index, part ->
-        if (index % 2 == 1) withStyle(SpanStyle(fontFamily = FontFamily.Monospace)) { append(part) } else append(part)
+        if (index % 2 == 1) withStyle(SpanStyle(fontFamily = OpenCodeFonts.monospace)) { append(part) } else append(part)
     }
 }
 
+/** iOS `errorTitle`. */
+private fun errorTitle(phase: AppFeature.FailureContext.Phase?, context: AppFeature.FailureContext?): String = when (phase) {
+    AppFeature.FailureContext.Phase.Pair -> "Couldn’t Pair"
+    AppFeature.FailureContext.Phase.LoadSessions -> "Couldn’t Load Sessions"
+    else -> "Couldn’t connect to ${context?.friendlyName ?: "server"}"
+}
+
+/**
+ * [announces]: TalkBack reads the title and message as they appear (live regions), where the card
+ * comes into view; the New Server sheet announces its own (see `ServerFormSheet`).
+ */
 @Composable
-private fun ConnectionErrorCard(store: StoreOf<AppFeature.State, AppFeature.Action>, message: String) {
+private fun ConnectionErrorCard(store: StoreOf<AppFeature.State, AppFeature.Action>, message: String, announces: Boolean) {
     val phase by store.observe { it.errorPhase }
     val context by store.observe { it.errorContext }
     var didCopy by remember(message) { mutableStateOf(false) }
-    val title = when (phase) {
-        AppFeature.FailureContext.Phase.Pair -> "Couldn’t Pair"
-        AppFeature.FailureContext.Phase.LoadSessions -> "Couldn’t Load Sessions"
-        else -> "Couldn’t connect to ${context?.friendlyName ?: "server"}"
-    }
+    val title = errorTitle(phase, context)
     val secondary = OpenCodeTheme.colors.secondaryText
+    val readsOut = Modifier.semantics { if (announces) liveRegion = LiveRegionMode.Polite }
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -595,14 +664,14 @@ private fun ConnectionErrorCard(store: StoreOf<AppFeature.State, AppFeature.Acti
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.semantics(mergeDescendants = true) { heading() },
+                modifier = Modifier.semantics(mergeDescendants = true) { heading() }.then(readsOut),
             ) {
                 OpenCodeIcon(SFSymbol.ExclamationmarkTriangleFill, contentDescription = null, tint = systemOrange(), size = 20.dp)
                 Text(title, style = OpenCodeTextStyles.headline, color = systemOrange())
             }
             SelectionContainer {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text(formatted(message), style = OpenCodeTextStyles.subheadline)
+                    Text(formatted(message), style = OpenCodeTextStyles.subheadline, modifier = readsOut)
                     context?.takeIf { it.details.isNotEmpty() }?.let { Text(it.detailText, style = OpenCodeTextStyles.subheadline) }
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         context?.let {
@@ -634,24 +703,73 @@ private fun ConnectionErrorCard(store: StoreOf<AppFeature.State, AppFeature.Acti
 private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>) {
     val state by store.observe { it }
     var revealsPassword by rememberSaveable { mutableStateOf(false) }
+    val passwordFocus = remember { FocusRequester() }
+    val eyeFocus = remember { FocusRequester() }
+    var isPasswordFocused by remember { mutableStateOf(false) }
+    var refocusesPassword by remember { mutableStateOf(false) }
+    var passwordValue by remember { mutableStateOf(TextFieldValue(state.password, TextRange(state.password.length))) }
     val scroll = rememberScrollState()
     val isConnectDisabled = state.connectionProgressLabel != null || state.serverURL.isBlank() || state.headerProblem != null
     val attempt = state.errorContext?.attempt
     val reduceMotion = rememberReduceMotion()
-    // Back to the top on the layout role, so a failed attempt's error is seen.
-    LaunchedEffect(attempt) { if (attempt != null) scroll.animateScrollTo(0, MotionRole.Layout.animation(reduceMotion = reduceMotion)) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // TalkBack starts on the title, not the scrim or the drag handle, as VoiceOver starts in
+    // iOS's navigation bar: one move once the sheet has opened, after TalkBack's own first focus
+    // in the new window, which would otherwise land after it.
+    var hasOpened by remember { mutableStateOf(false) }
+    LaunchedEffect(sheetState.currentValue) { if (sheetState.currentValue == SheetValue.Expanded) hasOpened = true }
+    val titleFocus = rememberAccessibilityFocusRequest(Unit.takeIf { hasOpened })
     ModalBottomSheet(
         onDismissRequest = { store.send(AppFeature.Action.CancelEditingTapped) },
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = sheetState,
+        dragHandle = { OpenCodeSheetHandle() },
+        shape = OpenCodeSheetDefaults.shape,
     ) {
         // Its password and headers, out of problem reports and voice screenshots.
         HidesFromScreenshots()
+        // iOS resigns the first responder on Connect, Go and each failed attempt. Here only the
+        // keyboard goes (the sheet window's controller): a cleared focus would fall to the drag
+        // handle, and TalkBack's focus with it.
+        val keyboard = LocalSoftwareKeyboardController.current
+        val dismissKeyboard = { keyboard?.hide() }
+        // TalkBack takes the scroll up to the error for the user's and leaves Connect for whatever
+        // is then in view (QA OB-B-01); VoiceOver stays on Connect. So while TalkBack is on
+        // Connect the form doesn't scroll, the error (out of view) is announced, and once the
+        // keyboard has gone and the card has pushed the form down, TalkBack is put back on
+        // Connect if that moved it off. The announcement comes last, or a focus move cuts it off.
+        val connectFocus = remember { AccessibilityFocusTarget() }
+        val connectInView = remember { BringIntoViewRequester() }
+        var staysOnConnect by remember { mutableStateOf(false) }
+        val announcer = remember { dependency(AccessibilityAnnouncer) }
+        val attemptAtOpen = remember { attempt }
+        val density = LocalDensity.current
+        val imeBottom by rememberUpdatedState(WindowInsets.ime.getBottom(density))
+        LaunchedEffect(attempt) {
+            if (attempt == null || attempt == attemptAtOpen) return@LaunchedEffect
+            dismissKeyboard()
+            if (staysOnConnect) {
+                staysOnConnect = false
+                snapshotFlow { imeBottom }.first { it == 0 }
+                // TalkBack's own move after the form shifts lands within this.
+                delay(TALKBACK_SETTLE_MS)
+                if (!connectFocus.isFocused) {
+                    connectInView.bringIntoView()
+                    delay(TALKBACK_SETTLE_MS)
+                    connectFocus.focus()
+                }
+            } else {
+                // Back to the top on the layout role, so a failed attempt's error is seen.
+                scroll.animateScrollTo(0, MotionRole.Layout.animation(reduceMotion = reduceMotion))
+            }
+            val failed = store.state
+            failed.errorMessage?.let { announcer.announce("${errorTitle(failed.errorPhase, failed.errorContext)}. ${it.replace("`", "")}", false) }
+        }
         Box(Modifier.fillMaxWidth().heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
             Text(
                 if (state.editingSavedServer == null) "New Server" else "Edit Server",
                 style = OpenCodeTextStyles.headline,
                 color = OpenCodeTheme.colors.text,
-                modifier = Modifier.semantics { heading() },
+                modifier = Modifier.accessibilityFocusRequest(titleFocus).semantics { heading() },
             )
             TextButton(
                 onClick = { store.send(AppFeature.Action.CancelEditingTapped) },
@@ -662,64 +780,104 @@ private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>)
             Modifier.fillMaxWidth().verticalScroll(scroll).imePadding().navigationBarsPadding().padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            state.errorMessage?.let { ConnectionErrorCard(store, it) }
-            OutlinedTextField(
+            state.errorMessage?.let { ConnectionErrorCard(store, it, announces = false) }
+            OpenCodeTextField(
                 value = state.serverName,
                 onValueChange = { store.send(AppFeature.Action.ServerNameChanged(it)) },
-                label = { Text("Name") },
+                label = "Name",
                 // Blank keeps the name the address gives, shown as the prompt.
-                placeholder = { Text(state.credentialNamePrompt) },
+                placeholder = state.credentialNamePrompt,
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, autoCorrectEnabled = false, imeAction = ImeAction.Next),
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
+            OpenCodeTextField(
                 value = state.serverURL,
                 onValueChange = { store.send(AppFeature.Action.ServerURLChanged(it)) },
-                label = { Text("Server address") },
-                placeholder = { Text("http://192.168.1.20:4096") },
+                label = "Server address",
+                placeholder = "http://192.168.1.20:4096",
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false, imeAction = ImeAction.Next),
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
+            OpenCodeTextField(
                 value = state.username,
                 onValueChange = { store.send(AppFeature.Action.UsernameChanged(it)) },
-                label = { Text("Username") },
-                placeholder = { Text("opencode") },
+                label = "Username",
+                placeholder = "opencode",
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Next),
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
-                value = state.password,
-                onValueChange = { store.send(AppFeature.Action.PasswordChanged(it)) },
-                label = { Text("Password") },
-                placeholder = { Text("Password") },
-                singleLine = true,
-                visualTransformation = if (revealsPassword) VisualTransformation.None else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = if (revealsPassword) KeyboardType.Text else KeyboardType.Password,
-                    autoCorrectEnabled = false,
-                    imeAction = ImeAction.Go,
-                ),
-                keyboardActions = KeyboardActions(onGo = { if (!isConnectDisabled) store.send(AppFeature.Action.ConnectButtonTapped) }),
-                trailingIcon = {
+            // A new field each time the password is shown or hidden, as iOS swaps its SecureField
+            // for a TextField: Compose keeps a field's first password flag (foundation 1.12's
+            // `CoreTextFieldSemanticsModifierNode` never stores a new one), so TalkBack would
+            // read a shown password as hidden. Input focus carries over to the new field; the
+            // eye sits over it, outside the swap, so TalkBack's focus stays on it.
+            Box {
+                androidx.compose.runtime.key(revealsPassword) {
+                    OpenCodeTextField(
+                        // Its own value, so the new field keeps the caret where it was.
+                        value = if (passwordValue.text == state.password) passwordValue else TextFieldValue(state.password, TextRange(state.password.length)),
+                        onValueChange = {
+                            passwordValue = it
+                            if (it.text != state.password) store.send(AppFeature.Action.PasswordChanged(it.text))
+                        },
+                        label = "Password",
+                        placeholder = "Password",
+                        singleLine = true,
+                        visualTransformation = if (revealsPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = if (revealsPassword) KeyboardType.Text else KeyboardType.Password,
+                            autoCorrectEnabled = false,
+                            imeAction = ImeAction.Go,
+                        ),
+                        keyboardActions = KeyboardActions(onGo = {
+                            if (!isConnectDisabled) {
+                                dismissKeyboard()
+                                store.send(AppFeature.Action.ConnectButtonTapped)
+                            }
+                        }),
+                        trailingIcon = { Spacer(Modifier.size(OpenCodeMinTapTarget)) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(passwordFocus)
+                            .onFocusChanged { isPasswordFocused = it.isFocused },
+                    )
+                }
+                // The label sits above the field: the eye centres on the field's 48 dp row.
+                Box(Modifier.matchParentSize(), contentAlignment = Alignment.BottomEnd) {
                     OpenCodeIconButton(
                         symbol = if (revealsPassword) SFSymbol.EyeSlash else SFSymbol.Eye,
                         contentDescription = if (revealsPassword) "Hide Password" else "Show Password",
-                        onClick = { revealsPassword = !revealsPassword },
+                        onClick = {
+                            refocusesPassword = isPasswordFocused
+                            // Through the eye, where TalkBack's focus already is: the old field's focus
+                            // would otherwise fall to the drag handle, and TalkBack's with it.
+                            if (isPasswordFocused) eyeFocus.requestFocus()
+                            revealsPassword = !revealsPassword
+                        },
                         style = OpenCodeIconButtonStyle.Standard,
+                        modifier = Modifier.focusRequester(eyeFocus),
                     )
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
+                }
+            }
+            LaunchedEffect(revealsPassword) {
+                if (!refocusesPassword) return@LaunchedEffect
+                refocusesPassword = false
+                passwordFocus.requestFocus()
+            }
             HeaderFields(store, state.headers, state.headerProblem)
             ConnectButton(
                 label = state.connectionProgressLabel ?: if (state.editingSavedServer == null) "Connect" else "Save and connect",
                 inProgress = state.connectionProgressLabel != null,
                 enabled = !isConnectDisabled,
-            ) { store.send(AppFeature.Action.ConnectButtonTapped) }
+                modifier = Modifier.bringIntoViewRequester(connectInView).accessibilityFocusTarget(connectFocus),
+            ) {
+                staysOnConnect = connectFocus.isFocused
+                dismissKeyboard()
+                store.send(AppFeature.Action.ConnectButtonTapped)
+            }
             Text(
                 formatted(editHint(state.editingSavedServer)),
                 style = OpenCodeTextStyles.footnote,
@@ -729,6 +887,9 @@ private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>)
         }
     }
 }
+
+/** How long TalkBack takes to move its focus after a scroll or a layout change it reacts to. */
+private const val TALKBACK_SETTLE_MS = 300L
 
 private fun editHint(editing: OpenCodeServer?): String {
     if (editing == null) {
@@ -743,7 +904,7 @@ private fun editHint(editing: OpenCodeServer?): String {
 
 /** iOS's Connect button: label-coloured when ready, a quiet fill while disabled, an arrow at the end. */
 @Composable
-private fun ConnectButton(label: String, inProgress: Boolean, enabled: Boolean, onClick: () -> Unit) {
+private fun ConnectButton(label: String, inProgress: Boolean, enabled: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val colors = OpenCodeTheme.colors
     Button(
         onClick = onClick,
@@ -754,14 +915,16 @@ private fun ConnectButton(label: String, inProgress: Boolean, enabled: Boolean, 
             disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             disabledContentColor = colors.secondaryText,
         ),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 12.dp),
-        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+        // The desktop's contrast button: small radius, medium label.
+        shape = RoundedCornerShape(OpenCodeRadius.fill),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+        modifier = modifier.fillMaxWidth().heightIn(min = 48.dp),
     ) {
         if (inProgress) {
             CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = colors.secondaryText)
             Spacer(Modifier.width(10.dp))
         }
-        Text(label, style = OpenCodeTextStyles.headline)
+        Text(label, style = PairingActionLabel)
         Spacer(Modifier.weight(1f))
         OpenCodeIcon(SFSymbol.ArrowRight, contentDescription = null)
     }
@@ -785,20 +948,20 @@ private fun HeaderFields(
         Text("Headers", style = OpenCodeTextStyles.caption1.copy(fontWeight = FontWeight.SemiBold), color = OpenCodeTheme.colors.secondaryText)
         headers.forEachIndexed { index, header ->
             val nameField: @Composable (Modifier) -> Unit = { modifier ->
-                OutlinedTextField(
+                OpenCodeTextField(
                     value = header.name,
                     onValueChange = { value -> update(index) { it.copy(name = value) } },
-                    placeholder = { Text("Name") },
+                    placeholder = "Name",
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Next),
                     modifier = modifier.semantics { contentDescription = "Header ${index + 1} name" },
                 )
             }
             val valueField: @Composable (Modifier) -> Unit = { modifier ->
-                OutlinedTextField(
+                OpenCodeTextField(
                     value = header.value,
                     onValueChange = { value -> update(index) { it.copy(value = value) } },
-                    placeholder = { Text("Value") },
+                    placeholder = "Value",
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Next),
                     modifier = modifier.semantics { contentDescription = "Header ${index + 1} value" },

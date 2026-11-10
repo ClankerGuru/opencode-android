@@ -1,5 +1,7 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.ui.openCodeHairline
+import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.motionBlurReveal
@@ -68,6 +70,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.HorizontalAlignmentLine
@@ -115,7 +118,8 @@ enum class ComposerTextStyle(val rawValue: String) {
  */
 object ComposerTunables {
     const val barHeight = 56f
-    const val cornerRadius = 28f
+    /** The desktop dock's 12 (iOS's capsule is 28). */
+    const val cornerRadius = 12f
     val textStyle = ComposerTextStyle.body
 
     const val horizontalMargin = 20f
@@ -136,8 +140,6 @@ object ComposerTunables {
     const val pillGap = 10f
     /** New Plus Menu: the attachment tiles sit this far from the surface's top and leading edges (f0670c5d). */
     const val attachmentInset = 19f
-    /** New Plus Menu's Send while the composer is empty (iOS `emptySendOpacity`). */
-    const val emptySendOpacity = 0.3f
 
     /** New Plus Menu's tile corners: concentric with the composer's, [attachmentInset] in. */
     val attachmentRadius: Float get() = max(cornerRadius - attachmentInset, 6f)
@@ -154,6 +156,8 @@ object ComposerTunables {
     const val queuedGlyphDrop = 1f
     const val plusScale = 17f
     const val buttonDiameter = 34f
+    /** Send's visible face, bigger than the other trailing controls (X feedback); its target stays 48. */
+    const val sendDiameter = 40f
     const val trailingGap = 11f
     const val micScale = 17f
     const val trailingSpacing = 4f
@@ -591,17 +595,20 @@ fun ComposerControlLabel(
     glyphSize: Dp = 18.dp,
     visualOffsetX: Float = 0f,
     glyphRise: Float = 0f,
+    faceDiameter: Float = ComposerTunables.buttonDiameter,
 ) {
     val reduceMotion = rememberReduceMotion()
     val fontScale = LocalDensity.current.fontScale
-    val diameter = min(34f * fontScale * (ComposerTunables.buttonDiameter / 34f), 44f)
+    // Grows with the font scale up to 44 (Send's bigger face up to 46), inside its 48 dp target.
+    val diameter = min(fontScale * faceDiameter, max(44f, faceDiameter + 6f))
     // Body grows 28/17 by Accessibility 1, where the glyph stops.
     val textScale = min(fontScale, 28f / 17f)
     Box(
         modifier
             .offset(x = visualOffsetX.dp)
             .size(diameter.dp)
-            .background(background, OpenCodeShape.circle),
+            // The desktop's submit button: a rounded square, not a circle.
+            .background(background, RoundedCornerShape(8.dp)),
         contentAlignment = Alignment.Center,
     ) {
         if (showsProgress) {
@@ -657,12 +664,13 @@ fun ComposerPillLabel(
             modifier = Modifier
                 .then(if (accessibilityLabel != null) Modifier.clearAndSetSemantics {} else Modifier)
                 .padding(vertical = 5.dp)
-                .clip(OpenCodeShape.capsule)
+                .clip(OpenCodeShape.control)
                 .indication(interactions, ripple()),
-            shape = OpenCodeShape.capsule,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            tonalElevation = 2.dp,
-            shadowElevation = 2.dp,
+            // The desktop's floating chip: flat fill, hairline ring, a small raised shadow.
+            shape = OpenCodeShape.control,
+            color = OpenCodeSurfaces.color,
+            border = OpenCodeSurfaces.border,
+            shadowElevation = OpenCodeSurfaces.raisedShadow,
         ) {
             ComposerPillContent(title = title, rolls = rolls, leading = leading)
         }
@@ -764,9 +772,11 @@ fun JumpToLatestPill(
                     Box(
                         Modifier
                             .size(34.dp)
-                            .shadow(2.dp, OpenCodeShape.circle)
-                            .clip(OpenCodeShape.circle)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            // The desktop's floating icon button: rounded square, hairline ring.
+                            .shadow(OpenCodeSurfaces.raisedShadow, OpenCodeShape.control)
+                            .clip(OpenCodeShape.control)
+                            .background(OpenCodeSurfaces.color)
+                            .openCodeHairline(OpenCodeShape.control)
                             .indication(interactions, ripple()),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -796,15 +806,15 @@ fun ComposerBanner(
     iconTint: Color = OpenCodeTheme.colors.secondaryText,
     detail: String? = null,
 ) {
-    // The pressed radius must fit even the minimum-height banner.
-    val radius = OpenCodeShapeGeometry.radius(28f, 52f)
+    // The composer's (desktop dock's) radius, clamped to fit even the minimum-height banner.
+    val radius = OpenCodeShapeGeometry.radius(ComposerTunables.cornerRadius, 52f)
     Surface(
         onClick = onClick,
         modifier = modifier.fillMaxWidth().heightIn(min = 52.dp),
         shape = RoundedCornerShape(radius.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 2.dp,
-        shadowElevation = 2.dp,
+        color = OpenCodeSurfaces.color,
+        border = OpenCodeSurfaces.border,
+        shadowElevation = OpenCodeSurfaces.raisedShadow,
     ) {
         Row(
             Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
@@ -859,26 +869,27 @@ fun Modifier.horizontalScrollEdgeFade(state: LazyListState, width: Dp = 20.dp, i
 }
 
 /**
- * iOS `ComposerSendLabel`: New Plus Menu's one fixed Send. The enabled disc and arrow are composited
- * before dimming, so the arrow stays its colour as the empty button fades to [ComposerTunables.emptySendOpacity].
+ * iOS `ComposerSendLabel`: New Plus Menu's one fixed Send. Empty, it's a neutral face
+ * ([OpenCodeSurfaces.neutralFill]) with a secondary arrow, so it stays legible on the white
+ * composer, and fades to the send colours as text arrives (iOS dims the disc to 0.3 instead).
  */
 @Composable
 fun ComposerSendLabel(enabled: Boolean, showsProgress: Boolean, visualOffsetX: Float, modifier: Modifier = Modifier) {
     val reduceMotion = rememberReduceMotion()
-    val alpha by animateFloatAsState(
-        if (enabled) 1f else ComposerTunables.emptySendOpacity,
+    val progress by animateFloatAsState(
+        if (enabled) 1f else 0f,
         Motion.swap.animation(if (enabled) MotionPhase.Enter else MotionPhase.Exit, reduceMotion),
-        label = "sendLabelAlpha",
+        label = "sendLabelProgress",
     )
+    val colors = OpenCodeTheme.colors
     ComposerControlLabel(
         systemImage = "arrow.up",
         showsProgress = showsProgress,
-        foreground = OpenCodeTheme.colors.sendButtonForeground,
-        background = OpenCodeTheme.colors.sendButtonBackground,
+        foreground = lerp(colors.secondaryText, colors.sendButtonForeground, progress),
+        background = lerp(OpenCodeSurfaces.neutralFill, colors.sendButtonBackground, progress),
         visualOffsetX = visualOffsetX,
-        modifier = modifier.graphicsLayer {
-            this.alpha = alpha
-            compositingStrategy = CompositingStrategy.ModulateAlpha
-        },
+        faceDiameter = ComposerTunables.sendDiameter,
+        glyphSize = 20.dp,
+        modifier = modifier,
     )
 }

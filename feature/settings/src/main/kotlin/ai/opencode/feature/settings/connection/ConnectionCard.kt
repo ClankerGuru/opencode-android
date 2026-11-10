@@ -2,6 +2,9 @@ package ai.opencode.feature.settings.connection
 
 import ai.opencode.core.motion.MotionTransition
 import ai.opencode.core.motion.MotionTunables
+import ai.opencode.core.ui.OpenCodeRadius
+import ai.opencode.core.ui.OpenCodeTextField
+import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.observe
 import ai.opencode.core.ui.AlertTextFields
@@ -60,9 +63,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.AlertDialog
+import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ripple
@@ -89,7 +91,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
@@ -105,9 +107,12 @@ import kotlin.math.roundToInt
 /** iOS `HomeFeature.State.credentialsRejectedStatus`: the HTTP status a refused sign-in comes back with. */
 const val credentialsRejectedStatus = 401
 
-/** The card's geometry (iOS `ConnectionCard.cornerRadius`, `boxInset`, `textInset`). */
+/**
+ * The card's geometry (iOS `ConnectionCard.cornerRadius`, `boxInset`, `textInset`). On this branch
+ * the card takes the Settings groups' desktop card radius, so it reads as one of them.
+ */
 private object ConnectionCardMetrics {
-    val cornerRadius = 26.dp
+    val cornerRadius = OpenCodeRadius.card
     /** The scope box's inset from the card. */
     val boxInset = 6.dp
     /** The text column's inset from the box. */
@@ -221,6 +226,7 @@ private fun ConnectionCardContent(
                 .fillMaxWidth()
                 .clip(cardShape)
                 .background(colors.groupedCard)
+                .border(1.dp, colors.border, cardShape)
                 .clickable(interactionSource = interaction, indication = ripple(), role = Role.Button, onClick = onOpen)
                 // Ahead of the clearing below, which would drop its marker.
                 .accessibilityFocusRequest(focusRequest)
@@ -341,7 +347,7 @@ private fun CardText(
 @Composable
 private fun CardAddress(monitor: ConnectionMonitor, stacked: Boolean) {
     val color = OpenCodeTheme.colors.tertiaryText
-    val mono = OpenCodeTextStyles.caption1.copy(fontFamily = FontFamily.Monospace)
+    val mono = OpenCodeTextStyles.caption1.copy(fontFamily = OpenCodeFonts.monospace)
     val caption = OpenCodeTextStyles.caption1
     if (stacked) {
         Column(Modifier.padding(top = 1.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -577,7 +583,7 @@ private fun RetryLabel(
 ) {
     Box(
         modifier
-            .clip(RoundedCornerShape(50))
+            .clip(OpenCodeShape.control)
             .background(OpenCodeTheme.colors.text.copy(alpha = 0.11f))
             .indication(interaction, ripple())
             .height(30.dp)
@@ -634,7 +640,7 @@ fun ServerPage(store: SettingsStore) {
                         SelectionContainer {
                             Text(
                                 monitor.server.host,
-                                style = SettingsText.title.copy(fontFamily = FontFamily.Monospace),
+                                style = SettingsText.title.copy(fontFamily = OpenCodeFonts.monospace),
                                 color = OpenCodeTheme.colors.secondaryText,
                                 maxLines = 1,
                                 overflow = TextOverflow.MiddleEllipsis,
@@ -688,16 +694,16 @@ fun ServerPage(store: SettingsStore) {
     }
 
     if (renaming) {
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = { renaming = false },
             title = { Text("Rename Server") },
             text = {
                 Column {
                     Text("Only this ${ai.opencode.core.ui.ThisDevice.name} uses the name. Leave it blank for “${current.friendlyName}”.")
-                    OutlinedTextField(
+                    OpenCodeTextField(
                         value = nameDraft,
                         onValueChange = { nameDraft = it },
-                        placeholder = { Text(current.friendlyName) },
+                        placeholder = current.friendlyName,
                         trailingIcon = AlertTextFields.clearButton(nameDraft) { nameDraft = "" },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),

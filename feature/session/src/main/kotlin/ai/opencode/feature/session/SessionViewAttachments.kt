@@ -9,6 +9,7 @@ import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
+import ai.opencode.core.ui.drawerPanHorizontalScroller
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.composer.AttachmentCameraView
 import ai.opencode.feature.composer.AttachmentMenuItem
@@ -67,7 +68,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
+import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -407,7 +408,7 @@ fun rememberSessionAttachmentImporter(store: StoreOf<SessionFeature.State, Sessi
 fun SessionAttachmentAlerts(importer: SessionAttachmentImporter) {
     val error = importer.attachmentError
     if (error != null) {
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = { importer.attachmentError = null },
             title = { Text("Couldn’t Add Image") },
             text = { Text(error) },
@@ -416,7 +417,7 @@ fun SessionAttachmentAlerts(importer: SessionAttachmentImporter) {
     }
     val upload = importer.largeUpload
     if (upload != null) {
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = importer::cancelLargeUpload,
             title = { Text(upload.title) },
             text = { Text(upload.message) },
@@ -577,6 +578,7 @@ fun PendingAttachmentsRow(
         modifier = Modifier
             // Edge to edge in the card, fading where photos run under its edges.
             .outsetHorizontally(inner)
+            .drawerPanHorizontalScroller({ listState.canScrollBackward }, { listState.canScrollForward })
             .horizontalScrollEdgeFade(listState, isEnabled = styled)
             .onGloballyPositioned { departing.row = it },
     ) {

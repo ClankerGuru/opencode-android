@@ -1,6 +1,9 @@
 package ai.opencode.feature.drawer.list
 
 import ai.opencode.core.motion.AmbientClock
+import ai.opencode.core.ui.openCodeHairline
+import ai.opencode.core.ui.OpenCodeRadius
+import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodePrimaryButton
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -122,7 +125,9 @@ fun DrawerServerNoteRow(note: ServerSwitchNote, onAction: () -> Unit, modifier: 
             .padding(horizontal = DrawerMetrics.rowEdge)
             .padding(top = 4.dp, bottom = 8.dp)
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(22.dp))
+            // The desktop card: floating fill, hairline ring, small radius.
+            .background(OpenCodeSurfaces.color, RoundedCornerShape(OpenCodeRadius.card))
+            .openCodeHairline(RoundedCornerShape(OpenCodeRadius.card))
             .padding(horizontal = 16.dp, vertical = 14.dp)
             .testTag("drawer-server-note"),
         verticalArrangement = Arrangement.spacedBy(2.dp),

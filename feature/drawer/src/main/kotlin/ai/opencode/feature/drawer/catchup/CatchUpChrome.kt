@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer.catchup
 
+import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionRole
@@ -175,12 +176,14 @@ private fun CatchUpUndoButton(canUndo: Boolean, onClick: () -> Unit) {
     FilledTonalButton(
         onClick = onClick,
         enabled = canUndo,
-        shape = OpenCodeShape.capsule,
+        shape = OpenCodeShape.control,
+        // The desktop's neutral button: base surface and a hairline.
+        border = androidx.compose.foundation.BorderStroke(1.dp, OpenCodeTheme.colors.border),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
         colors = ButtonDefaults.filledTonalButtonColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            containerColor = OpenCodeSurfaces.neutralFill,
             contentColor = OpenCodeTheme.colors.text,
-            disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            disabledContainerColor = OpenCodeSurfaces.neutralFill,
             disabledContentColor = OpenCodeTheme.colors.tertiaryText,
         ),
         modifier = Modifier.heightIn(min = OpenCodeMinTapTarget).widthIn(min = OpenCodeMinTapTarget),

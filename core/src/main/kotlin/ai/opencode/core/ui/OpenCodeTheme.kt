@@ -7,6 +7,11 @@ import android.app.Activity
 import android.app.UiModeManager
 import android.content.Context
 import android.content.ContextWrapper
+import android.database.ContentObserver
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -21,6 +26,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalConfiguration
@@ -49,6 +55,7 @@ fun OpenCodeTheme(
     theme: AppTheme = AppTheme.System,
     appearance: AppearanceColorScheme = AppearanceColorScheme.System,
     highContrast: Boolean = rememberHighContrast(),
+    strongBorders: Boolean = highContrast || rememberHighContrastText(),
     reduceMotion: Boolean = rememberReduceMotion(),
     content: @Composable () -> Unit,
 ) {
@@ -59,11 +66,11 @@ fun OpenCodeTheme(
     val dynamicScheme: ColorScheme? = remember(theme, isDark, context, configuration) {
         if (theme == AppTheme.System) DynamicSystemTheme.colorScheme(context, isDark) else null
     }
-    val colors = remember(theme, isDark, highContrast, dynamicScheme) {
+    val colors = remember(theme, isDark, highContrast, strongBorders, dynamicScheme) {
         if (dynamicScheme != null) {
-            DynamicSystemTheme.colors(dynamicScheme, isDark, highContrast)
+            DynamicSystemTheme.colors(dynamicScheme, isDark, highContrast, strongBorders)
         } else {
-            OpenCodeColors.resolve(theme, isDark, highContrast)
+            OpenCodeColors.resolve(theme, isDark, highContrast, strongBorders)
         }
     }
     val colorScheme = remember(colors, dynamicScheme) { dynamicScheme ?: colors.toColorScheme() }
@@ -134,10 +141,12 @@ fun rememberAppAppearance(): AppAppearance {
 
 /**
  * Android's counterpart of iOS Increase Contrast: the system contrast level
- * (`UiModeManager.getContrast()`, Android 14+) at medium or high. Live-updating.
+ * (`UiModeManager.getContrast()`, Android 14+) at medium or high. Live-updating. Android 13
+ * has no contrast level, so it reads as standard there.
  */
 @Composable
 fun rememberHighContrast(): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return false
     val context = LocalContext.current
     val uiModeManager = remember(context) { context.getSystemService(UiModeManager::class.java) }
     var contrast by remember(uiModeManager) { mutableFloatStateOf(uiModeManager?.contrast ?: 0f) }
@@ -151,6 +160,28 @@ fun rememberHighContrast(): Boolean {
 }
 
 private const val HIGH_CONTRAST_THRESHOLD = 0.5f
+
+/**
+ * Android's High contrast text accessibility setting (`Settings.Secure`
+ * `high_text_contrast_enabled`), live-updating. Only hairlines follow it ([OpenCodeColors.strongBorders]).
+ */
+@Composable
+fun rememberHighContrastText(): Boolean {
+    val context = LocalContext.current
+    val resolver = context.contentResolver
+    fun read() = Settings.Secure.getInt(resolver, HIGH_TEXT_CONTRAST, 0) == 1
+    var enabled by remember(resolver) { mutableStateOf(read()) }
+    DisposableEffect(resolver) {
+        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) { enabled = read() }
+        }
+        resolver.registerContentObserver(Settings.Secure.getUriFor(HIGH_TEXT_CONTRAST), false, observer)
+        onDispose { resolver.unregisterContentObserver(observer) }
+    }
+    return enabled
+}
+
+private const val HIGH_TEXT_CONTRAST = "high_text_contrast_enabled"
 
 /** Accessors for the design system inside [OpenCodeTheme]. */
 object OpenCodeTheme {

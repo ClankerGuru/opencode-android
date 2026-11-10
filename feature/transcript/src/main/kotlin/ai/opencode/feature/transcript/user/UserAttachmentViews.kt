@@ -4,6 +4,7 @@ import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconSize
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.drawerPanHorizontalScroller
 import ai.opencode.feature.media.mediaZoomSource
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
 import ai.opencode.feature.transcript.TranscriptAction
@@ -53,7 +54,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -77,8 +78,9 @@ internal fun TranscriptFileChips(
     // iOS anchors the row trailing only `for: .alignment`: a row that fits sits at the end, one
     // that doesn't starts at its first card.
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+        val scroll = rememberScrollState()
         Row(
-            Modifier.horizontalScroll(rememberScrollState()),
+            Modifier.drawerPanHorizontalScroller(scroll).horizontalScroll(scroll),
             horizontalArrangement = Arrangement.spacedBy(TranscriptMetrics.clustered),
         ) {
             for (file in files) {
@@ -187,7 +189,7 @@ internal fun PastedTextCard(id: String, text: String, summary: PastedTextSummary
             for (line in summary.preview) {
                 Text(
                     line,
-                    style = OpenCodeTextStyles.caption2.copy(fontFamily = FontFamily.Monospace),
+                    style = OpenCodeTextStyles.caption2.copy(fontFamily = OpenCodeFonts.monospace),
                     color = OpenCodeTheme.colors.secondaryText,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -260,7 +262,7 @@ internal fun SharedLocationCard(
             }
             Text(
                 location.coordinateText + (location.accuracyText?.let { " · $it" } ?: ""),
-                style = OpenCodeTextStyles.caption2.copy(fontFamily = FontFamily.Monospace),
+                style = OpenCodeTextStyles.caption2.copy(fontFamily = OpenCodeFonts.monospace),
                 color = OpenCodeTheme.colors.tertiaryText,
                 maxLines = 1,
             )
@@ -301,6 +303,11 @@ internal fun UserMessageImages(
     ) {
         // iOS anchors the strip trailing only `for: .alignment`: a strip that fits sits at the end,
         // one that doesn't starts at its first image.
-        if (images.size <= 3) strip(Modifier) else strip(Modifier.horizontalScroll(rememberScrollState()))
+        if (images.size <= 3) {
+            strip(Modifier)
+        } else {
+            val scroll = rememberScrollState()
+            strip(Modifier.drawerPanHorizontalScroller(scroll).horizontalScroll(scroll))
+        }
     }
 }

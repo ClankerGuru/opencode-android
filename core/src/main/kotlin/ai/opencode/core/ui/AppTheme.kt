@@ -323,7 +323,7 @@ object ThemePalette {
 
     fun definition(theme: AppTheme): ThemeDefinition = when (theme) {
         AppTheme.System -> system
-        AppTheme.OpenCode -> opencode
+        AppTheme.OpenCode -> BrandPalette.opencode
         AppTheme.TokyoNight -> tokyonight
         AppTheme.Catppuccin -> catppuccin
         AppTheme.Dracula -> dracula

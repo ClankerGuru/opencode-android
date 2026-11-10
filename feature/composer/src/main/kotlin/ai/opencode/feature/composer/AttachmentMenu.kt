@@ -71,6 +71,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
 import kotlin.math.abs
@@ -99,10 +100,10 @@ object AttachmentMenuMotion {
 
 /** iOS `AttachmentMenuMetrics` (points → dp). */
 object AttachmentMenuMetrics {
-    /** The composer's, so the menu reads as the same surface. */
-    val cornerRadius: Dp = 28.dp
-    /** Between the panel's edge and its rows; the highlight is concentric. */
-    val padding: Dp = 6.dp
+    /** The composer's, so the menu reads as the same surface (the desktop dock's 12). */
+    val cornerRadius: Dp = 12.dp
+    /** Between the panel's edge and its rows; the highlight is concentric (desktop context menu: 4). */
+    val padding: Dp = 4.dp
     /** Between the composer's top edge and the menu's bottom edge. */
     val composerGap: Dp = 10.dp
     val minimumWidth: Dp = 210.dp
@@ -143,7 +144,8 @@ object PlusMenuTunables {
     const val MENU_DROP = 80f
     /** The menu's width, × the screen's. */
     const val MENU_WIDTH = 0.63f
-    const val MENU_RADIUS = 28f
+    /** The open menu's corners: the desktop popover radius (`OpenCodeRadius.card`), as on the session’s ⋮ menu. */
+    const val MENU_RADIUS = 10f
     const val MENU_ROW_HEIGHT = 56f
     /** The menu's leading edge in from the composer's. */
     const val MENU_INSET = 0f
@@ -269,14 +271,15 @@ private fun AttachmentMenuRowLabel(item: AttachmentMenuItem, iconWidth: Dp, inse
                 .width(iconWidth)
                 .then(
                     if (circularIcon) {
-                        Modifier.height(iconWidth).background(MaterialTheme.colorScheme.surfaceContainerHighest, androidx.compose.foundation.shape.CircleShape)
+                        // Desktop context menus draw bare glyphs, no discs.
+                        Modifier.height(iconWidth)
                     } else Modifier,
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            OpenCodeIcon(item.systemImage, contentDescription = null, tint = OpenCodeTheme.colors.text)
+            OpenCodeIcon(item.systemImage, contentDescription = null, size = 20.dp, tint = OpenCodeTheme.colors.secondaryText)
         }
-        Text(item.title, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text, maxLines = 1)
+        Text(item.title, style = OpenCodeTextStyles.callout.copy(fontWeight = FontWeight.Medium), color = OpenCodeTheme.colors.text, maxLines = 1)
         Spacer(Modifier.width(24.dp))
     }
 }

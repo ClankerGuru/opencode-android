@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings
 
+import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.diagnostics.HidesFromScreenshots
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -155,6 +156,7 @@ internal fun VoiceProviderDetailPage(store: SettingsStore, opensAccount: Boolean
                             .heightIn(min = 48.dp)
                             .semantics { contentDescription = "Use ${other.name}" },
                         contentPadding = PaddingValues(horizontal = 14.dp),
+                        shape = OpenCodeShape.control,
                     ) { Text("Use", style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold)) }
                 }
             }

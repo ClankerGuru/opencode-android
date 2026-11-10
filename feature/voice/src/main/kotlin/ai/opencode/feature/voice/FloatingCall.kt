@@ -14,6 +14,7 @@ import ai.opencode.core.tuning.TuningPreset
 import ai.opencode.core.tuning.TuningPresets
 import ai.opencode.core.tuning.TuningStore
 import ai.opencode.core.ui.OpenCodeIcon
+import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
@@ -28,6 +29,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -53,7 +55,6 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -71,10 +72,16 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.shadow.Shadow
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
@@ -110,6 +117,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
@@ -1209,17 +1217,27 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
             shaping -> Modifier.pointerInput(model, "shape") { with(model) { shapeDrag() } }
             else -> Modifier.pointerInput(model, "orb") { with(model) { orbDrag() } }
         }
+        // The grown card's soft shadow, all round (the elevation shadow barely reaches its top edge).
+        val cardShadow = if (shaping) geometry.cardness(frame) * (1 - buttonLook) else 0.0
+        val cardShadowColor = Color.Black.copy(alpha = (if (OpenCodeTheme.colors.isDark) 0.5f else 0.1f) * cardShadow.toFloat() * alpha)
+        val cardBorder = VoiceCallSurfaceDefaults.cardBorder
         Box(
             Modifier
                 .placed(frame.left, frame.top, frame.width, frame.height)
                 .onPlaced { model.shapeCoordinates = it }
+                .dropShadow(shape, Shadow(radius = 20.dp, color = cardShadowColor, offset = DpOffset(0.dp, 3.dp)))
                 .graphicsLayer {
                     this.alpha = alpha
                     this.shape = shape
                     clip = true
                     shadowElevation = max(0.0, shadow).toFloat().dp.toPx()
                 }
-                .background(VoiceCallSurfaceDefaults.color)
+                .background(VoiceCallSurfaceDefaults.card)
+                .drawWithContent {
+                    drawContent()
+                    val edge = cardBorder.copy(alpha = cardBorder.alpha * (1 - buttonLook).toFloat())
+                    drawOutline(shape.createOutline(size, layoutDirection, this), edge, style = Stroke(1.dp.toPx()))
+                }
                 .then(gestures),
         ) {
             FloatingCallStack(Modifier.fillMaxSize()) {
@@ -1239,7 +1257,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
                     Box(
                         Modifier
                             .placed(0f, 0f, frame.width, frame.height)
-                            .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = backing.toFloat().coerceIn(0f, 1f))),
+                            .background(VoiceCallSurfaceDefaults.card.copy(alpha = backing.toFloat().coerceIn(0f, 1f))),
                     )
                 }
 
@@ -1367,7 +1385,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
                             null,
                             Modifier.graphicsLayer { rotationZ = Math.toDegrees(connect.glyphAngle).toFloat() },
                             size = 20.dp,
-                            tint = MaterialTheme.colorScheme.background,
+                            tint = OpenCodeTheme.colors.canvas,
                         )
                     }
                 }
@@ -1485,7 +1503,8 @@ private fun FloatingCallOrbControls(isMuted: Boolean, statusText: String, reduce
             Box(
                 Modifier
                     .size(20.dp)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape),
+                    .background(VoiceCallSurfaceDefaults.controlFill, CircleShape)
+                    .border(1.dp, VoiceCallSurfaceDefaults.controlBorder, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 OpenCodeIcon(SFSymbol.MicSlashFill, null, size = 12.dp, tint = OpenCodeTheme.colors.text)
@@ -1522,6 +1541,7 @@ private fun FloatingCallTag(text: String) {
         Modifier
             .height(36.dp)
             .background(VoiceCallSurfaceDefaults.color, CircleShape)
+            .border(1.dp, VoiceCallSurfaceDefaults.border, CircleShape)
             .padding(horizontal = 14.dp)
             .clearAndSetSemantics {},
         contentAlignment = Alignment.Center,
@@ -1552,13 +1572,19 @@ internal fun RowScope.FloatingCallControl(
     val reduceMotion = rememberReduceMotion()
     val dim by animateFloatAsState(if (isPlaceholder || !isEnabled) 0.35f else 1f, Motion.swap.animation(reduceMotion = reduceMotion), label = "floatingCallControlDim")
     val text = OpenCodeTheme.colors.text
-    val background = MaterialTheme.colorScheme.background
+    val background = OpenCodeTheme.colors.canvas
     val fill by animateColorAsState(
-        if (isDestructive) VoiceCallSurfaceDefaults.red else if (isOn) text else VoiceCallSurfaceDefaults.tertiaryFill,
+        if (isDestructive) VoiceCallSurfaceDefaults.red else if (isOn) text else VoiceCallSurfaceDefaults.controlFill,
         Motion.swap.animation(reduceMotion = reduceMotion),
         label = "floatingCallControlFill",
     )
+    val edge by animateColorAsState(
+        if (isDestructive || isOn) Color.Transparent else VoiceCallSurfaceDefaults.controlBorder,
+        Motion.easeOut(0.18),
+        label = "floatingCallControlEdge",
+    )
     val tint = if (isDestructive) Color.White else if (isOn) background else text
+    val shape = RoundedCornerShape(OpenCodeRadius.panel)
     Box(
         Modifier
             .weight(1f)
@@ -1571,15 +1597,19 @@ internal fun RowScope.FloatingCallControl(
             },
         contentAlignment = Alignment.Center,
     ) {
+        // iOS dims the whole control; here the glyph takes iOS's dim and the plate only part of
+        // it, so a control that isn't available still reads as a button on the light card.
+        val plateDim = 1f - (1f - dim) * 0.4f
         Box(
             Modifier
                 .size(diameter.dp)
-                .alpha(dim)
-                .background(fill, CircleShape),
+                .alpha(plateDim)
+                .background(fill, shape)
+                .border(1.dp, edge, shape),
             contentAlignment = Alignment.Center,
         ) {
             Crossfade(symbol, animationSpec = Motion.swap.animation(reduceMotion = reduceMotion), label = "floatingCallControlGlyph") { shown ->
-                OpenCodeIcon(shown, null, tint = tint, size = (diameter * 0.38f + 4).dp)
+                OpenCodeIcon(shown, null, tint = tint.copy(alpha = tint.alpha * dim / plateDim), size = (diameter * 0.38f + 4).dp)
             }
         }
     }

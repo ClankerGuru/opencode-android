@@ -41,16 +41,21 @@ class SystemActionActivity : Activity() {
     private fun handle(intent: Intent): Boolean {
         intent.getStringExtra(EXTRA_APP_FEATURE)?.let { spoken ->
             val directory = SessionDirectory.loadOrEmpty(SessionDirectory.file(filesDir))
+            // Calls only for a verified assistant (AppActionActivity), as iOS's run only from
+            // Siri and Shortcuts; any other app's call opens the session, where the user starts it.
+            val fromAssistant = intent.getBooleanExtra(EXTRA_FROM_ASSISTANT, false)
             when (val feature = OpenCodeShortcuts.feature(spoken, directory)) {
-                // Without the app showing only for an assistant (AppActionActivity); otherwise
-                // the call starts with the app open.
-                OpenCodeShortcuts.Feature.BackgroundCall -> if (intent.getBooleanExtra(EXTRA_FROM_ASSISTANT, false)) {
-                    startActivity(Intent(this, BackgroundCallActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                    return false
-                } else {
-                    StartVoiceCallIntent.perform(null)
+                OpenCodeShortcuts.Feature.BackgroundCall, OpenCodeShortcuts.Feature.StartVoiceCall -> when {
+                    !fromAssistant -> {
+                        AppLog.app.notice("App Action call from an unverified caller; opening the session")
+                        OpenSessionIntent.perform(SessionEntity.lastViewed(null))
+                    }
+                    feature == OpenCodeShortcuts.Feature.BackgroundCall -> {
+                        startActivity(Intent(this, BackgroundCallActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                        return false
+                    }
+                    else -> StartVoiceCallIntent.perform(null)
                 }
-                OpenCodeShortcuts.Feature.StartVoiceCall -> StartVoiceCallIntent.perform(null)
                 is OpenCodeShortcuts.Feature.NewSession -> NewSessionIntent.perform(feature.project)
                 is OpenCodeShortcuts.Feature.OpenSession -> OpenSessionIntent.perform(feature.session)
                 null -> Unit
@@ -102,7 +107,7 @@ class SystemActionActivity : Activity() {
         const val EXTRA_CONTROL_KIND = "controlKind"
         /** An App Action's spoken feature (`actions.intent.OPEN_APP_FEATURE`). */
         const val EXTRA_APP_FEATURE = "appFeature"
-        /** Set by [AppActionActivity]: the App Action came from an assistant. */
+        /** Set by [AppActionActivity]: the App Action came from a verified assistant, so it may start a call. */
         internal const val EXTRA_FROM_ASSISTANT = "fromAssistant"
         internal const val EXTRA_PUSH_REF = "opencode.ref"
         internal const val EXTRA_PUSH_SESSION = "opencode.sessionID"

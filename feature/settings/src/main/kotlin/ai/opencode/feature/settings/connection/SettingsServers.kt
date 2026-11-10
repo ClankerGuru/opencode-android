@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings.connection
 
+import ai.opencode.core.ui.OpenCodeTextField
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.ui.AlertTextFields
 import ai.opencode.core.ui.OpenCodeIcon
@@ -25,12 +26,11 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
+import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -122,16 +122,16 @@ fun SettingsServersSection(
     }
 
     renaming?.let { server ->
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = { renaming = null },
             title = { Text("Rename Server") },
             text = {
                 Column {
                     Text("Only this ${ai.opencode.core.ui.ThisDevice.name} uses the name. Leave it blank to use the computer’s.")
-                    OutlinedTextField(
+                    OpenCodeTextField(
                         value = nameDraft,
                         onValueChange = { nameDraft = it },
-                        placeholder = { Text(server.friendlyName) },
+                        placeholder = server.friendlyName,
                         trailingIcon = AlertTextFields.clearButton(nameDraft) { nameDraft = "" },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
@@ -150,7 +150,7 @@ fun SettingsServersSection(
     }
 
     removing?.let { server ->
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = { removing = null },
             title = { Text("Remove ${server.friendlyName}?") },
             text = { Text("This forgets the address and password on this ${ai.opencode.core.ui.ThisDevice.name}. Sessions on the server are not affected.") },

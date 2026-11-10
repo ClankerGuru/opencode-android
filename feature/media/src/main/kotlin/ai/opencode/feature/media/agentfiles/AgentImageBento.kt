@@ -311,7 +311,7 @@ class AgentImageBento(
         /** A tile cropping more than this shows its image whole instead ([fits]). */
         const val MAX_CROP = 0.3
         /** iOS `JustifiedImageRows.cornerRadius`. */
-        val defaultCornerRadius: Dp = 14.dp
+        val defaultCornerRadius: Dp = TranscriptMetrics.cardCornerRadius
 
         /** The corners of `frame` that lie on the bento's own corners. */
         fun corners(frame: BentoRect, width: Double, height: Double): BentoCorners {

@@ -3,16 +3,22 @@ package ai.opencode.feature.settings.servers
 import ai.opencode.core.dependencies.PasteboardClient
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.ui.AppearanceColorScheme
+import ai.opencode.core.ui.OpenCodeAlertDialog
 import ai.opencode.core.ui.OpenCodeButtonDefaults
 import ai.opencode.core.ui.OpenCodeFonts
 import ai.opencode.core.ui.OpenCodeIcon
+import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.ui.OpenCodeSecondaryButton
+import ai.opencode.core.ui.OpenCodeShape
+import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.OpenCodeTopBar
+import ai.opencode.core.ui.accessibilityFocusRequest
+import ai.opencode.core.ui.openCodeHairline
+import ai.opencode.core.ui.rememberAccessibilityFocusRequest
 import ai.opencode.core.ui.rememberAppAppearance
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,16 +29,12 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,8 +44,20 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -112,28 +126,38 @@ fun PairingScannerView(
         cameraAccess = camera.authorization()
     }
 
+    // VoiceOver starts on the navigation title, a header (iOS `.navigationTitle`), and comes back to
+    // it once the camera prompt is answered; TalkBack would start on Cancel (QA OB-B-04).
+    val titleFocus = rememberAccessibilityFocusRequest(cameraAccess)
+
     val appearance = rememberAppAppearance()
     OpenCodeTheme(theme = appearance.theme, appearance = AppearanceColorScheme.Dark) {
         Scaffold(
             modifier = modifier,
-            containerColor = Color.Black,
+            containerColor = OpenCodeTheme.colors.canvas,
             topBar = {
-                CenterAlignedTopAppBar(
-                    title = { Text("Scan Pairing Code", style = OpenCodeTextStyles.headline) },
-                    navigationIcon = { TextButton(onClick = onCancel) { Text("Cancel") } },
+                OpenCodeTopBar(
+                    centerTitle = true,
+                    hairline = false,
+                    containerColor = OpenCodeTheme.colors.canvas,
+                    contentColor = OpenCodeTheme.colors.text,
+                    title = {
+                        Text(
+                            "Scan Pairing Code",
+                            style = OpenCodeTextStyles.headline,
+                            modifier = Modifier.accessibilityFocusRequest(titleFocus).semantics { heading() },
+                        )
+                    },
+                    navigation = { ScannerBarButton("Cancel", onClick = onCancel) },
                     actions = {
                         if (isCameraAvailable && !isAccessDenied) {
-                            TextButton(onClick = ::paste) { Text("Paste") }
+                            ScannerBarButton("Paste", onClick = ::paste)
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Black,
-                        titleContentColor = Color.White,
-                    ),
                 )
             },
         ) { padding ->
-            Box(Modifier.fillMaxSize().background(Color.Black)) {
+            Box(Modifier.fillMaxSize().background(OpenCodeTheme.colors.canvas)) {
                 when {
                     !isCameraAvailable -> PairingScannerFallback(
                         symbol = "camera.metering.unknown",
@@ -163,7 +187,7 @@ fun PairingScannerView(
             }
         }
         if (pasteFailed) {
-            AlertDialog(
+            OpenCodeAlertDialog(
                 onDismissRequest = { pasteFailed = false },
                 confirmButton = { TextButton(onClick = { pasteFailed = false }) { Text("OK") } },
                 title = { Text("Nothing to Paste") },
@@ -175,6 +199,18 @@ fun PairingScannerView(
     }
 }
 
+/** The bar's text controls: plain labels with the desktop's control corners for the press state. */
+@Composable
+private fun ScannerBarButton(label: String, onClick: () -> Unit) {
+    TextButton(
+        onClick = onClick,
+        shape = OpenCodeShape.control,
+        colors = ButtonDefaults.textButtonColors(contentColor = OpenCodeTheme.colors.text),
+    ) {
+        Text(label, style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium))
+    }
+}
+
 @Composable
 private fun PairingViewfinder(modifier: Modifier = Modifier) {
     Column(modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -182,31 +218,76 @@ private fun PairingViewfinder(modifier: Modifier = Modifier) {
         Box(
             Modifier
                 .size(250.dp)
-                .border(BorderStroke(3.dp, Color.White.copy(alpha = 0.9f)), RoundedCornerShape(28.dp))
+                .drawBehind { drawViewfinder(Color.White) }
                 .clearAndSetSemantics {},
         )
         Spacer(Modifier.weight(1f))
         Column(
             Modifier
                 .padding(start = 24.dp, end = 24.dp, bottom = 32.dp)
-                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(18.dp))
+                .background(OpenCodeSurfaces.color.copy(alpha = 0.92f), OpenCodeShape.panel)
+                .openCodeHairline(OpenCodeShape.panel)
                 .padding(horizontal = 20.dp, vertical = 14.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text("Point your camera at the QR code", style = OpenCodeTextStyles.headline, color = Color.White, textAlign = TextAlign.Center)
+            Text("Point your camera at the QR code", style = OpenCodeTextStyles.headline, color = OpenCodeTheme.colors.text, textAlign = TextAlign.Center)
             Text(
                 buildAnnotatedString {
                     append("Run ")
-                    withStyle(SpanStyle(fontFamily = OpenCodeFonts.berkeleyMono, fontSize = 15.sp)) { append("opencode pair --remote") }
+                    withStyle(SpanStyle(fontFamily = OpenCodeFonts.monospace, fontSize = 14.sp, color = OpenCodeTheme.colors.text)) {
+                        append("opencode pair --remote")
+                    }
                     append(" on your computer to show it.")
                 },
                 style = OpenCodeTextStyles.subheadline,
-                color = Color.White.copy(alpha = 0.8f),
+                color = OpenCodeTheme.colors.secondaryText,
                 textAlign = TextAlign.Center,
             )
         }
     }
+}
+
+/**
+ * The viewfinder: four bold corner marks around a window with the desktop's sheet radius, and the
+ * scene outside the window dimmed. The marks sit just outside the window, on the dimmed scene, so
+ * they stay legible over bright scenes.
+ */
+private fun DrawScope.drawViewfinder(color: Color) {
+    val radius = OpenCodeRadius.sheet.toPx()
+    val dim = Path().apply {
+        fillType = PathFillType.EvenOdd
+        addRect(Rect(-size.width * 8, -size.height * 8, size.width * 9, size.height * 9))
+        addRoundRect(RoundRect(Rect(Offset.Zero, size), CornerRadius(radius)))
+    }
+    drawPath(dim, Color.Black.copy(alpha = 0.4f))
+
+    val stroke = 5.dp.toPx()
+    val arm = 44.dp.toPx()
+    // The stroke's centre line runs half a stroke outside the window edge.
+    val left = -stroke / 2
+    val top = -stroke / 2
+    val right = size.width + stroke / 2
+    val bottom = size.height + stroke / 2
+    val r = radius + stroke / 2
+    val corners = Path()
+    // Top left
+    corners.moveTo(left, top + arm)
+    corners.arcTo(Rect(left, top, left + 2 * r, top + 2 * r), 180f, 90f, false)
+    corners.lineTo(left + arm, top)
+    // Top right
+    corners.moveTo(right - arm, top)
+    corners.arcTo(Rect(right - 2 * r, top, right, top + 2 * r), 270f, 90f, false)
+    corners.lineTo(right, top + arm)
+    // Bottom right
+    corners.moveTo(right, bottom - arm)
+    corners.arcTo(Rect(right - 2 * r, bottom - 2 * r, right, bottom), 0f, 90f, false)
+    corners.lineTo(right - arm, bottom)
+    // Bottom left
+    corners.moveTo(left + arm, bottom)
+    corners.arcTo(Rect(left, bottom - 2 * r, left + 2 * r, bottom), 90f, 90f, false)
+    corners.lineTo(left, bottom - arm)
+    drawPath(corners, color, style = Stroke(width = stroke, cap = StrokeCap.Round))
 }
 
 @Composable
@@ -224,12 +305,12 @@ private fun PairingScannerFallback(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
     ) {
-        OpenCodeIcon(symbol, contentDescription = null, size = 34.dp, tint = Color.White.copy(alpha = 0.75f))
-        Text(title, style = OpenCodeTextStyles.headline, color = Color.White, textAlign = TextAlign.Center)
+        OpenCodeIcon(symbol, contentDescription = null, size = 28.dp, tint = OpenCodeTheme.colors.secondaryText)
+        Text(title, style = OpenCodeTextStyles.headline, color = OpenCodeTheme.colors.text, textAlign = TextAlign.Center)
         Text(
             inlineCode(message),
             style = OpenCodeTextStyles.subheadline,
-            color = Color.White.copy(alpha = 0.75f),
+            color = OpenCodeTheme.colors.secondaryText,
             textAlign = TextAlign.Center,
         )
         Column(Modifier.padding(top = 8.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -255,6 +336,7 @@ private fun PasteButton(prominent: Boolean, onClick: () -> Unit, content: @Compo
             colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
             contentPadding = OpenCodeButtonDefaults.contentPadding,
             content = content,
+            shape = OpenCodeShape.control,
         )
     } else {
         OpenCodeSecondaryButton(onClick = onClick, modifier = Modifier.fillMaxWidth(), content = content)

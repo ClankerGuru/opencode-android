@@ -682,7 +682,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         // pairs rather than being taken for an address with no password.
         val typed = state.serverURL.trim()
         if (state.editingSavedServer == null &&
-            (OpenCodePairingLink.decode(typed) != null || OpenCodePairingLink.isPairingEndpoint(typed))
+            (OpenCodePairingLink.decodeCopied(typed) != null || OpenCodePairingLink.isPairingEndpoint(typed))
         ) {
             return Reduced(state.copy(serverURL = ""), Effect.send(Action.PairingCodeScanned(typed)))
         }

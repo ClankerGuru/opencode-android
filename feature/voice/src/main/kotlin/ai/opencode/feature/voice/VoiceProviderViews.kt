@@ -227,7 +227,7 @@ fun VoiceProviderFailureCard(
     Column(
         modifier
             .fillMaxWidth()
-            .callSurface(shape, VoiceCallSurfaceDefaults.color)
+            .callSurface(shape, VoiceCallSurfaceDefaults.color, VoiceCallSurfaceDefaults.border)
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {

@@ -1,5 +1,9 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.ui.OpenCodeSearchField
+import ai.opencode.core.ui.OpenCodeSheetDefaults
+import ai.opencode.core.ui.OpenCodeSheetHandle
+import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.motion.transitionBlur
 
 import ai.opencode.core.motion.Motion
@@ -48,8 +52,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -236,7 +238,7 @@ fun DraftProjectList(
                 Box(
                     Modifier
                         .alpha(highlightAlpha)
-                        .background(OpenCodeTheme.colors.text.copy(alpha = 0.06f), RoundedCornerShape(50)),
+                        .background(OpenCodeTheme.colors.text.copy(alpha = 0.06f), RoundedCornerShape(8.dp)),
                 )
             },
         ) {
@@ -302,7 +304,7 @@ private fun DraftProjectRow(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
-            .background(OpenCodeTheme.colors.text.copy(alpha = 0.06f * highlight), RoundedCornerShape(50))
+            .background(OpenCodeTheme.colors.text.copy(alpha = 0.06f * highlight), RoundedCornerShape(8.dp))
             // A hidden row has no pointer node at all: a disabled one would still be hit and end
             // the search, eating taps meant for the chosen row folded under it.
             .then(if (takesTouches) Modifier.clickable(role = Role.Button, onClickLabel = hint, onClick = onClick) else Modifier)
@@ -436,7 +438,12 @@ fun ProjectPickerSheet(
     // ignores detents and presents the sheet at full height; half of it there showed only the
     // title, the search and a row under the gesture bar (QA F-36).
     val compactHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() } < 480.dp
-    ModalBottomSheet(onDismissRequest = onCancel, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = compactHeight)) {
+    ModalBottomSheet(
+        onDismissRequest = onCancel,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = compactHeight),
+        dragHandle = { OpenCodeSheetHandle() },
+        shape = OpenCodeSheetDefaults.shape,
+    ) {
         val routes = folderBrowser?.let { browser -> browser.collectState().value.routes }.orEmpty()
         BackHandler(enabled = routes.isNotEmpty()) {
             folderBrowser?.send(FolderBrowserFeature.Action.RoutesChanged(routes.dropLast(1)))
@@ -684,18 +691,10 @@ private fun SheetTitleBar(
 
 @Composable
 private fun SearchField(value: String, onValueChange: (String) -> Unit) {
-    TextField(
+    OpenCodeSearchField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = { Text("Search") },
-        leadingIcon = { OpenCodeIcon(SFSymbol.Magnifyingglass, contentDescription = null, size = 20.dp) },
-        singleLine = true,
-        shape = RoundedCornerShape(50),
-        colors = TextFieldDefaults.colors(
-            focusedIndicatorColor = Color.Transparent,
-            unfocusedIndicatorColor = Color.Transparent,
-            disabledIndicatorColor = Color.Transparent,
-        ),
+        placeholder = "Search",
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
     )
 }
@@ -717,6 +716,6 @@ private fun Unavailable(symbol: SFSymbol, title: String, description: String? = 
         OpenCodeIcon(symbol, contentDescription = null, size = 48.dp, tint = OpenCodeTheme.colors.secondaryText)
         Text(title, style = OpenCodeTextStyles.title3.copy(fontWeight = FontWeight.Bold), color = OpenCodeTheme.colors.text, textAlign = TextAlign.Center)
         if (description != null) Text(description, style = OpenCodeTextStyles.callout, color = OpenCodeTheme.colors.secondaryText, textAlign = TextAlign.Center)
-        if (action != null) Button(onClick = action.second) { Text(action.first) }
+        if (action != null) Button(onClick = action.second, shape = OpenCodeShape.control) { Text(action.first) }
     }
 }

@@ -1,8 +1,10 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.motion.transitionBlurEffect
 
 import ai.opencode.core.ui.excludedFromDrawerPan
+import ai.opencode.core.ui.floating
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import ai.opencode.core.dependencies.DateClient
@@ -67,6 +69,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.isSpecified
+import androidx.compose.ui.graphics.lerp as lerpColor
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
@@ -134,8 +139,8 @@ object ComposerMetrics {
     /** `composer.size.barHeight`. */
     const val barHeight = 56f
 
-    /** `composer.size.cornerRadius`. */
-    const val cornerRadius = 28f
+    /** `composer.size.cornerRadius`; on this branch the desktop dock's 12. */
+    const val cornerRadius = 12f
 
     /** `composer.spacing.innerHorizontal`. */
     const val innerHorizontal = 6f
@@ -146,9 +151,40 @@ object ComposerMetrics {
  * imitation.
  */
 object VoiceCallSurfaceDefaults {
-    /** The composer capsule and the call's cards. */
+    /**
+     * The composer and the call's cards: the desktop dock's raised surface
+     * (`--surface-raised-stronger-non-alpha`, white in light, a step above the canvas in dark).
+     */
     val color: Color
-        @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.surfaceContainerHigh
+        @Composable @ReadOnlyComposable get() = OpenCodeTheme.colors.floating
+
+    /** The dock's hairline ring (`--v2-border-border-base`). */
+    val border: Color
+        @Composable @ReadOnlyComposable get() = OpenCodeTheme.colors.border
+
+    /**
+     * The floating call's card and sheet: one step off the page in both modes (`#F3F3F3` on the
+     * light canvas, `#252525` on the dark), so the card reads as its own surface with its hairline
+     * and shadow. Mixed from the theme's canvas and text, so curated themes and Material You follow.
+     */
+    val card: Color
+        @Composable @ReadOnlyComposable get() = OpenCodeTheme.colors.let { lerpColor(it.canvas, it.text, if (it.isDark) 0.07f else 0.05f) }
+
+    /** The card's hairline, a little stronger than [border] so it holds on the tinted card. */
+    val cardBorder: Color
+        @Composable @ReadOnlyComposable get() = OpenCodeTheme.colors.let {
+            if (it.strongBorders) it.variant.borderStrong.color else lerpColor(it.canvas, it.text, if (it.isDark) 0.15f else 0.13f)
+        }
+
+    /** The card's controls: raised over the card (white in light, a step up in dark), worn with [controlBorder]. */
+    val controlFill: Color
+        @Composable @ReadOnlyComposable get() = OpenCodeTheme.colors.let { if (it.isDark) lerpColor(it.canvas, it.text, 0.13f) else it.canvas }
+
+    /** The controls' hairline. */
+    val controlBorder: Color
+        @Composable @ReadOnlyComposable get() = OpenCodeTheme.colors.let {
+            if (it.strongBorders) it.variant.borderStrong.color else lerpColor(it.canvas, it.text, if (it.isDark) 0.22f else 0.18f)
+        }
 
     /** `UIColor.tertiarySystemFill`: Mute's soft disc. */
     val tertiaryFill: Color
@@ -165,20 +201,29 @@ object VoiceCallSurfaceDefaults {
         @Composable @ReadOnlyComposable get() = OpenCodeTheme.colors.destructive
 }
 
-/** A call surface: tonal fill with a soft shadow (iOS `openCodeGlass(in:)`). */
-fun Modifier.callSurface(shape: Shape, color: Color): Modifier = graphicsLayer {
+/**
+ * A call surface: the desktop dock's flat fill, a hairline [border] and a small raised shadow
+ * (`--v2-elevation-raised`), instead of iOS glass.
+ */
+fun Modifier.callSurface(shape: Shape, color: Color, border: Color = Color.Unspecified): Modifier = graphicsLayer {
     this.shape = shape
-    shadowElevation = 3.dp.toPx()
-    clip = false
-}.background(color, shape)
-
-/** Animated geometry is observed by the layer/draw scopes, never by composition. */
-private fun Modifier.callSurface(shape: () -> Shape, color: Color): Modifier = graphicsLayer {
-    this.shape = shape()
-    shadowElevation = 3.dp.toPx()
+    shadowElevation = 1.5.dp.toPx()
     clip = false
 }.drawBehind {
-    drawOutline(shape().createOutline(size, layoutDirection, this), color)
+    val outline = shape.createOutline(size, layoutDirection, this)
+    drawOutline(outline, color)
+    if (border.isSpecified) drawOutline(outline, border, style = Stroke(1.dp.toPx()))
+}
+
+/** Animated geometry is observed by the layer/draw scopes, never by composition. */
+private fun Modifier.callSurface(shape: () -> Shape, color: Color, border: Color = Color.Unspecified): Modifier = graphicsLayer {
+    this.shape = shape()
+    shadowElevation = 1.5.dp.toPx()
+    clip = false
+}.drawBehind {
+    val outline = shape().createOutline(size, layoutDirection, this)
+    drawOutline(outline, color)
+    if (border.isSpecified) drawOutline(outline, border, style = Stroke(1.dp.toPx()))
 }
 
 /** Touches on this element and its children are dropped (iOS `.allowsHitTesting(false)` over content that shouldn't act). */
@@ -413,6 +458,7 @@ fun ComposerSurface(
         label = "expansionDim",
     )
     val surfaceColor = VoiceCallSurfaceDefaults.color
+    val surfaceBorder = VoiceCallSurfaceDefaults.border
     val cornerRadius = ComposerMetrics.cornerRadius
     val showsExpansion = activeExpansion?.isShown == true || (activeExpansion != null && expansionReach > 0)
     val glassFullAlpha by animateFloatAsState(if (surfaceExpanded) 1f else 0f, Motion.reducedFadeSpec(), label = "surfaceFull")
@@ -441,11 +487,11 @@ fun ComposerSurface(
                         Modifier
                             .fillMaxSize()
                             .graphicsLayer { alpha = 1f - glassFullAlpha }
-                            .callSurface({ TopInsetRect(extent(), cornerRadius) }, surfaceColor),
+                            .callSurface({ TopInsetRect(extent(), cornerRadius) }, surfaceColor, surfaceBorder),
                     )
-                    Box(Modifier.fillMaxSize().graphicsLayer { alpha = glassFullAlpha }.callSurface(RoundedCornerShape(cornerRadius.dp), surfaceColor))
+                    Box(Modifier.fillMaxSize().graphicsLayer { alpha = glassFullAlpha }.callSurface(RoundedCornerShape(cornerRadius.dp), surfaceColor, surfaceBorder))
                 } else {
-                    Box(Modifier.fillMaxSize().callSurface({ TopInsetRect(unrevealed(), cornerRadius) }, surfaceColor))
+                    Box(Modifier.fillMaxSize().callSurface({ TopInsetRect(unrevealed(), cornerRadius) }, surfaceColor, surfaceBorder))
                 }
             }
             Box(
@@ -476,7 +522,7 @@ fun ComposerSurface(
                 Box(
                     Modifier
                         .layoutId(SurfaceSlot.expansion)
-                        .clip(RoundedCornerShape(28.dp))
+                        .clip(RoundedCornerShape(ComposerMetrics.cornerRadius.dp))
                         .drawWithContent {
                             // Records the reach as each frame of its animation draws.
                             val drawn = activeExpansion.drawn
@@ -682,11 +728,11 @@ private fun ViewThatFitsHorizontally(modifier: Modifier = Modifier, wide: @Compo
  */
 @Composable
 fun VoiceCallEnded(store: VoiceStoreOf, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(28.dp)
+    val shape = RoundedCornerShape(ComposerMetrics.cornerRadius.dp)
     Box(
         modifier
             .fillMaxWidth()
-            .callSurface(shape, VoiceCallSurfaceDefaults.color)
+            .callSurface(shape, VoiceCallSurfaceDefaults.color, VoiceCallSurfaceDefaults.border)
             .padding(start = 18.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
     ) {
         val title = @Composable { Text("Call Ended", style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold)) }
@@ -739,11 +785,11 @@ fun VoiceCallFailure(store: VoiceStoreOf, message: String, modifier: Modifier = 
 @Composable
 private fun VoiceCallFailurePlainCard(store: VoiceStoreOf, message: String, modifier: Modifier) {
     val isMicrophoneDenied = message == VoiceAudioError.microphoneDenied.message
-    val shape = RoundedCornerShape(22.dp)
+    val shape = RoundedCornerShape(OpenCodeRadius.card)
     Column(
         modifier
             .fillMaxWidth()
-            .callSurface(shape, VoiceCallSurfaceDefaults.color)
+            .callSurface(shape, VoiceCallSurfaceDefaults.color, VoiceCallSurfaceDefaults.border)
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {

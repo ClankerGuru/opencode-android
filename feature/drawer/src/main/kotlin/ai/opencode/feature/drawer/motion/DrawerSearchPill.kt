@@ -1,5 +1,8 @@
 package ai.opencode.feature.drawer.motion
 
+import ai.opencode.core.ui.OpenCodeSurfaces
+import androidx.compose.foundation.shape.RoundedCornerShape
+import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
@@ -10,7 +13,6 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeMinTapTarget
 import ai.opencode.feature.drawer.style.DrawerMetrics
 import ai.opencode.feature.drawer.style.DrawerTunables
-import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
@@ -282,8 +284,11 @@ private fun SearchCapsule(
     val leading by animateFloatAsState(leadingPadding.value, DrawerSearchPillDefaults.morph(isSearching), label = "search-leading")
     val trailing by animateFloatAsState(trailingPadding.value, DrawerSearchPillDefaults.morph(isSearching), label = "search-trailing")
     Surface(
-        shape = OpenCodeShape.capsule,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        // The drawer's floating control, as its footer buttons: popover fill, hairline ring, soft shadow.
+        shape = RoundedCornerShape(OpenCodeRadius.panel),
+        color = OpenCodeSurfaces.color,
+        border = OpenCodeSurfaces.border,
+        shadowElevation = OpenCodeSurfaces.raisedShadow,
         contentColor = OpenCodeTheme.colors.text,
         modifier = modifier
             .height(size)
@@ -329,8 +334,10 @@ private fun SearchCapsule(
 @Composable
 private fun CancelButton(size: Dp, enabled: Boolean = true, onClick: () -> Unit) {
     Surface(
-        shape = OpenCodeShape.circle,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(OpenCodeRadius.panel),
+        color = OpenCodeSurfaces.color,
+        border = OpenCodeSurfaces.border,
+        shadowElevation = OpenCodeSurfaces.raisedShadow,
         contentColor = OpenCodeTheme.colors.text,
         modifier = Modifier
             .size(size)

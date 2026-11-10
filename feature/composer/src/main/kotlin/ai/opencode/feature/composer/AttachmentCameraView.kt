@@ -9,7 +9,9 @@ import ai.opencode.core.motion.MotionReduce
 import ai.opencode.core.motion.MotionTransition
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
+import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.ui.OpenCodeShape
+import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
@@ -65,6 +67,8 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -116,10 +120,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 import java.util.UUID
 import kotlin.math.abs
@@ -130,6 +130,10 @@ import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.round
 import kotlin.math.roundToInt
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * A still camera presented full screen; the preview fills the display while the controls
@@ -201,16 +205,17 @@ fun AttachmentCameraView(
                     Modifier
                         .align(Alignment.Center)
                         .padding(start = 16.dp, end = 16.dp, bottom = 72.dp)
-                        .background(Color.Black.copy(alpha = 0.7f))
-                        .padding(12.dp),
+                        .background(Color.Black.copy(alpha = 0.65f), OpenCodeShape.panel)
+                        .border(OpenCodeSurfaces.hairline, CameraChromeHairline, OpenCodeShape.panel)
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Text(message, style = OpenCodeTextStyles.subheadline, textAlign = TextAlign.Center, color = Color.White)
                     if (camera.needsSettings) {
-                        TextButton(onClick = camera::openSettings) { Text("Open Settings") }
+                        CameraMessageButton("Open Settings", onClick = camera::openSettings)
                     } else if (camera.canRetry) {
-                        TextButton(onClick = camera::activate) { Text("Try Again") }
+                        CameraMessageButton("Try Again", onClick = camera::activate)
                     }
                 }
             }
@@ -413,8 +418,8 @@ fun AttachmentCameraControls(
                         color = Color.Black,
                         style = OpenCodeTextStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
                         modifier = Modifier
-                            .background(CameraYellow, OpenCodeShape.capsule)
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                            .background(CameraYellow, RoundedCornerShape(OpenCodeRadius.xs))
+                            .padding(horizontal = 6.dp, vertical = 3.dp),
                     )
                 }
                 Spacer(Modifier.weight(1f))
@@ -479,7 +484,28 @@ fun AttachmentCameraControls(
 private val CameraYellow = Color(0xFFFFD60A)
 private val SHUTTER_SIZE = 72.dp
 
-/** iOS `openCodeGlassCircle(tint: .black.opacity(0.3))` over the preview. */
+/** The controls' translucent dark fill over the preview: light enough to let the photo through. */
+private val CameraChromeFill = Color.Black.copy(alpha = 0.3f)
+
+/** The controls' hairline over the preview, which keeps them visible over bright scenes. */
+private val CameraChromeHairline = Color.White.copy(alpha = 0.22f)
+
+/** The camera message's action: a plain white label with the desktop's control corners. */
+@Composable
+private fun CameraMessageButton(label: String, onClick: () -> Unit) {
+    TextButton(
+        onClick = onClick,
+        shape = OpenCodeShape.control,
+        colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
+    ) {
+        Text(label, style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium))
+    }
+}
+
+/**
+ * iOS `openCodeGlassCircle(tint: .black.opacity(0.3))` over the preview: a translucent circle with a
+ * hairline. Camera controls stay round, as on every phone camera, rather than the desktop's squares.
+ */
 @Composable
 private fun CameraCircleButton(
     symbol: SFSymbol,
@@ -493,7 +519,9 @@ private fun CameraCircleButton(
     Box(
         modifier
             .size(48.dp)
-            .background(Color.Black.copy(alpha = 0.3f), CircleShape)
+            .clip(CircleShape)
+            .background(CameraChromeFill)
+            .border(OpenCodeSurfaces.hairline, CameraChromeHairline, CircleShape)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .openCodeTapTarget()
             .clearAndSetSemantics {
@@ -526,7 +554,6 @@ private fun AttachmentLensPicker(
     HapticEffect(Haptic.selection, trigger = active?.id) { _, _ -> isPinching }
     Row(
         modifier
-            .background(Color.Black.copy(alpha = 0.25f), OpenCodeShape.capsule)
             .padding(2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -554,7 +581,8 @@ private fun AttachmentLensPicker(
                 Box(
                     Modifier
                         .size(side.dp)
-                        .background(Color.Black.copy(alpha = 0.45f), CircleShape),
+                        .background(CameraChromeFill, CircleShape)
+                        .border(OpenCodeSurfaces.hairline, CameraChromeHairline, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(

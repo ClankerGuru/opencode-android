@@ -51,12 +51,14 @@ import kotlin.math.min
 
 private fun body(weight: FontWeight = FontWeight.Normal) = TextStyle(fontSize = 17.sp, lineHeight = 22.sp, fontWeight = weight)
 
-private val phoneText = Color.White
+private val phoneText = WelcomeInk.hex(0xEDEDED)
 private val phoneSecondary = WelcomeInk.label2
 private val phoneTertiary = WelcomeInk.label3
-/** The app's dark tonal surfaces standing in for iOS glass. */
-private val phoneSurface = WelcomeInk.hex(0x232326)
-private val phoneSurfaceHigh = WelcomeInk.hex(0x2C2C30)
+/** The app's dark canvas, composer surface, bubble fill and hairline (the desktop palette, as the session draws them). */
+private val phoneCanvas = WelcomeInk.hex(0x161616)
+private val phoneSurface = WelcomeInk.hex(0x1C1C1C)
+private val phoneSurfaceHigh = WelcomeInk.hex(0x2E2E2E)
+private val phoneHairline = WelcomeInk.hex(0x2D2D2D)
 
 /**
  * The phone's screen: this app's session in dark mode, at a logical 440 × 956 scaled into the
@@ -66,7 +68,7 @@ private val phoneSurfaceHigh = WelcomeInk.hex(0x2C2C30)
  */
 @Composable
 internal fun WelcomePhone(frame: WelcomeFrame, pairing: Float, reduced: Boolean, voice: WelcomeVoice, wall: Double, targets: WelcomeTargets?) {
-    Box(Modifier.requiredSize(WelcomePhone.size.width.dp, WelcomePhone.size.height.dp).background(Color.Black)) {
+    Box(Modifier.requiredSize(WelcomePhone.size.width.dp, WelcomePhone.size.height.dp).background(phoneCanvas)) {
         Box(Modifier.fillMaxSize().alpha(1 - pairing).welcomeBlur(if (reduced) 0f else 3f * pairing)) {
             Box(Modifier.fillMaxSize().alpha(frame.transcript.toFloat()).welcomeBlur(if (reduced || frame.loopBlur < 0.05) 0f else frame.loopBlur.toFloat())) {
                 PhoneTranscript(frame, reduced, wall, targets)
@@ -87,15 +89,15 @@ internal fun WelcomePhone(frame: WelcomeFrame, pairing: Float, reduced: Boolean,
         PhoneStatusBar()
         Box(
             Modifier
-                .offset(x = ((WelcomePhone.size.width - 140) / 2).dp, y = (WelcomePhone.size.height - 13).dp)
-                .size(140.dp, 5.dp)
-                .background(Color.White.copy(alpha = 0.85f), CircleShape),
+                .offset(x = ((WelcomePhone.size.width - 108) / 2).dp, y = (WelcomePhone.size.height - 12).dp)
+                .size(108.dp, 4.dp)
+                .background(Color.White.copy(alpha = 0.8f), CircleShape),
         )
     }
 }
 
 internal object WelcomePhone {
-    /** The phone's logical screen (iPhone 17 Pro Max). */
+    /** The phone's logical screen (iOS draws an iPhone 17 Pro Max at the same size). */
     val size = Size(440f, 956f)
 
     /** The composer's bottom edge, above the home indicator. */
@@ -110,10 +112,10 @@ internal object WelcomePhone {
     const val GUTTER = 16f
     const val FLOW_HALF = 8f
 
-    /** The screenshot tile's corners (iOS `JustifiedImageRows.cornerRadius`). */
-    const val TILE_RADIUS = 14f
+    /** The screenshot tile's corners: the desktop card's 10 (iOS `JustifiedImageRows.cornerRadius` 14). */
+    const val TILE_RADIUS = 10f
 
-    /** The session header's circles (iOS `HeaderBlurTunables.buttonSize`). */
+    /** The session header's buttons (iOS `HeaderBlurTunables.buttonSize`). */
     const val BUTTON = 44f
 
     /** The composer's metrics (iOS `ComposerTunables`, `DictationBarPose.slot`). */
@@ -122,7 +124,8 @@ internal object WelcomePhone {
     const val INNER_VERTICAL = 6f
     const val TEXT_LEADING = 52f
     const val EXPANDED_TEXT_LEADING = 10f
-    const val CORNER = 26f
+    /** The composer's corners: the desktop dock's 12 (iOS 26). */
+    const val CORNER = 12f
     const val SLOT = 48f
 
     /** The agent's calls so far: reads, the browser, the edit, the screenshot (iOS `tools`). */
@@ -135,73 +138,82 @@ internal object WelcomePhone {
     }
 }
 
+/**
+ * An Android status bar (iOS draws the iPhone's: centred time, Dynamic Island): the time on the
+ * left, a centred punch-hole camera, and Wi-Fi, signal and battery on the right.
+ */
 @Composable
 private fun PhoneStatusBar() {
-    Box(Modifier.fillMaxWidth()) {
-        Text("9:41", style = TextStyle(fontSize = 16.5.sp, fontWeight = FontWeight.SemiBold), color = Color.White, modifier = Modifier.offset(y = 19.dp).width(146.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+    Box(Modifier.fillMaxWidth().height(44.dp)) {
+        Text(
+            "9:30",
+            style = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Medium),
+            color = Color.White,
+            modifier = Modifier.align(Alignment.CenterStart).padding(start = 28.dp),
+        )
         Box(
             Modifier
-                .offset(x = ((WelcomePhone.size.width - 120) / 2).dp, y = 12.dp)
-                .size(120.dp, 34.dp)
+                .align(Alignment.Center)
+                .size(22.dp)
                 .background(Color.Black, CircleShape)
-                .border(0.5.dp, Color.White.copy(alpha = 0.08f), CircleShape),
+                .border(0.75.dp, Color.White.copy(alpha = 0.1f), CircleShape),
         )
         Row(
-            Modifier.offset(y = 20.dp).width((WelcomePhone.size.width - 30).dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End),
+            Modifier.align(Alignment.CenterEnd).padding(end = 26.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Signal bars and a full battery, drawn (no Material Symbol matches the system glyphs).
-            Canvas(Modifier.size(18.dp, 12.dp)) {
-                val bar = size.width / 5.5f
-                for (index in 0 until 4) {
-                    val h = size.height * (0.4f + 0.2f * index)
-                    drawRoundRect(Color.White, Offset(index * bar * 1.5f, size.height - h), Size(bar, h), androidx.compose.ui.geometry.CornerRadius(bar / 3))
-                }
+            OpenCodeIcon("wifi", null, size = 16.dp, tint = Color.White)
+            // Cellular signal as Android draws it: a filled right triangle.
+            Canvas(Modifier.size(14.dp, 14.dp)) {
+                val triangle = Path()
+                triangle.moveTo(size.width, 0f)
+                triangle.lineTo(size.width, size.height)
+                triangle.lineTo(0f, size.height)
+                triangle.close()
+                drawPath(triangle, Color.White)
             }
-            OpenCodeIcon("wifi", null, size = 17.dp, tint = Color.White)
-            Canvas(Modifier.size(27.dp, 13.dp)) {
-                val body = Size(size.width - 2.5.dp.toPx(), size.height)
-                drawRoundRect(Color.White.copy(alpha = 0.4f), Offset.Zero, body, androidx.compose.ui.geometry.CornerRadius(4.dp.toPx()), style = Stroke(1.dp.toPx()))
-                val inset = 2.dp.toPx()
-                drawRoundRect(Color.White, Offset(inset, inset), Size(body.width - 2 * inset, body.height - 2 * inset), androidx.compose.ui.geometry.CornerRadius(2.5.dp.toPx()))
-                drawRoundRect(Color.White.copy(alpha = 0.4f), Offset(body.width + 1.dp.toPx(), size.height * 0.33f), Size(1.5.dp.toPx(), size.height * 0.34f), androidx.compose.ui.geometry.CornerRadius(1.dp.toPx()))
+            // A full battery: a rounded body with a small cap on the right.
+            Canvas(Modifier.size(24.dp, 12.dp)) {
+                val cap = 2.dp.toPx()
+                val body = Size(size.width - cap - 1.dp.toPx(), size.height)
+                drawRoundRect(Color.White, Offset.Zero, body, androidx.compose.ui.geometry.CornerRadius(3.5.dp.toPx()))
+                drawRoundRect(
+                    Color.White.copy(alpha = 0.6f),
+                    Offset(body.width + 1.dp.toPx(), size.height * 0.3f),
+                    Size(cap, size.height * 0.4f),
+                    androidx.compose.ui.geometry.CornerRadius(1.dp.toPx()),
+                )
             }
         }
     }
 }
 
-/** The session header's parts: the drawer and More circles and the title capsule (iOS `header`; Material surfaces for glass). */
+/**
+ * The session header as this app draws it on the desktop palette (iOS `header` has glass circles
+ * and a title capsule): the drawer and More icons on the canvas, the title and project beside them.
+ */
 @Composable
 private fun PhoneHeader(frame: WelcomeFrame) {
     val size = WelcomePhone.BUTTON
-    Box(Modifier.offset(y = WelcomePhone.HEADER_TOP.dp).fillMaxWidth().height(size.dp), contentAlignment = Alignment.Center) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(size.dp).background(phoneSurface, CircleShape), contentAlignment = Alignment.Center) {
-                OpenCodeIcon("line.3.horizontal", null, size = 20.dp, tint = phoneText)
-            }
-            Spacer(Modifier.weight(1f))
-            Box(Modifier.size(size.dp).background(phoneSurface, CircleShape), contentAlignment = Alignment.Center) {
-                OpenCodeIcon("ellipsis", null, size = 20.dp, tint = phoneText)
-            }
+    Row(
+        Modifier.offset(y = WelcomePhone.HEADER_TOP.dp).fillMaxWidth().height(size.dp).padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(size.dp), contentAlignment = Alignment.Center) {
+            OpenCodeIcon("line.3.horizontal", null, size = 22.dp, tint = phoneText)
         }
-        Column(
-            Modifier
-                .heightIn(min = size.dp)
-                .widthIn(max = 260.dp)
-                .background(phoneSurface, CircleShape)
-                .padding(horizontal = 18.dp, vertical = 3.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
+        Column(Modifier.weight(1f).padding(start = 8.dp), verticalArrangement = Arrangement.Center) {
             WelcomeStack(
                 labels = listOf("New Session", WelcomeStory.TITLE),
                 weights = if (frame.named) listOf(0.0, 1.0) else listOf(1.0, 0.0),
-                style = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
+                style = TextStyle(fontSize = 17.sp, lineHeight = 21.sp, fontWeight = FontWeight.Medium),
                 color = phoneText,
-                alignment = Alignment.Center,
             )
-            Text(WelcomeStory.PROJECT, style = TextStyle(fontSize = 12.sp), color = phoneText.copy(alpha = 0.75f), maxLines = 1)
+            Text(WelcomeStory.PROJECT, style = TextStyle(fontSize = 13.sp, lineHeight = 16.sp), color = phoneSecondary, maxLines = 1)
+        }
+        Box(Modifier.size(size.dp), contentAlignment = Alignment.Center) {
+            OpenCodeIcon("ellipsis", null, size = 20.dp, tint = phoneText)
         }
     }
 }
@@ -268,7 +280,7 @@ private fun UserBubble(text: String, modifier: Modifier) {
             color = phoneText,
             modifier = Modifier
                 .widthIn(max = 320.dp)
-                .background(phoneSurfaceHigh, RoundedCornerShape(20.dp))
+                .background(phoneSurfaceHigh, RoundedCornerShape(10.dp))
                 .padding(horizontal = 14.dp, vertical = 9.dp),
         )
     }
@@ -325,6 +337,7 @@ private fun PhoneComposer(frame: WelcomeFrame, reduced: Boolean, voice: WelcomeV
             Modifier
                 .width(width.dp)
                 .background(phoneSurface, RoundedCornerShape(WelcomePhone.CORNER.dp))
+                .border(1.dp, phoneHairline, RoundedCornerShape(WelcomePhone.CORNER.dp))
                 .padding(horizontal = WelcomePhone.INNER.dp, vertical = WelcomePhone.INNER_VERTICAL.dp),
         ) {
             Box(Modifier.fillMaxWidth().height(line.dp).alpha((frame.draft * frame.lines).toFloat()).clip(androidx.compose.ui.graphics.RectangleShape), contentAlignment = Alignment.BottomStart) {
@@ -343,7 +356,7 @@ private fun PhoneComposer(frame: WelcomeFrame, reduced: Boolean, voice: WelcomeV
                         Box(
                             Modifier
                                 .size(34.dp)
-                                .background(Color.White.copy(alpha = 0.12f * dictation), CircleShape)
+                                .background(Color.White.copy(alpha = 0.12f * dictation), RoundedCornerShape(8.dp))
                                 .graphicsLayer { rotationZ = 45 * dictation },
                             contentAlignment = Alignment.Center,
                         ) { OpenCodeIcon("plus", null, size = 22.dp, tint = phoneText) }
@@ -369,7 +382,7 @@ private fun PhoneComposer(frame: WelcomeFrame, reduced: Boolean, voice: WelcomeV
                             },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Box(Modifier.requiredSize(34.dp).background(Color.White, CircleShape), contentAlignment = Alignment.Center) {
+                        Box(Modifier.requiredSize(34.dp).background(Color.White, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
                             Box(Modifier.size(11.dp).background(Color.Black, RoundedCornerShape(2.dp)))
                         }
                     }
@@ -435,12 +448,12 @@ private fun PhoneScanner(modifier: Modifier) {
                 drawContent()
             },
     ) {
-        Box(Modifier.offset(16.dp, WelcomePhone.HEADER_TOP.dp).size(WelcomePhone.BUTTON.dp).background(phoneSurface, CircleShape), contentAlignment = Alignment.Center) {
+        Box(Modifier.offset(16.dp, WelcomePhone.HEADER_TOP.dp).size(WelcomePhone.BUTTON.dp).background(phoneSurface, RoundedCornerShape(10.dp)).border(1.dp, phoneHairline, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
             OpenCodeIcon("xmark", null, size = 18.dp, tint = phoneText)
         }
         Box(Modifier.offset(90.dp, 330.dp).size(260.dp), contentAlignment = Alignment.Center) {
             Canvas(Modifier.fillMaxSize()) {
-                drawPath(WelcomeViewfinderCorners.path(Rect(Offset.Zero, size), 24.dp.toPx()), Color.White, style = Stroke(4.dp.toPx(), cap = StrokeCap.Round))
+                drawPath(WelcomeViewfinderCorners.path(Rect(Offset.Zero, size), 12.dp.toPx()), Color.White, style = Stroke(2.5.dp.toPx(), cap = StrokeCap.Round))
             }
             Box(
                 Modifier

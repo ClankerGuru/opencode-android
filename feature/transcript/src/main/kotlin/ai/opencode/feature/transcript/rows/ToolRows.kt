@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -55,6 +56,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
@@ -125,7 +127,7 @@ internal fun SubagentToolView(call: OpenCodeToolCall, subagents: Map<String, Tra
                 Text(it, style = OpenCodeTextStyles.subheadline, color = colors.secondaryText)
             }
             if (failed) {
-                Text("Failed", style = OpenCodeTextStyles.caption1.copy(fontWeight = FontWeight.Medium), color = colors.destructive)
+                Text("Failed", style = OpenCodeTextStyles.caption1.copy(fontWeight = FontWeight.Medium), color = colors.danger)
             }
         }
         if (isKnown) {
@@ -138,13 +140,13 @@ internal fun SubagentToolView(call: OpenCodeToolCall, subagents: Map<String, Tra
 
 /** The collapsed Used N header: “Used 12 tools”, or a red “· 1 failed” (iOS `InlineToolGroupHeaderLabel`). */
 @Composable
-private fun InlineToolGroupHeaderLabel(header: InlineToolGroupHeader, modifier: Modifier = Modifier) {
+private fun InlineToolGroupHeaderLabel(header: InlineToolGroupHeader, expanded: Boolean, modifier: Modifier = Modifier) {
     val colors = OpenCodeTheme.colors
     val style = TranscriptFonts.metaFont().copy(fontFeatureSettings = "tnum")
     if (isAccessibilityTextSize()) {
         val text = buildAnnotatedString {
             withStyle(SpanStyle(color = colors.secondaryText)) { append(header.title) }
-            if (header.failed > 0) withStyle(SpanStyle(color = colors.destructive)) { append(" · ${header.failed} failed") }
+            if (header.failed > 0) withStyle(SpanStyle(color = colors.danger)) { append(" · ${header.failed} failed") }
             header.cue?.let { withStyle(SpanStyle(color = colors.secondaryText)) { append(" · $it") } }
         }
         Text(text, modifier, style = style)
@@ -159,11 +161,19 @@ private fun InlineToolGroupHeaderLabel(header: InlineToolGroupHeader, modifier: 
             // RollingNumber falls back to plain text when it doesn't fit (iOS `ViewThatFits`).
             RollingNumber(header.title, style = style, color = colors.secondaryText)
             if (header.failed > 0) {
-                RollingNumber(" · ${header.failed} failed", style = style, color = colors.destructive)
+                RollingNumber(" · ${header.failed} failed", style = style, color = colors.danger)
             }
             header.cue?.let {
                 Text(" · $it", style = style, color = colors.secondaryText, maxLines = 1, softWrap = false)
             }
+            // The desktop's disclosure chevron.
+            OpenCodeIcon(
+                if (expanded) "chevron.down" else "chevron.right",
+                contentDescription = null,
+                modifier = Modifier.align(Alignment.CenterVertically).padding(start = 4.dp),
+                size = 16.dp,
+                tint = colors.tertiaryText,
+            )
         }
     }
 }
@@ -184,6 +194,7 @@ internal fun InlineToolGroupView(entry: TranscriptEntry, key: String, tools: Lis
     Column(verticalArrangement = Arrangement.spacedBy(TranscriptMetrics.clustered)) {
         InlineToolGroupHeaderLabel(
             header,
+            isExpanded,
             Modifier
                 .fillMaxWidth()
                 .rowHitTarget(
@@ -250,20 +261,55 @@ private fun InlineRowDisclosure(entry: TranscriptEntry, row: InlineToolRow, bodi
     }
 }
 
-/** A regular-weight name and a muted detail; only commands are mono, and only failures are marked, in red. */
+/**
+ * The desktop's tool row (`basic-tool.css`): a faint tool glyph, a medium-weight name and a muted
+ * detail; only commands are mono, and only failures are marked, in red.
+ */
 @Composable
 private fun InlineRowLabel(row: InlineToolRow, expanded: Boolean, modifier: Modifier = Modifier) {
     val colors = OpenCodeTheme.colors
     val style = OpenCodeTextStyles.subheadline
     Row(
         modifier.fillMaxWidth().padding(vertical = InlineRowMetrics.rowPadding),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
+        OpenCodeIcon(
+            toolGlyph(row),
+            contentDescription = null,
+            size = 16.dp,
+            tint = if (row.isFailed) colors.danger else colors.tertiaryText,
+        )
+        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            InlineRowText(row, expanded, style)
+        }
+    }
+}
+
+/** The tool's glyph, by name (the desktop shows one per tool kind). */
+private fun toolGlyph(row: InlineToolRow): String {
+    if (row.detailIsCommand) return "terminal"
+    val name = row.name.lowercase()
+    return when {
+        "read" in name -> "doc.text"
+        "write" in name -> "doc"
+        "edit" in name || "patch" in name -> "pencil"
+        "grep" in name || "glob" in name || "search" in name || "find" in name || "list" in name -> "magnifyingglass"
+        "fetch" in name || "web" in name -> "globe"
+        "todo" in name -> "checklist"
+        else -> "hammer.fill"
+    }
+}
+
+@Composable
+private fun RowScope.InlineRowText(row: InlineToolRow, expanded: Boolean, style: TextStyle) {
+    val colors = OpenCodeTheme.colors
+    run {
         Text(
             row.name,
             Modifier.alignByBaseline().inlineRowPulse(row.isRunning),
-            style = style,
-            color = if (row.isFailed) colors.destructive else colors.text,
+            style = style.copy(fontWeight = FontWeight.Medium),
+            color = if (row.isFailed) colors.danger else colors.text,
         )
         val detail = row.detail
         if (detail != null) {
@@ -272,7 +318,7 @@ private fun InlineRowLabel(row: InlineToolRow, expanded: Boolean, modifier: Modi
                 detail,
                 Modifier.alignByBaseline().weight(1f, fill = false),
                 style = if (row.detailIsCommand) TranscriptFonts.toolFont else style,
-                color = if (row.isFailed) colors.destructive else colors.secondaryText,
+                color = if (row.isFailed) colors.danger else colors.secondaryText,
                 maxLines = if (unlimited) Int.MAX_VALUE else 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -304,6 +350,9 @@ private fun ToolBody(entry: TranscriptEntry, id: String, call: OpenCodeToolCall)
             .padding(end = TranscriptMetrics.compact, bottom = TranscriptMetrics.clustered)
             .fillMaxWidth()
             .clip(shape)
+            // The page's own fill, so the box stands off the opened group's faint band around it
+            // (on the band's fill it nearly vanished in light).
+            .background(colors.canvas)
             .border(0.5.dp, colors.border, shape),
     ) {
         if (hasInput) {
@@ -361,8 +410,8 @@ private fun ToolBody(entry: TranscriptEntry, id: String, call: OpenCodeToolCall)
                 } else {
                     call.error?.let { error ->
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            OpenCodeIcon("exclamationmark.circle.fill", contentDescription = null, Modifier.padding(top = 1.dp), size = 14.dp, tint = colors.destructive)
-                            SelectionContainer { Text(error, style = TranscriptFonts.toolFont, color = colors.destructive) }
+                            OpenCodeIcon("exclamationmark.circle.fill", contentDescription = null, Modifier.padding(top = 1.dp), size = 14.dp, tint = colors.danger)
+                            SelectionContainer { Text(error, style = TranscriptFonts.toolFont, color = colors.danger) }
                         }
                     }
                 }

@@ -70,7 +70,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextPainter
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
@@ -877,7 +877,7 @@ fun LinkPreviewCardContent(url: String, modifier: Modifier = Modifier) {
                 Text(SessionLink.title(url) ?: "Session", style = OpenCodeTextStyles.headline, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(
                     sessionID,
-                    style = OpenCodeTextStyles.footnote.copy(fontFamily = FontFamily.Monospace),
+                    style = OpenCodeTextStyles.footnote.copy(fontFamily = OpenCodeFonts.monospace),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.MiddleEllipsis,

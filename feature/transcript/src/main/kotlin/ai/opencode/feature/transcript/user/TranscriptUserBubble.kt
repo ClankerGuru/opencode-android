@@ -243,7 +243,7 @@ private fun UserBubbleFace(
         },
         modifier = modifier
             .voiceMessageBackground(VoiceMessageStyle.Standard, isPending, reveal, corners)
-            .padding(horizontal = TranscriptMetrics.contentGutter, vertical = TranscriptMetrics.bubbleVertical),
+            .padding(horizontal = TranscriptMetrics.standard, vertical = TranscriptMetrics.bubbleVertical),
     )
 }
 

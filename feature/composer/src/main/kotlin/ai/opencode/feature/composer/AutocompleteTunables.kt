@@ -56,6 +56,6 @@ object ComposerAutocompleteTunables {
     /** `composer.autocomplete.edgeFade` "Scroll edge fade (pt)" (0…60). */
     const val edgeFade = 24.0
 
-    /** iOS `ComposerTunables.cornerRadius` (`composer.size.cornerRadius`), the glass the highlight sits concentric in. */
-    const val composerCornerRadius = 28.0
+    /** `ComposerTunables.cornerRadius` (the desktop dock's 12; iOS 28), the surface the highlight sits concentric in. */
+    const val composerCornerRadius = 12.0
 }

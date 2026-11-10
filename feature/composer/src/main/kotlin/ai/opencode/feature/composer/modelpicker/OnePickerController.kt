@@ -540,15 +540,15 @@ class OnePickerController {
     }
 
     companion object {
-        /** iOS `ComposerTunables.cornerRadius` (session's composer capsule; 28 as shipped). */
-        const val COMPOSER_CORNER_RADIUS = 28.0
+        /** `ComposerTunables.cornerRadius`: the desktop dock's 12 on Android (iOS's capsule is 28). */
+        const val COMPOSER_CORNER_RADIUS = 12.0
 
         private val IDLE_POSE = OnePickerSimulation.FramePose(
             rect = Rect.Zero,
             targetRect = Rect.Zero,
             layoutSize = Size.Zero,
-            topRadius = 28.0,
-            bottomRadius = 28.0,
+            topRadius = COMPOSER_CORNER_RADIUS,
+            bottomRadius = COMPOSER_CORNER_RADIUS,
             contentReveal = 0.0,
             searchBarReveal = 0.0,
             glassOpacity = 0.0,
