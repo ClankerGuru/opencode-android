@@ -4,6 +4,8 @@ import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.log.AppLog
 import android.annotation.SuppressLint
+import android.content.ComponentCallbacks2
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.util.LruCache
@@ -22,9 +24,11 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -38,6 +42,8 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * A Mermaid diagram drawn once per source and theme: its SVG (vector, standing in for iOS's PDF),
@@ -69,7 +75,8 @@ sealed class MermaidRenderError : Exception() {
  * has been prepared ([naturalSize]).
  * The page is offline (a strict Content Security Policy, network loads blocked, no navigation)
  * and has no JavaScript interfaces: nothing in it can reach the app; results are read back by
- * polling the page. Main thread only. Port of iOS `MermaidRenderer`.
+ * polling the page. The web view goes [idleTimeout] after the last render or drawing, and on
+ * memory pressure with the rasters. Main thread only. Port of iOS `MermaidRenderer`.
  */
 class MermaidRenderer private constructor() {
     /** Diagrams by source and theme. Small: SVGs of a few kilobytes. In insertion order, at most 64. */
@@ -88,6 +95,25 @@ class MermaidRenderer private constructor() {
     private var pageLoad: CompletableDeferred<Unit>? = null
     /** The window to render in (iOS inserts its web view into the key window, off screen). */
     private var host: WeakReference<ViewGroup>? = null
+
+    /** How long the web view outlives the last render. */
+    var idleTimeout: Duration = 30.seconds
+    private var idle: Job? = null
+    /** Renders and drawings queued or under way. */
+    private var pending = 0
+    private var watchesMemory = false
+
+    /** Whether the offscreen web view (and its renderer process) is up. */
+    val hasWebView: Boolean get() = webView != null
+
+    /**
+     * Rasters and the page (Pele's JavaScript heap) go; drawn SVGs (a few kilobytes each) and
+     * laid out sizes stay, so cards keep their height and redraw from the SVG.
+     */
+    fun purge() {
+        images.evictAll()
+        if (pending == 0) reset()
+    }
 
     /**
      * The window the shared web view lives in, off screen: a web view in no window can have its
@@ -158,12 +184,33 @@ class MermaidRenderer private constructor() {
         val key = MermaidCacheKey(source, theme)
         diagrams[key]?.let { return@withContext it.getOrThrow() }
         val task = running[key] ?: scope.async {
+            beginWork()
             val result = runCatching { queue.withLock { render(source, theme) } }
+            endWork()
             running.remove(key)
             if (caches(result)) remember(result, key)
             result.getOrThrow()
         }.also { running[key] = it }
         task.await()
+    }
+
+    private fun beginWork() {
+        pending += 1
+        idle?.cancel()
+    }
+
+    private fun endWork() {
+        pending -= 1
+        if (pending == 0) scheduleIdle()
+    }
+
+    /** The web view goes once nothing has rendered or drawn for [idleTimeout]. */
+    private fun scheduleIdle() {
+        idle?.cancel()
+        idle = scope.launch {
+            delay(idleTimeout)
+            if (pending == 0) reset()
+        }
     }
 
     private fun remember(result: Result<MermaidDiagram>, key: MermaidCacheKey) {
@@ -237,31 +284,38 @@ class MermaidRenderer private constructor() {
     /** Draws [diagram] [width] × [height] dp big at [density], on the card's colour. */
     private suspend fun rasterize(diagram: MermaidDiagram, width: Float, height: Float, density: Float, theme: MermaidTheme): Bitmap? {
         if (width < 1 || height < 1) return null
-        return queue.withLock {
-            val webView = runCatching { readyWebView() }.getOrNull() ?: return@withLock null
-            val pixelWidth = (width * density).roundToInt().coerceAtLeast(1)
-            val pixelHeight = (height * density).roundToInt().coerceAtLeast(1)
-            val zoom = width / diagram.width
-            val background = background(theme)
-            val themeName = if (theme == MermaidTheme.Dark) "dark" else "light"
-            evaluate(
-                webView,
-                "window.showDiagram(${JSONObject.quote(diagram.svg)}, '$themeName', '${cssColor(background)}', $zoom); 0",
-            )
-            // The capture covers the diagram, so the view must too.
-            resize(webView, pixelWidth, pixelHeight)
-            awaitVisualState(webView)
-            if (this.webView !== webView) return@withLock null
-            val bitmap = runCatching {
-                Bitmap.createBitmap(pixelWidth, pixelHeight, Bitmap.Config.ARGB_8888).also { bitmap ->
-                    val canvas = Canvas(bitmap)
-                    canvas.drawColor(background.toArgb())
-                    webView.draw(canvas)
-                }
-            }.getOrNull()
-            tidy(webView)
-            bitmap
+        beginWork()
+        try {
+            return queue.withLock { draw(diagram, width, height, density, theme) }
+        } finally {
+            endWork()
         }
+    }
+
+    private suspend fun draw(diagram: MermaidDiagram, width: Float, height: Float, density: Float, theme: MermaidTheme): Bitmap? {
+        val webView = runCatching { readyWebView() }.getOrNull() ?: return null
+        val pixelWidth = (width * density).roundToInt().coerceAtLeast(1)
+        val pixelHeight = (height * density).roundToInt().coerceAtLeast(1)
+        val zoom = width / diagram.width
+        val background = background(theme)
+        val themeName = if (theme == MermaidTheme.Dark) "dark" else "light"
+        evaluate(
+            webView,
+            "window.showDiagram(${JSONObject.quote(diagram.svg)}, '$themeName', '${cssColor(background)}', $zoom); 0",
+        )
+        // The capture covers the diagram, so the view must too.
+        resize(webView, pixelWidth, pixelHeight)
+        awaitVisualState(webView)
+        if (this.webView !== webView) return null
+        val bitmap = runCatching {
+            Bitmap.createBitmap(pixelWidth, pixelHeight, Bitmap.Config.ARGB_8888).also { bitmap ->
+                val canvas = Canvas(bitmap)
+                canvas.drawColor(background.toArgb())
+                webView.draw(canvas)
+            }
+        }.getOrNull()
+        tidy(webView)
+        return bitmap
     }
 
     /**
@@ -318,6 +372,7 @@ class MermaidRenderer private constructor() {
             }.getOrNull()
         } ?: throw MermaidRenderError.Unavailable
         val context = dependency(AppContext)
+        watchMemory(context)
         val webView = WebView(context)
         webView.settings.apply {
             javaScriptEnabled = true
@@ -371,6 +426,25 @@ class MermaidRenderer private constructor() {
         }
         if (this.webView !== webView) throw MermaidRenderError.Interrupted
         return webView
+    }
+
+    /** Purges under memory pressure; registered once, with the first web view. */
+    private fun watchMemory(context: android.content.Context) {
+        if (watchesMemory) return
+        watchesMemory = true
+        // The application keeps the callbacks; the renderer lives as long as the app.
+        context.registerComponentCallbacks(object : ComponentCallbacks2 {
+            override fun onTrimMemory(level: Int) {
+                if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) scope.launch { purge() }
+            }
+
+            override fun onConfigurationChanged(newConfig: Configuration) = Unit
+
+            @Deprecated("Deprecated in Java")
+            override fun onLowMemory() {
+                scope.launch { purge() }
+            }
+        })
     }
 
     /** In a window but off screen. */

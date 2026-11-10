@@ -10,16 +10,19 @@ import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.Callable
-import java.util.concurrent.ExecutorService
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
 
 /**
  * Port of iOS `DiagnosticsJournal` (`OpenCode/Diagnostics/DiagnosticsJournal.swift`): the
  * diagnostics timeline on disk, an append-only JSON-lines file per run that rotates into one older
- * segment, so a run keeps at most two segments. Each write reaches the file before the next event,
- * so the tail survives a crash or a kill. At launch the previous run's segments are set aside, and
- * a marker written on activation and cleared on backgrounding tells whether that run ended while
- * it was in the foreground.
+ * segment, so a run keeps at most two segments. Events are written in batches, at most
+ * [WRITE_INTERVAL_MS] apart, and at once when the app backgrounds or something reads the segments,
+ * so the tail survives a crash or a kill to within that window. At launch the previous run's
+ * segments are set aside on the journal's queue, and a marker written on activation and cleared on
+ * backgrounding tells whether that run ended while it was in the foreground.
  *
  * Android: the marker follows `ProcessLifecycleOwner` (ON_RESUME ↔ iOS didBecomeActive, ON_STOP ↔
  * didEnterBackground); Android has no reliable willTerminate, and a process killed in the
@@ -38,12 +41,21 @@ class DiagnosticsJournal(
         val endedUnexpectedly: Boolean,
     )
 
-    private val queue: ExecutorService = Executors.newSingleThreadExecutor { Thread(it, "opencode.diagnostics.journal").apply { isDaemon = true } }
+    private val queue: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { Thread(it, "opencode.diagnostics.journal").apply { isDaemon = true } }
 
     // Confined to `queue`.
     private var stream: FileOutputStream? = null
     private var bytes = 0L
     private var isRecording = false
+
+    // Lines waiting for the next write, confined to `queue`.
+    private var pending = ByteArrayOutputStream()
+
+    // A write is already scheduled on `queue`.
+    private var writeScheduled = false
+
+    // Batches written to disk, for tests: events are batched, not one per write.
+    private var batches = 0
 
     private val current get() = File(directory, "current.jsonl")
     private val older get() = File(directory, "current.1.jsonl")
@@ -56,32 +68,60 @@ class DiagnosticsJournal(
         queue.execute(block)
     }
 
-    /** Sets the previous run aside and starts this one. Call once, before appending. */
-    fun open(recording: Boolean): PreviousRun = sync {
-        directory.mkdirs()
+    /**
+     * Sets the previous run aside and starts this one. Call once, before appending.
+     *
+     * The marker is a few bytes, read here because launch asks whether the last run ended
+     * unexpectedly; the directory and the last run's files are set aside on the queue, ahead of
+     * every append this run makes.
+     */
+    fun open(recording: Boolean): PreviousRun {
         val markedBuild = runCatching { marker.readText() }.getOrNull()
-        marker.delete()
-        val segments = listOf(older, current)
-        val hadEvents = segments.any { it.exists() }
-        if (hadEvents) {
-            for ((source, destination) in segments.zip(previous)) {
-                destination.delete()
-                source.renameTo(destination)
+        val hadEvents = older.exists() || current.exists()
+        async {
+            directory.mkdirs()
+            marker.delete()
+            if (hadEvents) {
+                for ((source, destination) in listOf(older, current).zip(previous)) {
+                    destination.delete()
+                    source.renameTo(destination)
+                }
             }
+            isRecording = recording
         }
-        isRecording = recording
-        PreviousRun(endedUnexpectedly = markedBuild == build && hadEvents)
+        return PreviousRun(endedUnexpectedly = markedBuild == build && hadEvents)
     }
 
     fun append(event: DiagnosticsEvent) = async {
         isRecording = true
         val line = runCatching { (json.encodeToString(DiagnosticsEvent.serializer(), event) + "\n").toByteArray() }.getOrNull() ?: return@async
-        if (bytes + line.size > segmentBytes && stream != null) rotate()
-        val out = stream ?: openCurrent() ?: return@async
+        // A segment never takes a batch it can't hold: what's waiting goes first.
+        if (pending.size() + line.size > segmentBytes) write()
+        pending.write(line)
+        if (pending.size() >= BATCH_BYTES) {
+            write()
+        } else if (!writeScheduled) {
+            writeScheduled = true
+            val delayedWrite = Runnable {
+                writeScheduled = false
+                write()
+            }
+            queue.schedule(delayedWrite, WRITE_INTERVAL_MS, TimeUnit.MILLISECONDS)
+        }
+    }
+
+    /** Writes what's waiting, rotating first if the segment has no room. Runs on `queue`. */
+    private fun write() {
+        if (pending.size() == 0) return
+        val batch = pending.toByteArray()
+        pending = ByteArrayOutputStream()
+        if (bytes + batch.size > segmentBytes && stream != null) rotate()
+        val out = stream ?: openCurrent() ?: return
         try {
-            out.write(line)
+            out.write(batch)
             out.flush()
-            bytes += line.size
+            bytes += batch.size
+            batches += 1
         } catch (_: Exception) {
             runCatching { out.close() }
             stream = null
@@ -93,12 +133,14 @@ class DiagnosticsJournal(
         runCatching { stream?.close() }
         stream = null
         bytes = 0
+        pending = ByteArrayOutputStream()
         isRecording = false
         (listOf(current, older) + previous).forEach { it.delete() }
     }
 
     /** Rewrites every segment without voice excerpts: Include Transcripts was turned off. */
     fun removeExcerpts() = async {
+        write()
         runCatching { stream?.close() }
         stream = null
         for (file in listOf(older, current) + previous) {
@@ -124,12 +166,16 @@ class DiagnosticsJournal(
 
     /** This run's events as written, oldest first. */
     fun currentRunEvents(): List<DiagnosticsEvent> = sync {
+        write()
         runCatching { stream?.fd?.sync() }
         listOf(older, current).flatMap(::events)
     }
 
-    /** Waits for queued writes. */
-    fun flush() = sync {}
+    /** Writes what's waiting; tests and teardown use it. */
+    fun flush() = sync { write() }
+
+    /** Batches written to disk, for tests: events are batched, not one per write. */
+    val writeBatches: Int get() = sync { batches }
 
     fun markForeground() = async {
         if (!isRecording) return@async
@@ -139,7 +185,16 @@ class DiagnosticsJournal(
         }
     }
 
-    fun markBackground() = async { marker.delete() }
+    /** `waits` only where an async removal might never run (iOS termination; tests). */
+    fun markBackground(waits: Boolean = false) {
+        val leave = {
+            // The next event may never come: what's waiting goes now.
+            write()
+            marker.delete()
+            Unit
+        }
+        if (waits) sync(leave) else async(leave)
+    }
 
     /** Follows the app's foreground state for the unclean-exit marker. */
     fun followApplicationState() {
@@ -168,6 +223,12 @@ class DiagnosticsJournal(
     }
 
     companion object {
+        /** How long an event waits for the write that carries it. */
+        const val WRITE_INTERVAL_MS = 250L
+
+        /** A batch this large is written at once, whatever the interval. */
+        const val BATCH_BYTES = 64 * 1_024
+
         private val json = Json { encodeDefaults = false; explicitNulls = false; ignoreUnknownKeys = true }
 
         /** `noBackupFilesDir/Diagnostics`, following the app's foreground state. */

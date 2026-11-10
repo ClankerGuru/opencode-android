@@ -10,8 +10,6 @@ import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.HomeSnapshotDate
 import ai.opencode.feature.drawer.drawerBadge
 import ai.opencode.feature.drawer.indicator
-import ai.opencode.feature.drawer.motion.DrawerDotArrival
-import ai.opencode.feature.drawer.motion.DrawerDotPose
 import ai.opencode.feature.session.DrawerBadge
 import ai.opencode.server.CachedHomeSnapshot
 import ai.opencode.server.OpenCodeServer
@@ -21,7 +19,6 @@ import ai.opencode.server.model.OpenCodeSession
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
@@ -73,11 +70,10 @@ class DrawerActivityTests {
 }
 
 /**
- * Port of iOS `DrawerActivityTests.swift` › `DrawerDotArrivalTests`, the `AppFeature` half of
- * `initialLoadOrRestoreWithDotAlreadyShowingStartsAtRest`: a restored Home already showing the dot
- * mounts it at rest. The `DrawerDotArrival.initial` half and the rest are `:feature:drawer`'s.
+ * Port of iOS `DrawerActivityTests.swift` › `DrawerDotTests`, the `AppFeature` test: a restored
+ * Home already showing the dot has it at once. The rest of `DrawerDotTests` is `:feature:drawer`'s.
  */
-class DrawerDotArrivalTests {
+class DrawerDotTests {
     @get:Rule val isolation = TestIsolationRule()
 
     private val shared = AppTestShared()
@@ -88,9 +84,7 @@ class DrawerDotArrivalTests {
     )
 
     @Test
-    fun initialLoadOrRestoreWithDotAlreadyShowingStartsAtRest() {
-        // Restoring AppFeature from a fresh cached snapshot with an unread session
-        // elsewhere already shows the dot on mount without firing an arrival animation.
+    fun restoredSnapshotShowsTheDotAtOnce() {
         val now = Instant.ofEpochSecond(1_800_000_000)
         val saved = OpenCodeServer(url = "https://restore-dot.example", username = "kit", password = "secret")
         val open = session("ses_open", idle = 1_000, viewed = 1_000)
@@ -111,8 +105,5 @@ class DrawerDotArrivalTests {
         assertNotNull(home)
         val restoredBadge = DependencyValues.withValues(values) { home!!.drawerBadge(excluding = open.id) }
         assertEquals(DrawerBadge.Unread, restoredBadge)
-        val mounted = DrawerDotArrival.initial(restoredBadge)
-        assertTrue(mounted.isSettled(0.0))
-        assertEquals(DrawerDotPose.resting, mounted.pose(0.0))
     }
 }

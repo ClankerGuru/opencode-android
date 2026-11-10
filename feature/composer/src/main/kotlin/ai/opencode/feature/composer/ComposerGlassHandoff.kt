@@ -1,10 +1,9 @@
 package ai.opencode.feature.composer
 
 import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -15,7 +14,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import kotlin.math.max
-import kotlin.math.roundToInt
 
 /**
  * iOS `View.handsGlassOver(to:...)`: the morph's source under it hands its surface over to the
@@ -43,8 +41,7 @@ fun Modifier.handsGlassOver(
     val density = LocalDensity.current
     if (sinksUnderSheet) {
         val hidden = morph.isOpen && !morph.foldPending
-        val motion: FiniteAnimationSpec<Float> = if (reduceMotion) tween(200, easing = Motion.EaseInOut)
-        else (if (hidden) ComposerMorphTunables.photoOpen else ComposerMorphTunables.photoReturn).spec()
+        val motion = Motion.panelOpen.animation<Float>(if (hidden) MotionPhase.Enter else MotionPhase.Exit, reduceMotion)
         // iOS `ComposerUnderSheetPlacement`: `hidden ? 1 − rise : 0`, animated only as `hidden`
         // changes; the rise follows the finger frame by frame.
         val placement = remember { Animatable(if (hidden) 1f else 0f) }
@@ -74,12 +71,8 @@ fun Modifier.handsGlassOver(
             .semantics { if (hiddenFromAccessibility) hideFromAccessibility() }
     } else {
         val open = morph.isOpen
-        val delaySeconds = closeDelay ?: (ComposerMorphTunables.close.duration * 0.62)
-        val spec: FiniteAnimationSpec<Float> = when {
-            reduceMotion -> tween(200, easing = Motion.EaseInOut)
-            returnsImmediately -> tween(140, easing = Motion.EaseInOut)
-            else -> tween(120, delayMillis = if (open) 0 else (delaySeconds * 1000).roundToInt(), easing = Motion.EaseInOut)
-        }
+        val delaySeconds = if (open || returnsImmediately) 0.0 else closeDelay ?: (Motion.panelClose.curve().duration * 0.62)
+        val spec = Motion.swap.animation<Float>(if (open) MotionPhase.Exit else MotionPhase.Enter, reduceMotion, delaySeconds)
         val a by animateFloatAsState(if (open) 0f else 1f, spec, label = "hands-glass-over")
         this.graphicsLayer { alpha = a }
     }

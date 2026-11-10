@@ -79,19 +79,11 @@ internal fun SessionFeature.reduceRequests(state: State, action: Action): Reduce
                 // reconnect join it or replay its pre-gap deltas over REST.
                 next = next.copy(liveText = emptyMap())
                 val abandon = abandonRefresh(next)
-                // Without the stream, reconciliation is the only content path: restart the watchdog at its unhealthy cadence.
-                val watched = watchdog(abandon.state)
-                return Reduced(
-                    watched.state,
-                    Effect.merge(
-                        abandon.effect,
-                        Effect.cancel(SessionFeature.CancelID.Requests),
-                        Effect.cancel(SessionFeature.CancelID.Inbox),
-                        Effect.cancel(SessionFeature.CancelID.InboxFetch),
-                        Effect.cancel(SessionFeature.CancelID.RequestsRetry),
-                        watched.effect,
-                    ),
-                )
+                // Nothing here asks a server that isn't answering: retrying reads into a dead route
+                // can stall a VPN tunnel (tailscale/tailscale#21773). Home's connection loop finds
+                // it again, and the reconnect re-reads.
+                val quiet = quietServerPolling(abandon.state)
+                return Reduced(quiet.state, Effect.merge(abandon.effect, quiet.effect))
             }
             val attempt = if (next.requestFailureAwaitingReconnect) {
                 RequestDockFeature.State.LoadAttempt.Reconnect
@@ -109,7 +101,8 @@ internal fun SessionFeature.reduceRequests(state: State, action: Action): Reduce
                 recovery += Effect.send(Action.RefreshRequested(RefreshReason.Reconnect))
             }
             val started = startPendingWork(next, attempt)
-            return Reduced(started.state, Effect.merge(listOf(models.effect, started.effect) + recovery))
+            val watched = watchdog(started.state)
+            return Reduced(watched.state, Effect.merge(listOf(models.effect, started.effect, watched.effect) + recovery))
         }
 
         is Action.RequestDock -> return reduceRequestDock(action.action, state)

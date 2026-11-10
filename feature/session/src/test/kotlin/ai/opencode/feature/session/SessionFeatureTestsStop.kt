@@ -642,6 +642,7 @@ class SessionFeatureTestsStop {
                 },
                 isSessionActive = { _, _ -> reads.increment() < 3 },
                 pendingInputs = { _, _ -> emptyList() },
+                familyPendingRequests = { _, _, _ -> OpenCodePendingRequests(permissions = emptyList(), forms = emptyList()) },
                 getSession = { _, _ -> session },
                 transcript = { _, _, _ -> emptyList() },
             )

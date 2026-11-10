@@ -2,9 +2,7 @@ package ai.opencode.feature.drawer
 
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.ImmediateClock
-import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.SharedKeys
-import ai.opencode.core.sharing.experimental
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.drawer.HomeFeatureTestSupport.homeTest
 import ai.opencode.feature.settings.HomeSettingsFeature
@@ -51,7 +49,6 @@ class VoiceProviderTestsHome {
     @Test fun aReconnectForgetsTheServersModelsAndAnyAnswerStillComing() = homeTest { h ->
         h.setShared(ServerSharedKeys.savedServers, listOf(server))
         h.setShared(ServerSharedKeys.savedServer, server)
-        h.setShared(experimental(ExperimentalFeature.serverVoice), true)
         h.setShared(VoiceSharedKeys.voiceServerChoice, VoiceServerChoice.Automatic)
         h.setShared(SharedKeys.openAIAPIKey, "sk-phone")
         h.setShared(SharedKeys.verifiedVoiceKeyFingerprint, VoiceKeyFingerprint.make(key = "sk-phone", model = VoiceEngine.gptLive.modelID))

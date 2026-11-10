@@ -88,6 +88,13 @@ class ServerFlowTests {
         assertEquals("Reconnecting to Studio…", reconnecting?.title)
         assertNull(reconnecting?.action)
         assertEquals(ServerConnectionNotice.Action.retry, reconnecting?.primary)
+        var inGrace = HomeConnectionFeature.State(server = studio).copy(connectionStatus = ConnectionStatus.reconnecting)
+        val early = ServerConnectionNotice(
+            status = inGrace.displayedStatus, credentialsRejected = false, errorMessage = null, server = studio, isSwitching = false,
+        )
+        assertNull("a reconnect waits out its grace before the pill shows", early)
+        inGrace = inGrace.copy(showsRecovery = true)
+        assertEquals(ConnectionStatus.reconnecting, inGrace.displayedStatus)
 
         val failed = notice(ConnectionStatus.disconnected, error = "Tailscale is off")
         assertEquals("Couldn’t connect to Studio", failed?.title)
@@ -112,7 +119,7 @@ class ServerFlowTests {
             serverSwitchNote = ServerSwitchNote(server = studio, returnedTo = "Laptop", reason = ServerSwitchNote.Reason.Unreachable),
         )
         var inputs = DrawerListInputs(
-            selectedSessionID = null, showsProjectIcons = false, reducedMotion = false, increasedContrast = false,
+            selectedSessionID = null, reducedMotion = false, increasedContrast = false,
         )
         fun build() = DrawerListModel.build(
             state = home, inputs = inputs, liftedID = null, catchUpMounted = false, whatsNewMounted = false,

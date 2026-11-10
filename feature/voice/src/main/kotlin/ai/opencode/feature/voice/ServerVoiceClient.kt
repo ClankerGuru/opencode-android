@@ -5,6 +5,7 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.log.AppLog
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.OpenCodeTransport
+import ai.opencode.server.ServerLinkClient
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
@@ -23,7 +24,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.security.MessageDigest
 
-/** Which voice provider new calls use when Server Voice is enabled. */
+/** Which voice provider new calls use when a server brokers them. */
 @Serializable
 enum class ServerVoiceProvider(val rawValue: String) {
     @SerialName("openai") openAI("openai"),
@@ -261,7 +262,7 @@ sealed class ServerVoiceError(message: String) : Exception(message) {
     override fun fillInStackTrace(): Throwable = this
 
     companion object {
-        const val unsupportedServerNotice = "This server doesn’t support server voice yet"
+        const val unsupportedServerNotice = "This server needs a newer OpenCode for voice calls"
 
         fun fromHTTPResponse(statusCode: Int, data: ByteArray): ServerVoiceError {
             if (statusCode == 404) return UnsupportedRoute
@@ -352,7 +353,7 @@ class ServerVoiceClient(
             method: String = "GET",
             body: ByteArray? = null,
         ): Request? {
-            val url = server.endpoint(path) ?: return null
+            val url = dependency(ServerLinkClient).resolve(server).endpoint(path) ?: return null
             val builder = Request.Builder().url(url).header("Accept", "application/json")
             if (body != null) {
                 builder.header("Content-Type", "application/json")

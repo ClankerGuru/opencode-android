@@ -1,5 +1,7 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.core.motion.MotionRole
+import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.ui.OpenCodeRadius
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,7 +46,6 @@ import ai.opencode.feature.drawer.style.DrawerEdgeStyle
 import ai.opencode.feature.drawer.style.DrawerFooterBackdrop
 import ai.opencode.feature.drawer.style.DrawerHeaderBackdrop
 import ai.opencode.feature.drawer.style.DrawerMetrics
-import ai.opencode.feature.drawer.style.DrawerRowLayout
 import ai.opencode.feature.drawer.style.DrawerSectionBreak
 import ai.opencode.feature.drawer.style.DrawerTunables
 import ai.opencode.feature.drawer.switcher.ServerFlowTitle
@@ -57,8 +58,6 @@ import ai.opencode.feature.voice.FloatingCallCenter
 import ai.opencode.feature.voice.floatingCallDrawerButton
 import ai.opencode.server.ServerSharedKeys
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
@@ -213,11 +212,9 @@ fun HomeDrawer(
 
     val inputs = DrawerListInputs(
         selectedSessionID = selectedSessionID,
-        showsProjectIcons = true,
         reducedMotion = reducedMotion,
         increasedContrast = highContrast,
         alwaysShowsHeaders = DrawerTunables.sectionBreak == DrawerSectionBreak.Header,
-        twoLineRows = DrawerTunables.rowLayout == DrawerRowLayout.TwoLine,
         serverSwap = serverSwapTarget,
     )
     val actions = remember(store, viewState) {
@@ -313,7 +310,6 @@ fun HomeDrawer(
                     text = search,
                     onTextChange = { store.send(HomeFeature.Action.SearchChanged(it)) },
                     reducedMotion = reducedMotion,
-                    onBegin = viewState::beginSearch,
                     onEnd = viewState::endSearch,
                     keyboardHold = viewState.keyboardHold,
                 )
@@ -560,17 +556,18 @@ private fun DrawerFooterTrailing(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AnimatedVisibility(
                     visible = offersCall && showsCall,
+                    // The call button comes on layout and goes on collapse (iOS 03adf07a).
                     enter = if (reducedMotion) {
-                        EnterTransition.None
+                        fadeIn(MotionRole.Layout.animation(reduceMotion = true))
                     } else {
-                        expandHorizontally(DrawerTunables.callButtonSpring.spec(IntSize.VisibilityThreshold), expandFrom = Alignment.End) +
-                            fadeIn(DrawerTunables.callButtonSpring.spec())
+                        expandHorizontally(MotionRole.Layout.animation(visibilityThreshold = IntSize.VisibilityThreshold), expandFrom = Alignment.End) +
+                            fadeIn(MotionRole.Layout.animation())
                     },
                     exit = if (reducedMotion) {
-                        ExitTransition.None
+                        fadeOut(MotionRole.Layout.animation(MotionPhase.Exit, reduceMotion = true))
                     } else {
-                        shrinkHorizontally(DrawerTunables.callButtonSpring.spec(IntSize.VisibilityThreshold), shrinkTowards = Alignment.End) +
-                            fadeOut(DrawerTunables.callButtonSpring.spec())
+                        shrinkHorizontally(MotionRole.Layout.animation(MotionPhase.Exit, visibilityThreshold = IntSize.VisibilityThreshold), shrinkTowards = Alignment.End) +
+                            fadeOut(MotionRole.Layout.animation(MotionPhase.Exit))
                     },
                 ) {
                     OpenCodeIconButton(

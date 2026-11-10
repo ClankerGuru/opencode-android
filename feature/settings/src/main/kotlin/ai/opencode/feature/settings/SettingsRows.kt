@@ -332,8 +332,8 @@ fun SettingsButtonRow(
 data class SettingsMenuOption<T>(val value: T, val title: String, val caption: String? = null)
 
 /**
- * iOS `SettingsMenuRow`: a choice in a Settings list: the title (with an icon and a caption when
- * given), then the value at the row's end in the secondary colour. iOS ends it with an
+ * iOS `SettingsMenuRow`: a choice in a Settings list: the title, then the value at the row's end
+ * in the secondary colour. iOS ends it with an
  * up-and-down chevron; Android uses Material's dropdown arrow. The whole row opens the menu (a
  * Material dropdown with checkmarks).
  * [sections] groups options under headers (Voice › Model's provider groups); a single unnamed
@@ -347,9 +347,6 @@ fun <T> SettingsMenuRow(
     sections: List<Pair<String?, List<SettingsMenuOption<T>>>>,
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
-    caption: String? = null,
-    symbol: String? = null,
-    tint: SettingsTint = SettingsTint.Gray,
     accessibilityLabel: String = title,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -362,16 +359,15 @@ fun <T> SettingsMenuRow(
             },
             onClick = { expanded = true },
         ) {
-            if (symbol != null) SettingsIcon(symbol, tint)
             if (stacked) {
                 // iOS at accessibility sizes: the value goes under the title.
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    SettingsRowText(title, caption)
+                    SettingsRowText(title, summary = null)
                     SettingsMenuValue(value)
                 }
             } else {
                 // The title takes what's left; the value keeps to the end, ellipsized past its cap.
-                SettingsRowText(title, caption, Modifier.weight(1f))
+                SettingsRowText(title, summary = null, modifier = Modifier.weight(1f))
                 SettingsMenuValue(value, Modifier.widthIn(max = SettingsMenuValueMaxWidth))
             }
         }
@@ -460,10 +456,7 @@ fun <T> SettingsMenuRow(
     options: List<SettingsMenuOption<T>>,
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
-    caption: String? = null,
-    symbol: String? = null,
-    tint: SettingsTint = SettingsTint.Gray,
-) = SettingsMenuRow(title, value, selection, listOf(null to options), onSelect, modifier, caption, symbol, tint)
+) = SettingsMenuRow(title, value, selection, listOf(null to options), onSelect, modifier)
 
 /** Leading spacer matching a row with an icon, for rows that line up under iconed rows. */
 @Composable

@@ -1,7 +1,9 @@
 package ai.opencode.feature.transcript.list
 
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.SpringSolver
-import ai.opencode.feature.transcript.TranscriptTunables
+import ai.opencode.core.motion.retarget
 
 /**
  * The New divider's own motion while the reader sees it (iOS `NewDividerMotion`, in
@@ -17,14 +19,16 @@ class NewDividerMotion(direction: Direction, height: Double, alpha: Double) {
 
     /** Its height, as a share of its measured one. */
     val height = SpringSolver(
-        TranscriptTunables.dividerCollapse,
+        Motion.layout,
+        direction.phase,
         value = height,
         target = direction.target,
         positionEpsilon = 0.002,
         velocityEpsilon = 0.02,
     )
     val alpha = SpringSolver(
-        TranscriptTunables.dividerFade,
+        Motion.swap,
+        direction.phase,
         value = alpha,
         target = direction.target,
         positionEpsilon = 0.005,
@@ -44,8 +48,8 @@ class NewDividerMotion(direction: Direction, height: Double, alpha: Double) {
     fun turn(direction: Direction) {
         if (direction == this.direction) return
         this.direction = direction
-        height.retarget(direction.target, TranscriptTunables.dividerCollapse)
-        alpha.retarget(direction.target, TranscriptTunables.dividerFade)
+        height.retarget(direction.target, Motion.layout, direction.phase)
+        alpha.retarget(direction.target, Motion.swap, direction.phase)
     }
 
     val shownHeight: Double get() = height.value.coerceIn(0.0, 1.0)
@@ -53,4 +57,10 @@ class NewDividerMotion(direction: Direction, height: Double, alpha: Double) {
     val isSettled: Boolean get() = height.isSettled && alpha.isSettled
 
     private val Direction.target: Double get() = if (this == Direction.Leaving) 0.0 else 1.0
+
+    /**
+     * Entering opens on `Motion.layout` and fades in on `Motion.swap`; leaving closes on their
+     * exits (`Motion.collapse`, the quicker fade).
+     */
+    private val Direction.phase: MotionPhase get() = if (this == Direction.Entering) MotionPhase.Enter else MotionPhase.Exit
 }

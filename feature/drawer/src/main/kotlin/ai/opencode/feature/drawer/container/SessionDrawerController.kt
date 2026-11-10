@@ -1,11 +1,14 @@
 package ai.opencode.feature.drawer.container
 
 import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionCurve
 import ai.opencode.core.motion.MotionFrameAction
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.SpringSolver
 import ai.opencode.core.motion.motionFrameLoop
 import ai.opencode.feature.drawer.catchup.CatchUpDisposition
+import ai.opencode.feature.drawer.catchup.CatchUpFinishTunables
 import ai.opencode.feature.drawer.catchup.CatchUpMetrics
 import ai.opencode.feature.drawer.catchup.CatchUpStackController
 import ai.opencode.feature.drawer.catchup.CatchUpStage
@@ -372,9 +375,9 @@ class SessionDrawerController internal constructor(
     }
 
     /**
-     * Moves the card's leading edge to the sidebar's (or the screen's), on a spring for the
-     * sidebar's toggle (iOS `UIViewPropertyAnimator(duration: 0.4, dampingRatio: 1)`). The card's
-     * own frame changes, so the session narrows and widens with the sidebar instead of sliding.
+     * Moves the card's leading edge to the sidebar's (or the screen's), on `MotionRole.Layout` for
+     * the sidebar's toggle (opening; closing on its exit, `Collapse`). The card's own frame changes,
+     * so the session narrows and widens with the sidebar instead of sliding.
      */
     internal fun layoutSidebar(animated: Boolean) {
         if (sidebarShown == null || catchUp != null) return
@@ -383,7 +386,7 @@ class SessionDrawerController internal constructor(
         val target = if (visible) drawerWidth else 0f
         sidebarJob?.cancel()
         sidebarJob = scope.launch {
-            if (animated) sidebarLeading.animateTo(target, SidebarSpring.spec()) else sidebarLeading.snapTo(target)
+            if (animated) sidebarLeading.animateTo(target, MotionRole.Layout.animation(if (visible) MotionPhase.Enter else MotionPhase.Exit)) else sidebarLeading.snapTo(target)
             if (!isSidebarVisible) isSidebarComposed = false
         }
     }
@@ -526,8 +529,8 @@ class SessionDrawerController internal constructor(
 
     /**
      * Entering: the card jumps to its inset frame and slides from the drawer's offset into the
-     * stack (0.45 s, damping 0.92); the chrome fades in as the drawer recedes and fades out. From
-     * the session itself the outgoing screen fades over the first card for 0.2 s.
+     * stack on `Motion.surface`; the chrome fades in as the drawer recedes and fades out. From
+     * the session itself the outgoing screen fades over the first card on `swap`'s exit.
      */
     private fun enter(animated: Boolean, startOffset: Float, startProgress: Float, showsCard: Boolean) {
         val snapshot = pendingSnapshot.takeIf { animated && startOffset <= 0f }
@@ -544,9 +547,9 @@ class SessionDrawerController internal constructor(
         runMorph(
             kind = CatchUpModeMorph.EnterCatchUp,
             animated = animated,
-            duration = ENTER_DURATION,
+            duration = SURFACE.duration,
             step = { t ->
-                val p = durationSpring(t, ENTER_DURATION, 0.92)
+                val p = progress(t, SURFACE)
                 val start = if (animated) PRERENDER_ALPHA else 0f
                 chromeAlpha.floatValue = start + (1f - start) * p
                 chromeScale.floatValue = 1f
@@ -555,11 +558,11 @@ class SessionDrawerController internal constructor(
                 val modal = sidebarShown == null
                 stackOffset.floatValue = if (modal) 0f else startOffset * (1f - p)
                 stackTy.floatValue = if (modal && startProgress > 0f) FINISH_RISE * (1f - p) else 0f
-                stackAlpha.floatValue = if (modal && startProgress > 0f) easeOut(t, 0.22) else 1f
+                stackAlpha.floatValue = if (modal && startProgress > 0f) progress(t, SWAP_IN) else 1f
                 drawerScale.floatValue = startScale + (closedScale - startScale) * p
                 drawerAlpha.floatValue = if (modal) (if (startProgress <= 0f) 0f else 1f) else 1f - p
                 dimAlpha.floatValue = startDim + (endDim - startDim) * p
-                outgoingAlpha.floatValue = if (snapshot == null) 0f else 1f - easeOut(t, 0.2)
+                outgoingAlpha.floatValue = if (snapshot == null) 0f else 1f - progress(t, SWAP_OUT)
             },
             completion = {
                 outgoing = null
@@ -639,9 +642,9 @@ class SessionDrawerController internal constructor(
             runMorph(
                 kind = CatchUpModeMorph.OpenIntoSession,
                 animated = true,
-                duration = OPEN_DURATION,
+                duration = SURFACE.duration,
                 step = { t ->
-                    val p = durationSpring(t, OPEN_DURATION, 1.0)
+                    val p = progress(t, SURFACE)
                     cardScale.floatValue = scale + (1f - scale) * p
                     cardTx.floatValue = tx * (1f - p)
                     cardTy.floatValue = ty * (1f - p)
@@ -662,9 +665,9 @@ class SessionDrawerController internal constructor(
             runMorph(
                 kind = CatchUpModeMorph.FinishIntoSession,
                 animated = true,
-                duration = FINISH_DURATION,
+                duration = CatchUpFinishTunables.sessionReturn.duration,
                 step = { t ->
-                    val p = durationSpring(t, FINISH_DURATION, 0.92)
+                    val p = progress(t, CatchUpFinishTunables.sessionReturn)
                     cardScale.floatValue = depth + (1f - depth) * p
                     cardTx.floatValue = 0f
                     cardTy.floatValue = FINISH_RISE * (1f - p)
@@ -680,10 +683,10 @@ class SessionDrawerController internal constructor(
         }
     }
 
-    /** The stage and the card behind go first (iOS's 0.16 s and 0.12 s ease-out fades). */
+    /** The stage and the card behind leave on `swap`'s exit, on the frame the session starts. */
     private fun fadeStage(t: Double, previewFrom: Float, finishing: Boolean) {
-        catchUpStack.preview.alpha = previewFrom * (1f - easeOut(t, 0.12))
-        val stage = easeOut(t, 0.16)
+        catchUpStack.preview.alpha = previewFrom * (1f - progress(t, SWAP_OUT))
+        val stage = progress(t, SWAP_OUT)
         chromeAlpha.floatValue = 1f - stage
         chromeScale.floatValue = if (finishing) 1f + 0.04f * stage else 1f
         if (sidebarShown == null) {
@@ -737,15 +740,15 @@ class SessionDrawerController internal constructor(
         runMorph(
             kind = CatchUpModeMorph.ReturnToDrawer,
             animated = animated,
-            duration = RETURN_DURATION,
+            duration = SURFACE.duration,
             step = { t ->
-                val p = durationSpring(t, RETURN_DURATION, 1.0)
+                val p = progress(t, SURFACE)
                 val modal = sidebarShown == null
                 drawerScale.floatValue = closed + (1f - closed) * p
                 // The open drawer's own dim is none; a black one fading out under the stage flashes in light mode.
                 dimAlpha.floatValue = 0f
                 // Modal drawer stays opaque over the full-screen session card while Catch Up fades out above it.
-                drawerAlpha.floatValue = if (modal) 1f else fadeIn(t, delay = 0.03, duration = 0.3)
+                drawerAlpha.floatValue = if (modal) 1f else fadeIn(t)
                 maskProgress.floatValue = p
                 cardRadius.floatValue = stackRadius + (displayCornerRadius - stackRadius) * p
                 borderAlpha.floatValue = 1f - p
@@ -756,16 +759,20 @@ class SessionDrawerController internal constructor(
                 val startAlpha = if (wasShowingCard) 1f else PRERENDER_ALPHA
                 cardAlpha.floatValue = if (modal) 1f else startAlpha + (1f - startAlpha) * p
                 scrimAlpha.floatValue = if (modal) 1f else p
-                catchUpStack.preview.alpha = previewFrom * (1f - easeOut(t, 0.08))
-                val stageFade = easeOut(t, 0.22)
+                // What leaves goes on `swap`'s exit as the list comes forward on its entrance, on
+                // the same frame: the exit is the quicker, so the list never shows through them.
+                val stageFade = progress(t, SWAP_OUT)
+                catchUpStack.preview.alpha = previewFrom * (1f - stageFade)
                 chromeAlpha.floatValue = 1f - stageFade
                 chromeScale.floatValue = 1f
                 stackAlpha.floatValue = 1f
                 stackTy.floatValue = 0f
                 if (snapshot != null) {
-                    // On modal drawer, the leaving card fades in sync with the stage above the opaque drawer.
-                    outgoingAlpha.floatValue = if (modal) 1f - stageFade else 1f - easeOut(t, 0.12)
-                    contentAlpha.floatValue = if (modal) 1f else fadeIn(t, delay = 0.1, duration = 0.2)
+                    // The two sessions swap through the card's own background: the stack's leaves
+                    // quicker than the returning one arrives. Over a modal drawer the leaving card
+                    // fades with the stage above it and the returning one is already there.
+                    outgoingAlpha.floatValue = 1f - stageFade
+                    contentAlpha.floatValue = if (modal) 1f else fadeIn(t)
                 } else {
                     outgoingAlpha.floatValue = 0f
                     contentAlpha.floatValue = 1f
@@ -871,22 +878,18 @@ class SessionDrawerController internal constructor(
     }
 
     private companion object {
-        /** iOS `UIViewPropertyAnimator(duration: 0.45, dampingRatio: 0.92)` entering Catch Up. */
-        const val ENTER_DURATION = 0.45
-        /** iOS 0.45 s, damping 1, opening into the session. */
-        const val OPEN_DURATION = 0.45
-        /** iOS 0.48 s, damping 0.92, finishing into the session. */
-        const val FINISH_DURATION = 0.48
-        /** iOS 0.45 s, damping 1, returning to the drawer. */
-        const val RETURN_DURATION = 0.45
+        /** A mode change (entering, opening a card, returning) is a full-screen change: `Motion.surface`. */
+        val SURFACE: MotionCurve get() = MotionRole.Surface.curve()
+        /** What arrives fades in on `swap`'s entrance. */
+        val SWAP_IN: MotionCurve get() = MotionRole.Swap.curve(MotionPhase.Enter)
+        /** What leaves fades on `swap`'s exit. */
+        val SWAP_OUT: MotionCurve get() = MotionRole.Swap.curve(MotionPhase.Exit)
         /** iOS `composerStripHeight` (68 pt): the stack card's composer strip that slides into the session. */
         const val COMPOSER_STRIP_HEIGHT = 68f
         /** The finished session rises from 18 pt below. */
         const val FINISH_RISE = 18f
         /** iOS `TranscriptMetrics.clustered` (8 pt): the stack card's top sits that far into the session. */
         const val CARD_TOP_CLUSTER = 8f
-        /** The sidebar's toggle (UIKit 0.4 s, damping 1). */
-        val SidebarSpring = MotionSpring(0.4, 0.0)
 
         /**
          * UIKit's `UIViewPropertyAnimator(duration:dampingRatio:)`: a spring whose envelope has
@@ -900,13 +903,22 @@ class SessionDrawerController internal constructor(
             return SpringSolver.evaluate(from = 0.0, to = 1.0, initialVelocity = 0.0, omega = omega, zeta = zeta, elapsed = t).first.toFloat()
         }
 
-        /** UIKit `.easeOut` over [duration] seconds. */
-        fun easeOut(t: Double, duration: Double): Float =
-            Motion.EaseOut.transform((t / duration).coerceIn(0.0, 1.0).toFloat())
+        /**
+         * How far along [curve] the morph is at [t] (iOS `MotionRole.propertyAnimator`): a spring
+         * as UIKit's `UIViewPropertyAnimator(duration:dampingRatio: 1 - bounce)`, or its ease.
+         */
+        fun progress(t: Double, curve: MotionCurve): Float {
+            val fraction = (t / max(curve.duration, 0.01)).coerceIn(0.0, 1.0).toFloat()
+            return when (curve) {
+                is MotionCurve.Spring -> durationSpring(t, curve.duration, 1.0 - curve.bounce)
+                is MotionCurve.EaseOut -> Motion.EaseOut.transform(fraction)
+                is MotionCurve.EaseInOut -> Motion.EaseInOut.transform(fraction)
+            }
+        }
 
-        /** iOS `CatchUpMotionStart.holdFadeIn`: from `prerenderAlpha` to 1, ease-in-out, [delay] after the start. */
-        fun fadeIn(t: Double, delay: Double, duration: Double): Float {
-            val p = Motion.EaseInOut.transform(((t - delay) / duration).coerceIn(0.0, 1.0).toFloat())
+        /** iOS `CatchUpMotionStart.holdFadeIn`: from `prerenderAlpha` to 1 on `Motion.swap`, from the start. */
+        fun fadeIn(t: Double): Float {
+            val p = progress(t, MotionRole.Swap.curve())
             return PRERENDER_ALPHA + (1f - PRERENDER_ALPHA) * p
         }
     }

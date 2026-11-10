@@ -1,7 +1,8 @@
 package ai.opencode.feature.media
 
 import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.touch.TouchRecovery
 import ai.opencode.core.touch.rememberTouchRecovery
 import ai.opencode.core.ui.AppearanceColorScheme
@@ -540,19 +541,19 @@ internal object MediaBackPreview {
     const val SIDEWAYS = 0.04f
 }
 
-/** The viewer's springs (iOS `UIView.animate(springDuration:bounce:)` values). */
+/**
+ * The viewer's motion roles (iOS `MediaViewerController` on `Motion`): fly in, content open and
+ * the zoom dismissal on surface; a short drag back to the photo on panel open (its slight bounce
+ * keeps Photos' cushion); home to the thumbnail on flight; nowhere to land, carried on and faded
+ * on panel close; the backdrop's fade in on dim.
+ */
 internal object MediaMotion {
-    /** Fly in, content open, content dismiss (0.4 s, critically damped). */
-    val open: MotionSpring = Motion.settle
-    /** A short drag springs back (0.4 s, 0.12 bounce). */
-    val springBack = MotionSpring(0.4, 0.12)
-    /** Flying home into the thumbnail (0.42 s, critically damped). */
-    val home = MotionSpring(0.42, 0.0)
-    /** Nowhere to land: carried on and faded (0.35 s). */
-    val away = MotionSpring(0.35, 0.0)
-    /** The backdrop's fade in (0.3 s ease-out). */
-    const val backdropIn = 0.3
-    /** Fade style's dismissal and recovery (0.2 s). */
+    val open = MotionRole.Surface
+    val springBack = MotionRole.PanelOpen
+    val home = MotionRole.Flight
+    val away = MotionRole.PanelClose
+    val backdropIn = MotionRole.Dim
+    /** Fade style's open (0.2 s). */
     const val fade = 0.2
 }
 
@@ -588,7 +589,8 @@ internal class FlightAccessories(val badges: List<MediaFlightAccessory>, frame: 
 internal class MediaViewerController(
     val state: MediaViewerState,
     private val isMedia: Boolean,
-    reducesMotion: Boolean,
+    /** Only the Fade style runs under Reduce Motion, so the flights see false; the roles still take it. */
+    private val reducesMotion: Boolean,
     private val scope: CoroutineScope,
     private val density: Density,
     private val onDismissed: () -> Unit,
@@ -753,9 +755,9 @@ internal class MediaViewerController(
         hideSource()
         hostAlpha = 1f
         updateStatusBarLight(true)
-        setChromeHidden(false, flightDuration = MediaMotion.open.duration)
+        setChromeHidden(false, flightDuration = MediaMotion.open.curve().duration)
         backdropJob = scope.launch {
-            animate(backdropAlpha, 1f, animationSpec = tween(millis(MediaMotion.backdropIn), easing = Motion.EaseOut)) { v, _ -> backdropAlpha = v }
+            animate(backdropAlpha, 1f, animationSpec = MediaMotion.backdropIn.animation(reduceMotion = reducesMotion)) { v, _ -> backdropAlpha = v }
         }
         val image = state.image
         val from = source?.let(::sourceFrame)
@@ -1125,11 +1127,14 @@ internal class MediaViewerController(
         if (isLeaving) return
         isLeaving = true
         flightGeneration += 1
-        setChromeHidden(true, flightDuration = MediaMotion.home.duration)
-        updateStatusBarLight(false)
-        catchBackdrop()
         val source = if (home) source else null
         val target = source?.let(::sourceFrame)
+        // Home to its thumbnail on flight; with nowhere to land it carries on down and fades on
+        // panel close. Neither bounces on the way out.
+        val role = if (target == null) MediaMotion.away else MediaMotion.home
+        setChromeHidden(true, flightDuration = role.curve().duration)
+        updateStatusBarLight(false)
+        catchBackdrop()
         val backdrop = backdropAlpha
         val image = state.image
         if (image != null) {
@@ -1158,7 +1163,7 @@ internal class MediaViewerController(
                 // Nowhere to land: carry on the way it was thrown and fade.
                 val drop = bounds.height * 0.25f
                 flightJob = scope.launch {
-                    spring(MediaMotion.away) { p ->
+                    spring(MediaMotion.away, phase = MotionPhase.Exit) { p ->
                         flight.frame = from.translate(0f, drop * p)
                         flight.scale = 1 - 0.2f * p
                         flight.alpha = 1 - p
@@ -1177,7 +1182,7 @@ internal class MediaViewerController(
             }
             val alpha = hostAlpha
             flightJob = scope.launch {
-                spring(MediaMotion.open) { p ->
+                spring(role, phase = if (target == null) MotionPhase.Exit else MotionPhase.Enter) { p ->
                     hostTransform = lerp(current, end, p)
                     hostAlpha = alpha * (1 - p)
                     backdropAlpha = backdrop * (1 - p)
@@ -1226,7 +1231,10 @@ internal class MediaViewerController(
         } else {
             val alpha = viewAlpha
             flightJob?.cancel()
-            flightJob = scope.launch { animate(alpha, 1f, animationSpec = tween(millis(MediaMotion.fade))) { v, _ -> viewAlpha = v } }
+            // Back on the release role (the reduced fade: Fade only runs under Reduce Motion).
+            flightJob = scope.launch {
+                animate(alpha, 1f, animationSpec = MotionRole.Release.animation(reduceMotion = reducesMotion)) { v, _ -> viewAlpha = v }
+            }
             setChromeHidden(false)
         }
     }
@@ -1345,9 +1353,10 @@ internal class MediaViewerController(
 
     // MARK: Animation
 
-    /** iOS `UIView.animate(springDuration:bounce:initialSpringVelocity:)`: one spring of progress 0 → 1 for every property. */
-    private suspend fun spring(spring: MotionSpring, velocity: Float = 0f, update: (Float) -> Unit) {
-        animate(0f, 1f, initialVelocity = velocity, animationSpec = spring.spec(visibilityThreshold = 0.0005f)) { value, _ -> update(value) }
+    /** iOS `role.animate(phase, reduceMotion:velocity:)`: one curve of progress 0 → 1 for every property. */
+    private suspend fun spring(role: MotionRole, velocity: Float = 0f, phase: MotionPhase = MotionPhase.Enter, update: (Float) -> Unit) {
+        val spec = role.animation(phase, reducesMotion, visibilityThreshold = 0.0005f)
+        animate(0f, 1f, initialVelocity = role.initialVelocity(velocity, reducesMotion), animationSpec = spec) { value, _ -> update(value) }
         update(1f)
     }
 

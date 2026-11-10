@@ -61,7 +61,16 @@ internal fun SessionFeature.reduceModelsAndFamily(state: State, action: Action):
             if (pending != null && next.models.isNotEmpty() && !SessionFeature.catalog(next.models, offers = pending)) {
                 next = next.copy(pendingModel = null, currentModel = next.session?.model ?: catalog.defaultModel?.ref)
             }
-            if (next.currentModel == null) next = next.copy(currentModel = catalog.defaultModel?.ref)
+            // A draft starts on the server's default at the level last picked for it; until the
+            // catalog lands it has none, and a send leaves the choice to the server.
+            if (next.currentModel == null) {
+                val model = if (next.session == null) {
+                    catalog.newSessionModel(next.modelVariants.value)
+                } else {
+                    catalog.defaultModel?.ref
+                }
+                next = next.copy(currentModel = model)
+            }
             Reduced(next)
         } else {
             var next = state.copy(isLoadingModels = false)
@@ -358,7 +367,7 @@ private fun SessionFeature.familyPicked(id: String, state: State): Reduced<State
         autoBackgroundClaims = emptyMap(),
         loadError = null,
         activePicker = null,
-        visibleLimit = 20,
+        visibleLimit = SessionFeature.baseVisibleLimit,
         browsingWindowStartID = null,
         earlierHistory = State.EarlierHistory.UnknownEdge,
         earlierHistoryInsertionID = null,
@@ -391,6 +400,7 @@ private fun SessionFeature.familyPicked(id: String, state: State): Reduced<State
             Effect.cancel(CancelID.AutocompleteCommand),
             Effect.cancel(CancelID.AutocompleteCommandWait),
             Effect.cancel(CancelID.Revert),
+            Effect.cancel(CancelID.WindowReset),
             // Clearing sessionSheet above cancels its auto-rename failure through ifLet teardown.
             endedCall,
             closesPage.effect,

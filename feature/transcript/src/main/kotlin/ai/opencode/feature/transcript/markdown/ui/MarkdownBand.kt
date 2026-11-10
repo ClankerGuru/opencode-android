@@ -1,10 +1,10 @@
 package ai.opencode.feature.transcript.markdown.ui
 
+import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeColors
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.drawerPanHorizontalScroller
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -84,8 +84,9 @@ fun HairlineRule(modifier: Modifier = Modifier, alpha: Float = 1f) {
  */
 @Composable
 fun Modifier.horizontalOverflowFade(state: ScrollState, width: Dp = 40.dp): Modifier {
-    val leading by animateFloatAsState(if (state.value > 1) 1f else 0f, tween(150, easing = Motion.EaseOut), label = "leadingFade")
-    val trailing by animateFloatAsState(if (state.maxValue - state.value > 1) 1f else 0f, tween(150, easing = Motion.EaseOut), label = "trailingFade")
+    val fade = Motion.swap.animation<Float>(reduceMotion = rememberReduceMotion())
+    val leading by animateFloatAsState(if (state.value > 1) 1f else 0f, fade, label = "leadingFade")
+    val trailing by animateFloatAsState(if (state.maxValue - state.value > 1) 1f else 0f, fade, label = "trailingFade")
     return graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
         .drawWithContent {
             drawContent()
@@ -116,17 +117,20 @@ class TableRules {
  * Code and tables sit in the desktop's inset block (iOS draws a full-width `MarkdownBand`).
  * Content scrolls horizontally inside the block, fading where more lies past it. A table's rules keep the viewport's width while its
  * columns scroll underneath.
+ *
+ * @param bandModifier applied to the whole block: a drag source there lifts the whole band.
  */
 @Composable
 fun MarkdownBand(
     modifier: Modifier = Modifier,
     rules: TableRules? = null,
+    bandModifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
     val colors = OpenCodeTheme.colors
     val scroll = rememberScrollState()
     val hairline = with(LocalDensity.current) { 1f.toDp() }
-    Column(modifier) {
+    Column(modifier.then(bandModifier)) {
         val shape = RoundedCornerShape(TranscriptBandStyle.cornerRadius)
         Box(
             Modifier

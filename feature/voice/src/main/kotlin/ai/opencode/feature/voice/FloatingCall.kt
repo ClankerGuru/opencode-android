@@ -4,12 +4,12 @@ import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionTransition
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.observe
 import ai.opencode.core.tuning.Tunable
 import ai.opencode.core.tuning.TunableChoice
-import ai.opencode.core.tuning.TunableSpring
 import ai.opencode.core.tuning.TuningPreset
 import ai.opencode.core.tuning.TuningPresets
 import ai.opencode.core.tuning.TuningStore
@@ -26,10 +26,7 @@ import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -173,9 +170,6 @@ object FloatingCallTunables {
     val maxSpeed = Tunable("call.float.maxSpeed", "Fastest throw (pt/s)", default = 6000.0, range = 1000.0..10000.0, step = 100.0)
     val overshoot = Tunable("call.float.overshoot", "Runs past the keep-out, at most", default = 40.0, range = 0.0..160.0, step = 2.0)
 
-    val edge = TunableSpring("call.float.edge", "Soft edge spring", duration = 0.4, bounce = 0.0)
-    val follow = TunableSpring("call.float.follow", "Follow the composer spring", duration = 0.35, bounce = 0.0)
-
     val styles: TuningPresets by lazy {
         TuningPresets(
             "call.float.style", "Shape",
@@ -191,8 +185,6 @@ object FloatingCallTunables {
         store.register(style)
         store.register(capsuleWidth, sideInset, topLimit, composerGap, liftShadow, restShadow)
         store.register(tapSlop, tapTime, catchSpeed, friction, maxSpeed, overshoot)
-        store.register(edge)
-        store.register(follow)
     }
 }
 
@@ -453,6 +445,7 @@ fun FloatingCallWindow(
             content.last = null
         }
     }
+    val reduceMotion = rememberReduceMotion()
     // iOS waits for the landing up to 40 × 0.1 s before taking the window down.
     var expired by remember { mutableStateOf(false) }
     LaunchedEffect(call) {
@@ -468,7 +461,14 @@ fun FloatingCallWindow(
             targetState = shown,
             modifier = modifier.fillMaxSize(),
             transitionSpec = {
-                EnterTransition.None togetherWith fadeOut(Motion.easeOut(0.25, delaySeconds = if (targetState == null) 0.15 else 0.0)) using SizeTransform(clip = false)
+                // A hang-up waits for the composer's own button to come back under the landed
+                // shape ([FLOATING_CALL_BUTTON_RETURN]) before fading.
+                val fade = if (targetState == null) {
+                    Motion.swap.animation<Float>(MotionPhase.Exit, reduceMotion, delaySeconds = FLOATING_CALL_BUTTON_RETURN)
+                } else {
+                    Motion.swap.animation(reduceMotion = reduceMotion)
+                }
+                EnterTransition.None togetherWith fadeOut(fade) using SizeTransform(clip = false)
             },
             label = "floatingCallWindow",
         ) { store ->
@@ -553,7 +553,8 @@ private class FloatingCallSurfaceModel(
 ) {
     val layout = FloatingCallLayout()
     val opacity = Animatable(0f)
-    var place by mutableStateOf(FloatingCallPlace())
+    /** Where the orb rests: the call center's, so this call and the next share one value. */
+    val place: FloatingCallPlace get() = center.place ?: FloatingCallPlace()
     val float = FloatingCallFloatMotion()
     val motion = FloatingCallStageMotion()
     val connect = FloatingCallConnectMotion()
@@ -564,7 +565,6 @@ private class FloatingCallSurfaceModel(
 
     var touch: FloatingCallOrbTouch? = null
     var dragMode: FloatingCallDragMode? = null
-    var dragNearest: FloatingCallStage? = null
     var tagJob: Job? = null
     var mountJob: Job? = null
     var lastPanelRequest = 0
@@ -626,7 +626,6 @@ private class FloatingCallSurfaceModel(
                 }
             }
         }
-        place = center.place ?: FloatingCallPlace()
         lastPanelRequest = center.panelRequest.count
         // Carried over to another screen grown: it stays grown.
         val stage = store.state.floatingStage.stage
@@ -648,7 +647,7 @@ private class FloatingCallSurfaceModel(
             // Carried over, or Reduce Motion: it appears where it rests, and the bigger field mounts now.
             mountJob?.cancel()
             bloomMounted = true
-            scope.launch { opacity.animateTo(1f, Motion.easeOut(if (reduceMotion) 0.2 else 0.25)) }
+            scope.launch { opacity.animateTo(1f, Motion.swap.animation(reduceMotion = reduceMotion)) }
             return
         }
         scope.launch { opacity.snapTo(1f) }
@@ -776,7 +775,6 @@ private class FloatingCallSurfaceModel(
     fun rest(point: Offset) {
         val area = liveRestArea()
         val next = FloatingCallPlace(point.x, if (point.y >= area.bounds.bottom - 0.5f) null else point.y)
-        if (place != next) place = next
         if (center.place != next) center.place = next
     }
 
@@ -944,7 +942,6 @@ private class FloatingCallSurfaceModel(
                 }
             } finally {
                 dragMode = null
-                dragNearest = null
             }
         }
     }
@@ -956,8 +953,7 @@ private class FloatingCallSurfaceModel(
         if (dragMode != FloatingCallDragMode.stage) return
         motion.drag(location.y.toDouble(), geometry)
         val nearest = geometry.nearest(motion.progress)
-        if (nearest != dragNearest) {
-            dragNearest = nearest
+        if (nearest != store.state.floatingStage.dragTarget) {
             send(FloatingCallStageFeature.Action.DragCrossed(nearest))
         }
     }
@@ -971,14 +967,12 @@ private class FloatingCallSurfaceModel(
         bloomMounted = true
         dismissKeyboard()
         motion.beginDrag(location.y.toDouble(), geometry)
-        dragNearest = store.state.floatingStage.stage
         send(FloatingCallStageFeature.Action.DragBegan)
     }
 
     private fun shapeEnded(velocityY: Float) {
         val mode = dragMode
         dragMode = null
-        dragNearest = null
         if (mode != FloatingCallDragMode.stage) return
         val settled = stageGeometry().settle(motion.progress, velocityY.toDouble())
         // A request that came up mid-drag holds it at the orb.
@@ -1082,7 +1076,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
     val composerTop = if (rawComposerTop != null) {
         animateFloatAsState(
             rawComposerTop,
-            if (reduceMotion) Motion.easeInOut(0.2) else FloatingCallTunables.follow.spec(),
+            Motion.layout.animation(reduceMotion = reduceMotion),
             label = "floatingCallComposer",
         ).value
     } else {
@@ -1157,7 +1151,6 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
         isMuted = isMuted,
         isSpeaking = isSpeaking,
         scene = scene,
-        isConnecting = phase == VoiceFeature.State.Phase.Connecting,
         tool = runningTool,
     )
 
@@ -1192,18 +1185,18 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
             )
         }
 
-        // The tag beside the orb naming the session the call now talks to.
+        // The tag beside the orb naming the session the call now talks to. It appears on micro
+        // and scales about itself.
         val tagVisible = model.tagShown && !lifting && float.position == null && !shaping
         Box(
             Modifier.placed(if (trailing) frame.left - 10 - 280 else frame.right + 10, frame.center.y - 18, 280f, 36f),
             contentAlignment = if (trailing) Alignment.CenterEnd else Alignment.CenterStart,
         ) {
-            val origin = TransformOrigin(if (trailing) 1f else 0f, 0.5f)
+            val micro = MotionTransition.micro(reduceMotion)
             AnimatedVisibility(
                 visible = tagVisible,
-                enter = fadeIn(if (reduceMotion) Motion.easeOut(0.2) else MotionSpring(0.3, 0.2).spec()) +
-                    scaleIn(if (reduceMotion) Motion.easeOut(0.2) else MotionSpring(0.3, 0.2).spec(), initialScale = 0.92f, transformOrigin = origin),
-                exit = fadeOut(Motion.easeOut(0.2)) + scaleOut(Motion.easeOut(0.2), targetScale = 0.92f, transformOrigin = origin),
+                enter = micro.enter,
+                exit = micro.exit,
                 label = "floatingCallTag",
             ) {
                 FloatingCallTag(model.tagText.orEmpty())
@@ -1402,6 +1395,13 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
 }
 
 /** Above the bloom's centre and the room below it in its field: enough for the card and the sheet's field at any stage between. */
+/**
+ * How long the composer's own button takes to come back under a landed shape (iOS
+ * `FloatingCallWindowRoot.buttonReturn`): the incoming button has to be there before the shape
+ * leaves.
+ */
+private const val FLOATING_CALL_BUTTON_RETURN = 0.15
+
 private const val FIELD_ABOVE = 220.0
 private const val FIELD_HEIGHT = 720f
 
@@ -1496,10 +1496,8 @@ private fun FloatingCallOrbControls(isMuted: Boolean, statusText: String, reduce
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .offset(x = 2.dp, y = (-2).dp),
-            enter = scaleIn(if (reduceMotion) Motion.easeOut(0.2) else MotionSpring(0.3, 0.25).spec(), initialScale = 0.4f) +
-                fadeIn(if (reduceMotion) Motion.easeOut(0.2) else MotionSpring(0.3, 0.25).spec()),
-            exit = scaleOut(if (reduceMotion) Motion.easeOut(0.2) else MotionSpring(0.3, 0.25).spec(), targetScale = 0.4f) +
-                fadeOut(if (reduceMotion) Motion.easeOut(0.2) else MotionSpring(0.3, 0.25).spec()),
+            enter = MotionTransition.micro(reduceMotion).enter,
+            exit = MotionTransition.micro(reduceMotion).exit,
             label = "floatingCallMuteBadge",
         ) {
             Box(
@@ -1571,12 +1569,13 @@ internal fun RowScope.FloatingCallControl(
 ) {
     val active = !isPlaceholder && isEnabled
     // Mute turning on, or every control dimming as the call ends, eases rather than flipping.
-    val dim by animateFloatAsState(if (isPlaceholder || !isEnabled) 0.35f else 1f, Motion.easeOut(0.18), label = "floatingCallControlDim")
+    val reduceMotion = rememberReduceMotion()
+    val dim by animateFloatAsState(if (isPlaceholder || !isEnabled) 0.35f else 1f, Motion.swap.animation(reduceMotion = reduceMotion), label = "floatingCallControlDim")
     val text = OpenCodeTheme.colors.text
     val background = OpenCodeTheme.colors.canvas
     val fill by animateColorAsState(
         if (isDestructive) VoiceCallSurfaceDefaults.red else if (isOn) text else VoiceCallSurfaceDefaults.controlFill,
-        Motion.easeOut(0.18),
+        Motion.swap.animation(reduceMotion = reduceMotion),
         label = "floatingCallControlFill",
     )
     val edge by animateColorAsState(
@@ -1609,7 +1608,7 @@ internal fun RowScope.FloatingCallControl(
                 .border(1.dp, edge, shape),
             contentAlignment = Alignment.Center,
         ) {
-            Crossfade(symbol, animationSpec = Motion.easeOut(0.18), label = "floatingCallControlGlyph") { shown ->
+            Crossfade(symbol, animationSpec = Motion.swap.animation(reduceMotion = reduceMotion), label = "floatingCallControlGlyph") { shown ->
                 OpenCodeIcon(shown, null, tint = tint.copy(alpha = tint.alpha * dim / plateDim), size = (diameter * 0.38f + 4).dp)
             }
         }

@@ -4,7 +4,9 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.motionPressEffect
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTheme
@@ -13,8 +15,6 @@ import ai.opencode.core.ui.accessibilityFocusRequest
 import ai.opencode.core.ui.rememberAccessibilityFocusRequest
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -70,10 +70,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -102,7 +100,7 @@ interface AttachmentPlusPeek {
 
 /**
  * The composer's + button (iOS `AttachmentPickerButton`). A tap opens the attachment menu
- * ([AttachmentMenuOverlay]), which grows up out of the button; touching down and holding
+ * ([ai.opencode.feature.composer.plusmenu.PlusMenuGlassSurface]), which grows up out of the button; touching down and holding
  * opens it too, and the finger can slide across the rows and release on one to choose it.
  * While the menu is open the + turns into a × that closes it. While dictating the same + turns
  * into the recording's ×, which cancels it, and a filled circle grows in behind it in the same
@@ -117,17 +115,11 @@ object AttachmentPickerButton {
         val isEnabled: Boolean = true,
     )
 
-    /** Main's picker: [maxPhotoSelection] without the New Plus Menu. */
-    const val MAX_PHOTO_SELECTION = 4
-
-    /** New Plus Menu's photo sheet takes up to 8 photos; main's picker stays at 4. */
-    fun maxPhotoSelection(plusMenu: Boolean): Int = if (plusMenu) 8 else MAX_PHOTO_SELECTION
+    /** The + menu and the photo sheet take up to 8 photos (iOS `maxPhotoSelection`). */
+    const val MAX_PHOTO_SELECTION = 8
 
     /** How long a touch rests on + before the menu opens under it. */
-    val holdDuration: Duration = 250.milliseconds
-
-    fun holdDuration(plusMenuSheet: Boolean): Duration =
-        if (plusMenuSheet) PlusMenuTunables.HOLD_DURATION.seconds else holdDuration
+    val holdDuration: Duration = PlusMenuTunables.HOLD_DURATION.seconds
 
     /** Moving this far (dp) before the hold elapses opens the menu at once. */
     internal const val DRAG_DISTANCE = 10f
@@ -193,7 +185,9 @@ fun AttachmentPickerButton(
         if (showsX) AttachmentMenuMotion.open(reduceMotion) else AttachmentMenuMotion.close(reduceMotion),
         label = "plus-rotation",
     )
-    val armedSpec = if (reduceMotion) Motion.easeInOut<Float>(0.15) else MotionSpring(0.22, 0.25).spec()
+    // Arming cancel swells the × in; letting go settles it back.
+    val armedPhase = if (cancelArmed) MotionPhase.Enter else MotionPhase.Exit
+    val armedSpec = Motion.microIn.animation<Float>(armedPhase, reduceMotion)
     val glyphScale by animateFloatAsState(if (cancelArmed) 1.1f else 1f, armedSpec, label = "plus-armed")
     val dictationSpec = if (isDictating) AttachmentMenuMotion.open<Float>(reduceMotion) else AttachmentMenuMotion.close(reduceMotion)
     val circleScale by animateFloatAsState(
@@ -204,7 +198,7 @@ fun AttachmentPickerButton(
     val circleAlpha by animateFloatAsState(if (isDictating) 1f else 0f, dictationSpec, label = "dictation-circle")
     val circleColor by animateColorAsState(
         if (cancelArmed) SystemRed else MaterialTheme.colorScheme.surfaceContainerHighest,
-        if (reduceMotion) Motion.easeInOut(0.15) else MotionSpring(0.22, 0.25).spec(),
+        Motion.microIn.animation(armedPhase, reduceMotion),
         label = "dictation-circle-color",
     )
     val glyphX by animateFloatAsState(if (isDictating) 0f else glyphOffset, dictationSpec, label = "plus-glyph-x")
@@ -225,12 +219,6 @@ fun AttachmentPickerButton(
         wasPopping = popsOnClose
         if (was && !popsOnClose && !currentIsOpen && !reduceMotion) pop.play()
     }
-    val touchAlpha by animateFloatAsState(
-        if (isTouching && !showsX) 0.55f else 1f,
-        // SwiftUI `.smooth(duration: 0.15)`: a critically damped spring.
-        MotionSpring(0.15).spec(),
-        label = "plus-touch",
-    )
     val glyphColor = if (cancelArmed) Color.White else OpenCodeTheme.colors.text
     val label = when {
         isDictating -> "Cancel dictation"
@@ -266,7 +254,7 @@ fun AttachmentPickerButton(
             press.began(isOpen = currentIsOpen)
             if (!currentIsOpen) {
                 hold = scope.launch {
-                    delay(AttachmentPickerButton.holdDuration(plusMenuSheet = currentPeek != null))
+                    delay(AttachmentPickerButton.holdDuration)
                     openByHold()
                 }
             }
@@ -355,7 +343,7 @@ fun AttachmentPickerButton(
         Box(
             Modifier
                 .offset(x = visualOffsetX.dp)
-                .alpha(touchAlpha),
+                .motionPressEffect(isTouching && !showsX, reduceMotion),
             contentAlignment = Alignment.Center,
         ) {
             val diameter = minOf(34f * fontScale * (PlusButtonComposerTunables.BUTTON_DIAMETER / 34f), 44f)
@@ -419,14 +407,17 @@ internal class PlusPop {
     val opacity = Animatable(1f)
 
     suspend fun play() = coroutineScope {
-        val delaySeconds = ComposerMorph.wallSeconds(PlusMenuTunables.PLUS_POP_DELAY)
-        val spring = PlusMenuTunables.plusPopSpring
-        val settle = ComposerMorph.wallSeconds(spring.duration)
+        // Held under the folding glass until it arrives, then in on `microIn` (its fade on
+        // `swap`'s entrance).
+        val delaySeconds = ComposerMorph.wallSeconds(Motion.panelClose.curve().duration * PlusMenuTunables.PLUS_POP_LEAD)
+        val pop = Motion.microIn.curve()
+        val settle = ComposerMorph.wallSeconds(pop.duration)
+        val fade = ComposerMorph.wallSeconds(Motion.swap.curve().duration)
         scale.snapTo(PlusMenuTunables.PLUS_POP.toFloat())
         opacity.snapTo(0f)
         delay((delaySeconds * 1000).roundToLong())
-        launch { scale.animateTo(1f, MotionSpring(settle, spring.bounce).spec()) }
-        launch { opacity.animateTo(1f, tween((minOf(0.1, settle) * 1000).roundToInt(), easing = LinearEasing)) }
+        launch { scale.animateTo(1f, MotionSpring(settle, pop.bounce).spec()) }
+        launch { opacity.animateTo(1f, MotionSpring(fade, 0.0).spec()) }
     }
 }
 

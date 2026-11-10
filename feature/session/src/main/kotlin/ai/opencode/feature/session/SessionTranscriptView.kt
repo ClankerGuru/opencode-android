@@ -4,7 +4,9 @@ package ai.opencode.feature.session
 
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionRollDirection
+import ai.opencode.core.motion.MotionTransition
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.motion.transitionBlurEffect
 import ai.opencode.core.store.StoreOf
@@ -51,13 +53,11 @@ import android.content.Intent
 import android.text.format.DateFormat
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -801,20 +801,16 @@ fun SyncingSessionTitle(
     style: TextStyle = HeaderBlurTunables.titleFont.textStyle.copy(fontWeight = FontWeight.Bold),
 ) {
     val reducedMotion = rememberReduceMotion()
+    val density = LocalDensity.current
     val colors = OpenCodeTheme.colors
     val color = if (isLastKnown && !isSyncing) colors.secondaryText else colors.text
     AnimatedContent(
         targetState = title,
         modifier = modifier.titleBreathing(isSyncing),
         transitionSpec = {
-            val spec = titleSmooth
-            when {
-                !animates -> (fadeIn(tween(0)) togetherWith fadeOut(tween(0))) using null
-                reducedMotion -> fadeIn(Motion.reducedFadeSpec()) togetherWith fadeOut(Motion.reducedFadeSpec())
-                // `.blurReplace(.upUp)`: both move up.
-                else -> (fadeIn(spec.spec()) + slideInVertically(spec.spec()) { it / 3 }) togetherWith
-                    (fadeOut(spec.spec()) + slideOutVertically(spec.spec()) { -it / 3 })
-            }
+            // iOS `.titleRoll` timed by `Motion.swap`; a title swapped in place without animation doesn't move.
+            if (!animates) (fadeIn(snap()) togetherWith fadeOut(snap())) using null
+            else MotionTransition.roll(MotionRollDirection.Up, reducedMotion, density, Motion.swap).content
         },
         label = "syncingSessionTitle",
     ) { shown ->
@@ -828,8 +824,6 @@ fun SyncingSessionTitle(
     }
 }
 
-/** SwiftUI `.smooth(duration: 0.45)`. */
-private val titleSmooth = MotionSpring(0.45, 0.0)
 
 /**
  * The session's run status: the status orb, then “Working” (or “Needs your input”) as still
@@ -909,8 +903,10 @@ fun WorkingLineRow(
         AnimatedVisibility(
             visible = offersMove,
             modifier = Modifier.align(Alignment.CenterEnd),
-            enter = if (reduceMotion) fadeIn(Motion.reducedFadeSpec()) else fadeIn(moveSnappy.spec()) + slideInHorizontally(moveSnappy.spec()) { 8 },
-            exit = if (reduceMotion) fadeOut(Motion.reducedFadeSpec()) else fadeOut(moveSnappy.spec()) + slideOutHorizontally(moveSnappy.spec()) { 8 },
+            enter = if (reduceMotion) fadeIn(Motion.microIn.animation(MotionPhase.Enter, reduceMotion = true))
+            else fadeIn(Motion.microIn.animation(MotionPhase.Enter)) + slideInHorizontally(Motion.microIn.animation(MotionPhase.Enter)) { 8 },
+            exit = if (reduceMotion) fadeOut(Motion.microIn.animation(MotionPhase.Exit, reduceMotion = true))
+            else fadeOut(Motion.microIn.animation(MotionPhase.Exit)) + slideOutHorizontally(Motion.microIn.animation(MotionPhase.Exit)) { 8 },
         ) {
             MoveToBackgroundAction(activity, onMoveToBackground)
         }
@@ -918,7 +914,6 @@ fun WorkingLineRow(
 }
 
 /** SwiftUI `.snappy(duration: 0.35)`. */
-private val moveSnappy = MotionSpring(0.35, 0.15)
 
 /** The copy glyph's centre from the text edge (its slot starts [ReplyCopyGlyph.leading] out). */
 private val COPY_CENTRE = ReplyCopyGlyph.slot / 2 + ReplyCopyGlyph.leading

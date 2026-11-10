@@ -407,17 +407,26 @@ object ServerSharedKeys {
  * Saves this as the last-used server at the top of the list, and marks the install as having
  * paired ([InstallHistory.paired], kept when servers are removed). Unchanged values are not
  * rewritten. An edited address no longer shares an ID with its old entry: replace that entry
- * explicitly ([original]) after the new connection has loaded.
+ * explicitly ([original]) after the new connection has loaded. An entry already saved under the
+ * same addresses keeps its address order: the address that answered this time is
+ * [ServerLinkClient]'s, in memory, so a LAN address that won at home is never saved as the one to
+ * try first.
  */
 fun OpenCodeServer.remember(original: OpenCodeServer? = null) {
     val savedServer = shared(ServerSharedKeys.savedServer)
     val savedServers = shared(ServerSharedKeys.savedServers)
     val installHistory = shared(SharedKeys.installHistory)
+    // What's on disk first: an edit's `original` came from Home, whose copy may be at the address
+    // in use.
+    var existing = savedServers.value.firstOrNull { it.persistenceID == persistenceID }
+    if (existing == null) existing = savedServer.value?.takeIf { it.persistenceID == persistenceID }
+    if (existing == null) existing = original?.takeIf { it.persistenceID == persistenceID }
+    val entry = keepingAddressOrder(existing)
     if (installHistory.value != InstallHistory.paired) installHistory.set(InstallHistory.paired)
-    if (savedServer.value != this) savedServer.set(this)
-    if (savedServers.value.firstOrNull() == this && original == null) return
+    if (savedServer.value != entry) savedServer.set(entry)
+    if (savedServers.value.firstOrNull() == entry && original == null) return
     savedServers.update { servers ->
-        listOf(this) + servers.filterNot { supersedes(it) || it.persistenceID == original?.persistenceID }
+        listOf(entry) + servers.filterNot { entry.supersedes(it) || it.persistenceID == original?.persistenceID }
     }
 }
 

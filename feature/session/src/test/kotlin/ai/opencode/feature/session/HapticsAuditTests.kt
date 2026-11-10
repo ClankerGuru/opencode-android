@@ -160,7 +160,7 @@ class HapticsAuditTests {
     @Test fun pickingPastTheLimitWarns() {
         val log = HapticsRecorder()
         val library = plusPhotoLibrary(log)
-        assertEquals(8, AttachmentPickerButton.maxPhotoSelection(plusMenu = true))
+        assertEquals(8, AttachmentPickerButton.MAX_PHOTO_SELECTION)
         for (index in 1..8) library.toggle("p$index")
         assertEquals(8, library.picks.size)
         val since = Since(log)
@@ -179,7 +179,7 @@ class HapticsAuditTests {
         library.toggle("p2")
         library.setAsidePicks()
         assertTrue(library.picks.isEmpty())
-        assertEquals(2, library.closingPickCount)
+        assertEquals(2, library.shownPickCount)
         assertEquals(2, library.order("p2"))
         library.resetClosingPicks()
         assertNull(library.order("p2"))

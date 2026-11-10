@@ -74,6 +74,7 @@ import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import androidx.compose.runtime.DisposableEffect
 import ai.opencode.feature.session.SessionView
+import ai.opencode.feature.session.withRequestsConnectionIsAvailable
 import ai.opencode.feature.settings.HomeSettingsFeature
 import ai.opencode.feature.settings.LocalAppearanceTranscriptPreview
 import ai.opencode.feature.settings.SettingsFeature
@@ -106,7 +107,9 @@ import androidx.compose.ui.unit.min
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 
 /**
  * Port of `OpenCode/Drawer/HomeView.swift`: one server's Home. The open session (or a draft) on
@@ -389,7 +392,9 @@ private fun HomeSessionStack(
         val top = it.topDetail
         top?.activePicker != null || top?.shellOutput != null
     }
-    val listContext by store.observe { it.sessionListContext(it.sessionDetail?.session) }
+    val listContext by remember(store) {
+        store.states.map { it.sessionListContext(it.sessionDetail?.session) }.distinctUntilChanged()
+    }.collectAsState(initial = store.state.sessionListContext(store.state.sessionDetail?.session))
     // Pages drawn while they animate out, by their identity.
     val known = remember { HashMap<Int, StackEntry>() }
     for (entry in entries) known[entry.page.id] = entry
@@ -459,14 +464,17 @@ internal fun HomeFeature.State.sessionListContext(session: OpenCodeSession?): Se
         isMuted = listed?.let { isMuted(it.id) } ?: false,
         elsewhere = if (isCatchUp) null else drawerBadge(excluding = session?.id),
         notice = if (isCatchUp) null else inAppNotice,
-        connection = if (isCatchUp) null else serverConnectionNotice,
+        connection = if (isCatchUp) null else serverConnectionNotice(),
     )
 }
 
-/** iOS `HomeView.serverConnectionNotice`: what the pill says of the connection. */
-internal val HomeFeature.State.serverConnectionNotice: ServerConnectionNotice?
-    get() = ServerConnectionNotice(
-        status = connectionStatus,
+/**
+ * iOS `HomeView.serverConnectionNotice`: what the pill says of the connection, from the displayed
+ * status, so a reconnect still in its grace says nothing.
+ */
+internal fun HomeFeature.State.serverConnectionNotice(): ServerConnectionNotice? =
+    ServerConnectionNotice(
+        status = connection.displayedStatus,
         credentialsRejected = credentialsRejected,
         errorMessage = connectionErrorMessage,
         server = server,
@@ -576,6 +584,8 @@ internal class CatchUpPreviewStores {
         var state = SessionFeature.State.session(home.server, session, projects = home.projects, cachedItems = items, isRunning = isRunning)
         // Marked as the card will be once it's open, so it doesn't jump then.
         state = home.applyingOpening(session, detail = home.seedingSessionSnapshot(state)).copy(readsOnView = false)
+        // Inert: its shell glyph doesn't probe the server either.
+        state = state.withRequestsConnectionIsAvailable(false)
         if (existing != null && inputs?.session?.id == session.id && existing.state.hasRenderedFirstContentFrame) {
             state = state.copy(hasRenderedFirstContentFrame = true)
         }
@@ -717,7 +727,7 @@ internal fun HomeLifecycle(store: StoreOf<HomeFeature.State, HomeFeature.Action>
                 Lifecycle.Event.ON_RESUME -> {
                     if (!leftActive[0]) return@LifecycleEventObserver
                     leftActive[0] = false
-                    currentStore.send(HomeFeature.Action.RetryConnectionTapped)
+                    currentStore.send(HomeFeature.Action.SceneBecameActive)
                     currentStore.send(HomeFeature.Action.NotificationSettingsRequested)
                 }
                 Lifecycle.Event.ON_PAUSE -> {
@@ -816,11 +826,10 @@ private fun rememberVoiceAvailable(server: OpenCodeServer): Boolean {
     val engine by preferences.engine.flow.collectAsState()
     val openAIKey by preferences.openAIKey.flow.collectAsState()
     val xaiKey by preferences.xaiKey.flow.collectAsState()
-    val serverVoice by preferences.serverVoice.flow.collectAsState()
     val provider by preferences.provider.flow.collectAsState()
     val voiceServer by preferences.voiceServer.flow.collectAsState()
     val support by preferences.support.flow.collectAsState()
-    return remember(server, enabled, engine, openAIKey, xaiKey, serverVoice, provider, voiceServer, support) {
+    return remember(server, enabled, engine, openAIKey, xaiKey, provider, voiceServer, support) {
         preferences.isAvailable(server)
     }
 }

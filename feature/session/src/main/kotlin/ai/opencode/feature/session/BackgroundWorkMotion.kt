@@ -3,10 +3,11 @@ package ai.opencode.feature.session
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionRelease
+import ai.opencode.core.motion.MotionRubberBand
 import ai.opencode.core.motion.SpringSolver
 import androidx.compose.animation.core.FiniteAnimationSpec
-import androidx.compose.animation.core.SpringSpec
 import androidx.compose.ui.geometry.Rect
 import kotlin.math.abs
 import kotlin.math.max
@@ -31,10 +32,6 @@ enum class BackgroundWorkStage {
 
 /** iOS `BackgroundWorkTunables`' shipped defaults (the tuning UI is not ported). */
 object BackgroundWorkTunables {
-    val morph = MotionSpring(duration = 0.34, bounce = 0.12)
-    val returnSpring = MotionSpring(duration = 0.34, bounce = 0.0)
-    val resize = MotionSpring(duration = 0.40, bounce = 0.0)
-
     /** Drag closes past (dp). */
     const val dragCloses: Float = 56f
 
@@ -62,30 +59,29 @@ object BackgroundWorkTunables {
 }
 
 object BackgroundWorkMotion {
-    /** The spring the surface morphs on, both ways. */
-    val morph: MotionSpring get() = BackgroundWorkTunables.morph
+    /** The capsule's surface grows into the panel (`panelOpen`) and folds back (`panelClose`). */
+    fun <T> morph(opening: Boolean, reduceMotion: Boolean): FiniteAnimationSpec<T> =
+        Motion.panelOpen.animation(if (opening) MotionPhase.Enter else MotionPhase.Exit, reduceMotion)
 
-    /** Under Reduce Motion, or with no capsule left to land in. */
-    fun <T> fade(): FiniteAnimationSpec<T> = Motion.reducedFadeSpec()
-
-    fun <T> of(reduceMotion: Boolean): FiniteAnimationSpec<T> = BackgroundWorkTunables.morph.animation(reduceMotion)
+    /** Reduce Motion's cross-fade, for the capsule's counts. */
+    fun <T> fade(): FiniteAnimationSpec<T> = Motion.reduced.animation(reduceMotion = true)
 
     /**
-     * Carries downward release velocity into the capsule morph when dismissed by drag. Returns the
-     * spec and the normalized initial velocity (fraction of the remaining distance per second),
-     * which Compose takes as the `Animatable`'s initial velocity (iOS `interpolatingSpring(…, initialVelocity:)`).
+     * The fold back into the capsule, carrying a downward throw's speed (relative to the distance
+     * left, at most 4×) into `panelClose`, so it never bounces. Returns the spec and that initial
+     * velocity, which Compose takes as the `Animatable`'s initial velocity.
      */
     fun closeAnimation(releaseVelocity: Float, remainingDistance: Float, reduceMotion: Boolean): Pair<FiniteAnimationSpec<Float>, Float> {
-        if (reduceMotion) return fade<Float>() to 0f
-        val spring = BackgroundWorkTunables.morph
-        val spec = SpringSpec<Float>(dampingRatio = spring.dampingRatio, stiffness = spring.stiffness)
-        if (releaseVelocity <= 1) return spec to 0f
-        val normalized = min(max(releaseVelocity / max(remainingDistance, 40f), 0f), 4f)
-        return spec to normalized
+        val relative = MotionRelease.relativeVelocity(releaseVelocity.toDouble(), 0.0, max(remainingDistance, 40f).toDouble())
+        val velocity = Motion.panelClose.initialVelocity(min(max(relative, 0.0), 4.0).toFloat(), reduceMotion)
+        return Motion.panelClose.animation<Float>(reduceMotion = reduceMotion) to velocity
     }
 
-    /** The capsule following its counts: its surface, words and glyph on one spring, unbouncy so a word leaving is never cut by the surface coming back. */
-    val resize: MotionSpring get() = BackgroundWorkTunables.resize
+    /**
+     * The capsule following its counts: its surface, words and glyph on one spring (`layout`),
+     * unbouncy so a word leaving is never cut by the surface coming back.
+     */
+    fun <T> resize(): FiniteAnimationSpec<T> = Motion.layout.animation()
 
     const val capsuleInset: Float = 5f
     /** The desktop dock's 12 (iOS's glass is 28): the capsule is a 34 dp chip with 12 dp corners. */
@@ -258,33 +254,24 @@ data class BackgroundWorkDrag(
     }
 
     companion object {
-        private const val UPWARD_SLOPE = 0.35f
+        private const val UPWARD_SLOPE = 0.35
 
-        /** Maps raw finger pull (`> 0` downward, `< 0` upward) to vertical offset with smooth hyperbolic rubber-banding above `0`. */
-        fun rubberBandedOffset(rawPull: Float, limit: Float = BackgroundWorkTunables.upwardRubberBand): Float {
-            if (rawPull >= 0) return rawPull
-            val u = -rawPull
-            val cap = max(limit, 1f)
-            val scaled = UPWARD_SLOPE * u
-            return -(scaled * cap) / (cap + scaled)
-        }
+        /** Above the open position the panel rubber-bands ([MotionRubberBand], never more than [limit]); down it follows the finger 1:1. */
+        private fun band(limit: Float): MotionRubberBand = MotionRubberBand(limit.toDouble(), UPWARD_SLOPE)
 
-        /** Analytical inverse of [rubberBandedOffset] so a regrab while rubber-banded upward resumes from the exact current `offset`. */
-        fun rawPull(offset: Float, limit: Float = BackgroundWorkTunables.upwardRubberBand): Float {
-            if (offset >= 0) return offset
-            val cap = max(limit, 1f)
-            val y = min(-offset, cap - 0.01f)
-            return -(y * cap) / (UPWARD_SLOPE * max(cap - y, 0.01f))
-        }
+        private val downward = 0.0..Double.MAX_VALUE
 
-        /** d(offset)/d(rawPull), so upward release velocity matches the rubber-banded speed of the panel. */
-        fun rubberBandDerivative(rawPull: Float, limit: Float = BackgroundWorkTunables.upwardRubberBand): Float {
-            if (rawPull >= 0) return 1f
-            val u = -rawPull
-            val cap = max(limit, 1f)
-            val denom = cap + UPWARD_SLOPE * u
-            return (UPWARD_SLOPE * cap * cap) / max(denom * denom, 0.001f)
-        }
+        /** Maps raw finger pull (`> 0` downward, `< 0` upward) to vertical offset. */
+        fun rubberBandedOffset(rawPull: Float, limit: Float = BackgroundWorkTunables.upwardRubberBand): Float =
+            band(limit).band(rawPull.toDouble(), downward).toFloat()
+
+        /** The exact inverse of [rubberBandedOffset], so a regrab while rubber-banded upward resumes from the drawn `offset`. */
+        fun rawPull(offset: Float, limit: Float = BackgroundWorkTunables.upwardRubberBand): Float =
+            band(limit).unband(offset.toDouble(), downward).toFloat()
+
+        /** `d offset / d rawPull`, so an upward release hands the spring the speed the panel is drawn moving. */
+        fun rubberBandDerivative(rawPull: Float, limit: Float = BackgroundWorkTunables.upwardRubberBand): Float =
+            if (rawPull < 0) band(limit).slope(rawPull.toDouble()).toFloat() else 1f
     }
 }
 
@@ -304,7 +291,10 @@ class BackgroundWorkDragController(private val haptics: HapticsClient) {
     val offset: Float get() = offsetState.floatValue
     val isReturning: Boolean get() = returningState.value
 
-    private var returnSolver = SpringSolver(BackgroundWorkTunables.returnSpring, positionEpsilon = 0.15, velocityEpsilon = 2.0)
+    /** Remove animations, set by the view (iOS reads `MotionReduce.isEnabled`). */
+    var reduceMotion: Boolean = false
+
+    private var returnSolver = SpringSolver(Motion.release, value = 0.0, target = 0.0, positionEpsilon = 0.15, velocityEpsilon = 2.0)
 
     private fun publish() {
         offsetState.floatValue = drag.offset
@@ -334,11 +324,13 @@ class BackgroundWorkDragController(private val haptics: HapticsClient) {
                     drag.offset = 0f
                     drag.grabOffset = 0f
                 } else {
+                    // Back open on the release spring, carrying the finger's speed.
                     returnSolver = SpringSolver(
-                        BackgroundWorkTunables.returnSpring,
+                        Motion.release,
                         value = drag.offset.toDouble(),
                         velocity = decision.velocity.toDouble(),
                         target = 0.0,
+                        reduceMotion = reduceMotion,
                         positionEpsilon = 0.15,
                         velocityEpsilon = 2.0,
                     )

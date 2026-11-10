@@ -6,8 +6,7 @@ import ai.opencode.feature.drawer.HomeFeature.State.Indicator
 import ai.opencode.feature.drawer.ServerSwapTarget
 import ai.opencode.feature.drawer.ServerSwitchNote
 import ai.opencode.feature.drawer.drawerListFooter
-import ai.opencode.feature.drawer.pinnedSessions
-import ai.opencode.feature.drawer.recentSessions
+import ai.opencode.feature.drawer.drawerSessions
 import ai.opencode.feature.drawer.statusSnapshot
 import ai.opencode.feature.drawer.style.DrawerSectionHeaderKind
 import ai.opencode.server.OpenCodeServer
@@ -67,7 +66,6 @@ data class DrawerListRow(
     val isLifted: Boolean,
     val time: String,
     val project: OpenCodeProject?,
-    val showsProjectIcons: Boolean,
     val server: OpenCodeServer,
     val reducedMotion: Boolean,
     val increasedContrast: Boolean,
@@ -107,13 +105,10 @@ data class DrawerListShortcuts(
 /** The list's view-local inputs beyond Home's state (iOS `DrawerListInputs`, minus UIKit insets). */
 data class DrawerListInputs(
     val selectedSessionID: String?,
-    val showsProjectIcons: Boolean,
     val reducedMotion: Boolean,
     val increasedContrast: Boolean,
     /** iOS `DrawerTunables.sectionBreak == .header`: section headers always show. */
     val alwaysShowsHeaders: Boolean = true,
-    /** iOS `DrawerTunables.rowLayout == .twoLine`: rows name their project even without icons. */
-    val twoLineRows: Boolean = false,
     /** Server Flow: the server the drawer shows, which may still be connecting. */
     val serverSwap: ServerSwapTarget? = null,
 )
@@ -142,7 +137,8 @@ data class DrawerListModel(
         /**
          * Home's state as the drawer shows it: shortcuts, then Pinned and Recents with their headers.
          * [timestamp] is iOS `DrawerTimestamp.text(for:now:)`; [project] resolves a row's project
-         * (iOS `OpenCodeProject.resolved(for:in:)`, or `SessionListContext.project` for two-line rows).
+         * (iOS `OpenCodeProject.resolved(for:in:)`). Every row has a project: a session in the home folder
+         * or at the server's root gets one derived from its directory, so its tile is stable from the first frame.
          */
         fun build(
             state: HomeFeature.State,
@@ -195,8 +191,10 @@ data class DrawerListModel(
                 if (state.deletionError != null) add(DrawerListItem.DeletionError)
             }
 
-            val pinned = state.pinnedSessions
-            val recents = state.recentSessions
+            // One pass for both lists (iOS f5636460).
+            val sessions = state.drawerSessions
+            val pinned = sessions.pinned
+            val recents = sessions.recents
             val rows = LinkedHashMap<String, DrawerListRow>()
             val headerFollows = HashMap<DrawerSectionHeaderKind, Boolean>()
 
@@ -209,8 +207,7 @@ data class DrawerListModel(
                 unread = status.isUnread(session),
                 isLifted = liftedID == session.id,
                 time = timestamp(session.updatedAt, now),
-                project = if (inputs.showsProjectIcons || inputs.twoLineRows) project(session, state.projects) else null,
-                showsProjectIcons = inputs.showsProjectIcons,
+                project = project(session, state.projects),
                 server = state.server,
                 reducedMotion = inputs.reducedMotion,
                 increasedContrast = inputs.increasedContrast,

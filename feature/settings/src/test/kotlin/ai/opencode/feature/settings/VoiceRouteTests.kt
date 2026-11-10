@@ -1,8 +1,6 @@
 package ai.opencode.feature.settings
 
-import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.SharedKeys
-import ai.opencode.core.sharing.experimental
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.voice.ServerVoiceProvider
 import ai.opencode.feature.voice.ServerVoiceSupport
@@ -37,7 +35,6 @@ class VoiceRouteTests {
         shared.set(VoiceSharedKeys.voiceEngine, VoiceEngine.gptLive)
         shared.set(SharedKeys.openAIAPIKey, null)
         shared.set(SharedKeys.xaiAPIKey, null)
-        shared.set(experimental(ExperimentalFeature.serverVoice), false)
         shared.set(VoiceSharedKeys.serverVoiceProvider, ServerVoiceProvider.openAI)
         shared.set(VoiceSharedKeys.voiceServerChoice, VoiceServerChoice.Automatic)
         shared.set(VoiceSharedKeys.serverVoiceSupportByServer, emptyMap())
@@ -46,6 +43,7 @@ class VoiceRouteTests {
 
     @Test fun inactiveGeminiNeverDisablesThePhoneKeyAcrossEntryPoints() {
         val shared = preserveSettings()
+        shared.set(VoiceSharedKeys.voiceServerChoice, VoiceServerChoice.Phone)
         shared.set(VoiceSharedKeys.serverVoiceProvider, ServerVoiceProvider.geminiLive)
         shared.read { assertFalse(VoiceRoutePreferences().isAvailable(server)) }
 
@@ -60,13 +58,10 @@ class VoiceRouteTests {
 
     @Test fun grokSuppressesUnrelatedServerErrors() {
         val shared = preserveSettings()
-        shared.set(experimental(ExperimentalFeature.serverVoice), true)
         shared.set(VoiceSharedKeys.serverVoiceSupportByServer, mapOf(server.persistenceID to ServerVoiceSupport.unsupported))
         val settings = VoiceSettingsFeature.State(server = server)
-        shared.read { assertTrue(settings.showsServerUnsupported) }
         shared.set(VoiceSharedKeys.voiceEngine, VoiceEngine.grok)
         shared.read {
-            assertFalse(settings.showsServerUnsupported)
             assertEquals(VoiceKeySource.Phone(VoiceProvider.xAI), settings.keySource)
             assertEquals("xAI Key", settings.keyRowTitle)
         }

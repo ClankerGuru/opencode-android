@@ -3,7 +3,7 @@ package ai.opencode.feature.composer
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.tuning.Tunable
-import ai.opencode.core.tuning.TunableSpring
+import ai.opencode.core.motion.Motion
 import ai.opencode.server.model.OpenCodeFormRequest
 import ai.opencode.server.model.OpenCodeFormValue
 import androidx.compose.animation.core.Animatable
@@ -34,7 +34,6 @@ object RequestCollapseTunables {
     val threshold = Tunable("requests.collapse.threshold", "Collapse past", default = 0.3, range = 0.1..0.8, step = 0.05)
     /** dp per second. */
     val flick = Tunable("requests.collapse.flick", "Flick speed", default = 700.0, range = 200.0..2000.0, step = 50.0)
-    val settle = TunableSpring("requests.collapse.settle", "Settle", duration = 0.42, bounce = 0.08)
 }
 
 /**
@@ -269,7 +268,7 @@ internal class RequestFold(initial: Float) {
         settle(formID, collapsed, velocity)
     }
 
-    /** Folds or opens the docked question on the settle spring, which the session's surface rides too. */
+    /** Folds or opens the docked question on the release spring, which the session's surface rides too. */
     fun settle(formID: String, collapsed: Boolean, velocity: Float = 0f) {
         gesture.isTracking = false
         animate(if (collapsed) 1f else 0f, velocity)
@@ -286,16 +285,14 @@ internal class RequestFold(initial: Float) {
 
     private fun animate(target: Float, velocity: Float) {
         val scope = scope ?: return
-        if (reducedMotion) {
-            scope.launch(start = CoroutineStart.UNDISPATCHED) { progress.snapTo(target) }
-            return
-        }
         val from = progress.value
         if (from != target) gesture.settling(target)
-        // Fraction of the distance per second, back in progress per second for the Animatable.
-        val initialVelocity = RequestCollapse.settleVelocity(velocity, from, target, gesture.travel) * (target - from)
+        // Let go, it carries the finger's speed on the release spring: a fraction of the
+        // distance per second, back in progress per second for the Animatable.
+        val fraction = Motion.release.initialVelocity(RequestCollapse.settleVelocity(velocity, from, target, gesture.travel), reducedMotion)
+        val initialVelocity = fraction * (target - from)
         scope.launch {
-            progress.animateTo(target, RequestCollapseTunables.settle.spring.spec(), initialVelocity = initialVelocity)
+            progress.animateTo(target, Motion.release.animation(reduceMotion = reducedMotion), initialVelocity = initialVelocity)
         }
     }
 

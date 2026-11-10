@@ -34,7 +34,7 @@ class BrowserVoiceTests {
     @Test fun aPageOpenedWhileConnectingIsToldOnConnect() = voiceTest { harness ->
         h = harness
         var voice = h.state { State(server, a) }.withPhase(State.Phase.Connecting)
-        voice = voice.copy(activeEngine = VoiceEngine.gptLive, startedTarget = voice.target, viewing = page)
+        voice = voice.copy(startedTarget = voice.target, viewing = page)
         val deltas = LockIsolated(listOf<String?>())
         val store = h.store(voice) {
             this[DateClient] = DateClient.constant(Instant.ofEpochSecond(0))

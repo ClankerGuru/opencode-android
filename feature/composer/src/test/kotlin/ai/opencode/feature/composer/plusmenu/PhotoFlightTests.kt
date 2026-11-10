@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer.plusmenu
 
+import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.SpringSolver
 import ai.opencode.feature.composer.ComposerImageImporter
 import ai.opencode.feature.composer.ComposerImageSource
@@ -58,7 +59,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * Port of iOS `PhotoFlightTests.swift`.
  *
  * Geometry is at density 1 (px = dp = iOS points), so the iOS numbers carry over unchanged.
- * iOS `FlightSpring` is core's [SpringSolver] here (`docs/parity/composer.md`).
+ * iOS's springs (`SpringSolver`) are core's [SpringSolver].
  *
  * Dropped:
  * - `aCleanFlightHasNoFindings`, `aFlightThatStartsAwayFromItsTileIsAPopIn`, `aFrameThatLeapsIsASnap`,
@@ -66,9 +67,10 @@ import kotlin.time.Duration.Companion.milliseconds
  *   `turningBackForANewSlotIsARetargetNotAReversal`, `dippingWithTheComposerIsAReversalEvenWhenTheSlotMoved`,
  *   `vanishingWithoutLandingIsAPopOut`, `softeningAwayIsNoPopOut`, `landingOffItsThumbnailIsAMiss`:
  *   they test `PhotoFlightAudit` (Motion Watch / lab trace telemetry), not ported (n/a in the parity table).
- * - `photoRequestGateResumesExactlyOnceAcrossCancelAndLateCompletion`: iOS's `PhotoRequestGate`
- *   guards a `PHImageRequestID` and a continuation (`arm`/`registered`/`finish`); Android's gate is
- *   an `android.os.CancellationSignal` plus structured cancellation, with no such states.
+ * - `requestGateResumesExactlyOnceAcrossCancelAndLateCompletion`: iOS's `OneShotRequestGate`
+ *   guards a continuation and the request's own cancel (`arm`/`started`/`finish`); Android's
+ *   [ai.opencode.feature.composer.OneShotRequestGate] is an `android.os.CancellationSignal` plus
+ *   structured cancellation, with no such states.
  * - In `plusPhotoLibraryExposesVideoAssetsAndLabFixtureIncludesVideosAndCameraCapture`, the
  *   `renderLabCameraCapture` check: Android's lab fixture has no camera-capture render.
  *
@@ -785,31 +787,33 @@ class PhotoFlightTests {
 
     @Test fun takePicksHoldsClosingPickCountUntilResetOrNewPick() {
         val library = PlusPhotoLibrary()
-        assertEquals(0, library.closingPickCount)
+        assertEquals(0, library.shownPickCount)
 
         library.toggle("lab-photo-0")
         library.toggle("lab-photo-1")
         assertEquals(listOf("lab-photo-0", "lab-photo-1"), library.picks)
-        assertEquals(0, library.closingPickCount)
+        // The foot shows the live picks while the sheet is open.
+        assertEquals(2, library.shownPickCount)
 
         val taken = library.takePicks()
         assertEquals(listOf("lab-photo-0", "lab-photo-1"), taken)
         assertTrue(library.picks.isEmpty())
-        assertEquals(2, library.closingPickCount)
+        assertEquals(2, library.shownPickCount)
 
-        // closePhotoSheet clears picks immediately; closingPickCount stays latched
+        // closePhotoSheet clears picks immediately; shownPickCount stays latched
         // while the foot dissolves with the folding sheet.
         library.clearPicks()
-        assertEquals(2, library.closingPickCount)
+        assertEquals(2, library.shownPickCount)
 
         library.resetClosingPicks()
-        assertEquals(0, library.closingPickCount)
+        assertEquals(0, library.shownPickCount)
 
         library.toggle("lab-photo-2")
         library.takePicks()
-        assertEquals(1, library.closingPickCount)
+        assertEquals(1, library.shownPickCount)
         library.toggle("lab-photo-0")
-        assertEquals(0, library.closingPickCount)
+        // A new pick drops the latch: the foot shows the live picks again.
+        assertEquals(1, library.shownPickCount)
         library.close()
     }
 
@@ -1189,7 +1193,7 @@ class PhotoFlightTests {
 
         // Tap Back (`backFromPhotoSheet`): morph enters `Closing` for 551 ms while `menuShown`
         // (`attachmentMenu == .menu`) remains true and `dismissesDown` is false.
-        morph.fold(ComposerMorphTunables.close.spec(), reduceMotion = false)
+        morph.fold(Motion.panelClose.animation(), reduceMotion = false)
         assertEquals(ComposerMorph.Phase.Closing, morph.phase)
         assertTrue(morph.isShown)
         assertFalse(morph.isOpening)
@@ -1208,7 +1212,7 @@ class PhotoFlightTests {
         var launched = false
         var opened = false
         morph.armThenOpen(
-            ComposerMorphTunables.photoOpen.spec(),
+            Motion.panelOpen.animation(),
             prepare = { prepared = true },
             launch = { launched = true },
             opened = { opened = true },
@@ -1227,7 +1231,7 @@ class PhotoFlightTests {
         morph.open()
 
         // 1. Back puts the morph into back-to-menu `Closing` (`morph.isShown`, `dismissesDown == false`, `menuShown`).
-        morph.fold(ComposerMorphTunables.close.spec(), reduceMotion = false)
+        morph.fold(Motion.panelClose.animation(), reduceMotion = false)
         assertEquals(ComposerMorph.Phase.Closing, morph.phase)
         val duringBack = ComposerMorphGeometry.unifiedMenuState(menuShown = true, morph = morph, dismissesDown = false)
         assertTrue(duringBack.closingToMenu)
@@ -1261,7 +1265,7 @@ class PhotoFlightTests {
 
         // 1. Dismissing the sheet (`closePhotoSheet`) sets `menuShown = false` and
         // `dismissesDown = true` while `morph` enters `Closing` (`morph.isShown`).
-        morph.fold(ComposerMorphTunables.photoReturn.spec(), reduceMotion = false)
+        morph.fold(Motion.panelClose.animation(), reduceMotion = false)
         assertEquals(ComposerMorph.Phase.Closing, morph.phase)
         assertTrue(morph.isShown)
         assertFalse(morph.isOpening)
@@ -1314,7 +1318,7 @@ class PhotoFlightTests {
         camera.expanded = true
         assertTrue(camera.shouldActivateCamera(sheetIsOpen = sheet.isOpen))
 
-        sheet.fold(ComposerMorphTunables.photoReturn.spec(), reduceMotion = false)
+        sheet.fold(Motion.panelClose.animation(), reduceMotion = false)
         assertTrue(sheet.isShown)
         assertFalse(sheet.isOpen)
         assertFalse(camera.shouldActivateCamera(sheetIsOpen = sheet.isOpen))
@@ -1326,7 +1330,7 @@ class PhotoFlightTests {
 
         fun rect(x: Float, y: Float, width: Float, height: Float) = Rect(Offset(x, y), Size(width, height))
 
-        /** iOS `FlightSpring(value:velocity:)`: [SpringSolver] stepped with explicit (ω, ζ). */
+        /** iOS `SpringSolver(value:velocity:duration: 1)`: stepped with explicit (ω, ζ). */
         fun spring(value: Double, velocity: Double = 0.0) = SpringSolver(value = value, velocity = velocity, omega = 1.0)
     }
 

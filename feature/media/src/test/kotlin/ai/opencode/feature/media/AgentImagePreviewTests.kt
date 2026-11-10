@@ -14,8 +14,19 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.Request
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.asResponseBody
+import okio.buffer
+import okio.source
+import java.io.File
+import java.io.InputStream
+import java.nio.file.Files
+import java.security.MessageDigest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -173,6 +184,76 @@ class AgentImagePreviewTests {
         }
         assertNull("the oldest go first", cache.size(key))
     }
+
+    @Test
+    fun aRememberedShapeIsReadOnceOffTheMainActor() = runBlocking {
+        val file = File(Files.createTempDirectory("agent-image-sizes").toFile(), "AgentImageSizes.json")
+        try {
+            val key = AgentImageKey(server = "s", path = "/Users/kit/game/a.png")
+            val cache = AgentImageSizeCache(file)
+            cache.warm()?.join()
+            assertNull(cache.size(key))
+
+            // A shape written straight to the file afterwards is never read while a composable
+            // draws: the cache read the file once, off the main thread.
+            val hash = MessageDigest.getInstance("SHA-256").digest("${key.server}|${key.path}".toByteArray())
+                .take(10).joinToString("") { "%02x".format(it) }
+            file.writeText("""{"sizes":{"$hash":[640,360]},"order":["$hash"]}""")
+            assertNull("no read while drawing", cache.size(key))
+
+            val next = AgentImageSizeCache(file)
+            next.warm()?.join()
+            assertEquals("the warm reads it", AgentImageSize(640.0, 360.0), next.size(key))
+        } finally {
+            file.parentFile?.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun aReadLooksAtTheFirst256KBOnly() = runBlocking {
+        // A header in the first bytes answers once, however many chunks arrive.
+        val png = AgentImageFixtures.png(640, 360) + ByteArray(1_000)
+        val sizes = ArrayList<AgentImageSize>()
+        AgentImageDownload.load(request("a.png"), validators = null, maxBytes = 10 shl 20, client = chunkedClient(png, 64)) { sizes.add(it) }
+        assertEquals(listOf(AgentImageSize(640.0, 360.0)), sizes)
+
+        // A header past the inspected window waits for the finished file: the read stops
+        // looking at 256 KB rather than searching the whole buffer on every chunk.
+        val late = java.io.ByteArrayOutputStream()
+        late.write(byteArrayOf(0xFF.toByte(), 0xD8.toByte()))
+        while (late.size() < AgentImageDownload.HEADER_INSPECTION_BYTES + 16) {
+            late.write(byteArrayOf(0xFF.toByte(), 0xE0.toByte(), 0xFF.toByte(), 0xFF.toByte())) // APP0, length 65,535
+            late.write(ByteArray(65_533))
+        }
+        late.write(intArrayOf(0xFF, 0xC0, 0x00, 0x0B, 0x08, 0x02, 0x58, 0x03, 0x20, 0x01).map { it.toByte() }.toByteArray())
+        val lateSizes = ArrayList<AgentImageSize>()
+        AgentImageDownload.load(request("b.jpg"), validators = null, maxBytes = 10 shl 20, client = chunkedClient(late.toByteArray(), 16 * 1024)) { lateSizes.add(it) }
+        assertTrue(lateSizes.isEmpty())
+    }
+
+    /** A client that answers every request with [body], [chunk] bytes per read. */
+    private fun chunkedClient(body: ByteArray, chunk: Int): OkHttpClient = OkHttpClient.Builder()
+        .addInterceptor { chain ->
+            val stream = object : InputStream() {
+                private var position = 0
+                override fun read(): Int = if (position < body.size) body[position++].toInt() and 0xFF else -1
+                override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+                    if (position >= body.size) return -1
+                    val count = minOf(length, chunk, body.size - position)
+                    System.arraycopy(body, position, buffer, offset, count)
+                    position += count
+                    return count
+                }
+            }
+            Response.Builder()
+                .request(chain.request())
+                .protocol(Protocol.HTTP_1_1)
+                .code(200)
+                .message("OK")
+                .body(stream.source().buffer().asResponseBody(null, body.size.toLong()))
+                .build()
+        }
+        .build()
 
     @Test
     fun aNewEntryStartsAtARememberedShape() {

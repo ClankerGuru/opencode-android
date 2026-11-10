@@ -48,7 +48,7 @@ object ComposerFileChip {
     /** The least height: larger text grows the chip rather than clipping it. */
     val height: Dp = 76.dp
     val width: Dp = 220.dp
-    /** iOS `ComposerTunables.attachmentRadius(plusMenu: false)`: main's corners. */
+    /** iOS `ComposerFileChip.cornerRadius`'s default: 22. */
     val cornerRadius: Dp = 22.dp
 
     fun subtitle(file: ComposerFileAttachment): String = AttachmentFileType.subtitle(file.name, file.mime, file.size)

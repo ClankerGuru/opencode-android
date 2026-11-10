@@ -9,6 +9,8 @@ import ai.opencode.feature.session.agentactivity.ShellGlyphModels
 import ai.opencode.feature.session.agentactivity.drawAgentActivityOrb
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
+import ai.opencode.server.retry.RetryPolicy
+import ai.opencode.server.retry.withRetryPolicy
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -103,7 +105,10 @@ fun ShellGlyph(
             for (id in shellIDs) {
                 if (id in gone || !meter.needsProbe(id)) continue
                 try {
-                    val page = client.shellOutput(probe.server, probe.directory, id, END_OF_CAPTURE_CURSOR, 1)
+                    // The next tick is the retry: a decoration never retries into a dead route.
+                    val page = withRetryPolicy(RetryPolicy.once) {
+                        client.shellOutput(probe.server, probe.directory, id, END_OF_CAPTURE_CURSOR, 1)
+                    }
                     meter.record(id, page.size)
                 } catch (error: OpenCodeClientError) {
                     if (error.statusCode == 404) gone += id

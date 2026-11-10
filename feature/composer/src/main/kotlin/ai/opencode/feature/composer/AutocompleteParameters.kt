@@ -1,5 +1,8 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionTunables
+
 /** Parameters snapshot read by [AutocompleteSimulation] (iOS `AutocompleteParameters`). */
 data class AutocompleteParameters(
     val order: AutocompleteOrder = AutocompleteOrder.Bottom,
@@ -7,36 +10,42 @@ data class AutocompleteParameters(
     val keysInstant: Boolean = true,
     val reducedMotion: Boolean = false,
 
-    val openDuration: Double = 0.3,
-    val openBounce: Double = 0.0,
-    val closeDuration: Double = 0.22,
-    val closeBounce: Double = 0.0,
-    val contentInDuration: Double = 0.28,
-    val contentInBounce: Double = 0.0,
-    val contentOutDuration: Double = 0.18,
-    val contentOutBounce: Double = 0.0,
-    val resizeDuration: Double = 0.14,
-    val resizeBounce: Double = 0.0,
-    val reflowDuration: Double = 0.14,
-    val reflowBounce: Double = 0.0,
-    val rowInDuration: Double = 0.1,
-    val rowInBounce: Double = 0.0,
-    val rowOutDuration: Double = 0.06,
-    val rowOutBounce: Double = 0.0,
-    val highlightDuration: Double = 0.14,
-    val highlightBounce: Double = 0.0,
-    val flightDuration: Double = 0.32,
-    val flightBounce: Double = 0.0,
+    // Timing comes from the motion roles: the glass and its content grow on `panelOpen` and fold
+    // on `panelClose`; filtering rows fade in on `microIn` and out on `microOut`, and slots, rows
+    // and height reflow on `collapse`, so typing stays crisp; the highlight slides on `swap`; a
+    // chosen row flies into its chip on `flight`; a list pulled past its end lets go on `release`.
+    val openDuration: Double = Motion.panelOpen.curve().duration,
+    val openBounce: Double = Motion.panelOpen.curve().bounce,
+    val closeDuration: Double = Motion.panelClose.curve().duration,
+    val closeBounce: Double = Motion.panelClose.curve().bounce,
+    val contentInDuration: Double = Motion.panelOpen.curve().duration,
+    val contentInBounce: Double = Motion.panelOpen.curve().bounce,
+    val contentOutDuration: Double = Motion.panelClose.curve().duration,
+    val contentOutBounce: Double = Motion.panelClose.curve().bounce,
+    val resizeDuration: Double = Motion.collapse.curve().duration,
+    val resizeBounce: Double = Motion.collapse.curve().bounce,
+    val reflowDuration: Double = Motion.collapse.curve().duration,
+    val reflowBounce: Double = Motion.collapse.curve().bounce,
+    val rowInDuration: Double = Motion.microIn.curve().duration,
+    val rowInBounce: Double = Motion.microIn.curve().bounce,
+    val rowOutDuration: Double = Motion.microOut.curve().duration,
+    val rowOutBounce: Double = Motion.microOut.curve().bounce,
+    val highlightDuration: Double = Motion.swap.curve().duration,
+    val highlightBounce: Double = Motion.swap.curve().bounce,
+    val flightDuration: Double = Motion.flight.curve().duration,
+    val flightBounce: Double = Motion.flight.curve().bounce,
+    val releaseDuration: Double = Motion.release.curve().duration,
 
-    val widthLead: Double = 1.85,
-    val contentDelay: Double = 0.03,
+    val widthLead: Double = MotionTunables.widthLead.value,
+    val contentDelay: Double = Motion.contentDelay,
     val coalesce: Double = 0.0,
     val blur: Double = 4.0,
     val scale: Double = 0.96,
     val rowBlur: Double = 0.0,
     val rowScale: Double = 1.0,
     val flightArc: Double = 1.4,
-    val reduceFade: Double = 0.18,
+    /** Under Reduce Motion every fade runs `Motion.reduced`, never slower than its spring. */
+    val reduceFade: Double = Motion.reduced.curve().duration,
 
     val maxRows: Double = 5.5,
     val rowHeight: Double = 40.0,
@@ -47,42 +56,19 @@ data class AutocompleteParameters(
     val cornerRadius: Double = 28.0,
 ) {
     companion object {
-        /** iOS `AutocompleteParameters.current(reducedMotion:)`: the tunables' values. */
+        /** iOS `AutocompleteParameters.current(reducedMotion:)`: the roles' timing and the tunables' values. */
         fun current(reducedMotion: Boolean = false): AutocompleteParameters = with(ComposerAutocompleteTunables) {
             AutocompleteParameters(
                 order = order,
                 exitMode = exitMode,
                 keysInstant = keysInstant,
                 reducedMotion = reducedMotion,
-                openDuration = open.duration,
-                openBounce = open.bounce,
-                closeDuration = close.duration,
-                closeBounce = close.bounce,
-                contentInDuration = contentIn.duration,
-                contentInBounce = contentIn.bounce,
-                contentOutDuration = contentOut.duration,
-                contentOutBounce = contentOut.bounce,
-                resizeDuration = resize.duration,
-                resizeBounce = resize.bounce,
-                reflowDuration = reflow.duration,
-                reflowBounce = reflow.bounce,
-                rowInDuration = rowIn.duration,
-                rowInBounce = rowIn.bounce,
-                rowOutDuration = rowOut.duration,
-                rowOutBounce = rowOut.bounce,
-                highlightDuration = highlight.duration,
-                highlightBounce = highlight.bounce,
-                flightDuration = flight.duration,
-                flightBounce = flight.bounce,
-                widthLead = widthLead,
-                contentDelay = contentDelay,
                 coalesce = coalesce,
                 blur = blur,
                 scale = scale,
                 rowBlur = rowBlur,
                 rowScale = rowScale,
                 flightArc = flightArc,
-                reduceFade = reduceFade,
                 maxRows = maxRows,
                 rowHeight = rowHeight,
                 padding = padding,

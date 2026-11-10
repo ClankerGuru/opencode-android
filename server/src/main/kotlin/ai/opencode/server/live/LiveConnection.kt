@@ -3,6 +3,7 @@ package ai.opencode.server.live
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodePairingLink
 import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.ServerLinkStore
 import ai.opencode.server.model.OpenCodeNotifyPluginStatus
 import ai.opencode.server.retry.RequestIdempotency
 import ai.opencode.server.retry.RetryPolicy
@@ -13,10 +14,20 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration.Companion.seconds
 
+/**
+ * Whether this address answers as this server. Probes race every address and the first verified
+ * one wins; retrying a dead address would hold that choice up, so a probe is sent once. A
+ * redirect (a captive portal), a page that isn't the V2 info, or a 401 (another server, or a
+ * password that no longer works) doesn't count. With a password, the answer itself proves the
+ * server holds it; without one, an address on someone else's network could be any OpenCode
+ * server, so its own address list must include one of ours.
+ */
 internal suspend fun requestHealth(server: OpenCodeServer) {
-    // Probes race every address of a server and the best reachable one wins; retrying a
-    // dead address would hold that choice up, so a probe is sent once.
-    request<StatusPayload>("/api/info", retry = RetryPolicy.once, isConnectionProbe = true, server = server)
+    val info = request<ServerInfoPayload>(
+        "/api/info", timeout = ServerLinkStore.probeTimeout, retry = RetryPolicy.once,
+        followsRedirects = false, isConnectionProbe = true, server = server,
+    )
+    if (!info.identifies(server)) throw OpenCodeClientError("A different OpenCode server answered at this address.")
 }
 
 internal suspend fun requestRedeemPairing(link: OpenCodePairingLink): OpenCodeServer {

@@ -7,7 +7,6 @@ import ai.opencode.core.dependencies.TestClock
 import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.sharing.SharedKeys
-import ai.opencode.core.sharing.experimental
 import ai.opencode.core.testing.eventually
 import ai.opencode.feature.voice.VoiceFeatureTestSupport.copy
 import ai.opencode.feature.voice.VoiceSessionDelegatorTestSupport.liveDelegatorState
@@ -138,7 +137,6 @@ class VoiceSessionDelegatorTests {
             shared.set(VoiceSharedKeys.voiceDelegatorChoice, VoiceDelegatorChoice.AutomaticSession)
 
             // 1. Server Voice brokered GPT-Live -> uses OpenCode Session Delegator with client delegation (no phone key needed).
-            shared.set(experimental(ExperimentalFeature.serverVoice), true)
             shared.set(VoiceSharedKeys.serverVoiceProvider, ServerVoiceProvider.openAI)
             shared.set(VoiceSharedKeys.serverVoiceSupportByServer, mapOf(server.persistenceID to ServerVoiceSupport.supported))
 
@@ -147,7 +145,7 @@ class VoiceSessionDelegatorTests {
             val startedConfigs = mutableListOf<RealtimeSessionConfig>()
             val serverStore = voiceTestStore(shared, { serverState }) {
                 this[DateClient] = DateClient.constant(Instant.ofEpochSecond(100))
-                this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.serverVoice, ExperimentalFeature.voiceSessionDelegator))
+                this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.voiceSessionDelegator))
                 this[VoiceDelegatorClient] = VoiceDelegatorClient(isEnabled = true) { _, _, _ -> throw AssertionError("Unused") }
                 this[VoiceCallLogClient] = VoiceCallLogClient(recorder = recorder)
                 this[VoiceWorkClient] = testVoiceWork(recentMessages = { _, _, _ -> emptyList() })
@@ -174,7 +172,7 @@ class VoiceSessionDelegatorTests {
 
             // 2. Phone-key GPT-Live -> locks in OpenCode Session Delegator & unboundSpeechUsesInstructions.
             startedConfigs.clear()
-            shared.set(experimental(ExperimentalFeature.serverVoice), false)
+            shared.set(VoiceSharedKeys.voiceServerChoice, VoiceServerChoice.Phone)
             shared.set(SharedKeys.openAIAPIKey, "sk-test")
             shared.set(SharedKeys.verifiedVoiceKeyFingerprint, VoiceKeyFingerprint.make(key = "sk-test", model = VoiceEngine.gptLive.modelID))
 

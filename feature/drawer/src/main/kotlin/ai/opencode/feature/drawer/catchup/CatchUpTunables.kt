@@ -4,7 +4,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlin.math.PI
+import ai.opencode.core.motion.MotionRole
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.exp
@@ -33,16 +33,6 @@ object CatchUpTunables {
     const val hapticThreshold = 1.0f
     /** Vertical resistance. */
     const val rubberBand = 0.3f
-
-    // Spring
-    /** Commit response (s). */
-    const val commitResponse = 0.38
-    /** Commit damping. */
-    const val commitDamping = 1.0f
-    /** Snap-back response (s). */
-    const val settleResponse = 0.38
-    /** Snap-back damping. */
-    const val settleDamping = 1.0f
 
     // Stack
     /** Back card scale. */
@@ -145,15 +135,17 @@ class CatchUpSpring(
     var position: Offset,
     var velocity: Offset,
     val target: Offset = Offset.Zero,
-    response: Double = CatchUpTunables.settleResponse,
-    dampingRatio: Float = CatchUpTunables.settleDamping,
 ) {
-    val response: Float = max(response.toFloat(), 0.08f)
-    val dampingRatio: Float = min(max(dampingRatio, 0.3f), 1.5f)
+    /** The release role's spring (iOS 03adf07a: drag releases land on `MotionRole.Release`). */
+    val omega: Float
+    val zeta: Float
     private val initialSignX: Float
     private val initialSignY: Float
 
     init {
+        val release = MotionRole.Release.curve().springParameters
+        omega = release.omega.toFloat()
+        zeta = release.zeta.toFloat()
         val dx = position.x - target.x
         val dy = position.y - target.y
         initialSignX = if (abs(dx) > 0.001f) (if (dx > 0) 1f else -1f) else 0f
@@ -167,8 +159,6 @@ class CatchUpSpring(
     fun step(dt: Float): Boolean {
         if (dt <= 0) return isSettled
         val clampedDt = min(dt, 1f / 20f)
-        val omega = 2 * PI.toFloat() / response
-        val zeta = dampingRatio
         val (nx, nvx) = stepAxis(position.x - target.x, velocity.x, omega, zeta, clampedDt, initialSignX)
         val (ny, nvy) = stepAxis(position.y - target.y, velocity.y, omega, zeta, clampedDt, initialSignY)
         position = Offset(target.x + nx, target.y + ny)

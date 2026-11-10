@@ -171,6 +171,12 @@ object AgentImageDownload {
 
     class FailureException(val failure: Failure) : Exception(failure.name)
 
+    /**
+     * How much of a growing read is searched for the header. PNG, GIF, WebP and JPEG headers are
+     * all within this; past it the shape comes from the finished file.
+     */
+    const val HEADER_INSPECTION_BYTES = 256 * 1024
+
     /** iOS's ephemeral session: the transport's pools' configuration, its own connections, URLSession's 60 s idle timeout. */
     val client: OkHttpClient by lazy {
         dependency(OpenCodeTransport).request.newBuilder()
@@ -237,8 +243,12 @@ object AgentImageDownload {
                 if (read == 0) continue
                 data.append(chunk, read)
                 if (data.count > maxBytes) throw FailureException(Failure.TooLarge)
-                if (!sized) {
-                    val size = AgentImageHeader.size(data.bytes, data.count) ?: continue
+                // Only the first bytes are inspected, so a long read doesn't decode a growing
+                // buffer on every chunk. A header past this point is read from the finished file.
+                val inspectedBefore = data.count - read
+                if (!sized && inspectedBefore < HEADER_INSPECTION_BYTES) {
+                    val inspected = minOf(data.count, HEADER_INSPECTION_BYTES)
+                    val size = AgentImageHeader.size(data.bytes, inspected) ?: continue
                     sized = true
                     onSize(size)
                 }

@@ -454,9 +454,14 @@ private fun AutocompleteListWindow(
                     val start = down.position.point()
                     while (true) {
                         val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        val change = event.changes.firstOrNull { it.id == down.id }
+                        if (change == null) {
+                            controller.endScroll()
+                            break
+                        }
                         val location = change.position.point()
                         if (!change.pressed) {
+                            controller.endScroll()
                             val tap = tracker.end(start, location)
                             if (tap != null) {
                                 AutocompleteTouchTracker.selectableRow(tap, controller.currentFrame.rows)?.let { currentOnSelect(it) }
@@ -909,6 +914,18 @@ class ComposerAutocompleteTextBridge {
     /** Call after each user edit (iOS `textViewDidChange` → `notifyCaretAfterEditIfNeeded`). */
     fun notifyCaretAfterEdit(text: String, selection: TextRange, composition: TextRange?) {
         emitCaretIfNeeded(text, selection, composition, requireDiffFromState = true)
+    }
+
+    /**
+     * Where an edit left the caret, for the edit's own action ([ComposerAutocompleteAction.TextEdited]):
+     * what [notifyCaretAfterEdit] would have sent on its own.
+     */
+    fun caretUpdateAfterEdit(text: String, selection: TextRange, composition: TextRange?): ComposerAutocompleteAction.CaretUpdate {
+        if (!isEnabled || isUpdatingProgrammaticText || composition != null) return ComposerAutocompleteAction.CaretUpdate.Unchanged
+        val actual = normalizedCaretOffset(selection, text.length)
+        if (actual == caretUTF16Offset || actual == lastSentCaretOffset) return ComposerAutocompleteAction.CaretUpdate.Unchanged
+        lastSentCaretOffset = actual
+        return ComposerAutocompleteAction.CaretUpdate.Moved(actual)
     }
 
     /** Call when the selection moves (iOS `textViewDidChangeSelection`). */

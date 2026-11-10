@@ -20,6 +20,7 @@ import ai.opencode.server.model.OpenCodeShellOutputPage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -38,6 +39,17 @@ class ShellOutputFeature : Reducer<ShellOutputFeature.State, ShellOutputFeature.
         const val maximumRetainedBytes = 4 * 1024 * 1024
         val pollInterval = 1.seconds
         val retryInterval = 3.seconds
+        val maximumRetryInterval = 30.seconds
+
+        /**
+         * A server that keeps failing is asked less often: 3, 6, 12, 24, then every 30 s. Traffic
+         * into a dead route can stall a VPN tunnel.
+         */
+        fun retryDelay(afterFailures: Int): Duration {
+            val doublings = minOf(maxOf(afterFailures - 1, 0), 4)
+            val delay = retryInterval * (1 shl doublings)
+            return minOf(delay, maximumRetryInterval)
+        }
         /** Asks the server for the capture's size without reading any of it (2^53 − 1, as iOS sends). */
         const val endOfCapture = 9_007_199_254_740_991L
 
@@ -284,6 +296,7 @@ class ShellOutputFeature : Reducer<ShellOutputFeature.State, ShellOutputFeature.
         return Effect.run<Action> { send ->
             var cursor = initialCursor
             var isRunning = wasRunning
+            var failures = 0
             while (currentCoroutineContext().isActive) {
                 try {
                     if (cursor == null) {
@@ -310,6 +323,7 @@ class ShellOutputFeature : Reducer<ShellOutputFeature.State, ShellOutputFeature.
                         if (page.cursor >= page.size) break
                     }
                     if (!isRunning) return@run
+                    failures = 0
                     clock.sleep(pollInterval)
                 } catch (cancellation: CancellationException) {
                     throw cancellation
@@ -317,7 +331,8 @@ class ShellOutputFeature : Reducer<ShellOutputFeature.State, ShellOutputFeature.
                     val error = failure.asClientError()
                     send(Action.PollFailed(error))
                     if (error.statusCode == 404) return@run
-                    clock.sleep(retryInterval)
+                    failures += 1
+                    clock.sleep(retryDelay(afterFailures = failures))
                 }
             }
         }.cancellable(CancelID.Poll, cancelInFlight = true)

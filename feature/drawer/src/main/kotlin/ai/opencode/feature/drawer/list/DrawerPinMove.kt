@@ -1,24 +1,23 @@
 package ai.opencode.feature.drawer.list
 
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionFrameAction
 import ai.opencode.core.motion.SpringSolver
 import ai.opencode.core.motion.motionFrameLoop
 import ai.opencode.feature.drawer.list.DrawerPinDrag.ItemKey
-import ai.opencode.feature.drawer.style.DrawerTunables
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.withFrameNanos
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.abs
-import kotlin.math.max
 
 /**
  * iOS ff935bef (`DrawerListController.apply`'s `movesPins`): Pin, Unpin and Move Up/Down outside a
  * drag (the menu, TalkBack) move the row to its new place while the rows between make room, all
- * in one move on `pinMoveSpring`; under Reduce Motion the rows that moved cross-fade in over
- * `pinMoveFade`. UIKit animates the snapshot; here [begin] notes where each visible row shows
+ * in one move on `MotionRole.Layout`; under Reduce Motion the rows that moved cross-fade in on
+ * `MotionRole.Reduced`. UIKit animates the snapshot; here [begin] notes where each visible row shows
  * before the store's change lays the list out anew, and [apply] (from the list's placement, so
  * the first frame already draws them where they were) starts each one there and springs its
  * offset to zero, through the pin drag's translations. A drag lands its own moves.
@@ -60,7 +59,6 @@ internal class DrawerPinMove(private val pinDrag: DrawerPinDrag) {
         from = null
         val host = pinDrag.host ?: return
         if (pinDrag.activeSessionID != null) return
-        val spring = DrawerTunables.pinMoveSpring.spring
         for (item in host.visibleItems()) {
             val was = start[item.key]
             val offset = was?.let { it - item.minY } ?: 0f
@@ -70,9 +68,8 @@ internal class DrawerPinMove(private val pinDrag: DrawerPinDrag) {
                 continue
             }
             if (abs(offset) <= 0.02f) continue
-            springs[item.key] = SpringSolver.of(
-                duration = max(spring.duration, 0.05),
-                bounce = spring.bounce,
+            springs[item.key] = SpringSolver(
+                MotionRole.Layout,
                 value = offset.toDouble(),
                 target = 0.0,
                 positionEpsilon = 0.08,
@@ -82,7 +79,6 @@ internal class DrawerPinMove(private val pinDrag: DrawerPinDrag) {
         }
         if (reducedMotion) {
             fadeElapsed = 0.0
-            if (DrawerTunables.pinMoveFade.value <= 0.0) fading.clear()
             fading.forEach { alphas[it] = 0f }
         }
         if (springs.isEmpty() && fading.isEmpty()) return
@@ -102,8 +98,8 @@ internal class DrawerPinMove(private val pinDrag: DrawerPinDrag) {
         }
         if (fading.isNotEmpty()) {
             fadeElapsed += dt
-            val duration = DrawerTunables.pinMoveFade.value
-            val progress = if (duration <= 0.0) 1f else (fadeElapsed / duration).toFloat().coerceIn(0f, 1f)
+            val duration = MotionRole.Reduced.curve().duration
+            val progress = (fadeElapsed / duration).toFloat().coerceIn(0f, 1f)
             val alpha = Motion.EaseInOut.transform(progress)
             fading.forEach { alphas[it] = alpha }
             if (progress < 1f) settled = false

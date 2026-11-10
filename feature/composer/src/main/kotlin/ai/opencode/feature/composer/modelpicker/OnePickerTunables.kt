@@ -1,6 +1,7 @@
 package ai.opencode.feature.composer.modelpicker
 
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionTunables
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.BrandAssets
 import ai.opencode.core.ui.TemplateAssetImage
@@ -35,41 +36,11 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * iOS `OnePickerTunables` (`modelPicker.one.*`): One Picker's springs, layout metrics and
- * options at their shipped defaults. The presets (Native, Punchy, Curated) and registration
- * are Tuning Panel, n/a (Android's tuning is `:devtools`).
+ * iOS `OnePickerTunables` (`modelPicker.one.*`): One Picker's layout metrics and options at
+ * their shipped defaults; its timing is the shared motion roles' ([OnePickerTiming]). The
+ * presets and registration are Tuning Panel, n/a (Android's tuning is `:devtools`).
  */
 object OnePickerTunables {
-    /** "Grow". */
-    val open = MotionSpring(0.35, 0.06)
-
-    /** "Grow width". */
-    val openWidth = MotionSpring(0.25, 0.0)
-
-    /** "Fold". */
-    val close = MotionSpring(0.28, 0.0)
-
-    /** "Between rests". */
-    val detent = MotionSpring(0.34, 0.04)
-
-    /** "Keyboard ride". */
-    val keyboardRide = MotionSpring(0.267, 0.0)
-
-    /** "Content in". */
-    val contentIn = MotionSpring(0.24, 0.0)
-
-    /** "Content out". */
-    val contentOut = MotionSpring(0.16, 0.0)
-
-    /** "Chip width". */
-    val chipWidth = MotionSpring(0.28, 0.0)
-
-    /** "Chip roll". */
-    val chipRoll = MotionSpring(0.34, 0.0)
-
-    /** "Arc sweep". */
-    val arcSpring = MotionSpring(0.30, 0.08)
-
     /** "Compact height" (320…640). */
     const val COMPACT_HEIGHT = 460.0
 
@@ -129,6 +100,18 @@ object OnePickerTunables {
 
     /** "Chevron on chip". */
     const val CHIP_SHOWS_CHEVRON = false
+}
+
+/**
+ * iOS `OnePickerTiming`: One Picker's motion, on the shared roles. It grows out of the chip on
+ * `Motion.panelOpen` and folds back on `Motion.panelClose`, its bottom edge riding the keyboard
+ * on `Motion.keyboard`; a rest changes on `Motion.layout`, and a drag let go settles on
+ * `Motion.release`.
+ */
+object OnePickerTiming {
+    /** Narrow to wide, the width gets there first: `panelOpen` quickened by `widthLead`. */
+    val widthDuration: Double
+        get() = Motion.panelOpen.curve().duration / max(MotionTunables.widthLead.value, 1.0)
 }
 
 /**
@@ -215,7 +198,7 @@ fun OnePickerProviderMark(
 }
 
 /**
- * iOS `AnimatedLevelArc`: the level arc sweeping on [OnePickerTunables.arcSpring] as the level
+ * iOS `AnimatedLevelArc`: the level arc sweeping on `Motion.microIn` as the level
  * changes. Off by default (`CHIP_SHOWS_ARC`, `ROW_SHOWS_ARC`). iOS's UIKit template-image cache
  * is n/a: Compose draws it directly.
  */
@@ -229,8 +212,8 @@ fun AnimatedLevelArc(
 ) {
     val reduceMotion = rememberReduceMotion()
     val pose = LevelArc.pose(scale.index(level), max(scale.count, 1))
-    val fill by animateFloatAsState(pose.fill.toFloat(), OnePickerTunables.arcSpring.animation(reduceMotion), label = "arcFill")
-    val lit by animateFloatAsState(min(pose.lit, 1.0).toFloat(), OnePickerTunables.arcSpring.animation(reduceMotion), label = "arcLit")
+    val fill by animateFloatAsState(pose.fill.toFloat(), Motion.microIn.animation(reduceMotion = reduceMotion), label = "arcFill")
+    val lit by animateFloatAsState(min(pose.lit, 1.0).toFloat(), Motion.microIn.animation(reduceMotion = reduceMotion), label = "arcLit")
     val increased = rememberHighContrast()
     val track = if (increased) min(LevelArc.TRACK_OPACITY * 1.7, 0.7) else LevelArc.TRACK_OPACITY
     val span = LevelScrubberTunables.arcSpan

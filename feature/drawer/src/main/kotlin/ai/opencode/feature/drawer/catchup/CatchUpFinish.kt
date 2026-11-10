@@ -1,8 +1,8 @@
 package ai.opencode.feature.drawer.catchup
 
+import ai.opencode.core.motion.MotionCurve
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.transitionBlurEffect
-
-import ai.opencode.core.motion.Motion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
@@ -71,6 +71,11 @@ import kotlin.math.sin
  * iOS `CatchUpFinishTunables`, as baked defaults (seconds unless noted).
  */
 object CatchUpFinishTunables {
+    /**
+     * The session coming back from faint, slightly small and low, as Catch Up closes itself (iOS
+     * `catchUp.finish.sessionReturn`): Catch Up's signature finish keeps its own spring.
+     */
+    val sessionReturn: MotionCurve = MotionCurve.Spring(duration = 0.48, bounce = 0.08)
     /** Close once emptied elsewhere (s). */
     const val closeDelay = 0.1
     /** Row starts as Catch Up closes (s). */
@@ -223,7 +228,7 @@ data class CatchUpFinishTimeline(
                 glintOpacity = t.glintOpacity,
                 glowTint = t.glowTint,
                 rest = t.rest,
-                fade = Motion.reducedFade,
+                fade = MotionRole.Reduced.curve().duration,
                 reducedMotion = reducedMotion,
             )
         }

@@ -51,15 +51,42 @@ internal class LiveSharedBytes private constructor(private val context: Context)
     }
     @Volatile private var preferences: Preferences? = null
 
+    /**
+     * File values waiting for the writer, newest only, by path (iOS `BackgroundFileWriter`):
+     * several changes before the writer gets to a file encode and write it once.
+     */
+    private val waitingFiles = HashMap<String, () -> ByteArray>()
+
     override fun read(kind: SharedStorageKind, id: String): ByteArray? = when (kind) {
         SharedStorageKind.AppStorage -> appStorage()[stringPreferencesKey(id)]?.encodeToByteArray()
-        is SharedStorageKind.File -> file(kind.directory, id).takeIf(File::exists)?.readBytes()
+        // A value still waiting for the writer is the newest one.
+        is SharedStorageKind.File -> waitingFile(file(kind.directory, id))?.invoke()
+            ?: file(kind.directory, id).takeIf(File::exists)?.readBytes()
         SharedStorageKind.Keychain -> Keychain.read(keychainFile(id))
         SharedStorageKind.InMemory -> memory.read(kind, id)
     }
 
+    private fun waitingFile(file: File): (() -> ByteArray)? = synchronized(waitingFiles) { waitingFiles[file.path] }
+
+    override fun writeEncoded(kind: SharedStorageKind, id: String, encode: () -> ByteArray) {
+        if (kind !is SharedStorageKind.File) return write(kind, id, encode())
+        val target = file(kind.directory, id)
+        val alreadyQueued = synchronized(waitingFiles) { waitingFiles.put(target.path, encode) != null }
+        if (alreadyQueued) return
+        io.execute {
+            val latest = synchronized(waitingFiles) { waitingFiles.remove(target.path) } ?: return@execute
+            try {
+                writeAtomically(target, latest())
+            } catch (error: Exception) {
+                AppLog.app.error { "Couldn’t write shared value: ${error::class.java.simpleName}" }
+            }
+        }
+    }
+
     override fun write(kind: SharedStorageKind, id: String, data: ByteArray?) {
         if (kind == SharedStorageKind.InMemory) return memory.write(kind, id, data)
+        // A direct write replaces any value still waiting, so it lands last.
+        if (kind is SharedStorageKind.File) synchronized(waitingFiles) { waitingFiles.remove(file(kind.directory, id).path) }
         io.execute {
             try {
                 when (kind) {

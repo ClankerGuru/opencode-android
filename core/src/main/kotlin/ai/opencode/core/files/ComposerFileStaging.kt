@@ -18,7 +18,7 @@ import java.nio.file.attribute.PosixFilePermissions
 import java.util.UUID
 
 /**
- * A file copied into the app's temporary storage (iOS `ComposerStagedFile`, ShareHandoff.swift).
+ * A file copied into the app's temporary storage (iOS `ComposerStagedFile`, System/Share/ComposerFileStaging.swift).
  * Moved to `:core`: the composer and the share target both stage files.
  */
 data class ComposerStagedFile(

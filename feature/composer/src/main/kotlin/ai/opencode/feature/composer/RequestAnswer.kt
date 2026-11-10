@@ -72,16 +72,30 @@ class RequestDockFeature<Draft> : Reducer<RequestDockFeature.State<Draft>, Reque
         val answerBarBaseline: String = "",
         /** The pending request the dock shows; null shows the first. */
         val selectedRequestID: String? = null,
-        /** Requests whose last reply didn't reach the server: their dock reads “Couldn’t send …” until the next attempt or edit. */
-        val failedReplyIDs: Set<String> = emptySet(),
-        /** Requests whose last dismissal failed: their line reads “Couldn’t dismiss request”, and Send stays Send. */
-        val failedDismissalIDs: Set<String> = emptySet(),
-        /** Requests the server had already settled, or no longer has, when the last reply went: nothing to retry or send, and × clears them here. */
-        val settledRequestIDs: Set<String> = emptySet(),
+        /** How each request's last reply ended, when its dock has to say so. */
+        val requestFailures: Map<String, RequestFailure> = emptyMap(),
         /** A successful reply must not become actionable again through an older poll. */
         val completedRequestIDs: Set<String> = emptySet(),
     ) {
         enum class LoadAttempt { Initial, Reconnect, Manual }
+
+        /** How a request's last reply ended, when its dock has to say so. */
+        enum class RequestFailure {
+            /** The reply didn't reach the server: Send reads Retry, and the line reads “Couldn’t send …”. */
+            Reply,
+
+            /** Dismissing it didn't reach the server: its line says so, Send stays Send. */
+            Dismissal,
+
+            /** The server had already settled it, or no longer has it: nothing to retry or send, and × clears it here. */
+            Settled,
+
+            /** Settled, found by a dismissal: its line still says the dismissal failed. */
+            SettledDismissal,
+            ;
+
+            val isSettled: Boolean get() = this == Settled || this == SettledDismissal
+        }
 
         /** The docked form's current page: the form, its active field on this page, and the page. */
         data class DockedFormPage(val form: OpenCodeFormRequest, val field: OpenCodeFormField?, val page: Int, val count: Int)
@@ -89,21 +103,21 @@ class RequestDockFeature<Draft> : Reducer<RequestDockFeature.State<Draft>, Reque
         val isAnswering: Boolean get() = parkedComposer != null
 
         /** The docked request's last reply didn't reach the server: Send reads Retry. */
-        val dockReplyFailed: Boolean get() = dockRequestID?.let { it in failedReplyIDs } ?: false
+        val dockReplyFailed: Boolean get() = dockRequestID?.let { requestFailures[it] } == RequestFailure.Reply
 
         /** What the request's error line leads with when its last reply or dismissal failed; null when its error is something else. */
         fun replyFailureTitle(id: String, isForm: Boolean): String? {
-            if (id in failedDismissalIDs) return "Couldn’t dismiss request"
-            if (id !in failedReplyIDs && id !in settledRequestIDs) return null
-            return if (isForm) "Couldn’t send answer" else "Couldn’t send reply"
+            return when (requestFailures[id]) {
+                RequestFailure.Dismissal, RequestFailure.SettledDismissal -> "Couldn’t dismiss request"
+                RequestFailure.Reply, RequestFailure.Settled -> if (isForm) "Couldn’t send answer" else "Couldn’t send reply"
+                null -> null
+            }
         }
 
         /** The reply or dismissal is going again (or the answer changed): last time's failure no longer stands. */
         fun clearReplyFailure(id: String): State<Draft> = copy(
             requestErrors = requestErrors - id,
-            failedReplyIDs = failedReplyIDs - id,
-            failedDismissalIDs = failedDismissalIDs - id,
-            settledRequestIDs = settledRequestIDs - id,
+            requestFailures = requestFailures - id,
         )
 
         val hasPendingRequests: Boolean get() = permissionRequests.isNotEmpty() || formRequests.isNotEmpty()
@@ -212,7 +226,7 @@ class RequestDockFeature<Draft> : Reducer<RequestDockFeature.State<Draft>, Reque
             val updated = if (value == null) answers - key else answers + (key to value)
             val next = copy(formAnswers = formAnswers + (formID to updated))
             // A settled request's error stays: no answer can take now.
-            return if (formID in settledRequestIDs) next else next.clearReplyFailure(formID)
+            return if (requestFailures[formID]?.isSettled == true) next else next.clearReplyFailure(formID)
         }
 
         private fun setCustomAnswer(text: String, field: OpenCodeFormField, formID: String): State<Draft> {
@@ -256,9 +270,7 @@ class RequestDockFeature<Draft> : Reducer<RequestDockFeature.State<Draft>, Reque
                 questionPageIndices = questionPageIndices.filterKeys { it in live },
                 requestErrors = requestErrors.filterKeys { it in live },
                 collapsedRequestIDs = if (live.containsAll(collapsedRequestIDs)) collapsedRequestIDs else collapsedRequestIDs.intersect(live),
-                failedReplyIDs = if (live.containsAll(failedReplyIDs)) failedReplyIDs else failedReplyIDs.intersect(live),
-                failedDismissalIDs = if (live.containsAll(failedDismissalIDs)) failedDismissalIDs else failedDismissalIDs.intersect(live),
-                settledRequestIDs = if (live.containsAll(settledRequestIDs)) settledRequestIDs else settledRequestIDs.intersect(live),
+                requestFailures = if (live.containsAll(requestFailures.keys)) requestFailures else requestFailures.filterKeys { it in live },
                 selectedRequestID = selected,
             )
             return next to (hadSelection && selected == null)
@@ -551,7 +563,7 @@ object RequestReplies {
     ): Reduced<RequestDockFeature.State<D>, RequestDockFeature.Action> {
         val form = state.formRequests.firstOrNull { it.id == id } ?: return Reduced(state)
         // Settled on the server already: sending again can't take (× clears it).
-        if (!canRespond(state, id) || id in state.settledRequestIDs) return Reduced(state)
+        if (!canRespond(state, id) || state.requestFailures[id]?.isSettled == true) return Reduced(state)
         val result = form.validatedAnswer(state.formAnswers[id] ?: emptyMap())
         val failure = result.exceptionOrNull() as? OpenCodeFormRequest.ValidationFailure
         if (failure != null) {
@@ -580,7 +592,7 @@ object RequestReplies {
         val form = state.formRequests.firstOrNull { it.id == id } ?: return Reduced(state)
         if (!canRespond(state, id)) return Reduced(state)
         // Settled or gone on the server: × only clears it here.
-        if (id in state.settledRequestIDs) {
+        if (state.requestFailures[id]?.isSettled == true) {
             val (pruned, _) = state.copy(completedRequestIDs = state.completedRequestIDs + id)
                 .prune(shouldRemove = { requestID, _ -> requestID == id }, keepingSelection = state.respondingRequestIDs)
             return Reduced(pruned)
@@ -661,13 +673,15 @@ object RequestReplies {
         if (!(wasResponding || requestIsKnown || sessionID == "global" || sessionID in familySessionIDs)) return null
         dependency(HapticsClient).play(if (error == null) Haptic.success else Haptic.error)
         if (error != null) {
-            var failed = next.copy(requestErrors = next.requestErrors + (id to error.message))
-            if (dismissal) failed = failed.copy(failedDismissalIDs = failed.failedDismissalIDs + id)
-            if (error.requestSettled) {
-                failed = failed.copy(settledRequestIDs = failed.settledRequestIDs + id)
-            } else if (!dismissal) {
-                failed = failed.copy(failedReplyIDs = failed.failedReplyIDs + id)
+            val failure = if (error.requestSettled) {
+                if (dismissal) RequestDockFeature.State.RequestFailure.SettledDismissal else RequestDockFeature.State.RequestFailure.Settled
+            } else {
+                if (dismissal) RequestDockFeature.State.RequestFailure.Dismissal else RequestDockFeature.State.RequestFailure.Reply
             }
+            var failed = next.copy(
+                requestErrors = next.requestErrors + (id to error.message),
+                requestFailures = next.requestFailures + (id to failure),
+            )
             // A folded question opens to show what went wrong.
             failed = failed.copy(collapsedRequestIDs = failed.collapsedRequestIDs - id)
             return RequestDockFeature.Settled(failed, clearedSelection = false)

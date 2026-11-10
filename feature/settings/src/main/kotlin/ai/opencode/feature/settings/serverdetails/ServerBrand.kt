@@ -1,6 +1,7 @@
 package ai.opencode.feature.settings.serverdetails
 
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.AmbientTimeline
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.BrandAssets
 import ai.opencode.core.ui.OpenCodeTheme
@@ -9,12 +10,6 @@ import ai.opencode.feature.settings.SettingsTint
 import ai.opencode.server.model.OpenCodeAccount
 import ai.opencode.server.model.OpenCodeMCPServer
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -280,43 +275,38 @@ fun StatusRingTile(
         // iOS `.quaternary`.
         else -> OpenCodeTheme.colors.secondaryText.copy(alpha = 0.18f)
     }
-    val ringColor by animateColorAsState(target, MotionSpring(0.3).animation(reduceMotion), label = "ring")
+    val ringColor by animateColorAsState(target, MotionRole.Swap.animation(reduceMotion = reduceMotion), label = "ring")
     val pending = status == OpenCodeMCPServer.Status.Pending
     val travelling = pending && !reduceMotion
-    val turn = if (travelling) {
-        val transition = rememberInfiniteTransition(label = "connecting")
-        val value by transition.animateFloat(
-            0f, 1f, infiniteRepeatable(tween(1000, easing = LinearEasing), RepeatMode.Restart), label = "turn",
-        )
-        value
-    } else {
-        0f
-    }
     val dash = when {
         status is OpenCodeMCPServer.Status.NeedsAuth -> floatArrayOf(4f, 3f)
         pending && reduceMotion -> floatArrayOf(3f, 3f)
         else -> null
     }
-    Box(
-        modifier
-            .size(outer)
-            .drawWithContent {
-                drawContent()
-                val width = 2.dp.toPx()
-                val inset = width / 2
-                val corner = CornerRadius(cornerDp.toPx() - inset)
-                val topLeft = Offset(inset, inset)
-                val ringSize = Size(this.size.width - width, this.size.height - width)
-                if (travelling) {
-                    drawRoundRect(Brush.sweepGradient(*travellingArc(ringColor, turn)), topLeft, ringSize, corner, style = Stroke(width))
-                } else {
-                    val effect = dash?.let { d -> PathEffect.dashPathEffect(FloatArray(d.size) { d[it] * density }) }
-                    drawRoundRect(ringColor, topLeft, ringSize, corner, style = Stroke(width, pathEffect = effect))
-                }
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        BrandTile(brand, size = size, muted = isOff)
+    // A small spinner on the shared ambient clock: one turn every half of the shared sweep.
+    AmbientTimeline(isActive = travelling, reduceMotion = reduceMotion) { sample ->
+        val turn = if (travelling) ((sample.sweep * 2) % 1.0).toFloat() else 0f
+        Box(
+            modifier
+                .size(outer)
+                .drawWithContent {
+                    drawContent()
+                    val width = 2.dp.toPx()
+                    val inset = width / 2
+                    val corner = CornerRadius(cornerDp.toPx() - inset)
+                    val topLeft = Offset(inset, inset)
+                    val ringSize = Size(this.size.width - width, this.size.height - width)
+                    if (travelling) {
+                        drawRoundRect(Brush.sweepGradient(*travellingArc(ringColor, turn)), topLeft, ringSize, corner, style = Stroke(width))
+                    } else {
+                        val effect = dash?.let { d -> PathEffect.dashPathEffect(FloatArray(d.size) { d[it] * density }) }
+                        drawRoundRect(ringColor, topLeft, ringSize, corner, style = Stroke(width, pathEffect = effect))
+                    }
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            BrandTile(brand, size = size, muted = isOff)
+        }
     }
 }
 

@@ -46,19 +46,24 @@ data class NewMessagesMark(
             viewedMilliseconds: Long? = null,
             unread: Boolean = false,
         ): String? {
-            val hasTimedAfterViewed = viewedMilliseconds?.let { cutoff ->
-                items.any { TranscriptTimeStamps.isAtOrBefore(cutoff, it.id) == false }
-            } ?: false
-            if (seen.isEmpty() && !unread && !hasTimedAfterViewed) return null
+            if (seen.isEmpty() && !unread && viewedMilliseconds == null) return null
             fun isSeen(item: OpenCodeTranscriptItem): Boolean {
                 if (item.id in seen) return true
                 if (viewedMilliseconds != null && TranscriptTimeStamps.isAtOrBefore(viewedMilliseconds, item.id) == true) return true
                 return false
             }
             // After the last row they saw: older rows paged in or a notice placed in an earlier
-            // turn aren't news.
+            // turn aren't news. Found from the end, so a long session's read history is never
+            // walked; only the tail after it is.
             val afterSeen = items.indexOfLast(::isSeen).let { if (it >= 0) it + 1 else 0 }
+            TranscriptScan.record(items.size - afterSeen + if (afterSeen > 0) 1 else 0)
             val tail = items.subList(afterSeen, items.size)
+            // A viewed time alone marks only if something after it carries a later time.
+            if (seen.isEmpty() && !unread && viewedMilliseconds != null &&
+                tail.none { TranscriptTimeStamps.isAtOrBefore(viewedMilliseconds, it.id) == false }
+            ) {
+                return null
+            }
             val isOwn = ownPrompts(tail)
             val lastOwn = tail.indexOfLast(isOwn)
             val start = if (lastOwn >= 0) afterSeen + lastOwn + 1 else afterSeen

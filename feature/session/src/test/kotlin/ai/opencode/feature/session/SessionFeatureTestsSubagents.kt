@@ -7,6 +7,7 @@ import ai.opencode.core.dependencies.TestClock
 import ai.opencode.core.dependencies.UuidClient
 import ai.opencode.feature.composer.DraftState
 import ai.opencode.feature.composer.PendingPrompt
+import ai.opencode.feature.composer.RequestDockFeature
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.session.SessionTestSupport.LockIsolated
@@ -313,7 +314,7 @@ class SessionFeatureTestsSubagents {
         store.receive(Action.requestResponseFinished(sessionID = "child", requestID = form.id, error = OpenCodeClientError("HTTP 503"))) {
             it.withRespondingRequestIDs(emptySet())
                 .withRequestErrors(it.requestErrors + (form.id to "HTTP 503"))
-                .withFailedReplyIDs(setOf(form.id))
+                .updateRequestDock { dock -> dock.copy(requestFailures = mapOf(form.id to RequestDockFeature.State.RequestFailure.Reply)) }
         }
         store.send(Action.PendingRequestsResponse(sessionID = root.id, result = Result.success(OpenCodePendingRequests(permissions = emptyList(), forms = emptyList()))))
         assertEquals(listOf(form), store.state.formRequests)

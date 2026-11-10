@@ -133,14 +133,19 @@ data class RetryPolicy(
         return minOf(maxDelay, uncapped)
     }
 
-    /** "Equal jitter": uniformly between half the ceiling and the ceiling. [unit] is in 0..<1. */
-    fun delay(n: Int, unit: Double): Duration {
-        val ceiling = ceiling(n)
-        val clamped = unit.coerceIn(0.0, 1.0)
-        return ceiling / 2 + (ceiling / 2) * clamped
-    }
+    fun delay(n: Int, unit: Double): Duration = jitter(ceiling(n), unit)
 
     companion object {
+        /**
+         * "Equal jitter": uniformly between half [ceiling] and [ceiling]. [unit] is in 0..<1.
+         * Unlike full jitter, every wait is at least half its ceiling, so the retries are spread
+         * over a few seconds of dropout instead of possibly bunching at its start.
+         */
+        fun jitter(ceiling: Duration, unit: Double): Duration {
+            val clamped = unit.coerceIn(0.0, 1.0)
+            return ceiling / 2 + (ceiling / 2) * clamped
+        }
+
         /** Every request: five attempts over 7.5–15 s of waits, within 30 s of the first failure. */
         val request = RetryPolicy(maxAttempts = 5, baseDelay = 1.seconds, maxDelay = 8.seconds, retryWindow = 30.seconds)
 
@@ -150,8 +155,15 @@ data class RetryPolicy(
         /** One attempt: the caller owns retrying, or a fast answer matters more. */
         val once = RetryPolicy(maxAttempts = 1, baseDelay = Duration.ZERO, maxDelay = Duration.ZERO, retryWindow = null, waitsForNetwork = false)
 
-        /** The event stream: waits within 2 s for a minute, then up to 15 s. */
-        val stream = RetryPolicy(maxAttempts = null, baseDelay = 1.seconds, maxDelay = 15.seconds, retryWindow = null, fastWindow = 60.seconds)
+        /**
+         * The event stream is also the recovery probe when no requests are in flight. Its waits
+         * stay within 2 s for the first 15 s, which covers a tunnel or Wi-Fi handoff, then double
+         * (4, 8, 16 … s) to five minutes, so a host that stays unreachable isn't sent a packet
+         * every second or two: some VPN clients stall the whole tunnel while packets to a dead
+         * peer queue. The stream's owner starts over at once when the route changes, the server
+         * answers, the app comes back, or the person taps Try Again.
+         */
+        val stream = RetryPolicy(maxAttempts = null, baseDelay = 1.seconds, maxDelay = 300.seconds, retryWindow = null, fastWindow = 15.seconds)
 
         /** Local consumers falling behind need time, not another address. */
         val streamOverflow = RetryPolicy(maxAttempts = null, baseDelay = 1.seconds, maxDelay = 15.seconds, retryWindow = null, waitsForNetwork = false)
@@ -227,7 +239,7 @@ class RetryBackoff(val policy: RetryPolicy) {
                 slowFailures += 1
                 minOf(policy.maxDelay, policy.fastMaxDelay * (1L shl minOf(slowFailures, 30)).toDouble())
             }
-            delay = ceiling / 2 + ceiling / 2 * unit.coerceIn(0.0, 1.0)
+            delay = RetryPolicy.jitter(ceiling, unit)
         } else {
             delay = policy.delay(failures, unit)
         }
@@ -328,6 +340,8 @@ class RetryPause internal constructor(
     sealed interface Kind {
         data class Sleep(val delay: Duration) : Kind
         data class Network(val limit: Duration?) : Kind
+
+        val waitsForNetwork: Boolean get() = this is Network
 
         val logSummary: String
             get() = when (this) {

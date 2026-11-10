@@ -127,15 +127,12 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
          * one isn't a move.
          */
         val pendingModel: OpenCodeModelRef? = null,
-        /** The voice engine locked in when the call starts. */
-        val activeEngine: VoiceEngine? = VoiceEngine.gptLive,
+        /** The route locked in when the call starts: its engine and provider are what the call runs on. */
         val activeRoute: VoiceRoute = VoiceRoute.PhoneKey(VoiceEngine.gptLive),
-        /** The server voice provider locked in when the call starts. */
-        val activeProvider: ServerVoiceProvider = ServerVoiceProvider.openAI,
         /** Whether [supportServer] supports `POST /api/experimental/voice/session`. */
         val serverVoiceSupport: ServerVoiceSupport = ServerVoiceSupport.unknown,
         /**
-         * The saved server that brokered the last Server Voice start, when it
+         * The saved server that brokered the last server-brokered start, when it
          * wasn't the call's own (Settings › Voice › Voice Server).
          */
         val serverVoiceBroker: OpenCodeServer? = null,
@@ -173,12 +170,12 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
         val sessionDelegator: VoiceSessionDelegator.State = VoiceSessionDelegator.State(),
         /**
          * The server brokering the call, named while it connects and when it
-         * fails (the Server Voice experiment). Null on this phone.
+         * fails. Null on this phone.
          */
         val callPlace: VoiceCallPlace? = null,
         /**
-         * A failed start says why and offers the one fix (the Server Voice
-         * experiment); otherwise its card shows the error as it came.
+         * A failed start says why and offers the one fix; a Grok call's card
+         * shows the error as it came, with Check API Key for its xAI key.
          */
         val diagnosesFailure: Boolean = false,
         /** Pure state machine tracking delegated session prompts and their outcomes. */
@@ -284,6 +281,9 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
          */
         val unpromptedMove: Int? get() = if (moveReason != null && moveReason in MoveReason.unprompted) moves else null
 
+        val activeEngine: VoiceEngine? get() = activeRoute.engine
+        val activeProvider: ServerVoiceProvider get() = activeRoute.provider
+
         val directoryName: String get() = lastPathComponent(target.directory)
 
         /**
@@ -348,6 +348,9 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
 
         /** Read by the delegator's model tools: the picker's favorites. */
         val favoriteModelIDs: Set<String> get() = shared(SharedKeys.favoriteModelIDs).value
+
+        /** Read by `create_session`: the level last picked for each model. */
+        val modelVariants: Map<String, String> get() = shared(SharedKeys.modelVariants).value
         val transcripts: Map<String, VoiceTranscriptRecord> get() = shared(VoiceSharedKeys.voiceTranscripts).value
 
         /** Null on a draft, which has nothing to remember yet. */
@@ -844,7 +847,7 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
                 )
                 VoiceCallFix.chooseProvider -> Reduced(
                     state,
-                    Effect.send(Action.Delegate(DelegateAction.OpenVoiceSettings(if (state.diagnosesFailure) VoiceSettingsPage.provider else VoiceSettingsPage.voice))),
+                    Effect.send(Action.Delegate(DelegateAction.OpenVoiceSettings(VoiceSettingsPage.provider))),
                 )
                 VoiceCallFix.updateOpenCode -> {
                     val opener = dependency(VoiceCallFixClient)

@@ -33,10 +33,18 @@ data class AgentSelectionState(
     /** The agent each queued send was sent with, applied when its message starts or Send Now makes it a steer (as `queuedPicks`). */
     val queuedPicks: Map<String, String> = emptyMap(),
     val queuedPickDue: String? = null,
+    /**
+     * The folder `primaryAgents` were listed from: the chip mounting again (each time the
+     * composer expands) asks only for another folder's.
+     */
+    val listedDirectory: ListedDirectory? = null,
     val sessionAgents: Shared<Map<String, String>> = shared(AgentPickerSharedKeys.sessionAgents),
     val defaultAgentID: Shared<String> = shared(AgentPickerSharedKeys.defaultAgentID),
     val knownPrimaryAgents: Shared<List<OpenCodeAutocompleteAgent>> = shared(AgentPickerSharedKeys.knownPrimaryAgents),
 )
+
+/** iOS `SessionFeature.ListedDirectory`: the folder an agents list came from (null: the server's own). */
+data class ListedDirectory(val directory: String?)
 
 /** iOS `SessionFeature.agentsAttempts`: tries for the agents list, the first, then retries after 1 s and 2 s. */
 internal const val agentsAttempts = 3
@@ -46,9 +54,12 @@ internal fun SessionFeature.reduceAgents(state: State, action: Action): Reduced<
     Action.AgentsRequested -> {
         if (!experimentalFeatures(ExperimentalFeature.agentSelection)) {
             Reduced(state)
+        } else if (state.primaryAgents.isNotEmpty() && state.agentSelection.listedDirectory == ListedDirectory(state.effectiveDirectory)) {
+            // Already listed for this folder: the chip shows that list.
+            Reduced(state)
         } else {
-            val server = state.server
             val directory = state.effectiveDirectory
+            val server = state.server
             val clock = clock
             val client = openCodeClient
             Reduced(
@@ -85,6 +96,10 @@ internal fun SessionFeature.reduceAgents(state: State, action: Action): Reduced<
             } else {
                 var next = state
                 if (next.primaryAgents != agents) next = next.withPrimaryAgents(agents)
+                val listed = ListedDirectory(next.effectiveDirectory)
+                if (agents.isNotEmpty() && next.agentSelection.listedDirectory != listed) {
+                    next = next.copy(agentSelection = next.agentSelection.copy(listedDirectory = listed))
+                }
                 if (agents.isNotEmpty() && next.knownPrimaryAgents != agents) {
                     next.agentSelection.knownPrimaryAgents.set(agents)
                 }

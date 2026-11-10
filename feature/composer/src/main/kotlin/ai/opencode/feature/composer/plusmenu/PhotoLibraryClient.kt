@@ -12,10 +12,8 @@ import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Shader
 import android.graphics.Typeface
-import android.os.CancellationSignal
 import android.os.Handler
 import android.os.Looper
-import android.os.OperationCanceledException
 import android.provider.MediaStore
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -27,7 +25,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -35,7 +32,6 @@ import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.time.Instant
 import java.util.Locale
-import kotlin.coroutines.coroutineContext
 import kotlin.coroutines.resume
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -212,38 +208,6 @@ class PhotoLibraryClient(
                 changes = { emptyFlow() },
                 manageLimitedSelection = {},
             )
-        }
-    }
-}
-
-/**
- * Synchronizes one cancellable MediaStore request: the coroutine's cancellation cancels the
- * platform request through its [CancellationSignal] exactly once, and a cancelled or failed
- * request resumes with null. iOS `PhotoRequestGate` (which guards a `PHImageRequestID` and a
- * continuation); on Android the signal plus structured cancellation are the whole gate.
- */
-class PhotoRequestGate {
-    val signal = CancellationSignal()
-
-    val isCancelled: Boolean get() = signal.isCanceled
-
-    fun cancel() {
-        if (!signal.isCanceled) signal.cancel()
-    }
-
-    /** Runs [load] on the IO dispatcher, cancelling the platform request if the caller is cancelled. */
-    suspend fun <T : Any> run(load: (CancellationSignal) -> T?): T? = withContext(Dispatchers.IO) {
-        val job = coroutineContext[Job]
-        val handle = job?.invokeOnCompletion { if (it != null) cancel() }
-        try {
-            if (isCancelled) null else load(signal)
-        } catch (_: OperationCanceledException) {
-            null
-        } catch (error: Exception) {
-            if (error is kotlinx.coroutines.CancellationException) throw error
-            null
-        } finally {
-            handle?.dispose()
         }
     }
 }

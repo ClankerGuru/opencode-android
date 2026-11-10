@@ -234,7 +234,10 @@ class FloatingCallStageTests {
         val over = geometry.progress(atLift = 736.0 - 70 + 200)
         assertTrue(over > 2)
         // 200 pt past the top moves the sheet only about 52 pt.
-        assertTrue(abs(geometry.lift(over) - (736 - 70 + 52.4)) < 0.5)
+        assertTrue(abs(70 - geometry.frame(over).top - 52.4) < 0.5)
+        // A finger catching it there holds it where it's drawn.
+        assertTrue(abs(geometry.lift(over) - (736 - 70 + 200)) < 0.01)
+        assertTrue(abs(geometry.progress(atLift = geometry.lift(over)) - over) < 0.0001)
         assertEquals(0.0, geometry.progress(atLift = -100.0), 0.0)
     }
 

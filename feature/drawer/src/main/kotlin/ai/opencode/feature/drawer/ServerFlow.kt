@@ -2,6 +2,7 @@ package ai.opencode.feature.drawer
 
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.session.ServerConnectionNotice
+import ai.opencode.feature.session.ServerFlowTunables
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.friendlyName
 
@@ -105,7 +106,9 @@ enum class ServerMenuStatus(val title: String, val systemImage: SFSymbol) {
 
 /**
  * iOS `ServerConnectionNotice.init?(status:credentialsRejected:errorMessage:server:isSwitching:)`:
- * null while connected, and while the drawer switches servers (the switch is the drawer's to show).
+ * null while connected and while the drawer switches servers (the switch is the drawer's to show).
+ * Pass [HomeConnectionFeature.State.displayedStatus], which reads connected while a reconnect is
+ * still in its grace.
  */
 operator fun ServerConnectionNotice.Companion.invoke(
     status: HomeConnectionFeature.State.ConnectionStatus,

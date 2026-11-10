@@ -68,6 +68,8 @@ sealed interface SettingsPage {
     /** Settings › Developer (iOS `DiagnosticsView`; Android's `:devtools` page). */
     data object Developer : SettingsPage
     data object Playgrounds : SettingsPage
+    /** Settings › Playgrounds › Motion (iOS `MotionPlaygroundView`; the page lives in `:devtools`). */
+    data object MotionPlayground : SettingsPage
 }
 
 /**

@@ -62,9 +62,9 @@ class ScreenCaptureFeedbackTests {
         assertNull(ScreenFlashStyle.resolve(reduceMotion = false, dimFlashingLights = true))
         assertNull(ScreenFlashStyle.resolve(reduceMotion = true, dimFlashingLights = true))
         val flash = ScreenFlashStyle.resolve(reduceMotion = false, dimFlashingLights = false)
-        assertEquals(ScreenFlashStyle(ScreenFlashStyle.Tone.white, ScreenFlashTunables.opacity.value, ScreenFlashTunables.duration.value), flash)
+        assertEquals(ScreenFlashStyle(ScreenFlashStyle.Tone.white, ScreenFlashTunables.opacity.value, reduceMotion = false), flash)
         val dim = ScreenFlashStyle.resolve(reduceMotion = true, dimFlashingLights = false)
-        assertEquals(ScreenFlashStyle(ScreenFlashStyle.Tone.dim, ScreenFlashTunables.reducedOpacity.value, ScreenFlashTunables.reducedDuration.value), dim)
+        assertEquals(ScreenFlashStyle(ScreenFlashStyle.Tone.dim, ScreenFlashTunables.reducedOpacity.value, reduceMotion = true), dim)
         assertTrue("Softer and shorter", dim!!.peak < flash!!.peak && dim.duration < flash.duration)
     }
 }

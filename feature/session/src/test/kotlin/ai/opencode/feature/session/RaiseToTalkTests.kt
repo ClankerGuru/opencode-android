@@ -29,6 +29,8 @@ import ai.opencode.feature.voice.VoiceCallClient
 import ai.opencode.feature.voice.VoiceCallEvent
 import ai.opencode.feature.voice.VoiceCallHost
 import ai.opencode.feature.voice.VoiceFeature
+import ai.opencode.feature.voice.VoiceServerChoice
+import ai.opencode.feature.voice.VoiceSharedKeys
 import ai.opencode.feature.voice.VoiceWorkClient
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeServer
@@ -334,6 +336,7 @@ class RaiseToTalkTests {
     }
 
     @Test fun failedPreflightFollowedByManualCallStartsOnSpeaker() = sessionTest { h ->
+        h.sharedStore.reference(VoiceSharedKeys.voiceServerChoice).set(VoiceServerChoice.Phone)
         val host = VoiceCallHost()
         val shouldFailPreflight = LockIsolated(true)
         val startedAtEar = LockIsolated(listOf<Boolean>())
@@ -393,6 +396,7 @@ class RaiseToTalkTests {
     }
 
     @Test fun loweringDuringPreflightStartsOnSpeakerAndConnectedReappliesCurrentState() = sessionTest { h ->
+        h.sharedStore.reference(VoiceSharedKeys.voiceServerChoice).set(VoiceServerChoice.Phone)
         val preflight = CompletableDeferred<Unit>()
         val startedConfigs = LockIsolated(listOf<Boolean>())
         val setAtEarCalls = LockIsolated(listOf<Boolean>())

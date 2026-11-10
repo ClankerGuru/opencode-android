@@ -57,8 +57,6 @@ fun interface DotScopeLevelSource {
 
 /** iOS `DotScopeView.Mode`. */
 sealed interface DotScopeMode {
-    data class Call(val stage: DotScopeSimulation.Stage) : DotScopeMode
-
     /** Both traces render in your warm pearl and follow [level] (Composer's dictation levels). */
     data class Dictation(val leadingInset: Float, val trailingInset: Float, val level: DotScopeLevelSource) : DotScopeMode
 
@@ -67,13 +65,10 @@ sealed interface DotScopeMode {
      * otherwise. No microphone or call involved.
      */
     data class Preview(val active: Boolean) : DotScopeMode
-
-    /** The floating call's panel: the call's scope across its full width, with no room kept for buttons at either end. */
-    data class Panel(val stage: DotScopeSimulation.Stage) : DotScopeMode
 }
 
 /**
- * The call and dictation bar's visual: an LED dot-matrix oscilloscope where your voice (warm
+ * The dictation bar's visual: an LED dot-matrix oscilloscope where your voice (warm
  * pearl) and the agent's (cool pearl) are two braided traces leaving phosphor trails over a
  * soft glow behind each button. In dictation mode both traces render in your warm pearl and
  * follow the dictation level. Under Reduce Motion it is the quiet state, still; in the
@@ -81,44 +76,35 @@ sealed interface DotScopeMode {
  *
  * Android: an AGSL [RuntimeShader] ([DotScopeShaders]) drawn by a Compose [Canvas]; a
  * `withFrameNanos` loop advances the plain-object [DotScopeRenderer] (never reducer actions)
- * only while the scope is visible: not [isHidden], not [LocalDotScopeCovered], and the
+ * only while the scope is visible: not [LocalDotScopeCovered], and the
  * lifecycle resumed (iOS `scenePhase == .active`). A paused scope keeps its last frame and
  * resumes with a reset clock, so it never fast-forwards. Under Reduce Motion it draws one still
- * frame whenever its inputs change.
- *
- * @param isHidden faded out behind something else: no drawing.
- * @param renderer one call's scope shared by the views that show it, so its trails carry
- *   across. `null` makes one.
+ * frame whenever its inputs change. After [DotScopeRenderer.QUIET_AFTER] of silence only the
+ * slow carrier moves, so it draws every other frame (iOS halves `preferredFramesPerSecond`).
  */
 @Composable
 fun DotScopeView(
     mode: DotScopeMode,
     modifier: Modifier = Modifier,
-    isHidden: Boolean = false,
-    renderer: DotScopeRenderer? = null,
 ) {
     val reduceMotion = rememberReduceMotion()
     val isDark = OpenCodeTheme.colors.isDark
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
     val isCovered = LocalDotScopeCovered.current
-    val ownRenderer = remember { if (renderer == null) DotScopeRenderer.make() else null }
-    val scope = renderer ?: ownRenderer ?: return
-    val shared = renderer != null
+    val scope = remember { DotScopeRenderer.make() } ?: return
     val density = LocalDensity.current.density
     var size by remember { mutableStateOf(IntSize.Zero) }
     var frame by remember { mutableIntStateOf(0) }
     val currentMode by rememberUpdatedState(mode)
-    val currentHidden by rememberUpdatedState(isHidden)
 
-    // Each mounted surface owns its configuration even when the simulation is shared: apply it
-    // at draw time, and a hidden view never overwrites the visible one's mode.
+    // Each mounted surface owns its configuration: apply it at draw time.
     fun configure() {
         scope.isDark = isDark
         scope.isStill = reduceMotion
-        if (!shared || !currentHidden) scope.mode = currentMode
+        scope.mode = currentMode
     }
 
-    val isPaused = isHidden || isCovered || !lifecycle.isAtLeast(Lifecycle.State.RESUMED)
+    val isPaused = isCovered || !lifecycle.isAtLeast(Lifecycle.State.RESUMED)
     LaunchedEffect(scope, isPaused, reduceMotion, size, density, if (reduceMotion) mode else Unit, isDark) {
         if (size.width <= 0 || size.height <= 0) return@LaunchedEffect
         if (isPaused) return@LaunchedEffect
@@ -129,8 +115,11 @@ fun DotScopeView(
             if (scope.render(nowSeconds = System.nanoTime() / 1e9, pixelWidth = size.width, pixelHeight = size.height, scale = density)) frame++
             return@LaunchedEffect
         }
+        var frames = 0L
         while (true) {
             val nanos = withFrameNanos { it }
+            frames++
+            if (!DotScopeRenderer.drawsFrame(isQuiet = scope.isQuiet, frame = frames)) continue
             configure()
             if (scope.render(nowSeconds = nanos / 1e9, pixelWidth = size.width, pixelHeight = size.height, scale = density)) frame++
         }
@@ -175,10 +164,9 @@ object DotScopePalette {
 
 /**
  * Steps the scope's simulation at a fixed rate and draws the lit grid (iOS `DotScopeRenderer`).
- * A plain object: one per mounted scope, or one per call shared by the views that show it.
- * Configuration and publication are main
- * thread only; simulation and half-float packing run on Default. The mutex covers both, so
- * shared surfaces never advance the same simulation or reuse its buffer concurrently.
+ * A plain object, one per mounted scope. Configuration and publication are main thread only;
+ * simulation and half-float packing run on Default. The mutex covers both, so frames never
+ * advance the simulation or reuse its buffer concurrently.
  */
 class DotScopeRenderer private constructor() {
     private var simulation = DotScopeSimulation()
@@ -190,13 +178,17 @@ class DotScopeRenderer private constructor() {
     /** Dictation's window eases to new insets as the bar's buttons come and go. */
     private var insets: ScopeVector2? = null
 
-    var mode: DotScopeMode = DotScopeMode.Call(DotScopeSimulation.Stage.live)
+    var mode: DotScopeMode = DotScopeMode.Preview(active = false)
     var isDark = true
     var isStill = false
 
-    // Hot loop: clients resolved once.
-    private val sounds = VoiceCallSounds.shared
-    private val levels = VoiceAudioLevels.shared
+    /** When a voice was last above [QUIET_LEVEL]. Worker, under frameMutex. */
+    private var lastHeard = Double.NEGATIVE_INFINITY
+
+    /** Nothing on screen moves faster than a slow breath: half the frame rate draws the same picture. */
+    @Volatile
+    var isQuiet = false
+        private set
 
     private val shader = RuntimeShader(DotScopeShaders.dotScopeFragment)
     private var grid: DotScopeGrid? = null
@@ -214,7 +206,7 @@ class DotScopeRenderer private constructor() {
         clockGeneration++
     }
 
-    private fun prepareGrid(pixelWidth: Int, pixelHeight: Int, scale: Float, mode: DotScopeMode): DotScopeGrid? {
+    private fun prepareGrid(pixelWidth: Int, pixelHeight: Int, scale: Float): DotScopeGrid? {
         if (pixelWidth < 1 || pixelHeight < 1 || scale <= 0f) return null
         val next = DotScopeGrid(pixelWidth = pixelWidth, pixelHeight = pixelHeight, scale = scale, requestedPitch = 3.5f)
         if (next != grid) {
@@ -223,21 +215,18 @@ class DotScopeRenderer private constructor() {
             val texture = createBitmap(next.columns, next.rows, Bitmap.Config.RGBA_F16, hasAlpha = true, colorSpace = ColorSpace.get(ColorSpace.Named.EXTENDED_SRGB))
             bitmap = texture
             pixels = ByteBuffer.allocateDirect(next.columns * next.rows * 8).order(ByteOrder.nativeOrder())
-            // The floating call's panel is not the bar the call's sounds are timed to.
-            if (mode !is DotScopeMode.Panel) sounds.noteScopeWidth(next.width)
         }
         return grid
     }
 
     private data class FrameState(
-        val live: Float, val glow: ScopeVector2, val breath: Float,
-        val grid: Float, val presence: Float, val insets: ScopeVector2?,
+        val live: Float, val glow: ScopeVector2, val breath: Float, val insets: ScopeVector2?,
     )
 
     /** One awaited request per display frame, not a queue of work that can outlive its view. */
     suspend fun render(nowSeconds: Double, pixelWidth: Int, pixelHeight: Int, scale: Float): Boolean {
-        // Snapshot this surface before waiting for a shared renderer. No worker reads Compose
-        // state, a level source, the sound clock, or mutable main-thread configuration.
+        // Snapshot this surface before waiting for the previous frame. No worker reads Compose
+        // state, a level source, or mutable main-thread configuration.
         val mode = mode
         val isStill = isStill
         val isDark = isDark
@@ -246,26 +235,19 @@ class DotScopeRenderer private constructor() {
             is DotScopeMode.Dictation -> mode.level.level().let { VoiceAudioLevels.Snapshot(it, it * 0.85f) }
             is DotScopeMode.Preview -> (if (mode.active) previewLevels(nowSeconds) else 0f to 0f)
                 .let { VoiceAudioLevels.Snapshot(it.first, it.second) }
-            else -> levels.snapshot()
-        }
-        val stageElapsed = if (isStill) null else when (mode) {
-            is DotScopeMode.Call -> sounds.stageElapsed(mode.stage)
-            is DotScopeMode.Panel -> sounds.stageElapsed(mode.stage)
-            else -> null
         }
         return frameMutex.withLock {
             if (generation != clockGeneration) return@withLock false
-            val grid = prepareGrid(pixelWidth, pixelHeight, scale, mode) ?: return@withLock false
+            val grid = prepareGrid(pixelWidth, pixelHeight, scale) ?: return@withLock false
             val state = withContext(Dispatchers.Default) {
                 PerfTrace.section("dot_scope_compute") {
                     if (simulatedGeneration != generation) {
                         lastFrame = null
                         simulatedGeneration = generation
                     }
-                    simulate(grid, nowSeconds, mode, isStill, snapshot, stageElapsed)
+                    simulate(grid, nowSeconds, mode, isStill, snapshot)
                     pack(grid)
-                    val scan = simulation.scan(grid.width)
-                    FrameState(simulation.live, simulation.glow, simulation.breath, scan.grid, scan.presence, insets)
+                    FrameState(simulation.live, simulation.glow, simulation.breath, insets)
                 }
             }
             // Cancellation of the owning LaunchedEffect prevents publication on return from
@@ -288,21 +270,19 @@ class DotScopeRenderer private constructor() {
 
     private fun simulate(
         grid: DotScopeGrid, nowSeconds: Double, mode: DotScopeMode, isStill: Boolean,
-        snapshot: VoiceAudioLevels.Snapshot, stageElapsed: Double?,
+        snapshot: VoiceAudioLevels.Snapshot,
     ) {
         val target = when (mode) {
-            is DotScopeMode.Call, is DotScopeMode.Preview -> ScopeVector2(DotScopeSimulation.windowInset, DotScopeSimulation.windowInset)
-            is DotScopeMode.Panel -> ScopeVector2(0f, 0f)
+            is DotScopeMode.Preview -> ScopeVector2(DotScopeSimulation.windowInset, DotScopeSimulation.windowInset)
             is DotScopeMode.Dictation -> ScopeVector2(mode.leadingInset, mode.trailingInset)
         }
         if (isStill) {
             val connected = when (mode) {
-                is DotScopeMode.Call -> mode.stage == DotScopeSimulation.Stage.live
-                is DotScopeMode.Panel -> mode.stage == DotScopeSimulation.Stage.live
                 is DotScopeMode.Preview -> mode.active
                 is DotScopeMode.Dictation -> true
             }
             simulation = DotScopeSimulation.still(connected)
+            isQuiet = true
             insets = target
             simulation.windowInsets = target
         } else {
@@ -316,20 +296,21 @@ class DotScopeRenderer private constructor() {
             } ?: target
             insets = eased
             simulation.windowInsets = eased
+            val loudest: Float
             when (mode) {
-                is DotScopeMode.Call, is DotScopeMode.Panel -> {
-                    val stage = if (mode is DotScopeMode.Call) mode.stage else (mode as DotScopeMode.Panel).stage
-                    // Where the shared clock was when this frame's step begins.
-                    simulation.setStage(stage, stageElapsed?.let { max(0.0, it - elapsed) })
-                    simulation.advance(elapsed, you = snapshot.user, agent = snapshot.assistant, connected = stage == DotScopeSimulation.Stage.live)
-                }
                 is DotScopeMode.Dictation -> {
+                    loudest = snapshot.user
                     simulation.advance(elapsed, you = snapshot.user, agent = snapshot.assistant, connected = true)
                 }
                 is DotScopeMode.Preview -> {
+                    val carrier = if (mode.active) 1f else 0f
+                    // Connecting or disconnecting eases the carrier in and out.
+                    loudest = if (abs(simulation.live - carrier) > 0.01f) 1f else max(snapshot.user, snapshot.assistant)
                     simulation.advance(elapsed, you = snapshot.user, agent = snapshot.assistant, connected = mode.active)
                 }
             }
+            if (loudest > QUIET_LEVEL) lastHeard = nowSeconds
+            isQuiet = isQuiet(lastHeard = lastHeard, now = nowSeconds)
         }
         simulation.render(grid, field)
     }
@@ -357,13 +338,9 @@ class DotScopeRenderer private constructor() {
         val bar = floatArrayOf(0f, grid.width, 0f, 0f)
         val shape = floatArrayOf(grid.height / 2, 0f, 0f, 0f)
         when (mode) {
-            is DotScopeMode.Call, is DotScopeMode.Preview -> {
+            is DotScopeMode.Preview -> {
                 isDictation = false
                 window = floatArrayOf(DotScopeSimulation.windowInset, DotScopeSimulation.windowFade, 0f, 0f)
-            }
-            is DotScopeMode.Panel -> {
-                isDictation = false
-                window = floatArrayOf(0f, 1f, 0f, 1f)
             }
             is DotScopeMode.Dictation -> {
                 isDictation = true
@@ -374,7 +351,7 @@ class DotScopeRenderer private constructor() {
         val glow = state.glow
         shader.setFloatUniform("grid", grid.pitch, grid.columns.toFloat(), grid.rows.toFloat(), grid.scale)
         shader.setFloatUniform("origin", grid.originX, grid.originY, grid.width, grid.height)
-        shader.setFloatUniform("state", state.live, if (isDark) 1f else 0f, state.grid, state.presence)
+        shader.setFloatUniform("state", state.live, if (isDark) 1f else 0f, 1f, 1f)
         shader.setFloatUniform("window", window)
         shader.setFloatUniform("glow", glow.x, glow.y, state.breath, state.live)
         shader.setFloatUniform("you", palette.you)
@@ -387,13 +364,29 @@ class DotScopeRenderer private constructor() {
 
     companion object {
         /**
-         * Builds the shader once off the main thread, so the first scope (a held mic's bar, a
-         * call) appears at once. Android compiles AGSL lazily per program; this warms the
-         * process's shader cache like iOS `DotScopeRenderer.prepare()`.
+         * Builds the shader once off the main thread, so the first scope (a held mic's bar)
+         * appears at once. Android compiles AGSL lazily per program; this warms the
+         * process's shader cache like iOS `DotScopeRenderer.prepare()`, at most once a launch.
          */
         fun prepare() {
+            if (prepared) return
+            prepared = true
             Thread { runCatching { RuntimeShader(DotScopeShaders.dotScopeFragment) } }.start()
         }
+
+        @Volatile
+        private var prepared = false
+
+        const val QUIET_LEVEL = 0.02f
+
+        /** Long enough for the last syllable's trails to fade. */
+        const val QUIET_AFTER = 1.5
+
+        /** Silent long enough that only the slow carrier moves. */
+        fun isQuiet(lastHeard: Double, now: Double): Boolean = now - lastHeard > QUIET_AFTER
+
+        /** Whether display frame [frame] draws: all of them, or every other one while quiet. */
+        fun drawsFrame(isQuiet: Boolean, frame: Long): Boolean = !isQuiet || frame % 2 == 0L
 
         fun make(): DotScopeRenderer? = runCatching { DotScopeRenderer() }
             .onFailure { AppLog.voice.error("dot_scope_shader_failed type=${it.javaClass.simpleName}") }

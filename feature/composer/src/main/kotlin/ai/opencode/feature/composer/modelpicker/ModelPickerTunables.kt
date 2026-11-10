@@ -1,6 +1,8 @@
 package ai.opencode.feature.composer.modelpicker
 
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
+import androidx.compose.animation.core.FiniteAnimationSpec
 
 // Port of iOS `Composer/ModelPicker/ModelPickerTunables.swift` (split out of ModelPickerOverlays in 17a991b1).
 //
@@ -15,9 +17,6 @@ import ai.opencode.core.motion.MotionSpring
  * Picker's detents ([ModelListDetent]), the photo sheet and the call's composer expansion still read.
  */
 object ModelPickerTunables {
-    val glassOpen = MotionSpring(0.42, 0.1)
-    val glassClose = MotionSpring(0.3, 0.0)
-    val restSpring = MotionSpring(0.42, 0.06)
     const val settle = 0.6
     const val dimDark = 0.35
     const val dimLight = 0.18
@@ -39,5 +38,7 @@ object ModelPickerTunables {
     const val contentFadeEnd = 150.0
     const val revealBlur = 8.0
 
-    fun glass(opening: Boolean): MotionSpring = if (opening) glassOpen else glassClose
+    /** The glass grows on `Motion.panelOpen` and folds on `Motion.panelClose`. */
+    fun <T> glass(opening: Boolean): FiniteAnimationSpec<T> =
+        Motion.panelOpen.animation(if (opening) MotionPhase.Enter else MotionPhase.Exit, reduceMotion = false)
 }

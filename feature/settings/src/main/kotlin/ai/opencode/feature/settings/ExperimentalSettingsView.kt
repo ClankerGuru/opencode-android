@@ -3,16 +3,18 @@ package ai.opencode.feature.settings
 import ai.opencode.core.experiments.key
 import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.experiments.ExperimentalGroup
-import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionRole
+import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.AllExperiments
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.observe
 import ai.opencode.devtools.DevTools
 import ai.opencode.devtools.DevToolsView
+import ai.opencode.devtools.playgrounds.MotionPlaygroundView
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.ColumnScope
@@ -127,9 +129,10 @@ fun ExperimentalFeatureToggle(
     onChange: (Boolean) -> Unit,
     highlighted: Boolean = false,
 ) {
+    val reduceMotion = rememberReduceMotion()
     val highlight by animateColorAsState(
         if (highlighted) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else Color.Transparent,
-        highlightSpec(highlighted),
+        highlightSpec(highlighted, reduceMotion),
         label = "experiment-highlight",
     )
     SettingsToggleRow(
@@ -143,9 +146,9 @@ fun ExperimentalFeatureToggle(
     )
 }
 
-/** Tinted at once, then fades out over 0.6 s (iOS `withAnimation(.easeOut(duration: 0.6))`). */
-private fun highlightSpec(highlighted: Boolean): AnimationSpec<Color> =
-    if (highlighted) snap() else tween(durationMillis = 600, easing = Motion.EaseOut)
+/** Tinted at once, then fades out on the dim role (iOS `Motion.dim.animation(.exit)`). */
+private fun highlightSpec(highlighted: Boolean, reduceMotion: Boolean): AnimationSpec<Color> =
+    if (highlighted) snap() else MotionRole.Dim.animation(MotionPhase.Exit, reduceMotion)
 
 /**
  * iOS `ExperimentalSettingsRow`: Settings' row into Experimental, counting experiments turned on
@@ -205,6 +208,10 @@ fun PlaygroundsSettingsView(store: SettingsStore) {
             SettingsRow("Onboarding", "dot.radiowaves.left.and.right", SettingsTint.Indigo, showsChevron = false) {
                 send(HomeSettingsFeature.Action.OnboardingPlaygroundOpened)
             }
+            SettingsDivider(inset = true)
+            SettingsRow("Motion", "sparkles", SettingsTint.Indigo, showsChevron = false) {
+                store.send(SettingsFeature.Action.PagePushed(SettingsPage.MotionPlayground))
+            }
         }
         settingsSection(key = "welcome-preview", footer = footerText("The first-run welcome, shown before any server is paired.")) {
             ExperimentalFeatureToggle(
@@ -219,5 +226,13 @@ fun PlaygroundsSettingsView(store: SettingsStore) {
                 }
             }
         }
+    }
+}
+
+/** Settings › Playgrounds › Motion: iOS `MotionPlaygroundView`, one example per motion role. */
+@Composable
+fun MotionPlaygroundSettingsView(store: SettingsStore) {
+    SettingsPageScaffold(title = "Motion", store = store) {
+        item(key = "motion-playground") { MotionPlaygroundView() }
     }
 }

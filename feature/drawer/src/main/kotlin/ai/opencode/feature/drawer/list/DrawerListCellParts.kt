@@ -1,7 +1,8 @@
 package ai.opencode.feature.drawer.list
 
 import ai.opencode.core.dependencies.dependency
-import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.AmbientClock
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.feature.drawer.catchup.rememberTouchExplorationEnabled
@@ -16,12 +17,7 @@ import ai.opencode.feature.drawer.style.DrawerTunables
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeProject
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -34,10 +30,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import kotlin.math.ceil
 import androidx.compose.ui.unit.IntSize
@@ -104,13 +102,6 @@ object DrawerListFonts {
 }
 
 /**
- * Whether the drawer is shown on screen (iOS `DrawerListActivityRing.didMoveToWindow`): a
- * prewarmed drawer kept hidden behind the session card pauses its row rings so they neither spin
- * off screen nor wake the frame clock.
- */
-val LocalDrawerVisible = compositionLocalOf { true }
-
-/**
  * The Working ring (iOS `DrawerListActivityRing`): an open arc (72 % of the circle, 1.8 dp,
  * round caps) with a fading tail, turned once every 0.8 s in the draw phase (no recomposition or
  * positional layer invalidation per frame). Pass `isSpinning = running && !reduceMotion`: it stops
@@ -121,17 +112,17 @@ val LocalDrawerVisible = compositionLocalOf { true }
 fun DrawerListActivityRing(isSpinning: Boolean, opaqueTail: Boolean, modifier: Modifier = Modifier) {
     val color = OpenCodeTheme.colors.secondaryText
     val tail = if (opaqueTail) color else color.copy(alpha = 0f)
-    val spinning = isSpinning && LocalDrawerVisible.current && !rememberTouchExplorationEnabled()
-    val rotation = if (spinning) {
-        val transition = rememberInfiniteTransition(label = "drawer-activity-ring")
-        transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(tween(durationMillis = 800, easing = LinearEasing)),
-            label = "spin",
-        )
-    } else {
-        null
+    // Half an ambient sweep per turn (iOS 03adf07a: `AmbientClock`, so every ring turns in step).
+    // A hidden drawer's ring holds still: no frame ticks for a drawer nobody sees; nor does it
+    // while TalkBack explores by touch (W-06).
+    val hidden = LocalDrawerHidden.current.value
+    val spins = isSpinning && !hidden && !rememberTouchExplorationEnabled()
+    val rotation = remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(spins) {
+        if (!spins) return@LaunchedEffect
+        while (true) {
+            withFrameNanos { rotation.floatValue = 360f * AmbientClock.sweep(AmbientClock.mediaTime(), fraction = 0.5).toFloat() }
+        }
     }
     Canvas(modifier.clearAndSetSemantics {}) {
         val inset = 0.9.dp.toPx()
@@ -142,7 +133,7 @@ fun DrawerListActivityRing(isSpinning: Boolean, opaqueTail: Boolean, modifier: M
             0.9f to tail,
             center = center,
         )
-        rotate(degrees = rotation?.value ?: 0f) {
+        rotate(degrees = if (spins) rotation.floatValue else 0f) {
             drawArc(
                 brush = brush,
                 startAngle = 0f,
@@ -252,7 +243,8 @@ fun DrawerListProjectTile(
     ) {
         Crossfade(
             targetState = icon,
-            animationSpec = if (reducedMotion) snap() else tween(durationMillis = 180, easing = Motion.EaseOut),
+            // The initial and palette dissolve into the icon (iOS `Motion.swap`).
+            animationSpec = MotionRole.Swap.animation(reduceMotion = reducedMotion),
             label = "project-tile",
         ) { shown ->
             if (shown != null) {

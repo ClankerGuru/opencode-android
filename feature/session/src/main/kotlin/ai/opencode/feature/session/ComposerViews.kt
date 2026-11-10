@@ -3,7 +3,7 @@ package ai.opencode.feature.session
 import ai.opencode.core.ui.openCodeHairline
 import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.motionBlurReveal
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
@@ -16,7 +16,6 @@ import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.composer.ComposerTextInputTunables
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.snap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Brush
@@ -26,7 +25,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -142,16 +140,9 @@ object ComposerTunables {
     const val pillGap = 10f
     /** New Plus Menu: the attachment tiles sit this far from the surface's top and leading edges (f0670c5d). */
     const val attachmentInset = 19f
-    /** New Plus Menu's Send crossfade between empty and ready, in seconds (iOS `sendFade`). */
-    const val sendFade = 0.15
-    /** New Plus Menu: the attachment row's height change as the location card arrives or leaves. */
-    val attachmentResize = MotionSpring(0.4, 0.0)
 
     /** New Plus Menu's tile corners: concentric with the composer's, [attachmentInset] in. */
     val attachmentRadius: Float get() = max(cornerRadius - attachmentInset, 6f)
-
-    /** iOS `attachmentRadius(plusMenu:)`: off, the row keeps main's 22. */
-    fun attachmentRadius(plusMenu: Boolean): Float = if (plusMenu) attachmentRadius else 22f
 
     const val plusOffset = 28f
     /** Nudges the + glyph's ink inside its target (OC-477). */
@@ -543,8 +534,8 @@ data class ComposerControls(
 /**
  * iOS `composerHidden(_:fadesOnReveal:)` (`ComposerFoldedControl`): folded away once faded out
  * (under the dictation bar, or a request's + until it's the recording's ×). Its space stays; it
- * leaves TalkBack and stops taking touches. Unfolding fades it in with the row (fadeStandard,
- * after contentDelay) unless [fadesOnReveal] is false.
+ * leaves TalkBack and stops taking touches. Unfolding fades it in with the row (`Motion.swap`,
+ * after `Motion.contentDelay`) unless [fadesOnReveal] is false.
  */
 @Composable
 fun ComposerHidden(
@@ -560,7 +551,7 @@ fun ComposerHidden(
         if (hidden) {
             alpha.snapTo(0f)
         } else if (alpha.value < 1f) {
-            alpha.animateTo(1f, Motion.easeOut(Motion.fadeStandard, if (reduceMotion) 0.0 else Motion.contentDelay, reduceMotion))
+            alpha.animateTo(1f, Motion.swap.animation(reduceMotion = reduceMotion, delaySeconds = Motion.contentDelay))
         }
     }
     val folded = if (hidden) {
@@ -727,11 +718,7 @@ fun JumpToLatestPill(
     var mounted by remember { mutableStateOf(isShown) }
     LaunchedEffect(isShown, reduceMotion) {
         if (isShown) mounted = true
-        val spec = when {
-            reduceMotion -> Motion.easeInOut<Float>(0.2)
-            isShown -> JumpToLatestPillMotion.intro.spec()
-            else -> JumpToLatestPillMotion.outro.spec()
-        }
+        val spec = Motion.microIn.animation<Float>(if (isShown) MotionPhase.Enter else MotionPhase.Exit, reduceMotion)
         presence.animateTo(if (isShown) 1f else 0f, spec)
         if (!isShown) mounted = false
     }
@@ -803,11 +790,9 @@ fun JumpToLatestPill(
     }
 }
 
-/** [JumpToLatestPill]'s springs. */
+/** [JumpToLatestPill]'s slot gap; it scales and fades in and out on `microIn` and `microOut`. */
 object JumpToLatestPillMotion {
     const val gap = 8f
-    val intro = MotionSpring(0.26, 0.22)
-    val outro = MotionSpring(0.18, 0.0)
 }
 
 /** iOS `ComposerBanner`: a full-width bar that takes the composer's place, on its same surface. */
@@ -858,7 +843,7 @@ fun ComposerBanner(
 @Composable
 fun Modifier.horizontalScrollEdgeFade(state: LazyListState, width: Dp = 20.dp, isEnabled: Boolean = true): Modifier {
     if (!isEnabled) return this
-    val fade = tween<Float>(150, easing = FastOutSlowInEasing)
+    val fade = Motion.swap.animation<Float>(reduceMotion = rememberReduceMotion())
     val leading by animateFloatAsState(if (state.canScrollBackward) 1f else 0f, fade, label = "edgeFadeLeading")
     val trailing by animateFloatAsState(if (state.canScrollForward) 1f else 0f, fade, label = "edgeFadeTrailing")
     return graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
@@ -893,7 +878,7 @@ fun ComposerSendLabel(enabled: Boolean, showsProgress: Boolean, visualOffsetX: F
     val reduceMotion = rememberReduceMotion()
     val progress by animateFloatAsState(
         if (enabled) 1f else 0f,
-        if (reduceMotion) snap() else tween((ComposerTunables.sendFade * 1000).toInt(), easing = FastOutSlowInEasing),
+        Motion.swap.animation(if (enabled) MotionPhase.Enter else MotionPhase.Exit, reduceMotion),
         label = "sendLabelProgress",
     )
     val colors = OpenCodeTheme.colors

@@ -175,7 +175,6 @@ class SessionFeatureTestsResume {
         ) {
             it.copy(earlierHistory = State.EarlierHistory.Exhausted, earlierHistoryInsertionID = older.id)
         }
-        store.receive(Action.AcceptedTranscriptUpdated::class)
         assertEquals(store.state.items.size, store.state.items.map { it.id }.toSet().size)
         store.finish()
     }

@@ -1,6 +1,5 @@
 package ai.opencode.feature.composer.modelpicker
 
-import ai.opencode.core.motion.MotionSpring
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -78,7 +77,6 @@ fun progressiveBlurStrengths(profile: ProgressiveBlurProfile, samples: Int = 32)
 /** Port of iOS `LevelArc` (`Shape`): the level glyph's arc geometry. */
 object LevelArc {
     const val TRACK_OPACITY = 0.28
-    val spring = MotionSpring(0.32, 0.22)
 
     data class Pose(val fill: Double, val lit: Double)
 

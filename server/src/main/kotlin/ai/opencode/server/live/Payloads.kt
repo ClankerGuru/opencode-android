@@ -1,5 +1,7 @@
 package ai.opencode.server.live
 
+import ai.opencode.server.ConnectionRoute
+import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.internal.ElementSerializer
 import ai.opencode.server.internal.WireJson
 import ai.opencode.server.internal.bool
@@ -84,9 +86,50 @@ internal data class ShellInfo(
     )
 }
 
-/** Required fields only OpenCode reports make decoding reject other servers. */
+/**
+ * V2 `GET /api/info`: the fields every V2 server sends, and the addresses it listens on. Required
+ * fields only OpenCode reports make decoding reject other servers.
+ */
 @Serializable
-internal data class StatusPayload(val version: String, val pid: Int)
+internal data class ServerInfoPayload(val version: String, val pid: Int, val urls: List<String>? = null) {
+    /**
+     * See [requestHealth]; `server.url` is the address that answered. A password, or a server
+     * with one address, needs nothing more. Without a password, an answer on a local network could
+     * come from any OpenCode server that happens to use the same address on whatever network the
+     * phone is on, so it must list one of our other addresses: one off the local network when we
+     * have one (another LAN address could collide too), and it can't stay quiet about its addresses.
+     */
+    fun identifies(server: OpenCodeServer): Boolean {
+        if (server.password.isNotEmpty() || server.candidateURLs.size <= 1) return true
+        val others = server.candidateURLs.filter { it != server.url }
+        if (!isLocal(server.url)) {
+            val listed = urls ?: return true
+            return overlap(listed, server.candidateURLs)
+        }
+        val remote = others.filter { !isLocal(it) }
+        val listed = urls ?: return remote.isEmpty()
+        return overlap(listed, if (remote.isEmpty()) others else remote)
+    }
+
+}
+
+private fun isLocal(url: String): Boolean {
+    val route = ConnectionRoute.of(url)
+    return route == ConnectionRoute.LocalNetwork || route == ConnectionRoute.Loopback
+}
+
+private fun overlap(urls: List<String>, candidates: List<String>): Boolean {
+    val ours = HashSet<String>()
+    for (candidate in candidates) {
+        val origin = OpenCodeServer.origin(candidate) ?: continue
+        ours.add(origin)
+    }
+    for (url in urls) {
+        val origin = OpenCodeServer.origin(url) ?: continue
+        if (origin in ours) return true
+    }
+    return false
+}
 
 /** `{token, device?: {name}}`; a missing or malformed device name never fails pairing. */
 internal data class PairingSessionPayload(val token: String, val deviceName: String?) {

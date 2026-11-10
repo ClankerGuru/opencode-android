@@ -20,6 +20,6 @@ internal val WhatsNewShipped.dragFromTranscript: WhatsNewEntry
             "Drop any of them into the message box to attach or paste them.",
             "Scrolling, selecting text and menus work as before.",
         ),
-        example = "Hold a code block in a reply, then drag it into Notes.",
+        example = "Select a line of code in a reply, then hold the selection and drag the block into Notes.",
         tryIt = Destination.Prompt("Write a short Swift function that reverses a string, in a code block."),
     )

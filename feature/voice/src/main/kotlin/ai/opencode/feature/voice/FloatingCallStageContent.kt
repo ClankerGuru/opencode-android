@@ -236,7 +236,10 @@ fun FloatingCallTranscript(store: VoiceStoreOf, modifier: Modifier = Modifier) {
     val targets by store.observe { it.captionTargets }
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
     // Opening onto a call in progress shows what's there from the first frame.
-    var reveal by remember { mutableStateOf(CaptionReveal().sync(store.state.captionTargets, revealed = true)) }
+    var reveal by remember {
+        val opening = CaptionReveal().sync(store.state.captionTargets, revealed = true)
+        mutableStateOf(opening.trim(force = true) ?: opening)
+    }
     var now by remember { mutableDoubleStateOf(transcriptNow()) }
     val queueChanged = remember { Channel<Unit>(Channel.CONFLATED) }
     val latestReveal by rememberUpdatedState(reveal)
@@ -250,6 +253,9 @@ fun FloatingCallTranscript(store: VoiceStoreOf, modifier: Modifier = Modifier) {
         if (!animationEnd.isFinite() || !isActive) return@LaunchedEffect
         while (now < animationEnd) withFrameNanos { now = it / 1e9 }
         now = transcriptNow()
+        // Settled: the lines that have risen out of the column are dropped, so a long call
+        // never re-lays out, or re-matches, everything said so far.
+        reveal.trim()?.let { reveal = it }
     }
     // Reveals queued words for the call's lifetime, waking when lines change.
     LaunchedEffect(Unit) {

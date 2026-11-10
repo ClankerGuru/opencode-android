@@ -55,6 +55,33 @@ fun OpenCodeProject.Companion.resolved(session: OpenCodeSession, projects: List<
         projects.firstOrNull { it.id == session.projectID }?.let { return it }
     }
     projects.firstOrNull { it.directory == session.directory }?.let { return it }
+    return OpenCodeProject.unlisted(session)
+}
+
+/** [resolved] for many sessions: the projects indexed once (iOS `OpenCodeProject.Lookup`). */
+class OpenCodeProjectLookup(projects: List<OpenCodeProject>) {
+    private val byID = HashMap<String, OpenCodeProject>()
+    private val byDirectory = HashMap<String, OpenCodeProject>()
+
+    init {
+        // The first of each, as `resolved` finds it.
+        for (project in projects) {
+            if (project.id !in byID) byID[project.id] = project
+            if (project.directory !in byDirectory) byDirectory[project.directory] = project
+        }
+    }
+
+    fun resolved(session: OpenCodeSession): OpenCodeProject {
+        if (session.projectID != "global") {
+            val match = byID[session.projectID]
+            if (match != null) return match
+        }
+        return byDirectory[session.directory] ?: OpenCodeProject.unlisted(session)
+    }
+}
+
+/** A project for a session in no known project, from its folder. */
+private fun OpenCodeProject.Companion.unlisted(session: OpenCodeSession): OpenCodeProject {
     val name = ProjectMark.folderName(session.directory)
     val id = if (session.projectID.isEmpty() || session.projectID == "global") "folder:" + session.directory else session.projectID
     return OpenCodeProject(id = id, name = name.ifEmpty { session.directory }, directory = session.directory)
@@ -137,13 +164,13 @@ data class ProjectIconRequest(val server: OpenCodeServer, val projectID: String,
      * Scoped by server and the full resolved URL, so an updated `?v=<hash>` or override
      * fetches a fresh entry while identical versioned URLs share one entry.
      */
-    val cacheKey: String
-        get() {
-            // The decoder version keeps old renders from surviving on disk.
-            val raw = "svg-v2|${server.persistenceID}|$resolvedURLString"
-            val digest = MessageDigest.getInstance("SHA-256").digest(raw.toByteArray(Charsets.UTF_8))
-            return "${server.persistenceID}|" + digest.take(16).joinToString("") { "%02x".format(it) }
-        }
+    // Worked out once per request (iOS f5636460 stores it): the tile asks for it on every pass.
+    val cacheKey: String by lazy {
+        // The decoder version keeps old renders from surviving on disk.
+        val raw = "svg-v2|${server.persistenceID}|$resolvedURLString"
+        val digest = MessageDigest.getInstance("SHA-256").digest(raw.toByteArray(Charsets.UTF_8))
+        "${server.persistenceID}|" + digest.take(16).joinToString("") { "%02x".format(it) }
+    }
 }
 
 /** iOS `URLComponents` parsing as the icon code uses it. */

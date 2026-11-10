@@ -47,15 +47,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 /*
- * Port of iOS `Settings/VoiceProviderPage.swift` (ce694097, Server Voice experiment): Settings ›
+ * Port of iOS `Settings/VoiceProviderPage.swift` (ce694097): Settings ›
  * Voice's Voice Provider row, its page, and Your OpenAI Account. Tiles and statuses are voice's
  * `VoiceProviderTile`/`VoiceProviderStatus` (iOS `Voice/VoiceProviderViews.swift`), sized by
  * `VoiceProviderTunables`.
  */
 
 /**
- * Settings › Voice's Voice Provider row (the Server Voice experiment): who runs calls, where, and
- * whether they can now. It opens the provider's page.
+ * Settings › Voice's Voice Provider row: who runs calls, where, and whether they can now. It opens the provider's page.
  */
 @Composable
 internal fun VoiceProviderSettingsRow(state: VoiceSettingsFeature.State, onClick: () -> Unit) {
@@ -99,6 +98,7 @@ internal fun VoiceProviderDetailPage(store: SettingsStore, opensAccount: Boolean
     var showsUnavailable by rememberSaveable { mutableStateOf(false) }
     var openedAccount by rememberSaveable { mutableStateOf(false) }
     val openAccount = { store.send(SettingsFeature.Action.PagePushed(SettingsPage.VoiceAccount)) }
+    LaunchedEffect(voice) { voice.send(VoiceSettingsFeature.Action.ProviderPageAppeared) }
     LaunchedEffect(opensAccount) {
         if (opensAccount && !openedAccount) {
             openedAccount = true

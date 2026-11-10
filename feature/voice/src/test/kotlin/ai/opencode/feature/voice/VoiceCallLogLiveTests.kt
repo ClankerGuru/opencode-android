@@ -214,6 +214,11 @@ class VoiceCallLogLiveTests {
         assertEquals(listOf(id), uploads.all)
     }
 
+    @Test fun liveCopiesAreWrittenAtMostEveryTenSeconds() {
+        // A long call's log re-encodes whole on every write; background and hang-up still write at once.
+        assertEquals(10.0, VoiceCallLogRecorder.liveWriteInterval, 0.0)
+    }
+
     @Test fun protectedDataErrorsAreRecognised() {
         assertTrue(VoiceCallLogRecorder.isProtectedData(AccessDeniedException("/data/InProgress/a.json")))
         assertTrue(VoiceCallLogRecorder.isProtectedData(IOException("open failed: EPERM (Operation not permitted)")))

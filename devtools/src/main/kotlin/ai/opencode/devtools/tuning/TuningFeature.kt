@@ -210,11 +210,17 @@ object TuningPanelKeys {
     val placement: SharedKey<String> = SharedKey.appStorage("tuning-placement", "")
 }
 
-/** iOS `TuningPanelGroups.shown`: this screen's groups that have tunables and aren't settled; with All, every unsettled group, this screen's first. */
+/**
+ * iOS `TuningPanelGroups.shown`: this screen's groups (then the global ones) that have tunables
+ * and aren't settled; with All, every unsettled group, this screen's first.
+ */
 object TuningPanelGroups {
+    /** iOS `globalGroups`: [TuningContext.globalGroups]. */
+    val globalGroups: List<String> get() = TuningContext.globalGroups
+
     fun shown(registered: List<String>, context: TuningContext, showsAll: Boolean, hidden: Set<String>): List<String> {
         val available = registered.filter { it !in hidden }
-        val here = context.groups.filter { it in available }
+        val here = context.panelGroups.filter { it in available }
         if (!showsAll) return here
         return here + available.filter { it !in here }
     }

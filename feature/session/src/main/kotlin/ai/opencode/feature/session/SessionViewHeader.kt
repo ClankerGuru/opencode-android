@@ -3,6 +3,7 @@ package ai.opencode.feature.session
 import ai.opencode.core.motion.transitionBlur
 
 import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.SharedKeys
@@ -247,8 +248,8 @@ internal fun SessionHeaderControls(
                 // It fades into the slot a draft kept for it.
                 showsSessionMenu -> AnimatedVisibility(
                     visibleState = remember { MutableTransitionState(false).apply { targetState = true } },
-                    enter = fadeIn(if (reducedMotion) snap() else tween(250, easing = Motion.EaseOut)),
-                    exit = fadeOut(if (reducedMotion) snap() else tween(250, easing = Motion.EaseOut)),
+                    enter = fadeIn(Motion.microIn.animation(MotionPhase.Enter, reducedMotion)),
+                    exit = fadeOut(Motion.microIn.animation(MotionPhase.Exit, reducedMotion)),
                 ) { SessionMenuButton(store, model, listContext) }
                 holdsSessionMenuSlot -> Spacer(Modifier.size(headerButtonSize).clearAndSetSemantics {})
             }
@@ -374,7 +375,7 @@ private fun HeaderTitle(
             Column(
                 Modifier
                     // The header doesn't carry the screen's transactions: the capsule animates its own width.
-                    .then(if (!reducedMotion && animates) Modifier.animateContentSize(capsuleSmooth.spec()) else Modifier)
+                    .then(if (!reducedMotion && animates) Modifier.animateContentSize(Motion.layout.animation(reduceMotion = false)) else Modifier)
                     .heightIn(min = headerButtonSize)
                     .padding(horizontal = 8.dp, vertical = if (isAccessibilityFontScale(fontScale)) 8.dp else 3.dp),
                 horizontalAlignment = Alignment.Start,
@@ -395,8 +396,8 @@ private fun HeaderTitle(
                 }
                 AnimatedVisibility(
                     visible = subtitle != null,
-                    enter = fadeIn(if (reducedMotion) snap() else tween(200, easing = Motion.EaseInOut)),
-                    exit = fadeOut(if (reducedMotion) snap() else tween(200, easing = Motion.EaseInOut)),
+                    enter = fadeIn(Motion.layout.animation(reduceMotion = reducedMotion)),
+                    exit = fadeOut(Motion.layout.animation(reduceMotion = reducedMotion)),
                 ) {
                     val shown = subtitle ?: ""
                     if (model.autoRenameFailed) {
@@ -422,9 +423,6 @@ private fun HeaderTitle(
         }
     }
 }
-
-/** SwiftUI `.smooth(duration: 0.45)`. */
-private val capsuleSmooth = MotionSpring(0.45, 0.0)
 
 /** Session actions; the rim doubles as the context gauge. */
 @Composable

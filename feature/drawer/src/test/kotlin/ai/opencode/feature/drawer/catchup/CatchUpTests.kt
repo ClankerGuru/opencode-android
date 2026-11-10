@@ -562,7 +562,7 @@ class CatchUpTests {
         assertFalse(state.statusSnapshot().needsCatchUp(child))
         val model = DrawerListModel.build(
             state = state,
-            inputs = DrawerListInputs(selectedSessionID = null, showsProjectIcons = false, reducedMotion = false, increasedContrast = false),
+            inputs = DrawerListInputs(selectedSessionID = null, reducedMotion = false, increasedContrast = false),
             liftedID = null,
             catchUpMounted = true,
             whatsNewMounted = false,
@@ -684,8 +684,6 @@ class CatchUpTests {
                 position = Offset(84f, 18f),
                 velocity = Offset(initialVx, 0f),
                 target = Offset.Zero,
-                response = 0.38,
-                dampingRatio = 1.0f,
             )
             var prevX = spring.position.x
             var settled = false

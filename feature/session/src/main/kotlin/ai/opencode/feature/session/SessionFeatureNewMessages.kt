@@ -24,7 +24,7 @@ fun SessionFeature.State.noteLeaving(): SessionFeature.State {
     // next one arrives fresh rather than moving.
     val s = copy(newMessages = null, newMessagesFitThrough = null, newMessagesEarlierBaseline = null)
     if (s.newMessagesBaseline != null) return s
-    val unreadIndex = unreadMarkID?.let { id -> s.items.indexOfFirst { it.id == id } } ?: -1
+    val unreadIndex = unreadMarkID?.let { id -> s.items.indexOfLast { it.id == id } } ?: -1
     return when {
         earlierBaseline != null -> s.copy(
             newMessagesBaseline = earlierBaseline.seen,
@@ -33,13 +33,13 @@ fun SessionFeature.State.noteLeaving(): SessionFeature.State {
             newMessagesWatched = earlierBaseline.watched,
         )
         unreadIndex >= 0 -> s.copy(
-            newMessagesBaseline = s.items.subList(0, unreadIndex).mapTo(HashSet()) { it.id },
+            newMessagesBaseline = SessionFeature.SwitchSnapshot.seenTail(s.items.subList(0, unreadIndex)),
             newMessagesBaselineTimestamp = null,
             newMessagesUnread = unreadIndex == 0,
             newMessagesWatched = emptySet(),
         )
         else -> s.copy(
-            newMessagesBaseline = s.items.mapTo(HashSet()) { it.id },
+            newMessagesBaseline = SessionFeature.SwitchSnapshot.seenTail(s.items),
             newMessagesBaselineTimestamp = null,
             newMessagesUnread = false,
             newMessagesWatched = emptySet(),
@@ -92,11 +92,10 @@ fun SessionFeature.State.absorbFittingNewMessages(): SessionFeature.State {
 /**
  * Places the divider above the first row the reader hasn't seen. The read after their return
  * [settles] it: with nothing new the divider goes, and what arrives from then on arrives in front
- * of them. The list shows the divider only with the experiment on and when what it marks doesn't
- * fit on screen (`newMessagesFit`). With it off the mark is still placed, without a divider: it's
- * what lets a following reader glide to what arrived instead of the rows landing in one frame.
- * Only rows that [keptShapes] (grew or were added, [NewMessagesFold.keepsShapes]) may reuse a fold
- * found before.
+ * of them. The list draws that divider only when what it marks doesn't fit on screen
+ * (`newMessagesFit`); without one the mark is still placed, and is what lets a following reader
+ * glide to what arrived instead of the rows landing in one frame. Only rows that [keptShapes]
+ * (grew or were added, [NewMessagesFold.keepsShapes]) may reuse a fold found before.
  */
 fun SessionFeature.State.updateNewMessagesMark(settles: Boolean, keptShapes: Boolean = false): SessionFeature.State {
     var s = if (keptShapes) this else copy(newMessagesFolded = null)

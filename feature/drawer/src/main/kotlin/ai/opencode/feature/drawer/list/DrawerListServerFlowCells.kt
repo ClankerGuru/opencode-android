@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer.list
 
+import ai.opencode.core.motion.AmbientClock
 import ai.opencode.core.ui.openCodeHairline
 import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.ui.OpenCodeSurfaces
@@ -12,12 +13,6 @@ import ai.opencode.feature.drawer.motion.ServerSwapMotion
 import ai.opencode.feature.drawer.style.DrawerMetrics
 import ai.opencode.feature.drawer.style.DrawerTunables
 import ai.opencode.feature.session.ServerFlowTunables
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -30,9 +25,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -72,16 +71,16 @@ fun DrawerListGhostCell(index: Int, reducedMotion: Boolean, modifier: Modifier =
     val base = colors.tertiaryText.copy(alpha = colors.tertiaryText.alpha * 0.35f)
     val shine = colors.tertiaryText.copy(alpha = colors.tertiaryText.alpha * 0.2f)
     val fraction = drawerGhostLengths[index % drawerGhostLengths.size]
-    val phase = if (reducedMotion) {
-        null
-    } else {
-        val transition = rememberInfiniteTransition(label = "drawer-ghost")
-        val value by transition.animateFloat(
-            0f, 1f,
-            infiniteRepeatable(tween(1600, easing = LinearEasing), RepeatMode.Restart),
-            label = "drawer-ghost-sweep",
-        )
-        value
+    // One ambient sweep per pass (iOS 03adf07a: `AmbientClock`, linear, in step with every sweep).
+    // A hidden drawer's ghosts hold still: no frame ticks for a drawer nobody sees.
+    val hidden = LocalDrawerHidden.current.value
+    val sweeps = !reducedMotion && !hidden
+    val sweep = remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(sweeps) {
+        if (!sweeps) return@LaunchedEffect
+        while (true) {
+            withFrameNanos { sweep.floatValue = AmbientClock.sweep(AmbientClock.mediaTime()).toFloat() }
+        }
     }
     Canvas(
         modifier
@@ -96,7 +95,8 @@ fun DrawerListGhostCell(index: Int, reducedMotion: Boolean, modifier: Modifier =
         val width = available * fraction
         val radius = CornerRadius(6.dp.toPx())
         drawRoundRect(base, topLeft = Offset(leading, top), size = Size(width, barHeight), cornerRadius = radius)
-        if (phase != null && width > 0f) {
+        if (sweeps && width > 0f) {
+            val phase = sweep.floatValue
             // The sweep runs from the bar's right to its left, three bars wide with the shine in its middle.
             val sweepStart = leading + width - phase * 2 * width - width
             val brush = Brush.horizontalGradient(

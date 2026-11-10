@@ -84,7 +84,7 @@ class DrawerSessionPagesReviewTests {
             this[OpenCodeClient] = client { copy(sessionPage = { _, _, _ -> OpenCodeSessionPage(listOf(listed), next = "c2") }) }
         }
         store.exhaustive = false
-        val inputs = DrawerListInputs(selectedSessionID = null, showsProjectIcons = false, reducedMotion = false, increasedContrast = false)
+        val inputs = DrawerListInputs(selectedSessionID = null, reducedMotion = false, increasedContrast = false)
         fun model(): DrawerListModel = h.state {
             DrawerListModel.build(
                 state = store.state, inputs = inputs, liftedID = null, catchUpMounted = false, whatsNewMounted = false,

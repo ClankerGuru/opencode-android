@@ -34,8 +34,6 @@ import ai.opencode.feature.system.notifications.NotificationPermission
 import ai.opencode.feature.system.share.ReceivedShare
 import ai.opencode.feature.settings.HomeSettingsFeature
 import ai.opencode.feature.system.liveactivity.SessionLiveActivity
-import ai.opencode.core.sharing.ExperimentalFeatures
-import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.feature.voice.VoiceSharedKeys
 import ai.opencode.feature.voice.VoiceEngine
 import ai.opencode.feature.settings.SettingsFeature
@@ -502,12 +500,11 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         /**
          * The pages a call's card opens Settings at (iOS `SettingsView`'s `voicePage` and
          * `VoiceSettingsView`'s `opensPage`, which push on appearing): Voice, then Voice Provider
-         * (with Your Account over it) when Server Voice's provider row stands in for the key row.
+         * (with Your Account over it) when the provider row stands in for the key row (not Grok).
          */
         private fun voiceSettingsPath(voicePage: VoiceSettingsPage?): List<SettingsPage> {
             voicePage ?: return emptyList()
-            val showsProviderRow = dependency(ExperimentalFeatures)(ExperimentalFeature.serverVoice) &&
-                shared(VoiceSharedKeys.voiceEngine).value != VoiceEngine.grok
+            val showsProviderRow = shared(VoiceSharedKeys.voiceEngine).value != VoiceEngine.grok
             if (!showsProviderRow || voicePage == VoiceSettingsPage.voice) return listOf(SettingsPage.Voice)
             return listOf(SettingsPage.Voice, SettingsPage.VoiceProvider(opensAccount = voicePage == VoiceSettingsPage.account))
         }
@@ -567,10 +564,6 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
                 }
                 return projects.sortedByDescending { lastUsed[it.id] ?: Instant.MIN }
             }
-
-        /** The model a new session inherits: the newest session's (iOS `lastUsedModel`). */
-        val lastUsedModel: OpenCodeModelRef?
-            get() = sessions.firstOrNull { it.model != null }?.model
 
         companion object {
             /**
@@ -683,6 +676,10 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         /** Last-known running state is too old to show while reconnecting. */
         data object LastKnownActivityExpired : Action
         data object RetryConnectionTapped : Action
+        /** Grace timers and scene activation: see [HomeConnectionFeature.Action]. */
+        data object SceneBecameActive : Action
+        data object ReconnectingGraceElapsed : Action
+        data class OfflineGraceElapsed(val pathDown: Boolean) : Action
         /** Server Flow: the note's Try Again or Pair Again. */
         data object ServerSwitchNoteActionTapped : Action
         /** The network path came back or moved to another interface. */
@@ -812,6 +809,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         data object SnapshotRetry : CancelID
         data object LastKnownActivity : CancelID
         data object NetworkPath : CancelID
+        data object ConnectionGrace : CancelID
         data object InAppNotice : CancelID
         data object LiveUpdatesAfterLeaving : CancelID
         data object SessionActivityWait : CancelID
@@ -1036,7 +1034,6 @@ fun HomeFeature.State.makeDraft(directory: String? = null, reason: String = "you
         server = s.server,
         draftProject = directory?.let { OpenCodeProject.folder(it, projects) } ?: projects.firstOrNull(),
         projects = projects,
-        inheritedModel = s.lastUsedModel,
         navigationID = transition.navID,
         visit = transition.visit,
     )
@@ -1057,10 +1054,9 @@ fun HomeFeature.State.openingDraft(directory: String? = null, reason: String = "
 }
 
 /**
- * The server has [model] for [sessionID]: the list's copy says so, so a new session started now
- * inherits it. Its snapshot (a session visited before) and a pick waiting for its screen follow:
- * a pick it matches no longer waits, and an explicit switch ([replacesPick], the voice
- * delegator's) replaces any.
+ * The server has [model] for [sessionID]: the list's copy says so. Its snapshot (a session
+ * visited before) and a pick waiting for its screen follow: a pick it matches no longer waits,
+ * and an explicit switch ([replacesPick], the voice delegator's) replaces any.
  */
 fun HomeFeature.State.notingModel(model: OpenCodeModelRef, sessionID: String, replacesPick: Boolean = false): HomeFeature.State {
     var s = updatingSession(sessionID) { it.copy(model = model) }
@@ -1125,6 +1121,11 @@ private fun HomeFeature.State.finishingDetailTransition(
     val outgoing = sessionDetail
     // The screen swaps details in place without appearing again, so the new one inherits whether it is on screen.
     next = next.copy(isVisible = outgoing?.isVisible ?: false, inheritsLiveWork = keepsIdentity)
+    // Its timers wait, as the last one's did, for the server and the return.
+    next = next.withRequestsConnectionIsAvailable(isConnected).copy(
+        isSceneActive = outgoing?.isSceneActive ?: true,
+        isBackgrounded = outgoing?.isBackgrounded ?: false,
+    )
     // The same identity names the Working line's runs, so their numbers carry on.
     if (keepsIdentity) next = next.copy(workingRun = next.workingRun.copy(counter = outgoing?.workingRun?.counter ?: 0))
     // Raise to Talk's grace after a recording follows the screen too.
@@ -1286,6 +1287,8 @@ fun HomeFeature.State.pushingSubagent(session: OpenCodeSession, reason: String? 
     )
     detail = s.seedingSessionSnapshot(detail)
     detail = detail.copy(streamIsHealthy = s.isEventStreamLive || parent.streamIsHealthy)
+    detail = detail.withRequestsConnectionIsAvailable(parent.requestsConnectionIsAvailable)
+        .copy(isBackgrounded = parent.isBackgrounded)
     detail = s.applyingOpening(session, detail = detail)
     if (session.id in s.unopenedSeen) s = s.copy(unopenedSeen = s.unopenedSeen - session.id)
     val pick = s.waitingPicks[session.id]

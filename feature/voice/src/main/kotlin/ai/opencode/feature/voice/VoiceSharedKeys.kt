@@ -16,7 +16,7 @@ object VoiceSharedKeys {
     /** Voice engine for new calls. Defaults to GPT-Live, including for users upgrading from builds that only had Realtime. */
     val voiceEngine = SharedKey.appStorage("voice-engine", VoiceEngine.gptLive)
 
-    /** Voice provider when Server Voice is enabled. Defaults to OpenAI. */
+    /** The provider a server brokers calls on (Voice Provider). Defaults to OpenAI. */
     val serverVoiceProvider = SharedKey.appStorage("server-voice-provider", ServerVoiceProvider.openAI)
 
     /** Whether each connected server (by `persistenceID`) offers `POST /api/experimental/voice/session`. */

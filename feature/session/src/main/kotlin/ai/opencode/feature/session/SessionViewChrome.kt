@@ -1,13 +1,8 @@
 package ai.opencode.feature.session
 
-import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionTransition
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.LocalContentColor
@@ -51,29 +46,18 @@ fun DrawerGlyph(modifier: Modifier = Modifier) {
 
 /**
  * What the composer's row swaps as a request takes it or gives it back (the placeholder, the mark
- * and +, the trailing controls): the outgoing leaves a beat before the incoming arrives, so two
- * never read at once. iOS blur-replaces; Android fades with a slight scale. Reduce Motion fades.
+ * and +, the trailing controls): the outgoing leaves on the same frame the incoming arrives
+ * (`Motion.swap`), so the row never stands empty. Reduce Motion cross-fades.
  */
 object RequestBarSwap {
-    fun enter(reducedMotion: Boolean): EnterTransition {
-        val spec = tween<Float>(durationMillis = if (reducedMotion) 160 else 240, delayMillis = 100, easing = Motion.EaseOut)
-        return if (reducedMotion) fadeIn(spec) else fadeIn(spec) + scaleIn(spec, initialScale = 0.96f)
-    }
+    fun enter(reducedMotion: Boolean): EnterTransition = MotionTransition.swap(reducedMotion).enter
 
-    fun exit(reducedMotion: Boolean): ExitTransition {
-        val spec = tween<Float>(durationMillis = 120, easing = EaseIn)
-        return if (reducedMotion) fadeOut(spec) else fadeOut(spec) + scaleOut(spec, targetScale = 0.96f)
-    }
-
-    /** SwiftUI `.easeIn`. */
-    private val EaseIn = androidx.compose.animation.core.CubicBezierEasing(0.42f, 0f, 1f, 1f)
+    fun exit(reducedMotion: Boolean): ExitTransition = MotionTransition.swap(reducedMotion).exit
 }
 
-/** The composer and the call trade places on one surface: iOS blur-replaces; a cross-fade under Reduce Motion. */
+/** The composer and the call trade places on one surface, on the same frame (`Motion.swap`); a cross-fade under Reduce Motion. */
 object ComposerSwap {
-    fun enter(reducedMotion: Boolean): EnterTransition =
-        if (reducedMotion) fadeIn(Motion.reducedFadeSpec()) else fadeIn(Motion.settle.spec()) + scaleIn(Motion.settle.spec(), initialScale = 0.96f)
+    fun enter(reducedMotion: Boolean): EnterTransition = MotionTransition.swap(reducedMotion).enter
 
-    fun exit(reducedMotion: Boolean): ExitTransition =
-        if (reducedMotion) fadeOut(Motion.reducedFadeSpec()) else fadeOut(Motion.settle.spec()) + scaleOut(Motion.settle.spec(), targetScale = 0.96f)
+    fun exit(reducedMotion: Boolean): ExitTransition = MotionTransition.swap(reducedMotion).exit
 }

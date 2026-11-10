@@ -4,6 +4,7 @@ import ai.opencode.core.tuning.Tunable
 import ai.opencode.core.tuning.TuningStore
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodePrimaryButton
+import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
@@ -170,35 +171,43 @@ fun VoiceProviderStatus(state: VoiceProviderState, modifier: Modifier = Modifier
 }
 
 /**
- * Above the call bar while a call connects through a server (the Server Voice experiment): who
- * runs it and where, “Connecting via My Mac…”.
+ * Above the call bar while a call connects through a server: who runs it and where,
+ * “Connecting via My Mac…”. A small control-shaped panel on the call's surface with its hairline,
+ * like the failure and ended cards in the same slot (iOS glass capsule): it floats over the
+ * transcript, where bare text ran into the messages behind it.
  */
 @Composable
 fun VoiceConnectingCaption(place: VoiceCallPlace, text: String, modifier: Modifier = Modifier) {
     SideEffect { VoiceProviderTunables.register() }
-    Row(
+    Box(
         modifier
             .fillMaxWidth()
-            .padding(start = 12.dp, end = 12.dp, bottom = 8.dp)
-            .semantics(mergeDescendants = true) {}
-            .testTag("voice-connecting-caption"),
-        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        VoiceProviderTile(place.brand, size = VoiceProviderTunables.connectingTile.value)
-        Text(
-            text,
-            style = OpenCodeTextStyles.footnote,
-            color = OpenCodeTheme.colors.secondaryText,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Row(
+            Modifier
+                .callSurface(OpenCodeShape.control, VoiceCallSurfaceDefaults.color, VoiceCallSurfaceDefaults.border)
+                .padding(start = 6.dp, end = 12.dp, top = 6.dp, bottom = 6.dp)
+                .semantics(mergeDescendants = true) {}
+                .testTag("voice-connecting-caption"),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            VoiceProviderTile(place.brand, size = VoiceProviderTunables.connectingTile.value)
+            Text(
+                text,
+                style = OpenCodeTextStyles.footnote,
+                color = OpenCodeTheme.colors.secondaryText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
 /**
- * A failed call's card (the Server Voice experiment): the provider that couldn't start it,
- * badged, one sentence, and the one button that fixes it.
+ * A failed call's card: the provider that couldn't start it, badged, one sentence, and the one button that fixes it.
  *
  * @param brand who ran the call; null on this phone, or a server that couldn't say.
  */

@@ -645,7 +645,9 @@ private class ComposerFieldSwipeInput : ComposerSwipeInput {
  * (the keyboard morph scrubs it; null follows [expanded]); [refusesFocus] keeps the field from
  * taking focus while something else owns the composer (One Picker open). [currentText] reads
  * the parent's draft as it is now (a composition's [text] can lag the reader's edit), and a new
- * [focusRequest] places the caret at the end ([ComposerTextInputController.syncText]).
+ * [focusRequest] places the caret at the end ([ComposerTextInputController.syncText]). [onEdit]
+ * (iOS `onEdit`) takes a typed edit and where it left the caret as one call, instead of
+ * [onTextChange] plus the bridge's own caret report.
  * [isCovered]: something is drawn over the field (the + menu); like the drawer's hold, it hides
  * the field's handles and text toolbar, which are popup windows above the app's.
  */
@@ -680,6 +682,7 @@ fun ComposerTextInput(
     refusesFocus: (() -> Boolean)? = null,
     currentText: (() -> String)? = null,
     focusRequest: Int = 0,
+    onEdit: ((String, ComposerAutocompleteAction.CaretUpdate) -> Unit)? = null,
     isCovered: Boolean = false,
 ) {
     // QA AG-01: a dark/light or language switch recreates the activity, where iOS's text view keeps
@@ -704,6 +707,7 @@ fun ComposerTextInput(
     var hasFocus by remember { mutableStateOf(false) }
 
     val currentOnTextChange by rememberUpdatedState(onTextChange)
+    val currentOnEdit by rememberUpdatedState(onEdit)
     val currentOnFocusedChange by rememberUpdatedState(onFocusedChange)
     val currentIsFocused by rememberUpdatedState(isFocused)
     val currentOnImagePaste by rememberUpdatedState(onImagePaste)
@@ -750,8 +754,16 @@ fun ComposerTextInput(
         val nonSendFrom = controller.nonSendEditFrom
         controller.nonSendEditFrom = null
         if (nonSendFrom != null && newText == nonSendFrom + "\n") currentOnNonSendNewline?.invoke(newText)
-        controller.publish(newText, currentOnTextChange)
-        currentBridge?.notifyCaretAfterEdit(newText, state.selection, state.composition)
+        val onEdit = currentOnEdit
+        if (onEdit != null) {
+            // One action for the edit and the caret it left (iOS `onEdit`).
+            val caret = currentBridge?.caretUpdateAfterEdit(newText, state.selection, state.composition)
+                ?: ComposerAutocompleteAction.CaretUpdate.Unchanged
+            controller.publish(newText) { onEdit(it, caret) }
+        } else {
+            controller.publish(newText, currentOnTextChange)
+            currentBridge?.notifyCaretAfterEdit(newText, state.selection, state.composition)
+        }
         if (controller.syncsAfterPublish) {
             controller.syncsAfterPublish = false
             syncFromParent()

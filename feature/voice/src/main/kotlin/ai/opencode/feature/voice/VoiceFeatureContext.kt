@@ -11,16 +11,6 @@ import kotlin.time.Duration.Companion.milliseconds
 
 // iOS `VoiceFeature+Context.swift`.
 
-val VoiceFeature.State.showsPoorConnection: Boolean get() = isConnectionPoor && !isReconnecting
-
-val VoiceFeature.State.scopeStage: DotScopeSimulation.Stage
-    get() = when (phase) {
-        VoiceFeature.State.Phase.Connecting -> DotScopeSimulation.Stage.connecting
-        VoiceFeature.State.Phase.Live, is VoiceFeature.State.Phase.EndingAfterGoodbye ->
-            if (isReconnecting) DotScopeSimulation.Stage.connecting else DotScopeSimulation.Stage.live
-        VoiceFeature.State.Phase.Ended, is VoiceFeature.State.Phase.Failed, VoiceFeature.State.Phase.Dropped -> DotScopeSimulation.Stage.ending
-    }
-
 fun VoiceFeature.State.viewingSession(at: Instant): OpenCodeSession? =
     target.sessionID?.let { OpenCodeSession(id = it, serverTitle = sessionTitle, projectID = "", directory = target.directory, updatedAt = at) }
 

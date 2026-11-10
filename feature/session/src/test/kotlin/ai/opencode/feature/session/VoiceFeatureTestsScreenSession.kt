@@ -29,6 +29,7 @@ import ai.opencode.feature.voice.VoiceDelegator
 import ai.opencode.feature.voice.VoiceEngine
 import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.feature.voice.VoiceHandoff
+import ai.opencode.feature.voice.VoiceRoute
 import ai.opencode.feature.voice.VoiceWorkAdmission
 import ai.opencode.feature.voice.VoiceWorkClient
 import ai.opencode.feature.voice.VoiceWorkTarget
@@ -162,7 +163,7 @@ class VoiceFeatureTestsScreenSession {
         val earlier = listOf<OpenCodeTranscriptItem>(OpenCodeTranscriptItem.UserText(id = "msg_before", text = "Earlier"))
         val state = h.state {
             State.session(server = server, session = session, cachedItems = earlier).copy(
-                voice = live(VoiceFeature.State(server, session)).copy(activeEngine = VoiceEngine.realtime, usesDelegator = false),
+                voice = live(VoiceFeature.State(server, session)).copy(activeRoute = VoiceRoute.PhoneKey(VoiceEngine.realtime), usesDelegator = false),
                 isVisible = true,
             )
         }
@@ -471,7 +472,7 @@ class VoiceFeatureTestsScreenSession {
         val model = OpenCodeModelRef(id = "fixture-model", providerID = "fixture")
         val project = OpenCodeProject(id = "p", name = "project", directory = "/project")
         val state = h.state {
-            State.draft(server = server, draftProject = project, projects = listOf(project), inheritedModel = model)
+            State.draft(server = server, draftProject = project, projects = listOf(project)).copy(currentModel = model)
                 .copy(voice = live(VoiceFeature.State(server, draftDirectory = "/project", model = model)))
         }
         val store = h.store(state) {
@@ -520,7 +521,7 @@ class VoiceFeatureTestsScreenSession {
 
         val project = OpenCodeProject(id = "p", name = "project", directory = "/project")
         val state = h.state {
-            State.draft(server = server, draftProject = project, projects = listOf(project), inheritedModel = model)
+            State.draft(server = server, draftProject = project, projects = listOf(project)).copy(currentModel = model)
                 .copy(voice = live(VoiceFeature.State(server, draftDirectory = "/project", model = model)))
         }
         val completed = LockIsolated(listOf<String>())

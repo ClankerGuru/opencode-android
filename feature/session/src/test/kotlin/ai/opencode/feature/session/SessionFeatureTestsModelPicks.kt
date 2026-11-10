@@ -125,7 +125,7 @@ class SessionFeatureTestsModelPicks {
         val first = OpenCodeModelRef(id = "fast-frank", providerID = "opencode")
         val second = OpenCodeModel(modelID = "slow-sam", providerID = "opencode", name = "Slow Sam")
         val state = h.state {
-            SessionFeature.State.draft(server = testServer, draftProject = project, projects = listOf(project), inheritedModel = first)
+            SessionFeature.State.draft(server = testServer, draftProject = project, projects = listOf(project)).copy(currentModel = first)
         }.withDraft("hello")
         val gate = Gate()
         val store = h.store(state) {
@@ -487,7 +487,7 @@ class SessionFeatureTestsModelPicks {
         val created = testSession(id = "ses_new", title = "Untitled session", directory = "/tmp/demo")
         val model = OpenCodeModelRef(id = "fast-frank", providerID = "opencode")
         val state = h.state {
-            SessionFeature.State.draft(server = testServer, draftProject = project, projects = listOf(project), inheritedModel = model)
+            SessionFeature.State.draft(server = testServer, draftProject = project, projects = listOf(project)).copy(currentModel = model)
         }.withDraft("hello")
         val calls = LockIsolated<List<String>>(emptyList())
         val store = h.store(state) {
@@ -537,6 +537,63 @@ class SessionFeatureTestsModelPicks {
         store.state.assertRemembersModelNames(listOf(defaultModel))
         assertEquals(listOf<String?>("/tmp/demo"), directories.value)
         assertEquals("Example Model", store.state.currentModelName)
+    }
+
+    /**
+     * A new session starts on the server's default model (`model` in the
+     * person's OpenCode config), which carries no variant, at the level last
+     * picked for that model.
+     */
+    @Test
+    fun aDraftStartsOnTheServersDefaultAtItsRememberedLevel() {
+        for (remembered in listOf(null, "high")) sessionTest { h ->
+            val opus = OpenCodeModel(modelID = "opus", providerID = "example", name = "Opus", variants = listOf("low", "high"))
+            val other = OpenCodeModel(modelID = "other", providerID = "example", name = "Other", variants = listOf("low", "high"))
+            val bareDefault = OpenCodeModel(modelID = "opus", providerID = "example", name = "Opus")
+            val project = OpenCodeProject(id = "proj_1", name = "demo", directory = "/tmp/demo")
+            val state = h.state { SessionFeature.State.draft(server = testServer, draftProject = project, projects = listOf(project)) }
+            state.modelVariants.set(mapOf(opus.id to (remembered ?: "default"), other.id to "low"))
+            val store = h.store(state) {
+                this[OpenCodeClient] = this[OpenCodeClient].copy(
+                    modelCatalog = { _, _ -> OpenCodeModelCatalog(models = listOf(other, opus), defaultModel = bareDefault) },
+                )
+            }
+
+            assertNull(store.state.currentModel)
+            store.send(Action.ModelButtonTapped) {
+                it.copy(activePicker = SessionFeature.State.ActivePicker.model, isLoadingModels = true)
+            }
+            store.receive(Action.ModelsResponse::class) {
+                it.copy(isLoadingModels = false, models = listOf(other, opus), currentModel = opus.ref(remembered))
+            }
+            store.state.assertRemembersModelNames(listOf(other, opus))
+        }
+    }
+
+    /** A model picked on the draft stays when the catalog is read again. */
+    @Test
+    fun aDraftsPickOutlastsTheServersDefault() = sessionTest { h ->
+        val opus = OpenCodeModel(modelID = "opus", providerID = "example", name = "Opus")
+        val other = OpenCodeModel(modelID = "other", providerID = "example", name = "Other")
+        val project = OpenCodeProject(id = "proj_1", name = "demo", directory = "/tmp/demo")
+        val state = h.state { SessionFeature.State.draft(server = testServer, draftProject = project, projects = listOf(project)) }
+        val store = h.store(state) {
+            this[OpenCodeClient] = this[OpenCodeClient].copy(
+                modelCatalog = { _, _ -> OpenCodeModelCatalog(models = listOf(opus, other), defaultModel = opus) },
+            )
+        }
+
+        store.send(Action.ModelButtonTapped) {
+            it.copy(activePicker = SessionFeature.State.ActivePicker.model, isLoadingModels = true)
+        }
+        store.receive(Action.ModelsResponse::class) {
+            it.copy(isLoadingModels = false, models = listOf(opus, other), currentModel = opus.ref)
+        }
+        store.state.assertRemembersModelNames(listOf(opus, other))
+        store.send(Action.ModelPicked(other)) { it.copy(currentModel = other.ref, activePicker = null) }
+        store.send(Action.ModelButtonTapped) { it.copy(activePicker = SessionFeature.State.ActivePicker.model) }
+        store.receive(Action.ModelsResponse::class)
+        assertEquals(other.ref, store.state.currentModel)
     }
 
     @Test

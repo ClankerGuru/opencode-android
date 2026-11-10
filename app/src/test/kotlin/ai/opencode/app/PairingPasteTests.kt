@@ -28,7 +28,7 @@ class PairingPasteTests {
         clipboard.set("hello")
         store.send(AppFeature.Action.PastePairingCodeTapped) { it.copy(pasteError = "That isn’t a pairing link") }
         clipboard.set("http://127.0.0.1:4096/auth/connect/abc")
-        store.send(AppFeature.Action.PastePairingCodeTapped) { it.copy(pasteError = AppFeature.loopbackPairingMessage) }
+        store.send(AppFeature.Action.PastePairingCodeTapped) { it.copy(pasteError = loopbackPairingMessage) }
         assertNull(store.state.errorMessage)
         store.send(AppFeature.Action.ScanPairingCodeTapped) { it.copy(pasteError = null, isScanningPairingCode = true) }
         store.finish()

@@ -74,7 +74,7 @@ class ModelDisplayNameTests {
         val encoded = Json.encodeToString(serializer, store.state.modelDisplayNamesByServer.value)
         val decoded = Json.decodeFromString(serializer, encoded)
         assertEquals(named.name, decoded[server.persistenceID]?.name(model.ref))
-        val next = h.state { State.draft(server = server, draftProject = null, projects = emptyList(), inheritedModel = model.ref) }
+        val next = h.state { State.draft(server = server, draftProject = null, projects = emptyList()).copy(currentModel = model.ref) }
         assertEquals(true, next.models.isEmpty())
         assertEquals(named.name, next.currentModelName)
         assertEquals("Opus Custom", next.currentModelShortName)
@@ -88,7 +88,7 @@ class ModelDisplayNameTests {
 
     private fun failedReadRetriesOnReconnectAndKeepsRememberedName(transcriptIsRefreshing: Boolean) = sessionTest { h ->
         val named = model.copy(name = "Claude Opus Custom")
-        var initial = h.state { State.draft(server = server, draftProject = null, projects = emptyList(), inheritedModel = model.ref) }
+        var initial = h.state { State.draft(server = server, draftProject = null, projects = emptyList()).copy(currentModel = model.ref) }
         if (transcriptIsRefreshing) initial = initial.copy(refresh = State.Refresh(id = 1, reason = RefreshReason.Resume))
         h.state { initial.modelDisplayNamesByServer.update { it + (server.persistenceID to ModelDisplayNames(listOf(named))) } }
         val attempts = LockIsolated(0)
@@ -120,7 +120,7 @@ class ModelDisplayNameTests {
 
     @Test
     fun reconnectDoesNotDropALoadedNameOrFetchAgain() = sessionTest { h ->
-        val initial = h.state { State.draft(server = server, draftProject = null, projects = emptyList(), inheritedModel = model.ref) }
+        val initial = h.state { State.draft(server = server, draftProject = null, projects = emptyList()).copy(currentModel = model.ref) }
             .copy(models = listOf(model))
         val store = h.store(initial)
         store.send(Action.EventStreamConnected(server)) { it.copy(streamIsHealthy = true) }
@@ -146,7 +146,7 @@ class ModelDisplayNameTests {
     @Test
     fun catalogKeysAndServersKeepTheirOwnNames() = sessionTest { h ->
         val fast = OpenCodeModel(modelID = model.modelID, providerID = model.providerID, name = "Opus Fast", catalogID = "fast")
-        var initial = h.state { State.draft(server = server, draftProject = null, projects = emptyList(), inheritedModel = fast.ref) }
+        var initial = h.state { State.draft(server = server, draftProject = null, projects = emptyList()).copy(currentModel = fast.ref) }
         h.state { initial.modelDisplayNamesByServer.update { it + (server.persistenceID to ModelDisplayNames(listOf(model, fast))) } }
         assertEquals("Opus Fast", initial.currentModelName)
         initial = initial.copy(currentModel = model.ref)
@@ -157,7 +157,7 @@ class ModelDisplayNameTests {
 
     @Test
     fun emptyAndRawCatalogNamesCannotEraseAKnownLabel() = sessionTest { h ->
-        val initial = h.state { State.draft(server = server, draftProject = null, projects = emptyList(), inheritedModel = model.ref) }
+        val initial = h.state { State.draft(server = server, draftProject = null, projects = emptyList()).copy(currentModel = model.ref) }
         val named = model.copy(name = "Claude Opus Custom")
         h.state { initial.modelDisplayNamesByServer.update { it + (server.persistenceID to ModelDisplayNames(listOf(named))) } }
         val store = h.store(initial)
@@ -188,7 +188,7 @@ class ModelDisplayNameTests {
         assertEquals(base.name, all.unambiguousName(ref))
         assertEquals(sibling.name, all.name(sibling.ref))
 
-        var state = h.state { State.draft(server = server, draftProject = null, projects = emptyList(), inheritedModel = ref) }
+        var state = h.state { State.draft(server = server, draftProject = null, projects = emptyList()).copy(currentModel = ref) }
         h.state { state.modelDisplayNamesByServer.update { it + (server.persistenceID to remembered) } }
         state = state.copy(models = listOf(sibling, base))
         assertNull(state.currentModelInfo, "A sibling's API ID is not its catalogue key")
@@ -206,7 +206,7 @@ class ModelDisplayNameTests {
 
     private fun chipIdentitySurvivesCatalogArrivalWithTheSameNameAndIcon(provider: String) = sessionTest { h ->
         var named = model.copy(providerID = provider)
-        var state = h.state { State.draft(server = server, draftProject = null, projects = emptyList(), inheritedModel = named.ref) }
+        var state = h.state { State.draft(server = server, draftProject = null, projects = emptyList()).copy(currentModel = named.ref) }
         h.state { state.modelDisplayNamesByServer.update { it + (server.persistenceID to ModelDisplayNames(listOf(named))) } }
         val before = OnePickerChip.ModelKey(state.modelPicker)
         assertEquals("$provider/${named.key}", before.id)
@@ -225,7 +225,7 @@ class ModelDisplayNameTests {
     @Test
     fun reorderedCatalogDoesNotRewriteRememberedNames() = sessionTest { h ->
         val other = OpenCodeModel(modelID = "other", providerID = "example", name = "Other Model")
-        val initial = h.state { State.draft(server = server, draftProject = null, projects = emptyList(), inheritedModel = model.ref) }
+        val initial = h.state { State.draft(server = server, draftProject = null, projects = emptyList()).copy(currentModel = model.ref) }
             .copy(models = listOf(model, other))
         h.state { initial.modelDisplayNamesByServer.update { it + (server.persistenceID to ModelDisplayNames(listOf(model, other))) } }
         val store = h.store(initial)
@@ -248,7 +248,7 @@ class ModelDisplayNameTests {
     }
 
     private fun failureAfterSSEConnectedRetriesOnceOnContactOrForeground(foreground: Boolean) = sessionTest { h ->
-        val initial = h.state { State.draft(server = server, draftProject = null, projects = emptyList(), inheritedModel = model.ref) }
+        val initial = h.state { State.draft(server = server, draftProject = null, projects = emptyList()).copy(currentModel = model.ref) }
             .withRequestsConnectionIsAvailable(true)
             .copy(hasRenderedFirstContentFrame = true)
         val responses = Channel<Result<OpenCodeModelCatalog>>(Channel.UNLIMITED)

@@ -4,7 +4,10 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionCurve
 import ai.opencode.core.motion.MotionFrameAction
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.SpringSolver
 import ai.opencode.core.motion.motionFrameLoop
 import ai.opencode.feature.drawer.motion.DrawerPanEvent
@@ -24,7 +27,6 @@ import androidx.compose.ui.graphics.layer.GraphicsLayer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.hypot
@@ -199,20 +201,23 @@ class CatchUpStackController internal constructor() {
     }
 
     fun revealPreview(animated: Boolean) {
-        if (!animated || reducedMotion) {
+        if (!animated) {
             preview.alpha = 1f
             preview.pose = peekPose(0f)
             setPreviewDepth(0f)
             return
         }
-        // Start tucked behind the front surface, then ease down into the stack.
-        preview.pose = CatchUpPose.Identity
+        // Start tucked behind the front surface, then ease down into the stack (`MotionRole.Layout`);
+        // under Reduce Motion it fades in where it rests.
+        val to = peekPose(0f)
+        val from = if (reducedMotion) to else CatchUpPose.Identity
+        if (reducedMotion) preview.alpha = 0f
+        preview.pose = from
         setPreviewDepth(0f)
         val fromAlpha = preview.alpha
-        val to = peekPose(0f)
-        run(animate(Curve.DurationSpring(0.36, 1f), step = { p ->
+        run(animate(Curve.role(MotionRole.Layout, reduceMotion = reducedMotion), step = { p ->
             preview.alpha = fromAlpha + (1f - fromAlpha) * p
-            preview.pose = CatchUpPose.Identity.lerp(to, p)
+            preview.pose = from.lerp(to, p)
         }))
     }
 
@@ -243,12 +248,17 @@ class CatchUpStackController internal constructor() {
 
     /**
      * Emptied without a flight (another device read the last card): Catch Up closes itself
-     * `closeDelay` later. A flung last card closes it at once.
+     * `closeDelay` later, counted on display frames (slowed with the animation time scale), so the
+     * close lands on a frame in step with the card fading out. A flung last card closes it at once.
      */
     private fun scheduleFinish(finish: () -> Unit) {
         if (finishJob != null) return
         finishJob = scope.launch {
-            delay((CatchUpFinishTunables.closeDelay * 1000).toLong())
+            var remaining = CatchUpFinishTunables.closeDelay
+            motionFrameLoop(frameDurationSeconds = frameDuration) { tick ->
+                remaining -= tick.dt
+                if (remaining > 0) MotionFrameAction.Continue else MotionFrameAction.Stop
+            }
             finishJob = null
             finish()
         }
@@ -509,7 +519,7 @@ class CatchUpStackController internal constructor() {
         isTransitioning = true
         if (reducedMotion) {
             run(
-                animate(Curve.Tween(0.2, Motion.EaseOut), step = { p ->
+                animate(Curve.role(MotionRole.Release, reduceMotion = true), step = { p ->
                     applyDrag(Offset(startOffset.x * (1 - p), startOffset.y * (1 - p)), isSettling = true)
                 }) { finishSettle() },
             )
@@ -525,8 +535,6 @@ class CatchUpStackController internal constructor() {
             position = startOffset,
             velocity = Offset(inwardVx, inwardVy),
             target = Offset.Zero,
-            response = CatchUpTunables.settleResponse,
-            dampingRatio = CatchUpTunables.settleDamping,
         )
         settleJob = scope.launch {
             motionFrameLoop(frameDurationSeconds = frameDuration) { tick ->
@@ -653,8 +661,6 @@ class CatchUpStackController internal constructor() {
         val distance = max(abs(target.tx - startPose.tx), 1f)
         val vToward = velocity.x * direction
         val relative = if (vToward > 0) min(vToward / distance, 6f) else 0f
-        val commitDuration = if (reducedMotion) 0.25 else CatchUpTunables.commitResponse
-        val commitDamping = if (reducedMotion) 1f else CatchUpTunables.commitDamping
         val badgeStartWash = flyingBadge.washDistance
 
         val running = Running()
@@ -672,7 +678,9 @@ class CatchUpStackController internal constructor() {
                 val bitmap = captureLive()
                 handOver(bitmap)
             }
-            val curve = Curve.DurationSpring(commitDuration, commitDamping, relative)
+            // The card flies off on `MotionRole.Flight` carrying the flick's speed, and the next
+            // rises on the same spring (a fade under Reduce Motion).
+            val curve = Curve.role(MotionRole.Flight, reduceMotion = reducedMotion, initialVelocity = relative)
             var elapsed = 0.0
             fun frame(p: Float) {
                 // Without a snapshot the live card already left for the next session: nothing flies.
@@ -698,7 +706,7 @@ class CatchUpStackController internal constructor() {
         val previewEndDim = 0f
         val previewStartFactor = previewBorderFactor
         run(
-            animate(Curve.DurationSpring(commitDuration, commitDamping), step = { p ->
+            animate(Curve.role(MotionRole.Flight, reduceMotion = reducedMotion), step = { p ->
                 preview.pose = previewStart.lerp(CatchUpPose.Identity, p)
                 previewDim = previewStartDim + (previewEndDim - previewStartDim) * p
                 previewBorderFactor = previewStartFactor + (1f - previewStartFactor) * p
@@ -718,7 +726,7 @@ class CatchUpStackController internal constructor() {
         isContentEnabled = true
         val from = live.alpha
         run(
-            animate(Curve.Tween(0.16, Motion.EaseInOut), step = { p -> live.alpha = from + (1f - from) * p }) {
+            animate(Curve.role(MotionRole.Swap, reduceMotion = reducedMotion), step = { p -> live.alpha = from + (1f - from) * p }) {
                 isTransitioning = false
                 // Behind the open card again, now showing the card after it.
                 previewID = null
@@ -788,7 +796,8 @@ class CatchUpStackController internal constructor() {
         running.job = scope.launch {
             startUndo(if (hadCard) captureLive() else null)
             val peek = peekPose(0f)
-            val curve = Curve.DurationSpring(0.55, 0.86f)
+            // The card the person asked back arrives on `MotionRole.PanelOpen`.
+            val curve = Curve.role(MotionRole.PanelOpen, reduceMotion = false)
             var elapsed = 0.0
             motionFrameLoop(frameDurationSeconds = frameDuration) { tick ->
                 elapsed += tick.dt
@@ -805,20 +814,24 @@ class CatchUpStackController internal constructor() {
 
     // Arrivals
 
-    /** A card appears after the stack was finished: it rises from the back. */
+    /**
+     * A card appears after the stack was finished: it rises from the back (`MotionRole.Layout`),
+     * or fades in where it rests under Reduce Motion.
+     */
     private fun rise() {
-        val from = peekPose(0f)
+        val from = if (reducedMotion) CatchUpPose.Identity else peekPose(0f)
         live.pose = from
         live.alpha = 0f
         isContentEnabled = true
         run(
-            animate(Curve.DurationSpring(0.4, 1f), step = { p ->
+            animate(Curve.role(MotionRole.Layout, reduceMotion = reducedMotion), step = { p ->
                 live.pose = from.lerp(CatchUpPose.Identity, p)
                 live.alpha = p
             }),
         )
     }
 
+    /** The card's old picture leaves on swap's exit over the new one. */
     private fun crossfadeCard() {
         if (live.alpha <= 0.01f) return
         val card = CatchUpFlyingCard(nextFlyingID++, aboveLive = true, badge = null, shadow = false)
@@ -832,7 +845,7 @@ class CatchUpStackController internal constructor() {
             val bitmap = captureLive() ?: return@launch running.complete()
             card.bitmap = bitmap
             flyingCards += card
-            val curve = Curve.Tween(0.25, Motion.EaseOut)
+            val curve = Curve.role(MotionRole.Swap, MotionPhase.Exit, reduceMotion = reducedMotion)
             var elapsed = 0.0
             motionFrameLoop(frameDurationSeconds = frameDuration) { tick ->
                 elapsed += tick.dt
@@ -846,7 +859,8 @@ class CatchUpStackController internal constructor() {
 
     private fun fade(to: Float) {
         val from = live.alpha
-        run(animate(Curve.Tween(0.25, Motion.EaseOut), step = { p -> live.alpha = from + (to - from) * p }))
+        val phase = if (to > from) MotionPhase.Enter else MotionPhase.Exit
+        run(animate(Curve.role(MotionRole.Swap, phase, reduceMotion = reducedMotion), step = { p -> live.alpha = from + (to - from) * p }))
     }
 
     // Helpers
@@ -887,16 +901,12 @@ class CatchUpStackController internal constructor() {
         }
 
         /**
-         * UIKit's `UISpringTimingParameters(dampingRatio:initialVelocity:)` run for `duration`: a
-         * spring whose envelope has decayed to ~0.1 % at [duration], with [initialVelocity] in
-         * units of the whole travel per second, landing exactly at 1 when the duration ends.
+         * A spring on a motion role's curve, run until it settles; [initialVelocity] is in units
+         * of the whole travel per second.
          */
-        data class DurationSpring(val duration: Double, val dampingRatio: Float, val initialVelocity: Float = 0f) : Curve {
-            private val zeta = dampingRatio.toDouble().coerceIn(0.05, 2.0)
-            private val omega = if (zeta >= 1) 9.23 / max(duration, 0.01) else 7.5 / (zeta * max(duration, 0.01))
-
+        data class RoleSpring(val omega: Double, val zeta: Double, val initialVelocity: Float) : Curve {
             override fun progress(t: Double): Float {
-                if (t >= duration) return 1f
+                if (isDone(t)) return 1f
                 return SpringSolver.evaluate(
                     from = 0.0,
                     to = 1.0,
@@ -907,7 +917,35 @@ class CatchUpStackController internal constructor() {
                 ).first.toFloat()
             }
 
-            override fun isDone(t: Double) = t >= duration
+            override fun isDone(t: Double): Boolean {
+                if (t >= MAX_SECONDS) return true
+                val (x, v) = SpringSolver.evaluate(
+                    from = 0.0,
+                    to = 1.0,
+                    initialVelocity = initialVelocity.toDouble(),
+                    omega = omega,
+                    zeta = zeta,
+                    elapsed = t,
+                )
+                return t > 0 && abs(1 - x) < 0.001 && abs(v) < 0.01
+            }
+        }
+
+        companion object {
+            const val MAX_SECONDS = 2.0
+
+            /** iOS `MotionRole.propertyAnimator(_:reduceMotion:initialVelocity:)`: the role's curve as a [Curve]. */
+            fun role(role: MotionRole, phase: MotionPhase = MotionPhase.Enter, reduceMotion: Boolean, initialVelocity: Float = 0f): Curve {
+                val curve = role.curve(phase, reduceMotion)
+                return when (curve) {
+                    is MotionCurve.EaseOut -> Tween(curve.duration, Motion.EaseOut)
+                    is MotionCurve.EaseInOut -> Tween(curve.duration, Motion.EaseInOut)
+                    is MotionCurve.Spring -> {
+                        val parameters = curve.springParameters
+                        RoleSpring(parameters.omega, parameters.zeta, if (reduceMotion) 0f else initialVelocity)
+                    }
+                }
+            }
         }
     }
 

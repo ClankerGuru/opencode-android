@@ -21,6 +21,7 @@ import ai.opencode.server.model.OpenCodeToolCall
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import kotlin.time.Duration
 import ai.opencode.feature.transcript.list.NewMessagesFold
+import ai.opencode.feature.transcript.list.TranscriptScan
 
 // Port of iOS `SessionFeature+Stream.swift`.
 
@@ -93,12 +94,22 @@ internal fun SessionFeature.Companion.mergeTranscript(
 
     val merged = older + fetched
     if (retainedIDs.isEmpty()) return merged + trailing
+    // Rows held for the stream all sit at or after the window's first row, and so do the rows
+    // they're placed against: link only that span (the window, a screen or two), never every row
+    // of a long session. With no overlap at all, that span is everything.
+    val existingStart = windowStart ?: 0
+    val mergedStart = if (windowStart == null) 0 else older.size
+    var linked = 0
+    // Past the window's first row, only the window survives.
+    val survivingIDs = if (windowStart == null) merged.mapTo(HashSet(merged.size)) { it.id } else windowIDs
     // Keep an unpersisted part before the next surviving row, rather than moving it behind later
     // steering messages on every page refresh.
-    val survivingIDs = merged.mapTo(HashSet(merged.size)) { it.id }
     val nextSurvivor = HashMap<String, String?>()
     var successor: String? = null
-    for (item in existing.asReversed()) {
+    for (index in existing.indices.reversed()) {
+        if (index < existingStart) break
+        val item = existing[index]
+        linked += 1
         if (item.id in retainedIDs) {
             nextSurvivor[item.id] = successor
         } else if (item.id in survivingIDs) {
@@ -108,18 +119,30 @@ internal fun SessionFeature.Companion.mergeTranscript(
     // A new steering echo may have no old successor. Anchor after the part's own fetched siblings,
     // then fall back to its predecessor's whole message.
     val messageEnds = HashMap<String, Int>()
-    val positions = HashMap<String, Int>(merged.size)
-    for ((index, item) in merged.withIndex()) {
+    val positions = HashMap<String, Int>(merged.size - mergedStart)
+    for (index in mergedStart until merged.size) {
+        linked += 1
+        val item = merged[index]
         positions[item.id] = index
         messageEnds[messageID(item)] = index + 1
     }
+    // A message with no row in the span ends where its last older row does.
+    fun messageEnd(messageID: String): Int? {
+        messageEnds[messageID]?.let { return it }
+        for (index in mergedStart - 1 downTo 0) {
+            if (messageID(merged[index]) == messageID) return index + 1
+        }
+        return null
+    }
     val buckets = HashMap<Int, MutableList<OpenCodeTranscriptItem>>()
     var predecessor: OpenCodeTranscriptItem? = null
-    for (item in existing) {
+    for (index in existingStart until existing.size) {
+        val item = existing[index]
+        linked += 1
         if (item.id in retainedIDs) {
             val insertion = nextSurvivor[item.id]?.let { positions[it] }
-                ?: messageEnds[messageID(item)]
-                ?: predecessor?.let { messageEnds[messageID(it)] }
+                ?: messageEnd(messageID(item))
+                ?: predecessor?.let { messageEnd(messageID(it)) }
                 // An echo older than a window that jumped ahead of held history goes before it;
                 // with no history held (a session still loading) it's the newest row.
                 ?: if (messageID(item) in echoedPromptIDs && hasServerRows) 0 else merged.size
@@ -128,8 +151,12 @@ internal fun SessionFeature.Companion.mergeTranscript(
             predecessor = item
         }
     }
+    TranscriptScan.record(linked)
     val result = ArrayList<OpenCodeTranscriptItem>(merged.size + retainedIDs.size + trailing.size)
-    for (index in merged.indices) {
+    // Rows go in only from the first bucket on (an echo can go first of all).
+    val plainEnd = minOf(mergedStart, buckets.keys.minOrNull() ?: merged.size)
+    result.addAll(merged.subList(0, plainEnd))
+    for (index in plainEnd until merged.size) {
         buckets[index]?.let(result::addAll)
         result += merged[index]
     }
@@ -151,6 +178,19 @@ internal fun SessionFeature.Companion.messageID(item: OpenCodeTranscriptItem): S
         is OpenCodeTranscriptItem.RunRetry -> item.id.dropLast("-retry".length)
         else -> item.id
     }
+}
+
+/** iOS `SessionFeature.ids(_:in:)`: which of [ids] are rows in [items], looking from the end (live parts are recent) and stopping once all are found. */
+internal fun SessionFeature.Companion.ids(ids: Set<String>, items: List<OpenCodeTranscriptItem>): Set<String> {
+    if (ids.isEmpty()) return emptySet()
+    val found = HashSet<String>()
+    for (index in items.indices.reversed()) {
+        val id = items[index].id
+        if (id !in ids) continue
+        found += id
+        if (found.size == ids.size) break
+    }
+    return found
 }
 
 /** iOS `SessionFeature.promptIDs(in:)`. */
@@ -424,8 +464,27 @@ private fun SessionFeature.refreshResponse(
         if (!s.hasPendingLocalPrompt) s = s.copy(isAwaitingReply = false)
     }
     val preserveProjection = s.isRunning || inFlight.followup == RefreshReason.RunState
-    val previousIDs = s.items.mapTo(HashSet()) { it.id }
-    s = when (val scope = refresh.scope) {
+    // Only the rows this read could touch are indexed: the raced events' parts, and the settled
+    // message's own rows while the reader watches. Never a set of every row in a long session.
+    val racedIDs = HashSet<String>()
+    if (preserveProjection) {
+        for (event in inFlight.racedEvents) event.transcriptItemID?.let { racedIDs += it }
+        for (item in refresh.items) racedIDs -= item.id
+    }
+    val racedBefore = SessionFeature.ids(racedIDs, s.items)
+    val scope = refresh.scope
+    val watchedMessage = if (scope is SessionFeature.AuthoritativeRefresh.Scope.Message &&
+        s.watchesTranscript && s.newMessagesBaseline != null
+    ) {
+        MessageRows(scope.messageID)
+    } else {
+        null
+    }
+    val messageRowsBefore = HashSet<String>()
+    if (watchedMessage != null) {
+        for (item in s.items) if (watchedMessage.contains(item)) messageRowsBefore += item.id
+    }
+    s = when (scope) {
         SessionFeature.AuthoritativeRefresh.Scope.Page ->
             applyAuthoritative(refresh.items, refresh.pageCursor, s, preserveProjection)
         is SessionFeature.AuthoritativeRefresh.Scope.Message ->
@@ -435,15 +494,15 @@ private fun SessionFeature.refreshResponse(
     // A carried row already contains the events received during this read. Replay only onto
     // replaced/missing parts; otherwise a tool's input deltas append twice (or input.started
     // resets its payload).
-    val fetchedIDs = refresh.items.mapTo(HashSet()) { it.id }
-    val retainedIDs = s.items.mapNotNullTo(HashSet()) { item -> item.id.takeIf { it in previousIDs && it !in fetchedIDs } }
+    val retainedIDs = SessionFeature.ids(racedBefore, s.items)
     val replayEvents = inFlight.racedEvents.filter { event ->
         preserveProjection && event.transcriptItemID?.let { it in retainedIDs } != true
     }
+    val replayedRows = ArrayList<String>()
     if (replayEvents.isNotEmpty()) {
         val previousFirstID = s.firstVisibleItemID
         val projection = LiveProjection(s)
-        for (event in replayEvents) applyLiveEvent(event, projection)
+        for (event in replayEvents) applyLiveEvent(event, projection)?.let { replayedRows += it }
         s = projection.applied(s).retainRenderedWindowStart(previousFirstID).pinBrowsingWindowIfNeeded()
     }
     s = when (val context = refresh.context) {
@@ -456,7 +515,16 @@ private fun SessionFeature.refreshResponse(
     // settles, or a read while away marks.
     val returned = s.watchesTranscript
     val settles = returned && refresh.scope == SessionFeature.AuthoritativeRefresh.Scope.Page
-    s = if (settles || !returned) s.updateNewMessagesMark(settles = settles) else s.noteWatched(previousIDs)
+    if (settles || !returned) {
+        s = s.updateNewMessagesMark(settles = settles)
+    } else if (watchedMessage != null) {
+        // Only a message read gets here: what it added is that message's rows, and any row a
+        // raced event brought back.
+        for (item in s.items) {
+            if (watchedMessage.contains(item) && item.id !in messageRowsBefore) s = s.noteWatched(itemID = item.id)
+        }
+        for (id in replayedRows) s = s.noteWatched(itemID = id)
+    }
     if (s.newMessages != null) s = s.clearNewMessagesAfterOwnPrompt()
     var observed = refresh.observed
     val current = s.session
@@ -492,16 +560,25 @@ private fun SessionFeature.refreshResponse(
 }
 
 private fun SessionFeature.sceneActiveChanged(state: SessionFeature.State, isActive: Boolean): Reduced<SessionFeature.State, Action> {
-    val returning = isActive && !state.isSceneActive
+    val wasBackgrounded = state.isBackgrounded
+    // A screen swapped in while away may not have seen the scene go.
+    val returning = isActive && (!state.isSceneActive || wasBackgrounded)
     var s = state.copy(isSceneActive = isActive)
     if (isActive) s = s.copy(isBackgrounded = false)
     if (s.watchesTranscript) s = s.absorbFittingNewMessages()
     if (!returning) return Reduced(s)
+    // Polls stopped for the background, not for a glance at the notification shade.
+    var polls: Effect<Action> = Effect.none()
+    if (wasBackgrounded) {
+        val resumed = resumeServerPolling(s)
+        s = resumed.state
+        polls = resumed.effect
+    }
     // Reads wait out the background: a Stop the server took reads on from here, and a read that
     // failed or was dropped must not leave Working up with nothing running.
-    if (s.isInterrupting && s.stopAttempt?.acknowledged == true) return Reduced(s, settleStop(s))
-    if (!s.isAwaitingReply || s.isExternallyActive || s.isSubmittingPrompt) return Reduced(s)
-    return Reduced(s, confirmRunState(s, after = Duration.ZERO))
+    if (s.isInterrupting && s.stopAttempt?.acknowledged == true) return Reduced(s, Effect.merge(polls, settleStop(s)))
+    if (!s.isAwaitingReply || s.isExternallyActive || s.isSubmittingPrompt) return Reduced(s, polls)
+    return Reduced(s, Effect.merge(polls, confirmRunState(s, after = Duration.ZERO)))
 }
 
 private fun SessionFeature.visibilityChanged(state: SessionFeature.State, visible: Boolean): Reduced<SessionFeature.State, Action> {
@@ -594,7 +671,7 @@ private fun SessionFeature.task(state: SessionFeature.State): Reduced<SessionFea
                     CancelID.BackgroundHint, CancelID.ViewReceipt, CancelID.ResyncDelay, CancelID.ResyncMinimum,
                     CancelID.AutocompleteCatalog, CancelID.AutocompleteCommands,
                     CancelID.AutocompleteFiles, CancelID.AutocompleteSessions, CancelID.AutocompleteAutoRun,
-                    CancelID.AutocompleteCommand, CancelID.AutocompleteCommandWait,
+                    CancelID.AutocompleteCommand, CancelID.AutocompleteCommandWait, CancelID.WindowReset,
                 ),
             )
         },
@@ -831,7 +908,8 @@ internal fun SessionFeature.upsertLiveTextChange(
  * a later step's message starts after the switch and goes below.
  */
 private fun liveInsertionIndex(messageID: String, items: List<OpenCodeTranscriptItem>): Int {
-    val floor = items.indexOfLast { SessionFeature.item(it, messageID) }.takeIf { it >= 0 }
+    val rows = MessageRows(messageID)
+    val floor = items.indexOfLast { rows.contains(it) }.takeIf { it >= 0 }
         ?: items.indexOfLast { TranscriptEntry.promptID(it) != null }.takeIf { it >= 0 }
     val start = floor?.let { it + 1 } ?: 0
     for (index in start until items.size) {

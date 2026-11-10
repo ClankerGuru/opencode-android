@@ -2,6 +2,7 @@ package ai.opencode.feature.settings
 
 import ai.opencode.core.diagnostics.HidesFromProblemReports
 import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.PageTransitions
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.LocalScreenCovered
@@ -16,7 +17,6 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -89,7 +89,8 @@ fun SettingsPresentation(
     val scope = rememberCoroutineScope()
     val focus = LocalFocusManager.current
     val shown by rememberUpdatedState(isShown)
-    val springBack = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+    // A cancelled back swipe springs home on the release role (iOS `Motion.release`).
+    val springBack = MotionRole.Release.animation<Float>()
     val density = LocalDensity.current
     val slidePx = with(density) { PageTransitions.SlideDistance.toPx() }
     val leanPx = with(density) { PageTransitions.BackPreviewShift.toPx() }
@@ -223,8 +224,8 @@ private fun settingsAlpha(p: Float, closing: Boolean): Float {
 private val MoveSpec: AnimationSpec<Float>
     get() = tween(Motion.millis(PageTransitions.DURATION_SECONDS), easing = FastOutSlowInEasing)
 
-/** The cross-fade under reduce motion. */
-private val FadeSpec: AnimationSpec<Float> get() = tween(Motion.millis(PageTransitions.REDUCED_FADE_SECONDS))
+/** The cross-fade under reduce motion: the surface role's reduced fade (iOS `Motion.surface`). */
+private val FadeSpec: AnimationSpec<Float> get() = MotionRole.Surface.animation(reduceMotion = true)
 
 /**
  * iOS `SettingsCover`: whether Settings or What’s New covers Home completely and at rest, which

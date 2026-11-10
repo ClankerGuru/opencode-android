@@ -22,7 +22,7 @@ import kotlin.math.abs
  * decisions are the pure rules [DrawerListTitleView] and [DrawerListSessionCell] draw with
  * ([DrawerListTitle.placement], [DrawerRevealFade]), in dp. A title's natural width (iOS measures
  * the label) is given: wider than the 200 dp row for a long title, narrower for a short one. The
- * card-edge mask is sampled with the reveal's ease-in (`revealFadeIn`) finished, as iOS samples it.
+ * card-edge mask is sampled with the reveal's ease-in (`MotionRole.Swap`) finished, as iOS samples it.
  *
  * Deleted:
  * - `aRelayoutMidRevealKeepsTheFadeAtTheEdge`: a UIKit cell laid out again keeps its mask layer;

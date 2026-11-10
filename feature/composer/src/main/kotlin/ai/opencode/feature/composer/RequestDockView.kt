@@ -5,7 +5,8 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionReduce
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.motion.transitionBlurEffect
 import ai.opencode.core.ui.OpenCodeIcon
@@ -146,22 +147,13 @@ object RequestDockMetrics {
 }
 
 /**
- * The panel's content motion (iOS `RequestPanelReveal.content`): it rises and sharpens in as
- * the glass grows, and sinks and fades away ahead of the glass folding over it. Springs, so a
- * request arriving or leaving mid-flight retargets from where it is. The glass itself is the
- * session's ([RequestPanelReveal.glass]).
+ * The request panel's glass growing out of the composer and folding back (iOS
+ * `RequestPanelReveal`, in `SessionView+Chrome.swift`; here so the session can reach it): the
+ * panel roles. Its content arrives on `Motion.panelOpen` and leaves on `Motion.microOut`.
  */
 object RequestPanelReveal {
-    fun <T> content(showing: Boolean, reducedMotion: Boolean): FiniteAnimationSpec<T> = when {
-        reducedMotion -> Motion.easeInOut(Motion.reducedFade)
-        showing -> MotionSpring.fromResponse(0.42, 0.86).spec()
-        else -> MotionSpring.fromResponse(0.22, 1.0).spec()
-    }
-
-    /** Unbouncy, and quicker to fold than to grow; folding waits a beat for the content to fade. */
-    fun <T> glass(opening: Boolean): FiniteAnimationSpec<T> =
-        if (opening) MotionSpring.fromResponse(0.42, 1.0).spec()
-        else MotionSpring.fromResponse(0.32, 1.0).animation(reduceMotion = false, delaySeconds = 0.08)
+    fun <T> animation(opening: Boolean, reducedMotion: Boolean): FiniteAnimationSpec<T> =
+        Motion.panelOpen.animation(if (opening) MotionPhase.Enter else MotionPhase.Exit, reducedMotion)
 }
 
 /**
@@ -228,18 +220,28 @@ fun RequestDockView(
         }
     }
     SideEffect { if (live != null && live != lastShown) lastShown = live }
-    // Mounted hidden for its first frame, so it rises in; cleared when it leaves, so the same request docking again rises again.
+    // Mounted hidden for its first frame, so it rises in.
     LaunchedEffect(live?.id) {
-        arrivedID = live?.id
+        val id = live?.id
+        if (id != null) arrivedID = id
         // Another request docked, or none: a drag or settle under way was the last one's.
         panelGesture.reset()
     }
     DisposableEffect(Unit) { onDispose { panelGesture.reset() } }
+    // The request left: it blurs and sinks away where it was, ahead of the glass folding over
+    // it, and is dropped once that fade lands (the alpha's finish below), unless another request
+    // docked meanwhile. Cleared, so the same request docking again rises again (iOS `leave`).
     LaunchedEffect(live == null) {
-        if (live != null || lastShown == null) return@LaunchedEffect
-        delay(500)
-        lastShown = null
+        if (live != null) return@LaunchedEffect
+        val leaving = lastShown ?: return@LaunchedEffect
+        if (arrivedID != leaving.id) {
+            // Never arrived, so there's no fade to wait for.
+            lastShown = null
+            return@LaunchedEffect
+        }
+        arrivedID = null
     }
+    val latestLive by rememberUpdatedState(live)
     // Each request starts folded, with nothing sent.
     val focus = remember { FocusRequester() }
     val androidContext = LocalContext.current
@@ -256,23 +258,34 @@ fun RequestDockView(
     val idle = dock.respondingRequestIDs.isEmpty()
     LaunchedEffect(idle) {
         val id = dock.dockRequestID
-        if (idle && id != null && id in dock.failedReplyIDs) state.sentAction = null
+        if (idle && id != null && dock.requestFailures[id] == RequestDockFeature.State.RequestFailure.Reply) state.sentAction = null
     }
 
     val shown = live ?: lastShown ?: return
     key(shown.id) {
-        val showing = live != null && arrivedID == shown.id
-        val alpha by animateFloatAsState(if (showing) 1f else 0f, RequestPanelReveal.content(showing, reducedMotion), label = "requestAlpha")
+        // Arrived and not yet leaving.
+        val showing = arrivedID == shown.id
+        // Arriving it grows in on `panelOpen`; leaving it fades on `microOut`.
+        val reveal: FiniteAnimationSpec<Float> =
+            if (showing) Motion.panelOpen.animation(reduceMotion = reducedMotion) else Motion.microOut.animation(reduceMotion = reducedMotion)
+        val alpha by animateFloatAsState(
+            if (showing) 1f else 0f,
+            reveal,
+            label = "requestAlpha",
+            finishedListener = { value ->
+                if (value == 0f && latestLive == null && lastShown?.id == shown.id) lastShown = null
+            },
+        )
         val riseTarget = when {
             reducedMotion || showing -> 0f
             live == null -> RequestDockMetrics.rise.value / 2
             else -> RequestDockMetrics.rise.value
         }
-        val rise by animateFloatAsState(riseTarget, RequestPanelReveal.content(showing, reducedMotion), label = "requestRise")
+        val rise by animateFloatAsState(riseTarget, reveal, label = "requestRise")
         // Arriving it sharpens in as the surface grows; leaving it blurs away in place just
         // ahead of the surface folding over it (one motion). Reduce Motion only fades.
         val blurTarget = if (reducedMotion || showing) 0f else RequestDockMetrics.revealBlur.value
-        val blur by animateFloatAsState(blurTarget, RequestPanelReveal.content(showing, reducedMotion), label = "requestBlur")
+        val blur by animateFloatAsState(blurTarget, reveal, label = "requestBlur")
         val leaving = live == null
         Box(
             modifier
@@ -799,7 +812,7 @@ private class DockScope(
         val progress = remember { Animatable(0f) }
         var done by remember { mutableStateOf(false) }
         LaunchedEffect(Unit) {
-            progress.animateTo(1f, MotionSpring(0.3).animation(reducedMotion))
+            progress.animateTo(1f, Motion.layout.animation(reduceMotion = reducedMotion))
             done = true
         }
         if (done) return
@@ -950,9 +963,11 @@ private class DockScope(
         val expanded = state.expandedPermissionID == permission.id
         val fontScale = LocalDensity.current.fontScale
         RequestPanelFallback(
-            // iOS animates expandedPermissionID with the 0.3 s panel spring. Animate the
-            // column, not the footer: the caption rides its top and Allow stays on the bar.
-            columnModifier = if (reducedMotion) Modifier else Modifier.animateContentSize(MotionSpring(0.3).spec()),
+            // Opens on `layout`, closes on `collapse`. Animate the column, not the footer: the
+            // caption rides its top and Allow stays on the bar.
+            columnModifier = Modifier.animateContentSize(
+                Motion.layout.animation(if (expanded) MotionPhase.Enter else MotionPhase.Exit, reducedMotion),
+            ),
             footer = {
                 // Allow stays in reach: past the floors the rest scrolls above it. The actions stop growing at the first accessibility size.
                 val density = LocalDensity.current
@@ -984,7 +999,13 @@ private class DockScope(
     fun SummaryRow(permission: OpenCodePermissionRequest, command: String?, expanded: Boolean) {
         val colors = OpenCodeTheme.colors
         val summary = remember(permission, command) { PermissionSummary(permission, command) }
-        val turn by animateFloatAsState(if (expanded) 180f else 0f, MotionSpring(0.3).animation(reducedMotion), label = "summaryChevron")
+        // It turns over; under Reduce Motion the glyph swaps instead.
+        val turn by animateFloatAsState(
+            MotionReduce.rotation(if (expanded) 180f else 0f, reducedMotion),
+            Motion.layout.animation(if (expanded) MotionPhase.Enter else MotionPhase.Exit, reducedMotion),
+            label = "summaryChevron",
+        )
+        val chevron = if (reducedMotion && expanded) SFSymbol.ChevronUp else SFSymbol.ChevronDown
         val textStyle = if (summary.isCode) RequestTranscriptMetrics.toolFont else OpenCodeTextStyles.subheadline
         val firstLine = with(LocalDensity.current) { if (textStyle.lineHeight.isSp) textStyle.lineHeight.toDp() else 0.dp }
         // Centred in its 48 dp while one line; the chevron stays on the first line's baseline as it wraps.
@@ -1018,7 +1039,7 @@ private class DockScope(
                 )
                 Box(Modifier.heightIn(min = firstLine), contentAlignment = Alignment.Center) {
                     // `.caption.weight(.semibold)`.
-                    OpenCodeIcon(SFSymbol.ChevronDown, contentDescription = null, size = 12.dp, tint = colors.secondaryText, modifier = Modifier.rotate(turn))
+                    OpenCodeIcon(chevron, contentDescription = null, size = 12.dp, tint = colors.secondaryText, modifier = Modifier.rotate(turn))
                 }
             }
         }
@@ -1126,7 +1147,7 @@ private class DockScope(
     fun rememberEntrance(animate: Boolean, slide: Boolean): Modifier {
         val progress = remember { Animatable(if (animate) 0f else 1f) }
         LaunchedEffect(Unit) {
-            if (progress.value < 1f) progress.animateTo(1f, MotionSpring(0.3).animation(reducedMotion))
+            if (progress.value < 1f) progress.animateTo(1f, Motion.layout.animation(reduceMotion = reducedMotion))
         }
         val offset = if (slide && !reducedMotion) 24.dp else 0.dp
         return Modifier.graphicsLayer {

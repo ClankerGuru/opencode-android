@@ -24,7 +24,7 @@ import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.OpenCodeTransport
-import ai.opencode.server.model.OpenCodeHomeSnapshot
+import ai.opencode.server.model.OpenCodeModelCatalog
 import ai.opencode.server.model.OpenCodeModelRef
 import ai.opencode.server.model.OpenCodePendingRequests
 import ai.opencode.server.model.OpenCodeSession
@@ -192,11 +192,11 @@ class VoiceLatencyBudgetTests {
     }
 
     @Test fun optionalStepsAroundACreateAreBounded() = voiceTest {
-        // No live board: the newest session's model would need a snapshot, and
-        // the fresh read of the new session hangs too. Neither holds it up.
+        // The server's default model needs a catalog read, and the fresh read
+        // of the new session hangs too. Neither holds it up.
         val switched = LockIsolated(0)
         val client = OpenCodeClient.testValue.copy(
-            homeSnapshot = { hang() },
+            modelCatalog = { _, _ -> hang() },
             createSession = { _, directory, _ -> OpenCodeSession(id = "ses_new", serverTitle = "New", projectID = "p", directory = directory, updatedAt = VoiceFeatureTestSupport.distantPast) },
             switchModel = { _, _, _ -> switched.increment() },
             getSession = { _, _ -> hang() },
@@ -509,7 +509,7 @@ class VoiceLatencyBudgetTests {
     @Test fun aSessionCreatedBeforeItsMessageFailedIsStillReported() = voiceTest {
         val client = OpenCodeClient.testValue.copy(
             createSession = { _, directory, _ -> OpenCodeSession(id = "ses_new", serverTitle = "New", projectID = "p", directory = directory, updatedAt = VoiceFeatureTestSupport.distantPast) },
-            homeSnapshot = { OpenCodeHomeSnapshot(projects = emptyList(), sessions = emptyList(), activeSessionIDs = emptySet()) },
+            modelCatalog = { _, _ -> OpenCodeModelCatalog(models = emptyList(), defaultModel = null) },
             getSession = { _, _ -> throw OpenCodeClientError(message = "Offline") },
             sendDeliveredPrompt = { _, _, _, _ -> throw OpenCodeClientError(message = "The server returned HTTP 500.", statusCode = 500) },
         )

@@ -5,6 +5,7 @@ import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.TestClock
 import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.TestStore
+import ai.opencode.core.sharing.shared
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.makeDetail
@@ -13,6 +14,8 @@ import ai.opencode.feature.voice.DotScopeSimulation
 import ai.opencode.feature.voice.ScreenAwakeClient
 import ai.opencode.feature.voice.VoiceCallEvent
 import ai.opencode.feature.voice.VoiceFeature
+import ai.opencode.feature.voice.VoiceServerChoice
+import ai.opencode.feature.voice.VoiceSharedKeys
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeHomeSnapshot
 import ai.opencode.server.model.OpenCodeSession
@@ -114,6 +117,7 @@ class ScreenAwakeTests {
     /** A call that fails as it starts (no API key) turns the screen on and straight off again, in that order, with nothing left on. */
     @Test
     fun aCallThatFailsAsItStartsLeavesTheScreenFreeToSleep() = runTest {
+        shared.run { shared(VoiceSharedKeys.voiceServerChoice).set(VoiceServerChoice.Phone) }
         val calls = Locked<List<Boolean>>(emptyList())
         val store = makeStore(calls, TestClock())
 

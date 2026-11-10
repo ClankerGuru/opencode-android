@@ -388,15 +388,14 @@ class SessionSwitchTests {
         h.skipInFlightEffects()
     }
 
-    /** A model a send applied reaches the list, so a new session inherits it. */
+    /** A model a send applied reaches the list's copy of its session. */
     @Test
-    fun anAppliedModelIsWhatANewSessionInherits() = homeTest { h ->
+    fun anAppliedModelReachesTheList() = homeTest { h ->
         val model = OpenCodeModelRef(id = "picked-model", providerID = "example")
         val store = h.store(h.homeState())
         store.exhaustive = false
         store.send(detail(SessionFeature.Action.ModelApplied(sessionID = "root", model = model)))
         assertEquals(model, store.state.sessions.first { it.id == "root" }.model)
-        assertEquals(model, store.state.lastUsedModel)
     }
 
     @Test

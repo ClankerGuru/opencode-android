@@ -470,7 +470,7 @@ class LiveDelegationFeatureTests {
         val gate = Gate<Unit>()
         val shared = VoiceTestShared()
         val store = voiceTestStore(shared, {
-            VoiceFeature.State(server, session).withPhase(VoiceFeature.State.Phase.Live).copy(activeEngine = VoiceEngine.gptLive)
+            VoiceFeature.State(server, session).withPhase(VoiceFeature.State.Phase.Live)
         }) {
             this[VoiceCallClient] = testVoiceCall(
                 retarget = { order += "retarget" },

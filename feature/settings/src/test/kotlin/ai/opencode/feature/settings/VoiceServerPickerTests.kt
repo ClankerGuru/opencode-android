@@ -2,10 +2,8 @@ package ai.opencode.feature.settings
 
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.TestClock
-import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.SharedStore
-import ai.opencode.core.sharing.experimental
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.voice.ServerVoiceClient
@@ -49,11 +47,10 @@ class VoiceServerPickerTests {
     private val grok = ServerVoiceModel(model = "grok-voice-1", provider = "xai", available = true)
     private val geminiLive = ServerVoiceModel(model = "gemini-3.8-live", provider = "google", available = true)
 
-    /** `servers` saved and `server` the one in use, with Server Voice on and `choice` in Voice Provider. */
+    /** `servers` saved and `server` the one in use, with `choice` in Voice Provider. */
     private fun SettingsTestShared.save(servers: List<OpenCodeServer>, choice: VoiceServerChoice = VoiceServerChoice.Automatic) {
         set(ServerSharedKeys.savedServers, servers)
         set(ServerSharedKeys.savedServer, server)
-        set(experimental(ExperimentalFeature.serverVoice), true)
         set(VoiceSharedKeys.voiceServerChoice, choice)
     }
 
@@ -72,11 +69,11 @@ class VoiceServerPickerTests {
     )
 
     /**
-     * Settings › Voice asks every saved server, the connected one too, and Voice Provider lists
-     * the others ready to take calls: not a Grok-only server (No key) or one without the list
-     * (Update OpenCode). A server that doesn't answer next time reads as offline.
+     * Settings › Voice asks only the connected server; opening Voice Provider asks the other saved
+     * servers, and it lists the ones ready to take calls: not a Grok-only server (No key) or one
+     * without the list (Update OpenCode). A server that doesn't answer next time reads as offline.
      */
-    @Test fun settingsAsksEverySavedServerAndListsTheOthersThatCanBrokerACall() = runTest {
+    @Test fun settingsAsksTheConnectedServerAndTheProviderPageAsksTheOthers() = runTest {
         val shared = SettingsTestShared()
         shared.save(listOf(server, studio, grokBox, oldBox))
         val clock = TestClock()
@@ -106,7 +103,12 @@ class VoiceServerPickerTests {
         store.send(VoiceSettingsFeature.Action.Task)
         clock.advance(1.seconds)
         store.receive(VoiceSettingsFeature.Action.VoiceModelsLoaded(server.persistenceID, 0, ServerVoiceModelsAnswer.Listed(listOf(gptLive))))
-        clock.advance(1.seconds)
+        clock.advance(10.seconds)
+        assertEquals("Settings › Voice leaves the other saved servers alone", listOf(server.persistenceID), asked.value)
+        store.withDependencies { assertTrue(store.state.providerCatalog.unavailable.isEmpty()) }
+
+        store.send(VoiceSettingsFeature.Action.ProviderPageAppeared)
+        clock.advance(2.seconds)
         store.receive(VoiceSettingsFeature.Action.VoiceModelsLoaded(studio.persistenceID, 0, ServerVoiceModelsAnswer.Listed(listOf(gptLive))))
         clock.advance(1.seconds)
         store.receive(VoiceSettingsFeature.Action.VoiceModelsLoaded(grokBox.persistenceID, 0, ServerVoiceModelsAnswer.Listed(listOf(grok))))
@@ -136,7 +138,8 @@ class VoiceServerPickerTests {
         store.send(VoiceSettingsFeature.Action.Task)
         clock.advance(1.seconds)
         store.receive(VoiceSettingsFeature.Action.VoiceModelsLoaded(server.persistenceID, 0, ServerVoiceModelsAnswer.Listed(listOf(gptLive))))
-        clock.advance(1.seconds)
+        store.send(VoiceSettingsFeature.Action.ProviderPageAppeared)
+        clock.advance(2.seconds)
         store.receive(VoiceSettingsFeature.Action.VoiceModelsLoaded(studio.persistenceID, 0, ServerVoiceModelsAnswer.NoAnswer))
         assertEquals(ServerVoiceModelsAnswer.NoAnswer, shared.get(VoiceSharedKeys.voiceModelsByServer)[studio.persistenceID])
         clock.advance(1.seconds)
@@ -151,20 +154,6 @@ class VoiceServerPickerTests {
             assertEquals(listOf("Studio", "Old Box"), catalog.unavailable.map { it.title })
             assertEquals(listOf(VoiceProviderState.offline, VoiceProviderState.needsUpdate), catalog.unavailable.map { it.state })
         }
-        store.finish()
-    }
-
-    /** With Server Voice off the page asks no one. */
-    @Test fun settingsAsksNoServerWithServerVoiceOff() = runTest {
-        val shared = SettingsTestShared()
-        shared.save(listOf(server, studio))
-        shared.set(experimental(ExperimentalFeature.serverVoice), false)
-        val store = TestStore(VoiceSettingsFeature.State(server = server), VoiceSettingsFeature(), this) {
-            this[SharedStore] = shared.store
-            this[ServerVoiceClient] = serverVoice { throw AssertionError("Server Voice is off") }
-        }
-        store.send(VoiceSettingsFeature.Action.Task)
-        store.withDependencies { assertFalse(store.state.broker.isEnabled) }
         store.finish()
     }
 
@@ -305,14 +294,12 @@ class VoiceServerPickerTests {
         shared.setSupport(mapOf(server.persistenceID to ServerVoiceSupport.supported, studio.persistenceID to ServerVoiceSupport.unsupported))
         shared.read {
             assertEquals(VoiceRoute.Unavailable(VoiceRoute.Reason.ServerUnsupported), settings.route)
-            assertTrue(settings.showsServerUnsupported)
             assertEquals(VoiceProviderState.needsUpdate, settings.providerCatalog.active.state)
         }
 
         shared.setSupport(mapOf(server.persistenceID to ServerVoiceSupport.unsupported, studio.persistenceID to ServerVoiceSupport.supported))
         shared.read {
             assertEquals(VoiceRoute.serverOpenAI(VoiceRoute.OpenAI.gptLive), settings.route)
-            assertFalse(settings.showsServerUnsupported)
             assertEquals(VoiceKeySource.Server(providerName = "OpenAI"), settings.keySource)
         }
     }

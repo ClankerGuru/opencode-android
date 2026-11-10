@@ -89,9 +89,7 @@ class DiagnosticsJournalTests {
             second.open(recording = true)
             second.append(event("launched"))
             second.markForeground()
-            second.markBackground()
-            // Each journal has its own queue (as iOS's); the next run is another process, so wait here.
-            second.flush()
+            second.markBackground(waits = true) // waited for, as at termination
             assertFalse(DiagnosticsJournal(directory = directory, build = BUILD).open(recording = true).endedUnexpectedly)
         } finally {
             directory.deleteRecursively()

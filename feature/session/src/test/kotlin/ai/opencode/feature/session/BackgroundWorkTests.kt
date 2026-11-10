@@ -1011,9 +1011,10 @@ class BackgroundWorkTests {
         assertEquals(panel, frames.last())
 
         // Every single frame-to-frame transition across grab, drag, release, regrab, and settle
-        // moves by at most 1.5 pt on every edge.
+        // moves by at most 2.5 pt on every edge: no jump, only the release spring's
+        // peak speed (24 pt back at ω 28.5 peaks near 250 pt/s, 2.1 pt a frame at 120 Hz).
         val maxStep = frames.zipWithNext().maxOf { (a, b) -> maxEdgeDelta(a, b) }
-        assertTrue("Largest frame-to-frame edge step was $maxStep pt", maxStep <= 1.5f)
+        assertTrue("Largest frame-to-frame edge step was $maxStep pt", maxStep <= 2.5f)
 
         // Grabbing during the open morph (where `open()` resets the controller) starts at
         // offset 0 with zero jump, and `stopReturn()` at the start of `close()` stops any

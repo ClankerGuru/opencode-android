@@ -1,7 +1,6 @@
 package ai.opencode.app
 
 import ai.opencode.core.dependencies.PasteboardClient
-import ai.opencode.core.dependencies.UuidClient
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
@@ -48,6 +47,7 @@ import ai.opencode.feature.voice.VoiceCallServiceClient
 import ai.opencode.server.CachedHomeSnapshot
 import ai.opencode.server.ConnectionFailureDetail
 import ai.opencode.server.OpenCodeClient
+import ai.opencode.server.ServerLinkClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodePairingLink
 import ai.opencode.server.OpenCodeServer
@@ -57,8 +57,6 @@ import ai.opencode.server.model.OpenCodeHomeSnapshot
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.keepingFirstPrompts
 import ai.opencode.server.remember
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 /**
@@ -216,15 +214,21 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
             }
 
         /**
-         * Anything shown over Home, from the app or from Home: the servers, server setup and scanner
-         * sheets, the pairing confirmation, the share, notification, system action and pairing
-         * error alerts, and `HomeFeature.State.presentsOverHome`. The server switch toast isn't
-         * one. Also the open session's own presentations (`sessionDetail.presentsOverSession`).
+         * Anything shown over Home, from the app or from Home: [presentsOverApp],
+         * `HomeFeature.State.presentsOverHome`, and the open session's own presentations
+         * (`sessionDetail.presentsOverSession`). The server switch toast isn't one.
          */
         val isPresentingAnything: Boolean
+            get() = presentsOverApp || home?.presentsOverHome == true || home?.presentsOverSession == true
+
+        /**
+         * Anything the app itself shows over Home: the servers and setup sheets, the pairing scan
+         * and confirmation, and the share, notification and system action alerts. Read by what
+         * must not appear beneath it (the drawer, a client tool's consent card).
+         */
+        val presentsOverApp: Boolean
             get() = isEditingServer || isScanningPairingCode || pendingPairing != null || pairingError != null ||
-                shareError != null || notificationError != null || systemActionError != null ||
-                home?.presentsOverHome == true || home?.presentsOverSession == true
+                shareError != null || notificationError != null || systemActionError != null
 
         /** A call that is connecting or connected keeps the screen on, but only in the foreground. */
         val keepsScreenAwake: Boolean get() = isInForeground && home?.hasLiveCall == true
@@ -624,7 +628,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         is Action.ServerTapped -> selectServer(action.server, state)
         Action.ReturnToServerTapped -> state.returnServer?.let { selectServer(it, state) } ?: Reduced(state)
         is Action.ServerDeleted -> serverDeleted(state, action.server)
-        Action.ScanPairingCodeTapped -> cancelConnection(beginPairing(state.copy(pasteError = null)))
+        Action.ScanPairingCodeTapped -> cancelConnection(beginScanningPairingCode(state.copy(pasteError = null)))
         Action.ScannerDismissed -> {
             val next = state.copy(isScanningPairingCode = false)
             // Opened over Home, there's no attempt to cancel and Home carries on.
@@ -737,7 +741,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         is HomeFeature.DelegateAction.ServerRenamed -> Reduced(renameServer(action.server, action.name, state))
         is HomeFeature.DelegateAction.EditServerRequested -> Reduced(editServer(action.server, state))
         is HomeFeature.DelegateAction.ServerRemovalConfirmed -> Reduced(state, confirmRemoval(action.server, state))
-        HomeFeature.DelegateAction.PairServerRequested -> Reduced(beginPairing(state))
+        HomeFeature.DelegateAction.PairServerRequested -> Reduced(beginScanningPairingCode(state))
         HomeFeature.DelegateAction.AddServerRequested -> Reduced(beginNewServer(state))
     }
 
@@ -747,11 +751,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         LaunchBloomController.completeColdLaunch()
         if (!destination.isValid) return Reduced(state)
         val server = state.knownServers.firstOrNull { it.persistenceID == destination.serverKey }
-            ?: return Reduced(
-                state.copy(
-                    notificationError = "This server is no longer saved on this ${ThisDevice.name}. Connect to it again to open the session.",
-                ),
-            )
+            ?: return Reduced(state.copy(notificationError = serverNoLongerSavedMessage))
         val next = state.copy(notificationError = null, pendingNotification = destination)
         // A home for this server opens the session itself, even while it is still reconnecting
         // after a cold launch: rebuilding it would flash "Connecting…" over the restored list.
@@ -773,7 +773,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         val next = state.copy(pendingNotification = null)
         val session = action.result.getOrNull()
         if (session == null || session.id != destination.sessionID) {
-            return Reduced(next.copy(notificationError = "It may have been deleted, or the server may be unavailable."))
+            return Reduced(next.copy(notificationError = sessionNoLongerAvailableMessage))
         }
         val inserted = next.insertingSession(session)
         return Reduced(inserted, openSession(inserted, session.id))
@@ -790,11 +790,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         if (server == null) {
             // Nothing to open before a server is paired; the app is open now.
             if (key == null) return Reduced(state)
-            return Reduced(
-                state.copy(
-                    systemActionError = "This server is no longer saved on this ${ThisDevice.name}. Connect to it again to open the session.",
-                ),
-            )
+            return Reduced(state.copy(systemActionError = serverNoLongerSavedMessage))
         }
         val next = state.copy(systemActionError = null)
         // As with notifications, a home for this server handles it even while still reconnecting.
@@ -816,7 +812,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         if (action.action.destination == SystemAction.Destination.LastViewed) {
             return Reduced(state, openInHome(action.action, SystemAction.Destination.LastViewed))
         }
-        return Reduced(state.copy(systemActionError = "It may have been deleted, or the server may be unavailable."))
+        return Reduced(state.copy(systemActionError = sessionNoLongerAvailableMessage))
     }
 
     /**
@@ -913,76 +909,6 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         )
     }
 
-    private fun requestPairing(text: String, state: State): Reduced<State, Action> {
-        LaunchBloomController.completeColdLaunch()
-        val pending = state.pendingPairing
-        if (pending != null) {
-            val count = state.ignoredPendingPairingCount + 1
-            AppLog.app.info { "pairing link ignored while pending id=${pending.id} ignoredCount=$count" }
-            return Reduced(state.copy(ignoredPendingPairingCount = count))
-        }
-        return validatePairing(text).fold(
-            onSuccess = { link ->
-                Reduced(
-                    state.copy(
-                        pairingError = null,
-                        ignoredPendingPairingCount = 0,
-                        pendingPairing = PendingPairing(
-                            id = dependency(UuidClient).next().toString(),
-                            link = link,
-                            replacedServerNames = link.replacedServers(state.knownServers).map { it.displayName },
-                        ),
-                    ),
-                )
-            },
-            onFailure = { error ->
-                dependency(HapticsClient).play(Haptic.error)
-                Reduced(state.copy(pairingError = error.message))
-            },
-        )
-    }
-
-    private fun beginPairing(link: OpenCodePairingLink, state: State): Reduced<State, Action> {
-        val next = leaveHome(
-            state.copy(
-                pendingPairing = null,
-                ignoredPendingPairingCount = 0,
-                pairingError = null,
-                isScanningPairingCode = false,
-                isEditingServer = false,
-                editingSavedServer = null,
-                manualEntryDraft = null,
-            ),
-        )
-        dependency(HapticsClient).play(Haptic.tap)
-        return redeem(link, next)
-    }
-
-    /** Exchange a one-time pairing link for a token, then connect normally. */
-    private fun redeem(link: OpenCodePairingLink, state: State): Reduced<State, Action> {
-        val normalized = link.normalizedForRedemption
-        val generation = state.connectionGeneration + 1
-        val attempt = ConnectionAttempt(id = generation, server = normalized.server)
-        val next = state.copy(
-            pendingNotification = null,
-            connection = State.Connection.Pairing,
-            connectionGeneration = generation,
-            connectionAttempt = attempt,
-        )
-        val client = dependency(OpenCodeClient)
-        return Reduced(
-            next,
-            Effect.run<Action> { send ->
-                val result = try {
-                    Result.success(client.redeemPairing(normalized))
-                } catch (error: OpenCodeClientError) {
-                    Result.failure(error)
-                }
-                send(Action.PairingRedeemed(attempt.id, result))
-            }.cancellable(CancelID.Health, cancelInFlight = true),
-        )
-    }
-
     private fun pairingRedeemed(state: State, action: Action.PairingRedeemed): Reduced<State, Action> {
         val attempt = state.connectionAttempt
         if (attempt?.id != action.attemptID || state.connection != State.Connection.Pairing) return Reduced(state)
@@ -1022,8 +948,10 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                 ).withoutHome(),
             )
         }
-        // Adopt the complete winning target, not a URL combined with form auth.
-        var next = state.copy(connection = State.Connection.LoadingHome(server)).load(server)
+        // Adopt the complete winning target, not a URL combined with form auth, in the address
+        // order it was entered or paired with.
+        val saved = server.keepingAddressOrder(attempt.server)
+        var next = state.copy(connection = State.Connection.LoadingHome(server)).load(saved)
         // An edited entry is replaced only after its sessions load.
         val forgotten = ArrayList<Effect<Action>>()
         if (next.editingSavedServer == null) {
@@ -1037,7 +965,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                 next = reduced.state
                 forgotten += reduced.effect
             }
-            server.remember()
+            saved.remember()
         }
         val client = dependency(OpenCodeClient)
         return Reduced(
@@ -1130,8 +1058,9 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
     }
 
     /**
-     * Probes every address concurrently, but saves the healthiest external scope rather than
-     * whichever LAN address happened to answer first (iOS `connect(_:)`).
+     * Races every address at once ([ServerLinkClient.probe]): the first that answers as this
+     * server is used now, while the server is saved with the address order it was paired or
+     * entered with (iOS `connect(_:)`).
      */
     internal fun connect(
         state: State,
@@ -1145,9 +1074,13 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         val attempt = ConnectionAttempt(id = generation, server = next.server, pairing = pairing)
         next = next.copy(connection = State.Connection.Connecting, connectionGeneration = generation, connectionAttempt = attempt)
         if (!keepingHome) next = next.withoutHome()
-        val client = dependency(OpenCodeClient)
+        val link = dependency(ServerLinkClient)
         val health = Effect.run<Action> { send ->
-            val result = probe(client, attempt.server)
+            val result = try {
+                Result.success(link.probe(attempt.server))
+            } catch (error: OpenCodeClientError) {
+                Result.failure(error)
+            }
             send(Action.HealthResponse(attempt.id, result))
         }
         return Reduced(
@@ -1160,44 +1093,6 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         )
     }
 
-    private suspend fun probe(client: OpenCodeClient, server: OpenCodeServer): Result<OpenCodeServer> = coroutineScope {
-        var lastError = OpenCodeClientError(OpenCodeClientError.UNREACHABLE_MESSAGE)
-        val pending = HashMap<Int, Int>()
-        val healthy = HashMap<Int, OpenCodeServer>()
-        val results = Channel<Pair<Int, Result<OpenCodeServer>>>(Channel.UNLIMITED)
-        val jobs = server.candidateURLs.map { url ->
-            val candidate = server.at(url)
-            val rank = OpenCodeServer.reachabilityRank(url)
-            pending[rank] = (pending[rank] ?: 0) + 1
-            launch {
-                val result = try {
-                    client.health(candidate)
-                    Result.success(candidate)
-                } catch (error: OpenCodeClientError) {
-                    Result.failure(error)
-                }
-                results.send(rank to result)
-            }
-        }
-        repeat(jobs.size) {
-            val (rank, result) = results.receive()
-            pending[rank] = (pending[rank] ?: 1) - 1
-            result.fold(
-                onSuccess = { if (healthy[rank] == null) healthy[rank] = it },
-                onFailure = { error ->
-                    val clientError = error as OpenCodeClientError
-                    lastError = clientError.copy(connectionFailures = lastError.connectionFailures + clientError.connectionFailures)
-                },
-            )
-            val preferredRank = healthy.keys.minOrNull()
-            if (preferredRank != null && pending.none { it.key < preferredRank && it.value > 0 }) {
-                jobs.forEach { it.cancel() }
-                return@coroutineScope Result.success(healthy.getValue(preferredRank))
-            }
-        }
-        Result.failure(lastError)
-    }
-
     companion object {
         /** A typed address without a scheme means plain HTTP on a LAN or tailnet (iOS `withDefaultScheme`). */
         fun withDefaultScheme(address: String): String {
@@ -1205,11 +1100,12 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
             return "http://$address"
         }
 
-        val invalidPairingCodeMessage =
-            "That isn’t an OpenCode pairing code. Run opencode pair --remote on your computer, then scan its QR code or paste the link it prints."
-        val loopbackPairingMessage: String
-            get() = "That server only listens on localhost, so this ${ThisDevice.casualName} can’t reach it. Run opencode pair --remote on your computer instead, which works from any network."
         const val EMPTY_CLIPBOARD_MESSAGE = "Your clipboard is empty"
         const val NOT_A_PAIRING_LINK_MESSAGE = "That isn’t a pairing link"
     }
 }
+
+internal val serverNoLongerSavedMessage: String
+    get() = "This server is no longer saved on this ${ThisDevice.name}. Connect to it again to open the session."
+
+internal const val sessionNoLongerAvailableMessage = "It may have been deleted, or the server may be unavailable."

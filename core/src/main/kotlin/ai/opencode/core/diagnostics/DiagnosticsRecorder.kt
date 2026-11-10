@@ -321,6 +321,13 @@ class DiagnosticsRecorder(
         var currentNavigationEpoch: Int? = null
         var currentSessionID: String? = null
         val requestStarts = HashMap<String, Double>()
+
+        // When `requestStarts` was last swept, and how many events have come since.
+        var requestPrunedAt = Double.NEGATIVE_INFINITY
+        var eventsSinceRequestPrune = 0
+
+        // Sweeps of `requestStarts`, so a test can count them: they are periodic.
+        var requestPrunes = 0
     }
 
     private val lock = Any()
@@ -411,6 +418,17 @@ class DiagnosticsRecorder(
             else -> DiagnosticsEvent.Kind.Mark
         }
         DiagnosticsEvent(kind = kind, monotonicSeconds = now, wallDate = wall, name = name, sessionID = sessionID, navigationEpoch = state.currentNavigationEpoch)
+    }
+
+    /**
+     * How the app reaches its server: a path change, an address race, a stalled event stream.
+     * [detail] carries kinds, counts and timings only, never an address.
+     */
+    fun recordLink(name: String, detail: String) = record { now, wall ->
+        DiagnosticsEvent(
+            kind = DiagnosticsEvent.Kind.Stream, monotonicSeconds = now, wallDate = wall, name = name,
+            sessionID = null, navigationEpoch = state.currentNavigationEpoch, reason = detail,
+        )
     }
 
     /** One live Motion Watch jump (kind, row kinds, stable IDs and detail only; never message text). */
@@ -552,10 +570,22 @@ class DiagnosticsRecorder(
 
     private fun prune(now: Double) {
         val oldest = now - retentionSeconds
-        state.requestStarts.entries.removeAll { it.value < oldest }
+        // A sweep walks every unfinished start, so it runs periodically rather than on every
+        // recorded event; unswept starts are only ever read by an end.
+        state.eventsSinceRequestPrune += 1
+        if (state.eventsSinceRequestPrune >= REQUEST_PRUNE_EVERY_EVENTS || now - state.requestPrunedAt >= REQUEST_PRUNE_EVERY_SECONDS) {
+            state.eventsSinceRequestPrune = 0
+            state.requestPrunedAt = now
+            state.requestStarts.entries.removeAll { it.value < oldest }
+            state.requestPrunes += 1
+        }
+        // Unfinished timings stay bounded however long they wait for a sweep.
         if (state.requestStarts.size > maximumEvents) state.requestStarts.minByOrNull { it.value }?.key?.let(state.requestStarts::remove)
         while (state.events.isNotEmpty() && state.events.first().monotonicSeconds < oldest) state.events.removeFirst()
     }
+
+    /** Sweeps of the request-start dictionary, for tests: never one per event. */
+    val requestPruneCount: Int get() = synchronized(lock) { state.requestPrunes }
 
     private fun notifyChange() {
         if (notifyPending) return
@@ -571,6 +601,13 @@ class DiagnosticsRecorder(
         const val TRANSCRIPTS_DEFAULTS_KEY = "diagnostics.includeTranscripts"
         const val EXCERPT_LIMIT = 120
         const val NOTIFY_INTERVAL = 0.25
+
+        /**
+         * The request-start dictionary is swept every this many events, or after this long,
+         * whichever comes first: the sweep walks it, and it runs for every recorded event.
+         */
+        const val REQUEST_PRUNE_EVERY_EVENTS = 64
+        const val REQUEST_PRUNE_EVERY_SECONDS = 5.0
         const val DEFAULT_RETENTION_SECONDS = 600.0
         val retentionMinutes: Int = (DEFAULT_RETENTION_SECONDS / 60).toInt()
         const val TOUCH_PROBE_EVENT_NAME = "touch_probe"

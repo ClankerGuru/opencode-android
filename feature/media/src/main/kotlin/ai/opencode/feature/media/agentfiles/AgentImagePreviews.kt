@@ -4,6 +4,7 @@ import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.log.AppLog
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.server.retry.NetworkPathMonitor
 import android.content.ComponentCallbacks2
 import android.content.res.Configuration
@@ -30,11 +31,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.nio.ByteBuffer
-import java.security.MessageDigest
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import java.util.Collections
 import java.util.WeakHashMap
 import kotlin.math.max
@@ -450,6 +447,22 @@ class AgentImagePreviews(
         if (isHeld(entry) && !isHeld(old) && key in probed) armDeadline(key)
     }
 
+    /**
+     * Changes [key]'s entry where it stands: every write goes through [set], so a layout change
+     * always reaches the list first.
+     */
+    private fun mutate(key: AgentImageKey, change: (Entry) -> Entry) {
+        set(key, change(entry(key)))
+    }
+
+    /**
+     * Settles [key] at [phase], keeping the shape and deadline it was laid out at: what it shows
+     * is no longer the pixels that were up.
+     */
+    private fun settle(key: AgentImageKey, phase: Phase) {
+        mutate(key) { it.copy(phase = phase, loadedAt = null, rechecking = false) }
+    }
+
     // Shapes
 
     /**
@@ -491,9 +504,8 @@ class AgentImagePreviews(
             runCatching { sleep(SHAPE_DEADLINE) }
             if (!currentCoroutineContext().isActive) return@launch
             deadlines.remove(key)
-            val entry = entry(key)
-            if (!isHeld(entry)) return@launch
-            set(key, entry.copy(overdue = true))
+            if (!isHeld(entry(key))) return@launch
+            mutate(key) { it.copy(overdue = true) }
             trace("image-overdue")
         }
     }
@@ -516,7 +528,7 @@ class AgentImagePreviews(
             is AgentImageProbeResult.Size -> {
                 if (entry.size != result.size) {
                     val wasOverdue = entry.overdue
-                    set(key, entry.copy(size = result.size))
+                    mutate(key) { it.copy(size = result.size) }
                     trace("image-shape", "ms" to ms, "source" to "probe", "late" to wasOverdue)
                 }
                 sizes.store(result.size, key)
@@ -524,7 +536,7 @@ class AgentImagePreviews(
             }
             AgentImageProbeResult.NotFound -> {
                 forget(key)
-                set(key, Entry(phase = Phase.Missing, size = entry.size, overdue = entry.overdue))
+                settle(key, Phase.Missing)
             }
             AgentImageProbeResult.NotModified, AgentImageProbeResult.Unknown -> Unit
         }
@@ -541,12 +553,11 @@ class AgentImagePreviews(
         requests[key] = request
         if (entriesState[key] == null) entriesState[key] = entry(key)
         if (entry(key).phase == Phase.Loaded) pin(key)
-        val current = entry(key)
-        if (current.phase == Phase.Loaded && image(key) == null) {
+        if (entry(key).phase == Phase.Loaded && image(key) == null) {
             // The cache let the pixels go: they're owed again, to every place that shows them,
             // until a read brings them (however it's cancelled meanwhile).
             fresh.removeAll { it.key == key }
-            set(key, current.copy(phase = Phase.Waiting, loadedAt = null))
+            mutate(key) { it.copy(phase = Phase.Waiting, loadedAt = null) }
         }
         if (isDeferredByNetwork(key)) {
             recordConstrained(key, setOf(sighting))
@@ -597,9 +608,10 @@ class AgentImagePreviews(
         // It stays counted until its job has finished, so no more than CONCURRENT_READS ever run.
         read.cancelled = true
         read.job.cancel()
-        var entry = entry(key)
-        if (entry.phase == Phase.Loading) entry = entry.copy(phase = Phase.Waiting)
-        set(key, entry.copy(rechecking = false))
+        mutate(key) { entry ->
+            val phase = if (entry.phase == Phase.Loading) Phase.Waiting else entry.phase
+            entry.copy(phase = phase, rechecking = false)
+        }
     }
 
     private fun enqueue(key: AgentImageKey) {
@@ -624,10 +636,16 @@ class AgentImagePreviews(
         nextReadID += 1
         val id = nextReadID
         val sightings = unanswered.remove(key)?.toSet() ?: emptySet()
-        var entry = entry(key)
-        val rechecks = entry.phase == Phase.Loaded && image(key) != null
-        if (rechecks) entry = entry.copy(rechecking = true) else if (entry.phase == Phase.Waiting) entry = entry.copy(phase = Phase.Loading)
-        set(key, entry)
+        val rechecks = entry(key).phase == Phase.Loaded && image(key) != null
+        mutate(key) { entry ->
+            if (rechecks) {
+                entry.copy(rechecking = true)
+            } else if (entry.phase == Phase.Waiting) {
+                entry.copy(phase = Phase.Loading)
+            } else {
+                entry
+            }
+        }
         val sent = if (rechecks) validators[key]?.takeIf { !it.isEmpty } else null
         // The pixels a 304 confirms, kept until it answers whatever the cache does.
         val pinnedImage = if (rechecks) image(key) else null
@@ -681,14 +699,14 @@ class AgentImagePreviews(
                 AgentImageResponse.NotModified -> {
                     // Put back what the cache may have let go meanwhile.
                     if (image(key) == null && pinnedImage != null) store(pinnedImage, key)
-                    set(key, entry(key).copy(rechecking = false))
+                    mutate(key) { it.copy(rechecking = false) }
                 }
                 is AgentImageResponse.File -> {
                     val image = decoder(response.data)
                     if (image == null) {
                         if (!isCurrent(key, id)) return requeue(key, sightings)
                         forget(key)
-                        set(key, Entry(phase = Phase.Unavailable, size = entry(key).size, overdue = entry(key).overdue))
+                        settle(key, Phase.Unavailable)
                     } else {
                         if (!isCurrent(key, id) || !currentCoroutineContext().isActive) return requeue(key, sightings)
                         val size = AgentImageHeader.size(response.data, final = true)
@@ -719,30 +737,29 @@ class AgentImagePreviews(
                     if (!isCurrent(key, id)) return requeue(key, sightings)
                     noteRead(key)
                     forget(key)
-                    set(key, Entry(phase = Phase.Missing, size = entry(key).size, overdue = entry(key).overdue))
+                    settle(key, Phase.Missing)
                     failures.remove(key)
                     answered()
                 }
                 AgentImageDownload.Failure.TooLarge -> {
                     if (!isCurrent(key, id)) return requeue(key, sightings)
                     forget(key)
-                    set(key, Entry(phase = Phase.Unavailable, size = entry(key).size, overdue = entry(key).overdue))
+                    settle(key, Phase.Unavailable)
                     answered()
                 }
                 AgentImageDownload.Failure.Constrained -> {
                     if (!isCurrent(key, id)) return requeue(key, sightings)
-                    val entry = entry(key)
-                    if (entry.phase == Phase.Loaded) {
+                    if (entry(key).phase == Phase.Loaded) {
                         // A recheck refused on a constrained network keeps what's shown,
                         // unconfirmed, so tapping fetches the current file.
-                        set(key, entry.copy(rechecking = false))
+                        mutate(key) { it.copy(rechecking = false) }
                         constrainedSightings.getOrPut(key) { HashSet() }.addAll(sightings)
                     } else {
                         onLayoutChange?.invoke(key)
                         recordConstrained(key, sightings)
                         deadlines.remove(key)?.cancel()
                         probed.remove(key)
-                        set(key, entry.copy(phase = Phase.Waiting, overdue = false))
+                        mutate(key) { it.copy(phase = Phase.Waiting, overdue = false) }
                     }
                     failures.remove(key)
                     retrying.remove(key)
@@ -756,13 +773,12 @@ class AgentImagePreviews(
 
     private fun failedOnTheWay(key: AgentImageKey, id: Int, sightings: Set<AgentImageSighting>) {
         if (!isCurrent(key, id)) return requeue(key, sightings)
-        val entry = entry(key)
         when {
             // A recheck that failed on the way keeps what's shown, unconfirmed.
-            entry.phase == Phase.Loaded -> set(key, entry.copy(rechecking = false))
+            entry(key).phase == Phase.Loaded -> mutate(key) { it.copy(rechecking = false) }
             // A retry is coming: the preview waits at its shape rather than turning into a card and back.
-            (failures[key] ?: 0) < RETRY_DELAYS.size -> set(key, entry.copy(phase = Phase.Waiting))
-            else -> set(key, Entry(phase = Phase.Unavailable, size = entry.size, overdue = entry.overdue))
+            (failures[key] ?: 0) < RETRY_DELAYS.size -> mutate(key) { it.copy(phase = Phase.Waiting) }
+            else -> settle(key, Phase.Unavailable)
         }
         // Not an answer: these sightings read again on the retry.
         retrying.getOrPut(key) { HashSet() }.addAll(sightings)
@@ -804,7 +820,7 @@ class AgentImagePreviews(
         val wasMissing = entry.phase == Phase.Missing
         if (!wasMissing && entry.size == size) return
         val wasOverdue = entry.overdue
-        set(key, entry.copy(phase = Phase.Loading, size = size))
+        mutate(key) { it.copy(phase = Phase.Loading, size = size) }
         if (!wasMissing) trace("image-shape", "source" to "read", "late" to wasOverdue)
         // The read's validator comes with its file; until then the shape has none.
         sizes.store(size, key)
@@ -866,10 +882,13 @@ class AgentImagePreviews(
                 dispatcher = Dispatchers.Unconfined,
             )
 
-        /** When the pixels of a decided batch's [index]th tile may begin to fade in: a gentle stagger from when it was decided. */
+        /**
+         * When the pixels of a decided batch's [index]th tile may begin to fade in: the shared
+         * stagger (`staggerStep` apart, within `staggerCap`) from when it was decided.
+         */
         fun pixelsNotBefore(batch: BentoBatch?, index: Int): Double {
             batch ?: return 0.0
-            return batch.decidedAt + AgentImageTunables.pixelStagger * index
+            return batch.decidedAt + MotionRole.staggerDelay(index)
         }
 
         /** No shape to draw yet, nor a card: out of the layout. */
@@ -915,117 +934,3 @@ typealias AgentImageLoader = suspend (AgentImageRequest, AgentImageValidators?, 
 typealias AgentImageDecoder = suspend (ByteArray) -> Bitmap?
 typealias AgentImageSleep = suspend (Duration) -> Unit
 typealias AgentImageProber = suspend (AgentImageRequest, String?) -> AgentImageProbeResult
-
-/**
- * Shapes of images read before, so a preview opens at its own shape before anything is read
- * again (iOS `AgentImageSizeCache`). Keyed by a hash of the server and path, at most [LIMIT]
- * entries, oldest out first, saved at most once a second off the main thread.
- */
-class AgentImageSizeCache(private val file: File?) {
-    @Serializable
-    private data class Stored(
-        val sizes: MutableMap<String, List<Double>> = LinkedHashMap(),
-        val order: MutableList<String> = ArrayList(),
-        /** The ETag each shape was read under, to revalidate it with. */
-        var tags: MutableMap<String, String>? = LinkedHashMap(),
-    )
-
-    private val lock = Any()
-    private var stored: Stored? = null
-    private var pendingSave = false
-
-    private fun load(): Stored {
-        stored?.let { return it }
-        val loaded = file?.takeIf { it.exists() }?.let { runCatching { json.decodeFromString<Stored>(it.readText()) }.getOrNull() } ?: Stored()
-        stored = loaded
-        return loaded
-    }
-
-    fun size(key: AgentImageKey): AgentImageSize? = synchronized(lock) {
-        val pair = load().sizes[hash(key)] ?: return null
-        if (pair.size != 2 || pair[0] <= 0 || pair[1] <= 0) return null
-        AgentImageSize(pair[0], pair[1])
-    }
-
-    fun store(size: AgentImageSize, key: AgentImageKey) {
-        val changed = synchronized(lock) {
-            val stored = load()
-            val hash = hash(key)
-            val value = listOf(size.width, size.height)
-            if (stored.sizes[hash] == value) return@synchronized false
-            if (stored.sizes[hash] == null) stored.order.add(hash)
-            stored.sizes[hash] = value
-            while (stored.order.size > LIMIT) {
-                val oldest = stored.order.removeAt(0)
-                stored.sizes.remove(oldest)
-                stored.tags?.remove(oldest)
-            }
-            true
-        }
-        if (changed) save()
-    }
-
-    fun entityTag(key: AgentImageKey): String? = synchronized(lock) { load().tags?.get(hash(key)) }
-
-    /** The ETag the stored shape belongs to (null forgets it). */
-    fun storeEntityTag(entityTag: String?, key: AgentImageKey) {
-        val changed = synchronized(lock) {
-            val stored = load()
-            val hash = hash(key)
-            if (stored.sizes[hash] == null || stored.tags?.get(hash) == entityTag) return@synchronized false
-            val tags = stored.tags ?: LinkedHashMap<String, String>().also { stored.tags = it }
-            if (entityTag == null) tags.remove(hash) else tags[hash] = entityTag
-            true
-        }
-        if (changed) save()
-    }
-
-    private fun save() {
-        val file = file ?: return
-        val scheduled = synchronized(lock) {
-            val wasPending = pendingSave
-            pendingSave = true
-            !wasPending
-        }
-        if (!scheduled) return
-        saveScope.launch {
-            delay(1.seconds)
-            val text = synchronized(lock) {
-                pendingSave = false
-                stored?.let { json.encodeToString(Stored.serializer(), it.copy(sizes = LinkedHashMap(it.sizes), order = ArrayList(it.order), tags = it.tags?.let(::LinkedHashMap))) }
-            } ?: return@launch
-            runCatching {
-                val temporary = File(file.parentFile, file.name + ".tmp")
-                temporary.writeText(text)
-                temporary.renameTo(file)
-            }
-        }
-    }
-
-    companion object {
-        const val LIMIT = 600
-
-        private val json = Json { ignoreUnknownKeys = true }
-        private val saveScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-        /**
-         * `cacheDir/AgentImageSizes.json`; in memory where no context is installed. Lab runs that
-         * keep no transcript on disk keep no shapes either, so one run never opens with another's
-         * (iOS `LabTranscriptDiskCache.isDisabled`, `OPENCODE_LAB_DISABLE_TRANSCRIPT_DISK_CACHE=1`):
-         * `debug.opencode.lab_disable_transcript_disk_cache` = 1, debuggable builds only.
-         */
-        val live: AgentImageSizeCache by lazy {
-            val disabled = LabLaunch.property("debug.opencode.lab_disable_transcript_disk_cache") == "1"
-            AgentImageSizeCache(
-                if (disabled) null else runCatching { File(dependency(AppContext).cacheDir, "AgentImageSizes.json") }.getOrNull(),
-            )
-        }
-
-        val inMemory: AgentImageSizeCache get() = AgentImageSizeCache(null)
-
-        /** SHA-256 of `server|path`, first 10 bytes as hex. */
-        private fun hash(key: AgentImageKey): String =
-            MessageDigest.getInstance("SHA-256").digest("${key.server}|${key.path}".toByteArray())
-                .take(10).joinToString("") { "%02x".format(it) }
-    }
-}

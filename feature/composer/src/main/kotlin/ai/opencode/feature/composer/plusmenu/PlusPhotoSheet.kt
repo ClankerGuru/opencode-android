@@ -2,38 +2,39 @@ package ai.opencode.feature.composer.plusmenu
 
 import ai.opencode.core.ui.OpenCodeSheetDefaults
 import ai.opencode.core.ui.OpenCodeSheetHandleDefaults
-import ai.opencode.core.haptics.Haptic
-import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.haptics.Haptic
+import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.ui.appFormattingLocale
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionRole
+import ai.opencode.core.motion.MotionRubberBand
+import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.ui.OpenCodeIcon
+import ai.opencode.core.ui.OpenCodeIconButton
+import ai.opencode.core.ui.OpenCodeIconButtonStyle
+import ai.opencode.core.ui.OpenCodePrimaryButton
+import ai.opencode.core.ui.OpenCodeSecondaryButton
+import ai.opencode.core.ui.OpenCodeShape
+import ai.opencode.core.ui.OpenCodeSurfaces
+import ai.opencode.core.ui.OpenCodeTextStyles
+import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.composer.AttachmentPickerButton
 import ai.opencode.feature.composer.ComposerMorph
 import ai.opencode.feature.composer.ComposerMorphTunables
 import ai.opencode.feature.composer.LocalComposerMorphContentActive
 import ai.opencode.feature.composer.PickerTunables
 import ai.opencode.feature.composer.PlusMenuTunables
-import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.MotionSpring
-import ai.opencode.core.motion.rememberReduceMotion
-import ai.opencode.core.ui.OpenCodeIcon
-import ai.opencode.core.ui.OpenCodeIconButton
-import ai.opencode.core.ui.OpenCodePrimaryButton
-import ai.opencode.core.ui.OpenCodeSecondaryButton
-import ai.opencode.core.ui.OpenCodeShape
-import ai.opencode.core.ui.OpenCodeTextStyles
-import ai.opencode.core.ui.OpenCodeTheme
-import ai.opencode.core.ui.SFSymbol
-import ai.opencode.core.ui.openCodeTapTarget
 import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.res.Configuration
 import android.content.res.Resources
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -42,6 +43,10 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -82,19 +87,28 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionOnScreen
@@ -108,19 +122,11 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.PointerInputChange
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.util.VelocityTracker
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.semantics.testTag
-import kotlin.math.hypot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -135,6 +141,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import kotlin.math.abs
+import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -159,12 +166,14 @@ class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(Photo
         private set
 
     /**
-     * Picks held while the sheet folds away after Add or Back, so the Add pill and the order
+     * The picks shown while the sheet folds away after Add or Back, so the Add pill and the order
      * badges stay as they were and dissolve with the sheet instead of changing on the tap.
      */
-    var closingPicks: List<String> by mutableStateOf(emptyList())
-        private set
-    val closingPickCount: Int get() = closingPicks.size
+    private var closingPicks: List<String>? by mutableStateOf(null)
+
+    /** What the sheet shows: its picks, or the last set while it folds away. */
+    val shownPicks: List<String> get() = closingPicks ?: picks
+    val shownPickCount: Int get() = shownPicks.size
 
     /** Top visible photo ID when the user scrolled the library, so reopening the sheet in the same session returns there. */
     var savedScrollPhotoID: String? = null
@@ -288,11 +297,11 @@ class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(Photo
     }
 
     fun toggle(id: String) {
-        resetClosingPicks()
+        closingPicks = null
         if (id in picks) {
             picks = picks - id
             haptics.play(Haptic.selection)
-        } else if (picks.size < AttachmentPickerButton.maxPhotoSelection(plusMenu = true)) {
+        } else if (picks.size < AttachmentPickerButton.MAX_PHOTO_SELECTION) {
             picks = picks + id
             haptics.play(Haptic.selection)
         } else {
@@ -305,13 +314,13 @@ class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(Photo
         haptics.play(Haptic.tap)
     }
 
-    fun order(id: String): Int? = (if (picks.isEmpty()) closingPicks else picks).indexOf(id).takeIf { it >= 0 }?.plus(1)
+    fun order(id: String): Int? = shownPicks.indexOf(id).takeIf { it >= 0 }?.plus(1)
 
     /** Picks handed over to be attached; the sheet starts over next time. */
     fun takePicks(): List<String> {
-        closingPicks = picks
         val taken = picks
-        picks = emptyList()
+        closingPicks = taken
+        clearPicks()
         return taken
     }
 
@@ -326,7 +335,7 @@ class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(Photo
     }
 
     fun resetClosingPicks() {
-        if (closingPicks.isNotEmpty()) closingPicks = emptyList()
+        if (closingPicks != null) closingPicks = null
     }
 
     fun resetSavedScrollPosition() {
@@ -509,10 +518,10 @@ data class PlusPhotoSheetDetent(
     }
 
     companion object {
+        /** UIKit's rubber band (`MotionRubberBand`), never more than [limit]. */
         fun rubberBand(excess: Float, limit: Float, factor: Float): Float {
             if (excess <= 0 || limit <= 0 || factor <= 0) return 0f
-            val scaled = excess * factor
-            return (limit * scaled) / (limit + scaled)
+            return MotionRubberBand(limit.toDouble(), factor.toDouble()).stretch(excess.toDouble()).toFloat()
         }
 
         fun normalizedInitialVelocity(velocity: Float, from: Float, to: Float): Float {
@@ -921,7 +930,7 @@ fun PlusPhotoSheetContent(
                 PlusPhotoTile(
                     photo = photo,
                     order = library.order(photo.id),
-                    canPickMore = library.picks.size < AttachmentPickerButton.maxPhotoSelection(plusMenu = true),
+                    canPickMore = library.picks.size < AttachmentPickerButton.MAX_PHOTO_SELECTION,
                     scale = density,
                     inFlight = flights.hidesPhoto(photo.id),
                     flights = flights,
@@ -989,14 +998,18 @@ private fun DeniedNotice(onOpenSettings: () -> Unit) {
 
 /** iOS `PlusPhotoSheetFoot.height` / `inset` (dp). */
 object PlusPhotoSheetFootDefaults {
-    const val HEIGHT = 48f
+    /** The floating toolbar's height (Material 3 Expressive's, around a 48 dp button). */
+    const val HEIGHT = 64f
     const val INSET = 16f
+    /** The toolbar's own inner padding at its ends. */
+    const val PADDING = 8f
 }
 
 /**
- * Back on the leading edge and the trailing [PlusPhotoPill] along the photo sheet's foot: All
- * Photos with no picks (expands the sheet), Add N Photos once photos are picked; a long press
- * offers All Photos and, under limited access, Select More Photos…. iOS `PlusPhotoSheetFoot`.
+ * The photo sheet's foot (iOS `PlusPhotoSheetFoot`) as a floating toolbar, like the system photo
+ * picker's, on the desktop's floating surface (fill, hairline and raised shadow): Back on the leading edge and the trailing [PlusPhotoPillControl]:
+ * All Photos with no picks (expands the sheet), Add N Photos once photos are picked; a long press
+ * offers All Photos and, under limited access, Select More Photos….
  */
 @Composable
 fun PlusPhotoSheetFoot(
@@ -1007,34 +1020,45 @@ fun PlusPhotoSheetFoot(
     onAdd: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val count = if (library.picks.isEmpty()) library.closingPickCount else library.picks.size
-    Row(
-        modifier
+    val count = library.shownPickCount
+    Surface(
+        modifier = modifier
             .fillMaxWidth()
-            .padding(start = (PlusPhotoSheetFootDefaults.INSET + 2).dp, end = (PlusPhotoSheetFootDefaults.INSET + 2).dp, bottom = PlusPhotoSheetFootDefaults.INSET.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(start = PlusPhotoSheetFootDefaults.INSET.dp, end = PlusPhotoSheetFootDefaults.INSET.dp, bottom = PlusPhotoSheetFootDefaults.INSET.dp)
+            .height(PlusPhotoSheetFootDefaults.HEIGHT.dp),
+        shape = OpenCodeShape.panel,
+        color = OpenCodeSurfaces.color,
+        border = OpenCodeSurfaces.border,
+        shadowElevation = OpenCodeSurfaces.raisedShadow,
     ) {
-        OpenCodeIconButton(
-            symbol = SFSymbol.ChevronLeft,
-            contentDescription = "Back",
-            onClick = onBack,
-            // iOS `accessibilityHint("Returns to attachment options")`: TalkBack reads “Double-tap to return…”.
-            modifier = Modifier.semantics {
-                testTag = "plus-photo-back"
-                onClick(label = "Return to attachment options") { onBack(); true }
-            },
-        )
-        Spacer(Modifier.weight(1f).width(12.dp))
-        PlusPhotoPill(
-            count = count,
-            isLimited = library.access == PhotoLibraryAccess.Limited,
-            onAllPhotos = onAllPhotos,
-            onSelectMore = library::manageLimitedSelection,
-            onAdd = {
-                library.addPressed()
-                onAdd()
-            },
-        )
+        Row(
+            Modifier.padding(horizontal = PlusPhotoSheetFootDefaults.PADDING.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OpenCodeIconButton(
+                symbol = SFSymbol.ChevronBackward,
+                contentDescription = "Back",
+                onClick = onBack,
+                // A bare glyph: the toolbar is its surface.
+                style = OpenCodeIconButtonStyle.Standard,
+                // iOS `accessibilityHint("Returns to attachment options")`: TalkBack reads “Double-tap to return…”.
+                modifier = Modifier.semantics {
+                    testTag = "plus-photo-back"
+                    onClick(label = "Return to attachment options") { onBack(); true }
+                },
+            )
+            Spacer(Modifier.weight(1f).width(12.dp))
+            PlusPhotoPillControl(
+                count = count,
+                isLimited = library.access == PhotoLibraryAccess.Limited,
+                onAllPhotos = onAllPhotos,
+                onSelectMore = library::manageLimitedSelection,
+                onAdd = {
+                    library.addPressed()
+                    onAdd()
+                },
+            )
+        }
     }
 }
 
@@ -1111,24 +1135,31 @@ private fun PlusPhotoTile(
     }
     DisposableEffect(photo.id) { onDispose { flights.source(photo.id, null) } }
 
+    val reduceMotion = rememberReduceMotion()
+    // Gone at once as its photo takes off; back on the swap's fade once it lands.
     val alpha by animateFloatAsState(
         targetValue = if (inFlight) 0f else 1f,
-        // iOS `.smooth(duration: 0.25)`: a spring with no bounce.
-        animationSpec = if (inFlight) androidx.compose.animation.core.snap() else MotionSpring(0.25).spec(),
+        animationSpec = if (inFlight) androidx.compose.animation.core.snap() else Motion.swap.animation(reduceMotion = reduceMotion),
         label = "tile-in-flight",
     )
     // iOS `PhotoSelectionButtonStyle`: press feedback changes only overlays. A press only dims
-    // (previewing the next number flashed a "1" on any tile a sheet drag started on); picked and
-    // unpicked show at once, with the selection haptic, never on a fade.
+    // (previewing the next number flashed a "1" on any tile a sheet drag started on). Picked, the
+    // photo draws inset with rounded corners under its number, as the system photo picker marks a
+    // selection; the number shows at once, with the selection haptic, and the inset springs.
     val interaction = remember { MutableInteractionSource() }
     val isPressed by interaction.collectIsPressedAsState()
-    val pressDim = if (isPressed && !picked) PlusMenuTunables.SELECTION_DIM.toFloat() * 0.5f else 0f
-    val dim = if (picked) PlusMenuTunables.SELECTION_DIM.toFloat() else pressDim
+    val dim = if (isPressed && !picked) PlusMenuTunables.SELECTION_DIM.toFloat() * 0.5f else 0f
+    val pickedInset by animateFloatAsState(
+        targetValue = if (picked) 1f else 0f,
+        animationSpec = MotionRole.MicroIn.animation(if (picked) MotionPhase.Enter else MotionPhase.Exit, reduceMotion),
+        label = "tile-picked",
+    )
+    val clip = remember { Path() }
     // The limit is picked: the rest wash out, so a tap past it reads as “full”, not broken.
     val full = !picked && !canPickMore
     val limitDim by animateFloatAsState(
         targetValue = if (full) PlusMenuTunables.LIMIT_DIM.toFloat() else 0f,
-        animationSpec = tween(200, easing = Motion.EaseOut),
+        animationSpec = Motion.swap.animation(if (full) MotionPhase.Enter else MotionPhase.Exit, reduceMotion),
         label = "tile-limit",
     )
     val washColor = MaterialTheme.colorScheme.background
@@ -1144,16 +1175,28 @@ private fun PlusPhotoTile(
             }
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .drawWithContent {
-                drawContent()
-                resolved?.let { drawAspectFill(it, Rect(Offset.Zero, size)) }
+                // The photo first, then the badges over it, then the wash over everything.
+                val inset = PlusMenuTunables.SELECTED_TILE_INSET.dp.toPx() * pickedInset
+                val photoRect = Rect(inset, inset, size.width - inset, size.height - inset)
+                resolved?.let { image ->
+                    if (inset > 0.5f) {
+                        val radius = PlusMenuTunables.SELECTED_TILE_RADIUS.dp.toPx() * pickedInset
+                        clip.reset()
+                        clip.addRoundRect(RoundRect(photoRect, CornerRadius(radius)))
+                        clipPath(clip) { drawAspectFill(image, photoRect) }
+                    } else {
+                        drawAspectFill(image, photoRect)
+                    }
+                }
                 if (dim > 0f) drawRect(Color.Black.copy(alpha = dim))
+                drawContent()
                 if (limitDim > 0f) drawRect(washColor.copy(alpha = limitDim))
             }
             .clickable(interactionSource = interaction, indication = null, enabled = !inFlight, role = Role.Button, onClick = onTap)
             .clearAndSetSemantics {
                 contentDescription = if (photo.isVideo) "Video" else "Photo"
                 stateDescription = if (full) {
-                    listOf(description, "${AttachmentPickerButton.maxPhotoSelection(plusMenu = true)} photos is the most you can add")
+                    listOf(description, "${AttachmentPickerButton.MAX_PHOTO_SELECTION} photos is the most you can add")
                         .filter { it.isNotEmpty() }.joinToString(", ")
                 } else {
                     description
@@ -1169,7 +1212,7 @@ private fun PlusPhotoTile(
         if (picked) {
             Box(
                 Modifier
-                    .align(Alignment.BottomEnd)
+                    .align(Alignment.TopStart)
                     .padding(PlusMenuTunables.SELECTION_BADGE_INSET.dp)
                     .size(PlusMenuTunables.SELECTION_BADGE_SIZE.dp)
                     .background(OpenCodeTheme.colors.accent, CircleShape)
@@ -1178,7 +1221,8 @@ private fun PlusPhotoTile(
             ) {
                 Text(
                     order?.toString() ?: "",
-                    color = Color.White,
+                    // The accent's own foreground, so the number reads on a light accent too.
+                    color = OpenCodeTheme.colors.variant.accent.highContrastForeground.color,
                     style = OpenCodeTextStyles.caption1.copy(fontWeight = FontWeight.Bold, fontFeatureSettings = "tnum"),
                 )
             }

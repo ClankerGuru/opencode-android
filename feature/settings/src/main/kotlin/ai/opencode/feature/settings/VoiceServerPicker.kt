@@ -1,6 +1,5 @@
 package ai.opencode.feature.settings
 
-import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.cancellable
 import ai.opencode.feature.voice.ServerVoiceModels
@@ -13,8 +12,8 @@ import ai.opencode.feature.voice.VoiceReadiness
 import ai.opencode.feature.voice.VoiceRoute
 import ai.opencode.server.OpenCodeServer
 
-// Port of iOS `Settings/VoiceServerPicker.swift`: Settings › Voice › Voice Provider (the Server
-// Voice experiment), which provider calls use. Automatic by default (the connected server, this
+// Port of iOS `Settings/VoiceServerPicker.swift`: Settings › Voice › Voice Provider, which
+// provider calls use. Automatic by default (the connected server, this
 // phone's key, then another saved server that's ready), or one picked. The rows themselves are
 // on the Voice Provider page (`VoiceProviderPage.kt`).
 
@@ -33,11 +32,10 @@ val VoiceSettingsFeature.State.readiness: VoiceReadiness
 
 val VoiceSettingsFeature.State.broker: VoiceBroker
     get() = VoiceBroker(
-        serverVoice = ExperimentalFeature.serverVoice.isActive(serverVoiceExperiment),
         choice = voiceServer,
         provider = serverVoiceProvider,
         connected = connectedServer,
-        saved = { savedServers + listOfNotNull(savedServer) },
+        saved = savedServers + listOfNotNull(savedServer),
         readiness = readiness,
     )
 
@@ -75,14 +73,17 @@ val VoiceSettingsFeature.State.keySource: VoiceKeySource
     }
 
 /**
- * Asks each saved server which voice models it holds keys for, so Voice Provider can say which
- * are ready and Automatic can move on to them. A server that doesn't answer reads as offline; one
- * without the list (a 404) as needing an update.
+ * Asks saved servers which voice models they hold keys for, so Voice Provider can say which are
+ * ready and Automatic can move on to them. A server that doesn't answer reads as offline; one
+ * without the list (a 404) as needing an update. Settings › Voice asks the connected server; the
+ * others only when Voice Provider's page, which lists them, opens: a saved server may be asleep,
+ * and asking one that won't answer is traffic into a dead route.
  */
-internal fun VoiceSettingsFeature.checkVoiceServers(state: VoiceSettingsFeature.State): Effect<VoiceSettingsFeature.Action> {
-    if (!ExperimentalFeature.serverVoice.isActive(state.serverVoiceExperiment)) return Effect.none()
+internal fun VoiceSettingsFeature.checkVoiceServers(
+    servers: List<OpenCodeServer>,
+): Effect<VoiceSettingsFeature.Action> {
     val client = serverVoice
-    return Effect.merge((listOfNotNull(state.connectedServer) + state.otherSavedServers).map { server ->
+    return Effect.merge(servers.map { server ->
         val epoch = VoiceModelsCache.epoch(server.persistenceID)
         Effect.run<VoiceSettingsFeature.Action> { send ->
             val models = client.models(server)

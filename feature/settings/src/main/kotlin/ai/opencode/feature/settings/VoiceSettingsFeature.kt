@@ -38,18 +38,6 @@ import kotlinx.coroutines.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Data-driven provider group for the Voice Model menu so additional providers (such as Gemini
- * Live) can slot in without changing the view structure (iOS `VoiceProviderGroup`).
- */
-data class VoiceProviderGroup(val id: String, val name: String, val keyRowTitle: String, val engines: List<VoiceEngine>) {
-    constructor(provider: VoiceProvider) : this(provider.rawValue, provider.displayName, provider.keyRowTitle, provider.engines)
-
-    companion object {
-        val defaultGroups: List<VoiceProviderGroup> = VoiceProvider.allCases.map(::VoiceProviderGroup)
-    }
-}
-
-/**
  * Port of iOS `VoiceSettingsFeature` (`Settings/SettingsView.swift`) with `VoiceServerPicker.swift`'s
  * state extension: Settings › Voice. The shared values are read live through [shared]; the reducer
  * writes them only when they change.
@@ -60,7 +48,6 @@ class VoiceSettingsFeature : Reducer<VoiceSettingsFeature.State, VoiceSettingsFe
         val server: OpenCodeServer? = null,
         /** The connected server's sessions, for the Delegator page's pick (Home's, else its own load). */
         val sessions: List<OpenCodeSession> = emptyList(),
-        val providerGroups: List<VoiceProviderGroup> = VoiceProviderGroup.defaultGroups,
         val isEditingKey: Boolean = false,
         val revealsKey: Boolean = false,
         val isCheckingKey: Boolean = false,
@@ -72,7 +59,6 @@ class VoiceSettingsFeature : Reducer<VoiceSettingsFeature.State, VoiceSettingsFe
         val savedServer: OpenCodeServer? get() = shared(ServerSharedKeys.savedServer).value
         val savedServers: List<OpenCodeServer> get() = shared(ServerSharedKeys.savedServers).value
         val cachedHomeSnapshots: Map<String, CachedHomeSnapshot> get() = shared(ServerSharedKeys.cachedHomeSnapshots).value
-        val serverVoiceExperiment: Boolean get() = shared(ExperimentalFeature.serverVoice.key).value
         val voiceSessionDelegatorExperiment: Boolean get() = shared(ExperimentalFeature.voiceSessionDelegator.key).value
         val voiceDelegatorChoice: VoiceDelegatorChoice get() = shared(VoiceSharedKeys.voiceDelegatorChoice).value
         /** Each saved server's voice models, the connected one's too, by `persistenceID`, as it last answered. */
@@ -93,11 +79,10 @@ class VoiceSettingsFeature : Reducer<VoiceSettingsFeature.State, VoiceSettingsFe
         val modelRowValue: String get() = if (showsProviderRow) voiceEngine.title else voiceEngine.providerModelTitle
 
         /**
-         * Server Voice's Voice Provider row stands in for the key row. Grok always uses this
-         * phone's xAI key, so it keeps today's rows.
+         * The Voice Provider row stands in for the key row. Grok always uses this phone's xAI key,
+         * so it keeps its key row.
          */
-        val showsProviderRow: Boolean
-            get() = ExperimentalFeature.serverVoice.isActive(serverVoiceExperiment) && voiceEngine != VoiceEngine.grok
+        val showsProviderRow: Boolean get() = voiceEngine != VoiceEngine.grok
 
         val serverVoiceSupport: ServerVoiceSupport get() = broker.support(serverVoiceSupportByServer)
 
@@ -108,9 +93,6 @@ class VoiceSettingsFeature : Reducer<VoiceSettingsFeature.State, VoiceSettingsFe
                 hasOpenAIKey = hasOpenAIKey,
                 hasXAIKey = !xaiAPIKey.orEmpty().trim().isEmpty(),
             )
-
-        val showsServerUnsupported: Boolean
-            get() = broker.isEnabled && voiceEngine != VoiceEngine.grok && serverVoiceSupport == ServerVoiceSupport.unsupported
 
         val keyRowTitle: String get() = keySource.rowTitle
 
@@ -156,6 +138,7 @@ class VoiceSettingsFeature : Reducer<VoiceSettingsFeature.State, VoiceSettingsFe
         data object VoicePickerDisappeared : Action
         data class RaiseToTalkChanged(val on: Boolean) : Action
         data class CallSoundPackSelected(val pack: VoiceCallSoundPack) : Action
+        data object ProviderPageAppeared : Action
         data class VoiceModelsLoaded(val serverID: String, val asked: Int, val answer: ServerVoiceModelsAnswer) : Action
         data class VoiceDelegatorChoiceChanged(val choice: VoiceDelegatorChoice) : Action
         data object DelegatorPageAppeared : Action
@@ -177,7 +160,7 @@ class VoiceSettingsFeature : Reducer<VoiceSettingsFeature.State, VoiceSettingsFe
 
     override fun reduce(state: State, action: Action): Reduced<State, Action> = when (action) {
         Action.Task -> {
-            val voiceServers = checkVoiceServers(state)
+            val voiceServers = checkVoiceServers(listOfNotNull(state.connectedServer))
             if (!state.voiceModeEnabled || !state.keySource.isPhoneKey) {
                 Reduced(state, voiceServers)
             } else {
@@ -270,6 +253,7 @@ class VoiceSettingsFeature : Reducer<VoiceSettingsFeature.State, VoiceSettingsFe
             if (state.callSoundPack != action.pack) shared(VoiceSharedKeys.callSoundPack).set(action.pack)
             Reduced(state)
         }
+        Action.ProviderPageAppeared -> Reduced(state, checkVoiceServers(state.otherSavedServers))
         is Action.VoiceModelsLoaded -> {
             VoiceModelsCache.record(action.answer, action.serverID, action.asked)
             Reduced(state)

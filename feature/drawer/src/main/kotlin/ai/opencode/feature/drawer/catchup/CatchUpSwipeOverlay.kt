@@ -1,8 +1,6 @@
 package ai.opencode.feature.drawer.catchup
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.keyframes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,6 +34,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ai.opencode.core.motion.MotionRole
+import ai.opencode.core.motion.MotionTunables
 import ai.opencode.core.ui.OpenCodeTextStyles
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -87,14 +87,11 @@ class CatchUpBadgeState(val disposition: CatchUpDisposition) {
         isFull = full
         ringDistance = max(distance, 0f)
         if (fullChanged && full && animatedPop && !reducedMotion) {
+            // The filled disc arrives on `MotionRole.MicroIn`, from as far above full size as a
+            // micro arrival starts below it (iOS 03adf07a).
             scope?.launch {
-                pop.snapTo(1f)
-                pop.animateTo(1f, keyframes {
-                    durationMillis = 260
-                    1f at 0 using PopIn
-                    1.16f at (260 * 0.45f).toInt() using PopOut
-                    1f at 260
-                })
+                pop.snapTo(2f - MotionTunables.microInScale.value)
+                pop.animateTo(1f, MotionRole.MicroIn.animation())
             }
         } else if (clamped < 0.01f && pop.isRunning) {
             scope?.launch { pop.snapTo(1f) }
@@ -107,11 +104,6 @@ class CatchUpBadgeState(val disposition: CatchUpDisposition) {
         washDistance = other.washDistance
         isFull = other.isFull
         lastDistance = other.lastDistance
-    }
-
-    private companion object {
-        val PopIn = CubicBezierEasing(0.25f, 1f, 0.5f, 1f)
-        val PopOut = CubicBezierEasing(0.3f, 0f, 0.4f, 1f)
     }
 }
 

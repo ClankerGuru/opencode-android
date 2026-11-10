@@ -33,6 +33,8 @@ fun State.withRequestFailureAwaitingReconnect(value: Boolean): State =
     updateRequestDock { it.copy(requestFailureAwaitingReconnect = value) }
 val State.requestsConnectionIsAvailable: Boolean get() = requestDock.requestsConnectionIsAvailable
 fun State.withRequestsConnectionIsAvailable(value: Boolean): State = updateRequestDock { it.copy(requestsConnectionIsAvailable = value) }
+/** Timers may read the server: Home has heard from it and the app is in front. Otherwise Home's connection loop is the only thing that asks. */
+val State.pollsServer: Boolean get() = requestsConnectionIsAvailable && !isBackgrounded
 val State.requestErrors: Map<String, String> get() = requestDock.requestErrors
 fun State.withRequestErrors(value: Map<String, String>): State = updateRequestDock { it.copy(requestErrors = value) }
 /** While a pending request docks, the composer is its answer, and what was typed waits here. */
@@ -50,9 +52,6 @@ fun State.withAnswerBarBaseline(value: String): State = updateRequestDock { it.c
 /** The pending request the dock shows; null shows the first. */
 val State.selectedRequestID: String? get() = requestDock.selectedRequestID
 fun State.withSelectedRequestID(value: String?): State = updateRequestDock { it.copy(selectedRequestID = value) }
-/** Requests whose last reply didn't reach the server: their dock reads “Couldn’t send …”. */
-val State.failedReplyIDs: Set<String> get() = requestDock.failedReplyIDs
-fun State.withFailedReplyIDs(value: Set<String>): State = updateRequestDock { it.copy(failedReplyIDs = value) }
 /** A successful reply must not become actionable again through an older poll. */
 val State.completedRequestIDs: Set<String> get() = requestDock.completedRequestIDs
 fun State.withCompletedRequestIDs(value: Set<String>): State = updateRequestDock { it.copy(completedRequestIDs = value) }

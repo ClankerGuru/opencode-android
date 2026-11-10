@@ -6,6 +6,7 @@ import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.core.files.ComposerFileStaging
 import ai.opencode.core.files.ComposerStagedFile
 import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.ui.drawerPanHorizontalScroller
@@ -221,7 +222,7 @@ class SessionAttachmentImporter internal constructor(
             },
             // iOS `maxPhotoSelection(plusMenu: usesPlusMenuSheet)`; the session always uses the
             // New Plus Menu (`SessionPhotoSheetState.usesPlusMenuSheet`), so its sheet's 8.
-            limit = AttachmentPickerButton.maxPhotoSelection(plusMenu = true),
+            limit = AttachmentPickerButton.MAX_PHOTO_SELECTION,
         )
     }
 
@@ -337,12 +338,12 @@ class SessionAttachmentImporter internal constructor(
     /**
      * iOS `syncPickedPhotos` / `addLibraryPhotos`: photos picked in the system picker attach at
      * once — images on the inline image path, videos as uploads (when the server takes them).
-     * At most `maxPhotoSelection(plusMenu = true)` (8), the photo sheet's limit. [onAdded] is `focusComposer`.
+     * At most [AttachmentPickerButton.MAX_PHOTO_SELECTION] (8), the photo sheet's limit. [onAdded] is `focusComposer`.
      */
     fun importPickedMedia(uris: List<Uri>, onAdded: (() -> Unit)? = null) {
         if (uris.isEmpty()) return
         scope.launch {
-            val picks = uris.take(AttachmentPickerButton.maxPhotoSelection(plusMenu = true))
+            val picks = uris.take(AttachmentPickerButton.MAX_PHOTO_SELECTION)
             val kinds = withContext(Dispatchers.IO) { picks.map { it to ComposerPickers.isVideo(it) } }
             val videos = kinds.filter { it.second }.map { it.first }
             val images = kinds.filterNot { it.second }.map { it.first }
@@ -539,7 +540,7 @@ fun PendingAttachmentsRow(
     val inset = ComposerTunables.attachmentInset.dp
     val inner = if (styled) ComposerTunables.innerHorizontal.dp else 0.dp
     val parentTop = if (composerExpanded) 0.dp else ComposerTunables.innerVertical.dp
-    val radius = ComposerTunables.attachmentRadius(plusMenu = styled).dp
+    val radius = ComposerTunables.attachmentRadius.dp
     val locationHeight = SharedLocationCard.compactMapHeight + SharedLocationCard.compactFooterHeight()
     val rowHeightTarget = if (!styled) {
         PendingAttachmentMetrics.slotSide
@@ -548,7 +549,7 @@ fun PendingAttachmentsRow(
     }
     val rowHeight by animateDpAsState(
         rowHeightTarget,
-        if (reduceMotion || !styled) snap() else ComposerTunables.attachmentResize.spec(),
+        if (!styled) snap() else Motion.layout.animation(if (showsLocation) MotionPhase.Enter else MotionPhase.Exit, reduceMotion),
         label = "attachmentRowHeight",
     )
     val listState = rememberLazyListState()
@@ -747,7 +748,7 @@ private class DepartingAttachments(private val graphics: GraphicsContext, privat
         val layer = layers.remove(key) ?: return
         val position = positions.remove(key)
         val spec: FiniteAnimationSpec<Float>? = when {
-            usesPlusMenuSheet -> AttachmentRemoval.animation(reduceMotion)
+            usesPlusMenuSheet -> AttachmentRemoval.exitAnimation(reduceMotion)
             reduceMotion -> null
             else -> tween(durationMillis = DEFAULT_EXIT_MILLIS, easing = EaseOut)
         }

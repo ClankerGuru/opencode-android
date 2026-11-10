@@ -297,7 +297,7 @@ class LiveCallCoordinatorTests {
         call.advance(50)
         val output = "[COMPLETE] " + "$rulesAnswer ".repeat(12)
         val chunks = LiveContentChunker.commentaryChunks(output)
-        assertTrue("An answer's chunks are capped; two are enough to put the end before the beginning", chunks.size > 1)
+        assertTrue("Two chunks are enough to put the end before the beginning", chunks.size > 1)
         socket.stallFirstCommentary = true
         harness.coordinator.completeFunction(callID = "del_rules", output = output)
         assertEquals("Held behind the speech", 0, socket.commentaryEntered)

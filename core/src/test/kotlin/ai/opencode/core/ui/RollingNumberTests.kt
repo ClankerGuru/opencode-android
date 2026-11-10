@@ -1,5 +1,7 @@
 package ai.opencode.core.ui
 
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionTunables
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.core.tuning.TuneValue
 import ai.opencode.core.tuning.TuningContext
@@ -71,17 +73,18 @@ class RollingNumberTests {
             parsed1000.tokens.map { it.first },
         )
 
-        // Outward 25 ms stagger from the right on 9 -> 1,000: ones (0 ms), tens (25 ms), hundreds (50 ms), group:3 (75 ms), thousands (100 ms).
+        // Outward `Motion.staggerStep` stagger from the right on 9 -> 1,000: ones, tens, hundreds, group:3, thousands one step apart.
+        val step = style.stagger
         model.retarget("9", us, at = start, animated = false, style = style)
         model.retarget("1,000", us, at = start, animated = true, style = style)
         val delaysByKey = model.slots.associate { it.key to it.delay }
         assertEquals(0.0, delaysByKey[RollingNumberModel.Key.Integer(0, 0)]!!, 0.0)
-        assertTrue(abs((delaysByKey[RollingNumberModel.Key.Integer(0, 1)] ?: -1.0) - 0.025) < 0.0001)
-        assertTrue(abs((delaysByKey[RollingNumberModel.Key.Integer(0, 2)] ?: -1.0) - 0.050) < 0.0001)
-        assertTrue(abs((delaysByKey[RollingNumberModel.Key.Group(0, 3)] ?: -1.0) - 0.075) < 0.0001)
-        assertTrue(abs((delaysByKey[RollingNumberModel.Key.Integer(0, 3)] ?: -1.0) - 0.100) < 0.0001)
+        assertTrue(abs((delaysByKey[RollingNumberModel.Key.Integer(0, 1)] ?: -1.0) - step) < 0.0001)
+        assertTrue(abs((delaysByKey[RollingNumberModel.Key.Integer(0, 2)] ?: -1.0) - 2 * step) < 0.0001)
+        assertTrue(abs((delaysByKey[RollingNumberModel.Key.Group(0, 3)] ?: -1.0) - 3 * step) < 0.0001)
+        assertTrue(abs((delaysByKey[RollingNumberModel.Key.Integer(0, 3)] ?: -1.0) - 4 * step) < 0.0001)
 
-        // Existing multi-digit roll (123 -> 456) staggers reels from the right (0 ms, 25 ms, 50 ms).
+        // Existing multi-digit roll (123 -> 456) staggers reels from the right, one step apart.
         model.retarget("123", us, at = start, animated = false, style = style)
         model.retarget("456", us, at = start, animated = true, style = style)
         val early = model.frame(start + 0.015, metrics, style)
@@ -301,16 +304,14 @@ class RollingNumberTests {
     @Test
     fun tunablesDefaultToOption3AndRespondToLiveOverrides() {
         val off = TuningStore(null)
-        assertEquals(0.34, RollingNumberTunables.duration.defaultValue, 0.0)
-        assertEquals(0.0, RollingNumberTunables.bounce.defaultValue, 0.0)
-        assertEquals(0.025, RollingNumberTunables.stagger.defaultValue, 0.0)
         assertEquals(1.0, RollingNumberTunables.blurAmount.defaultValue, 0.0)
         assertEquals(0.18f, RollingNumberTunables.edgeFade.defaultValue, 0f)
 
+        // The roll runs on `Motion.layout`, its places `Motion.staggerStep` apart.
         val defaultStyle = RollingNumberTunables.style(off)
-        assertEquals(0.34, defaultStyle.duration, 0.0)
-        assertEquals(0.0, defaultStyle.bounce, 0.0)
-        assertEquals(0.025, defaultStyle.stagger, 0.0)
+        assertEquals(MotionTunables.layoutSpring.duration.defaultValue, defaultStyle.duration, 0.0)
+        assertEquals(MotionTunables.layoutSpring.bounce.defaultValue, defaultStyle.bounce, 0.0)
+        assertEquals(MotionTunables.staggerStep.defaultValue, defaultStyle.stagger, 0.0)
         assertTrue(defaultStyle.motionBlur)
         assertEquals(1.0, defaultStyle.blurAmount, 0.0)
         assertEquals(0.18f, defaultStyle.edgeFade, 0f)
@@ -321,7 +322,8 @@ class RollingNumberTests {
         assertTrue(live.descriptors.map { it.group }.all { it == "numbers" })
         assertTrue(TuningContext.session.groups.contains("numbers"))
 
-        live.set("numbers.duration", TuneValue.Number(0.42))
+        Motion.register(live)
+        live.set("motion.springs.layout.duration", TuneValue.Number(0.42))
         live.set("numbers.blur", TuneValue.Number(0.0))
         val tuned = RollingNumberTunables.style(live)
         assertEquals(0.42, tuned.duration, 0.0)

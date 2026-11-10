@@ -10,5 +10,5 @@ internal val WhatsNewShipped.gptLiveOwnKey: WhatsNewEntry
         day = "2026-10-23",
         title = "GPT-Live Keys",
         symbol = "key",
-        summary = "GPT-Live calls use your own OpenAI key. With Server Voice on, they can use your server’s OpenAI key or its OpenCode Console connection instead.",
+        summary = "GPT-Live calls can use your own OpenAI key, your server’s OpenAI key, or its OpenCode Console connection.",
     )

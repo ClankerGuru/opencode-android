@@ -1,10 +1,13 @@
 package ai.opencode.feature.transcript.list
 
+import ai.opencode.core.dependencies.Clock
+import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.diagnostics.MotionFrame
 import ai.opencode.core.diagnostics.PerfTimeline
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.motion.MotionFrameAction
 import ai.opencode.core.motion.motionFrameLoop
+import ai.opencode.core.touch.TouchRecovery
 import ai.opencode.feature.transcript.NewMessagesPlacement
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.TranscriptConfiguration
@@ -217,6 +220,13 @@ class TranscriptListController(
      * mark takes every touch, so a frame loop that stops stepping must not keep the list locked.
      */
     private var handoffDeadline: Job? = null
+
+    /**
+     * Real seconds ([Clock], the touch net's wall time) when the hand-off began (iOS
+     * `TranscriptMarkHandoff.startedAt`).
+     */
+    private var handoffStartedAt: Double? = null
+    private val clock = dependency(Clock)
 
     fun handoffProgress(): Float {
         @Suppress("UNUSED_VARIABLE") val tick = frameTick
@@ -487,7 +497,7 @@ class TranscriptListController(
             val hold = if (previous.isLoading) MarkLoadingTiming(emptyLoadingSince).handoffDelay(time) else 0.0
             if (hold != null) {
                 beginHandoff(previous.isLoading, previous.showsEmptyState, emptyLoadingSince, time, hold,
-                    if (previous.isLoading) MarkLoadingTunables.fadeOut else EmptyStateTunables.exitFade)
+                    MarkLoadingTiming(emptyLoadingSince).fadeOut)
                 pendingEffects += { startMotion() }
             }
         }
@@ -768,6 +778,8 @@ class TranscriptListController(
         // returning to the app mid-hand-off restores touches at once.
         finishHandoff()
         if (isShowingToReader) {
+            // A drag the screen or the app took as it left never reported its end.
+            releaseStrandedGesture(reason = "reappeared")
             lastLayout?.let(::onLayout)
         } else {
             cancelBorrowedDrag()
@@ -1011,6 +1023,17 @@ class TranscriptListController(
         lastLayout?.let { checkNewMessagesPassed(it) }
         // iOS: the selection's menu comes back once the list settles.
         if (replySelection.isSelected && !replySelection.isDragging && !replySelection.menuWanted) replySelection.presentMenu()
+    }
+
+    /**
+     * iOS `releaseStrandedGesture`: the reader's hold on the list outlived its gesture (the list
+     * left the screen under a finger and no end was reported), so nothing holds it now. Like iOS
+     * it only drops the hold; the next layout follows or browses from where the list is.
+     */
+    private fun releaseStrandedGesture(reason: String) {
+        if (!isUserGestureActive || state.isScrollInProgress) return
+        isUserGestureActive = false
+        AppLog.app.notice("transcript_gesture_released owner=transcript_list reason=$reason")
     }
 
     /** TalkBack/focus scrolls enter LazyListState's scroll mutation without nested drag events. */
@@ -1293,6 +1316,7 @@ class TranscriptListController(
     internal fun beginHandoff(loading: Boolean, showsEmpty: Boolean, since: Double?, time: Double, hold: Double, fade: Double) {
         handoffDeadline?.cancel()
         emptyHandoff = EmptyHandoff(loading, showsEmpty, since, time + hold, fade)
+        handoffStartedAt = clock.now().inWholeNanoseconds / 1e9
         val seconds = MarkLoadingTiming.handoffDeadlineSeconds(hold, fade)
         handoffDeadline = scope.launch {
             delay((seconds * 1000).toLong())
@@ -1307,6 +1331,28 @@ class TranscriptListController(
         handoffDeadline?.cancel()
         handoffDeadline = null
         emptyHandoff = null
+        handoffStartedAt = null
+    }
+
+    /**
+     * The transcript's touch-net fault (iOS `TranscriptTouchSafety.recoveries`, `.transcript`
+     * owner): an unfinished hand-off owns the list's touches until
+     * [MarkLoadingTiming.handoffTouchDeadline] real seconds after it began, however slow lab motion
+     * runs. iOS's disabled-list and disabled-host faults are n/a: nothing here disables the list.
+     */
+    fun touchRecoveryFault(): TouchRecovery.Fault? {
+        val handoff = emptyHandoff ?: return null
+        return TouchRecovery.Fault(
+            TouchRecovery.Reason.Transition,
+            handoff,
+            grace = TouchRecovery.Fault.Grace.Wall(MarkLoadingTiming.handoffTouchDeadline),
+            startedAt = handoffStartedAt,
+        )
+    }
+
+    /** Releases a [touchRecoveryFault]: cancels the hand-off (iOS `handoff.cancel()`). */
+    fun releaseTouchRecoveryFault() {
+        if (emptyHandoff != null) finishHandoff()
     }
 
     // MARK: Motion loop
@@ -1435,7 +1481,7 @@ class TranscriptListController(
             moved = moved || active
         }
         if (pendingEntrances.isNotEmpty()) {
-            pendingEntrances.entries.removeAll { now - (entranceStarts[it.key] ?: it.value.first) > RowEntrance.WINDOW + RowEntrance.SETTLING_DURATION }
+            pendingEntrances.entries.removeAll { now - (entranceStarts[it.key] ?: it.value.first) > RowEntrance.WINDOW + RowEntrance.maximumDuration }
             entranceStarts.keys.retainAll(pendingEntrances.keys)
             if (pendingEntrances.isNotEmpty()) {
                 frameTick++
@@ -1609,10 +1655,8 @@ class TranscriptListController(
             return measured
         }
         growths[key] = RowGrowth(from, measured, transcriptNow(), width,
-            springDuration = if (revised) {
-                val entry = (snapshot.rows[key.removePrefix("m:")] as? MessageRow.Entry)?.entry
-                if (entry is TranscriptEntry.ReplyEnd) ai.opencode.feature.transcript.links.LinkPreviewMotion.grow else ai.opencode.feature.media.AgentImageTunables.grow
-            } else null,
+            // A revised row (link previews, image rows) opens on `Motion.layout`.
+            springDuration = if (revised) ai.opencode.core.motion.Motion.layout.curve().duration else null,
         ).also { it.changedRow = revised || browsingGrows }
         revisedRows.remove(key)
         imageGrowth?.beginGrowth()
@@ -1672,11 +1716,7 @@ class TranscriptListController(
             return null
         }
         val start = entranceStarts.getOrPut(key) { time }
-        val duration = when (style) {
-            RowEntranceStyle.Arrival -> RowEntrance.DURATION
-            RowEntranceStyle.Settling -> RowEntrance.SETTLING_DURATION
-            RowEntranceStyle.WithFlight -> RowEntrance.WITH_FLIGHT_DURATION
-        }
+        val duration = RowEntrance.duration(style)
         val progress = ((time - start) / duration).toFloat()
         if (progress >= 1f) {
             pendingEntrances.remove(key)
@@ -2163,10 +2203,10 @@ class TranscriptListController(
     }
 }
 
-/** A disclosure's row height on its critically damped spring (open 0.3 s, close 0.24 s). */
+/** A disclosure's row height on its critically damped spring (`DisclosureMotion`). */
 private class DisclosureHeight(var height: Float, var target: Float, opening: Boolean) {
     private var velocity = 0.0
-    private val omega = 2 * Math.PI / if (opening) TranscriptTunables.disclosureOpen else TranscriptTunables.disclosureClose
+    private val omega = 2 * Math.PI / ai.opencode.feature.transcript.rows.DisclosureMotion.duration(opening)
 
     fun retarget(target: Float) {
         this.target = target

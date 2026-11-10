@@ -1,5 +1,6 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionFrameAction
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -146,8 +147,8 @@ class FloatingCallDrift(
     position: Offset,
     velocity: Offset = Offset.Zero,
     var friction: Double = FloatingCallTunables.friction.value,
-    var edgeDuration: Double = FloatingCallTunables.edge.duration.value,
-    var edgeBounce: Double = FloatingCallTunables.edge.bounce.value,
+    var edgeDuration: Double = Motion.layout.curve().duration,
+    var edgeBounce: Double = Motion.layout.curve().bounce,
 ) {
     private var x = position.x.toDouble()
     private var y = position.y.toDouble()

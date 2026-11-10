@@ -149,8 +149,9 @@ class LiveProtocolTests {
 
         val longSentence = "The test suite verified another module cleanly. ".repeat(50)
         val split = LiveContentChunker.commentaryChunks("[COMPLETE] $longSentence", maxCharacters = 400)
-        assertEquals(LiveContentChunker.maxCommentaryChunks, split.size)
+        assertTrue(split.size > 2)
         assertTrue(split.all { it.length <= 400 })
+        assertEquals("Every chunk is kept", longSentence.trim(), split.joinToString(" "))
     }
 
     @Test fun liveInstructionsFollowPromptingGuideTemplate() {
@@ -573,6 +574,7 @@ class VoiceEnginePersistenceTests {
 
     @Test fun defaultsToGPTLiveAndPersistsSelectionAcrossCalls() = runTest {
         val shared = VoiceTestShared()
+        shared.set(VoiceSharedKeys.voiceServerChoice, VoiceServerChoice.Phone)
         shared.set(VoiceSharedKeys.voiceEngine, VoiceEngine.gptLive)
         var voiceEngine = shared.get(VoiceSharedKeys.voiceEngine)
         assertEquals(VoiceEngine.gptLive, voiceEngine)
@@ -624,8 +626,8 @@ class VoiceEnginePersistenceTests {
         store.send(VoiceFeature.Action.Start)
         assertEquals(VoiceFeature.State.Phase.Failed("Add your xAI API key in Settings to use Voice."), store.state.phase)
         assertEquals(2, startedKeys.size)
-        // iOS also checks `SessionFeature.State.isVoiceAvailable(enabled: true, apiKey:)` (owned by
-        // :feature:session); the voice module's part is that Grok has no key from the OpenAI one.
+        // iOS also checks a session's `isVoiceAvailable` with Voice on (owned by :feature:session);
+        // the voice module's part is that Grok has no key from the OpenAI one.
         assertNull(voiceEngine.apiKey(openAI = "sk-test", xAI = null))
 
         shared.set(SharedKeys.xaiAPIKey, "xai-test")

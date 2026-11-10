@@ -946,7 +946,9 @@ class SelectedTranscriptCancellationTests {
         var initial = HomeFeature.State(server, snapshot).connected(HomeConnectionFeature.State.ConnectionStatus.reconnecting)
         initial = initial.openingDetail(home, cachedItems = listOf(text("h0", "Home")))
         initial = initial.copy(
-            sessionDetail = initial.sessionDetail?.copy(streamIsHealthy = true),
+            // About the cache drain: the open session's polls on reconnect are covered by
+            // SessionFeatureTestsQuietPolling.
+            sessionDetail = initial.sessionDetail?.copy(streamIsHealthy = true)?.withRequestsConnectionIsAvailable(true),
             transcriptCache = initial.transcriptCache +
                 ("home" to listOf(text("h0", "Home"))) +
                 ("s1" to listOf(text("s1-0", "Old s1"))) +

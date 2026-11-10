@@ -1,5 +1,6 @@
 package ai.opencode.core.ui
 
+import ai.opencode.core.motion.MotionRelease
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
@@ -55,13 +56,10 @@ object BackSwipeRules {
     }
 
     /**
-     * The drawer's release rule (iOS `BackSwipeSpring.goesBack`): a flick faster than
-     * 250 pt/s decides, otherwise the halfway mark. Pass [velocity] in dp/s and [offset],
-     * [width] in the same unit as each other.
+     * The release rule every back swipe shares (iOS `BackSwipeSpring.goesBack` →
+     * `MotionRelease.shouldCommit`): a flick decides, otherwise the halfway mark. Pass
+     * [velocity] in dp/s and [offset], [width] in the same unit as each other.
      */
     fun goesBack(offset: Float, width: Float, velocity: Float): Boolean =
-        if (abs(velocity) > FLICK_VELOCITY) velocity > 0 else offset > width / 2
-
-    /** iOS 250 pt/s → dp/s. */
-    const val FLICK_VELOCITY = 250f
+        MotionRelease.shouldCommit(translation = offset.toDouble(), velocity = velocity.toDouble(), distance = width.toDouble())
 }

@@ -11,8 +11,11 @@ import ai.opencode.core.ui.drawerPanHorizontalScroller
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.server.model.PastedText
 import androidx.compose.ui.graphics.asImageBitmap
-import ai.opencode.feature.composer.modelpicker.ModelPickerChip
-import ai.opencode.feature.composer.modelpicker.PlainModelPickerSheet
+import ai.opencode.feature.composer.modelpicker.ModelPickerEvent
+import ai.opencode.feature.composer.modelpicker.OnePickerChip
+import ai.opencode.feature.composer.modelpicker.OnePickerController
+import ai.opencode.feature.composer.modelpicker.OnePickerSheetHost
+import ai.opencode.feature.composer.plusmenu.PlusMenuGlassSurface
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -163,9 +166,13 @@ fun ComposerView(
                             onChoose = ::choose,
                         )
                         if (!state.isAnsweringRequest) {
-                            ModelPickerChip(
+                            // One Picker's chip; this host opens the list in its sheet, never the morph.
+                            val chipController = remember { OnePickerController() }
+                            OnePickerChip(
                                 state = state.modelPicker,
-                                onClick = { send(ComposerFeature.Action.ModelChipTapped) },
+                                controller = chipController,
+                                onEvent = { send(ComposerFeature.Action.ModelPicker(it)) },
+                                onOpen = { send(ComposerFeature.Action.ModelChipTapped) },
                             )
                         }
                         Spacer(Modifier.weight(1f))
@@ -182,20 +189,26 @@ fun ComposerView(
         if (state.isAttachmentMenuOpen) {
             AttachmentMenuDismissArea(onDismiss = { send(ComposerFeature.Action.AttachmentMenuDismissed) })
         }
-        AttachmentMenuOverlay(
-            phase = if (state.isAttachmentMenuOpen) AttachmentMenuPhase.Menu else AttachmentMenuPhase.Closed,
-            onPhaseChange = { if (it == AttachmentMenuPhase.Closed) send(ComposerFeature.Action.AttachmentMenuDismissed) },
+        val menuItems = listOf(AttachmentMenuItem.Camera, AttachmentMenuItem.Photos, AttachmentMenuItem.Files, AttachmentMenuItem.Location)
+        AttachmentMenuMeasure(anchors = anchors, items = menuItems)
+        PlusMenuGlassSurface(
             anchors = anchors,
-            press = press,
-            items = listOf(AttachmentMenuItem.Camera, AttachmentMenuItem.Photos, AttachmentMenuItem.Files, AttachmentMenuItem.Location),
-            includesVideos = true,
+            isOpen = state.isAttachmentMenuOpen,
+            items = menuItems,
+            highlighted = press.highlighted,
             onChoose = ::choose,
             onPaste = { send(ComposerFeature.Action.AttachmentMenuDismissed) },
-            identity = state.sessionID ?: "draft",
+            onDismiss = { send(ComposerFeature.Action.AttachmentMenuDismissed) },
+            modifier = Modifier.fillMaxSize(),
         )
 
         if (state.isModelPickerOpen) {
-            PlainModelPickerSheet(state = state.modelPicker, onEvent = { send(ComposerFeature.Action.ModelPicker(it)) })
+            OnePickerSheetHost(
+                state = state.modelPicker,
+                onEvent = { send(ComposerFeature.Action.ModelPicker(it)) },
+                onDismiss = { send(ComposerFeature.Action.ModelPicker(ModelPickerEvent.Dismiss)) },
+                onPickModel = { model, level -> send(ComposerFeature.Action.ModelPicker(ModelPickerEvent.ModelPickedWithLevel(model, level))) },
+            )
         }
     }
 }

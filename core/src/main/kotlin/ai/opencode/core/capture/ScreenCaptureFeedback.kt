@@ -3,6 +3,7 @@ package ai.opencode.core.capture
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.tuning.Tunable
 import android.app.Activity
 import android.app.Application
@@ -14,6 +15,7 @@ import android.os.Looper
 import android.provider.Settings
 import android.view.View
 import android.view.WindowManager
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 import java.lang.ref.WeakReference
 
@@ -76,17 +78,25 @@ object ScreenCaptureFeedback {
     }
 }
 
-/** Tuned on the phone (Settings → Diagnostics → Developer Mode → Tuning). */
+/**
+ * Tuned on the phone (Settings → Diagnostics → Developer Mode → Tuning). The flash decays on
+ * `Motion.dim` (`Motion.reduced` under Reduce Motion).
+ */
 object ScreenFlashTunables {
-    val duration = Tunable("motion.screenshotFlash.duration", "Screenshot flash decay (s)", default = 0.32, range = 0.1..1.0, step = 0.01)
     val opacity = Tunable("motion.screenshotFlash.opacity", "Screenshot flash peak", default = 0.85, range = 0.0..1.0, step = 0.05)
-    val reducedDuration = Tunable("motion.screenshotFlash.reducedDuration", "Reduce Motion: dim (s)", default = 0.2, range = 0.05..0.6, step = 0.01)
     val reducedOpacity = Tunable("motion.screenshotFlash.reducedOpacity", "Reduce Motion: dim peak", default = 0.18, range = 0.0..0.6, step = 0.02)
 }
 
 /** How the flash looks under the person's accessibility settings. */
-data class ScreenFlashStyle(val tone: Tone, val peak: Double, val duration: Double) {
+data class ScreenFlashStyle(
+    val tone: Tone,
+    val peak: Double,
+    /** Reduce Motion: the dim decays on `Motion.reduced`. */
+    val reduceMotion: Boolean,
+) {
     enum class Tone { white, dim }
+
+    val duration: Double get() = MotionRole.Dim.curve(reduceMotion = reduceMotion).duration
 
     companion object {
         /**
@@ -97,9 +107,9 @@ data class ScreenFlashStyle(val tone: Tone, val peak: Double, val duration: Doub
         fun resolve(reduceMotion: Boolean, dimFlashingLights: Boolean): ScreenFlashStyle? {
             if (dimFlashingLights) return null
             if (reduceMotion) {
-                return ScreenFlashStyle(Tone.dim, ScreenFlashTunables.reducedOpacity.value, ScreenFlashTunables.reducedDuration.value)
+                return ScreenFlashStyle(Tone.dim, ScreenFlashTunables.reducedOpacity.value, reduceMotion = true)
             }
-            return ScreenFlashStyle(Tone.white, ScreenFlashTunables.opacity.value, ScreenFlashTunables.duration.value)
+            return ScreenFlashStyle(Tone.white, ScreenFlashTunables.opacity.value, reduceMotion = false)
         }
     }
 }
@@ -187,11 +197,11 @@ private class ScreenFlash {
         view.animate().cancel()
         view.setBackgroundColor(if (style.tone == ScreenFlashStyle.Tone.white) Color.WHITE else Color.BLACK)
         view.alpha = style.peak.toFloat()
-        // iOS `UIView.animate(withDuration:options: .curveEaseOut)`.
+        // iOS `Motion.dim.animate(reduceMotion:)`: ease out, or ease in-out under Reduce Motion.
         view.animate()
             .alpha(0f)
             .setDuration((style.duration * 1_000).toLong())
-            .setInterpolator(DecelerateInterpolator())
+            .setInterpolator(if (style.reduceMotion) AccelerateDecelerateInterpolator() else DecelerateInterpolator())
             .withEndAction { if (generation == current) detach() }
             .start()
     }

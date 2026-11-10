@@ -1,5 +1,6 @@
 package ai.opencode.feature.transcript.rows
 
+import ai.opencode.core.motion.AmbientClock
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.tuning.AnimationTimeScale
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -26,8 +27,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.offset
 import androidx.compose.ui.unit.sp
-import kotlin.math.PI
-import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -136,8 +135,8 @@ fun Modifier.minimumHitTarget(side: Dp = MinimumHitRect.side, topReach: Dp = Dp.
 
 /** iOS `InlineRowPulse`: a running row's calm pulse, still under Reduce Motion. */
 object InlineRowPulse {
-    /** 1…0 and back over 2.2 s, eased. */
-    fun level(atSeconds: Double): Double = 0.5 + 0.5 * cos(atSeconds * 2 * PI / 2.2)
+    /** 1…0 and back over one `AmbientClock` breath, eased. */
+    fun level(atSeconds: Double): Double = 1 - AmbientClock.breath(atSeconds)
 
     /**
      * iOS `AnimationTimeScale.referenceTime(date)`: wall time in `timeIntervalSinceReferenceDate`

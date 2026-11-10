@@ -12,6 +12,7 @@ import ai.opencode.feature.session.SessionFeature.AuthoritativeRefresh
 import ai.opencode.feature.session.SessionFeature.CancelID
 import ai.opencode.core.diagnostics.LabMarks
 import ai.opencode.core.diagnostics.PerfTimeline
+import ai.opencode.feature.transcript.list.TranscriptScan
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeContextReading
@@ -83,11 +84,10 @@ internal fun SessionFeature.watchdog(
     // reducer tests do not inherit a perpetual timer.
     val watchdogClock = watchdogClock
     if (!sessionTimers.watchdog || watchdogClock == null) return Reduced(state)
+    // No session (a draft), a server that isn't answering, or an app in the background: no
+    // reconciliation timer. A reconnect or the return re-arms it.
     val session = state.session
-        ?: return Reduced(
-            state.copy(watchdogSchedule = null, watchdogGeneration = state.watchdogGeneration + 1),
-            Effect.cancel(CancelID.Watchdog),
-        )
+    if (session == null || !state.pollsServer) return stopWatchdog(state)
     val seconds = when {
         state.streamIsHealthy && state.streamSupportsProjection -> 20
         state.isRunning -> 3
@@ -133,6 +133,50 @@ internal fun SessionFeature.watchdogElapsed(
     )
 }
 
+private fun stopWatchdog(state: SessionFeature.State): Reduced<SessionFeature.State, Action> {
+    var s = state
+    if (s.watchdogSchedule != null) {
+        s = s.copy(watchdogSchedule = null, watchdogGeneration = s.watchdogGeneration + 1)
+    }
+    return Reduced(s, Effect.cancel(CancelID.Watchdog))
+}
+
+/**
+ * iOS `quietServerPolling(_:)`: stops every timed read of the server: the pending-work polls and
+ * the watchdog. Requests that answer the person (replies, sends) carry on.
+ */
+internal fun quietServerPolling(state: SessionFeature.State): Reduced<SessionFeature.State, Action> {
+    val stopped = stopWatchdog(state.copy(pendingWorkPollSeconds = null))
+    return Reduced(
+        stopped.state,
+        Effect.merge(
+            Effect.cancel(CancelID.Requests),
+            Effect.cancel(CancelID.Inbox),
+            Effect.cancel(CancelID.InboxFetch),
+            Effect.cancel(CancelID.RequestsRetry),
+            Effect.cancel(CancelID.RequestsChanged),
+            stopped.effect,
+        ),
+    )
+}
+
+/**
+ * iOS `resumeServerPolling(_:)`: back in front with the server reachable, polls and the watchdog
+ * start again at once, and a request read that was owed its retry gets it.
+ */
+internal fun SessionFeature.resumeServerPolling(state: SessionFeature.State): Reduced<SessionFeature.State, Action> {
+    if (!state.pollsServer || state.session == null) return Reduced(state)
+    val watchdog = watchdog(state)
+    if (!watchdog.state.hasRenderedFirstContentFrame) return watchdog
+    val owesRetry = watchdog.state.requestFailureAwaitingReconnect && watchdog.state.requestLoadAttempt == null
+    val polls = if (owesRetry) {
+        startPendingWork(watchdog.state, attempt = RequestDockFeature.State.LoadAttempt.Reconnect)
+    } else {
+        pollPendingWork(watchdog.state)
+    }
+    return Reduced(polls.state, Effect.merge(watchdog.effect, polls.effect))
+}
+
 private fun SessionFeature.sleepWatchdog(schedule: WatchdogSchedule, generation: Int): Effect<Action> {
     val clock = watchdogClock ?: return Effect.none()
     return Effect.run<Action> { send ->
@@ -146,28 +190,37 @@ private fun SessionFeature.sleepWatchdog(schedule: WatchdogSchedule, generation:
 /**
  * Permission/question prompts and queued input are both ephemeral server state that a dropped
  * event stream would desync, so one timer re-reads both while the session is open. (Re)starting it
- * adopts the cadence the stream's current health warrants.
+ * adopts the cadence the stream's current health warrants. Nothing reads while the server isn't
+ * answering; in the background (a reconnect during a call) it reads once and the return starts the
+ * timer.
  */
 internal fun SessionFeature.pollPendingWork(
     state: SessionFeature.State,
 ): Reduced<SessionFeature.State, Action> {
-    val session = state.session ?: return Reduced(state)
+    val session = state.session
+    if (session == null || !state.requestsConnectionIsAvailable) {
+        return Reduced(state.copy(pendingWorkPollSeconds = null))
+    }
     val seconds = SessionFeature.pendingWorkPollSeconds(streamIsHealthy = state.streamIsHealthy)
+    val repeats = !state.isBackgrounded
     val server = state.server
     val family = state.familySessions.map { it.id }
     val requests = Effect.run<Action> { send ->
         while (currentCoroutineContext().isActive) {
             readPendingRequests(server, session, family, send)
+            if (!repeats) return@run
             delay(seconds.seconds)
         }
     }.cancellable(CancelID.Requests, cancelInFlight = true)
     val inbox = Effect.run<Action> { send ->
         while (currentCoroutineContext().isActive) {
             send(Action.PendingInputsRequested(sessionID = session.id))
+            if (!repeats) return@run
             delay(seconds.seconds)
         }
     }.cancellable(CancelID.Inbox, cancelInFlight = true)
-    return Reduced(state.copy(pendingWorkPollSeconds = seconds), Effect.merge(requests, inbox))
+    val pollSeconds = if (repeats) seconds else null
+    return Reduced(state.copy(pendingWorkPollSeconds = pollSeconds), Effect.merge(requests, inbox))
 }
 
 /** iOS `fetchQueuedInputs(server:sessionID:)`. */
@@ -352,17 +405,38 @@ internal fun SessionFeature.acceptWindow(
         )
     }
     val nonDurableIDs = s.projectedMessageIDs + s.echoedPromptIDs + s.optimisticPromptIDs + s.failedSends.ids
+    val pendingNoticeIDs = s.pendingNoticeIDs
+    fun isDurable(item: OpenCodeTranscriptItem): Boolean =
+        !item.id.startsWith("info-") && item.id !in pendingNoticeIDs &&
+            (nonDurableIDs.isEmpty() || SessionFeature.messageID(item) !in nonDurableIDs)
+    // From the top until a durable row outside the window: in a long session that's the first
+    // row, not every row.
     var hasDurableRows = false
-    var firstFetchedIsDurable = false
     var allDurableRowsInWindow = true
-    val firstFetchedID = items.firstOrNull()?.id
+    var scanned = 0
     for (item in s.items) {
-        if (item.id.startsWith("info-") || item.id in s.pendingNoticeIDs) continue
-        if (nonDurableIDs.isNotEmpty() && SessionFeature.messageID(item) in nonDurableIDs) continue
+        scanned += 1
+        if (!isDurable(item)) continue
         hasDurableRows = true
-        if (item.id == firstFetchedID) firstFetchedIsDurable = true
-        if (item.id !in windowItemIDs) allDurableRowsInWindow = false
+        if (item.id !in windowItemIDs) {
+            allDurableRowsInWindow = false
+            break
+        }
     }
+    // The window's first row is near the end: looked for from there.
+    val firstFetchedID = items.firstOrNull()?.id
+    var firstFetchedIsDurable = false
+    if (firstFetchedID != null) {
+        for (index in s.items.indices.reversed()) {
+            scanned += 1
+            val item = s.items[index]
+            if (item.id == firstFetchedID && isDurable(item)) {
+                firstFetchedIsDurable = true
+                break
+            }
+        }
+    }
+    TranscriptScan.record(scanned)
     val preserve = preserveProjection ?: (s.isRunning || s.refresh?.followup == RefreshReason.RunState)
     if (!preserve) s = s.resetLiveProjection()
     LabMarks.mark("session_data", sessionID = s.session?.id)
@@ -438,7 +512,8 @@ internal fun SessionFeature.applyAuthoritativeMessage(
     preserveProjection: Boolean? = null,
 ): SessionFeature.State {
     LabMarks.mark("session_data", sessionID = state.session?.id)
-    val indexes = state.items.indices.filter { SessionFeature.item(state.items[it], messageID) }
+    val rows = MessageRows(messageID)
+    val indexes = state.items.indices.filter { rows.contains(state.items[it]) }
     val insertion = indexes.firstOrNull() ?: return state
     val last = indexes.last()
     // A durable boundary belongs to a part, not the whole message. A sibling tool can have started
@@ -457,7 +532,7 @@ internal fun SessionFeature.applyAuthoritativeMessage(
     val notices = ArrayList<Pair<String, OpenCodeTranscriptItem>>()
     var part = s.items[insertion].id
     for (item in s.items.subList(insertion, last + 1)) {
-        if (SessionFeature.item(item, messageID)) part = item.id
+        if (rows.contains(item)) part = item.id
         else if (item is OpenCodeTranscriptItem.Notice) notices += part to item
     }
     val noticeIDs = notices.mapTo(HashSet()) { it.second.id }
@@ -469,9 +544,9 @@ internal fun SessionFeature.applyAuthoritativeMessage(
     // Comparing the whole span also detects interleaved non-message rows, whose existing
     // remove/insert semantics must be preserved.
     if (s.items.subList(insertion, last + 1) != placed) {
-        val rows = s.items.filterNotTo(ArrayList()) { SessionFeature.item(it, messageID) || it.id in noticeIDs }
-        rows.addAll(minOf(insertion, rows.size), placed)
-        s = s.copy(items = rows).syncShellToolStatuses()
+        val kept = s.items.filterNotTo(ArrayList()) { rows.contains(it) || it.id in noticeIDs }
+        kept.addAll(minOf(insertion, kept.size), placed)
+        s = s.copy(items = kept).syncShellToolStatuses()
     }
     s = reconcilePromptEchoes(fetched, s)
     val prefix = "$messageID-"

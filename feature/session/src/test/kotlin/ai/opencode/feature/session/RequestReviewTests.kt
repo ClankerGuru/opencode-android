@@ -176,7 +176,7 @@ class RequestReviewTests {
         assertEquals(request.id, store.state.selectedRequestID)
         assertEquals(mapOf("q0" to OpenCodeFormValue.Str("Native")), store.state.formAnswers[request.id])
         assertEquals("Offline", store.state.requestErrors[request.id])
-        assertEquals(setOf(request.id), store.state.failedReplyIDs)
+        assertEquals(mapOf(request.id to RequestDockFeature.State.RequestFailure.Reply), store.state.requestDock.requestFailures)
         assertTrue(store.state.completedRequestIDs.isEmpty())
     }
 
@@ -496,13 +496,13 @@ class RequestReviewTests {
         store.receive(Action.requestResponseFinished(session.id, request.id, OpenCodeClientError(message = "HTTP 503"))) {
             it.withRespondingRequestIDs(emptySet())
                 .withRequestErrors(it.requestErrors + (request.id to "HTTP 503"))
-                .withFailedReplyIDs(setOf(request.id))
+                .updateRequestDock { dock -> dock.copy(requestFailures = mapOf(request.id to RequestDockFeature.State.RequestFailure.Reply)) }
         }
         store.receive(Action.PendingRequestsResponse(session.id, Result.success(OpenCodePendingRequests(permissions = emptyList(), forms = listOf(request))))) { it.withRequestArrivalsAreLive(true) }
         // The dock keeps the answer for the retry.
         assertEquals(mapOf("q0" to OpenCodeFormValue.Str("Native")), store.state.formAnswers[request.id])
         store.send(Action.formSubmitTapped(request.id)) {
-            it.withRespondingRequestIDs(setOf(request.id)).withRequestErrors(emptyMap()).withFailedReplyIDs(emptySet())
+            it.withRespondingRequestIDs(setOf(request.id)).withRequestErrors(emptyMap()).updateRequestDock { dock -> dock.copy(requestFailures = emptyMap()) }
         }
         store.receive(Action.requestResponseFinished(session.id, request.id, null)) {
             it.withRespondingRequestIDs(emptySet())

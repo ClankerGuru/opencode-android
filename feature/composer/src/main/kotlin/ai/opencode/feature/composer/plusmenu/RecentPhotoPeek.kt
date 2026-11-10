@@ -6,7 +6,7 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.feature.composer.AttachmentPlusPeek
 import ai.opencode.feature.composer.PlusMenuTunables
@@ -151,10 +151,6 @@ private const val PEEK_RADIUS = 14f
 private const val PEEK_LIFT = 1.14f
 private const val PEEK_RISE = 6f
 
-/** iOS `.smooth(duration: peekOpen.duration × 0.8)` in, `.smooth(duration: peekClose)` out: springs with no bounce. */
-private fun peekBackdropSpec(shown: Boolean) =
-    if (shown) MotionSpring(PlusMenuTunables.peekOpen.duration * 0.8).spec<Float>() else MotionSpring(PlusMenuTunables.PEEK_CLOSE).spec()
-
 /**
  * The strip (iOS `RecentPhotoPeekOverlay` + `RecentPhotoPeekBackdrop`). Mount it full-screen over
  * the session; it takes no touches (the + button's gesture drives [RecentPhotoPeek]) and is
@@ -176,7 +172,7 @@ fun RecentPhotoPeekOverlay(
     var size by remember { mutableStateOf(Size.Zero) }
     val progress by animateFloatAsState(
         targetValue = if (peek.isShown) 1f else 0f,
-        animationSpec = peekBackdropSpec(peek.isShown),
+        animationSpec = Motion.panelOpen.animation(if (peek.isShown) MotionPhase.Enter else MotionPhase.Exit, reduceMotion),
         label = "peek-backdrop",
     )
     Box(
@@ -204,11 +200,11 @@ fun RecentPhotoPeekOverlay(
         peek.tiles.forEachIndexed { index, tile ->
             val shown by animateFloatAsState(
                 targetValue = if (peek.isShown) 1f else 0f,
-                animationSpec = when {
-                    reduceMotion -> Motion.easeInOut(0.18)
-                    peek.isShown -> PlusMenuTunables.peekOpen.animation(false, delaySeconds = index * PlusMenuTunables.PEEK_STAGGER)
-                    // iOS `.smooth(duration: peekClose)`.
-                    else -> MotionSpring(PlusMenuTunables.PEEK_CLOSE).spec()
+                // One after another out of +, all at once back into it.
+                animationSpec = if (peek.isShown) {
+                    Motion.microIn.staggered(index, reduceMotion = reduceMotion)
+                } else {
+                    Motion.microOut.animation(reduceMotion = reduceMotion)
                 },
                 label = "peek-tile",
             )
@@ -294,7 +290,7 @@ private fun RecentPhotoPeekTile(
 
     val lift by animateFloatAsState(
         targetValue = if (isHighlighted && !reduceMotion) 1f else 0f,
-        animationSpec = if (reduceMotion) androidx.compose.animation.core.snap() else MotionSpring(0.24, 0.3).spec(),
+        animationSpec = Motion.microIn.animation(if (isHighlighted) MotionPhase.Enter else MotionPhase.Exit, reduceMotion),
         label = "peek-lift",
     )
     val shape = RoundedCornerShape(PEEK_RADIUS.dp)

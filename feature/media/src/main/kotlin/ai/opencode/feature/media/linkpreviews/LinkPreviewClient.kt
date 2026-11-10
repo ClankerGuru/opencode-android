@@ -46,8 +46,8 @@ class LinkPreviewClient(
     /** A fresh result already in memory, without waiting, so a reopened session draws its cards at once. */
     val cached: (LinkPreviewTarget) -> LinkPreviewResult? = { null },
     /**
-     * Last known rich metadata, even after its fresh TTL has expired, so a reopened session or
-     * expired card keeps its rich view while revalidating.
+     * Last known rich metadata, even after its fresh TTL has expired, so an expired card keeps
+     * its rich view while revalidating. Memory only: a cold miss is null rather than a disk read.
      */
     val stale: (LinkPreviewTarget) -> LinkPreviewMetadata? = { null },
     val load: suspend (LinkPreviewTarget) -> LinkPreviewResult = { LinkPreviewResult.Unavailable },
@@ -312,18 +312,15 @@ class LinkPreviewLoader(
 
     fun cached(target: LinkPreviewTarget): LinkPreviewResult? = cache.freshMemory(target.key)?.result
 
+    /**
+     * The last known rich metadata, from memory only: a card asks this while it draws, so it
+     * must never read the disk. A cold miss is null, and the record on disk reaches memory
+     * inside [load].
+     */
     fun stale(target: LinkPreviewTarget): LinkPreviewMetadata? {
-        val now = cache.now()
-        cache.withMemory { it[target.key] }?.let { record ->
-            return if (record.retentionDate > now) record.metadata else null
-        }
-        val record = cache.readDisk(target.key) ?: return null
-        val metadata = record.metadata
-        if (record.retentionDate > now && metadata != null) {
-            cache.withMemory { it[target.key] = record }
-            return metadata
-        }
-        return null
+        val record = cache.withMemory { it[target.key] } ?: return null
+        if (record.retentionDate <= cache.now()) return null
+        return record.metadata
     }
 
     suspend fun load(target: LinkPreviewTarget): LinkPreviewResult {
@@ -376,7 +373,7 @@ class LinkPreviewLoader(
                     metadata = metadata.copy(image = artwork(source?.imageURL, pixels = 960) ?: existing?.metadata?.image)
                 }
                 val fetchedAt = cache.now()
-                val lifetime = if (source == null) LOADED_LIFETIME else RICH_LIFETIME
+                val lifetime = freshLifetime(source)
                 Record(
                     metadata = metadata,
                     expires = fetchedAt + if (metadata == null) UNAVAILABLE_LIFETIME else lifetime,
@@ -432,6 +429,12 @@ class LinkPreviewLoader(
         const val UNAVAILABLE_LIFETIME: Long = 24L * 3600 * 1000
         /** GitHub and video metadata: five minutes. */
         const val RICH_LIFETIME: Long = 5L * 60 * 1000
+
+        /**
+         * How long an answer stays fresh: a post's text a week, a page's metadata (a repository's
+         * stars, a video's title) five minutes. The store reads this for its own retry window.
+         */
+        fun freshLifetime(source: RichLinkSource?): Long = if (source == null) LOADED_LIFETIME else RICH_LIFETIME
         const val MEMORY_LIMIT = 64
         const val DISK_LIMIT: Long = 50L shl 20
         private const val SWEEP_INTERVAL: Long = 600L * 1000

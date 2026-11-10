@@ -9,6 +9,7 @@ import ai.opencode.core.experiments.key
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticEffect
 import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.PresentationAction
@@ -22,8 +23,9 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.ProviderIcon
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.composer.AttachmentMenuDismissArea
+import ai.opencode.feature.composer.ComposerDismissTarget
 import ai.opencode.feature.composer.AttachmentMenuItem
-import ai.opencode.feature.composer.AttachmentMenuOverlay
+import ai.opencode.feature.composer.AttachmentMenuMeasure
 import ai.opencode.feature.composer.AttachmentMenuPhase
 import ai.opencode.feature.composer.AttachmentMenuPress
 import ai.opencode.feature.composer.AttachmentPickerButton
@@ -119,7 +121,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.offset
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.flowOf
@@ -223,21 +227,10 @@ fun SessionView(
     // iOS `orbClearance`: the room a resting orb takes above the composer, so it covers none of
     // the transcript's end. Beside the composer's column or dragged well up it makes none; only
     // the screen showing makes room.
-    val floatingCallCenter = remember { FloatingCallCenter.shared }
-    val callLive by remember(callStore) { callStore?.let { call -> call.states.map { !it.phase.isTerminal } } ?: flowOf(false) }
-        .collectAsState(false)
-    var orbComposer by remember { mutableStateOf(Rect.Zero) }
-    val orbRoom = if (isCovered || !callLive) 0f else {
-        val orb = floatingCallCenter.restingOrb(composerTop = orbComposer.top)
-        if (orb == null) 0f else FloatingCallRestArea.clearance(orb, orbComposer, FloatingCallTunables.composerGap.value.toFloat())
-    }
-    val orbReducedMotion = rememberReduceMotion()
-    val orbClearance by animateFloatAsState(
-        orbRoom,
-        if (orbReducedMotion) Motion.easeInOut(0.2) else FloatingCallTunables.follow.spec(),
-        label = "orbClearance",
-    )
-    SideEffect { composerHost.orbClearance = orbClearance }
+    // The composer's frame lives in `orbGeometry` and is read only by `OrbClearance`, during a
+    // call, so the composer riding the keyboard doesn't recompose SessionView (iOS d0b24aaa).
+    val orbGeometry = remember { OrbClearanceGeometry() }
+    OrbClearance(callStore, orbGeometry, isCovered, composerHost)
 
     val work by store.observe(BackgroundWorkModel::from)
     val agentScope by store.observe { "${it.server.persistenceID}|${it.session?.id ?: "draft"}" }
@@ -386,13 +379,13 @@ fun SessionView(
                         .composerKeyboardStepHold()
                         .onSizeChanged { scrollEdgeBridge.composerHeight = with(density) { it.height.toDp().value } }
                         // The resting orb's room: the transcript's end rises above it.
-                        .padding(top = orbClearance.dp)
+                        .orbClearancePadding(composerHost)
                         // The composer without that room, for where the orb rests.
                         .onGloballyPositioned {
                             val b = it.boundsInWindow()
                             val d = density.density
                             val frame = Rect(b.left / d, b.top / d, b.right / d, b.bottom / d)
-                            if (orbComposer != frame) orbComposer = frame
+                            if (orbGeometry.composer != frame) orbGeometry.composer = frame
                         }
                         // A floating call rests above the composer.
                         .floatingCallComposer()
@@ -457,7 +450,7 @@ private data class BackgroundWorkModel(
  * The + menu (iOS `attachmentMenuOverlay`, `toggleAttachmentMenu` and `chooseAttachment`) and what
  * it opens: Photos (the composer's photo sheet, growing out of the menu; on Android
  * the system photo picker, since the app has no photo library access), Files (the system document picker) and Location (one at a time). The menu is
- * :feature:composer's [AttachmentMenuOverlay], growing out of the + ([AttachmentPickerButton] in
+ * :feature:composer's [PlusMenuGlassSurface] (measured by [AttachmentMenuMeasure]), growing out of the + ([AttachmentPickerButton] in
  * the composer's row, which also chooses a row by sliding to it); it keeps the field's focus, and
  * choosing a picker gives the keyboard up, which returns once something is attached if the field
  * had it. System Back closes it (iOS's escape action).
@@ -466,6 +459,51 @@ private data class BackgroundWorkModel(
  * ([SessionAttachmentCamera]); Paste (while the clipboard holds an image, checked as the menu
  * opens) attaches the clipboard's images through `PasteboardClient` and brings the keyboard back.
  */
+/** iOS `OrbClearanceGeometry`: the composer's frame in the window, in dp, for where the orb rests. */
+private class OrbClearanceGeometry {
+    var composer by mutableStateOf(Rect.Zero)
+}
+
+/**
+ * iOS `orbClearance`: the room a resting orb takes above the composer, so it covers none of the
+ * transcript's end. Beside the composer's column or dragged well up it makes none; only the screen
+ * showing makes room. A leaf, so following the composer recomposes only this.
+ */
+@Composable
+private fun OrbClearance(
+    callStore: VoiceStoreOf?,
+    geometry: OrbClearanceGeometry,
+    isCovered: Boolean,
+    host: SessionComposerHost,
+) {
+    val floatingCallCenter = remember { FloatingCallCenter.shared }
+    val callLive by remember(callStore) { callStore?.let { call -> call.states.map { !it.phase.isTerminal } } ?: flowOf(false) }
+        .collectAsState(false)
+    var orbRoom = 0f
+    if (!isCovered && callLive) {
+        val composer = geometry.composer
+        val orb = floatingCallCenter.restingOrb(composerTop = composer.top)
+        if (orb != null) {
+            orbRoom = FloatingCallRestArea.clearance(orb, composer, FloatingCallTunables.composerGap.value.toFloat())
+        }
+    }
+    val reducedMotion = rememberReduceMotion()
+    val orbClearance by animateFloatAsState(
+        orbRoom,
+        Motion.layout.animation(if (orbRoom > 0f) MotionPhase.Enter else MotionPhase.Exit, reducedMotion),
+        label = "orbClearance",
+    )
+    SideEffect { host.orbClearance = orbClearance }
+}
+
+/** Top padding of [SessionComposerHost.orbClearance], read while laying out rather than composing. */
+private fun Modifier.orbClearancePadding(host: SessionComposerHost): Modifier = layout { measurable, constraints ->
+    val top = host.orbClearance.dp.roundToPx()
+    val placeable = measurable.measure(constraints.offset(vertical = -top))
+    val height = constraints.constrainHeight(placeable.height + top)
+    layout(placeable.width, height) { placeable.place(0, top) }
+}
+
 @Composable
 private fun SessionAttachmentMenu(
     store: StoreOf<State, Action>,
@@ -557,7 +595,7 @@ private fun SessionAttachmentMenu(
                 sheet.closeAttachmentMenu()
                 photos.launch(
                     ComposerPickers.photosIntent(
-                        maxItems = AttachmentPickerButton.maxPhotoSelection(plusMenu = true),
+                        maxItems = AttachmentPickerButton.MAX_PHOTO_SELECTION,
                         includesVideos = supportsFileUploads,
                     ),
                 )
@@ -618,22 +656,9 @@ private fun SessionAttachmentMenu(
             sheet.closeAttachmentMenu()
         }
     }
-    AttachmentMenuOverlay(
-        phase = phase,
-        onPhaseChange = { next -> if (next == AttachmentMenuPhase.Closed) sheet.closeAttachmentMenu() else sheet.attachmentMenu = next },
-        anchors = host.attachmentAnchors,
-        press = press,
-        items = items,
-        includesVideos = supportsFileUploads,
-        onChoose = chooseTapped,
-        onPaste = paste,
-        modifier = Modifier.fillMaxSize(),
-        // iOS `overComposer: usesPlusMenuSheet`: the New Plus Menu's rows are measured and
-        // anchored here and drawn by `PlusMenuGlassSurface`, over the composer.
-        overComposer = true,
-        handedOff = false,
-        identity = taskIdentity,
-    )
+    // iOS `AttachmentMenuMeasure`: the rows are measured and anchored here and drawn by
+    // `PlusMenuGlassSurface`, over the composer.
+    AttachmentMenuMeasure(anchors = host.attachmentAnchors, items = items, modifier = Modifier.fillMaxSize())
     // iOS `PlusMenuGlassSurface(isOpen:handsOff:…)`: the photo sheet takes the menu's surface
     // while it's shown and gives it back as Back's fold lands (`photoSheetMenuTakesBack`).
     // At rest its full-screen layers would still take TalkBack's touch over the header and
@@ -664,10 +689,16 @@ private fun SessionAttachmentMenu(
 @Composable
 private fun SessionComposerDismissArea(store: StoreOf<State, Action>, host: SessionComposerHost) {
     val autocompleteOpen by store.observe { it.autocomplete.isOpen }
-    when {
-        host.isAttachmentMenuOpen -> AttachmentMenuDismissArea(onDismiss = host.closeAttachmentMenu)
-        autocompleteOpen ->
+    val target = ComposerDismissTarget.current(
+        attachmentMenuOpen = host.isAttachmentMenuOpen,
+        autocompleteOpen = autocompleteOpen,
+        autocompleteDrawn = host.showsAutocomplete && !host.floatingCallCovers,
+    )
+    when (target) {
+        ComposerDismissTarget.AttachmentMenu -> AttachmentMenuDismissArea(onDismiss = host.closeAttachmentMenu)
+        ComposerDismissTarget.Autocomplete ->
             AttachmentMenuDismissArea(onDismiss = { store.send(Action.Autocomplete(ComposerAutocompleteAction.Dismissed)) })
+        null -> Unit
     }
 }
 

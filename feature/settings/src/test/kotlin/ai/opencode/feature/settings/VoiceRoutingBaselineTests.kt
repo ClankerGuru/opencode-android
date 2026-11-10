@@ -1,7 +1,5 @@
 package ai.opencode.feature.settings
 
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.experimental
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.voice.ServerVoiceProvider
 import ai.opencode.feature.voice.VoiceEngine
@@ -16,11 +14,10 @@ import org.junit.Test
 class VoiceRoutingBaselineTests {
     @get:Rule val isolation = TestIsolationRule()
 
-    @Test fun serverVoiceNeverHidesGroksPhoneKey() {
+    @Test fun aServerNeverHidesGroksPhoneKey() {
         val shared = SettingsTestShared()
         val state = VoiceSettingsFeature.State()
         shared.set(VoiceSharedKeys.voiceEngine, VoiceEngine.grok)
-        shared.set(experimental(ExperimentalFeature.serverVoice), true)
         for (provider in ServerVoiceProvider.entries) {
             shared.set(VoiceSharedKeys.serverVoiceProvider, provider)
             shared.read {

@@ -5,11 +5,8 @@ import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.TestClock
 import ai.opencode.core.dependencies.UuidClient
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.SharedStore
-import ai.opencode.core.sharing.experimental
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.TestStore
 import ai.opencode.server.OpenCodeServer
@@ -41,8 +38,8 @@ import java.util.UUID
  * broker a call, and the calls a chosen server brokers while each call's own work stays on
  * its server.
  *
- * Not here (their stores live in other modules): `settingsAsksEverySavedServerAndListsTheOthersThatCanBrokerACall`,
- * `settingsAsksNoServerWithServerVoiceOff`, `theChoiceStaysVisibleAndAStaleOneFallsBackToTheConnectedServer`,
+ * Not here (their stores live in other modules): `settingsAsksTheConnectedServerAndTheProviderPageAsksTheOthers`,
+ * `theChoiceStaysVisibleAndAStaleOneFallsBackToTheConnectedServer`,
  * `theKeyRowNamesOpenCodeWhenTheBrokerHostsTheCallThroughIt` (`VoiceSettingsFeature`, :feature:settings) and
  * `homeSavesTheChoiceAndAsksTheServerItNames` (`HomeSettingsFeature`). In
  * `everyEntryPointRoutesByTheChosenServersSupport` and `thisIPhoneUsesThePhonesOwnKey`, the
@@ -66,11 +63,10 @@ class VoiceServerPickerTests {
     /** iOS resets the process-wide shared values; each test here gets a fresh in-memory store. */
     private fun resetSharedState(): SpeechTestShared = SpeechTestShared()
 
-    /** `servers` saved and `server` the one in use, with Server Voice on and `choice` in Voice Server. */
+    /** `servers` saved and `server` the one in use, with `choice` in Voice Server. */
     private fun SpeechTestShared.save(servers: List<OpenCodeServer>, choice: VoiceServerChoice = VoiceServerChoice.Automatic) = run {
         shared(ServerSharedKeys.savedServers).set(servers)
         shared(ServerSharedKeys.savedServer).set(server)
-        shared(experimental(ExperimentalFeature.serverVoice)).set(true)
         shared(VoiceSharedKeys.voiceServerChoice).set(choice)
     }
 
@@ -197,7 +193,6 @@ class VoiceServerPickerTests {
         end: suspend () -> Unit,
     ): DependencyValues.Builder.() -> Unit = {
         this[SharedStore] = shared.store
-        this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.serverVoice))
         this[DateClient] = DateClient.constant(Instant.ofEpochSecond(at))
         // Android: the call's ongoing-notification ID and the start cue's clock.
         this[UuidClient] = UuidClient.incrementing()
@@ -247,8 +242,6 @@ class VoiceServerPickerTests {
                 callPlace = VoiceCallPlace("Studio", VoiceProviderOption.Brand.openAI),
                 startedTarget = VoiceWorkTarget(server = server, sessionID = session.id, directory = session.directory),
                 activeRoute = VoiceRoute.Server(VoiceRoute.ServerRoute.OpenAI(VoiceRoute.OpenAI.gptLive)),
-                activeEngine = VoiceEngine.gptLive,
-                activeProvider = ServerVoiceProvider.openAI,
                 callPresenceID = presenceID,
             )
         }

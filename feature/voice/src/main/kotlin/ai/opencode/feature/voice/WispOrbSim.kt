@@ -53,7 +53,6 @@ class WispOrbSim {
     private var power = WispPowerSim()
     private var gaze = WispGazeSim()
     private var coupling = WispCouplingSim()
-    private var pulses = WispPulseRings()
     private var idle = WispIdleSim()
     private val choreo = WispChoreoSim()
     private var attentive = WispAttentiveSim()
@@ -156,7 +155,6 @@ class WispOrbSim {
         swirlVelocity = 0f
         pourActive = false
         pourProgress = 0f
-        pulses = WispPulseRings()
         voicePush = 0f
         choreo.snap(workingRunning)
         attentive.resetStill()
@@ -199,10 +197,9 @@ class WispOrbSim {
         val comet = 0.30f * mix.comet
         val think = 0.35f * mix.think
         val confirm = 0.42f * mix.confirm
-        val pulse = 0.25f * mix.pulse
         val awake = 0.08f * (1 - mix.sleep)
         val personality = 0.10f * wispClamp(attentive.mix.x, 0f, 1f) + 0.12f * wispClamp(fidget.mix.x, 0f, 1f)
-        return (userTrace.glow + agentTrace.glow) * 0.55f + comet + think + confirm + pulse + pulses.glow + awake +
+        return (userTrace.glow + agentTrace.glow) * 0.55f + comet + think + confirm + awake +
             personality + 0.22f * gazeMix + WispPowerSim.ambientBoost(p)
     }
 
@@ -268,7 +265,6 @@ class WispOrbSim {
         )
 
         swirlVelocity *= exp(-h / 0.42f)
-        pulses.tick(h, pulsing = state == WispOrbState.pulsing)
         val glowGoal = rawAmbientGlowBase(tuning)
         ambientGlowBase += (glowGoal - ambientGlowBase) * (1 - exp(-h / 0.18f))
 
@@ -281,18 +277,6 @@ class WispOrbSim {
         val stillness = 1 - 0.8f * mix.muted
         val dPhase = (drift + voiceDrive + thinkDrive + swirlVelocity * 0.42f + carry) * stillness
         phaseAcc += (h * dPhase).toDouble()
-    }
-
-    /** Whether anything is still moving, so a still view keeps drawing. */
-    fun isTransitioning(tuning: WispOrbTuning): Boolean {
-        val (goalBase, _) = WispModeMix.palette(state, runningTint)
-        val db = tintBase - goalBase
-        val tintMoving = maxOf(abs(db.x), abs(db.y), abs(db.z)) > 5e-3f ||
-            maxOf(abs(tintBaseVel.x), abs(tintBaseVel.y), abs(tintBaseVel.z)) > 1e-2f
-        return power.isAnimating(state, tuning.restScale) || mix.isSettling(WispModeMix.target(state, muted)) ||
-            tintMoving || pourActive || pulses.active ||
-            choreo.isAnimating(thinking = state == WispOrbState.thinking, running = workingRunning) ||
-            attentive.isActive || fidget.isActive || userVoice.level > 0.025f || agentVoice.level > 0.015f
     }
 
     // Frame
@@ -329,7 +313,7 @@ class WispOrbSim {
         )
         u[WispOrbUniforms.levels] = floatArrayOf(userVoice.level, agentVoice.level, userVoice.kick, agentVoice.kick)
         u[WispOrbUniforms.mixA] = floatArrayOf(mix.sleep, mix.comet, mix.think, 0f)
-        u[WispOrbUniforms.mixB] = floatArrayOf(mix.pulse, mix.confirm, mix.error, mix.muted)
+        u[WispOrbUniforms.mixB] = floatArrayOf(mix.confirm, mix.muted, 0f, 0f)
         u[WispOrbUniforms.tintBase] = floatArrayOf(tintBase.x, tintBase.y, tintBase.z, if (reduceMotion) 1f else 0f)
         u[WispOrbUniforms.tintCore] = floatArrayOf(tintCore.x, tintCore.y, tintCore.z, if (pourActive) pourProgress else -1f)
         u[WispOrbUniforms.phosphor] = floatArrayOf(fastFall, slowFall, trail, wispClamp(duck, 0f, 1f))
@@ -391,8 +375,6 @@ class WispOrbSim {
         u[WispOrbUniforms.fidgetC] = fid[2]
         u[WispOrbUniforms.idleA] = idl[0]
         u[WispOrbUniforms.idleB] = idl[1]
-        val rings = pulses.frame(pulseMix = mix.pulse)
-        for (i in 0 until 3) u[WispOrbUniforms.pulseRings + i] = rings.copyOfRange(i * 4, i * 4 + 4)
 
         val glowSource = if (initialized) ambientGlowBase else rawAmbientGlowBase(tuning)
         val ambient = glowSource * tuning.glow * (1 - 0.85f * mix.muted)
@@ -437,7 +419,7 @@ class WispOrbSim {
 data class WispOrbPlacement(val centerX: Float, val centerY: Float, val pixelsPerPoint: Float)
 
 /**
- * One frame for the Wisp orb's passes (iOS `WispOrbUniforms`, same layout: 66 `float4`s), kept
+ * One frame for the Wisp orb's passes (iOS `WispOrbUniforms`, same layout: 63 `float4`s), kept
  * as one flat array so it uploads as a single `float4` array uniform. Slot names follow iOS.
  */
 class WispOrbUniforms {
@@ -471,7 +453,7 @@ class WispOrbUniforms {
         const val levels = 2
         /** Sleep, comet, think, think swirl. */
         const val mixA = 3
-        /** Pulse, confirm, error, muted. */
+        /** Confirm, muted, then two unused. */
         const val mixB = 4
         /** Tint base, Reduce Motion. */
         const val tintBase = 5
@@ -520,16 +502,14 @@ class WispOrbUniforms {
         const val fidgetC = 56
         const val idleA = 57
         const val idleB = 58
-        /** Six result rings: (radius, envelope) pairs, 3 slots. */
-        const val pulseRings = 59
         /** Centre (px), pixels per point, anti-alias width (dp). */
-        const val view = 62
+        const val view = 59
         /** Glow strength, glow reach (dp), dot search reach (cells), shadow drop (dp). */
-        const val glow = 63
+        const val glow = 60
         /** The glass a grown orb feathers into (px: min x, y, max x, y). */
-        const val clipRect = 64
+        const val clipRect = 61
         /** Its corner and feather (px; corner -1 for none), and the bottom the dots fade out above, over how many pixels. */
-        const val clipShape = 65
-        const val count = 66
+        const val clipShape = 62
+        const val count = 63
     }
 }

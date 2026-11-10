@@ -227,7 +227,7 @@ class VoiceClaimTests {
         shared.set(SharedKeys.openAIAPIKey, "sk-test")
         val voice = shared.read { VoiceFeature.State(server, session) }
             .withPhase(VoiceFeature.State.Phase.Live)
-            .copy(activeEngine = VoiceEngine.gptLive, usesDelegator = true)
+            .copy(usesDelegator = true)
 
         val receivedInput = Locked(listOf<VoiceDelegator.InputItem>())
         val completed = Locked(listOf<String>())
@@ -509,7 +509,6 @@ class VoiceClaimTests {
         shared.set(VoiceSharedKeys.voiceDelegatorSessionIDs, mapOf(serverKey to "ses_voice"))
 
         val initial = liveDelegatorState(shared, server, viewed)
-            .copy(activeEngine = VoiceEngine.gptLive)
             .recording(VoiceTranscriptTail.Role.user, "Also pack a charger", id = "u_pending")
 
         val verifyNote = VoiceActionClaim.verifyPrompt(question = "Did that go out?", claim = "That went through.")

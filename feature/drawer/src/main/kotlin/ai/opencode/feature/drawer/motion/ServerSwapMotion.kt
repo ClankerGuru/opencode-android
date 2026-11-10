@@ -1,8 +1,9 @@
 package ai.opencode.feature.drawer.motion
 
 import ai.opencode.core.motion.MotionFrameAction
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.SpringSolver
+import ai.opencode.core.motion.retarget
 import ai.opencode.core.motion.motionFrameLoop
 import ai.opencode.core.motion.rememberFrameDurationSeconds
 import ai.opencode.feature.drawer.ServerSwapTarget
@@ -27,6 +28,11 @@ import kotlin.math.abs
  * A plain motion object (AGENTS.md), stepped by [RunServerSwapMotion]'s frame loop: the title reads
  * [names], [width] and the underline; the list places its rows from [rows] in a graphics layer that
  * reads [frame]. Positions are in travel units: 0 at rest, ±1 a full travel.
+ *
+ * The springs are roles (iOS 03adf07a): the name arrives on `MotionRole.PanelOpen` (the person
+ * picked it), the width, the rows and the underline's fill on `Layout`, everything leaving on
+ * `Collapse`, and the underline fades on `Dim`. Only the chain's lag
+ * ([ServerFlowTunables.chainLag]) is its own. Under Reduce Motion each runs on `Reduced`.
  */
 @Stable
 class ServerSwapMotion {
@@ -77,14 +83,16 @@ class ServerSwapMotion {
     private val chains = HashMap<String, MutableList<SpringSolver>>()
     private val widths = HashMap<String, Float>()
     private var widthSpring: SpringSolver? = null
-    private var cue = spring(ServerFlowTunables.list, 0.0, 0.0, epsilon = 0.002)
-    private var fill = spring(ServerFlowTunables.fill, 0.0, 0.0, epsilon = 0.002)
+    private var reduceMotion = false
+    private var cue = spring(MotionRole.Dim, 0.0, 0.0, epsilon = 0.002)
+    private var fill = spring(MotionRole.Layout, 0.0, 0.0, epsilon = 0.002)
 
     /**
      * Shows a server. Idempotent: the title and the list both call it with what they're about to
      * draw, whichever comes first.
      */
-    fun sync(target: ServerSwapTarget, animated: Boolean) {
+    fun sync(target: ServerSwapTarget, animated: Boolean, reduceMotion: Boolean = false) {
+        this.reduceMotion = reduceMotion
         if (target == shown) return
         val previous = shown
         shown = target
@@ -100,38 +108,38 @@ class ServerSwapMotion {
                 val entry = entries.removeAt(index)
                 entry.exiting = false
                 entry.name = target.name
-                entry.position.retarget(0.0, ServerFlowTunables.title)
-                entry.rows.retarget(1.0, ServerFlowTunables.list)
+                entry.position.retarget(0.0, MotionRole.PanelOpen, reduceMotion = reduceMotion)
+                entry.rows.retarget(1.0, MotionRole.Layout, reduceMotion = reduceMotion)
                 entries += entry
             } else {
                 entries += Entry(
                     id = target.id,
                     name = target.name,
-                    position = spring(ServerFlowTunables.title, from = direction, to = 0.0),
-                    rows = spring(ServerFlowTunables.list, from = 1.0, to = 1.0),
+                    position = spring(MotionRole.PanelOpen, from = direction, to = 0.0),
+                    rows = spring(MotionRole.Layout, from = 1.0, to = 1.0),
                 )
                 chains.remove(target.id)
             }
             for (entry in entries) {
                 if (entry.id == target.id || entry.exiting) continue
                 entry.exiting = true
-                entry.position.retarget(-direction, ServerFlowTunables.exit)
-                entry.rows.retarget(0.0, ServerFlowTunables.exit)
+                entry.position.retarget(-direction, MotionRole.Collapse, reduceMotion = reduceMotion)
+                entry.rows.retarget(0.0, MotionRole.Collapse, reduceMotion = reduceMotion)
             }
             widths[target.id]?.let { retargetWidth(it) }
         } else {
             entries.firstOrNull { it.id == target.id }?.name = target.name
         }
         if (target.isConnecting) {
-            if (cue.target == 0.0) fill = spring(ServerFlowTunables.fill, 0.0, 0.0, epsilon = 0.002)
-            cue.retarget(1.0, ServerFlowTunables.width)
+            if (cue.target == 0.0) fill = spring(MotionRole.Layout, 0.0, 0.0, epsilon = 0.002)
+            cue.retarget(1.0, MotionRole.Dim, reduceMotion = reduceMotion)
         } else if (cue.target != 0.0) {
             if (previous.isConnecting && previous.id == target.id) {
                 // It answered: the underline fills, then fades.
-                fill.retarget(1.0, ServerFlowTunables.fill)
-                cue.retarget(0.0, ServerFlowTunables.fade)
+                fill.retarget(1.0, MotionRole.Layout, reduceMotion = reduceMotion)
+                cue.retarget(0.0, MotionRole.Dim, reduceMotion = reduceMotion)
             } else {
-                cue.retarget(0.0, ServerFlowTunables.exit)
+                cue.retarget(0.0, MotionRole.Collapse, reduceMotion = reduceMotion)
             }
         }
         publish()
@@ -144,7 +152,7 @@ class ServerSwapMotion {
         widths[id] = width
         if (id != shown?.id) return
         if (this.width == null || !isMoving) {
-            widthSpring = spring(ServerFlowTunables.width, width.toDouble(), width.toDouble(), epsilon = 0.1)
+            widthSpring = spring(MotionRole.Layout, width.toDouble(), width.toDouble(), epsilon = 0.1)
             this.width = width
         } else {
             retargetWidth(width)
@@ -160,7 +168,8 @@ class ServerSwapMotion {
         val chain = chains.getOrPut(server) { mutableListOf() }
         while (chain.size < count) {
             val above = chain.lastOrNull()?.value ?: entry.position.value
-            chain += spring(ServerFlowTunables.follow, from = above, to = above)
+            // Stepped toward the row above at the chain's lag ([step]).
+            chain += spring(MotionRole.Layout, from = above, to = above)
         }
         val fade = entry.rows.value.toFloat().coerceIn(0f, 1f)
         return chain.take(count).map { RowPose(it.value.toFloat(), opacity(it.value.toFloat()) * fade) }
@@ -173,10 +182,13 @@ class ServerSwapMotion {
     val leaving: List<String> get() = entries.filter { it.exiting }.map { it.id }
 
     private fun retargetWidth(width: Float) {
-        val spring = widthSpring ?: spring(ServerFlowTunables.width, width.toDouble(), width.toDouble(), epsilon = 0.1)
+        val spring = widthSpring ?: spring(MotionRole.Layout, width.toDouble(), width.toDouble(), epsilon = 0.1)
             .also { widthSpring = it }
-        spring.retarget(width.toDouble(), ServerFlowTunables.width)
+        spring.retarget(width.toDouble(), MotionRole.Layout, reduceMotion = reduceMotion)
     }
+
+    private fun spring(role: MotionRole, from: Double, to: Double, epsilon: Double = 0.001): SpringSolver =
+        SpringSolver(role, value = from, target = to, reduceMotion = reduceMotion, positionEpsilon = epsilon, velocityEpsilon = epsilon * 10)
 
     private fun snap(target: ServerSwapTarget) {
         isMoving = false
@@ -184,14 +196,14 @@ class ServerSwapMotion {
         entries += Entry(
             id = target.id,
             name = target.name,
-            position = spring(ServerFlowTunables.title, 0.0, 0.0),
-            rows = spring(ServerFlowTunables.list, 1.0, 1.0),
+            position = spring(MotionRole.PanelOpen, 0.0, 0.0),
+            rows = spring(MotionRole.Layout, 1.0, 1.0),
         )
         chains.clear()
-        widths[target.id]?.let { widthSpring = spring(ServerFlowTunables.width, it.toDouble(), it.toDouble(), epsilon = 0.1) }
+        widths[target.id]?.let { widthSpring = spring(MotionRole.Layout, it.toDouble(), it.toDouble(), epsilon = 0.1) }
         val presence = if (target.isConnecting) 1.0 else 0.0
-        cue = spring(ServerFlowTunables.width, presence, presence, epsilon = 0.002)
-        fill = spring(ServerFlowTunables.fill, 0.0, 0.0, epsilon = 0.002)
+        cue = spring(MotionRole.Dim, presence, presence, epsilon = 0.002)
+        fill = spring(MotionRole.Layout, 0.0, 0.0, epsilon = 0.002)
         publish()
         frame++
     }
@@ -209,7 +221,13 @@ class ServerSwapMotion {
             if (!entry.position.step(dt).isSettled) moving = true
             if (!entry.rows.step(dt).isSettled) moving = true
         }
-        val follow = SpringSolver.parameters(ServerFlowTunables.follow.duration, ServerFlowTunables.follow.bounce)
+        // Each row trails the one above by the chain's lag, critically damped; under Reduce Motion
+        // the rows fade together with the name.
+        val follow = if (reduceMotion) {
+            MotionRole.Reduced.curve().springParameters
+        } else {
+            SpringSolver.parameters(ServerFlowTunables.chainLag, 0.0)
+        }
         for (entry in entries) {
             val chain = chains[entry.id] ?: continue
             var leader = entry.position.value
@@ -250,8 +268,6 @@ class ServerSwapMotion {
 
         fun opacity(position: Float): Float = (1 - abs(position) / fadeAt).coerceIn(0f, 1f)
 
-        private fun spring(spring: MotionSpring, from: Double, to: Double, epsilon: Double = 0.001): SpringSolver =
-            SpringSolver(spring, value = from, target = to, positionEpsilon = epsilon, velocityEpsilon = epsilon * 10)
     }
 }
 

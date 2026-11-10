@@ -1,9 +1,7 @@
 package ai.opencode.feature.voice
 
-import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.Shared
 import ai.opencode.core.sharing.SharedKeys
-import ai.opencode.core.sharing.experimental
 import ai.opencode.core.sharing.shared
 import ai.opencode.server.OpenCodeServer
 
@@ -17,7 +15,6 @@ data class VoiceRoutePreferences(
     val engine: Shared<VoiceEngine> = shared(VoiceSharedKeys.voiceEngine),
     val openAIKey: Shared<String?> = shared(SharedKeys.openAIAPIKey),
     val xaiKey: Shared<String?> = shared(SharedKeys.xaiAPIKey),
-    val serverVoice: Shared<Boolean> = shared(experimental(ExperimentalFeature.serverVoice)),
     val provider: Shared<ServerVoiceProvider> = shared(VoiceSharedKeys.serverVoiceProvider),
     val voiceServer: Shared<VoiceServerChoice> = shared(VoiceSharedKeys.voiceServerChoice),
     val support: Shared<Map<String, ServerVoiceSupport>> = shared(VoiceSharedKeys.serverVoiceSupportByServer),
@@ -26,11 +23,10 @@ data class VoiceRoutePreferences(
     fun route(server: OpenCodeServer): VoiceRoute {
         val hasOpenAIKey = !(openAIKey.value ?: "").trim().isEmpty()
         val (broker, _) = VoiceBroker.resolve(
-            serverVoice = ExperimentalFeature.serverVoice.isActive(serverVoice.value),
             choice = voiceServer.value,
             provider = provider.value,
             connected = server,
-            saved = { VoiceFeature.savedServers },
+            saved = VoiceFeature.savedServers,
             answers = voiceModels.value,
             support = support.value,
             hasOpenAIKey = hasOpenAIKey,

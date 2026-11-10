@@ -338,11 +338,11 @@ sealed interface LiveCommand {
 object LiveContentChunker {
     /** Conservative character ceiling well under 500 tokens even for dense prose. */
     const val maxCharactersPerAppend = 1_400
-    const val maxCommentaryChunks = 2
 
     /**
      * Cleans up a session reply for spoken commentary and splits it into
-     * at most `maxCommentaryChunks` chunks within the 500-token limit.
+     * chunks within the 500-token limit. Every chunk is kept, so a long reply
+     * is read in full; `VoiceHandoff.replyLimit` bounds its length.
      */
     fun commentaryChunks(rawOutput: String, maxCharacters: Int = maxCharactersPerAppend): List<String> {
         var text = rawOutput.trim()
@@ -350,8 +350,7 @@ object LiveContentChunker {
             text = text.removePrefix("[COMPLETE]").trim()
         }
         text = collapseCodeBlocks(text)
-        val split = chunks(text, maxCharacters)
-        return split.take(maxCommentaryChunks)
+        return chunks(text, maxCharacters)
     }
 
     /**

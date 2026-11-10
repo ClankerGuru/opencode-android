@@ -7,7 +7,7 @@ import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.OpenCodeTransport
 import ai.opencode.server.model.ProjectMark
-import ai.opencode.server.retry.NetworkPathClient
+import ai.opencode.server.retry.NetworkPathMonitor
 import ai.opencode.server.retry.NetworkRetry
 import ai.opencode.server.retry.RequestIdempotency
 import ai.opencode.server.retry.ServerContact
@@ -414,11 +414,10 @@ class ProjectIconLoader(
                 .followRedirects(false)
                 .followSslRedirects(false)
                 .build()
-            val network = NetworkPathClient.liveValue
             ProjectIconLoader(
                 fetch = liveFetch(client),
                 directory = File(context.cacheDir, "project-icons"),
-                isConstrained = { network.isConstrained() },
+                isConstrained = { NetworkPathMonitor.shared?.isConstrained == true },
             ).also { loader -> loader.scope.launch(Dispatchers.IO) { loader.sweep() } }
         }
     }

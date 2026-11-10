@@ -5,6 +5,7 @@ import ai.opencode.feature.session.*
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.diagnostics.LabMarks
+import ai.opencode.core.sharing.SharedStore
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
@@ -21,15 +22,17 @@ import ai.opencode.feature.voice.VoiceSessionBoard
 import ai.opencode.feature.voice.VoiceSessionBoardClient
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeServerEvent
+import ai.opencode.server.ServerLinkClient
 import ai.opencode.server.TranscriptCachePersistence
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.SessionActivity
 import ai.opencode.server.model.keepingFirstPrompts
-import ai.opencode.server.remember
 import ai.opencode.feature.voice.VoiceFeature
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.milliseconds
 import ai.opencode.feature.voice.VoiceAppState
 import ai.opencode.feature.composer.DictationFeature
@@ -71,7 +74,13 @@ internal fun HomeFeature.reduceConnection(state: State, action: Action): HomeRed
         shareInbox.publishTargets(state.shareTargets)
         shareInbox.publishCredentials(ShareCredentials(state.server), true)
         val persistence = dependency(TranscriptCachePersistence)
-        Reduced(state, Effect.merge(Effect.run { persistence.flush() }, flushPersistedComposer(state)))
+        val sharedStore = dependency(SharedStore)
+        val flush = Effect.run<Action> {
+            persistence.flush()
+            // Home's snapshots and read dates still waiting for the writer land too (iOS 24057173).
+            withContext(Dispatchers.IO) { sharedStore.flush() }
+        }
+        Reduced(state, Effect.merge(flush, flushPersistedComposer(state)))
     }
 
     Action.SceneEnteredBackground -> {
@@ -131,10 +140,22 @@ internal fun HomeFeature.reduceConnection(state: State, action: Action): HomeRed
     Action.LastKnownActivityExpired -> Reduced(state)
 
     Action.NetworkRerouted ->
-        if (!state.isStreaming || state.credentialsRejected) Reduced(state) else refreshSnapshot(state.unsettlingNotices())
+        if (!state.isStreaming || state.credentialsRejected || state.connection.isInBackground) {
+            Reduced(state)
+        } else {
+            refreshSnapshot(state.unsettlingNotices())
+        }
 
     Action.RetryConnectionTapped ->
         if (state.credentialsRejected) Reduced(state) else refreshSnapshot(state.unsettlingNotices())
+
+    Action.SceneBecameActive -> {
+        // Decided on the connection's state before it settles this action.
+        val silence = dependency(ServerLinkClient).streamSilence(state.server.persistenceID)
+        if (!state.connection.resyncsWhenActive(silence)) Reduced(state) else refreshSnapshot(state.unsettlingNotices())
+    }
+
+    Action.ReconnectingGraceElapsed, is Action.OfflineGraceElapsed -> Reduced(state)
 
     is Action.SnapshotRefreshed -> snapshotRefreshed(state, action)
 
@@ -292,9 +313,8 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
             credentialsRejected = false,
             snapshotFailures = 0,
             lastKnownActivityDeadline = null,
-        ),
+        ).settleRecovery(),
     )
-    s.server.remember()
     s = s.initializingInbox()
     val needsAttentionRefresh = !wasConnected ||
         !s.isEventStreamLive ||
@@ -319,8 +339,16 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
         voiceNotified.effect,
         Effect.cancel(HomeFeature.CancelID.SnapshotRetry),
         Effect.cancel(HomeFeature.CancelID.LastKnownActivity),
+        Effect.cancel(HomeFeature.CancelID.ConnectionGrace),
         retry,
     )
+    // The open screen hears the server is back, a draft too: a draft that becomes a session in
+    // place starts its polls from there.
+    val detailReconnected = if (wasConnected) {
+        Effect.none()
+    } else {
+        sendToDetail(s, SessionFeature.Action.RequestsConnectionChanged(true))
+    }
     // A whole run can start and finish while disconnected. Even idle → idle must revalidate the
     // transcript, not just the working indicator.
     val detail = s.sessionDetail
@@ -342,11 +370,11 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
                 update,
                 if (detail.isExternallyActive == runState) Effect.none()
                 else sendToDetail(s, SessionFeature.Action.ExternalRunStateChanged(runState)),
-                if (wasConnected) Effect.none() else sendToDetail(s, SessionFeature.Action.RequestsConnectionChanged(true)),
+                detailReconnected,
             ),
         )
     }
-    return Reduced(s, Effect.merge(attention, ancestry, prefetch, drained.effect, voiceSnapshot, subagentRuns, searchesServer))
+    return Reduced(s, Effect.merge(attention, ancestry, prefetch, drained.effect, voiceSnapshot, subagentRuns, searchesServer, detailReconnected))
 }
 
 private fun HomeFeature.activeAncestryResolved(state: State, resolved: Map<String, String>): HomeReduced {

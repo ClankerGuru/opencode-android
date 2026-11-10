@@ -1,6 +1,8 @@
 package ai.opencode.server
 
 import ai.opencode.core.testing.TestIsolationRule
+import ai.opencode.server.live.ServerInfoPayload
+import ai.opencode.server.live.request
 import ai.opencode.server.model.OpenCodeHomeSnapshot
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.testing.WireFixture
@@ -264,8 +266,13 @@ class AppFeatureTests {
             assertTrue("Single-use pairing redemption must never follow a redirect", redirectTarget.requests.isEmpty())
 
             // Ordinary requests keep the default redirect handling.
-            OpenCodeClient.liveValue.health(ordinaryRedirectSource.server)
+            request<ServerInfoPayload>("/api/info", server = ordinaryRedirectSource.server)
             assertEquals(1, ordinaryRedirectSource.requests.size)
+            assertEquals(1, ordinaryTarget.requests.size)
+
+            // An address probe doesn't: a redirect is a captive portal, not the server.
+            expectClientError { OpenCodeClient.liveValue.health(ordinaryRedirectSource.server) }
+            assertEquals(2, ordinaryRedirectSource.requests.size)
             assertEquals(1, ordinaryTarget.requests.size)
         } finally {
             redirectTarget.close()

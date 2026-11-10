@@ -7,6 +7,7 @@ import ai.opencode.server.model.ModelVariant
 import ai.opencode.server.model.OpenCodeModel
 import ai.opencode.server.model.OpenCodeModelRef
 import ai.opencode.server.model.model
+import ai.opencode.server.model.savedLevel
 
 /**
  * Port of iOS `ModelPickerSection` (`Composer/ModelPicker/ModelPickerSections.swift`).
@@ -200,9 +201,7 @@ data class ModelPickerState(
         if (currentModelInfo?.id == model.id) {
             return currentLevel?.takeIf { it in model.variants }
         }
-        val saved = modelVariants[model.id]
-        if (saved != null && saved != "default" && saved in model.variants) return saved
-        return null
+        return model.savedLevel(modelVariants)
     }
 }
 

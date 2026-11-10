@@ -6,10 +6,13 @@ import ai.opencode.core.ui.OpenCodeSwitch
 import ai.opencode.core.ui.openCodeHairline
 import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.dependencies.dependency
-import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionRollDirection
+import ai.opencode.core.motion.MotionTransition
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.collectState
+import ai.opencode.core.ui.AlertTextFields
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
@@ -34,8 +37,6 @@ import ai.opencode.server.model.OpenCodeSession
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -434,12 +435,9 @@ private fun Hero(
                             AnimatedContent(
                                 targetState = title,
                                 transitionSpec = {
-                                    if (reduceMotion || !animates) {
-                                        fadeIn(titleFade()) togetherWith fadeOut(titleFade())
-                                    } else {
-                                        (slideInVertically(titleSpring.spec()) { it / 2 } + fadeIn(titleFade())) togetherWith
-                                            (slideOutVertically(titleSpring.spec()) { -it / 2 } + fadeOut(titleFade()))
-                                    }
+                                    // iOS `.titleRoll` timed by `Motion.swap`; without animation it swaps in place.
+                                    if (!animates) fadeIn(snap()) togetherWith fadeOut(snap())
+                                    else MotionTransition.roll(MotionRollDirection.Up, reduceMotion, density, Motion.swap).content
                                 },
                                 label = "sessionSheetTitle",
                                 modifier = Modifier.weight(1f, fill = false),
@@ -467,8 +465,6 @@ private fun Hero(
     }
 }
 
-private val titleSpring = MotionSpring(0.45, 0.0)
-private fun <T> titleFade() = ai.opencode.core.motion.Motion.easeInOut<T>(0.22)
 
 @Composable
 private fun LocationLine(session: OpenCodeSession, project: OpenCodeProject?, autoRenameFailed: Boolean) {
@@ -915,6 +911,9 @@ fun SessionActionPresentations(sheet: StoreOf<SessionSheetFeature.State, Session
                     value = state.renameDraft,
                     onValueChange = { sheet.send(SessionSheetFeature.Action.RenameDraftChanged(it)) },
                     placeholder = "Title",
+                    trailingIcon = AlertTextFields.clearButton(state.renameDraft) {
+                        sheet.send(SessionSheetFeature.Action.RenameDraftChanged(""))
+                    },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { sheet.send(SessionSheetFeature.Action.RenameSubmitted) }),

@@ -48,8 +48,6 @@ data class LivingOrbConfig(
     val scene: FloatingCallScene? = null,
     /** Where the disc sits when the view is bigger than it (One Shape's card and sheet). Null centres it in the view. */
     val bloom: LivingOrbBloom? = null,
-    /** The call is connecting for the first time (not reconnecting). */
-    val isConnecting: Boolean = false,
     /** The tool the agent is running, which picks Thinking's choreography. */
     val tool: String? = null,
 ) {
@@ -64,7 +62,7 @@ data class LivingOrbConfig(
                 FloatingCallScene.needsInput -> WispOrbState.confirming
             }
         }
-        if (isConnecting || mood == FloatingCallMood.connecting) return WispOrbState.connecting
+        if (mood == FloatingCallMood.connecting) return WispOrbState.connecting
         if (mood == FloatingCallMood.ended) return WispOrbState.sleeping
         val talking = !isMuted && userLevel > 0.06f
         if (isSpeaking) return if (talking) WispOrbState.bothSpeaking else WispOrbState.speaking
@@ -83,8 +81,6 @@ data class LivingOrbBloom(
     val fade: Float = 0.5f,
     /** The glass the disc sits in, which it feathers into (the card or sheet). */
     val visible: Rect? = null,
-    /** The visible shape's corner radius. */
-    val corner: Float = FloatingCallStageTunables.cardRadius.value.toFloat(),
 ) {
     /** What the placed dots feather into: the visible shape (or the disc), its corner, and how far in they fade. */
     data class Edge(val shape: Rect, val corner: Float, val feather: Float)
@@ -92,6 +88,7 @@ data class LivingOrbBloom(
     fun edge(feather: Double): Edge {
         val shape = visible ?: Rect(center.x - radius, center.y - radius, center.x + radius, center.y + radius)
         val half = min(shape.width, shape.height) / 2
+        val corner = FloatingCallStageTunables.cardRadius.value.toFloat()
         return Edge(shape, if (visible == null) radius else min(corner, half), min(feather.toFloat(), 0.18f * half))
     }
 }

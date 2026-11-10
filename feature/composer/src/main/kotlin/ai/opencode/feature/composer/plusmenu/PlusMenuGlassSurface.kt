@@ -12,9 +12,8 @@ import ai.opencode.feature.composer.AttachmentMenuAnchors
 import ai.opencode.feature.composer.AttachmentMenuItem
 import ai.opencode.feature.composer.AttachmentMenuMetrics
 import ai.opencode.feature.composer.AttachmentMenuMotion
-import ai.opencode.feature.composer.AttachmentMenuOverlay
+import ai.opencode.feature.composer.AttachmentMenuMeasure
 import ai.opencode.feature.composer.AttachmentMenuRows
-import ai.opencode.feature.composer.ComposerMorph
 import ai.opencode.feature.composer.PlusMenuTunables
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
@@ -57,7 +56,6 @@ import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.max
 import kotlin.math.min
@@ -74,7 +72,7 @@ import kotlin.math.roundToInt
  * above the keys ([PlusMenuPlacement.visibleMenu] with `coversKeyboard = false`, iOS's own
  * fallback when its guarded keyboard surface is unavailable); `KeyboardBandSurface` is n/a.
  *
- * [AttachmentMenuOverlay] (with `overComposer = true`) still measures the rows and publishes
+ * [AttachmentMenuMeasure] measures the rows and publishes
  * [anchors]; this draws them. Put it in a full-screen box over the session.
  *
  * @param handsOff the photo sheet took the glass: the menu leaves at once, and the next open
@@ -207,8 +205,8 @@ private fun PlusMenuWindowContent(
         generation += 1
         val closing = generation
         if (isOpen) {
-            launch { glass.animateTo(1f, AttachmentMenuMotion.open(reduceMotion, plusMenuSheet = true)) }
-            expanded.animateTo(1f, AttachmentMenuMotion.open(reduceMotion, plusMenuSheet = true))
+            launch { glass.animateTo(1f, AttachmentMenuMotion.open(reduceMotion)) }
+            expanded.animateTo(1f, AttachmentMenuMotion.open(reduceMotion))
             return@LaunchedEffect
         }
         if (reduceMotion) {
@@ -217,11 +215,11 @@ private fun PlusMenuWindowContent(
             if (closing == generation) onRetired()
             return@LaunchedEffect
         }
-        launch { expanded.animateTo(0f, PlusMenuTunables.collapse.spec()) }
-        // A spring's tail would park the disc on the + for a beat; the glass leaves on arrival.
-        delay((ComposerMorph.wallSeconds(PlusMenuTunables.COLLAPSE_GLASS_OUT) * 1000).roundToInt().toLong())
+        // The fold is logically done once the disc reaches the + (a spring's tail would park it
+        // there for a beat); then the glass leaves on `microOut`.
+        expanded.animateTo(0f, Motion.panelClose.animation(visibilityThreshold = 0.01f))
         if (closing != generation) return@LaunchedEffect
-        glass.animateTo(0f, Motion.easeOut(PlusMenuTunables.COLLAPSE_FADE))
+        glass.animateTo(0f, Motion.microOut.animation(reduceMotion = false))
         if (closing == generation) onRetired()
     }
 
@@ -266,7 +264,7 @@ private fun PlusMenuWindowContent(
                             val translation = dragged / density.density
                             val velocity = tracker.calculateVelocity().y / density.density
                             // iOS `predictedEndTranslation`: about a fifth of a second of the throw.
-                            if (AttachmentMenuOverlay.dragDismisses(translation, translation + velocity * 0.2f)) onDismiss()
+                            if (PlusMenuPlacement.dragDismisses(translation, translation + velocity * 0.2f)) onDismiss()
                         },
                     )
                 }
@@ -387,4 +385,7 @@ object PlusMenuPlacement {
         floor: Float = AttachmentMenuMetrics.overComposerFloor.value,
         navigationBarInset: Float = 0f,
     ): Float = min(composer.bottom + drop, screenBottom - max(navigationBarInset, floor))
+
+    /** A drag on the menu (dp) past either threshold puts it away. */
+    fun dragDismisses(translation: Float, predicted: Float): Boolean = translation > 50 || predicted > 160
 }

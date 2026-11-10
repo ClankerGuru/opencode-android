@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.Dp
 import ai.opencode.core.tuning.AnimationTimeScale
 import ai.opencode.core.tuning.Tunable
 import ai.opencode.core.tuning.TunableSpring
+import ai.opencode.core.tuning.TuneValue
 import ai.opencode.core.tuning.TuningStore
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
@@ -62,57 +63,43 @@ data class MotionSpring(val duration: Double, val bounce: Double = 0.0) {
 }
 
 /**
- * The shared motion vocabulary (iOS `Motion`, `OpenCode/Core/Motion/MotionConstants.swift`,
- * docs/motion.md). Every spring, fade, delay, stagger, blur radius and rise comes from here
- * or a feature's own constants, never a bare literal at a call site.
+ * The app's motion vocabulary (iOS `Motion`, `OpenCode/Core/Motion/MotionConstants.swift`,
+ * docs/motion.md): fourteen roles, each a [MotionRole] (`Motion.panelOpen`, `Motion.release`,
+ * …) that Compose specs and [SpringSolver] both read, plus the shared geometry, stagger and
+ * ambient values the roles use.
  *
  * Backed by live [MotionTunables] (iOS `Tunable`s, same keys and defaults): the Tuning Panel
- * (Developer Mode) changes them while you watch; off, each read is the default. Springs and
- * tweens built here also follow Developer Mode slow motion ([AnimationTimeScale]).
+ * (Developer Mode) lists them as the global Motion group (Springs, Fades, Geometry, Ambient)
+ * on every screen; off, each read is the default. Springs and tweens built here also follow
+ * Developer Mode slow motion ([AnimationTimeScale]).
  */
 object Motion {
-    // Canonical springs (duration, bounce), live from [MotionTunables]
+    /** iOS `Motion.sectionTitles`: the Motion group's sections, in order. */
+    val sectionTitles = listOf("Springs", "Fades", "Geometry", "Ambient")
 
-    /** Primary composer / chip / sheet expansion (0.42 s, 0.12 bounce). */
-    val morphOpen: MotionSpring get() = MotionTunables.morphOpen.spring
-    /** Primary sheet / morph fold (0.34 s, critically damped). */
-    val morphClose: MotionSpring get() = MotionTunables.morphClose.spring
-    /** Compact bar / capsule / pull-out expansion (0.34 s, 0.12 bounce). */
-    val panelOpen: MotionSpring get() = MotionTunables.panelOpen.spring
-    /** Critically damped layout resize, row promotion, or card settle (0.40 s). */
-    val settle: MotionSpring get() = MotionTunables.settle.spring
-    /** Disclosure / accordion / inline band expand (0.30 s). */
-    val disclosureOpen: MotionSpring get() = MotionTunables.disclosureOpen.spring
-    /** Disclosure / accordion / inline band collapse (0.24 s). */
-    val disclosureClose: MotionSpring get() = MotionTunables.disclosureClose.spring
-    /** Small badge, pill, or glyph entrance pop (0.26 s, 0.22 bounce). */
-    val microPop: MotionSpring get() = MotionTunables.microPop.spring
-    /** Small badge, pill, or glyph exit (0.18 s). */
-    val microExit: MotionSpring get() = MotionTunables.microExit.spring
-    /** Drawer / back-swipe critically damped slide (0.22 s; ω ≈ 28.5). */
-    val drawerSlide: MotionSpring get() = MotionTunables.drawerSlide.spring
+    // Roles
 
-    // Fade durations (seconds)
+    val press = MotionRole.Press
+    val microIn = MotionRole.MicroIn
+    val microOut = MotionRole.MicroOut
+    val swap = MotionRole.Swap
+    val layout = MotionRole.Layout
+    val collapse = MotionRole.Collapse
+    val panelOpen = MotionRole.PanelOpen
+    val panelClose = MotionRole.PanelClose
+    val surface = MotionRole.Surface
+    val release = MotionRole.Release
+    val flight = MotionRole.Flight
+    val keyboard = MotionRole.Keyboard
+    val dim = MotionRole.Dim
+    val reduced = MotionRole.Reduced
 
-    /** Cross-fade used under Reduce Motion (0.20 s, ease-in-out). */
-    val reducedFade: Double get() = MotionTunables.reducedFade.value
-    /** Fast outgoing content / press / chrome fade (0.14 s, ease-out). */
-    val fadeFast: Double get() = MotionTunables.fadeFast.value
-    /** Standard incoming content / row fade (0.22 s, ease-out). */
-    val fadeStandard: Double get() = MotionTunables.fadeStandard.value
-    /** Backdrop / full-bleed dim fade (0.32 s, ease-in-out). */
-    val fadeSlow: Double get() = MotionTunables.fadeSlow.value
-
-    // Delays, staggers & handover ratios
+    // Shared values, live from [MotionTunables]
 
     /** One beat after a surface begins expanding before interior content reveals (0.05 s). */
     val contentDelay: Double get() = MotionTunables.contentDelay.value
-    /** Outgoing content clears before incoming bar/panel content arrives (0.10 s). */
-    val handoffDelay: Double get() = MotionTunables.handoffDelay.value
     /** Per-item cascade delay across a staggered group (0.02 s). */
     val staggerStep: Double get() = MotionTunables.staggerStep.value
-    /** Fraction of close duration before the source surface retakes opacity (0.60). */
-    val foldHandoverRatio: Double get() = MotionTunables.foldHandoverRatio.value
 
     // Blur radii & entrance rises (iOS points → dp)
 
@@ -129,15 +116,73 @@ object Motion {
     /** Vertical rise for expanding panel content (10). */
     val panelRise: Dp get() = MotionTunables.panelRise.value
 
+    /** iOS `Motion.register(in:)`: [MotionTunables.register]. */
+    fun register(store: TuningStore = TuningStore.shared) = MotionTunables.register(store)
+
+    /** iOS `Motion.isRetiredKey`: the component-named keys the roles replaced (`motion.morphOpen.duration`, `motion.reducedFade`, …). */
+    fun isRetiredKey(key: String): Boolean {
+        val parts = key.split('.')
+        if (parts.size < 2 || parts[0] != "motion") return false
+        return parts[1] in retiredNames
+    }
+
+    private val retiredNames = setOf(
+        "morphOpen", "morphClose", "panelOpen", "settle", "disclosureOpen", "disclosureClose", "microPop", "microExit", "drawerSlide",
+        "reducedFade", "fadeFast", "fadeStandard", "fadeSlow", "contentDelay", "handoffDelay", "staggerStep",
+        "foldHandoverRatio", "blurSubtle", "blurPanel", "blurSheet", "blurBackdrop", "entranceRise", "panelRise",
+    )
+
+    // Deprecated: today's call sites keep their numbers until they move to a role (iOS keeps the
+    // same aliases). iOS points microPop, morphClose and disclosureOpen at their roles because no
+    // iOS call site used them; Android's still do, so these stay fixed at today's numbers.
+
+    /** Today's 0.34 s / 0.12 panel spring, fixed for the screens that haven't moved to [Motion.panelOpen]. */
+    @Deprecated("Use Motion.panelOpen")
+    val legacyPanelOpen = MotionSpring(0.34, 0.12)
+    /** Primary sheet / morph fold (0.34 s, critically damped). */
+    @Deprecated("Use Motion.panelClose")
+    val morphClose = MotionSpring(0.34, 0.0)
+    /** Critically damped layout resize, row promotion, or card settle (0.40 s). */
+    @Deprecated("Use Motion.layout or Motion.surface")
+    val settle = MotionSpring(0.40, 0.0)
+    /** Disclosure / accordion / inline band expand (0.30 s). */
+    @Deprecated("Use Motion.layout")
+    val disclosureOpen = MotionSpring(0.30, 0.0)
+    /** Disclosure / accordion / inline band collapse (0.24 s). */
+    @Deprecated("Use Motion.collapse")
+    val disclosureClose = MotionSpring(0.24, 0.0)
+    /** Small badge, pill, or glyph entrance pop (0.26 s, 0.22 bounce). */
+    @Deprecated("Use Motion.microIn")
+    val microPop = MotionSpring(0.26, 0.22)
+    /** iOS `Motion.microExit` → `microOut` (same 0.18 s). */
+    @Deprecated("Use Motion.microOut")
+    val microExit: MotionSpring get() = microOut.spring
+    /** iOS `Motion.drawerSlide` → `release` (critically damped at ω 28.5, ≈ 0.22 s). */
+    @Deprecated("Use Motion.release")
+    val drawerSlide: MotionSpring get() = release.spring
+
+    /** Cross-fade used under Reduce Motion (0.20 s, ease-in-out). */
+    @Deprecated("Use MotionTunables.reducedDuration", ReplaceWith("MotionTunables.reducedDuration.value"))
+    val reducedFade: Double get() = MotionTunables.reducedDuration.value
+    /** Fast outgoing content / press / chrome fade (0.14 s, ease-out). */
+    @Deprecated("Use MotionTunables.swapOutDuration", ReplaceWith("MotionTunables.swapOutDuration.value"))
+    val fadeFast: Double get() = MotionTunables.swapOutDuration.value
+    /** Standard incoming content / row fade (0.22 s, ease-out). */
+    @Deprecated("Use MotionTunables.swapInDuration", ReplaceWith("MotionTunables.swapInDuration.value"))
+    val fadeStandard: Double get() = MotionTunables.swapInDuration.value
+    /** Backdrop / full-bleed dim fade (0.32 s). */
+    @Deprecated("Use MotionTunables.dimDuration", ReplaceWith("MotionTunables.dimDuration.value"))
+    val fadeSlow: Double get() = MotionTunables.dimDuration.value
+
     /** SwiftUI `.easeInOut` (CSS ease-in-out). */
     val EaseInOut = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)
 
     /** SwiftUI `.easeOut` (CSS ease-out). */
     val EaseOut = CubicBezierEasing(0f, 0f, 0.58f, 1f)
 
-    /** iOS `Motion.reducedFadeAnimation`: `.easeInOut(duration: reducedFade)`. */
+    /** iOS `Motion.reducedFadeAnimation`: [Motion.reduced]'s `.easeInOut(duration: reducedDuration)`. */
     fun <T> reducedFadeSpec(delaySeconds: Double = 0.0): FiniteAnimationSpec<T> =
-        tween(durationMillis = millis(reducedFade), delayMillis = millis(delaySeconds), easing = EaseInOut)
+        tween(durationMillis = millis(MotionTunables.reducedDuration.value), delayMillis = millis(delaySeconds), easing = EaseInOut)
 
     /** iOS `Tunable<Double>.easeOut(delay:reduceMotion:)` for a fade of [seconds]. */
     fun <T> easeOut(seconds: Double, delaySeconds: Double = 0.0, reduceMotion: Boolean = false): FiniteAnimationSpec<T> =
@@ -182,43 +227,82 @@ private class DelayedVectorizedSpec<V : AnimationVector>(
 }
 
 /**
- * The [Motion] vocabulary as live tunables: iOS `Motion` in `Core/Motion/MotionConstants.swift`,
- * same keys, labels, defaults, ranges and steps (group `motion` in the Tuning Panel). Keep each
- * declaration on one line: `scripts/tune.py bake` rewrites its default.
+ * The [Motion] vocabulary as live tunables: iOS `Motion`'s tunables in
+ * `Core/Motion/MotionConstants.swift`, same keys, labels, defaults, ranges and steps (group
+ * `motion`, sections Springs, Fades, Geometry and Ambient). Keep each declaration on one line:
+ * `scripts/tune.py bake` rewrites its default.
  */
 object MotionTunables {
-    val morphOpen = TunableSpring("motion.morphOpen", "Morph open", duration = 0.42, bounce = 0.12)
-    val morphClose = TunableSpring("motion.morphClose", "Morph close", duration = 0.34, bounce = 0.0)
-    val panelOpen = TunableSpring("motion.panelOpen", "Panel open", duration = 0.34, bounce = 0.12)
-    val settle = TunableSpring("motion.settle", "Layout settle", duration = 0.40, bounce = 0.0)
-    val disclosureOpen = TunableSpring("motion.disclosureOpen", "Disclosure open", duration = 0.30, bounce = 0.0)
-    val disclosureClose = TunableSpring("motion.disclosureClose", "Disclosure close", duration = 0.24, bounce = 0.0)
-    val microPop = TunableSpring("motion.microPop", "Micro pop", duration = 0.26, bounce = 0.22)
-    val microExit = TunableSpring("motion.microExit", "Micro exit", duration = 0.18, bounce = 0.0)
-    val drawerSlide = TunableSpring("motion.drawerSlide", "Drawer slide", duration = 0.22, bounce = 0.0)
+    // Springs (duration s, bounce)
 
-    val reducedFade = Tunable("motion.reducedFade", "Reduce Motion fade (s)", default = 0.20, range = 0.05..0.6, step = 0.01)
-    val fadeFast = Tunable("motion.fadeFast", "Fast fade (s)", default = 0.14, range = 0.05..0.5, step = 0.01)
-    val fadeStandard = Tunable("motion.fadeStandard", "Standard fade (s)", default = 0.22, range = 0.05..0.6, step = 0.01)
-    val fadeSlow = Tunable("motion.fadeSlow", "Slow backdrop fade (s)", default = 0.32, range = 0.1..0.8, step = 0.01)
+    val microInSpring = TunableSpring("motion.springs.microIn", "Micro in", duration = 0.26, bounce = 0.15)
+    val microOutSpring = TunableSpring("motion.springs.microOut", "Micro out", duration = 0.18, bounce = 0.0)
+    val layoutSpring = TunableSpring("motion.springs.layout", "Layout", duration = 0.34, bounce = 0.0)
+    val collapseSpring = TunableSpring("motion.springs.collapse", "Collapse", duration = 0.26, bounce = 0.0)
+    val panelOpenSpring = TunableSpring("motion.springs.panelOpen", "Panel open", duration = 0.40, bounce = 0.10)
+    val panelCloseSpring = TunableSpring("motion.springs.panelClose", "Panel close", duration = 0.30, bounce = 0.0)
+    val surfaceSpring = TunableSpring("motion.springs.surface", "Surface", duration = 0.44, bounce = 0.0)
+    val flightSpring = TunableSpring("motion.springs.flight", "Flight", duration = 0.38, bounce = 0.0)
+    /** Critically damped release stiffness (ω, rad/s): `2π / ω` ≈ 0.22 s. */
+    val releaseOmega = Tunable("motion.springs.releaseOmega", "Release ω", default = 28.5, range = 12.0..60.0, step = 0.5)
+    /** Keyboard-riding motion when the system's own inset animation isn't available. */
+    val keyboardDuration = Tunable("motion.springs.keyboard", "Keyboard fallback (s)", default = 0.267, range = 0.15..0.5, step = 0.005)
 
-    val contentDelay = Tunable("motion.contentDelay", "Content arrival delay (s)", default = 0.05, range = 0.0..0.3, step = 0.01)
-    val handoffDelay = Tunable("motion.handoffDelay", "Handoff delay (s)", default = 0.10, range = 0.0..0.4, step = 0.01)
-    val staggerStep = Tunable("motion.staggerStep", "Stagger step (s)", default = 0.02, range = 0.0..0.15, step = 0.005)
-    val foldHandoverRatio = Tunable("motion.foldHandoverRatio", "Fold handover ratio", default = 0.60, range = 0.2..0.95, step = 0.05)
+    // Fades & eases (seconds)
 
-    val blurSubtle = Tunable("motion.blurSubtle", "Subtle blur (pt)", default = 3.dp, range = 0.0..20.0, step = 0.5)
-    val blurPanel = Tunable("motion.blurPanel", "Panel blur (pt)", default = 8.dp, range = 0.0..30.0, step = 0.5)
-    val blurSheet = Tunable("motion.blurSheet", "Sheet arrival blur (pt)", default = 14.dp, range = 0.0..30.0, step = 0.5)
-    val blurBackdrop = Tunable("motion.blurBackdrop", "Backdrop blur (pt)", default = 18.dp, range = 0.0..40.0, step = 0.5)
-    val entranceRise = Tunable("motion.entranceRise", "Entrance rise (pt)", default = 6.dp, range = 0.0..24.0, step = 1.0)
-    val panelRise = Tunable("motion.panelRise", "Panel content rise (pt)", default = 10.dp, range = 0.0..32.0, step = 1.0)
+    val pressDuration = Tunable("motion.fades.press", "Press down (s)", default = 0.10, range = 0.04..0.25, step = 0.01)
+    val swapInDuration = Tunable("motion.fades.swapIn", "Swap in (s)", default = 0.22, range = 0.08..0.5, step = 0.01)
+    val swapOutDuration = Tunable("motion.fades.swapOut", "Swap out (s)", default = 0.14, range = 0.06..0.4, step = 0.01)
+    val dimDuration = Tunable("motion.fades.dim", "Dim (s)", default = 0.32, range = 0.1..0.8, step = 0.01)
+    val reducedDuration = Tunable("motion.fades.reduced", "Reduce Motion fade (s)", default = 0.20, range = 0.05..0.5, step = 0.01)
+    /** One beat after glass starts growing before its content arrives. */
+    val contentDelay = Tunable("motion.fades.contentDelay", "Content delay (s)", default = 0.05, range = 0.0..0.2, step = 0.01)
+    val staggerStep = Tunable("motion.fades.staggerStep", "Stagger step (s)", default = 0.02, range = 0.0..0.08, step = 0.005)
+    val staggerCap = Tunable("motion.fades.staggerCap", "Stagger cap (s)", default = 0.10, range = 0.02..0.3, step = 0.01)
 
-    /** iOS `Motion.register(in:)`: lists every motion knob before its first read. */
+    // Geometry & thresholds (iOS points → dp, ratios)
+
+    val pressScale = Tunable("motion.geometry.pressScale", "Press scale", default = 0.97f, range = 0.90..1.0, step = 0.005)
+    val microInScale = Tunable("motion.geometry.microInScale", "Micro in scale", default = 0.85f, range = 0.5..1.0, step = 0.01)
+    val swapScale = Tunable("motion.geometry.swapScale", "Swap & exit scale", default = 0.96f, range = 0.85..1.0, step = 0.01)
+    val rollDistance = Tunable("motion.geometry.rollDistance", "Roll (pt)", default = 5.dp, range = 0.0..16.0, step = 0.5)
+    val blurSubtle = Tunable("motion.geometry.blurSubtle", "Subtle blur (pt)", default = 3.dp, range = 0.0..12.0, step = 0.5)
+    val blurPanel = Tunable("motion.geometry.blurPanel", "Panel blur (pt)", default = 8.dp, range = 0.0..24.0, step = 0.5)
+    val blurSheet = Tunable("motion.geometry.blurSheet", "Sheet blur (pt)", default = 14.dp, range = 0.0..30.0, step = 0.5)
+    val blurBackdrop = Tunable("motion.geometry.blurBackdrop", "Backdrop blur (pt)", default = 18.dp, range = 0.0..40.0, step = 0.5)
+    val entranceRise = Tunable("motion.geometry.entranceRise", "Entrance rise (pt)", default = 6.dp, range = 0.0..20.0, step = 1.0)
+    val panelRise = Tunable("motion.geometry.panelRise", "Panel rise (pt)", default = 10.dp, range = 0.0..28.0, step = 1.0)
+    val widthLead = Tunable("motion.geometry.widthLead", "Flight width lead (×)", default = 1.65, range = 1.0..2.5, step = 0.05)
+    /** dp per second (iOS points per second). */
+    val flickVelocity = Tunable("motion.geometry.flickVelocity", "Flick (pt/s)", default = 250.0, range = 100.0..900.0, step = 25.0)
+
+    // Ambient clock (seconds)
+
+    val breathPeriod = Tunable("motion.ambient.breathPeriod", "Breath period (s)", default = 1.70, range = 0.8..3.5, step = 0.05)
+    val sweepPeriod = Tunable("motion.ambient.sweepPeriod", "Sweep period (s)", default = 1.60, range = 0.6..3.5, step = 0.05)
+
+    /**
+     * iOS `Motion.register(in:)`: lists every role's tunables in the panel before anything has
+     * animated, in section order, and drops overrides left on keys this vocabulary retired.
+     */
     fun register(store: TuningStore = TuningStore.shared) {
-        listOf(morphOpen, morphClose, panelOpen, settle, disclosureOpen, disclosureClose, microPop, microExit, drawerSlide).forEach(store::register)
-        store.register(reducedFade, fadeFast, fadeStandard, fadeSlow)
-        store.register(contentDelay, handoffDelay, staggerStep, foldHandoverRatio)
-        store.register(blurSubtle, blurPanel, blurSheet, blurBackdrop, entranceRise, panelRise)
+        store.register(microInSpring)
+        store.register(microOutSpring)
+        store.register(layoutSpring)
+        store.register(collapseSpring)
+        store.register(panelOpenSpring)
+        store.register(panelCloseSpring)
+        store.register(surfaceSpring)
+        store.register(flightSpring)
+        store.register(releaseOmega)
+        store.register(keyboardDuration)
+        store.register(pressDuration, swapInDuration, swapOutDuration, dimDuration, reducedDuration, contentDelay, staggerStep, staggerCap)
+        store.register(pressScale, microInScale, swapScale, rollDistance, blurSubtle, blurPanel, blurSheet, blurBackdrop, entranceRise, panelRise, widthLead, flickVelocity)
+        store.register(breathPeriod, sweepPeriod)
+        val stale = HashMap<String, TuneValue?>()
+        for (key in store.overrides.keys) {
+            if (Motion.isRetiredKey(key)) stale[key] = null
+        }
+        if (stale.isNotEmpty()) store.set(stale)
     }
 }

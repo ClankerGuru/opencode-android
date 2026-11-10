@@ -117,13 +117,10 @@ class HomeViewState internal constructor(
         store.send(HomeFeature.Action.ManageServersTapped)
     }
 
-    /** Search opened (iOS `beginSearch()`; the pill animates itself). */
-    fun beginSearch() {
-        keyboardHold?.setDrawerSearching(true)
-        if (!search.isSearching) search.isSearching = true
-    }
-
-    /** Cancel and Escape clear the search and bring the title back (iOS `endSearch()`). */
+    /**
+     * The drawer animates search itself (`DrawerSearchPill`). Cancel and Escape clear the search
+     * and bring the title back (iOS `endSearch()`).
+     */
     fun endSearch() {
         keyboardHold?.setDrawerSearching(false)
         if (!search.isSearching && !search.isFocused && state.search.isEmpty()) return

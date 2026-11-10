@@ -5,6 +5,7 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.log.AppLog
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.OpenCodeTransport
+import ai.opencode.server.ServerLinkClient
 import ai.opencode.server.live.logDescription
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -13,7 +14,9 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -301,7 +304,15 @@ class ClientToolsClient(
                 .build()
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
             ClientToolsClient(
-                connect = { target -> ClientMcpSocket.connect(target, client, sockets, scope) },
+                connect = { target ->
+                    // To whichever of the server's addresses answers now (waiting for a race in
+                    // flight, or running one when none has answered yet).
+                    val link = dependency(ServerLinkClient)
+                    flow {
+                        val routed = ClientToolsTarget(link.route(target.server), target.directory, target.tools)
+                        emitAll(ClientMcpSocket.connect(routed, client, sockets, scope))
+                    }
+                },
                 reply = { call, result ->
                     if (call.connection == ClientToolCall.labConnection) true else sockets.reply(call, result)
                 },

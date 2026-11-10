@@ -359,7 +359,11 @@ class RenderedGapCounter {
     companion object { const val minimumGap = 48; const val maximumGap = 7200 }
 }
 class RenderedGapMeter {
-    var counter: RenderedGapCounter? = null; private set
+    @Volatile var counter: RenderedGapCounter? = null; private set
     @Synchronized fun enable() { counter = RenderedGapCounter() }
-    @Synchronized fun add(buffer: FloatArray, count: Int = buffer.size) { counter?.add(buffer, count) }
+    /** Off (every call but the lab's), this returns before taking the lock on the audio thread. */
+    fun add(buffer: FloatArray, count: Int = buffer.size) {
+        val counter = counter ?: return
+        synchronized(this) { counter.add(buffer, count) }
+    }
 }

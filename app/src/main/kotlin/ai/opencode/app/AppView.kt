@@ -9,6 +9,8 @@ import androidx.compose.foundation.BorderStroke
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.diagnostics.HidesFromScreenshots
 import ai.opencode.core.experiments.key
+import ai.opencode.core.motion.MotionRole
+import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.Store
@@ -43,6 +45,7 @@ import ai.opencode.feature.transcript.TranscriptMediaProviders
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.clienttools.ClientTool
 import ai.opencode.server.friendlyName
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -460,8 +463,10 @@ private fun PasteRow(store: StoreOf<AppFeature.State, AppFeature.Action>) {
 @Composable
 private fun CopyCommand(command: String, onCopy: (String) -> Unit) {
     var copied by remember { mutableStateOf(false) }
+    val reduceMotion = rememberReduceMotion()
     LaunchedEffect(copied) {
         if (!copied) return@LaunchedEffect
+        // The Copied checkmark's dwell.
         delay(1_500)
         copied = false
     }
@@ -499,12 +504,15 @@ private fun CopyCommand(command: String, onCopy: (String) -> Unit) {
                     fontFeatureSettings = "calt 0",
                 ),
             )
-            OpenCodeIcon(
-                if (copied) SFSymbol.Checkmark else SFSymbol.SquareOnSquare,
-                contentDescription = null,
-                tint = OpenCodeTheme.colors.secondaryText,
-                size = 16.dp,
-            )
+            // The copied checkmark swaps in and back on the swap role (a cross-fade under reduce motion).
+            Crossfade(copied, animationSpec = MotionRole.Swap.animation(reduceMotion = reduceMotion), label = "copy-command") { isCopied ->
+                OpenCodeIcon(
+                    if (isCopied) SFSymbol.Checkmark else SFSymbol.SquareOnSquare,
+                    contentDescription = null,
+                    tint = OpenCodeTheme.colors.secondaryText,
+                    size = 16.dp,
+                )
+            }
         }
     }
 }
@@ -703,6 +711,7 @@ private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>)
     val scroll = rememberScrollState()
     val isConnectDisabled = state.connectionProgressLabel != null || state.serverURL.isBlank() || state.headerProblem != null
     val attempt = state.errorContext?.attempt
+    val reduceMotion = rememberReduceMotion()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     // TalkBack starts on the title, not the scrim or the drag handle, as VoiceOver starts in
     // iOS's navigation bar: one move once the sheet has opened, after TalkBack's own first focus
@@ -749,7 +758,8 @@ private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>)
                     connectFocus.focus()
                 }
             } else {
-                scroll.animateScrollTo(0)
+                // Back to the top on the layout role, so a failed attempt's error is seen.
+                scroll.animateScrollTo(0, MotionRole.Layout.animation(reduceMotion = reduceMotion))
             }
             val failed = store.state
             failed.errorMessage?.let { announcer.announce("${errorTitle(failed.errorPhase, failed.errorContext)}. ${it.replace("`", "")}", false) }

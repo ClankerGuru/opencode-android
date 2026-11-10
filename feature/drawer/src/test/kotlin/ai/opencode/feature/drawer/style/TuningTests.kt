@@ -29,7 +29,6 @@ class TuningStoreTests {
 
     @Test
     fun drawerMotionTunablesDefaultToNativeLiterals() {
-        assertEquals(28.5, DrawerMotionTunables.CARD_OMEGA, 0.0)
         assertEquals(0.96f, DrawerMotionTunables.RECEDE_SCALE)
         assertEquals(0.7f, DrawerMotionTunables.DIM_DARK)
         assertEquals(0.6f, DrawerMotionTunables.DIM_LIGHT)

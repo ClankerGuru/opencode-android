@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.log.AppLog
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionFrameAction
 import ai.opencode.core.motion.PageTransitions
@@ -104,7 +105,7 @@ class SessionStackPage(
  * TalkBack and their own back handlers are parked on an inert dispatcher, so only the top screen
  * handles system back.
  *
- * Under Reduce Motion pushes and pops cross-fade (0.25 s) instead of sliding.
+ * Under Reduce Motion pushes and pops cross-fade (`Motion.reduced`) instead of sliding.
  *
  * @param pages the screens over the root, bottom first. New ids push (the last with the push
  *   motion), missing ids pop (the top with the pop motion), and pages that stay take the new
@@ -338,8 +339,6 @@ private class PageHorizontalScrollers(private val drawer: DrawerPanExclusion?) :
 /** What moves the top page: a push, a pop, or a back gesture (drag, then its settle). */
 internal enum class StackTransition { Push, Pop, Back }
 
-/** iOS `UIView.animate(withDuration: 0.25)`: Reduce Motion's push/pop cross-fade. */
-private const val REDUCED_FADE_SECONDS = 0.25
 
 private const val ROOT_KEY = "ai.opencode.session.stack.root"
 
@@ -643,7 +642,8 @@ internal class SessionPageStackMotion(
         job = scope.launch {
             motionFrameLoop(frameDurationSeconds = frameDuration) { tick ->
                 elapsed += tick.dt
-                val t = min(elapsed / REDUCED_FADE_SECONDS, 1.0).toFloat()
+                // iOS `Motion.reduced.animate(reduceMotion: true)`.
+                val t = min(elapsed / Motion.reduced.curve(reduceMotion = true).duration, 1.0).toFloat()
                 topAlpha = from + (to - from) * Motion.EaseInOut.transform(t)
                 if (t >= 1f) {
                     job = null
@@ -708,7 +708,14 @@ internal class SessionPageStackMotion(
      * [leanSign] is which way the preview leans on screen (+1 right, -1 left).
      */
     fun dragBegan(leanSign: Float): Boolean {
-        if (width <= 0 || !canGoBack || isPopping) return false
+        if (width <= 0 || !canGoBack) return false
+        // A finger already down as a pop began: the pop owns the page until it lands, so this
+        // drag is ignored. Taking the page would drop the pop's landing.
+        if (isPopping) {
+            val depth = pages.size
+            AppLog.app.info { "page_stack_back_drag_ignored reason=popping depth=$depth" }
+            return false
+        }
         // Caught mid-push: the drag takes the page from where it is.
         stopMotion()
         landing = null

@@ -175,17 +175,7 @@ data class ConnectionFailureDetail(
             return "$scheme://$shown:$port"
         }
 
-        fun isTailnetAddress(address: String): Boolean {
-            val bare = address.split("%", limit = 2).firstOrNull() ?: ""
-            HostAddress.parseIPv4(bare)?.let { b ->
-                val value = (b[0].toLong() shl 24) or (b[1].toLong() shl 16) or (b[2].toLong() shl 8) or b[3].toLong()
-                return (value and 0xffc00000L) == 0x64400000L
-            }
-            val bytes = HostAddress.parseIPv6(bare) ?: return false
-            return bytes.subList(0, 6) == listOf(0xfd, 0x7a, 0x11, 0x5c, 0xa1, 0xe0) ||
-                (bytes.subList(0, 10).all { it == 0 } && bytes[10] == 0xff && bytes[11] == 0xff &&
-                    bytes[12] == 100 && (bytes[13] and 0xc0) == 64)
-        }
+        fun isTailnetAddress(address: String): Boolean = HostAddress.of(address)?.route == ConnectionRoute.Tailscale
 
         /**
          * Best-effort system DNS, only after a failed connection probe: at most one

@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.motion.MotionRubberBand
 import java.util.UUID
 import kotlin.math.abs
 import kotlin.math.hypot
@@ -163,6 +164,12 @@ class AutocompleteSimulation(var params: AutocompleteParameters = AutocompletePa
     data class PendingCommit(val items: List<AutocompleteItem>, val highlightedID: String?, val userMoved: Boolean)
 
     var scrollOffset: Double = 0.0
+    /**
+     * Drawn past an end of the list, rubber-banded while a finger holds it ([scrollExcess] is how
+     * far the finger is past that end); let go, it springs home.
+     */
+    val overscroll = AutocompleteSpring(0.0)
+    var scrollExcess: Double = 0.0
     var lastCommitTime: Double = -10.0
     var pendingItems: PendingCommit? = null
     var pendingCommitAt: Double? = null
@@ -185,6 +192,7 @@ class AutocompleteSimulation(var params: AutocompleteParameters = AutocompletePa
             contentInScheduledAt != null ||
             !a.isStill() || !g.isStill() || !c.isStill() || !h.isStill() ||
             !hx.isStill() || !hy.isStill() || !hw.isStill() || !hh.isStill() || !ha.isStill() ||
+            !overscroll.isStill() ||
             (!isOpen && rows.isNotEmpty()) ||
             rows.any {
                 !it.p.isStill() || !it.slot.isStill() || !it.dx.isStill() || !it.dy.isStill() ||
@@ -260,7 +268,8 @@ class AutocompleteSimulation(var params: AutocompleteParameters = AutocompletePa
     private fun rowRects(listWidth: Double, listHeight: Double): RowGeometry {
         val lay = layoutRows(listWidth)
         val anchorY = if (isBottomOrder) listHeight else 0.0
-        val sy = if (isBottomOrder) scrollOffset else -scrollOffset
+        val drawnOffset = scrollOffset + overscroll.x
+        val sy = if (isBottomOrder) drawnOffset else -drawnOffset
         val rects = HashMap<String, RowBox>()
         for (row in rows) {
             val entry = lay.entries[row.id] ?: continue
@@ -368,6 +377,8 @@ class AutocompleteSimulation(var params: AutocompleteParameters = AutocompletePa
         if (wasClosed) {
             rows = mutableListOf()
             scrollOffset = 0.0
+            scrollExcess = 0.0
+            overscroll.snap(0.0)
             lastCommitTime = -10.0
             pendingItems = null
             pendingCommitAt = null
@@ -583,7 +594,18 @@ class AutocompleteSimulation(var params: AutocompleteParameters = AutocompletePa
         val lay = layoutRows(listWidth)
         val maxScroll = max(0.0, lay.length - maxListHeight)
         val delta = if (isBottomOrder) deltaY else -deltaY
-        scrollOffset = clamp(scrollOffset + delta, 0.0, maxScroll)
+        val wanted = scrollOffset + scrollExcess + delta
+        scrollOffset = clamp(wanted, 0.0, maxScroll)
+        // Past an end it gives like a scroll view's; a list that fits, and Reduce Motion, just stop there.
+        if (maxScroll <= 0 || params.reducedMotion) return
+        scrollExcess = wanted - scrollOffset
+        overscroll.snap(MotionRubberBand(maxListHeight).stretch(scrollExcess))
+    }
+
+    /** The finger let go: a list held past its end springs home. */
+    fun endScroll() {
+        scrollExcess = 0.0
+        if (overscroll.x != 0.0) overscroll.to(0.0, duration = params.releaseDuration, bounce = 0.0)
     }
 
     /**
@@ -674,7 +696,7 @@ class AutocompleteSimulation(var params: AutocompleteParameters = AutocompletePa
             }
         }
 
-        for (spring in listOf(a, g, c, h, hx, hy, hw, hh, ha)) spring.step(clampedDt)
+        for (spring in listOf(a, g, c, h, hx, hy, hw, hh, ha, overscroll)) spring.step(clampedDt)
 
         for (row in rows) {
             row.p.step(clampedDt)

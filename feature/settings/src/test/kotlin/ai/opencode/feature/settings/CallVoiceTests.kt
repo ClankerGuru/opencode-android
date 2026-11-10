@@ -2,10 +2,8 @@ package ai.opencode.feature.settings
 
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.TestClock
-import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.SharedStore
-import ai.opencode.core.sharing.experimental
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.settings.VoiceSettingsFeature.Action
@@ -17,6 +15,7 @@ import ai.opencode.feature.voice.VoiceKeyFingerprint
 import ai.opencode.feature.voice.VoicePreviewClient
 import ai.opencode.feature.voice.VoicePreviewError
 import ai.opencode.feature.voice.VoiceProvider
+import ai.opencode.feature.voice.VoiceServerChoice
 import ai.opencode.feature.voice.VoiceSharedKeys
 import ai.opencode.server.OpenCodeServer
 import kotlinx.coroutines.test.runTest
@@ -56,6 +55,8 @@ class CallVoiceTests {
         shared.set(SharedKeys.openAIAPIKey, null)
         shared.set(SharedKeys.xaiAPIKey, null)
         shared.set(SharedKeys.verifiedVoiceKeyFingerprint, null)
+        // This phone's key rows; the Voice Provider row names the provider.
+        shared.set(VoiceSharedKeys.voiceServerChoice, VoiceServerChoice.Phone)
 
         // Gemini Live, below, runs on the server calls start from.
         val store = TestStore(VoiceSettingsFeature.State(server = server), VoiceSettingsFeature(), this) {
@@ -65,7 +66,7 @@ class CallVoiceTests {
         }
 
         store.withDependencies {
-            assertEquals("OpenAI · GPT-Live", store.state.modelRowValue)
+            assertEquals("GPT-Live", store.state.modelRowValue)
             assertEquals("OpenAI Key", store.state.keyRowTitle)
             assertEquals(VoiceKeyStatus.Missing, store.state.keyStatus)
             assertEquals("Missing", store.state.keyBadgeTitle)
@@ -117,8 +118,8 @@ class CallVoiceTests {
         assertEquals(openAIFingerprint, shared.get(SharedKeys.verifiedVoiceKeyFingerprint))
         store.withDependencies { assertEquals(VoiceKeyStatus.Verified, store.state.keyStatus) }
 
-        // With server voice holding the key, the row becomes "Key on Your Server".
-        shared.set(experimental(ExperimentalFeature.serverVoice), true)
+        // With the server holding the key, the row becomes "Key on Your Server".
+        shared.set(VoiceSharedKeys.voiceServerChoice, VoiceServerChoice.Automatic)
         shared.set(VoiceSharedKeys.serverVoiceProvider, ServerVoiceProvider.geminiLive)
         store.send(Action.RouteChanged) { it.copy(isEditingKey = false) }
         store.withDependencies {

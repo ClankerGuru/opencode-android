@@ -6,7 +6,6 @@ import ai.opencode.core.dependencies.asContextElement
 import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.sharing.SharedKeys
-import ai.opencode.core.sharing.experimental
 import ai.opencode.core.store.TestStore
 import ai.opencode.feature.voice.VoiceSessionDelegatorTestSupport.admittingFirstTurn
 import ai.opencode.feature.voice.VoiceSessionDelegatorTestSupport.hearing
@@ -82,8 +81,6 @@ class VoiceSessionDelegatorServerVoiceTests {
         copy(
             startedTarget = VoiceWorkTarget(server = server, sessionID = session.id, directory = session.directory),
             activeRoute = route,
-            activeEngine = VoiceEngine.gptLive,
-            activeProvider = ServerVoiceProvider.openAI,
             activeVoice = CallVoice.marin,
             usesDelegator = usesDelegator,
             usesSessionDelegator = usesSessionDelegator,
@@ -177,7 +174,7 @@ class VoiceSessionDelegatorServerVoiceTests {
         val now = Instant.ofEpochSecond(at)
 
         // 1. Phone Key + Built-in -> `delegation: {type: "client"}`, `unboundSpeechUsesInstructions: false`, handled by `VoiceDelegator`.
-        shared.set(experimental(ExperimentalFeature.serverVoice), false)
+        shared.set(VoiceSharedKeys.voiceServerChoice, VoiceServerChoice.Phone)
         shared.set(SharedKeys.openAIAPIKey, "sk-phone")
         shared.set(SharedKeys.verifiedVoiceKeyFingerprint, VoiceKeyFingerprint.make(key = "sk-phone", model = VoiceEngine.gptLive.modelID))
         shared.set(VoiceSharedKeys.voiceDelegatorChoice, VoiceDelegatorChoice.BuiltIn)
@@ -200,7 +197,7 @@ class VoiceSessionDelegatorServerVoiceTests {
         }
 
         pkBuiltInStore.send(VoiceFeature.Action.Start) {
-            it.started(VoiceRoute.PhoneKey(VoiceEngine.gptLive), usesDelegator = true, usesSessionDelegator = false)
+            it.started(VoiceRoute.PhoneKey(VoiceEngine.gptLive), usesDelegator = true, usesSessionDelegator = false).copy(diagnosesFailure = true)
         }
         pkBuiltInStore.receive(VoiceFeature.Action.CallEvent(VoiceCallEvent.Connected), update = connected(now))
         assertEquals("sk-phone", pkBuiltInStream.configs.value.first().first)
@@ -243,7 +240,7 @@ class VoiceSessionDelegatorServerVoiceTests {
         }
 
         pkSessionStore.send(VoiceFeature.Action.Start) {
-            it.started(VoiceRoute.PhoneKey(VoiceEngine.gptLive), usesDelegator = false, usesSessionDelegator = true)
+            it.started(VoiceRoute.PhoneKey(VoiceEngine.gptLive), usesDelegator = false, usesSessionDelegator = true).copy(diagnosesFailure = true)
         }
         pkSessionStore.receive(VoiceFeature.Action.CallEvent(VoiceCallEvent.Connected), update = connected(now))
         assertEquals("sk-phone", pkSessionStream.configs.value.first().first)
@@ -261,7 +258,7 @@ class VoiceSessionDelegatorServerVoiceTests {
         // 3. Server Voice + Built-in (no phone key!) -> `delegation: {type: "responses", ...}`, `unboundSpeechUsesInstructions: false`, handled by `VoiceDelegator.runOnCall`.
         shared.set(SharedKeys.openAIAPIKey, null)
         shared.set(SharedKeys.verifiedVoiceKeyFingerprint, null)
-        shared.set(experimental(ExperimentalFeature.serverVoice), true)
+        shared.set(VoiceSharedKeys.voiceServerChoice, VoiceServerChoice.Automatic)
         shared.set(VoiceSharedKeys.serverVoiceProvider, ServerVoiceProvider.openAI)
         shared.set(VoiceSharedKeys.serverVoiceSupportByServer, mapOf(server.persistenceID to ServerVoiceSupport.supported))
         shared.set(VoiceSharedKeys.voiceDelegatorChoice, VoiceDelegatorChoice.BuiltIn)
@@ -273,7 +270,7 @@ class VoiceSessionDelegatorServerVoiceTests {
         val svBuiltInEffects = detachedScope(coroutineContext)
         val svBuiltInStore = store(shared, svBuiltInInitial, svBuiltInEffects, now = at) {
             this[UuidClient] = UuidClient.incrementing()
-            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.serverVoice, ExperimentalFeature.voiceSessionDelegator))
+            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.voiceSessionDelegator))
             this[VoiceDelegatorClient] = VoiceDelegatorClient(isEnabled = true) { _, _, _ ->
                 throw OpenCodeClientError("Server Built-in must run onCall, not phone /v1/responses")
             }
@@ -323,7 +320,7 @@ class VoiceSessionDelegatorServerVoiceTests {
         val svSessionEffects = detachedScope(coroutineContext)
         val svSessionStore = store(shared, svSessionInitial, svSessionEffects, now = at) {
             this[UuidClient] = UuidClient.incrementing()
-            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.serverVoice, ExperimentalFeature.voiceSessionDelegator))
+            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.voiceSessionDelegator))
             this[ServerIDClient] = mockServerID(session = { "ses_unused" }, message = { "msg_sv_s" })
             this[VoiceDelegatorClient] = VoiceDelegatorClient(isEnabled = true) { _, _, _ ->
                 throw OpenCodeClientError("Built-in must not run when OpenCode Session is chosen")
@@ -365,7 +362,6 @@ class VoiceSessionDelegatorServerVoiceTests {
         val at = 9_500L
         val now = Instant.ofEpochSecond(at)
 
-        shared.set(experimental(ExperimentalFeature.serverVoice), true)
         shared.set(VoiceSharedKeys.serverVoiceProvider, ServerVoiceProvider.openAI)
         shared.set(VoiceSharedKeys.serverVoiceSupportByServer, mapOf(server.persistenceID to ServerVoiceSupport.supported))
         shared.set(
@@ -381,7 +377,7 @@ class VoiceSessionDelegatorServerVoiceTests {
         val effects = detachedScope(coroutineContext)
         val store = store(shared, initial, effects, now = at) {
             this[UuidClient] = UuidClient.incrementing()
-            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.serverVoice, ExperimentalFeature.voiceSessionDelegator))
+            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.voiceSessionDelegator))
             this[VoiceDelegatorClient] = VoiceDelegatorClient(isEnabled = true) { _, _, _ ->
                 throw OpenCodeClientError("Server fallback must use onCall Responses delegation")
             }
@@ -563,7 +559,6 @@ class VoiceSessionDelegatorServerVoiceTests {
         val at = 9_800L
         val now = Instant.ofEpochSecond(at)
 
-        shared.set(experimental(ExperimentalFeature.serverVoice), true)
         shared.set(VoiceSharedKeys.serverVoiceProvider, ServerVoiceProvider.openAI)
         shared.set(VoiceSharedKeys.voiceServerChoice, VoiceServerChoice.Automatic)
         shared.set(VoiceSharedKeys.serverVoiceSupportByServer, mapOf(server.persistenceID to ServerVoiceSupport.unknown))
@@ -578,7 +573,7 @@ class VoiceSessionDelegatorServerVoiceTests {
         val effects = detachedScope(coroutineContext)
         val store = store(shared, shared.read { VoiceFeature.State(server, session) }, effects, now = at) {
             this[UuidClient] = UuidClient.incrementing()
-            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.serverVoice, ExperimentalFeature.voiceSessionDelegator))
+            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.voiceSessionDelegator))
             this[ServerVoiceClient] = ServerVoiceClient(
                 checkSupport = { ServerVoiceSupport.unsupported },
                 models = { null },

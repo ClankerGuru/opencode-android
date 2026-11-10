@@ -11,7 +11,7 @@ import ai.opencode.feature.drawer.catchup.CatchUpStack
 import ai.opencode.feature.drawer.catchup.CatchUpStage
 import ai.opencode.feature.drawer.catchup.CatchUpStageProxy
 import ai.opencode.feature.drawer.catchup.rememberCatchUpStackController
-import ai.opencode.feature.drawer.list.LocalDrawerVisible
+import ai.opencode.feature.drawer.list.LocalDrawerHidden
 import ai.opencode.feature.drawer.list.rememberInboxSidebarOn
 import ai.opencode.feature.drawer.motion.DrawerCorner
 import ai.opencode.feature.drawer.motion.DrawerDepth
@@ -280,6 +280,9 @@ fun SessionDrawerContainer(
         drawerPrewarmed = true
     }
     val drawerComposed = drawerShows || drawerEverShown[0] || drawerPrewarmed
+    // While it can't show, the composed drawer builds nothing and nothing in it ticks (iOS f5636460):
+    // shut, or a sidebar that's slid away.
+    val drawerHidden = rememberUpdatedState(!drawerShows || (sidebarShown != null && !controller.isSidebarVisible))
     // Android: the phone's drawer is a Material modal drawer. It slides in over the session,
     // which stays put under a scrim, instead of the session sliding aside as iOS's card does.
     val modal = sidebarShown == null
@@ -339,7 +342,6 @@ fun SessionDrawerContainer(
         Box(Modifier.focusRequester(focusSink).focusTarget())
         // The modal drawer, over the card; or the sidebar, beside it.
         if (drawerComposed) {
-            val drawerVisible = drawerShows && (sidebarShown == null || controller.isSidebarVisible)
             val hiddenFromAccessibility = !drawerShows || catchUp != null ||
                 if (sidebarShown != null) !controller.isSidebarVisible else motion.isDrawerHiddenFromAccessibility.value
             Box(
@@ -379,9 +381,7 @@ fun SessionDrawerContainer(
                     .then(if (modal) Modifier.clip(ModalDrawerShape) else Modifier)
                     .then(if (hiddenFromAccessibility) Modifier.clearAndMergeSemantics() else Modifier),
             ) {
-                CompositionLocalProvider(LocalDrawerVisible provides drawerVisible) {
-                    drawer()
-                }
+                CompositionLocalProvider(LocalDrawerHidden provides drawerHidden) { drawer() }
                 if (sidebarShown != null) {
                     // The sidebar's edge against the session.
                     Box(
@@ -704,7 +704,7 @@ fun SessionDrawerContainer(
         if (controller.drawerWidth != width.value) {
             controller.finishModeTransition()
             controller.drawerWidth = width.value
-            motion.updateWidth(width.value)
+            motion.updateWidth(width.value, catchingUp = controller.catchUp != null)
             controller.sidebarWidthChanged()
         }
         controller.contentSessionID = contentSessionID

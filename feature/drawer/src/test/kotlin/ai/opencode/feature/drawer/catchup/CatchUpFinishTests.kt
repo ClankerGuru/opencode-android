@@ -202,7 +202,7 @@ class CatchUpFinishHomeTests {
     /** The finish the drawer list hands its Catch Up row. */
     private fun finish(state: HomeFeature.State): Int? {
         val inputs = DrawerListInputs(
-            selectedSessionID = null, showsProjectIcons = false, reducedMotion = false, increasedContrast = false,
+            selectedSessionID = null, reducedMotion = false, increasedContrast = false,
         )
         return DrawerListModel.build(
             state = state, inputs = inputs, liftedID = null, catchUpMounted = true, whatsNewMounted = false,

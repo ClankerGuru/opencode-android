@@ -90,9 +90,6 @@ class LiveOutboundQueue(items: List<LiveOutboundItem> = emptyList()) {
 
     fun hasEligibleItems(forSocket: Int?): Boolean = _items.any { it.afterSocketID != forSocket }
 
-    val isContextOnly: Boolean
-        get() = _items.isNotEmpty() && _items.all { it.role == LiveOutboundRole.Context }
-
     fun enqueue(newItems: List<LiveOutboundItem>, now: Duration? = null) {
         for (newItem in newItems) {
             val item = if (newItem.enqueuedAt == null && now != null) newItem.copy(enqueuedAt = now) else newItem

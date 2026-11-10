@@ -153,12 +153,24 @@ class HomeChildFeatureTests {
                 connectionStatus = HomeConnectionFeature.State.ConnectionStatus.reconnecting,
                 isEventStreamLive = false,
                 lastKnownActivityDeadline = now.plusMillis(HomeFeature.lastKnownActivityLifetime.inWholeMilliseconds),
+                isRecovering = true,
+                recoveryFailures = 1,
             )
         }
-        store.send(HomeConnectionFeature.Action.ConnectionLost) {
-            it.copy(connectionStatus = HomeConnectionFeature.State.ConnectionStatus.disconnected)
+        // A second failure inside the grace stays Reconnecting.
+        store.send(HomeConnectionFeature.Action.ConnectionLost) { it.copy(recoveryFailures = 2) }
+        clock.advance(2.5.seconds)
+        store.receive(HomeConnectionFeature.Action.ReconnectingGraceElapsed) { it.copy(showsRecovery = true) }
+        clock.advance(9.5.seconds)
+        store.receive(HomeConnectionFeature.Action.OfflineGraceElapsed(pathDown = false)) {
+            it.copy(
+                connectionStatus = HomeConnectionFeature.State.ConnectionStatus.disconnected,
+                isRecovering = false,
+                showsRecovery = false,
+                recoveryFailures = 0,
+            )
         }
-        clock.advance(HomeFeature.lastKnownActivityLifetime)
+        clock.advance(HomeFeature.lastKnownActivityLifetime - 12.seconds)
         store.receive(HomeConnectionFeature.Action.LastKnownActivityExpired) { it.copy(lastKnownActivityDeadline = null) }
         store.finish()
     }
@@ -183,7 +195,7 @@ class HomeChildFeatureTests {
         }
         store.send(HomeConnectionFeature.Action.NetworkRerouted)
         store.receive(HomeConnectionFeature.Action.ConnectionLost)
-        store.send(HomeConnectionFeature.Action.SceneEnteredBackground)
+        store.send(HomeConnectionFeature.Action.SceneEnteredBackground) { it.copy(isInBackground = true) }
         clock.advance(120.seconds)
         store.finish()
         assertEquals(1, subscriptions)
@@ -214,6 +226,7 @@ class HomeChildFeatureTests {
         var subscriptions = 0
         val rejected = OpenCodeClientError("Sign-in failed", statusCode = 401)
         val store = TestStore(state, HomeConnectionFeature(), this) {
+            this[Clock] = TestClock()
             this[OpenCodeClient] = this[OpenCodeClient].copy(
                 events = {
                     subscriptions += 1
@@ -231,11 +244,22 @@ class HomeChildFeatureTests {
                 isEventStreamLive = false,
             )
         }
+        // Try Again shows Reconnecting at once: the person asked.
         store.send(HomeConnectionFeature.Action.RetryConnectionTapped) {
-            it.copy(connectionStatus = HomeConnectionFeature.State.ConnectionStatus.reconnecting)
+            it.copy(
+                connectionStatus = HomeConnectionFeature.State.ConnectionStatus.reconnecting,
+                showsRecovery = true,
+                isRecovering = true,
+            )
         }
         store.receive(HomeConnectionFeature.Action.ServerConnected(server)) {
-            it.copy(connectionErrorMessage = null, hasConnected = true, isEventStreamLive = true)
+            it.copy(
+                connectionErrorMessage = null,
+                hasConnected = true,
+                isEventStreamLive = true,
+                showsRecovery = false,
+                isRecovering = false,
+            )
         }
         store.receive(HomeConnectionFeature.Action.EventStreamFailed(rejected)) {
             it.copy(
@@ -259,7 +283,13 @@ class HomeChildFeatureTests {
         )
         val store = TestStore(state, HomeConnectionFeature(), this)
         store.send(HomeConnectionFeature.Action.ServerConnected(server)) {
-            it.copy(connectionErrorMessage = null, credentialsRejected = false, hasConnected = true, isEventStreamLive = true)
+            it.copy(
+                connectionStatus = HomeConnectionFeature.State.ConnectionStatus.reconnecting,
+                connectionErrorMessage = null,
+                credentialsRejected = false,
+                hasConnected = true,
+                isEventStreamLive = true,
+            )
         }
         store.finish()
     }
@@ -297,16 +327,22 @@ class HomeChildFeatureTests {
                 connectionStatus = HomeConnectionFeature.State.ConnectionStatus.reconnecting,
                 isEventStreamLive = false,
                 lastKnownActivityDeadline = now.plusMillis(HomeFeature.lastKnownActivityLifetime.inWholeMilliseconds),
+                isRecovering = true,
+                recoveryFailures = 1,
             )
         }
         clock.advance(1.seconds)
         second.send(OpenCodeServerEvent.Connected)
-        store.receive(HomeConnectionFeature.Action.ServerConnected(server)) { it.copy(isEventStreamLive = true) }
+        store.receive(HomeConnectionFeature.Action.ServerConnected(server)) {
+            it.copy(isEventStreamLive = true, isRecovering = false, recoveryFailures = 0)
+        }
         assertEquals(2, subscriptions)
         store.send(HomeConnectionFeature.Action.ConnectionLost) {
-            it.copy(connectionStatus = HomeConnectionFeature.State.ConnectionStatus.disconnected, isEventStreamLive = false)
+            it.copy(isEventStreamLive = false, isRecovering = true, recoveryFailures = 1)
         }
-        store.send(HomeConnectionFeature.Action.SceneEnteredBackground)
+        store.send(HomeConnectionFeature.Action.SceneEnteredBackground) {
+            it.copy(isInBackground = true, isRecovering = false, recoveryFailures = 0)
+        }
         clock.advance(HomeFeature.lastKnownActivityLifetime)
         store.receive(HomeConnectionFeature.Action.LastKnownActivityExpired) { it.copy(lastKnownActivityDeadline = null) }
         store.finish()

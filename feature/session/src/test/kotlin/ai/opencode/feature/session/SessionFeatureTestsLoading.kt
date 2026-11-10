@@ -460,7 +460,7 @@ class SessionFeatureTestsLoading {
         ) {
             it.copy(earlierHistory = State.EarlierHistory.Exhausted)
         }
-        store.receive(Action.AcceptedTranscriptUpdated(sessionID = session.id, items = emptyList()))
+        // An empty page changes nothing Home keeps: not published.
         assertFalse(store.state.isLoadingEarlier)
         assertFalse(store.state.hasEarlierItems)
         assertFalse(store.state.isTranscriptLoading)
@@ -1016,12 +1016,12 @@ class SessionFeatureTestsLoading {
         store.send(Action.TranscriptResponse(sessionID = session.id, result = Result.success(listOf(item))))
         store.receive(Action.AcceptedTranscriptUpdated::class)
         assertTrue(store.state.isLoadingEarlier)
+        // A page of rows already loaded changes nothing Home keeps: not published.
         store.send(
             Action.EarlierHistoryResponse(session.id, 0, null, Result.success(OpenCodeTranscriptPage(items = listOf(item), next = null))),
         ) {
             it.copy(earlierHistory = State.EarlierHistory.Exhausted, earlierHistoryInsertionID = item.id)
         }
-        store.receive(Action.AcceptedTranscriptUpdated::class)
         store.finish()
     }
 

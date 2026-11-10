@@ -311,7 +311,7 @@ class PairingOpensDrawerAppTests {
     fun aPairingErrorBeforeTheDrawerOpensDropsIt() = runTest {
         val store = landWithDrawerRequested()
         store.send(AppFeature.Action.PairingURLOpened("https://opencode.abc123.opentunnel.xyz/auth/connect/bad!code")) {
-            it.copy(pairingError = AppFeature.invalidPairingCodeMessage, home = it.home?.copy(drawerOpenRequest = null))
+            it.copy(pairingError = invalidPairingCodeMessage, home = it.home?.copy(drawerOpenRequest = null))
         }
         assertTrue(store.state.isPresentingAnything)
         store.send(AppFeature.Action.PairingErrorDismissed) { it.copy(pairingError = null) }

@@ -10,6 +10,7 @@ import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.OpenCodeServerEvent
+import ai.opencode.server.retry.TransportFailure
 import ai.opencode.server.model.OpenCodeHomeSnapshot
 import ai.opencode.server.retry.NetworkPathClient
 import ai.opencode.server.retry.NetworkRetry
@@ -79,6 +80,10 @@ class EventStreamReconnectTests {
         val store = TestStore(state, HomeFeature(), effects) {
             this[Clock] = clock
             this[OpenCodeClient] = OpenCodeClient.testValue.copy(
+                // Only the expected address answers the race.
+                health = { candidate ->
+                    if (candidate.url != expectedAddress) throw OpenCodeClientError.unreachable(TransportFailure.NotSent)
+                },
                 events = { candidate ->
                     addresses += candidate.url
                     if (candidate.url != expectedAddress) {
@@ -126,7 +131,9 @@ class EventStreamReconnectTests {
             assertEquals("REST responses must not wake an overflow retry", 0, wakeListeners.get())
             if (index < 5) clock.advance((ceiling / 2 + 1).milliseconds)
         }
-        assertEquals((if (useAlternate) listOf(server.url) else emptyList()) + List(6) { expectedAddress }, addresses.toList())
+        // The race found the answering address, so no stream tried the other; overflows reconnect
+        // to the same one.
+        assertEquals(List(6) { expectedAddress }, addresses.toList())
         effects.cancel()
         clock.advance(HomeFeature.lastKnownActivityLifetime)
         assertEquals("Cancellation during overflow backoff prevents further subscriptions", 6, channels.size)
@@ -190,7 +197,8 @@ class EventStreamReconnectTests {
         assertEquals(8, operations.size)
         assertEquals(1, operations.filterNotNull().toSet().size)
         assertTrue(operations.all { it != null })
-        clock.advance(900.milliseconds)
+        // The answer restarted the backoff: the next wait is its first (0.5–1 s).
+        clock.advance(450.milliseconds)
         assertEquals("A single recovery cue cannot cause a retry storm", 8, subscriptions.get())
         effects.cancel()
         store.finish()
@@ -216,7 +224,9 @@ class EventStreamReconnectTests {
         store.exhaustive = false
         store.send(HomeFeature.Action.NetworkRerouted)
         store.receive(connectionLost)
-        store.send(HomeFeature.Action.SceneEnteredBackground)
+        store.send(HomeFeature.Action.SceneEnteredBackground) {
+            it.copy(connection = it.connection.copy(isInBackground = true))
+        }
         clock.advance(120.seconds)
         assertEquals(1, subscriptions.get())
         store.finish()

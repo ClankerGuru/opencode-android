@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer.modelpicker
 
+import ai.opencode.core.motion.MotionRubberBand
 import ai.opencode.core.motion.SpringSolver
 import ai.opencode.core.ui.OpenCodeShapeGeometry
 import ai.opencode.server.model.ModelSearch
@@ -333,7 +334,7 @@ class OnePickerSimulation(
         val rawTop = dragOriginTop + dy
         val clampedTop = if (rawTop < ceiling) {
             val over = ceiling - rawTop
-            val rubber = 36 * (1 - 1 / (over / 120 + 1))
+            val rubber = MotionRubberBand(36.0, 0.3).stretch(over)
             ceiling - rubber
         } else {
             min(bottom.value - minHeight, rawTop)

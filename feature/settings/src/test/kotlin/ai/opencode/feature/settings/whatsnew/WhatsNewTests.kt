@@ -242,7 +242,7 @@ class WhatsNewTests {
         val pages = listOf(
             WhatsNewEntry.SettingsDestination.Themes, WhatsNewEntry.SettingsDestination.Sessions, WhatsNewEntry.SettingsDestination.Voice,
             WhatsNewEntry.SettingsDestination.Notifications, WhatsNewEntry.SettingsDestination.Servers, WhatsNewEntry.SettingsDestination.Experimental,
-            WhatsNewEntry.SettingsDestination.Experiment("server-voice"), WhatsNewEntry.SettingsDestination.Developer,
+            WhatsNewEntry.SettingsDestination.Experiment("in-app-browser"), WhatsNewEntry.SettingsDestination.Developer,
         )
         val entryPages = mapOf("a" to SettingsPage.WhatsNewDetail("a"), "fix" to SettingsPage.WhatsNewSmallerChanges)
         val shared = SettingsTestShared()
