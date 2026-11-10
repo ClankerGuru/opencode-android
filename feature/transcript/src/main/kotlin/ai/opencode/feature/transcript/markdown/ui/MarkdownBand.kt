@@ -8,17 +8,23 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.ScrollableDefaults
+import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberOverscrollEffect
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
@@ -31,6 +37,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import ai.opencode.core.motion.Motion
@@ -118,6 +125,10 @@ class TableRules {
  * Content scrolls horizontally inside the block, fading where more lies past it. A table's rules keep the viewport's width while its
  * columns scroll underneath.
  *
+ * [action] sits in the block's top-trailing corner, over the content (a code block's copy
+ * button). The whole block takes the sideways drag, so a swipe that starts on the action
+ * still scrolls and cancels its tap.
+ *
  * @param bandModifier applied to the whole block: a drag source there lifts the whole band.
  */
 @Composable
@@ -125,10 +136,13 @@ fun MarkdownBand(
     modifier: Modifier = Modifier,
     rules: TableRules? = null,
     bandModifier: Modifier = Modifier,
+    action: (@Composable BoxScope.() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val colors = OpenCodeTheme.colors
     val scroll = rememberScrollState()
+    val overscroll = rememberOverscrollEffect()
+    val layoutDirection = LocalLayoutDirection.current
     val hairline = with(LocalDensity.current) { 1f.toDp() }
     Column(modifier.then(bandModifier)) {
         val shape = RoundedCornerShape(TranscriptBandStyle.cornerRadius)
@@ -138,27 +152,38 @@ fun MarkdownBand(
                 .clip(shape)
                 .background(TranscriptBandStyle.fill(colors))
                 .border(hairline, colors.border, shape)
-                .padding(vertical = TranscriptBandStyle.verticalPadding)
-                .drawWithContent {
-                    drawContent()
-                    val offsets = rules?.offsets ?: return@drawWithContent
-                    val px = hairline.toPx()
-                    for ((index, y) in offsets.withIndex()) {
-                        drawRect(
-                            colors.border.copy(alpha = colors.border.alpha * (if (index == 0) 1f else 0.6f)),
-                            topLeft = Offset(0f, y),
-                            size = Size(size.width, px),
-                        )
-                    }
-                },
+                .drawerPanHorizontalScroller(scroll)
+                .scrollable(
+                    scroll,
+                    Orientation.Horizontal,
+                    overscrollEffect = overscroll,
+                    reverseDirection = ScrollableDefaults.reverseDirection(layoutDirection, Orientation.Horizontal, false),
+                ),
+            contentAlignment = Alignment.CenterStart,
         ) {
             Box(
                 Modifier
-                    .drawerPanHorizontalScroller(scroll)
+                    .fillMaxWidth()
+                    .padding(vertical = TranscriptBandStyle.verticalPadding)
+                    .drawWithContent {
+                        drawContent()
+                        val offsets = rules?.offsets ?: return@drawWithContent
+                        val px = hairline.toPx()
+                        for ((index, y) in offsets.withIndex()) {
+                            drawRect(
+                                colors.border.copy(alpha = colors.border.alpha * (if (index == 0) 1f else 0.6f)),
+                                topLeft = Offset(0f, y),
+                                size = Size(size.width, px),
+                            )
+                        }
+                    }
                     .horizontalOverflowFade(scroll, width = 32.dp)
-                    .horizontalScroll(scroll)
+                    .horizontalScroll(scroll, overscrollEffect = overscroll, enabled = false)
                     .padding(horizontal = TranscriptBandStyle.horizontalPadding),
             ) { content() }
+            if (action != null) {
+                Box(Modifier.align(Alignment.TopEnd)) { action() }
+            }
         }
     }
 }

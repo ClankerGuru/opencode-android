@@ -14,6 +14,7 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.OpenCodeMinTapTarget
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.server.OpenCodePairingLink
 import android.view.ViewGroup
@@ -98,8 +99,8 @@ import kotlin.math.roundToInt
 
 /** Port of iOS `BrowserMetrics`. */
 object BrowserMetrics {
-    /** The controls, like the session header's. */
-    val controlSize = 44.dp
+    /** The controls, like the session header's: Android's 48 dp minimum touch target (iOS 44 pt). */
+    val controlSize = OpenCodeMinTapTarget
     /** The back button's row at the top, where the session header's sits. */
     val headerClearance = TranscriptMetrics.clustered + controlSize + 8.dp
     /** The bottom bar's height. */

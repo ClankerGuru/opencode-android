@@ -212,6 +212,11 @@ class SessionComposerHost {
      * the composer's top (the jump button, a draft's projects) stands above the orb too.
      */
     var orbClearance by mutableFloatStateOf(0f)
+    /**
+     * The top of the composer's surface in the window, in px (NaN when it isn't shown): where the
+     * session's bottom scroll edge starts, below the pills, the jump button and a resting orb.
+     */
+    var surfaceTopInWindow by mutableFloatStateOf(Float.NaN)
     /** iOS `toggleAttachmentMenu` (VIEW-PICKERS); null opens nothing. */
     var onPlusTapped: (() -> Unit)? by mutableStateOf(null)
     /** The attachment menu is open (iOS `attachmentMenu != .closed`): + shows open, the composer stays expanded. */
@@ -1308,9 +1313,11 @@ private fun SessionComposerEnv.ComposerCapsule() {
     val cap = { requestPanelCap() }
     val activeHeight = { activeRequestPanelHeight(cap()) }
     val room = { if (showsRequestPanel) activeHeight() else 0f }
+    DisposableEffect(Unit) { onDispose { host.surfaceTopInWindow = Float.NaN } }
     Box(
         Modifier
             .fillMaxWidth()
+            .onGloballyPositioned { host.surfaceTopInWindow = it.boundsInWindow().top }
             .layout { measurable, constraints ->
                 val bar = measurable.measure(constraints.offset(vertical = -room().dp.roundToPx()))
                 // Measuring a self-animating permission updates its height. Reserve that

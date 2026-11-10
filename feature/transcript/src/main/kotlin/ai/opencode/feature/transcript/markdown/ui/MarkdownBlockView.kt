@@ -134,7 +134,11 @@ private fun BlockContent(kind: Kind, grown: List<TranscriptTextReveal.Arrival>, 
                     surface = TranscriptDragSurfaceStyle.Band,
                 )
             }
-            MarkdownBand(bandModifier = drag) {
+            val source = kind.code.source
+            MarkdownBand(
+                bandModifier = drag,
+                action = { CodeCopyButton(source) { send(TranscriptAction.CopyTextTapped(it)) } },
+            ) {
                 QuoteSelectionContainer(kind, inReply = selection != null) {
                     ArrivingText(text, grown, MarkdownStyle.codeTextStyle(style.tuning.codeLeading), colors.text, softWrap = false, selectionKey = selection)
                 }

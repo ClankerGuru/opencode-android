@@ -71,6 +71,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -105,8 +106,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
@@ -328,6 +332,10 @@ fun SessionView(
                     transcriptPlaced = { scrollEdgeBridge.hasPlacedTranscript },
                     modifier = Modifier.align(Alignment.TopCenter),
                 )
+                SessionBottomScrollEdge(
+                    surfaceTopInWindow = { composerHost.surfaceTopInWindow },
+                    modifier = Modifier.matchParentSize(),
+                )
                 // Behind the composer, so its × stays reachable: a tap anywhere else or a downward
                 // drag dismisses the menu, or Composer Autocomplete's suggestions.
                 if (!isInertPreview) {
@@ -423,6 +431,43 @@ fun SessionView(
 /** iOS `CatchUpMetrics.composerClearance.bottom`. */
 internal const val CATCH_UP_COMPOSER_CLEARANCE = 12f
 
+/**
+ * The soft bottom edge behind the floating composer (iOS's soft scroll edge under its bottom
+ * bar): rows stay fully visible down to the composer surface's top edge, then fade into the
+ * canvas over its corner radius, so nothing shows around its rounded corners, beside it or
+ * under the navigation bar. The pills, the jump button and a resting orb above the surface keep
+ * unfaded rows behind them. A plain canvas gradient that takes no touches and is hidden from
+ * TalkBack; the surface's top is read in the draw phase.
+ */
+@Composable
+private fun SessionBottomScrollEdge(surfaceTopInWindow: () -> Float, modifier: Modifier) {
+    val canvas = OpenCodeTheme.colors.canvas
+    var originInWindow by remember { mutableFloatStateOf(0f) }
+    Spacer(
+        modifier
+            .clearAndSetSemantics {}
+            .onGloballyPositioned { originInWindow = it.boundsInWindow().top }
+            .drawBehind {
+                val surfaceTop = surfaceTopInWindow()
+                if (surfaceTop.isNaN()) return@drawBehind
+                val fadeTop = surfaceTop - originInWindow
+                if (fadeTop <= 0f || fadeTop >= size.height) return@drawBehind
+                val solidTop = fadeTop + ComposerTunables.cornerRadius.dp.toPx()
+                // Eases out: the corner curves away fastest just under the top edge, so a row
+                // beside it is mostly covered within the first few dp.
+                val stops = arrayOf(
+                    0f to canvas.copy(alpha = 0f),
+                    0.3f to canvas.copy(alpha = 0.85f),
+                    1f to canvas,
+                )
+                drawRect(
+                    brush = Brush.verticalGradient(*stops, startY = fadeTop, endY = solidTop),
+                    topLeft = Offset(0f, fadeTop),
+                    size = Size(size.width, size.height - fadeTop),
+                )
+            },
+    )
+}
 
 /** What the background-work panel reads from the session. */
 @Immutable
