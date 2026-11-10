@@ -38,9 +38,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -99,16 +96,13 @@ fun AppearanceSettingsView(store: SettingsStore) {
 
     SettingsPageScaffold(title = "Appearance", store = store) {
         settingsSection(key = "mode", header = "Mode") {
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
-                AppearanceColorScheme.entries.forEachIndexed { index, mode ->
-                    SegmentedButton(
-                        selected = scheme == mode,
-                        onClick = { send(HomeSettingsFeature.Action.AppearanceColorSchemeChanged(mode)) },
-                        shape = SegmentedButtonDefaults.itemShape(index, AppearanceColorScheme.entries.size),
-                        icon = {},
-                    ) { Text(mode.title) }
-                }
-            }
+            SettingsSegmentedControl(
+                options = AppearanceColorScheme.entries,
+                selected = scheme,
+                title = { it.title },
+                onSelect = { send(HomeSettingsFeature.Action.AppearanceColorSchemeChanged(it)) },
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            )
         }
         settingsSection(key = "theme", header = "Theme") {
             // The clickable row merges its texts: "Theme", then the theme (iOS's label and value).
@@ -295,7 +289,6 @@ private fun ThemeOptionRow(
     isSelected: Boolean,
     onClick: () -> Unit,
 ) {
-    val variant = definition.variant(isDark)
     // The clickable row merges its title: the theme's name once (iOS's label), then selected.
     SettingsRowFrame(
         Modifier.semantics { selected = isSelected },
@@ -311,7 +304,7 @@ private fun ThemeOptionRow(
             modifier = Modifier.weight(1f),
         )
         if (isSelected) {
-            OpenCodeIcon(SFSymbol.CheckmarkCircleFill, contentDescription = null, size = 22.dp, tint = variant.swatchAccent.color)
+            OpenCodeIcon(SFSymbol.CheckmarkCircleFill, contentDescription = null, size = 22.dp, tint = OpenCodeTheme.colors.selection)
         } else {
             Box(
                 Modifier

@@ -220,7 +220,7 @@ private fun SettingsServerRow(
                     SFSymbol.Checkmark,
                     contentDescription = null,
                     size = 20.dp,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = OpenCodeTheme.colors.selection,
                     modifier = Modifier.padding(start = 12.dp),
                 )
             }

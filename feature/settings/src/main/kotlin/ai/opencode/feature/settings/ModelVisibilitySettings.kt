@@ -34,9 +34,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -201,17 +198,13 @@ fun ModelVisibilitySettingsView(store: SettingsStore) {
         SettingsPageScaffold(title = "Models", store = store) {
             item(key = "mode") {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().testTag("model-visibility-mode")) {
-                        listOf(ModelVisibility.Mode.hide to "Hide", ModelVisibility.Mode.onlyShow to "Only Show")
-                            .forEachIndexed { index, (mode, title) ->
-                                SegmentedButton(
-                                    selected = visibility.mode == mode,
-                                    onClick = { models.send(ModelVisibilityFeature.Action.ModeChanged(mode)) },
-                                    shape = SegmentedButtonDefaults.itemShape(index, 2),
-                                    icon = {},
-                                ) { Text(title) }
-                            }
-                    }
+                    SettingsSegmentedControl(
+                        options = listOf(ModelVisibility.Mode.hide, ModelVisibility.Mode.onlyShow),
+                        selected = visibility.mode,
+                        title = { if (it == ModelVisibility.Mode.hide) "Hide" else "Only Show" },
+                        onSelect = { models.send(ModelVisibilityFeature.Action.ModeChanged(it)) },
+                        modifier = Modifier.testTag("model-visibility-mode"),
+                    )
                     SettingsFooterText(
                         if (visibility.mode == ModelVisibility.Mode.hide) {
                             "Turn off models you never use. The model picker lists the rest."

@@ -10,6 +10,12 @@ import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +37,8 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SliderColors
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.Typography
@@ -40,6 +48,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -110,8 +119,16 @@ enum class SettingsTint(private val light: Long, private val dark: Long) {
  */
 @Composable
 fun SettingsIcon(symbol: String, tint: SettingsTint, modifier: Modifier = Modifier) {
+    if (!LocalSettingsRowIcons.current) return
     OpenCodeIcon(symbol, contentDescription = null, modifier = modifier, size = SettingsIconSize, tint = OpenCodeTheme.colors.secondaryText)
 }
+
+/**
+ * Whether settings rows here draw their leading [SettingsIcon]. Detail pages don't, as the
+ * desktop's settings rows have none; the main Settings page provides `true`, since it works like
+ * the desktop's settings sidebar, which has icons.
+ */
+val LocalSettingsRowIcons = staticCompositionLocalOf { false }
 
 /** A settings row's icon size (Material list leading icon). */
 val SettingsIconSize = 24.dp
@@ -201,9 +218,21 @@ fun SettingsSection(
  */
 @Composable
 fun SettingsDivider(inset: Boolean = false) {
-    // The desktop list's divider: a hairline inset 16 (`list.css`), not Material's segmented gap.
-    HorizontalDivider(Modifier.padding(start = 16.dp), thickness = 1.dp, color = OpenCodeTheme.colors.border)
+    // The desktop's `settings-row` border: a hairline inset to the card's padding on both sides,
+    // or, under an iconed row, starting at the text like a list inset.
+    var start = 16.dp
+    if (inset && LocalSettingsRowIcons.current) {
+        start = 16.dp + SettingsIconSize + 16.dp
+    }
+    HorizontalDivider(
+        Modifier.padding(start = start, end = 16.dp),
+        thickness = SettingsDividerThickness,
+        color = OpenCodeTheme.colors.rowDivider,
+    )
 }
+
+/** The row divider's weight: the desktop's 0.5 px line is one device pixel on a 2x screen. */
+private val SettingsDividerThickness = 0.5.dp
 
 /** A row's frame: full-width target, 16 dp sides, at least [SettingsRowMinHeight] tall, 16 dp between its parts. */
 @Composable
@@ -395,7 +424,7 @@ fun <T> SettingsMenuRow(
                         leadingIcon = {
                             Box(Modifier.width(20.dp)) {
                                 if (option.value == selection) {
-                                    OpenCodeIcon(SFSymbol.Checkmark, contentDescription = null, size = 18.dp)
+                                    OpenCodeIcon(SFSymbol.Checkmark, contentDescription = null, size = 18.dp, tint = OpenCodeTheme.colors.selection)
                                 }
                             }
                         },
@@ -460,4 +489,105 @@ fun <T> SettingsMenuRow(
 
 /** Leading spacer matching a row with an icon, for rows that line up under iconed rows. */
 @Composable
-fun RowScope.SettingsIconSpacer() = Spacer(Modifier.width(SettingsIconSize))
+fun RowScope.SettingsIconSpacer() {
+    if (!LocalSettingsRowIcons.current) return
+    Spacer(Modifier.width(SettingsIconSize))
+}
+
+/**
+ * A settings segmented choice, drawn as the desktop's segmented control
+ * (`navigation/segmented-control`): a quiet track with a border-base edge, and the chosen
+ * segment as a raised base-coloured pill with a border-strong edge and base text; the others
+ * are muted text. Corners are 6 dp (`OpenCodeRadius.sm`). Selection stays neutral, as on the
+ * desktop. Each segment is a radio button for TalkBack and fills a 48 dp tap height.
+ */
+@Composable
+fun <T> SettingsSegmentedControl(
+    options: List<T>,
+    selected: T,
+    title: (T) -> String,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = OpenCodeTheme.colors
+    val shape = RoundedCornerShape(OpenCodeRadius.sm)
+    // Desktop: track bg-layer-01, chosen segment bg-base, edges border-base / border-strong.
+    val trackFill = if (colors.isDark) Color.Transparent else colors.groupedCanvas
+    val indicatorFill = colors.canvas
+    val indicatorEdge = when {
+        colors.strongBorders -> colors.border
+        colors.isDark -> Color.White.copy(alpha = 0.2f)
+        else -> Color.Black.copy(alpha = 0.2f)
+    }
+    Box(modifier.fillMaxWidth().height(SegmentTapHeight), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(SegmentHeight)
+                .background(trackFill, shape)
+                .border(SegmentEdge, colors.rowDivider, shape),
+        )
+        Row(Modifier.fillMaxWidth().height(SegmentTapHeight).selectableGroup()) {
+            for (option in options) {
+                val isSelected = option == selected
+                val fill by animateColorAsState(
+                    if (isSelected) indicatorFill else Color.Transparent,
+                    tween(120),
+                    label = "segmentFill",
+                )
+                val edge by animateColorAsState(
+                    if (isSelected) indicatorEdge else Color.Transparent,
+                    tween(120),
+                    label = "segmentEdge",
+                )
+                val text by animateColorAsState(
+                    if (isSelected) colors.text else colors.secondaryText,
+                    tween(150),
+                    label = "segmentText",
+                )
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(SegmentTapHeight)
+                        .selectable(selected = isSelected, role = Role.RadioButton, onClick = { onSelect(option) }),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(SegmentHeight)
+                            .background(fill, shape)
+                            .border(SegmentEdge, edge, shape),
+                    )
+                    Text(
+                        title(option),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = text,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+private val SegmentHeight = 40.dp
+private val SegmentTapHeight = 48.dp
+
+/** The desktop control's 0.5 px edges. */
+private val SegmentEdge = 0.5.dp
+
+/** A settings slider: the filled part and thumb in the selection colour, as the desktop's timeline slider. */
+@Composable
+fun settingsSliderColors(): SliderColors {
+    val colors = OpenCodeTheme.colors
+    return SliderDefaults.colors(
+        thumbColor = colors.selection,
+        activeTrackColor = colors.selection,
+        activeTickColor = colors.onSelection.copy(alpha = 0.6f),
+        inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        inactiveTickColor = colors.secondaryText.copy(alpha = 0.6f),
+    )
+}
