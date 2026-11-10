@@ -18,6 +18,7 @@ import ai.opencode.core.ui.OpenCodeIconButtonStyle
 import ai.opencode.core.ui.OpenCodePrimaryButton
 import ai.opencode.core.ui.OpenCodeSecondaryButton
 import ai.opencode.core.ui.OpenCodeShape
+import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
@@ -997,7 +998,7 @@ private fun DeniedNotice(onOpenSettings: () -> Unit) {
 
 /** iOS `PlusPhotoSheetFoot.height` / `inset` (dp). */
 object PlusPhotoSheetFootDefaults {
-    /** Material 3 Expressive's floating toolbar height. */
+    /** The floating toolbar's height (Material 3 Expressive's, around a 48 dp button). */
     const val HEIGHT = 64f
     const val INSET = 16f
     /** The toolbar's own inner padding at its ends. */
@@ -1005,8 +1006,8 @@ object PlusPhotoSheetFootDefaults {
 }
 
 /**
- * The photo sheet's foot (iOS `PlusPhotoSheetFoot`) as a Material 3 Expressive floating toolbar,
- * like the system photo picker's: Back on the leading edge and the trailing [PlusPhotoPillControl]:
+ * The photo sheet's foot (iOS `PlusPhotoSheetFoot`) as a floating toolbar, like the system photo
+ * picker's, on the desktop's floating surface (fill, hairline and raised shadow): Back on the leading edge and the trailing [PlusPhotoPillControl]:
  * All Photos with no picks (expands the sheet), Add N Photos once photos are picked; a long press
  * offers All Photos and, under limited access, Select More Photos….
  */
@@ -1025,9 +1026,10 @@ fun PlusPhotoSheetFoot(
             .fillMaxWidth()
             .padding(start = PlusPhotoSheetFootDefaults.INSET.dp, end = PlusPhotoSheetFootDefaults.INSET.dp, bottom = PlusPhotoSheetFootDefaults.INSET.dp)
             .height(PlusPhotoSheetFootDefaults.HEIGHT.dp),
-        shape = OpenCodeShape.capsule,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shadowElevation = 3.dp,
+        shape = OpenCodeShape.panel,
+        color = OpenCodeSurfaces.color,
+        border = OpenCodeSurfaces.border,
+        shadowElevation = OpenCodeSurfaces.raisedShadow,
     ) {
         Row(
             Modifier.padding(horizontal = PlusPhotoSheetFootDefaults.PADDING.dp),
@@ -1213,14 +1215,14 @@ private fun PlusPhotoTile(
                     .align(Alignment.TopStart)
                     .padding(PlusMenuTunables.SELECTION_BADGE_INSET.dp)
                     .size(PlusMenuTunables.SELECTION_BADGE_SIZE.dp)
-                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+                    .background(OpenCodeTheme.colors.accent, CircleShape)
                     .border(1.5.dp, Color.White, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     order?.toString() ?: "",
                     // The accent's own foreground, so the number reads on a light accent too.
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    color = OpenCodeTheme.colors.variant.accent.highContrastForeground.color,
                     style = OpenCodeTextStyles.caption1.copy(fontWeight = FontWeight.Bold, fontFeatureSettings = "tnum"),
                 )
             }

@@ -15,7 +15,12 @@ import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.tuning.TuningContext
 import ai.opencode.core.tuning.TuningStore
 import ai.opencode.core.ui.OpenCodeSecondaryButton
+import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeSpacing
+import ai.opencode.core.ui.OpenCodeSurfaces
+import ai.opencode.core.ui.OpenCodeSwitch
+import ai.opencode.core.ui.OpenCodeTextStyles
+import ai.opencode.core.ui.OpenCodeTheme
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
@@ -37,9 +42,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -55,6 +57,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import java.util.UUID
@@ -65,7 +68,7 @@ import kotlinx.coroutines.launch
  * Android counterpart of iOS `MotionPlaygroundView` + `MotionPlaygroundStages`
  * (`Tuning/Playgrounds/`): one example per motion role, with a Reduce Motion switch that starts at
  * the system setting. While it's on screen the tuning panel shows the Motion group
- * ([TuningContext.motionPlayground]). Material surfaces instead of iOS's grouped backgrounds; the
+ * ([TuningContext.motionPlayground]). The desktop's floating surfaces instead of iOS's grouped backgrounds; the
  * Mac page's playground status has no Android counterpart.
  */
 @Composable
@@ -83,8 +86,8 @@ fun MotionPlaygroundView(modifier: Modifier = Modifier) {
             Modifier.fillMaxWidth().heightIn(min = 52.dp).stageBackground().padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Reduce Motion", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Switch(checked = reduceMotion, onCheckedChange = { reduceMotion = it })
+            Text("Reduce Motion", Modifier.weight(1f), style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text)
+            OpenCodeSwitch(checked = reduceMotion, onCheckedChange = { reduceMotion = it })
         }
         MicroStage(reduceMotion)
         PanelStage(reduceMotion)
@@ -107,7 +110,7 @@ private fun MotionStage(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(OpenCodeSpacing.s8)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+            Text(title, Modifier.weight(1f), style = OpenCodeTextStyles.headline, color = OpenCodeTheme.colors.text)
             if (action != null) OpenCodeSecondaryButton(action, onClick = onAction)
         }
         Box(Modifier.fillMaxWidth().stageBackground().padding(16.dp)) { content() }
@@ -116,7 +119,12 @@ private fun MotionStage(
 
 @Composable
 private fun Modifier.stageBackground(): Modifier =
-    clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainer)
+    clip(OpenCodeShape.panel).background(OpenCodeSurfaces.color).border(OpenCodeSurfaces.border, OpenCodeShape.panel)
+
+/** A neutral desktop tile (light fill and hairline) for the examples that move. */
+@Composable
+private fun Modifier.exampleTile(): Modifier =
+    clip(OpenCodeShape.card).background(OpenCodeSurfaces.neutralFill).border(OpenCodeSurfaces.border, OpenCodeShape.card)
 
 @Composable
 private fun MicroStage(reduceMotion: Boolean) {
@@ -126,9 +134,9 @@ private fun MicroStage(reduceMotion: Boolean) {
             MotionPresence(isOpen = isShown, reduceMotion = reduceMotion) {
                 Text(
                     "3 New",
-                    Modifier.clip(CircleShape).background(MaterialTheme.colorScheme.primary).padding(horizontal = 14.dp, vertical = 6.dp),
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    style = MaterialTheme.typography.labelLarge,
+                    Modifier.clip(OpenCodeShape.control).background(OpenCodeTheme.colors.accent).padding(horizontal = 12.dp, vertical = 6.dp),
+                    color = OpenCodeTheme.colors.variant.accent.highContrastForeground.color,
+                    style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium),
                 )
             }
         }
@@ -142,11 +150,10 @@ private fun PanelStage(reduceMotion: Boolean) {
     val height by animateDpAsState(if (isOpen) 180.dp else 56.dp, Motion.panelOpen.animation(phase, reduceMotion), label = "panel")
     MotionStage("Panel", if (isOpen) "Close" else "Open", { isOpen = !isOpen }) {
         Box(
-            Modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.secondaryContainer).clickable { isOpen = !isOpen },
+            Modifier.fillMaxWidth().height(height).exampleTile().clickable { isOpen = !isOpen },
             contentAlignment = Alignment.TopStart,
         ) {
-            Text("Panel", Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSecondaryContainer)
+            Text("Panel", Modifier.padding(16.dp), style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text)
         }
     }
 }
@@ -158,8 +165,8 @@ private fun LayoutStage(reduceMotion: Boolean) {
     val height by animateDpAsState(if (isExpanded) 120.dp else 44.dp, Motion.layout.animation(phase, reduceMotion), label = "layout")
     MotionStage("Layout", if (isExpanded) "Collapse" else "Expand", { isExpanded = !isExpanded }) {
         Column(Modifier.fillMaxWidth().height(height)) {
-            Text("opencode-ios", style = MaterialTheme.typography.bodyLarge)
-            Text("3 sessions · 2 running", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+            Text("opencode-ios", style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text)
+            Text("3 sessions · 2 running", color = OpenCodeTheme.colors.secondaryText, style = OpenCodeTextStyles.subheadline)
         }
     }
 }
@@ -169,9 +176,9 @@ private fun SwapStage(reduceMotion: Boolean) {
     var count by remember { mutableIntStateOf(1) }
     MotionStage("Swap", "Next", { count += 1 }) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            MotionSwap(value = count, reduceMotion = reduceMotion) { Text("Step $it", style = MaterialTheme.typography.titleMedium) }
+            MotionSwap(value = count, reduceMotion = reduceMotion) { Text("Step $it", style = OpenCodeTextStyles.headline, color = OpenCodeTheme.colors.text) }
             MotionSwap(value = count, roll = MotionRollDirection.Up, reduceMotion = reduceMotion) {
-                Text("$it", style = MaterialTheme.typography.titleMedium)
+                Text("$it", style = OpenCodeTextStyles.headline, color = OpenCodeTheme.colors.text)
             }
         }
     }
@@ -182,12 +189,11 @@ private fun PressStage(reduceMotion: Boolean) {
     val interaction = remember { MutableInteractionSource() }
     MotionStage("Press") {
         Column(
-            Modifier.fillMaxWidth().motionPress(interaction, reduceMotion).clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.secondaryContainer)
+            Modifier.fillMaxWidth().motionPress(interaction, reduceMotion).exampleTile()
                 .clickable(interactionSource = interaction, indication = null) {}.padding(16.dp),
         ) {
-            Text("Studio", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSecondaryContainer)
-            Text("Connected", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
+            Text("Studio", style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text)
+            Text("Connected", style = OpenCodeTextStyles.subheadline, color = OpenCodeTheme.colors.secondaryText)
         }
     }
 }
@@ -206,11 +212,11 @@ private fun ReleaseStage(reduceMotion: Boolean) {
             val travel = with(density) { (maxWidth - card).toPx() }.coerceAtLeast(1f).toDouble()
             val band = MotionRubberBand(dimension = travel)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                repeat(2) { Box(Modifier.size(card).border(1.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(18.dp))) }
+                repeat(2) { Box(Modifier.size(card).border(1.dp, OpenCodeTheme.colors.border, OpenCodeShape.card)) }
             }
             Box(
-                Modifier.offset { IntOffset(position.value.roundToInt(), 0) }.size(card).clip(RoundedCornerShape(18.dp))
-                    .background(MaterialTheme.colorScheme.primary)
+                Modifier.offset { IntOffset(position.value.roundToInt(), 0) }.size(card).clip(OpenCodeShape.card)
+                    .background(OpenCodeTheme.colors.accent)
                     .draggable(
                         state = rememberDraggableState { delta ->
                             raw += delta
@@ -253,7 +259,7 @@ private fun FlightStage(reduceMotion: Boolean) {
             val rect = MotionFlightGeometry.rect(from, to, progress.value)
             Box(
                 Modifier.offset(rect.left.dp, rect.top.dp).size(rect.width.dp, rect.height.dp)
-                    .clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.tertiary),
+                    .clip(OpenCodeShape.card).background(OpenCodeTheme.colors.signal),
             )
         }
     }
@@ -267,11 +273,11 @@ private fun AmbientStage(reduceMotion: Boolean) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Box(
                     Modifier.size(14.dp).graphicsLayer { alpha = 0.35f + 0.65f * sample.breath.toFloat() }
-                        .clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+                        .clip(CircleShape).background(OpenCodeTheme.colors.accent),
                 )
-                BoxWithConstraints(Modifier.weight(1f).height(6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)) {
+                BoxWithConstraints(Modifier.weight(1f).height(6.dp).clip(OpenCodeShape.capsule).background(OpenCodeSurfaces.neutralFill)) {
                     val sweep = if (sample.isSettled) 0f else sample.sweep.toFloat()
-                    Box(Modifier.offset(x = (maxWidth - 48.dp) * sweep).size(48.dp, 6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary))
+                    Box(Modifier.offset(x = (maxWidth - 48.dp) * sweep).size(48.dp, 6.dp).clip(OpenCodeShape.capsule).background(OpenCodeTheme.colors.accent))
                 }
             }
         }

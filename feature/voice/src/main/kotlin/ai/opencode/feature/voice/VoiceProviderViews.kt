@@ -4,6 +4,7 @@ import ai.opencode.core.tuning.Tunable
 import ai.opencode.core.tuning.TuningStore
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodePrimaryButton
+import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
@@ -171,9 +172,9 @@ fun VoiceProviderStatus(state: VoiceProviderState, modifier: Modifier = Modifier
 
 /**
  * Above the call bar while a call connects through a server: who runs it and where,
- * “Connecting via My Mac…”. A capsule on the call's surface, like the failure and ended cards in
- * the same slot (iOS glass): it floats over the transcript, where bare text ran into the messages
- * behind it.
+ * “Connecting via My Mac…”. A small control-shaped panel on the call's surface with its hairline,
+ * like the failure and ended cards in the same slot (iOS glass capsule): it floats over the
+ * transcript, where bare text ran into the messages behind it.
  */
 @Composable
 fun VoiceConnectingCaption(place: VoiceCallPlace, text: String, modifier: Modifier = Modifier) {
@@ -186,7 +187,7 @@ fun VoiceConnectingCaption(place: VoiceCallPlace, text: String, modifier: Modifi
     ) {
         Row(
             Modifier
-                .callSurface(CircleShape, VoiceCallSurfaceDefaults.color)
+                .callSurface(OpenCodeShape.control, VoiceCallSurfaceDefaults.color, VoiceCallSurfaceDefaults.border)
                 .padding(start = 6.dp, end = 12.dp, top = 6.dp, bottom = 6.dp)
                 .semantics(mergeDescendants = true) {}
                 .testTag("voice-connecting-caption"),

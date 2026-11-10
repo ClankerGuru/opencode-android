@@ -5,6 +5,9 @@ import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeShape
+import ai.opencode.core.ui.OpenCodeSurfaces
+import ai.opencode.core.ui.OpenCodeTextStyles
+import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
@@ -14,13 +17,13 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
@@ -40,22 +43,23 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-/** The trailing button's metrics: Material 3's 48 dp button inside the 64 dp floating toolbar. */
+/** The trailing button's metrics: a 48 dp desktop button inside the 64 dp floating toolbar. */
 internal object PhotoPillMetrics {
     const val HEIGHT = 48f
-    /** A text button's side padding (Material: 12 dp). */
-    const val TEXT_PADDING = 12f
-    /** A filled button's side padding (Material: 24 dp at this size; 20 keeps “Add 8 Photos” roomy at large text). */
+    /** All Photos' side padding. */
+    const val TEXT_PADDING = 16f
+    /** Add N Photos' side padding (20 keeps “Add 8 Photos” roomy at large text). */
     const val FILLED_PADDING = 20f
 }
 
 /**
  * The photo sheet's trailing button (iOS `PlusPhotoPillControl`): “All Photos” with no picks
- * (expands the sheet), then “Add 1 Photo” / “Add 2 Photos”. On Android it's a Material text button
- * that becomes a filled button once something is picked, as the system photo picker's Done does;
- * the filled button's width follows its label. A long press offers All Photos (with picks) and,
+ * (expands the sheet), then “Add 1 Photo” / “Add 2 Photos”. A neutral desktop button (light fill
+ * and hairline) that becomes the accent fill once something is picked, as the system photo
+ * picker's Done does; the filled button's width follows its label. A long press offers All Photos (with picks) and,
  * under limited access, Select More Photos….
  */
 @OptIn(ExperimentalFoundationApi::class)
@@ -99,8 +103,10 @@ fun PlusPhotoPillControl(
             if (picked) {
                 PhotoFootButton(
                     text = addTitle(shownCount),
-                    container = MaterialTheme.colorScheme.primary,
-                    content = MaterialTheme.colorScheme.onPrimary,
+                    container = OpenCodeTheme.colors.accent,
+                    // The accent's own foreground, so the label reads on a light accent too.
+                    content = OpenCodeTheme.colors.variant.accent.highContrastForeground.color,
+                    border = null,
                     sidePadding = PhotoPillMetrics.FILLED_PADDING,
                     onClick = tap,
                     onLongClick = if (hasMenu) ({ menuOpen = true }) else null,
@@ -109,8 +115,9 @@ fun PlusPhotoPillControl(
             } else {
                 PhotoFootButton(
                     text = "All Photos",
-                    container = Color.Transparent,
-                    content = MaterialTheme.colorScheme.primary,
+                    container = OpenCodeSurfaces.neutralFill,
+                    content = OpenCodeTheme.colors.text,
+                    border = OpenCodeTheme.colors.border,
                     sidePadding = PhotoPillMetrics.TEXT_PADDING,
                     onClick = tap,
                     onLongClick = if (hasMenu) ({ menuOpen = true }) else null,
@@ -144,13 +151,14 @@ fun PlusPhotoPillControl(
 
 private fun addTitle(count: Int): String = if (count == 1) "Add 1 Photo" else "Add $count Photos"
 
-/** A Material button (filled or text) that also takes a long press, which `Button` can't. */
+/** A desktop button (accent or neutral) that also takes a long press, which `Button` can't. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun PhotoFootButton(
     text: String,
     container: Color,
     content: Color,
+    border: Color?,
     sidePadding: Float,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)?,
@@ -159,7 +167,8 @@ private fun PhotoFootButton(
     Box(
         modifier
             .heightIn(min = PhotoPillMetrics.HEIGHT.dp)
-            .clip(OpenCodeShape.capsule)
+            .clip(OpenCodeShape.control)
+            .then(if (border == null) Modifier else Modifier.border(1.dp, border, OpenCodeShape.control))
             .combinedClickable(
                 interactionSource = null,
                 indication = ripple(color = content),
@@ -167,10 +176,10 @@ private fun PhotoFootButton(
                 onClick = onClick,
                 onLongClick = onLongClick,
             )
-            .then(if (container == Color.Transparent) Modifier else Modifier.background(container))
+            .background(container)
             .padding(horizontal = sidePadding.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, color = content, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+        Text(text, color = content, style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
     }
 }
