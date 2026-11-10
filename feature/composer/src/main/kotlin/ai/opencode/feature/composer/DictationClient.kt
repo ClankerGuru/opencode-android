@@ -10,6 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.AudioFormat
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -21,6 +22,7 @@ import android.speech.RecognitionSupport
 import android.speech.RecognitionSupportCallback
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import androidx.annotation.RequiresApi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -500,13 +502,14 @@ private class SpeechSetup(private val context: Context) {
     /** Downloads the on-device model for [language]: true installed, null scheduled, false when it won't be there. */
     private suspend fun install(language: String): Boolean? = withContext(Dispatchers.Main) {
         val recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
         try {
-            awaitModelDownload { listener ->
-                recognizer.triggerModelDownload(
-                    Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).putExtra(RecognizerIntent.EXTRA_LANGUAGE, language),
-                    mainExecutor,
-                    listener,
-                )
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                // Android 13 has no download listener: request it and let awaitInstalled poll.
+                recognizer.triggerModelDownload(intent)
+                null
+            } else {
+                awaitModelDownload { listener -> recognizer.triggerModelDownload(intent, mainExecutor, listener) }
             }
         } finally {
             recognizer.destroy()
@@ -554,6 +557,7 @@ private class SpeechSetup(private val context: Context) {
 }
 
 /** The service can retain the listener after destroy(). Detach the waiting press even if it never calls back. */
+@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 internal suspend fun awaitModelDownload(trigger: (ModelDownloadListener) -> Unit): Boolean? {
     val result = CompletableDeferred<Boolean?>(currentCoroutineContext()[Job])
     try {

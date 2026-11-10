@@ -14,7 +14,7 @@ Release) arrives as a Play update. Details in [docs/releasing.md](docs/releasing
 
 **Sideload instead:** every push to `main` builds a debug APK and publishes it as the rolling
 [`main-latest` pre-release](https://github.com/anomalyco/opencode-android/releases/tag/main-latest).
-It runs on Android 15 or newer.
+It runs on Android 13 or newer.
 
 1. On your phone, sign in to GitHub in the browser (the repo is private), then open
    [opencode-android.apk](https://github.com/anomalyco/opencode-android/releases/download/main-latest/opencode-android.apk).

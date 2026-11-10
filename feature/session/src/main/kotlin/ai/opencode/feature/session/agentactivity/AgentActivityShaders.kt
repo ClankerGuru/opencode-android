@@ -16,7 +16,7 @@ import android.graphics.RuntimeShader
  * cells in the same row-major order and skips any farther than a pitch, which composites the same
  * cells in the same order.
  *
- * minSdk is 35, so `RuntimeShader` (API 33) is always available and no Canvas fallback is needed.
+ * minSdk is 33, so `RuntimeShader` (API 33) is always available and no Canvas fallback is needed.
  *
  * Uniforms:
  * - `header0`: originX, originY, pitch, scale
