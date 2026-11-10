@@ -127,7 +127,7 @@ private fun ItemView(entry: TranscriptEntry, item: OpenCodeTranscriptItem, rowID
                 item.text,
                 Modifier.fillMaxWidth(),
                 style = OpenCodeTextStyles.footnote,
-                color = if (item.isError) colors.destructive else colors.secondaryText,
+                color = if (item.isError) colors.danger else colors.secondaryText,
             )
 
         is OpenCodeTranscriptItem.RunError ->
@@ -173,8 +173,8 @@ private fun CompactionView(entry: TranscriptEntry, id: String, info: OpenCodeCom
     val rule: @Composable (Modifier) -> Unit = { ruleModifier ->
         TranscriptRule(
             ruleModifier,
-            lineColor = if (failed) colors.destructive.copy(alpha = 0.5f) else quaternaryLine(),
-            labelColor = if (failed) colors.destructive else colors.secondaryText,
+            lineColor = if (failed) colors.danger.copy(alpha = 0.5f) else quaternaryLine(),
+            labelColor = if (failed) colors.danger else colors.secondaryText,
         ) {
             if (info.status == OpenCodeCompaction.Status.Running) {
                 CircularProgressIndicator(Modifier.size(10.dp), color = LocalContentColor.current, strokeWidth = 1.5.dp)
@@ -207,7 +207,7 @@ private fun CompactionView(entry: TranscriptEntry, id: String, info: OpenCodeCom
         if (failed) {
             info.errorMessage?.let { message ->
                 SelectionContainer {
-                    Text(message, Modifier.fillMaxWidth(), style = OpenCodeTextStyles.footnote, color = colors.destructive)
+                    Text(message, Modifier.fillMaxWidth(), style = OpenCodeTextStyles.footnote, color = colors.danger)
                 }
             }
         }

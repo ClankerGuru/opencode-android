@@ -1,5 +1,11 @@
 package ai.opencode.app
 
+import ai.opencode.core.ui.OpenCodeSheetDefaults
+import ai.opencode.core.ui.OpenCodeSheetHandle
+import ai.opencode.core.ui.OpenCodeSurfaces
+import androidx.compose.ui.unit.sp
+import ai.opencode.core.ui.OpenCodeRadius
+import androidx.compose.foundation.BorderStroke
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.diagnostics.HidesFromScreenshots
 import ai.opencode.core.experiments.key
@@ -66,7 +72,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
+import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -74,7 +80,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
+import ai.opencode.core.ui.OpenCodeTextField
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -211,7 +217,7 @@ private fun AppAlerts(store: StoreOf<AppFeature.State, AppFeature.Action>) {
     systemActionError?.let { ErrorAlert("Couldn’t Open Session", it) { store.send(AppFeature.Action.SystemActionErrorDismissed) } }
     pairingError?.let { ErrorAlert("Couldn’t Pair with Server", it) { store.send(AppFeature.Action.PairingErrorDismissed) } }
     pendingPairing?.let { pending ->
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = { store.send(AppFeature.Action.PairingCancelled(pending.id)) },
             title = { Text(pending.title) },
             text = { Text(pending.message) },
@@ -223,7 +229,7 @@ private fun AppAlerts(store: StoreOf<AppFeature.State, AppFeature.Action>) {
 
 @Composable
 private fun ErrorAlert(title: String, message: String, onDismiss: () -> Unit) {
-    AlertDialog(
+    OpenCodeAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { Text(message) },
@@ -315,9 +321,10 @@ private fun PairingActionsButtons(store: StoreOf<AppFeature.State, AppFeature.Ac
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         PairingActionButton(
             onClick = { store.send(AppFeature.Action.AddServerTapped) },
-            container = MaterialTheme.colorScheme.surfaceContainerHighest,
+            container = OpenCodeSurfaces.neutralFill,
             content = colors.text,
-        ) { Text("Enter a Server Manually", style = OpenCodeTextStyles.headline, textAlign = TextAlign.Center) }
+            border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
+        ) { Text("Enter a Server Manually", style = PairingActionLabel, textAlign = TextAlign.Center) }
         PairingActionButton(
             onClick = { store.send(AppFeature.Action.ScanPairingCodeTapped) },
             enabled = progress == null,
@@ -327,11 +334,11 @@ private fun PairingActionsButtons(store: StoreOf<AppFeature.State, AppFeature.Ac
             if (progress != null) {
                 CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = colors.canvas)
                 Spacer(Modifier.width(10.dp))
-                Text(progress!!, style = OpenCodeTextStyles.headline)
+                Text(progress!!, style = PairingActionLabel)
             } else {
-                OpenCodeIcon(SFSymbol.QrcodeViewfinder, contentDescription = null)
-                Spacer(Modifier.width(10.dp))
-                Text("Scan Pairing Code", style = OpenCodeTextStyles.headline, textAlign = TextAlign.Center)
+                OpenCodeIcon(SFSymbol.QrcodeViewfinder, contentDescription = null, size = 18.dp)
+                Spacer(Modifier.width(8.dp))
+                Text("Scan Pairing Code", style = PairingActionLabel, textAlign = TextAlign.Center)
             }
         }
     }
@@ -343,12 +350,15 @@ private fun PairingActionButton(
     container: Color,
     content: Color,
     enabled: Boolean = true,
+    border: BorderStroke? = null,
     label: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
 ) {
     Button(
         onClick = onClick,
         enabled = enabled,
-        shape = RoundedCornerShape(16.dp),
+        // The desktop's button: small radius, not a 16 dp card.
+        shape = RoundedCornerShape(OpenCodeRadius.fill),
+        border = border,
         colors = ButtonDefaults.buttonColors(
             containerColor = container,
             contentColor = content,
@@ -357,10 +367,16 @@ private fun PairingActionButton(
             disabledContentColor = content,
         ),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
         content = label,
     )
 }
+
+/**
+ * The pairing buttons' label. Semibold, a step above the desktop's medium button text: on these
+ * full-width buttons, the screen's two main actions, medium read as softer than the copy above.
+ */
+private val PairingActionLabel get() = OpenCodeTextStyles.callout.copy(fontWeight = FontWeight.SemiBold)
 
 /** What a new user needs on their computer before the scan can work. */
 @Composable
@@ -454,8 +470,12 @@ private fun CopyCommand(command: String, onCopy: (String) -> Unit) {
             onCopy(command)
             copied = true
         },
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        // The desktop's shell block: a clearly filled box, hairline border.
+        shape = RoundedCornerShape(OpenCodeRadius.fill),
+        color = OpenCodeSurfaces.commandFill,
+        // Explicit: the fill matches `surfaceVariant`, whose content colour is the secondary text.
+        contentColor = OpenCodeTheme.colors.text,
+        border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
         // The label stands in for the visible command (cleared below), read once as a button
         // (iOS `.accessibilityLabel("Copy \(command)")` on a `Button`).
         modifier = Modifier.heightIn(min = 48.dp).semantics {
@@ -472,11 +492,10 @@ private fun CopyCommand(command: String, onCopy: (String) -> Unit) {
             Text(
                 command,
                 modifier = Modifier.weight(1f, fill = false).clearAndSetSemantics {},
-                // Berkeley Mono's contextual alternates join `//` and `--` into ligatures that
-                // read as `https: //`; a command to retype is drawn as typed.
-                style = OpenCodeTextStyles.callout.copy(
-                    fontFamily = OpenCodeFonts.berkeleyMono,
-                    fontSize = OpenCodeTextStyles.subheadline.fontSize,
+                // The desktop's mono; no contextual alternates, so a command to retype is drawn as typed.
+                style = OpenCodeTextStyles.footnote.copy(
+                    fontFamily = OpenCodeFonts.monospace,
+                    lineHeight = 20.sp,
                     fontFeatureSettings = "calt 0",
                 ),
             )
@@ -568,7 +587,7 @@ private fun SavedServerList(store: StoreOf<AppFeature.State, AppFeature.Action>,
         }
     }
     pendingRemoval?.let { server ->
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = { pendingRemoval = null },
             title = { Text("Remove ${server.displayName}?") },
             text = { Text("This forgets the address and password on this ${ThisDevice.name}. Sessions on the server are not affected.") },
@@ -604,7 +623,7 @@ private fun formatted(message: String): AnnotatedString = buildAnnotatedString {
         return@buildAnnotatedString
     }
     parts.forEachIndexed { index, part ->
-        if (index % 2 == 1) withStyle(SpanStyle(fontFamily = FontFamily.Monospace)) { append(part) } else append(part)
+        if (index % 2 == 1) withStyle(SpanStyle(fontFamily = OpenCodeFonts.monospace)) { append(part) } else append(part)
     }
 }
 
@@ -694,6 +713,8 @@ private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>)
     ModalBottomSheet(
         onDismissRequest = { store.send(AppFeature.Action.CancelEditingTapped) },
         sheetState = sheetState,
+        dragHandle = { OpenCodeSheetHandle() },
+        shape = OpenCodeSheetDefaults.shape,
     ) {
         // Its password and headers, out of problem reports and voice screenshots.
         HidesFromScreenshots()
@@ -750,30 +771,30 @@ private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>)
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             state.errorMessage?.let { ConnectionErrorCard(store, it, announces = false) }
-            OutlinedTextField(
+            OpenCodeTextField(
                 value = state.serverName,
                 onValueChange = { store.send(AppFeature.Action.ServerNameChanged(it)) },
-                label = { Text("Name") },
+                label = "Name",
                 // Blank keeps the name the address gives, shown as the prompt.
-                placeholder = { Text(state.credentialNamePrompt) },
+                placeholder = state.credentialNamePrompt,
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, autoCorrectEnabled = false, imeAction = ImeAction.Next),
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
+            OpenCodeTextField(
                 value = state.serverURL,
                 onValueChange = { store.send(AppFeature.Action.ServerURLChanged(it)) },
-                label = { Text("Server address") },
-                placeholder = { Text("http://192.168.1.20:4096") },
+                label = "Server address",
+                placeholder = "http://192.168.1.20:4096",
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false, imeAction = ImeAction.Next),
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
+            OpenCodeTextField(
                 value = state.username,
                 onValueChange = { store.send(AppFeature.Action.UsernameChanged(it)) },
-                label = { Text("Username") },
-                placeholder = { Text("opencode") },
+                label = "Username",
+                placeholder = "opencode",
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Next),
                 modifier = Modifier.fillMaxWidth(),
@@ -785,15 +806,15 @@ private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>)
             // eye sits over it, outside the swap, so TalkBack's focus stays on it.
             Box {
                 androidx.compose.runtime.key(revealsPassword) {
-                    OutlinedTextField(
+                    OpenCodeTextField(
                         // Its own value, so the new field keeps the caret where it was.
                         value = if (passwordValue.text == state.password) passwordValue else TextFieldValue(state.password, TextRange(state.password.length)),
                         onValueChange = {
                             passwordValue = it
                             if (it.text != state.password) store.send(AppFeature.Action.PasswordChanged(it.text))
                         },
-                        label = { Text("Password") },
-                        placeholder = { Text("Password") },
+                        label = "Password",
+                        placeholder = "Password",
                         singleLine = true,
                         visualTransformation = if (revealsPassword) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(
@@ -814,8 +835,8 @@ private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>)
                             .onFocusChanged { isPasswordFocused = it.isFocused },
                     )
                 }
-                // The outlined field's 8 dp above its border is the label's.
-                Box(Modifier.matchParentSize().padding(top = 8.dp), contentAlignment = Alignment.CenterEnd) {
+                // The label sits above the field: the eye centres on the field's 48 dp row.
+                Box(Modifier.matchParentSize(), contentAlignment = Alignment.BottomEnd) {
                     OpenCodeIconButton(
                         symbol = if (revealsPassword) SFSymbol.EyeSlash else SFSymbol.Eye,
                         contentDescription = if (revealsPassword) "Hide Password" else "Show Password",
@@ -884,14 +905,16 @@ private fun ConnectButton(label: String, inProgress: Boolean, enabled: Boolean, 
             disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             disabledContentColor = colors.secondaryText,
         ),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 12.dp),
-        modifier = modifier.fillMaxWidth().heightIn(min = 52.dp),
+        // The desktop's contrast button: small radius, medium label.
+        shape = RoundedCornerShape(OpenCodeRadius.fill),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+        modifier = modifier.fillMaxWidth().heightIn(min = 48.dp),
     ) {
         if (inProgress) {
             CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = colors.secondaryText)
             Spacer(Modifier.width(10.dp))
         }
-        Text(label, style = OpenCodeTextStyles.headline)
+        Text(label, style = PairingActionLabel)
         Spacer(Modifier.weight(1f))
         OpenCodeIcon(SFSymbol.ArrowRight, contentDescription = null)
     }
@@ -915,20 +938,20 @@ private fun HeaderFields(
         Text("Headers", style = OpenCodeTextStyles.caption1.copy(fontWeight = FontWeight.SemiBold), color = OpenCodeTheme.colors.secondaryText)
         headers.forEachIndexed { index, header ->
             val nameField: @Composable (Modifier) -> Unit = { modifier ->
-                OutlinedTextField(
+                OpenCodeTextField(
                     value = header.name,
                     onValueChange = { value -> update(index) { it.copy(name = value) } },
-                    placeholder = { Text("Name") },
+                    placeholder = "Name",
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Next),
                     modifier = modifier.semantics { contentDescription = "Header ${index + 1} name" },
                 )
             }
             val valueField: @Composable (Modifier) -> Unit = { modifier ->
-                OutlinedTextField(
+                OpenCodeTextField(
                     value = header.value,
                     onValueChange = { value -> update(index) { it.copy(value = value) } },
-                    placeholder = { Text("Value") },
+                    placeholder = "Value",
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Next),
                     modifier = modifier.semantics { contentDescription = "Header ${index + 1} value" },

@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -190,14 +191,14 @@ private fun DesktopColumn(frame: WelcomeFrame, wall: Double, reduced: Boolean, t
             Text(WelcomeScreenshot.NAME, style = ui(13f), color = deskDim)
         }
         Text(
-            WelcomeStreamedText.attributed(WelcomeStory.REPLY_WORDS, frame.deskWords, deskText, code = FontFamily.Monospace),
+            WelcomeStreamedText.attributed(WelcomeStory.REPLY_WORDS, frame.deskWords, deskText, code = OpenCodeFonts.monospace),
             style = ui(13f).copy(lineHeight = 19.sp),
             modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp).welcomeRow(frame.deskReply),
         )
         Bubble(WelcomeStory.SHIP_IT, WelcomeTarget.DeskShip, targets, Modifier.padding(top = 14.dp).welcomeShow(frame.deskShip, dy = 6f, scale = 0.95f, anchor = trailing, reduced = reduced).welcomeRow(frame.deskShip))
         ToolRow("terminal", Modifier.padding(top = 10.dp).welcomeShow(frame.run, dy = 4f, reduced = reduced).welcomeRow(frame.run)) {
             Text("Running commands", style = ui(13f), color = deskText, modifier = Modifier.welcomeShimmer(1.0, wall, reduced))
-            Text("git push", style = ui(12.5f, family = FontFamily.Monospace), color = deskDim)
+            Text("git push", style = ui(12.5f, family = OpenCodeFonts.monospace), color = deskDim)
         }
     }
 }

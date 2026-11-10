@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings.onboarding
 
+import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
@@ -112,7 +113,7 @@ internal fun OnboardingPlaygroundControls(
         }
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilledTonalButton(onClick = { store.send(Action.ReplayTapped) }) {
+            FilledTonalButton(onClick = { store.send(Action.ReplayTapped) }, shape = OpenCodeShape.control) {
                 OpenCodeIcon(SFSymbol.ArrowCounterclockwise, contentDescription = null, size = OpenCodeIconSize.small)
                 Spacer(Modifier.size(6.dp))
                 Text("Replay")
@@ -140,6 +141,7 @@ private fun FailureMenu(failure: Failure?, onChange: (Failure?) -> Unit) {
                 contentDescription = "Server"
                 stateDescription = title
             },
+            shape = OpenCodeShape.control,
         ) {
             OpenCodeIcon(
                 if (failure == null) SFSymbol.CheckmarkCircle else SFSymbol.ExclamationmarkTriangle,
@@ -182,6 +184,7 @@ private fun PhaseButton(control: Control, current: Boolean, onClick: () -> Unit)
         onClick = onClick,
         modifier = Modifier.heightIn(min = 48.dp).semantics { selected = current },
         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+        shape = OpenCodeShape.control,
     ) {
         Box(
             Modifier

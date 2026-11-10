@@ -82,7 +82,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.AlertDialog
+import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -1006,7 +1006,7 @@ private fun sessionSheetDetails(state: State) = SessionSheetDetails(
 private fun LocationErrorAlert(store: StoreOf<State, Action>) {
     val error by store.observe { it.locationError }
     val message = error ?: return
-    AlertDialog(
+    OpenCodeAlertDialog(
         onDismissRequest = { store.send(Action.locationErrorDismissed) },
         title = { Text("Couldn’t Share Location") },
         text = { Text(message) },

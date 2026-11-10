@@ -1,5 +1,7 @@
 package ai.opencode.feature.system.intents
 
+import ai.opencode.core.ui.OpenCodeTextField
+import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.feature.system.LeftToRight
 import ai.opencode.feature.system.SessionDirectory
 import ai.opencode.core.dependencies.AppContext
@@ -36,7 +38,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -204,12 +205,14 @@ private fun AskOpenCodeView(
         Surface(
             modifier = Modifier.padding(24.dp).widthIn(max = 520.dp).fillMaxWidth()
                 .clickable(onClick = {}, indication = null, interactionSource = null),
-            shape = MaterialTheme.shapes.extraLarge,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            // The desktop dialog: floating fill, hairline ring, 12 dp corners, no tonal elevation.
+            shape = OpenCodeSurfaces.dialogShape,
+            color = OpenCodeSurfaces.color,
+            border = OpenCodeSurfaces.border,
             // Explicit: `contentColorFor` matches roles by value, and in the dark themes the
             // container shares its colour with a role whose content colour is dim.
             contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = 6.dp,
+            tonalElevation = 0.dp,
         ) {
             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -232,11 +235,11 @@ private fun AskOpenCodeView(
                     return@Column
                 }
                 val focus = remember { FocusRequester() }
-                OutlinedTextField(
+                OpenCodeTextField(
                     value = state.message,
                     onValueChange = { text -> onUpdate { it.copy(message = text) } },
-                    label = { Text(AskOpenCodeIntent.MESSAGE_TITLE) },
-                    placeholder = { Text(AskOpenCodeIntent.REQUEST_VALUE_DIALOG) },
+                    label = AskOpenCodeIntent.MESSAGE_TITLE,
+                    placeholder = AskOpenCodeIntent.REQUEST_VALUE_DIALOG,
                     minLines = 2,
                     maxLines = 6,
                     enabled = !state.isSending,

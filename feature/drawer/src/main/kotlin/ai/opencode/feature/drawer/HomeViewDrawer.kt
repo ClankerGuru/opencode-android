@@ -1,5 +1,9 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.core.ui.OpenCodeSurfaces
+import ai.opencode.core.ui.OpenCodeRadius
+import androidx.compose.foundation.shape.RoundedCornerShape
+import ai.opencode.feature.drawer.style.drawerCanvas
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.rememberReduceMotion
@@ -9,7 +13,6 @@ import ai.opencode.core.store.observe
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconButton
 import ai.opencode.core.ui.OpenCodeIconButtonStyle
-import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
@@ -79,7 +82,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
-import androidx.compose.material3.AlertDialog
+import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -230,7 +233,7 @@ fun HomeDrawer(
     Box(
         modifier
             .fillMaxSize()
-            .background(colors.canvas)
+            .background(colors.drawerCanvas)
             // TalkBack reads top to bottom, as VoiceOver reads iOS's header inset, list and bottom
             // bar: the title and search, the list, then New Session and Settings. The bands lie
             // over the full-height list, so without an order TalkBack read the controls first.
@@ -427,7 +430,7 @@ private fun rowMenu(store: StoreOf<HomeFeature.State, HomeFeature.Action>, row: 
 fun HomeDeleteConfirmation(store: StoreOf<HomeFeature.State, HomeFeature.Action>) {
     val pending by store.observe { it.pendingDeletion }
     val session = pending ?: return
-    AlertDialog(
+    OpenCodeAlertDialog(
         onDismissRequest = { store.send(HomeFeature.Action.DeleteSessionCancelled) },
         title = { Text("Delete “" + session.title + "”?") },
         text = { Text("This removes the session from the server for all clients.") },
@@ -460,8 +463,12 @@ private fun DrawerNewSessionButton(enabled: Boolean, onClick: () -> Unit) {
     val rise = DrawerTunables.footerGlyphRise.value * glyph / 17f
     val tint = if (enabled) colors.text else colors.tertiaryText
     Surface(
-        shape = OpenCodeShape.capsule,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        // The desktop's floating control: the popover fill, hairline ring and a soft shadow, at the
+        // floating panels' radius so the tall footer buttons don't read as keys.
+        shape = RoundedCornerShape(OpenCodeRadius.panel),
+        color = OpenCodeSurfaces.color,
+        border = OpenCodeSurfaces.border,
+        shadowElevation = OpenCodeSurfaces.raisedShadow,
         contentColor = tint,
         modifier = Modifier
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
@@ -490,7 +497,7 @@ private fun DrawerNewSessionButton(enabled: Boolean, onClick: () -> Unit) {
             )
             Text(
                 "New Session",
-                style = OpenCodeTextStyles.body.copy(fontWeight = FontWeight.SemiBold),
+                style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium),
                 color = tint,
                 maxLines = 1,
             )
@@ -544,8 +551,10 @@ private fun DrawerFooterTrailing(
             }
         }
         Surface(
-            shape = OpenCodeShape.capsule,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(OpenCodeRadius.panel),
+            color = OpenCodeSurfaces.color,
+            border = OpenCodeSurfaces.border,
+            shadowElevation = OpenCodeSurfaces.raisedShadow,
             contentColor = OpenCodeTheme.colors.text,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {

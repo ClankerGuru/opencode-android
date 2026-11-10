@@ -93,7 +93,7 @@ data class WelcomeSceneLayout(
             val laptopWidth = 1 + 2 * baseOverhang
             val laptopHeight = lidHeight + baseHeight
             val phoneHeight = laptopHeight * PHONE_RATIO
-            val phoneBezelRatio = 0.026f
+            val phoneBezelRatio = 0.02f
             val phoneAspect = WelcomePhone.size.height / WelcomePhone.size.width
             val phoneWidth = phoneHeight / ((1 - 2 * phoneBezelRatio) * phoneAspect + 2 * phoneBezelRatio)
             val unit = Size(laptopWidth + phoneWidth * (1 - OVERLAP), phoneHeight)
@@ -345,7 +345,7 @@ private fun Laptop(layout: WelcomeSceneLayout, frame: WelcomeFrame, wall: Double
 private fun Phone(layout: WelcomeSceneLayout, frame: WelcomeFrame, wall: Double, pairing: Float, reduced: Boolean, voice: WelcomeVoice, targets: WelcomeTargets?, modifier: Modifier) {
     val phone = layout.phone
     val screen = layout.phoneScreen
-    val corner = phone.width * 0.174f
+    val corner = phone.width * 0.11f
     val outerShape = RoundedCornerShape(corner.dp)
     val innerShape = RoundedCornerShape(max(0f, corner - (screen.left - phone.left)).dp)
     Box(modifier.size(layout.size.width.dp, layout.size.height.dp)) {

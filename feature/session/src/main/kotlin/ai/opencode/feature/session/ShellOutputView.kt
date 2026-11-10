@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
@@ -36,7 +37,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.AlertDialog
+import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -73,7 +74,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -182,7 +183,7 @@ fun ShellOutputView(
         }
     }
     if (state.isConfirmingStop) {
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = { store.send(ShellOutputFeature.Action.IsConfirmingStopChanged(false)) },
             title = { Text("Stop This Shell?") },
             text = { Text("The command ends now. The output shown here stays until you close it.") },
@@ -219,7 +220,7 @@ private fun Toolbar(state: ShellOutputFeature.State, onClose: () -> Unit, send: 
         Spacer(Modifier.width(48.dp))
         Text(
             state.shell.title,
-            style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace),
+            style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold, fontFamily = OpenCodeFonts.monospace),
             color = OpenCodeTheme.colors.text,
             maxLines = 1,
             overflow = TextOverflow.MiddleEllipsis,
@@ -412,7 +413,7 @@ private fun ShellOutputTextView(text: String, startCursor: Int, isFollowing: Boo
             else listState.animateScrollToItem(lines.size - 1, Int.MAX_VALUE / 2)
         }
     }
-    val style = OpenCodeTextStyles.footnote.copy(fontFamily = FontFamily.Monospace, fontSize = 13.sp, color = OpenCodeTheme.colors.text)
+    val style = OpenCodeTextStyles.footnote.copy(fontFamily = OpenCodeFonts.monospace, fontSize = 13.sp, color = OpenCodeTheme.colors.text)
     SelectionContainer {
         LazyColumn(
             state = listState,
@@ -481,6 +482,7 @@ private fun StatusBar(state: ShellOutputFeature.State, runningGlyph: @Composable
                     disabledContentColor = red.copy(alpha = 0.5f),
                 ),
                 modifier = Modifier.heightIn(min = 48.dp).testTag("shell-output-stop"),
+                shape = OpenCodeShape.control,
             ) {
                 if (state.isStopping) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                 else Text("Stop Shell")

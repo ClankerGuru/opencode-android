@@ -1,5 +1,7 @@
 package ai.opencode.feature.system.widgets
 
+import ai.opencode.core.ui.OpenCodeSearchField
+import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.feature.system.LeftToRight
 import ai.opencode.core.ui.OpenCodeAppTheme
 import ai.opencode.core.ui.OpenCodeIcon
@@ -34,7 +36,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -115,12 +116,14 @@ private fun ChooseSessionView(directory: SessionDirectory, onChoose: (SessionEnt
     Box(Modifier.fillMaxSize().safeDrawingPadding().imePadding(), contentAlignment = Alignment.Center) {
         Surface(
             modifier = Modifier.padding(16.dp).widthIn(max = 560.dp).fillMaxWidth().heightIn(max = 640.dp),
-            shape = MaterialTheme.shapes.extraLarge,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            // The desktop dialog: floating fill, hairline ring, 12 dp corners, no tonal elevation.
+            shape = OpenCodeSurfaces.dialogShape,
+            color = OpenCodeSurfaces.color,
+            border = OpenCodeSurfaces.border,
             // Explicit: `contentColorFor` matches roles by value, and the container shares its
             // colour with a role whose content colour is dim (as Ask OpenCode's dialog).
             contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = 6.dp,
+            tonalElevation = 0.dp,
         ) {
             Column {
                 Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 8.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -131,12 +134,10 @@ private fun ChooseSessionView(directory: SessionDirectory, onChoose: (SessionEnt
                     )
                     OpenCodeIconButton(SFSymbol.Xmark, contentDescription = "Close", onClick = onClose, style = OpenCodeIconButtonStyle.Standard)
                 }
-                OutlinedTextField(
+                OpenCodeSearchField(
                     value = query,
                     onValueChange = { query = it },
-                    placeholder = { Text("Search") },
-                    leadingIcon = { OpenCodeIcon(SFSymbol.Magnifyingglass, contentDescription = null) },
-                    singleLine = true,
+                    placeholder = "Search",
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 )
                 LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(bottom = 8.dp)) {

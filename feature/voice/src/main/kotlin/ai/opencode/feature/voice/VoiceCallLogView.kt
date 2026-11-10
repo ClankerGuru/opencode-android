@@ -1,5 +1,7 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.ui.OpenCodeTopBar
+import ai.opencode.core.ui.OpenCodeTopBarBackButton
 import ai.opencode.core.ui.appFormattingLocale
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -44,8 +46,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CenterAlignedTopAppBar
+import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -58,7 +59,6 @@ import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -86,7 +86,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.drawText
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
@@ -138,11 +138,10 @@ fun VoiceCallLogList(
     Scaffold(
         modifier = modifier,
         topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("History", style = OpenCodeTextStyles.headline, modifier = Modifier.semantics { heading() }) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { OpenCodeIcon(SFSymbol.ChevronBackward, contentDescription = "Back") }
-                },
+            OpenCodeTopBar(
+                title = { Text("History", modifier = Modifier.semantics { heading() }) },
+                navigation = { OpenCodeTopBarBackButton(onClick = onBack) },
+                centerTitle = true,
                 actions = {
                     if (developerMode || logs.isNotEmpty()) {
                         Box {
@@ -177,7 +176,6 @@ fun VoiceCallLogList(
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             )
         },
     ) { padding ->
@@ -217,7 +215,7 @@ fun VoiceCallLogList(
     }
 
     if (confirmingDeleteAll) {
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = { confirmingDeleteAll = false },
             title = { Text("Delete all voice calls?") },
             confirmButton = {
@@ -313,12 +311,10 @@ fun VoiceCallReplayView(log: VoiceCallLog, onBack: () -> Unit, modifier: Modifie
     Scaffold(
         modifier = modifier,
         topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(log.title, style = OpenCodeTextStyles.headline, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() }) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { OpenCodeIcon(SFSymbol.ChevronBackward, contentDescription = "Back") }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
+            OpenCodeTopBar(
+                title = { Text(log.title, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() }) },
+                navigation = { OpenCodeTopBarBackButton(onClick = onBack) },
+                centerTitle = true,
             )
         },
     ) { padding ->
@@ -612,7 +608,7 @@ private fun ReplayEvents(log: VoiceCallLog, playback: VoiceCallReplayPlayback, r
                             Box(Modifier.width(3.dp).fillMaxHeight().background(event.color))
                             Text(
                                 event.text,
-                                style = OpenCodeTextStyles.caption1.copy(fontFamily = FontFamily.Monospace),
+                                style = OpenCodeTextStyles.caption1.copy(fontFamily = OpenCodeFonts.monospace),
                                 color = OpenCodeTheme.colors.text,
                                 modifier = Modifier.padding(8.dp),
                             )

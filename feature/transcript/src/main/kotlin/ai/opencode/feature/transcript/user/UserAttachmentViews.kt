@@ -54,7 +54,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -189,7 +189,7 @@ internal fun PastedTextCard(id: String, text: String, summary: PastedTextSummary
             for (line in summary.preview) {
                 Text(
                     line,
-                    style = OpenCodeTextStyles.caption2.copy(fontFamily = FontFamily.Monospace),
+                    style = OpenCodeTextStyles.caption2.copy(fontFamily = OpenCodeFonts.monospace),
                     color = OpenCodeTheme.colors.secondaryText,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -262,7 +262,7 @@ internal fun SharedLocationCard(
             }
             Text(
                 location.coordinateText + (location.accuracyText?.let { " · $it" } ?: ""),
-                style = OpenCodeTextStyles.caption2.copy(fontFamily = FontFamily.Monospace),
+                style = OpenCodeTextStyles.caption2.copy(fontFamily = OpenCodeFonts.monospace),
                 color = OpenCodeTheme.colors.tertiaryText,
                 maxLines = 1,
             )

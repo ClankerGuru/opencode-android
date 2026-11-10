@@ -1,5 +1,7 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.ui.OpenCodeShape
+import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconButton
@@ -102,7 +104,9 @@ fun VoiceCallRowsCard(store: VoiceStoreOf?, hidden: Boolean, reduceMotion: Boole
     AnimatedVisibility(visible = !live.isEmpty, modifier = modifier, enter = enter, exit = exit) {
         Surface(
             shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            // The desktop card: floating fill, hairline ring.
+            color = OpenCodeSurfaces.color,
+            border = OpenCodeSurfaces.border,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column {
@@ -163,6 +167,7 @@ private fun ScreenRequestRow(request: ClientToolCall, send: (VoiceFeature.Action
         Button(
             onClick = { send(VoiceFeature.Action.ScreenRequest(VoiceScreenRequestFeature.Action.ShareTapped)) },
             modifier = Modifier.semantics { testTag = "voice-screen-request-share" },
+            shape = OpenCodeShape.control,
         ) { Text("Share") }
     }
 }
@@ -192,6 +197,7 @@ private fun OpenLinkRow(request: ClientToolCall, send: (VoiceFeature.Action) -> 
         Button(
             onClick = { send(VoiceFeature.Action.OpenLink(VoiceOpenLinkFeature.Action.OpenTapped)) },
             modifier = Modifier.semantics { testTag = "voice-open-link-open" },
+            shape = OpenCodeShape.control,
         ) { Text("Open") }
     }
 }

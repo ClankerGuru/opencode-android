@@ -1,5 +1,12 @@
 package ai.opencode.feature.settings.onboarding
 
+import ai.opencode.core.ui.OpenCodeSheetDefaults
+import ai.opencode.core.ui.OpenCodeSheetHandle
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.clip
+import ai.opencode.core.ui.openCodeHairline
+import ai.opencode.core.ui.OpenCodeSurfaces
+import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
@@ -62,7 +69,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTag
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -321,6 +328,8 @@ private fun WelcomeOtherWays(pasteError: String?, send: (WelcomeFeature.Action) 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
+        dragHandle = { OpenCodeSheetHandle() },
+        shape = OpenCodeSheetDefaults.shape,
     ) {
         Column(
             Modifier
@@ -362,7 +371,7 @@ private fun OtherWaysSection(
         if (header != null) {
             Text(header, style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.secondaryText, modifier = Modifier.padding(horizontal = 16.dp).semantics { heading() })
         }
-        Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Surface(shape = RoundedCornerShape(OpenCodeRadius.card), color = OpenCodeSurfaces.color, border = OpenCodeSurfaces.border) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), content = content)
         }
         if (footer != null) {
@@ -396,10 +405,15 @@ private fun WelcomeCommand(command: String, onCopy: (String) -> Unit) {
         delay(1_500)
         copied = false
     }
+    // The desktop's shell block: a clearly filled box with a hairline, as on the connection screen.
+    val shape = RoundedCornerShape(OpenCodeRadius.fill)
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
+            .clip(shape)
+            .background(OpenCodeSurfaces.commandFill, shape)
+            .openCodeHairline(shape)
             .clickable {
                 onCopy(command)
                 copied = true
@@ -412,9 +426,10 @@ private fun WelcomeCommand(command: String, onCopy: (String) -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        Spacer(Modifier.width(4.dp))
         Text(
             command,
-            style = OpenCodeTextStyles.callout.copy(fontFamily = FontFamily.Monospace),
+            style = OpenCodeTextStyles.callout.copy(fontFamily = OpenCodeFonts.monospace),
             modifier = Modifier.weight(1f),
         )
         OpenCodeIcon(
@@ -423,6 +438,7 @@ private fun WelcomeCommand(command: String, onCopy: (String) -> Unit) {
             tint = OpenCodeTheme.colors.secondaryText,
             size = 16.dp,
         )
+        Spacer(Modifier.width(4.dp))
     }
 }
 

@@ -1,5 +1,7 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.ui.OpenCodeShape
+import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -30,7 +32,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -182,13 +183,14 @@ fun ServerConnectionPill(
     var menuShown by remember { mutableStateOf(false) }
     val fontScale = LocalDensity.current.fontScale
     Box(modifier) {
+        // The desktop's floating chip: flat fill, hairline ring, small radius.
         Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            tonalElevation = 2.dp,
-            shadowElevation = 2.dp,
+            shape = OpenCodeShape.control,
+            color = OpenCodeSurfaces.color,
+            border = OpenCodeSurfaces.border,
+            shadowElevation = OpenCodeSurfaces.raisedShadow,
             modifier = Modifier
-                .clip(CircleShape)
+                .clip(OpenCodeShape.control)
                 .combinedClickable(
                     onClick = { onAction(notice.primary) },
                     onLongClick = if (offersEdit) ({ menuShown = true }) else null,

@@ -101,7 +101,7 @@ fun PlusPhotoPill(
     val p = progress.value.coerceIn(0f, 1f)
     Box(modifier) {
         Surface(
-            shape = OpenCodeShape.capsule,
+            shape = OpenCodeShape.control,
             // The label turns white and the fill accent over the first pick, not at its start.
             color = lerp(idleFill, accent, p),
             contentColor = lerp(idleText, Color.White, p),
