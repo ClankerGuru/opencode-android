@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
-import ai.opencode.core.store.observe
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -105,9 +104,7 @@ internal fun VoiceDelegatorSettingsRow(state: VoiceSettingsFeature.State, onClic
 @Composable
 internal fun VoiceDelegatorSettingsPage(store: SettingsStore) {
     val voice = rememberVoiceStore(store)
-    val local by voice.observe { it }
-    @Suppress("UNUSED_VARIABLE") val revision = rememberVoiceSharedRevision()
-    val state = local
+    val state = rememberVoiceState(voice)
     var searchQuery by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(voice) { voice.send(VoiceSettingsFeature.Action.DelegatorPageAppeared) }
 

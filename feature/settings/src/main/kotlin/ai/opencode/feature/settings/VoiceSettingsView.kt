@@ -108,6 +108,19 @@ internal fun rememberVoiceSharedRevision(): Any {
 }
 
 /**
+ * The Voice store's state for a Voice page, as a new instance whenever the state or a shared value
+ * it reads changes. The pages' list rows capture `state` and read shared values through its
+ * getters, which Compose can't observe, so an unchanged instance would leave a row stale: Enable
+ * Voice wouldn't move until the page was opened again.
+ */
+@Composable
+internal fun rememberVoiceState(voice: VoiceStore): VoiceSettingsFeature.State {
+    val local by voice.observe { it }
+    val revision = rememberVoiceSharedRevision()
+    return remember(local, revision) { local.copy() }
+}
+
+/**
  * Port of iOS `VoiceSettingsView` / `AdvancedSettingsView` (`Settings/SettingsView.swift`):
  * Settings › Voice. 1. Enable Voice; 2. the Voice Provider row and Model; for Grok, Model (provider
  * plus model) and its xAI Key row. Then Voice; 3. Raise to Talk and Call History.
@@ -115,9 +128,7 @@ internal fun rememberVoiceSharedRevision(): Any {
 @Composable
 fun VoiceSettingsView(store: SettingsStore) {
     val voice = rememberVoiceStore(store)
-    val local by voice.observe { it }
-    @Suppress("UNUSED_VARIABLE") val revision = rememberVoiceSharedRevision()
-    val state = local
+    val state = rememberVoiceState(voice)
     val reduceMotion = rememberReduceMotion()
     val settings = { action: HomeSettingsFeature.Action -> store.send(SettingsFeature.Action.Settings(action)) }
     LaunchedEffect(voice) { voice.send(VoiceSettingsFeature.Action.Task) }
@@ -338,9 +349,7 @@ object CallVoicePicker {
 @Composable
 fun CallVoicePickerView(store: SettingsStore) {
     val voice = rememberVoiceStore(store)
-    val local by voice.observe { it }
-    @Suppress("UNUSED_VARIABLE") val revision = rememberVoiceSharedRevision()
-    val state = local
+    val state = rememberVoiceState(voice)
     val engine = state.voiceEngine
     val selected = state.callVoice.resolved(engine)
     DisposableEffect(voice) { onDispose { voice.send(VoiceSettingsFeature.Action.VoicePickerDisappeared) } }

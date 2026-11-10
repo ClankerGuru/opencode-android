@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Text
-import ai.opencode.core.store.observe
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -89,9 +88,7 @@ internal fun VoiceProviderSettingsRow(state: VoiceSettingsFeature.State, onClick
 @Composable
 internal fun VoiceProviderDetailPage(store: SettingsStore, opensAccount: Boolean = false) {
     val voice = rememberVoiceStore(store)
-    val local by voice.observe { it }
-    @Suppress("UNUSED_VARIABLE") val revision = rememberVoiceSharedRevision()
-    val state = local
+    val state = rememberVoiceState(voice)
     val settings = { action: HomeSettingsFeature.Action -> store.send(SettingsFeature.Action.Settings(action)) }
     val catalog = state.providerCatalog
     val active = catalog.active
@@ -200,9 +197,7 @@ internal fun VoiceProviderDetailPage(store: SettingsStore, opensAccount: Boolean
 @Composable
 internal fun VoiceProviderAccountPage(store: SettingsStore) {
     val voice = rememberVoiceStore(store)
-    val local by voice.observe { it }
-    @Suppress("UNUSED_VARIABLE") val revision = rememberVoiceSharedRevision()
-    val state = local
+    val state = rememberVoiceState(voice)
     val settings = { action: HomeSettingsFeature.Action -> store.send(SettingsFeature.Action.Settings(action)) }
     // Picked outright, not by Automatic.
     val isPicked = state.voiceServer == VoiceServerChoice.Phone
