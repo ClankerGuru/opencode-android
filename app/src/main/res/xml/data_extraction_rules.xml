@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Backup and device transfer (minSdk 35, so no fullBackupContent). Mirrors iOS: every file-stored shared value sets
+  Backup and device transfer (minSdk 33, so no fullBackupContent). Mirrors iOS: every file-stored shared value sets
   isExcludedFromBackup on its file and directory (Core/SharedKeys.swift), and the composer's
   state and attachments do too (Composer/ComposerPersistence.swift), so Application Support
   (filesDir/support: composer-state.json, ComposerAttachments/, snapshots) and Documents

@@ -26,6 +26,8 @@ import android.service.quicksettings.TileService
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.service.quicksettings.PendingIntentActivityWrapper
+import androidx.core.service.quicksettings.TileServiceCompat
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.glance.ColorFilter
@@ -129,8 +131,9 @@ abstract class OpenCodeTileService : TileService() {
     override fun onClick() {
         super.onClick()
         val intent = OpenCodeControls.intent(this, kind, null)
-        val pending = PendingIntent.getActivity(this, kind.hashCode(), intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        startActivityAndCollapse(pending)
+        // A PendingIntent on Android 14+, the Intent itself on 13 (its only form there).
+        val pending = PendingIntentActivityWrapper(this, kind.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT, false)
+        TileServiceCompat.startActivityAndCollapse(this, pending)
     }
 }
 

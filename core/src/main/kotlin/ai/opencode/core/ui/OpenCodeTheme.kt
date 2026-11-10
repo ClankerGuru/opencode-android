@@ -8,6 +8,7 @@ import android.app.UiModeManager
 import android.content.Context
 import android.content.ContextWrapper
 import android.database.ContentObserver
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
@@ -140,10 +141,12 @@ fun rememberAppAppearance(): AppAppearance {
 
 /**
  * Android's counterpart of iOS Increase Contrast: the system contrast level
- * (`UiModeManager.getContrast()`, Android 14+) at medium or high. Live-updating.
+ * (`UiModeManager.getContrast()`, Android 14+) at medium or high. Live-updating. Android 13
+ * has no contrast level, so it reads as standard there.
  */
 @Composable
 fun rememberHighContrast(): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return false
     val context = LocalContext.current
     val uiModeManager = remember(context) { context.getSystemService(UiModeManager::class.java) }
     var contrast by remember(uiModeManager) { mutableFloatStateOf(uiModeManager?.contrast ?: 0f) }

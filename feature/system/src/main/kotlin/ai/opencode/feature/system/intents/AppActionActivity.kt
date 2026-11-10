@@ -50,7 +50,7 @@ class AppActionActivity : Activity() {
          * referrer) names Google's assistant, that UID owns the package, and it's signed with
          * Google's key. The system shares the launching app only when it opts in
          * (`ActivityOptions.setShareIdentityEnabled`); otherwise this is false, and the launch
-         * gets the path the user confirms. On Android 14 always require that confirmation.
+         * gets the path the user confirms. On Android 13 and 14 always require that confirmation.
          */
         fun isVerifiedAssistant(activity: Activity): Boolean =
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM &&

@@ -8,7 +8,7 @@ package ai.opencode.feature.settings.connection
  *
  * Metal reads the field from a buffer; here it is a `columns × rows` bitmap sampled at cell
  * centres ([ConnectionScopeRenderer.FIELD_SCALE] packs light above 1 into a byte). Coordinates are
- * the draw's local pixels, as Metal's `position`. minSdk is 35, so `RuntimeShader` (API 33) is
+ * the draw's local pixels, as Metal's `position`. minSdk is 33, so `RuntimeShader` (API 33) is
  * always available.
  *
  * Uniforms:

@@ -34,7 +34,7 @@ import kotlin.math.min
  * The calm dot-matrix Drift field behind the Catch Up stack that blooms as the last card goes
  * (D-33 option 3; iOS `CatchUpDriftFieldView` + `CatchUpDriftRenderer` + `catchUpDriftFragment`
  * in `DotScopeShaders.metal`). The Metal fragment shader is ported to AGSL and drawn with a
- * [RuntimeShader] (API 33+; the app's minimum is 35, so there is no fallback path).
+ * [RuntimeShader] (API 33+; the app's minimum is 33, so there is no fallback path).
  *
  * Drawn on the 3.5 pt LED grid with the warm/cool pearl palette. Reduce Motion holds one still
  * frame (time 1.3 s); the field pauses while the screen isn't resumed (iOS `scenePhase`).
