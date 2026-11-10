@@ -96,9 +96,12 @@ class LiveVoiceAudioSession(private val context: Context) : VoiceAudioSessionCon
         return dependency(VoiceMicrophonePermission).request()
     }
     @Synchronized override fun activate(demo: Boolean) {
-        if (savedMode == null) savedMode = manager.mode
+        if (savedMode == null) {
+            val current = manager.mode
+            savedMode = if (current == AudioManager.MODE_NORMAL || current == AudioManager.MODE_IN_COMMUNICATION) current else AudioManager.MODE_NORMAL
+        }
         val old = request
-        if (old != null) manager.abandonAudioFocusRequest(old)
+        if (old != null) runCatching { manager.abandonAudioFocusRequest(old) }
         val focus = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
             .setAudioAttributes(attributes(demo)).setWillPauseWhenDucked(true)
             .setOnAudioFocusChangeListener({ change -> synchronized(this) { listeners.values.map { it.first } }.forEach { it(change) } }, handler).build()
@@ -107,25 +110,46 @@ class LiveVoiceAudioSession(private val context: Context) : VoiceAudioSessionCon
             throw VoiceAudioError.engineRejected("Activating call audio", "audio focus denied")
         val mode = if (demo) AudioManager.MODE_NORMAL else AudioManager.MODE_IN_COMMUNICATION
         observedMode = mode // Ignore our own category write, including its async callback.
-        manager.mode = mode
+        runCatching { manager.mode = mode }.onFailure { error ->
+            throw VoiceAudioError.engineRejected("Activating call audio", error.message ?: error.javaClass.simpleName)
+        }
     }
     @Synchronized override fun deactivate() {
-        manager.clearCommunicationDevice()
-        savedMode?.let { observedMode = it; manager.mode = it }; savedMode = null
-        request?.let { manager.abandonAudioFocusRequest(it) }; request = null
+        runCatching { manager.clearCommunicationDevice() }
+        val restore = savedMode; savedMode = null
+        if (restore != null) {
+            observedMode = restore
+            val current = runCatching { manager.mode }.getOrDefault(AudioManager.MODE_NORMAL)
+            if (current == AudioManager.MODE_NORMAL || current == AudioManager.MODE_IN_COMMUNICATION) {
+                runCatching { manager.mode = restore }
+            }
+        }
+        val activeRequest = request; request = null
+        if (activeRequest != null) runCatching { manager.abandonAudioFocusRequest(activeRequest) }
     }
     override fun route(atEar: Boolean, demo: Boolean) {
-        if (demo) { manager.clearCommunicationDevice(); return }
-        val available = manager.availableCommunicationDevices
-        val current = manager.communicationDevice
-        val external = current?.takeIf { VoiceAudioRoute.isExternalOutput(it.type) }
-            ?: available.firstOrNull { VoiceAudioRoute.isExternalOutput(it.type) }
-        val desired = external ?: available.firstOrNull {
+        if (demo) { runCatching { manager.clearCommunicationDevice() }; return }
+        val available = runCatching { manager.availableCommunicationDevices }.getOrElse { emptyList() }
+        val current = runCatching { manager.communicationDevice }.getOrNull()
+        val builtin = available.firstOrNull {
             it.type == if (atEar) AudioDeviceInfo.TYPE_BUILTIN_EARPIECE else AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
         }
+        val external = current?.takeIf { cur -> VoiceAudioRoute.isExternalOutput(cur.type) && available.any { it.id == cur.id } }
+            ?: available.firstOrNull { VoiceAudioRoute.isExternalOutput(it.type) }
+        val desired = external ?: builtin
         if (desired != null) {
-            if (current?.id != desired.id) manager.setCommunicationDevice(desired)
-        } else manager.clearCommunicationDevice()
+            if (current?.id != desired.id) {
+                val applied = runCatching { manager.setCommunicationDevice(desired) }.getOrElse { error ->
+                    AppLog.voice.notice("Couldn’t select communication device (${error.javaClass.simpleName})")
+                    false
+                }
+                if (!applied && external != null && builtin != null && current?.id != builtin.id) {
+                    runCatching { manager.setCommunicationDevice(builtin) }
+                }
+            }
+        } else {
+            runCatching { manager.clearCommunicationDevice() }
+        }
     }
     @Synchronized override fun observe(id: UUID, focus: (Int) -> Unit, route: () -> Unit) {
         listeners[id] = focus to route
@@ -201,7 +225,13 @@ class VoiceAudioEngine(
     private val holder = owner.holder(session::deactivate)
     /** Audio in Calls: the music player, attached only while that experiment is on. */
     @Volatile private var callAudio: CallAudioPlayer? = null
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, error ->
+            if (error !is CancellationException) {
+                AppLog.voice.error("Call audio background task failed (${error.javaClass.simpleName})")
+            }
+        },
+    )
     private val control = kotlinx.coroutines.sync.Mutex()
     private val lock = Any()
     private val trackLock = Any()
@@ -567,7 +597,10 @@ class VoiceAudioEngine(
             synchronized(lock) {
                 val played = playback.playedMilliseconds(if (externalOwner) externalFrames else playedFrames, PCM.sampleRate, session.outputLatency)
                 resetPlaybackQueue()
-                if (externalOwner) externalControl?.flush() else track?.let { it.pause(); it.flush(); if (alive && !interrupted) it.play() }
+                if (externalOwner) externalControl?.flush()
+                else track?.takeIf { it.state == AudioTrack.STATE_INITIALIZED }?.let {
+                    runCatching { it.pause(); it.flush(); if (alive && !interrupted) it.play() }
+                }
                 levels.clearAssistant(); played
             }
         }
@@ -582,7 +615,16 @@ class VoiceAudioEngine(
         atEar = value
         if (!running || demo || VoiceAudioRoute.hasExternalOutput(session.outputPorts)) return@withLock
         if (atEar) cancelSpeakerRamp() else beginSpeakerRamp()
-        holder.withActive { session.route(atEar, demo) }
+        try {
+            holder.withActive { session.route(atEar, demo) }
+        } catch (error: CancellationException) {
+            if (!currentCoroutineContext().isActive) throw error
+            return@withLock
+        } catch (error: Exception) {
+            cancelSpeakerRamp()
+            AppLog.voice.error("Couldn’t route call audio (${error.javaClass.simpleName})")
+            return@withLock
+        }
         note(VoiceCallLog.Note.Kind.audio, (if (atEar) "At the ear: earpiece · " else "Away from the ear: speaker · ") + session.routeDescription)
     } }
     suspend fun noteConnected() {
@@ -623,10 +665,26 @@ class VoiceAudioEngine(
         if (interrupted) { recoverFromInterruption(); return@withLock }
         val external = VoiceAudioRoute.hasExternalOutput(session.outputPorts)
         if (!demo && !atEar && !external) beginSpeakerRamp() else cancelSpeakerRamp()
-        holder.withActive { session.route(atEar, demo) }
+        try {
+            holder.withActive { session.route(atEar, demo) }
+        } catch (error: CancellationException) {
+            if (!currentCoroutineContext().isActive) throw error
+        } catch (error: Exception) {
+            AppLog.voice.error("Couldn’t route call audio (${error.javaClass.simpleName})")
+        }
         if (!demo && session.mode != AudioManager.MODE_IN_COMMUNICATION) {
-            holder.activate { session.activate(demo); session.route(atEar, demo) }
-            note(VoiceCallLog.Note.Kind.audio, "⚠︎ Call audio session restored · ${session.routeDescription}")
+            try {
+                holder.activate { session.activate(demo); session.route(atEar, demo) }
+                note(VoiceCallLog.Note.Kind.audio, "⚠︎ Call audio session restored · ${session.routeDescription}")
+            } catch (error: CancellationException) {
+                if (!currentCoroutineContext().isActive) throw error
+                cancelSpeakerRamp()
+                return@withLock
+            } catch (error: Exception) {
+                cancelSpeakerRamp()
+                AppLog.voice.error("Couldn’t restore call audio (${error.javaClass.simpleName})")
+                return@withLock
+            }
         } else {
             // iOS notes a fallback to the built-in output (`oldDeviceUnavailable`) as the ear's
             // route, and following an external device as a route change.
@@ -692,15 +750,28 @@ class VoiceAudioEngine(
         } finally { holder.release(); backstop.cancel(); sounds.flushDebugLogAsync(); scope.cancel(); control.unlock() }
     }
     private fun releaseHardware() {
-        runCatching { record?.stop() }; runCatching { track?.stop() }
-        captureThread?.takeIf { it != Thread.currentThread() }?.join(1000)
-        playbackThread?.takeIf { it != Thread.currentThread() }?.join(1000)
+        // Detach under trackLock -> lock before stopping/releasing so concurrent flush()
+        // never calls pause() on an uninitialized AudioTrack.
+        val (input, output) = synchronized(trackLock) {
+            synchronized(lock) {
+                playbackEpoch++
+                val currentRecord = record
+                val currentTrack = track
+                record = null
+                track = null
+                currentRecord to currentTrack
+            }
+        }
+        val cap = captureThread.also { captureThread = null }
+        val play = playbackThread.also { playbackThread = null }
+        runCatching { input?.stop() }; runCatching { output?.stop() }
+        cap?.takeIf { it != Thread.currentThread() }?.join(1000)
+        play?.takeIf { it != Thread.currentThread() }?.join(1000)
         // Release unblocks a driver read/write that refused stop, then join it.
         effects.forEach { runCatching { it.release() } }; effects.clear()
-        record?.release(); track?.release()
-        captureThread?.takeIf { it != Thread.currentThread() && it.isAlive }?.join(1000)
-        playbackThread?.takeIf { it != Thread.currentThread() && it.isAlive }?.join(1000)
-        record = null; track = null; captureThread = null; playbackThread = null
+        runCatching { input?.release() }; runCatching { output?.release() }
+        cap?.takeIf { it != Thread.currentThread() && it.isAlive }?.join(1000)
+        play?.takeIf { it != Thread.currentThread() && it.isAlive }?.join(1000)
     }
     private suspend fun playStandaloneCue(samples: FloatArray, tail: Boolean = false) = withContext(Dispatchers.IO) {
         // A cue that can't get a track is skipped, never a crash in the engine's scope.
