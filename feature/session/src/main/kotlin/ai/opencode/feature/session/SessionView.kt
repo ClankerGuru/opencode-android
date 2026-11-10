@@ -83,7 +83,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
-import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import ai.opencode.core.ui.OpenCodeAlertDialog
@@ -334,8 +333,7 @@ fun SessionView(
                     modifier = Modifier.align(Alignment.TopCenter),
                 )
                 SessionBottomScrollEdge(
-                    composerHeight = { scrollEdgeBridge.composerHeight },
-                    clearance = if (onCatchUpOpen == null) 0f else CATCH_UP_COMPOSER_CLEARANCE,
+                    surfaceTopInWindow = { composerHost.surfaceTopInWindow },
                     modifier = Modifier.matchParentSize(),
                 )
                 // Behind the composer, so its × stays reachable: a tap anywhere else or a downward
@@ -435,38 +433,41 @@ internal const val CATCH_UP_COMPOSER_CLEARANCE = 12f
 
 /**
  * The soft bottom edge behind the floating composer (iOS's soft scroll edge under its bottom
- * bar): rows fade into the canvas just above the composer, so nothing shows around its rounded
- * corners, beside it or under the navigation bar. A plain canvas gradient, the bottom
- * counterpart of [SessionHeaderBackdrop]'s bar. It takes no touches and is hidden from TalkBack;
- * the composer's height is read in the draw phase.
+ * bar): rows stay fully visible down to the composer surface's top edge, then fade into the
+ * canvas over its corner radius, so nothing shows around its rounded corners, beside it or
+ * under the navigation bar. The pills, the jump button and a resting orb above the surface keep
+ * unfaded rows behind them. A plain canvas gradient that takes no touches and is hidden from
+ * TalkBack; the surface's top is read in the draw phase.
  */
 @Composable
-private fun SessionBottomScrollEdge(composerHeight: () -> Float, clearance: Float, modifier: Modifier) {
+private fun SessionBottomScrollEdge(surfaceTopInWindow: () -> Float, modifier: Modifier) {
     val canvas = OpenCodeTheme.colors.canvas
-    val obstruction = WindowInsets.ime.union(WindowInsets.navigationBars).inContainer()
+    var originInWindow by remember { mutableFloatStateOf(0f) }
     Spacer(
         modifier
             .clearAndSetSemantics {}
+            .onGloballyPositioned { originInWindow = it.boundsInWindow().top }
             .drawBehind {
-                val composerTop = size.height - obstruction.getBottom(this) - (clearance + composerHeight()).dp.toPx()
-                if (composerHeight() <= 0f || composerTop <= 0f) return@drawBehind
-                val fadeTop = (composerTop - BOTTOM_EDGE_FADE_ABOVE.dp.toPx()).coerceAtLeast(0f)
-                val solidTop = composerTop + BOTTOM_EDGE_FADE_BELOW.dp.toPx()
+                val surfaceTop = surfaceTopInWindow()
+                if (surfaceTop.isNaN()) return@drawBehind
+                val fadeTop = surfaceTop - originInWindow
+                if (fadeTop <= 0f || fadeTop >= size.height) return@drawBehind
+                val solidTop = fadeTop + ComposerTunables.cornerRadius.dp.toPx()
+                // Eases out: the corner curves away fastest just under the top edge, so a row
+                // beside it is mostly covered within the first few dp.
+                val stops = arrayOf(
+                    0f to canvas.copy(alpha = 0f),
+                    0.3f to canvas.copy(alpha = 0.85f),
+                    1f to canvas,
+                )
                 drawRect(
-                    brush = Brush.verticalGradient(listOf(canvas.copy(alpha = 0f), canvas), startY = fadeTop, endY = solidTop),
+                    brush = Brush.verticalGradient(*stops, startY = fadeTop, endY = solidTop),
                     topLeft = Offset(0f, fadeTop),
                     size = Size(size.width, size.height - fadeTop),
                 )
             },
     )
 }
-
-/** How far above the composer's top the bottom edge starts to fade in (dp). */
-private const val BOTTOM_EDGE_FADE_ABOVE = 20f
-
-/** How far below the composer's top the bottom edge is solid canvas, past its corners (dp). */
-private const val BOTTOM_EDGE_FADE_BELOW = 16f
-
 
 /** What the background-work panel reads from the session. */
 @Immutable
