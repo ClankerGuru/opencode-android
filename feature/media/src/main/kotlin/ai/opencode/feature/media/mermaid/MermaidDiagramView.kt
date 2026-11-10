@@ -64,7 +64,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -295,7 +295,7 @@ private fun MermaidCode(source: String, modifier: Modifier = Modifier) {
 
 /** iOS `TranscriptMetrics.codeFont`: subheadline, monospaced. */
 @Composable
-private fun codeStyle() = OpenCodeTextStyles.subheadline.copy(fontFamily = FontFamily.Monospace)
+private fun codeStyle() = OpenCodeTextStyles.subheadline.copy(fontFamily = OpenCodeFonts.monospace)
 
 /** A diagram's Mermaid source, highlighted and selectable (iOS `MermaidSourceView`). */
 @Composable

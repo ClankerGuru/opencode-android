@@ -1,5 +1,12 @@
 package ai.opencode.feature.system.widgets
 
+import ai.opencode.core.sharing.shared
+import ai.opencode.core.ui.AppTheme
+import ai.opencode.core.ui.OpenCodeColors
+import ai.opencode.core.ui.ThemeSharedKeys
+import ai.opencode.core.ui.toColorScheme
+import androidx.glance.color.ColorProviders
+import androidx.glance.material3.ColorProviders as MaterialColorProviders
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.system.ControlDirectoryStore
@@ -166,7 +173,7 @@ abstract class OpenCodeControlWidget : GlanceAppWidget() {
             val preferences = currentState<Preferences>()
             val entity = OpenCodeControls.chosenEntity(preferences)
             val value = SessionControlValue.of(entity, directory)
-            GlanceTheme {
+            GlanceTheme(colors = widgetColors()) {
                 ControlButton(
                     symbol = symbol(value),
                     title = title(value),
@@ -221,12 +228,27 @@ class NewSessionWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = NewSessionWidget()
 }
 
+/**
+ * The app's theme for widgets: the chosen curated theme's colours (the OpenCode desktop palette by
+ * default), or the wallpaper's dynamic colours for System. Read when the widget renders.
+ */
+@Composable
+private fun widgetColors(): ColorProviders {
+    val theme = shared(ThemeSharedKeys.appTheme).value
+    if (theme == AppTheme.System) return GlanceTheme.colors
+    return MaterialColorProviders(
+        light = OpenCodeColors.resolve(theme, isDark = false).toColorScheme(),
+        dark = OpenCodeColors.resolve(theme, isDark = true).toColorScheme(),
+    )
+}
+
 @Composable
 private fun ControlButton(symbol: SFSymbol, title: String, detail: String?, description: String, intent: Intent) {
     Row(
         modifier = GlanceModifier.fillMaxSize()
             .background(GlanceTheme.colors.secondaryContainer)
-            .cornerRadius(28.dp)
+            // The desktop dock's 12 dp corners (iOS's control is a 28 pt capsule).
+            .cornerRadius(12.dp)
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .clickable(actionStartActivity(intent))
             .semantics { contentDescription = description },

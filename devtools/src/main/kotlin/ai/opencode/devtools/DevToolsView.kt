@@ -1,12 +1,17 @@
 package ai.opencode.devtools
 
+import ai.opencode.core.ui.OpenCodeIconButtonStyle
+import ai.opencode.core.ui.OpenCodeIconButton
 import ai.opencode.core.diagnostics.DiagnosticsEvent
 import ai.opencode.core.diagnostics.MotionWatchEvent
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.collectState
 import ai.opencode.core.tuning.AnimationTimeScale
 import ai.opencode.core.ui.OpenCodeIcon
+import ai.opencode.core.ui.OpenCodeSwitchDefaults
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.OpenCodeTopBar
+import ai.opencode.core.ui.OpenCodeTopBarBackButton
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.devtools.perf.TimeScaleLabel
 import androidx.activity.compose.BackHandler
@@ -16,13 +21,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
@@ -33,7 +38,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -43,7 +47,6 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -98,11 +101,11 @@ fun DevToolsView(
     Scaffold(
         modifier = modifier,
         topBar = {
-            TopAppBar(
+            OpenCodeTopBar(
                 title = { Text(title, Modifier.semantics { heading() }) },
-                navigationIcon = {
+                navigation = {
                     val back = if (state.route != DevToolsFeature.Route.Main) ({ send(DevToolsFeature.Action.BackTapped) }) else onClose
-                    if (back != null) IconButton(onClick = back) { OpenCodeIcon(SFSymbol.ChevronBackward, "Back") }
+                    if (back != null) OpenCodeTopBarBackButton(onClick = back)
                 },
                 actions = { Actions(state, send) },
             )
@@ -134,20 +137,25 @@ private fun Actions(state: DevToolsFeature.State, send: (DevToolsFeature.Action)
         DevToolsFeature.Route.Troubleshooting, DevToolsFeature.Route.Network -> {
             var menu by remember { mutableStateOf(false) }
             Box {
-                IconButton(onClick = { menu = true }, enabled = state.events.isNotEmpty()) { OpenCodeIcon(SFSymbol.SquareAndArrowUp, "Share") }
+                OpenCodeIconButton(SFSymbol.SquareAndArrowUp, "Share", onClick = { menu = true }, style = OpenCodeIconButtonStyle.Standard, enabled = state.events.isNotEmpty())
                 DropdownMenu(menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(text = { Text("Text") }, onClick = { menu = false; send(DevToolsFeature.Action.ShareTimelineTapped(json = false)) })
                     DropdownMenuItem(text = { Text("JSON") }, onClick = { menu = false; send(DevToolsFeature.Action.ShareTimelineTapped(json = true)) })
                 }
             }
-            IconButton(onClick = { send(DevToolsFeature.Action.ClearTapped) }, enabled = state.events.isNotEmpty() || state.motionJumps.isNotEmpty()) {
-                OpenCodeIcon(SFSymbol.Trash, "Clear", tint = MaterialTheme.colorScheme.error)
-            }
+            OpenCodeIconButton(
+                SFSymbol.Trash,
+                "Clear",
+                onClick = { send(DevToolsFeature.Action.ClearTapped) },
+                style = OpenCodeIconButtonStyle.Standard,
+                tint = MaterialTheme.colorScheme.error,
+                enabled = state.events.isNotEmpty() || state.motionJumps.isNotEmpty(),
+            )
         }
         DevToolsFeature.Route.Logs -> {
-            IconButton(onClick = { send(DevToolsFeature.Action.Reload) }) { OpenCodeIcon(SFSymbol.ArrowClockwise, "Refresh") }
-            IconButton(onClick = { send(DevToolsFeature.Action.CopyLogTapped) }) { OpenCodeIcon(SFSymbol.DocOnDoc, "Copy") }
-            IconButton(onClick = { send(DevToolsFeature.Action.ShareLogTapped) }) { OpenCodeIcon(SFSymbol.SquareAndArrowUp, "Share") }
+            OpenCodeIconButton(SFSymbol.ArrowClockwise, "Refresh", onClick = { send(DevToolsFeature.Action.Reload) }, style = OpenCodeIconButtonStyle.Standard)
+            OpenCodeIconButton(SFSymbol.DocOnDoc, "Copy", onClick = { send(DevToolsFeature.Action.CopyLogTapped) }, style = OpenCodeIconButtonStyle.Standard)
+            OpenCodeIconButton(SFSymbol.SquareAndArrowUp, "Share", onClick = { send(DevToolsFeature.Action.ShareLogTapped) }, style = OpenCodeIconButtonStyle.Standard)
         }
         else -> Unit
     }
@@ -306,7 +314,7 @@ private fun SwitchRow(
             Text(title, style = MaterialTheme.typography.bodyLarge, color = if (enabled) MaterialTheme.colorScheme.onSurface else OpenCodeTheme.colors.secondaryText)
             if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = OpenCodeTheme.colors.secondaryText)
         }
-        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
+        Switch(checked = checked, onCheckedChange = null, enabled = enabled, colors = OpenCodeSwitchDefaults.colors())
     }
 }
 

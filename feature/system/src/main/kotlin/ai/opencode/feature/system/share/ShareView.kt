@@ -1,5 +1,10 @@
 package ai.opencode.feature.system.share
 
+import ai.opencode.core.ui.OpenCodeSearchField
+import ai.opencode.core.ui.OpenCodeSheetDefaults
+import ai.opencode.core.ui.OpenCodeSheetHandle
+import ai.opencode.core.ui.OpenCodeRadius
+import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.motion.transitionBlur
 
 import ai.opencode.core.files.AttachmentFileType
@@ -72,7 +77,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
+import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -194,7 +199,7 @@ fun ShareView(state: ShareModel.State, actions: ShareActions) {
     }
 
     state.saveError?.let { error ->
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = actions.onDismissSaveError,
             title = { Text("Couldn’t Save for OpenCode") },
             text = { Text(error) },
@@ -383,12 +388,12 @@ private fun Status(state: ShareModel.State, actions: ShareActions, reduceMotion:
             when (val current = shown[0]) {
                 is ShareModel.Phase.Failed -> {
                     Text(current.problem.message, style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.weight(1f))
-                    FilledTonalButton(onClick = actions.onSendLater) { Text("Send Later") }
-                    if (current.problem.canRetry) Button(onClick = actions.onSend) { Text("Try Again") }
+                    FilledTonalButton(onClick = actions.onSendLater, shape = OpenCodeShape.control) { Text("Send Later") }
+                    if (current.problem.canRetry) Button(onClick = actions.onSend, shape = OpenCodeShape.control) { Text("Try Again") }
                 }
                 else -> {
                     Text("Saved. Open OpenCode to continue", style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.weight(1f))
-                    Button(onClick = actions.onDone) { Text("Done") }
+                    Button(onClick = actions.onDone, shape = OpenCodeShape.control) { Text("Done") }
                 }
             }
         }
@@ -527,7 +532,7 @@ private fun Images(images: List<ShareModel.SharedImage>, height: Dp) {
             bitmap = bitmap,
             contentDescription = "Image",
             contentScale = ContentScale.Fit,
-            modifier = Modifier.heightIn(max = height).clip(RoundedCornerShape(18.dp)),
+            modifier = Modifier.heightIn(max = height).clip(RoundedCornerShape(OpenCodeRadius.card)),
         )
     } else if (images.isNotEmpty()) {
         LazyRow(
@@ -540,7 +545,7 @@ private fun Images(images: List<ShareModel.SharedImage>, height: Dp) {
                     bitmap = bitmap,
                     contentDescription = "Image ${index + 1} of ${images.size}",
                     contentScale = ContentScale.Fit,
-                    modifier = Modifier.heightIn(max = minOf(height, 300.dp)).clip(RoundedCornerShape(16.dp)),
+                    modifier = Modifier.heightIn(max = minOf(height, 300.dp)).clip(RoundedCornerShape(OpenCodeRadius.card)),
                 )
             }
         }
@@ -552,7 +557,7 @@ private fun Card(modifier: Modifier = Modifier, content: @Composable () -> Unit)
     Box(
         modifier
             .fillMaxWidth()
-            .background(OpenCodeTheme.colors.userBubble, RoundedCornerShape(14.dp))
+            .background(OpenCodeTheme.colors.userBubble, RoundedCornerShape(OpenCodeRadius.card))
             .padding(14.dp),
     ) {
         content()
@@ -710,7 +715,7 @@ private fun Chip(
     val foreground = if (selected) colors.canvas else colors.text
     Box(
         Modifier
-            .clip(OpenCodeShape.capsule)
+            .clip(OpenCodeShape.control)
             .clickable(onClickLabel = hint, role = Role.Button, onClick = onClick)
             .openCodeTapTarget(accessibility = false)
             .semantics {
@@ -723,7 +728,7 @@ private fun Chip(
             Modifier
                 .clearAndSetSemantics {}
                 .height(36.dp)
-                .background(container, OpenCodeShape.capsule)
+                .background(container, OpenCodeShape.control)
                 .padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -774,8 +779,10 @@ private fun MessageBar(state: ShareModel.State, actions: ShareActions, reduceMot
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(26.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        // The desktop dock: 12 dp corners, floating fill, hairline ring.
+        shape = RoundedCornerShape(OpenCodeRadius.panel),
+        color = OpenCodeSurfaces.color,
+        border = OpenCodeSurfaces.border,
         contentColor = colors.text,
     ) {
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -958,7 +965,13 @@ private fun ShareSessionSearch(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var query by rememberSaveable { mutableStateOf("") }
     val colors = OpenCodeTheme.colors
-    ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState, containerColor = colors.groupedCanvas) {
+    ModalBottomSheet(
+        onDismissRequest = onClose,
+        sheetState = sheetState,
+        containerColor = colors.groupedCanvas,
+        dragHandle = { OpenCodeSheetHandle() },
+        shape = OpenCodeSheetDefaults.shape,
+    ) {
         Box(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
             OpenCodeIconButton(
                 symbol = SFSymbol.Xmark,
@@ -969,30 +982,12 @@ private fun ShareSessionSearch(
             )
             Text("Sessions", style = OpenCodeTextStyles.headline, modifier = Modifier.align(Alignment.Center))
         }
-        Surface(
+        OpenCodeSearchField(
+            value = query,
+            onValueChange = { query = it },
+            placeholder = "Search",
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            shape = OpenCodeShape.fill,
-            color = colors.inlineCodeFill,
-        ) {
-            Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                OpenCodeIcon(SFSymbol.Magnifyingglass, contentDescription = null, size = OpenCodeIconSize.small, tint = colors.secondaryText)
-                Spacer(Modifier.width(8.dp))
-                BasicTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    singleLine = true,
-                    textStyle = OpenCodeTextStyles.body.copy(color = colors.text),
-                    cursorBrush = SolidColor(colors.accent),
-                    modifier = Modifier.weight(1f),
-                    decorationBox = { inner ->
-                        Box {
-                            if (query.isEmpty()) Text("Search", style = OpenCodeTextStyles.body, color = colors.tertiaryText)
-                            inner()
-                        }
-                    },
-                )
-            }
-        }
+        )
         val pinned = matches(state.targets?.pinned ?: emptyList(), query)
         val recents = matches(state.targets?.recents ?: emptyList(), query)
         LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(bottom = 24.dp)) {

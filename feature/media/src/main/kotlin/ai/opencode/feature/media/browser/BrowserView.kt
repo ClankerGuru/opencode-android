@@ -1,5 +1,7 @@
 package ai.opencode.feature.media
 
+import ai.opencode.core.ui.OpenCodeRadius
+import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.scene.ActiveScene
@@ -189,10 +191,12 @@ fun BrowserPage(
         // Where the drawer button sits on the session: back to it.
         Surface(
             onClick = ::close,
-            shape = CircleShape,
+            shape = RoundedCornerShape(OpenCodeRadius.card),
             contentColor = OpenCodeTheme.colors.text,
-            tonalElevation = 3.dp,
-            shadowElevation = 2.dp,
+            // The desktop floating surface: flat fill, hairline ring.
+            color = OpenCodeSurfaces.color,
+            border = OpenCodeSurfaces.border,
+            shadowElevation = OpenCodeSurfaces.raisedShadow,
             modifier = Modifier
                 .windowInsetsPadding(WindowInsets.safeDrawing.union(WindowInsets.statusBars))
                 .padding(start = 12.dp, top = TranscriptMetrics.clustered)
@@ -271,9 +275,11 @@ private fun Bar(store: StoreOf<BrowserFeature.State, BrowserFeature.Action>, pag
     val isAsking = page?.isAsking == true
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         Surface(
-            shape = OpenCodeShape.capsule,
-            tonalElevation = 3.dp,
-            shadowElevation = 2.dp,
+            shape = OpenCodeShape.control,
+            // The desktop floating surface: flat fill, hairline ring.
+            color = OpenCodeSurfaces.color,
+            border = OpenCodeSurfaces.border,
+            shadowElevation = OpenCodeSurfaces.raisedShadow,
             modifier = Modifier
                 .weight(1f)
                 .height(BrowserMetrics.barHeight),
@@ -299,9 +305,11 @@ private fun Bar(store: StoreOf<BrowserFeature.State, BrowserFeature.Action>, pag
         }
         Surface(
             onClick = { store.send(if (isAsking) BrowserFeature.Action.AskDismissed else BrowserFeature.Action.AskTapped) },
-            shape = CircleShape,
-            tonalElevation = 3.dp,
-            shadowElevation = 2.dp,
+            shape = RoundedCornerShape(OpenCodeRadius.card),
+            // The desktop floating surface: flat fill, hairline ring.
+            color = OpenCodeSurfaces.color,
+            border = OpenCodeSurfaces.border,
+            shadowElevation = OpenCodeSurfaces.raisedShadow,
             modifier = Modifier
                 .size(BrowserMetrics.barHeight)
                 .semantics { contentDescription = if (isAsking) "Cancel" else "Ask About This Page" }
@@ -388,9 +396,11 @@ private fun AskComposer(
         store.send(BrowserFeature.Action.AskSent)
     }
     Surface(
-        shape = RoundedCornerShape(BrowserMetrics.barHeight / 2),
-        tonalElevation = 3.dp,
-        shadowElevation = 2.dp,
+        shape = RoundedCornerShape(OpenCodeRadius.panel),
+        // The desktop floating surface: flat fill, hairline ring.
+        color = OpenCodeSurfaces.color,
+        border = OpenCodeSurfaces.border,
+        shadowElevation = OpenCodeSurfaces.raisedShadow,
         modifier = Modifier.fillMaxWidth().heightIn(min = BrowserMetrics.barHeight),
     ) {
         Row(verticalAlignment = Alignment.Bottom) {
@@ -464,9 +474,11 @@ private fun ReplyCapsule(
         BrowserReplyStatus.Working -> "Working"
     }
     Surface(
-        shape = OpenCodeShape.capsule,
-        tonalElevation = 3.dp,
-        shadowElevation = 2.dp,
+        shape = OpenCodeShape.control,
+        // The desktop floating surface: flat fill, hairline ring.
+        color = OpenCodeSurfaces.color,
+        border = OpenCodeSurfaces.border,
+        shadowElevation = OpenCodeSurfaces.raisedShadow,
         modifier = Modifier
             .heightIn(min = BrowserMetrics.controlSize)
             .then(if (goesBack) Modifier.clickable(role = Role.Button, onClickLabel = "Go back to the session", onClick = close) else Modifier)

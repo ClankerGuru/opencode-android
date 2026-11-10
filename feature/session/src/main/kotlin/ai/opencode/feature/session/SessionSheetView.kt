@@ -1,5 +1,10 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.ui.OpenCodeTextField
+import ai.opencode.core.ui.OpenCodeSheetHandle
+import ai.opencode.core.ui.OpenCodeSwitch
+import ai.opencode.core.ui.openCodeHairline
+import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
@@ -52,15 +57,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
+import ai.opencode.core.ui.OpenCodeAlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -75,7 +78,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.text.modifiers.TextAutoSizeLayoutScope
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.layout.layout
@@ -355,7 +357,7 @@ fun SessionSheetPrewarm(
                     AlwaysNotifyCard(isOn = false, isPending = false) { }
                     DeleteRow(enabled = true) { }
                     rememberModalBottomSheetState(skipPartiallyExpanded = true)
-                    BottomSheetDefaults.DragHandle()
+                    OpenCodeSheetHandle()
                 }
             }
         }
@@ -691,11 +693,12 @@ private fun cardFill(): Color {
     }
 }
 
-private val cardShape = RoundedCornerShape(20.dp)
+/** The desktop card: small radius, a hairline ring around its quiet fill. */
+private val cardShape = RoundedCornerShape(OpenCodeRadius.card)
 
 @Composable
 private fun DetailsCard(details: SessionSheetDetails, onModelTapped: () -> Unit, providerIcon: (@Composable (String, String?, Dp) -> Unit)?) {
-    Column(Modifier.fillMaxWidth().background(cardFill(), cardShape)) {
+    Column(Modifier.fillMaxWidth().background(cardFill(), cardShape).openCodeHairline(cardShape)) {
         ModelRow(details, onModelTapped, providerIcon)
         HorizontalDivider(Modifier.padding(start = 16.dp))
         ContextRow(details)
@@ -816,13 +819,14 @@ private fun AlwaysNotifyCard(isOn: Boolean, isPending: Boolean, onToggle: (Boole
                 .heightIn(min = 48.dp)
                 .testTag("session-sheet-always-notify")
                 .background(cardFill(), cardShape)
+                .openCodeHairline(cardShape)
                 .clip(cardShape)
                 .toggleable(value = isOn, enabled = !isPending, role = Role.Switch, onValueChange = onToggle)
                 .padding(horizontal = 16.dp, vertical = if (isAccessibilitySize) 10.dp else 0.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("Always Notify", style = OpenCodeTextStyles.callout, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
-            Switch(checked = isOn, onCheckedChange = null, enabled = !isPending)
+            OpenCodeSwitch(checked = isOn, onCheckedChange = null, enabled = !isPending)
         }
         Text(
             "Notify this $device whenever a reply finishes, even ones you didn’t send from here.",
@@ -903,14 +907,14 @@ fun SessionActionPresentations(sheet: StoreOf<SessionSheetFeature.State, Session
         // The alert's field takes the keyboard as it opens, as iOS's alert text field does.
         val focus = remember { FocusRequester() }
         LaunchedEffect(Unit) { focus.requestFocus() }
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = { sheet.send(SessionSheetFeature.Action.IsRenamingChanged(false)) },
             title = { Text("Rename Session") },
             text = {
-                OutlinedTextField(
+                OpenCodeTextField(
                     value = state.renameDraft,
                     onValueChange = { sheet.send(SessionSheetFeature.Action.RenameDraftChanged(it)) },
-                    placeholder = { Text("Title") },
+                    placeholder = "Title",
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { sheet.send(SessionSheetFeature.Action.RenameSubmitted) }),
@@ -928,7 +932,7 @@ fun SessionActionPresentations(sheet: StoreOf<SessionSheetFeature.State, Session
         )
     }
     state.failure?.let { failure ->
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = { sheet.send(SessionSheetFeature.Action.FailureDismissed) },
             title = { Text(failure.title) },
             text = { Text(failure.message) },
@@ -936,7 +940,7 @@ fun SessionActionPresentations(sheet: StoreOf<SessionSheetFeature.State, Session
         )
     }
     if (state.confirmsDeletion) {
-        AlertDialog(
+        OpenCodeAlertDialog(
             onDismissRequest = { sheet.send(SessionSheetFeature.Action.ConfirmsDeletionChanged(false)) },
             title = { Text("Delete “${title ?: "Session"}”?", modifier = Modifier.semantics { heading() }) },
             text = { Text("This removes the session from the server for all clients.") },

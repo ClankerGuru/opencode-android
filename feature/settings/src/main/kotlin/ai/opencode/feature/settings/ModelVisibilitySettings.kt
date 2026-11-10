@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings
 
+import ai.opencode.core.ui.OpenCodeSearchField
 import ai.opencode.core.dependencies.Dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
@@ -33,7 +34,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -49,7 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
@@ -246,7 +246,7 @@ fun ModelVisibilitySettingsView(store: SettingsStore) {
                 ) {
                     stale.all.forEach { id ->
                         SettingsRowFrame {
-                            Text(id, style = OpenCodeTextStyles.subheadline.copy(fontFamily = FontFamily.Monospace), color = OpenCodeTheme.colors.secondaryText)
+                            Text(id, style = OpenCodeTextStyles.subheadline.copy(fontFamily = OpenCodeFonts.monospace), color = OpenCodeTheme.colors.secondaryText)
                         }
                         SettingsDivider()
                     }
@@ -302,12 +302,10 @@ fun ModelVisibilityProviderView(store: SettingsStore, providerID: String) {
 
     SettingsPageScaffold(title = providerTitle, store = store) {
         item(key = "search") {
-            OutlinedTextField(
+            OpenCodeSearchField(
                 value = filter,
                 onValueChange = { filter = it },
-                placeholder = { Text("Search Models") },
-                singleLine = true,
-                leadingIcon = { OpenCodeIcon(SFSymbol.Magnifyingglass, contentDescription = null, size = 20.dp) },
+                placeholder = "Search Models",
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
             )
         }

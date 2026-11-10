@@ -1,5 +1,9 @@
 package ai.opencode.feature.settings.serverdetails
 
+import ai.opencode.core.ui.OpenCodeSearchField
+import ai.opencode.core.ui.OpenCodeSheetDefaults
+import ai.opencode.core.ui.OpenCodeSheetHandle
+import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.PageTransitions
@@ -48,7 +52,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -65,7 +68,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -95,6 +98,8 @@ internal fun ServerDetailsTray(
         onDismissRequest = { send(ServerDetailsFeature.Action.TrayChanged(null)) },
         sheetState = sheetState,
         containerColor = OpenCodeTheme.colors.groupedCanvas,
+        dragHandle = { OpenCodeSheetHandle() },
+        shape = OpenCodeSheetDefaults.shape,
     ) {
         when (tray) {
             ServerDetailsFeature.Tray.Mcp -> MCPServersTray(state, send, close)
@@ -132,7 +137,7 @@ private fun TrayHeader(title: String?, subtitle: String?, onClose: () -> Unit, o
 /** The inset-grouped card a tray's rows sit on. */
 @Composable
 private fun TrayCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Box(modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(OpenCodeTheme.colors.groupedCard)) {
+    Box(modifier.padding(horizontal = OpenCodeRadius.card).fillMaxWidth().clip(RoundedCornerShape(OpenCodeRadius.panel)).background(OpenCodeTheme.colors.groupedCard)) {
         content()
     }
 }
@@ -206,9 +211,9 @@ private fun MCPServersList(
         LazyColumn(contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)) {
             itemsIndexed(servers, key = { _, mcp -> mcp.name }) { index, mcp ->
                 val shape = when {
-                    servers.size == 1 -> RoundedCornerShape(26.dp)
-                    index == 0 -> RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)
-                    index == servers.lastIndex -> RoundedCornerShape(bottomStart = 26.dp, bottomEnd = 26.dp)
+                    servers.size == 1 -> RoundedCornerShape(OpenCodeRadius.panel)
+                    index == 0 -> RoundedCornerShape(topStart = OpenCodeRadius.panel, topEnd = OpenCodeRadius.panel)
+                    index == servers.lastIndex -> RoundedCornerShape(bottomStart = OpenCodeRadius.panel, bottomEnd = OpenCodeRadius.panel)
                     else -> RoundedCornerShape(0.dp)
                 }
                 // iOS `.animation(.spring(duration: 0.3, bounce: 0), value: servers)`.
@@ -304,13 +309,13 @@ private fun MCPServerTray(
             when (mcp.status) {
                 is OpenCodeMCPServer.Status.Failed -> mcp.errorText?.let { error ->
                     val red = SettingsTint.Red.color()
-                    val shape = RoundedCornerShape(16.dp)
+                    val shape = RoundedCornerShape(OpenCodeRadius.card)
                     SelectionContainer(
                         Modifier.fillMaxWidth().background(red.copy(alpha = 0.1f), shape).border(0.5.dp, red.copy(alpha = 0.25f), shape).padding(14.dp),
                     ) {
                         Text(
                             error,
-                            style = OpenCodeTextStyles.footnote.copy(fontFamily = FontFamily.Monospace),
+                            style = OpenCodeTextStyles.footnote.copy(fontFamily = OpenCodeFonts.monospace),
                             color = OpenCodeTheme.colors.text,
                         )
                     }
@@ -329,7 +334,7 @@ private fun MCPServerTray(
                 Spacer(Modifier.weight(1f))
                 Text(
                     mcp.name,
-                    style = OpenCodeTextStyles.subheadline.copy(fontFamily = FontFamily.Monospace),
+                    style = OpenCodeTextStyles.subheadline.copy(fontFamily = OpenCodeFonts.monospace),
                     color = OpenCodeTheme.colors.secondaryText,
                 )
             }
@@ -431,13 +436,10 @@ private fun SkillsTray(skills: List<OpenCodeAutocompleteSkill>, close: () -> Uni
     }
     Column(Modifier.fillMaxSize()) {
         TrayHeader("Skills", "${skills.size} on this server", close)
-        OutlinedTextField(
+        OpenCodeSearchField(
             value = query,
             onValueChange = { query = it },
-            placeholder = { Text("Search Skills") },
-            leadingIcon = { OpenCodeIcon(SFSymbol.Magnifyingglass, contentDescription = null) },
-            singleLine = true,
-            shape = CircleShape,
+            placeholder = "Search Skills",
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
         )
         if (shown.isEmpty()) {
@@ -447,9 +449,9 @@ private fun SkillsTray(skills: List<OpenCodeAutocompleteSkill>, close: () -> Uni
         LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)) {
             itemsIndexed(shown, key = { _, skill -> skill.id }) { index, skill ->
                 val shape = when {
-                    shown.size == 1 -> RoundedCornerShape(26.dp)
-                    index == 0 -> RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)
-                    index == shown.lastIndex -> RoundedCornerShape(bottomStart = 26.dp, bottomEnd = 26.dp)
+                    shown.size == 1 -> RoundedCornerShape(OpenCodeRadius.panel)
+                    index == 0 -> RoundedCornerShape(topStart = OpenCodeRadius.panel, topEnd = OpenCodeRadius.panel)
+                    index == shown.lastIndex -> RoundedCornerShape(bottomStart = OpenCodeRadius.panel, bottomEnd = OpenCodeRadius.panel)
                     else -> RoundedCornerShape(0.dp)
                 }
                 Column(Modifier.padding(horizontal = 16.dp).clip(shape).background(OpenCodeTheme.colors.groupedCard)) {
@@ -459,7 +461,7 @@ private fun SkillsTray(skills: List<OpenCodeAutocompleteSkill>, close: () -> Uni
                     ) {
                         Text(
                             skill.name,
-                            style = SettingsText.title.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium),
+                            style = SettingsText.title.copy(fontFamily = OpenCodeFonts.monospace, fontWeight = FontWeight.Medium),
                             color = OpenCodeTheme.colors.text,
                         )
                         val description = skill.description

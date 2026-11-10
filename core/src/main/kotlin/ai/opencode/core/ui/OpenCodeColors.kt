@@ -25,6 +25,11 @@ class OpenCodeColors(
     val theme: AppTheme,
     val isDark: Boolean,
     val highContrast: Boolean,
+    /**
+     * Hairlines draw in the strong border colour: Increase Contrast or Android's high-contrast
+     * text setting (desktop hairlines are under 3:1 against the canvas).
+     */
+    val strongBorders: Boolean,
     /** The raw palette, for swatches (`swatchCanvas`, `swatchRing`, `swatchAccent`) and contrast checks. */
     val variant: ThemeVariant,
     /** Plain backgrounds (iOS `systemBackground`). */
@@ -56,6 +61,11 @@ class OpenCodeColors(
     val sendButtonBackground: Color,
     val sendButtonForeground: Color,
     val link: Color,
+    /**
+     * Unread and new-item indicators (drawer dots, Catch Up). The desktop draws its unread dot
+     * in `--v2-background-bg-accent` (blue), not the neutral [accent]; this is the theme's link blue.
+     */
+    val signal: Color,
     val syntaxKeyword: Color,
     val syntaxString: Color,
     val syntaxNumber: Color,
@@ -67,6 +77,11 @@ class OpenCodeColors(
     val diffRemovedText: Color,
     /** Destructive roles only (iOS `systemRed`: delete, end call). */
     val destructive: Color,
+    /**
+     * Failure text and glyphs (a failed tool, a run error): the desktop's `--v2-state-fg-danger`,
+     * deeper than [destructive] in light and softer in dark. Not for fills behind white labels.
+     */
+    val danger: Color,
     private val bodyTextResolver: (Double) -> Color,
 ) {
     /**
@@ -87,7 +102,7 @@ class OpenCodeColors(
          * this uses their concrete values (the [ThemePalette.system] reference palette plus the
          * UIKit-only fills below).
          */
-        fun resolve(theme: AppTheme, isDark: Boolean, highContrast: Boolean = false): OpenCodeColors {
+        fun resolve(theme: AppTheme, isDark: Boolean, highContrast: Boolean = false, strongBorders: Boolean = highContrast): OpenCodeColors {
             val v = ThemePalette.definition(theme).variant(isDark)
             val system = theme == AppTheme.System
             val label = v.text
@@ -104,6 +119,7 @@ class OpenCodeColors(
                 theme = theme,
                 isDark = isDark,
                 highContrast = highContrast,
+                strongBorders = strongBorders || highContrast,
                 variant = v,
                 canvas = v.canvas.color,
                 groupedCanvas = (if (isDark) v.canvas else v.canvasWeak).color,
@@ -120,11 +136,12 @@ class OpenCodeColors(
                 secondaryText = (if (!system && highContrast) v.text else v.textWeak).color,
                 tertiaryText = (if (!system && highContrast) v.textWeak else v.textTertiary).color,
                 defaultBodyText = bodyResolver(0.92),
-                border = (if (!system && highContrast) v.borderStrong else v.border).color,
+                border = (if ((!system && highContrast) || strongBorders) v.borderStrong else v.border).color,
                 accent = v.accent.color,
                 sendButtonBackground = (if (system) label else v.accent).color,
                 sendButtonForeground = (if (system) v.canvas else v.accent.highContrastForeground).color,
                 link = v.link.color,
+                signal = v.link.color,
                 syntaxKeyword = v.syntaxKeyword.color,
                 syntaxString = v.syntaxString.color,
                 syntaxNumber = v.syntaxNumber.color,
@@ -135,6 +152,7 @@ class OpenCodeColors(
                 diffAddedText = (if (system) label else v.diffAddedText).color,
                 diffRemovedText = (if (system) label else v.diffRemovedText).color,
                 destructive = SystemColors.red(isDark).color,
+                danger = (if (system) SystemColors.red(isDark) else v.diffRemovedText).color,
                 bodyTextResolver = bodyResolver,
             )
         }
@@ -163,8 +181,7 @@ internal object SystemColors {
  * | secondaryContainer / onSecondaryContainer | surfaceStrong (secondary buttons) / text |
  * | tertiary / onTertiary | link / white (System) or the link's high-contrast foreground (themes) |
  * | background, surface, surfaceContainerLowest | canvas |
- * | surfaceContainerLow | canvasWeak (grouped canvas, light) |
- * | surfaceContainer | canvasWeak ↔ userBubble midpoint |
+ * | surfaceContainerLow, surfaceContainer | System: canvasWeak / canvasWeak ↔ userBubble midpoint; curated themes: the desktop's floating surface ([floating]: canvas in light, a raised step above the canvas in dark), so sheets, menus and tooltips are flat floating panels |
  * | surfaceContainerHigh, surfaceVariant | userBubble |
  * | surfaceContainerHighest | surfaceStrong |
  * | onSurface / onSurfaceVariant | text / secondary text |
@@ -181,9 +198,11 @@ fun OpenCodeColors.toColorScheme(): ColorScheme {
     val textRgba = if (!system && highContrast) v.textStrong else v.text
     val secondary = (if (!system && highContrast) v.text else v.textWeak).composited(canvas)
     val outline = v.borderStrong.composited(canvas)
-    val outlineVariant = (if (!system && highContrast) v.borderStrong else v.border).composited(canvas)
+    val outlineVariant = (if ((!system && highContrast) || strongBorders) v.borderStrong else v.border).composited(canvas)
     val error = if (system) SystemColors.red(isDark) else v.diffRemovedText
     val container = v.canvasWeak.mixedInOklab(v.userBubble, 0.5)
+    // Desktop floating surfaces (sheets, menus, popovers): white in light, a step up in dark.
+    val floatingSurface = if (isDark) v.darkFloatingFill() else canvas
     val primaryContainer = canvas.mixedInOklab(accent, 0.22)
     val errorContainer = (if (system) SystemColors.red(isDark).withAlpha(0.14) else v.glassDiffRemovedFill).composited(canvas)
     val surfaceBright = if (isDark) v.surfaceStrong else canvas
@@ -214,7 +233,8 @@ fun OpenCodeColors.toColorScheme(): ColorScheme {
         onSurface = textRgba.color,
         surfaceVariant = v.userBubble.color,
         onSurfaceVariant = secondary.color,
-        surfaceTint = accent.color,
+        // Flat surfaces (desktop): no tonal-elevation tint; depth comes from hairlines.
+        surfaceTint = Color.Transparent,
         inverseSurface = v.text.color,
         inverseOnSurface = canvas.color,
         error = error.color,
@@ -225,10 +245,10 @@ fun OpenCodeColors.toColorScheme(): ColorScheme {
         outlineVariant = outlineVariant.color,
         surfaceBright = surfaceBright.color,
         surfaceDim = surfaceDim.color,
-        surfaceContainer = container.color,
+        surfaceContainer = (if (system) container else floatingSurface).color,
         surfaceContainerHigh = v.userBubble.color,
         surfaceContainerHighest = v.surfaceStrong.color,
-        surfaceContainerLow = v.canvasWeak.color,
+        surfaceContainerLow = (if (system) v.canvasWeak else floatingSurface).color,
         surfaceContainerLowest = canvas.color,
         scrim = Color.Black,
     )

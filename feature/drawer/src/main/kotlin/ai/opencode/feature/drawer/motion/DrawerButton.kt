@@ -439,7 +439,7 @@ private fun DrawerButtonCapsule(
         label = "drawer-button-fill",
     )
     Surface(
-        shape = OpenCodeShape.capsule,
+        shape = OpenCodeShape.control,
         color = fill,
         contentColor = OpenCodeTheme.colors.text,
         modifier = widthModifier

@@ -30,7 +30,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -44,10 +44,10 @@ private val FocusLineBackground = Color(red = 1f, green = 0.8f, blue = 0f, alpha
 private val MaxUnwrappedWidth: Dp = 16_384.dp
 
 /** iOS `TranscriptMetrics.codeFont`: subheadline, monospaced. */
-private val NumberedCodeStyle: TextStyle = OpenCodeTextStyles.subheadline.copy(fontFamily = FontFamily.Monospace)
+private val NumberedCodeStyle: TextStyle = OpenCodeTextStyles.subheadline.copy(fontFamily = OpenCodeFonts.monospace)
 
 /** iOS `AgentTextDocument.codeUIFont`: footnote 13, monospaced. */
-private val LazyCodeStyle: TextStyle = OpenCodeTextStyles.footnote.copy(fontFamily = FontFamily.Monospace)
+private val LazyCodeStyle: TextStyle = OpenCodeTextStyles.footnote.copy(fontFamily = OpenCodeFonts.monospace)
 
 /**
  * Highlighted source with line numbers for small files, or a lazy unnumbered list of lines for

@@ -73,7 +73,7 @@ fun DrawerHeaderBackdrop(
     modifier: Modifier = Modifier,
     revealed: Float = 1f,
     scrollState: DrawerHeaderScrollState? = null,
-    background: Color = OpenCodeTheme.colors.canvas,
+    background: Color = OpenCodeTheme.colors.drawerCanvas,
 ) {
     Spacer(
         modifier
@@ -151,7 +151,7 @@ fun DrawerFooterBackdrop(
     reach: Dp,
     insetBottom: Dp,
     modifier: Modifier = Modifier,
-    background: Color = OpenCodeTheme.colors.canvas,
+    background: Color = OpenCodeTheme.colors.drawerCanvas,
 ) {
     Spacer(
         modifier

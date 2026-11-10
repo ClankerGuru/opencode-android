@@ -157,7 +157,7 @@ internal fun InboxSidebarList(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        OpenCodeIcon(SFSymbol.RectangleStack, contentDescription = null, tint = colors.accent)
+                        OpenCodeIcon(SFSymbol.RectangleStack, contentDescription = null, tint = colors.signal)
                         Text("Catch Up", style = OpenCodeTextStyles.body, color = colors.text, modifier = Modifier.weight(1f))
                         Text("$catchUpCount", style = OpenCodeTextStyles.body.copy(fontFeatureSettings = "tnum"), color = colors.secondaryText)
                     }
@@ -282,7 +282,7 @@ internal fun InboxSidebarRowView(row: InboxSidebarRow, now: Instant, modifier: M
             Modifier
                 .padding(top = 7.dp)
                 .size(8.dp)
-                .background(if (row.unread) colors.accent else Color.Transparent, CircleShape),
+                .background(if (row.unread) colors.signal else Color.Transparent, CircleShape),
         )
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             // iOS: Text + Spacer(minLength: 8) + age. The title takes all the width the age

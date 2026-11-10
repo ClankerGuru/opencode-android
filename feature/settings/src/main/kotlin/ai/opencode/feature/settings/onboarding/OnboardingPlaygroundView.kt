@@ -1,5 +1,9 @@
 package ai.opencode.feature.settings.onboarding
 
+import ai.opencode.core.ui.openCodeHairline
+import ai.opencode.core.ui.OpenCodeSurfaces
+import ai.opencode.core.ui.OpenCodeRadius
+import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.motion.transitionBlurEffect
 
 import ai.opencode.core.diagnostics.HidesFromScreenshots
@@ -193,6 +197,7 @@ fun OnboardingPlaygroundView(
                             FilledTonalButton(
                                 onClick = { store.send(Action.ControlsHiddenChanged(false)) },
                                 modifier = Modifier.heightIn(min = 48.dp).widthIn(min = 64.dp),
+                                shape = OpenCodeShape.control,
                             ) {
                                 OpenCodeIcon(SFSymbol.ChevronUp, contentDescription = "Show Controls", size = OpenCodeIconSize.small)
                             }
@@ -427,9 +432,10 @@ private fun Camera(on: Boolean, send: (Action) -> Unit) {
                 Entrance(on, 2) {
                     Text(
                         "opencode pair --remote",
-                        style = OpenCodeTextStyles.callout.copy(fontFamily = OpenCodeFonts.berkeleyMono, fontSize = 15.sp),
+                        style = OpenCodeTextStyles.callout.copy(fontFamily = OpenCodeFonts.monospace, fontSize = 15.sp),
                         modifier = Modifier
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(8.dp))
+                            .background(OpenCodeSurfaces.neutralFill, OpenCodeShape.control)
+                            .openCodeHairline(OpenCodeShape.control)
                             .padding(horizontal = 10.dp, vertical = 6.dp),
                     )
                 }
@@ -479,7 +485,7 @@ private fun Connected(on: Boolean, send: (Action) -> Unit) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Entrance(on, 0) {
                     Box(
-                        Modifier.size(56.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape),
+                        Modifier.size(56.dp).background(OpenCodeSurfaces.neutralFill, CircleShape).openCodeHairline(CircleShape),
                         contentAlignment = Alignment.Center,
                     ) {
                         OpenCodeIcon(SFSymbol.Checkmark, contentDescription = null, size = OpenCodeIconSize.large)
@@ -685,7 +691,7 @@ private fun ApertureLayer(
     val shownTarget = phase == Phase.camera || phase == Phase.waiting
     val shown = animateFloatAsState(if (shownTarget) 1f else 0f, OnboardingMotion.layout(reduceMotion), label = "aperture")
     val waiting = animateFloatAsState(if (phase == Phase.waiting) 1f else 0f, OnboardingMotion.layout(reduceMotion), label = "found")
-    val shape = RoundedCornerShape(32.dp)
+    val shape = RoundedCornerShape(OpenCodeRadius.panel)
     val density = LocalDensity.current.density
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         Box(
@@ -796,14 +802,15 @@ private fun FirstSessionPage(
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = 52.dp)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(26.dp))
+                    .background(OpenCodeSurfaces.color, RoundedCornerShape(OpenCodeRadius.panel))
+                    .openCodeHairline(RoundedCornerShape(OpenCodeRadius.panel))
                     .padding(start = 18.dp, end = 8.dp)
                     .semantics(mergeDescendants = true) { contentDescription = "Message" },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("Ask anything…", color = secondary(), modifier = Modifier.weight(1f))
                 Box(
-                    Modifier.size(36.dp).background(OpenCodeTheme.colors.tertiaryText, CircleShape),
+                    Modifier.size(36.dp).background(OpenCodeTheme.colors.tertiaryText, OpenCodeShape.control),
                     contentAlignment = Alignment.Center,
                 ) {
                     OpenCodeIcon(SFSymbol.ArrowUp, contentDescription = null, size = OpenCodeIconSize.small, tint = OpenCodeTheme.colors.canvas)
@@ -840,6 +847,7 @@ private fun PrimaryButton(title: String, active: Boolean, onClick: () -> Unit) {
             disabledContentColor = content,
         ),
         contentPadding = OpenCodeButtonDefaults.contentPadding,
+        shape = OpenCodeShape.control,
     ) { Text(title, style = OpenCodeTextStyles.headline) }
 }
 
@@ -852,19 +860,25 @@ private fun SecondaryButton(title: String, active: Boolean, onClick: () -> Unit)
         modifier = Modifier.fillMaxWidth().heightIn(min = OpenCodeButtonDefaults.height),
         colors = colors.copy(disabledContainerColor = colors.containerColor, disabledContentColor = colors.contentColor),
         contentPadding = OpenCodeButtonDefaults.contentPadding,
+        shape = OpenCodeShape.control,
     ) { Text(title, style = OpenCodeTextStyles.headline) }
 }
 
-/** iOS's large circular glass icon button; off (without dimming) while its page is inactive. */
+/**
+ * iOS's large circular glass icon button, drawn as the desktop's icon button (a rounded square
+ * with a hairline, like `OpenCodeIconButton(style = Circle)`); off (without dimming) while its
+ * page is inactive.
+ */
 @Composable
 private fun CircleIconButton(symbol: SFSymbol, label: String, active: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val container = MaterialTheme.colorScheme.surfaceContainerHighest
+    val container = OpenCodeSurfaces.neutralFill
     val content = OpenCodeTheme.colors.text
+    val shape = RoundedCornerShape(OpenCodeRadius.card)
     FilledTonalIconButton(
         onClick = onClick,
         enabled = active,
-        modifier = modifier.size(48.dp),
-        shape = CircleShape,
+        modifier = modifier.size(48.dp).openCodeHairline(shape),
+        shape = shape,
         colors = IconButtonDefaults.filledTonalIconButtonColors(
             containerColor = container,
             contentColor = content,

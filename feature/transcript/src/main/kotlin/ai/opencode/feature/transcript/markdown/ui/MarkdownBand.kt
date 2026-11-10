@@ -3,11 +3,11 @@ package ai.opencode.feature.transcript.markdown.ui
 import ai.opencode.core.ui.OpenCodeColors
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.drawerPanHorizontalScroller
-import ai.opencode.feature.transcript.LocalTranscriptLayoutTuning
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,10 +15,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -33,10 +35,21 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import ai.opencode.core.motion.Motion
 
-/** What every transcript band shares: code, tables, and opened inline rows (iOS `TranscriptBandStyle`). */
+/**
+ * What every transcript band shares: code, tables, and opened inline rows. On this branch a band
+ * is the desktop's inset block (`markdown.css` `.highlights`, `message-part.css` tool output): a
+ * faint fill inside a hairline border with small rounded corners, at the prose's width rather
+ * than iOS's full-bleed band between hairlines.
+ */
 object TranscriptBandStyle {
-    /** From a hairline to the content's first line box. */
+    /** From the border to the content's first line box. */
     val verticalPadding: Dp = 12.dp
+
+    /** The content's inset from the border (desktop `padding: 12px`). */
+    val horizontalPadding: Dp = 12.dp
+
+    /** Desktop `--radius-md`-ish block corners. */
+    val cornerRadius: Dp = 8.dp
 
     fun fill(colors: OpenCodeColors): Color = colors.codeBand
 }
@@ -100,9 +113,8 @@ class TableRules {
 }
 
 /**
- * Code and tables run the screen's full width on a faint band between hairlines (iOS
- * `MarkdownBand`). Content starts at the prose edge and scrolls out to the screen edges,
- * fading where more lies past them. A table's rules keep the viewport's width while its
+ * Code and tables sit in the desktop's inset block (iOS draws a full-width `MarkdownBand`).
+ * Content scrolls horizontally inside the block, fading where more lies past it. A table's rules keep the viewport's width while its
  * columns scroll underneath.
  */
 @Composable
@@ -112,15 +124,16 @@ fun MarkdownBand(
     content: @Composable () -> Unit,
 ) {
     val colors = OpenCodeTheme.colors
-    val gutter = LocalTranscriptLayoutTuning.current.contentGutter.dp
     val scroll = rememberScrollState()
     val hairline = with(LocalDensity.current) { 1f.toDp() }
-    Column(modifier.bleedHorizontal(gutter)) {
-        HairlineRule()
+    Column(modifier) {
+        val shape = RoundedCornerShape(TranscriptBandStyle.cornerRadius)
         Box(
             Modifier
                 .fillMaxWidth()
+                .clip(shape)
                 .background(TranscriptBandStyle.fill(colors))
+                .border(hairline, colors.border, shape)
                 .padding(vertical = TranscriptBandStyle.verticalPadding)
                 .drawWithContent {
                     drawContent()
@@ -140,9 +153,8 @@ fun MarkdownBand(
                     .drawerPanHorizontalScroller(scroll)
                     .horizontalOverflowFade(scroll, width = 32.dp)
                     .horizontalScroll(scroll)
-                    .padding(horizontal = gutter),
+                    .padding(horizontal = TranscriptBandStyle.horizontalPadding),
             ) { content() }
         }
-        HairlineRule()
     }
 }

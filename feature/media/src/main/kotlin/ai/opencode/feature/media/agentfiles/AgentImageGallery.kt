@@ -56,7 +56,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTag
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -734,7 +734,7 @@ fun AgentImageStatusCard(file: AgentFileReference, status: AgentImageStatusCard.
             )
             Text(
                 file.path,
-                style = OpenCodeTextStyles.caption1.copy(fontFamily = FontFamily.Monospace),
+                style = OpenCodeTextStyles.caption1.copy(fontFamily = OpenCodeFonts.monospace),
                 color = if (notFound) colors.tertiaryText else colors.secondaryText,
                 maxLines = 1,
                 overflow = TextOverflow.MiddleEllipsis,

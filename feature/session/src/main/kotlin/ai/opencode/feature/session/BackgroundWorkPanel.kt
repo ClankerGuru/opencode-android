@@ -1,5 +1,7 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.ui.openCodeHairline
+import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.diagnostics.LabMarks
 import ai.opencode.core.haptics.Haptic
@@ -396,7 +398,7 @@ fun BackgroundWorkGlyph(
 
 // MARK: Presentation
 
-/** The surface's shape: the panel's 28 dp corners, never more than half its height (iOS `GlassGeometry.radius`). */
+/** The surface's shape: the panel's corners ([BackgroundWorkMotion.panelRadius]), never more than half its height (iOS `GlassGeometry.radius`). */
 private class BackgroundWorkShape(private val radius: Float) : Shape {
     override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
         val r = min(max(0f, radius * density.density), max(0f, size.height) / 2)
@@ -765,7 +767,7 @@ fun BackgroundWorkPresentation(
         val hidden = isCovered
         val hiddenAlpha by androidx.compose.animation.core.animateFloatAsState(if (hidden) 0f else 1f, Motion.reducedFadeSpec(), label = "hidden")
         val summary = BackgroundWorkSummary.summary(rowAgents, rowShells)
-        val surfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        val surfaceColor = OpenCodeSurfaces.color
         val shape = remember { BackgroundWorkShape(BackgroundWorkMotion.panelRadius) }
 
         val nestedScroll = remember(isScrollable) {
@@ -826,9 +828,10 @@ fun BackgroundWorkPresentation(
                     val dy = if (stage == BackgroundWorkStage.closed && progress.value == 0f && composedTop != null && now != null) now.y - composedTop else 0f
                     if (dy == 0f) drawContent() else translate(top = dy) { this@drawWithContent.drawContent() }
                 }
-                .shadow(if (isPanel) 6.dp else 2.dp, shape, clip = false)
+                .shadow(if (isPanel) OpenCodeSurfaces.popoverShadow else OpenCodeSurfaces.raisedShadow, shape, clip = false)
                 .clip(shape)
                 .background(surfaceColor)
+                .openCodeHairline(shape)
                 .then(if (hidden) Modifier.clearAndSetSemantics { } else Modifier),
         ) {
             // The capsule's label, a button while the surface is at rest. Kept composed under the open

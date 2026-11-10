@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.rememberReduceMotion
@@ -20,6 +21,7 @@ import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.TwoWayConverter
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -176,10 +178,10 @@ object AttachmentMenuMotion {
 
 /** iOS `AttachmentMenuMetrics` (points → dp). */
 object AttachmentMenuMetrics {
-    /** The composer's, so the menu and the card read as the same surface. */
-    val cornerRadius: Dp = 28.dp
-    /** Between the panel's edge and its rows; the highlight is concentric. */
-    val padding: Dp = 6.dp
+    /** The composer's, so the menu and the card read as the same surface (the desktop dock's 12). */
+    val cornerRadius: Dp = 12.dp
+    /** Between the panel's edge and its rows; the highlight is concentric (desktop context menu: 4). */
+    val padding: Dp = 4.dp
     /** Between the composer's top edge and the menu's or card's bottom edge. */
     val composerGap: Dp = 10.dp
     val minimumWidth: Dp = 210.dp
@@ -231,7 +233,8 @@ object PlusMenuTunables {
     const val MENU_DROP = 80f
     /** The menu's width, × the screen's. */
     const val MENU_WIDTH = 0.63f
-    const val MENU_RADIUS = 28f
+    /** The open menu's corners: the desktop popover radius (`OpenCodeRadius.card`), as on the session’s ⋮ menu. */
+    const val MENU_RADIUS = 10f
     const val MENU_ROW_HEIGHT = 56f
     /** The menu's leading edge in from the composer's. */
     const val MENU_INSET = 0f
@@ -369,14 +372,15 @@ private fun AttachmentMenuRowLabel(item: AttachmentMenuItem, iconWidth: Dp, inse
                 .width(iconWidth)
                 .then(
                     if (circularIcon) {
-                        Modifier.height(iconWidth).background(MaterialTheme.colorScheme.surfaceContainerHighest, androidx.compose.foundation.shape.CircleShape)
+                        // Desktop context menus draw bare glyphs, no discs.
+                        Modifier.height(iconWidth)
                     } else Modifier,
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            OpenCodeIcon(item.systemImage, contentDescription = null, tint = OpenCodeTheme.colors.text)
+            OpenCodeIcon(item.systemImage, contentDescription = null, size = 20.dp, tint = OpenCodeTheme.colors.secondaryText)
         }
-        Text(item.title, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text, maxLines = 1)
+        Text(item.title, style = OpenCodeTextStyles.callout.copy(fontWeight = FontWeight.Medium), color = OpenCodeTheme.colors.text, maxLines = 1)
         Spacer(Modifier.width(24.dp))
     }
 }
@@ -853,7 +857,7 @@ internal fun attachmentMenuFrames(
 
 /** The card's colour: what the cover fades in and out as (iOS `SystemPasteControl.glass`, the panel's opaque colour). */
 @Composable
-private fun panelColor(): androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.surfaceContainer
+private fun panelColor(): androidx.compose.ui.graphics.Color = OpenCodeTheme.colors.let { if (it.isDark) it.codeBand else it.canvas }
 
 @Composable
 private fun AttachmentMenuPanel(
@@ -883,8 +887,9 @@ private fun AttachmentMenuPanel(
             ),
         shape = shape,
         color = panelColor(),
-        tonalElevation = 3.dp,
-        shadowElevation = 6.dp,
+        // The desktop popover: flat fill, hairline ring, soft shadow (`--shadow-md`).
+        border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
+        shadowElevation = 4.dp,
     ) {
         Box(Modifier.fillMaxSize().clip(shape)) { content() }
     }
@@ -1074,7 +1079,7 @@ private fun CardControls(
                 Row(
                     Modifier
                         .heightIn(min = header)
-                        .clip(RoundedCornerShape(percent = 50))
+                        .clip(OpenCodeShape.control)
                         .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                         .then(
                             if (interactive) {

@@ -143,9 +143,10 @@ private val missing = OpenCodeClientError(message = "Missing", statusCode = 404)
  */
 class BackgroundWorkTests {
     @Test fun glassRadiusFitsCapsuleAndPanelThroughoutMorph() {
-        // The 44 pt target contains 34 pt of glass: its end caps are 17, not 28.
+        // The 44 pt target contains 34 pt of surface. Android diverges from iOS on purpose: the
+        // desktop's 12 dp corners fit it whole (iOS's 28 clamps to 17 end caps).
         val capsuleHeight = 44f - 2 * BackgroundWorkMotion.capsuleInset
-        assertEquals(17f, OpenCodeShapeGeometry.radius(BackgroundWorkMotion.panelRadius, capsuleHeight))
+        assertEquals(12f, OpenCodeShapeGeometry.radius(BackgroundWorkMotion.panelRadius, capsuleHeight))
         assertEquals(BackgroundWorkMotion.panelRadius, OpenCodeShapeGeometry.radius(BackgroundWorkMotion.panelRadius, 160f))
         var height = 0f
         while (height <= 320f) {

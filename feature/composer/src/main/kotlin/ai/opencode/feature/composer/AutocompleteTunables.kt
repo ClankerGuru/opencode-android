@@ -86,8 +86,8 @@ object ComposerAutocompleteTunables {
     /** `composer.autocomplete.reduceFade` "Reduce Motion fade (s)" (0.1…0.4). */
     const val reduceFade = 0.18
 
-    /** iOS `ComposerTunables.cornerRadius` (`composer.size.cornerRadius`), the glass the highlight sits concentric in. */
-    const val composerCornerRadius = 28.0
+    /** `ComposerTunables.cornerRadius` (the desktop dock's 12; iOS 28), the surface the highlight sits concentric in. */
+    const val composerCornerRadius = 12.0
 
     /** An iOS `TuningPreset`: a name and the parameters it sets (everything else resets to default). */
     data class Preset(val name: String, val apply: (AutocompleteParameters) -> AutocompleteParameters)

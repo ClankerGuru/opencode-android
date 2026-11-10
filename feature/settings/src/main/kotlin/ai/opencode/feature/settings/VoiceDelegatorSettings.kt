@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings
 
+import ai.opencode.core.ui.OpenCodeSearchField
 import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -18,7 +19,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import ai.opencode.core.store.observe
 import androidx.compose.runtime.Composable
@@ -181,13 +181,11 @@ internal fun VoiceDelegatorSettingsPage(store: SettingsStore) {
             val server = state.connectedServer
             if (server != null) {
                 item(key = "search") {
-                    OutlinedTextField(
+                    OpenCodeSearchField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
+                        placeholder = "Filter sessions",
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                        placeholder = { Text("Filter sessions") },
-                        leadingIcon = { OpenCodeIcon(SFSymbol.Magnifyingglass, contentDescription = null, size = 18.dp) },
-                        singleLine = true,
                     )
                 }
                 settingsSection(

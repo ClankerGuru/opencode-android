@@ -92,7 +92,7 @@ import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
@@ -705,7 +705,7 @@ private fun DetailSiteLine(summary: LinkPreviewSummary, palette: LinkPreviewPale
             // Only a SHA changes face, and it keeps the caption's size.
             Text(
                 reference,
-                style = if (summary.referenceIsCode) style.copy(fontFamily = FontFamily.Monospace) else style,
+                style = if (summary.referenceIsCode) style.copy(fontFamily = OpenCodeFonts.monospace) else style,
                 color = palette.tertiary,
                 maxLines = 1,
                 softWrap = false,

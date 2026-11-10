@@ -1,12 +1,13 @@
 package ai.opencode.feature.settings
 
+import ai.opencode.core.ui.OpenCodeTopBar
+import ai.opencode.core.ui.OpenCodeTopBarBackButton
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.ui.AppTheme
 import ai.opencode.core.ui.AppearanceColorScheme
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeRadius
-import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.ThemeDefinition
@@ -35,16 +36,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -63,7 +61,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontFamily
+import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
@@ -172,14 +170,11 @@ fun ThemesSettingsView(store: SettingsStore) {
     Scaffold(
         containerColor = colors.groupedCanvas,
         topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("Themes", style = OpenCodeTextStyles.headline, modifier = Modifier.semantics { heading() }) },
-                navigationIcon = {
-                    IconButton(onClick = { store.send(SettingsFeature.Action.BackTapped) }) {
-                        OpenCodeIcon(SFSymbol.ChevronBackward, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = canvas),
+            OpenCodeTopBar(
+                title = { Text("Themes", modifier = Modifier.semantics { heading() }) },
+                navigation = { OpenCodeTopBarBackButton(onClick = { store.send(SettingsFeature.Action.BackTapped) }) },
+                centerTitle = true,
+                containerColor = canvas,
             )
         },
     ) { padding ->
@@ -420,7 +415,7 @@ private const val PreviewMaxFontScale = 19f / 17f
 @Composable
 private fun ImitationTranscriptPreview(theme: AppTheme, isDark: Boolean) {
     val v = rememberThemeDefinition(theme).variant(isDark)
-    val mono = FontFamily.Monospace
+    val mono = OpenCodeFonts.monospace
     Column(
         Modifier
             .fillMaxWidth()
