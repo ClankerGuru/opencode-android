@@ -267,7 +267,7 @@ object OpenCodeTextFieldDefaults {
         return OpenCodeTextFieldColors(
             container = container,
             border = border,
-            focusedBorder = scheme.primary,
+            focusedBorder = colors.focusRing,
             error = scheme.error,
             text = colors.text,
             label = colors.secondaryText,

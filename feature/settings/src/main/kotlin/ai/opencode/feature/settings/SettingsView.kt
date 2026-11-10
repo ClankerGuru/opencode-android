@@ -49,6 +49,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
@@ -279,64 +280,67 @@ private fun SettingsRootPage(store: SettingsStore) {
         store.send(SettingsFeature.Action.PagePushed(page))
     }
 
-    SettingsPageScaffold(title = "Settings", store = store) {
-        item(key = "connection", contentType = "connection") {
-            ConnectionCard(
-                store,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                onOpen = { returnFocus.opened(SettingsPage.Server) },
-                focusRequest = returnFocus.request(SettingsPage.Server),
-            )
-        }
-        // Preferences: Appearance, Sessions, Models, Voice and Notifications.
-        settingsSection(key = "preferences") {
-            SettingsRow("Appearance", "paintpalette.fill", SettingsTint.Purple, value = appTheme.title, modifier = returnFocus.on(SettingsPage.Appearance)) {
-                push(SettingsPage.Appearance)
+    // The main page keeps its icons, as the desktop's settings sidebar does.
+    CompositionLocalProvider(LocalSettingsRowIcons provides true) {
+        SettingsPageScaffold(title = "Settings", store = store) {
+            item(key = "connection", contentType = "connection") {
+                ConnectionCard(
+                    store,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    onOpen = { returnFocus.opened(SettingsPage.Server) },
+                    focusRequest = returnFocus.request(SettingsPage.Server),
+                )
             }
-            SettingsDivider(inset = true)
-            SettingsRow("Sessions", "bubble.left.fill", SettingsTint.Blue, modifier = returnFocus.on(SettingsPage.Sessions)) { push(SettingsPage.Sessions) }
-            if (ExperimentalFeature.hideModels.isActive(hideModels)) {
-                SettingsDivider(inset = true)
-                SettingsRow("Models", "cpu", SettingsTint.Teal, modifier = returnFocus.on(SettingsPage.Models)) { push(SettingsPage.Models) }
-            }
-            SettingsDivider(inset = true)
-            SettingsRow("Voice", "waveform", SettingsTint.Indigo, value = if (voiceModeEnabled) "On" else "Off", modifier = returnFocus.on(SettingsPage.Voice)) {
-                push(SettingsPage.Voice)
-            }
-            notificationPermission?.let { permission ->
-                SettingsDivider(inset = true)
-                SettingsRow(
-                    "Notifications",
-                    "bell.badge.fill",
-                    SettingsTint.Red,
-                    value = if (permission == NotificationPermission.Enabled) "On" else "Off",
-                    modifier = returnFocus.on(SettingsPage.Notifications),
-                ) { push(SettingsPage.Notifications) }
-            }
-        }
-        settingsSection(key = "whats-new") {
-            SettingsRow("What’s New", "sparkles", SettingsTint.Orange, modifier = returnFocus.on(SettingsPage.WhatsNew)) { push(SettingsPage.WhatsNew) }
-        }
-        settingsSection(
-            key = "experimental",
-            footer = {
-                SettingsFooterText("Unfinished features, diagnostics, and live tuning.")
-                // iOS stacks the footer's lines 14 apart; the footer column already spaces them 6.
-                SelectionContainer(Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                    Text(
-                        AppVersion.current.label,
-                        style = OpenCodeTextStyles.footnote.copy(fontFeatureSettings = "tnum"),
-                        color = OpenCodeTheme.colors.secondaryText,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+            // Preferences: Appearance, Sessions, Models, Voice and Notifications.
+            settingsSection(key = "preferences") {
+                SettingsRow("Appearance", "paintpalette.fill", SettingsTint.Purple, value = appTheme.title, modifier = returnFocus.on(SettingsPage.Appearance)) {
+                    push(SettingsPage.Appearance)
                 }
-            },
-        ) {
-            ExperimentalSettingsRow(returnFocus.on(SettingsPage.Experimental())) { push(SettingsPage.Experimental()) }
-            SettingsDivider(inset = true)
-            SettingsRow("Developer", "hammer.fill", SettingsTint.Teal, value = if (developerMode) "On" else "Off", modifier = returnFocus.on(SettingsPage.Developer)) {
-                push(SettingsPage.Developer)
+                SettingsDivider(inset = true)
+                SettingsRow("Sessions", "bubble.left.fill", SettingsTint.Blue, modifier = returnFocus.on(SettingsPage.Sessions)) { push(SettingsPage.Sessions) }
+                if (ExperimentalFeature.hideModels.isActive(hideModels)) {
+                    SettingsDivider(inset = true)
+                    SettingsRow("Models", "cpu", SettingsTint.Teal, modifier = returnFocus.on(SettingsPage.Models)) { push(SettingsPage.Models) }
+                }
+                SettingsDivider(inset = true)
+                SettingsRow("Voice", "waveform", SettingsTint.Indigo, value = if (voiceModeEnabled) "On" else "Off", modifier = returnFocus.on(SettingsPage.Voice)) {
+                    push(SettingsPage.Voice)
+                }
+                notificationPermission?.let { permission ->
+                    SettingsDivider(inset = true)
+                    SettingsRow(
+                        "Notifications",
+                        "bell.badge.fill",
+                        SettingsTint.Red,
+                        value = if (permission == NotificationPermission.Enabled) "On" else "Off",
+                        modifier = returnFocus.on(SettingsPage.Notifications),
+                    ) { push(SettingsPage.Notifications) }
+                }
+            }
+            settingsSection(key = "whats-new") {
+                SettingsRow("What’s New", "sparkles", SettingsTint.Orange, modifier = returnFocus.on(SettingsPage.WhatsNew)) { push(SettingsPage.WhatsNew) }
+            }
+            settingsSection(
+                key = "experimental",
+                footer = {
+                    SettingsFooterText("Unfinished features, diagnostics, and live tuning.")
+                    // iOS stacks the footer's lines 14 apart; the footer column already spaces them 6.
+                    SelectionContainer(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                        Text(
+                            AppVersion.current.label,
+                            style = OpenCodeTextStyles.footnote.copy(fontFeatureSettings = "tnum"),
+                            color = OpenCodeTheme.colors.secondaryText,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                },
+            ) {
+                ExperimentalSettingsRow(returnFocus.on(SettingsPage.Experimental())) { push(SettingsPage.Experimental()) }
+                SettingsDivider(inset = true)
+                SettingsRow("Developer", "hammer.fill", SettingsTint.Teal, value = if (developerMode) "On" else "Off", modifier = returnFocus.on(SettingsPage.Developer)) {
+                    push(SettingsPage.Developer)
+                }
             }
         }
     }

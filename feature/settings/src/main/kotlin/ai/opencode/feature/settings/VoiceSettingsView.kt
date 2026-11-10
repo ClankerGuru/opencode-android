@@ -405,7 +405,7 @@ private fun VoiceRow(
                 SFSymbol.Checkmark,
                 contentDescription = null,
                 size = 20.dp,
-                tint = if (isSelected) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent,
+                tint = if (isSelected) OpenCodeTheme.colors.selection else androidx.compose.ui.graphics.Color.Transparent,
             )
         }
         val accent = MaterialTheme.colorScheme.primary

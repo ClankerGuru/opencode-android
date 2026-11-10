@@ -66,6 +66,21 @@ class OpenCodeColors(
      * in `--v2-background-bg-accent` (blue), not the neutral [accent]; this is the theme's link blue.
      */
     val signal: Color,
+    /**
+     * Fill for on and selected controls: switch tracks, selected segments, radio and checkmark
+     * marks, slider tracks. The desktop's `--v2-background-bg-accent` (blue-600) in the OpenCode
+     * theme, the theme's own accent elsewhere. Never for primary buttons or text.
+     */
+    val selection: Color,
+    /** Content drawn on [selection]: a switch thumb, a check inside a filled radio. */
+    val onSelection: Color,
+    /** Focus ring on text and search fields (desktop `--v2-border-border-focus`, blue-500). */
+    val focusRing: Color,
+    /**
+     * Hairline between rows inside a card (desktop `--v2-border-border-base`: black or white at
+     * 10%), so it reads on [groupedCard] in light and dark. The strong border under Increase Contrast.
+     */
+    val rowDivider: Color,
     val syntaxKeyword: Color,
     val syntaxString: Color,
     val syntaxNumber: Color,
@@ -142,6 +157,22 @@ class OpenCodeColors(
                 sendButtonForeground = (if (system) v.canvas else v.accent.highContrastForeground).color,
                 link = v.link.color,
                 signal = v.link.color,
+                selection = when {
+                    theme == AppTheme.OpenCode -> DesktopAccent.bgAccent
+                    system -> v.link.color
+                    else -> v.accent.color
+                },
+                onSelection = if (theme == AppTheme.OpenCode || system) Color.White else v.accent.highContrastForeground.color,
+                focusRing = when {
+                    theme == AppTheme.OpenCode -> DesktopAccent.borderFocus
+                    system -> v.link.color
+                    else -> v.accent.color
+                },
+                rowDivider = when {
+                    (!system && highContrast) || strongBorders -> v.borderStrong.color
+                    isDark -> DesktopAccent.borderBaseDark
+                    else -> DesktopAccent.borderBaseLight
+                },
                 syntaxKeyword = v.syntaxKeyword.color,
                 syntaxString = v.syntaxString.color,
                 syntaxNumber = v.syntaxNumber.color,
@@ -157,6 +188,19 @@ class OpenCodeColors(
             )
         }
     }
+}
+
+/** Exact desktop tokens (`packages/ui/src/styles/tokens/theme.css`), the same in light and dark. */
+internal object DesktopAccent {
+    /** `--v2-background-bg-accent`: blue-600. */
+    val bgAccent = Color(0xFF3B5CF6)
+
+    /** `--v2-border-border-focus`: blue-500. */
+    val borderFocus = Color(0xFF7698FD)
+
+    /** `--v2-border-border-base`: black at 10% (light), white at 10% (dark). */
+    val borderBaseLight = Color(0x1A000000)
+    val borderBaseDark = Color(0x1AFFFFFF)
 }
 
 /** UIKit system colours the iOS System theme reads that have no field in [ThemeVariant]. */

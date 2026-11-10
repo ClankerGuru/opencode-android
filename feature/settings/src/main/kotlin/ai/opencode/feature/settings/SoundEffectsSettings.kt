@@ -52,6 +52,7 @@ fun SoundEffectsSettingsRows(send: (HomeSettingsFeature.Action) -> Unit) {
                 onValueChange = { send(HomeSettingsFeature.Action.SoundEffectsVolumeChanged((it * 10).roundToInt() / 10.0)) },
                 valueRange = 0f..1f,
                 steps = 9,
+                colors = settingsSliderColors(),
                 modifier = Modifier
                     .weight(1f)
                     .semantics {

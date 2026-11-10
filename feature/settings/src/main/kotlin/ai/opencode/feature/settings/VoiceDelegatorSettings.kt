@@ -260,7 +260,7 @@ private fun ModeRow(
             contentDescription = null,
             modifier = Modifier.alpha(if (isSelected) 1f else 0f),
             size = 18.dp,
-            tint = OpenCodeTheme.colors.accent,
+            tint = OpenCodeTheme.colors.selection,
         )
     }
 }

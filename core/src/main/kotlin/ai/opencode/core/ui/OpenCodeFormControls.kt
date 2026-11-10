@@ -154,8 +154,9 @@ private fun switchColors(): SwitchColors {
     val lightThumb = if (colors.isDark) colors.secondaryText else scheme.surfaceContainerLowest
     val edge = if (colors.isDark) Color.Transparent else Color.Black.copy(alpha = 0.10f)
     return SwitchColors(
-        checkedTrack = scheme.primary,
-        checkedThumb = scheme.onPrimary,
+        // On is the desktop's accent fill with a white thumb (`switch.css` checked state).
+        checkedTrack = colors.selection,
+        checkedThumb = colors.onSelection,
         uncheckedTrack = scheme.surfaceContainerHighest,
         uncheckedBorder = outline,
         uncheckedThumb = lightThumb,
