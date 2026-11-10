@@ -71,6 +71,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -82,6 +83,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import ai.opencode.core.ui.OpenCodeAlertDialog
@@ -105,8 +107,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
@@ -328,6 +333,11 @@ fun SessionView(
                     transcriptPlaced = { scrollEdgeBridge.hasPlacedTranscript },
                     modifier = Modifier.align(Alignment.TopCenter),
                 )
+                SessionBottomScrollEdge(
+                    composerHeight = { scrollEdgeBridge.composerHeight },
+                    clearance = if (onCatchUpOpen == null) 0f else CATCH_UP_COMPOSER_CLEARANCE,
+                    modifier = Modifier.matchParentSize(),
+                )
                 // Behind the composer, so its × stays reachable: a tap anywhere else or a downward
                 // drag dismisses the menu, or Composer Autocomplete's suggestions.
                 if (!isInertPreview) {
@@ -422,6 +432,40 @@ fun SessionView(
 
 /** iOS `CatchUpMetrics.composerClearance.bottom`. */
 internal const val CATCH_UP_COMPOSER_CLEARANCE = 12f
+
+/**
+ * The soft bottom edge behind the floating composer (iOS's soft scroll edge under its bottom
+ * bar): rows fade into the canvas just above the composer, so nothing shows around its rounded
+ * corners, beside it or under the navigation bar. A plain canvas gradient, the bottom
+ * counterpart of [SessionHeaderBackdrop]'s bar. It takes no touches and is hidden from TalkBack;
+ * the composer's height is read in the draw phase.
+ */
+@Composable
+private fun SessionBottomScrollEdge(composerHeight: () -> Float, clearance: Float, modifier: Modifier) {
+    val canvas = OpenCodeTheme.colors.canvas
+    val obstruction = WindowInsets.ime.union(WindowInsets.navigationBars).inContainer()
+    Spacer(
+        modifier
+            .clearAndSetSemantics {}
+            .drawBehind {
+                val composerTop = size.height - obstruction.getBottom(this) - (clearance + composerHeight()).dp.toPx()
+                if (composerHeight() <= 0f || composerTop <= 0f) return@drawBehind
+                val fadeTop = (composerTop - BOTTOM_EDGE_FADE_ABOVE.dp.toPx()).coerceAtLeast(0f)
+                val solidTop = composerTop + BOTTOM_EDGE_FADE_BELOW.dp.toPx()
+                drawRect(
+                    brush = Brush.verticalGradient(listOf(canvas.copy(alpha = 0f), canvas), startY = fadeTop, endY = solidTop),
+                    topLeft = Offset(0f, fadeTop),
+                    size = Size(size.width, size.height - fadeTop),
+                )
+            },
+    )
+}
+
+/** How far above the composer's top the bottom edge starts to fade in (dp). */
+private const val BOTTOM_EDGE_FADE_ABOVE = 20f
+
+/** How far below the composer's top the bottom edge is solid canvas, past its corners (dp). */
+private const val BOTTOM_EDGE_FADE_BELOW = 16f
 
 
 /** What the background-work panel reads from the session. */
