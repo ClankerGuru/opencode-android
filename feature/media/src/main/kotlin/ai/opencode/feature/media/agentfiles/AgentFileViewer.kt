@@ -1,6 +1,7 @@
 package ai.opencode.feature.media
 
 import ai.opencode.core.ui.OpenCodeTopBar
+import ai.opencode.core.ui.OpenCodeTopBarBackButton
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
@@ -254,7 +255,7 @@ private fun AgentFilePageContent(
                     if (isRoot) {
                         TextButton(onClick = onDone, modifier = Modifier.testTag("agent-file-done")) { Text("Done") }
                     } else {
-                        IconButton(onClick = onBack) { OpenCodeIcon("chevron.left", contentDescription = "Back") }
+                        OpenCodeTopBarBackButton(onClick = onBack)
                     }
                 },
                 actions = {
