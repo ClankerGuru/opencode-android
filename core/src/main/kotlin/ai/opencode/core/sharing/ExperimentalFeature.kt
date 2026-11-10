@@ -48,7 +48,7 @@ enum class ExperimentalFeature(
 
     // Calls
     backgroundCallIntent(
-        "background-call-intent", "Background Action Button Call", ExperimentalGroup.calls, "button.programmable",
+        "background-call-intent", "Background Call Shortcut", ExperimentalGroup.calls, "button.programmable",
         "Calls start without opening the app",
         // Starts the microphone with the app in the background.
         joinsAll = false,
@@ -64,8 +64,8 @@ enum class ExperimentalFeature(
     // Drawer
     inboxSidebar("inbox-sidebar", "Inbox Sidebar", ExperimentalGroup.drawer, "tray"),
     sessionLiveActivity(
-        "session-live-activity", "Session Live Activity", ExperimentalGroup.drawer, "platter.filled.top.iphone",
-        "Follow runs on the Lock Screen",
+        "session-live-activity", "Session Live Updates", ExperimentalGroup.drawer, "platter.filled.top.iphone",
+        "Follow runs in a live notification",
     ),
     soundEffects("sound-effects", "Sound Effects", ExperimentalGroup.drawer, "speaker.wave.2.fill", "Soft sounds for replies and requests"),
 

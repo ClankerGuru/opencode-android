@@ -18,7 +18,7 @@ internal val WhatsNewShipped.callVoice: WhatsNewEntry
             "Ask for any session by name: Voice opens it and starts or steers work there.",
             "Talk over it to interrupt, or ask how the work is going.",
             "Tap the call bar for live captions.",
-            "Mute and End from the Lock Screen and the Dynamic Island.",
+            "Mute and End from the call’s notification, on the Lock Screen too.",
             "Touch and hold Stop to call while the agent works.",
             "Choose a voice in Settings → Voice.",
         ),
