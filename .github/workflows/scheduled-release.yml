@@ -3,7 +3,7 @@ name: Scheduled release
 # Cuts a GitHub Release of main at noon and 6 p.m. Central, as the iOS app does
 # (opencode-ios scheduled-release.yml), then starts the Android workflow on its v* tag,
 # which ships to Google Play internal and open testing (docs/releasing.md). Skips when
-# main has nothing new since the last release.
+# main has nothing new since the last release or its commit hasn't passed CI.
 on:
   schedule:
     # GitHub cron is UTC. These cover noon and 6 p.m. in both CST and CDT;
@@ -46,6 +46,13 @@ jobs:
           sha=$(git rev-parse HEAD)
           if git tag --points-at "$sha" | grep -q '^v'; then
             echo "main ($sha) is already released as $(git tag --points-at "$sha" | grep '^v' | head -1); skipping."
+            exit 0
+          fi
+          # Only release a commit whose push run on main passed (android.yml then skips
+          # scripts/check.sh on the tag). A run still going retries at the next release time.
+          status=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow android.yml --branch main --event push --commit "$sha" --json conclusion --jq '.[0].conclusion')
+          if [ "$status" != success ]; then
+            echo "main ($sha) hasn't passed android.yml (latest run: ${status:-none or still running}); skipping."
             exit 0
           fi
           tag="v$(scripts/version.sh "$sha")"
