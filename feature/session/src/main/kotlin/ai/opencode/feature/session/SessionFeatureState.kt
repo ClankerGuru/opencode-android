@@ -108,7 +108,7 @@ val State.foregroundWork: State.ForegroundWork?
             if (item !is OpenCodeTranscriptItem.Tool) continue
             val call = item.call
             if (call.messageID == null || call.status != OpenCodeToolCall.Status.Running) continue
-            if (!(call.isShell || call.name == "subagent" || call.name == "task")) continue
+            if (!call.isShell) continue
             return State.ForegroundWork(item.id, call.startedAt)
         }
         return null

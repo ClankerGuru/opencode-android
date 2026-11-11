@@ -187,7 +187,7 @@ data class OpenCodeClient(
     val shellOutput: suspend (server: OpenCodeServer, directory: String, shellID: String, cursor: Int, limit: Int) -> OpenCodeShellOutputPage,
     /** Terminates the shell and discards its retained output. */
     val stopShell: suspend (server: OpenCodeServer, directory: String, shellID: String) -> Unit,
-    /** Moves the session's blocking shell and subagent tools into background observation. */
+    /** Moves the session's blocking shells to the background. */
     val moveToBackground: suspend (server: OpenCodeServer, sessionID: String) -> Unit,
     val viewSession: suspend (server: OpenCodeServer, sessionID: String, idle: Long) -> Unit,
     /** Reads the session's newest messages for the context the last reply filled. */

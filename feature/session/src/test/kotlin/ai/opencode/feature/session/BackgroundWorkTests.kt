@@ -259,7 +259,7 @@ class BackgroundWorkTests {
         store.finish()
     }
 
-    @Test fun serverStartTimeShortensTheWaitAndSubagentsQualify() = sessionTest { h ->
+    @Test fun serverStartTimeShortensTheWaitForAShell() = sessionTest { h ->
         val clock = TestClock()
         val now = Instant.ofEpochSecond(1_800_000_000)
         val state = h.state().copy(isExternallyActive = true, offersManualMoveToBackground = true)
@@ -267,13 +267,12 @@ class BackgroundWorkTests {
             this[Clock] = clock
             this[DateClient] = DateClient.constant(now)
         }
-        val subagent = runningTool(name = "subagent", startedAt = now.minusMillis(2_500))
-        show(listOf(subagent), store)
+        show(listOf(runningTool(startedAt = now.minusMillis(2_500))), store)
         clock.advance(500.milliseconds)
         store.receive(Action.BackgroundHintElapsed("msg_a-tool-call_1")) { it.copy(movableWorkKey = "msg_a-tool-call_1") }
 
         // A refresh that only learns the start time keeps the offer up.
-        val refreshed = runningTool(name = "subagent", startedAt = now.minusSeconds(10))
+        val refreshed = runningTool(startedAt = now.minusSeconds(10))
         show(listOf(refreshed), store)
         assertTrue(store.state.showsMoveToBackground)
     }
@@ -291,7 +290,7 @@ class BackgroundWorkTests {
 
         val read = runningTool(name = "read")
         show(listOf(read), store)
-        assertNull("Only shells and subagents can move", store.state.foregroundWork)
+        assertNull("Only shells can move", store.state.foregroundWork)
 
         val idle = h.state(cachedItems = listOf(runningTool())).copy(isExternallyActive = false)
         assertNull("An idle session has nothing blocking it", idle.foregroundWork)
@@ -456,10 +455,14 @@ class BackgroundWorkTests {
         assertTrue(store.state.showsMoveToBackground)
     }
 
-    @Test fun steeringWithNonShellOrSubagentToolDoesNotMoveToBackground() = sessionTest { h ->
+    @Test fun steeringWithNonShellToolDoesNotMoveToBackground() {
+        for (name in listOf("read", "subagent", "task")) steeringWithNonShellToolDoesNotMoveToBackground(name)
+    }
+
+    private fun steeringWithNonShellToolDoesNotMoveToBackground(name: String) = sessionTest { h ->
         val clock = TestClock()
         val now = Instant.ofEpochSecond(1_800_000_000)
-        val state = h.state(cachedItems = listOf(runningTool(name = "read", startedAt = now.minusSeconds(10)))).copy(
+        val state = h.state(cachedItems = listOf(runningTool(name = name, startedAt = now.minusSeconds(10)))).copy(
             isExternallyActive = true,
             draft = "Also check the header",
         )
@@ -477,6 +480,7 @@ class BackgroundWorkTests {
             )
         }
         store.exhaustive = false
+        assertNull("Only shells can block a steer: $name", store.state.foregroundWork)
         store.send(Action.SendTapped)
         store.receive(Action.PromptAdmitted::class)
         assertEquals(listOf("prompt:ses_bg:steer:Also check the header"), calls.value)

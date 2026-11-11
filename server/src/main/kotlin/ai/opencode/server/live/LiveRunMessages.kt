@@ -87,9 +87,13 @@ private class RunMessagePayload(
         }
         val launches = parts.mapNotNull { part ->
             if (part.type != "tool" || (part.name != "subagent" && part.name != "task")) return@mapNotNull null
-            if (part.input?.obj?.get("background") != OpenCodeJSONValue.Bool(true)) return@mapNotNull null
+            val input = part.input?.obj
+            if (input?.get("notify") == OpenCodeJSONValue.Bool(false)) return@mapNotNull null
+            val running = part.metadata?.get("status")?.string == "running"
+            val legacyBackground = input?.get("background") == OpenCodeJSONValue.Bool(true)
+            if (!running && !legacyBackground) return@mapNotNull null
             val sessionID = part.metadata?.get("sessionID")?.string ?: return@mapNotNull null
-            OpenCodeRunMessage.Launch(sessionID, part.input?.obj?.get("description")?.string)
+            OpenCodeRunMessage.Launch(sessionID, input?.get("description")?.string)
         }
         val toolCalls = parts.withIndex().mapNotNull { (index, part) ->
             val name = part.name
