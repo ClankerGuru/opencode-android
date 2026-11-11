@@ -241,6 +241,33 @@ class AppFeatureTests {
     }
 
     @Test
+    fun pairingRedemptionPrefersTheCodesAddressesAndKeepsReportedOnesAsFallbacks() = runTest {
+        val tunnel = "https://k7f3m2qz9x.opentunnel.dev"
+        val fixture = WireFixture { request ->
+            when (request.route) {
+                "GET /auth/connect/synth_code_2" -> Reply.Json(200, """{"token":"1790000000.synthetic_token_signature"}""")
+                "GET /api/info" -> Reply.Json(
+                    200,
+                    """{"version":"2.0.0","pid":1,"urls":["http://127.0.0.1:4096","http://192.168.1.10:4096","$tunnel/"],"paths":{"tmp":"/tmp"}}""",
+                )
+                else -> Reply.status(404)
+            }
+        }
+        try {
+            // `opencode pair --url <address>`: the code lists only the address the person chose.
+            val link = OpenCodePairingLink.decode("""{"code":"synth_code_2","urls":["${fixture.server.url}"]}""")
+            val server = OpenCodeClient.liveValue.redeemPairing(link!!)
+            assertEquals(fixture.server.url, server.url)
+            assertEquals(listOf(fixture.server.url), server.preferredURLs)
+            assertEquals("Reported addresses stay as fallbacks, without loopback", listOf("http://192.168.1.10:4096", tunnel), server.alternateURLs)
+            // The fixture's name is an internet address, so the LAN one isn't held back; the tunnel is.
+            assertEquals(listOf(fixture.server.url, "http://192.168.1.10:4096"), server.firstAttemptURLs)
+        } finally {
+            fixture.close()
+        }
+    }
+
+    @Test
     fun pairingRedemptionRejectsRedirectsWhileOrdinaryRequestsFollowRedirectsAsBefore() = runTest {
         val redirectTarget = WireFixture(scheme = "https") { Reply.Json(200, """{"token":"1790000000.redirected_token_signature"}""") }
         val targetURL = redirectTarget.server.url

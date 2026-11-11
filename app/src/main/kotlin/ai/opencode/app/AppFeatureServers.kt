@@ -70,6 +70,7 @@ internal fun beginNewServer(state: AppFeature.State): AppFeature.State {
         username = "opencode",
         password = "",
         alternateURLs = emptyList(),
+        preferredURLs = emptyList(),
         serverName = "",
         headers = emptyList(),
     )

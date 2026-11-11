@@ -114,6 +114,8 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         val editingSavedServer: OpenCodeServer? = null,
         /** Addresses discovered from a pairing code, tried alongside `serverURL`. */
         val alternateURLs: List<String> = emptyList(),
+        /** The pairing code's own addresses, preferred over the others (`OpenCodeServer.preferredURLs`). */
+        val preferredURLs: List<String> = emptyList(),
         val isScanningPairingCode: Boolean = false,
         val pendingPairing: PendingPairing? = null,
         val ignoredPendingPairingCount: Int = 0,
@@ -176,6 +178,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                         val headerName = header.name.trim()
                         if (headerName.isEmpty()) null else OpenCodeServer.Header(headerName, header.value.trim())
                     },
+                    preferredURLs = preferredURLs,
                 )
             }
 
@@ -194,7 +197,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                 if (address.isEmpty()) return "Optional"
                 var target = server.copy(name = null, url = address)
                 val original = editingSavedServer
-                if (original != null && address != original.url) target = target.copy(alternateURLs = emptyList())
+                if (original != null && address != original.url) target = target.copy(alternateURLs = emptyList(), preferredURLs = emptyList())
                 return target.friendlyName
             }
 
@@ -243,6 +246,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
             username = server.username,
             password = server.password,
             alternateURLs = server.alternateURLs,
+            preferredURLs = server.preferredURLs,
             serverName = server.name ?: "",
             headers = server.headers,
         )
@@ -693,7 +697,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         val original = next.editingSavedServer
         // A changed address replaces the old one; stale pairing alternates must not silently
         // reconnect to the address the user just edited.
-        if (original != null && next.serverURL != original.url) next = next.copy(alternateURLs = emptyList())
+        if (original != null && next.serverURL != original.url) next = next.copy(alternateURLs = emptyList(), preferredURLs = emptyList())
         next = next.copy(manualEntryDraft = next.server)
         // A server added from the drawer is switched to like a saved one; an edit of the server
         // in use reconnects it, which ends its Home first.

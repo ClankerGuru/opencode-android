@@ -24,6 +24,7 @@ import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
@@ -425,17 +426,31 @@ class ServerLinkStore(
         const val failuresBeforeForgetting = 2
 
         /**
-         * Every address at once; the first that answers as this server wins and the rest are
-         * cancelled, so no slower attempt keeps a socket open. Saved order doesn't matter: a LAN
+         * A pairing code's own addresses ([OpenCodeServer.preferredCandidateURLs]) get this long to
+         * answer before the server's other addresses are tried too. A reachable server answers in
+         * well under a second, even through a relay; an address that's away costs this much more.
+         */
+        val preferredHeadStart: Duration = 1.5.seconds
+
+        /**
+         * [OpenCodeServer.firstAttemptURLs] (the pairing code's own addresses) at once, then, once
+         * they have all failed or had [preferredHeadStart] to answer, every other address too; the first that answers as this
+         * server wins and the rest are cancelled, so no slower attempt keeps a socket open. So an
+         * address the code listed (`opencode pair --url`'s) is used when it answers, even when
+         * another the server reported (its OpenTunnel address) would answer sooner. Without
+         * preferred addresses every address starts at once and saved order doesn't matter: a LAN
          * address saved first can't hold up a tunnel address that answers sooner. With no winner,
          * a refused sign-in (401) beats an unreachable address, since retrying can't fix it.
          */
         suspend fun race(server: OpenCodeServer, health: suspend (OpenCodeServer) -> Unit): RaceOutcome {
             val candidates = server.candidateURLs
+            val first = server.firstAttemptURLs
+            val later = candidates.filter { it !in first }
             val started = Clock.liveValue.now()
             val result: Result<OpenCodeServer> = coroutineScope {
-                val outcomes = Channel<Result<OpenCodeServer>>(Channel.UNLIMITED)
-                for (url in candidates) {
+                // A null outcome: the preferred addresses' head start is over.
+                val outcomes = Channel<Result<OpenCodeServer>?>(Channel.UNLIMITED)
+                fun attempt(url: String) {
                     val candidate = server.at(url)
                     launch {
                         val outcome = try {
@@ -447,9 +462,36 @@ class ServerLinkStore(
                         outcomes.send(outcome)
                     }
                 }
+                for (url in first) attempt(url)
+                var headStart: Job? = null
+                if (later.isNotEmpty()) {
+                    headStart = launch {
+                        delay(preferredHeadStart)
+                        outcomes.send(null)
+                    }
+                }
+                var waiting = first.size
+                var laterStarted = later.isEmpty()
                 val failures = mutableListOf<OpenCodeClientError>()
-                repeat(candidates.size) {
+                while (waiting > 0 || !laterStarted) {
+                    if (!laterStarted && waiting == 0) {
+                        // Every preferred address failed before its head start was over.
+                        headStart?.cancel()
+                        for (url in later) attempt(url)
+                        waiting += later.size
+                        laterStarted = true
+                        continue
+                    }
                     val outcome = outcomes.receive()
+                    if (outcome == null) {
+                        if (!laterStarted) {
+                            for (url in later) attempt(url)
+                            waiting += later.size
+                            laterStarted = true
+                        }
+                        continue
+                    }
+                    waiting -= 1
                     if (outcome.isSuccess) {
                         coroutineContext.cancelChildren()
                         return@coroutineScope outcome
