@@ -5,7 +5,6 @@ import ai.opencode.core.motion.transitionBlur
 
 import ai.opencode.core.tuning.Tunable
 import ai.opencode.core.ui.LocalDrawerKeyboardSignals
-import ai.opencode.core.ui.bottomSafeArea
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.foundation.layout.Box
@@ -14,6 +13,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imeAnimationSource
 import androidx.compose.foundation.layout.imeAnimationTarget
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
@@ -106,17 +106,10 @@ class ComposerKeyboardProgress internal constructor(
             val excluded = excluded.value
             val active = isActive.value
             val bottom = navigation.getBottom(density).toFloat()
-            val keys = ime.getBottom(density)
-            val height = max(0f, keys - bottom)
-            if (keys == target.getBottom(density) && height > 0f) {
-                // Up and resting on their target: fully up, whatever an older source says (Android-only:
-                // HyperOS can leave a source taller than the keys, which shrank the gap above them).
-                travel = height
-            } else {
-                val full = max(source.getBottom(density), target.getBottom(density)) - bottom
-                if (full > 0f) travel = full
-                if (travel <= 1f && height > 0f) travel = height
-            }
+            val height = max(0f, ime.getBottom(density) - bottom)
+            val full = max(source.getBottom(density), target.getBottom(density)) - bottom
+            if (full > 0f) travel = full
+            if (travel <= 1f && height > 0f) travel = height
             if (!active) return held
             val next = if (travel > 1f && !excluded) (height / travel).coerceIn(0f, 1f) else 0f
             held = next
@@ -148,7 +141,7 @@ fun rememberComposerKeyboardProgress(): ComposerKeyboardProgress {
     val ime = WindowInsets.ime
     val source = WindowInsets.imeAnimationSource
     val target = WindowInsets.imeAnimationTarget
-    val navigation = WindowInsets.bottomSafeArea
+    val navigation = WindowInsets.navigationBars
     return remember(ime, source, target, navigation) {
         ComposerKeyboardProgress(density, isActive, excluded, ime, source, target, navigation)
     }

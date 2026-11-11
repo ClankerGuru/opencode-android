@@ -1,7 +1,6 @@
 package ai.opencode.feature.session
 
 import ai.opencode.core.ui.OpenCodeSheetHandleDefaults
-import ai.opencode.core.ui.bottomSafeArea
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.rememberReduceMotion

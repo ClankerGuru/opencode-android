@@ -3,7 +3,6 @@ package ai.opencode.feature.composer
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.rememberReduceMotion
-import ai.opencode.core.ui.bottomSafeArea
 import ai.opencode.feature.composer.modelpicker.ModelPickerTunables
 import ai.opencode.feature.composer.plusmenu.PhotoFlights
 import ai.opencode.feature.composer.plusmenu.PhotoLibraryAccessHost
@@ -17,6 +16,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -85,7 +85,7 @@ fun ComposerMorphPhotoSheet(
     val px = density.density
     val scope = rememberCoroutineScope()
     val imeBottom = WindowInsets.ime.getBottom(density)
-    val navigationBottom = WindowInsets.bottomSafeArea.getBottom(density)
+    val navigationBottom = WindowInsets.navigationBars.getBottom(density)
 
     // Detent state in root dp; [displayTop] is its top as drawn (iOS animates `photoSheetDetent`).
     var detent by remember { mutableStateOf(PlusPhotoSheetDetent()) }

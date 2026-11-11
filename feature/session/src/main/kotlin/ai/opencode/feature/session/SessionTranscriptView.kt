@@ -12,7 +12,6 @@ import ai.opencode.core.motion.transitionBlurEffect
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.core.ui.OpenCodeIcon
-import ai.opencode.core.ui.bottomSafeArea
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.ProviderIcon
 import ai.opencode.core.ui.SFSymbol

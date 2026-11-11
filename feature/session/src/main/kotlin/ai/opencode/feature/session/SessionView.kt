@@ -2,7 +2,6 @@
 
 package ai.opencode.feature.session
 
-import ai.opencode.core.ui.bottomSafeArea
 import ai.opencode.core.ui.inContainer
 import ai.opencode.feature.composer.composerWindowTouches
 import ai.opencode.core.dependencies.dependency
@@ -79,9 +78,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import ai.opencode.core.ui.OpenCodeAlertDialog
@@ -429,6 +430,13 @@ fun SessionView(
 
 /** iOS `CatchUpMetrics.composerClearance.bottom`. */
 internal const val CATCH_UP_COMPOSER_CLEARANCE = 12f
+
+/**
+ * What the composer rests on: the navigation bar, but at least 8 dp. Android-only: some phones
+ * (HyperOS with the gesture hint hidden) report a 0 navigation bar, where iOS always has a safe area.
+ */
+internal val WindowInsets.Companion.bottomSafeArea: WindowInsets
+    @Composable get() = navigationBars.union(WindowInsets(bottom = 8.dp))
 
 /**
  * The soft bottom edge behind the floating composer (iOS's soft scroll edge under its bottom
