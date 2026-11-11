@@ -54,13 +54,14 @@ class SessionFeatureTestsRendering {
     @Test
     fun restPageDuringStreamPreservesUnsettledAssistantRowsWithoutDuplicatingEchoes() {
         val user = user("msg_user", "First prompt")
-        val liveText = assistant("msg_reply-text-0", "Still typing")
+        val liveText = assistant("msg_reply-text-0", "Still typing").copy(inProgress = true)
         val liveTool = OpenCodeTranscriptItem.Tool(id = "msg_reply-tool-call", call = toolCall("shell"))
-        val existing = listOf(user, liveText, liveTool)
+        val obsolete = assistant("msg_reply-text-1", "Removed on server")
+        val existing = listOf(user, liveText, liveTool, obsolete)
 
         // A queued second prompt can trigger a page read before these ephemeral
         // parts have durable REST values. Neither the answer nor its tool vanishes.
-        assertEquals(existing, SessionFeature.mergeTranscript(fetched = listOf(user), existing = existing, projectedMessageIDs = setOf("msg_reply")))
+        assertEquals(listOf(user, liveText, liveTool), SessionFeature.mergeTranscript(fetched = listOf(user), existing = existing, projectedMessageIDs = setOf("msg_reply")))
 
         // Once REST echoes text, it replaces the SSE part exactly once, while an
         // unpersisted tool stays projected until the message settles.
@@ -126,7 +127,7 @@ class SessionFeatureTestsRendering {
     @Test
     fun androidDivergenceEmptyCompletePageKeepsOnlyPendingAndProtectedRows() = sessionTest { h ->
         val stale = user("old", "Cached")
-        val live = assistant("msg_reply-text-0", "Streaming")
+        val live = assistant("msg_reply-text-0", "Streaming").copy(inProgress = true)
         val pending = user("msg_pending", "Sending")
         val state = h.makeState(cachedItems = listOf(stale, live, pending), isRunning = true).copy(
             optimisticPromptIDs = setOf(pending.id), projectedMessageIDs = setOf("msg_reply"),

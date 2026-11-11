@@ -43,8 +43,9 @@ internal fun SessionFeature.Companion.mergeTranscript(
     echoedPromptIDs: Set<String> = emptySet(),
     pendingNoticeIDs: Set<String> = emptySet(),
     complete: Boolean = false,
+    preserveInProgressText: Boolean = projectedMessageIDs.isNotEmpty(),
 ): List<OpenCodeTranscriptItem> {
-    if (!complete && fetched.isEmpty()) return existing
+    if (!complete && fetched.isEmpty()) return if (preserveInProgressText) existing else existing.filterNot { it.isInProgressText }
     val windowIDs = fetched.mapTo(HashSet(fetched.size)) { it.id }
     fun isOptimistic(item: OpenCodeTranscriptItem): Boolean =
         optimisticPromptIDs.isNotEmpty() && TranscriptEntry.promptID(item)?.let { it in optimisticPromptIDs } == true
@@ -60,7 +61,9 @@ internal fun SessionFeature.Companion.mergeTranscript(
         if (sameWindow) {
             for (index in 0 until prefixCount) {
                 val item = existing[index]
-                if (item.id in windowIDs || item.id.startsWith("info-") || isOptimistic(item)) { sameWindow = false; break }
+                if (item.id in windowIDs || item.id.startsWith("info-") || isOptimistic(item) ||
+                    (item.isInProgressText && !preserveInProgressText)
+                ) { sameWindow = false; break }
             }
         }
         if (sameWindow) return existing
@@ -74,16 +77,19 @@ internal fun SessionFeature.Companion.mergeTranscript(
     val trailing = ArrayList<OpenCodeTranscriptItem>()
     val retainedIDs = HashSet<String>()
     var hasServerRows = false
-    val protectedMessages = projectedMessageIDs + echoedPromptIDs
     // Classify once. Only the overlapping suffix can contain unpersisted parts; don't build two
     // full-history arrays and then filter them again.
     for ((index, item) in existing.withIndex()) {
         if (item.id in windowIDs) {
             hasServerRows = true
         } else if (index >= (windowStart ?: 0) &&
-            (item.id in pendingNoticeIDs || (protectedMessages.isNotEmpty() && messageID(item) in protectedMessages))
+            ((preserveInProgressText && item.isInProgressText) || item.id in pendingNoticeIDs ||
+                (item !is OpenCodeTranscriptItem.AssistantMarkdown && projectedMessageIDs.isNotEmpty() && messageID(item) in projectedMessageIDs) ||
+                (echoedPromptIDs.isNotEmpty() && messageID(item) in echoedPromptIDs))
         ) {
             retainedIDs += item.id
+        } else if (item.isInProgressText && !preserveInProgressText) {
+            continue
         } else if (item.id.startsWith("info-") || isOptimistic(item)) {
             trailing += item
         } else {
@@ -163,6 +169,23 @@ internal fun SessionFeature.Companion.mergeTranscript(
     buckets[merged.size]?.let(result::addAll)
     result += trailing
     return result
+}
+
+/** A replacement read keeps only omitted streaming text, in order among the fetched rows. */
+fun SessionFeature.Companion.preservingInProgressText(
+    fetched: List<OpenCodeTranscriptItem>, existing: List<OpenCodeTranscriptItem>,
+): List<OpenCodeTranscriptItem> {
+    if (existing.none { it.isInProgressText }) return fetched
+    val ids = fetched.mapTo(HashSet()) { it.id }
+    val anchorsAndText = existing.filter { it.id in ids || it.isInProgressText }
+    return mergeTranscript(fetched, anchorsAndText, complete = true, preserveInProgressText = true)
+}
+
+/** A REST text part has reached its durable boundary. Drop its raw SSE prefix, even for a first read. */
+internal fun SessionFeature.State.settlingText(fetched: List<OpenCodeTranscriptItem>): SessionFeature.State {
+    if (liveText.isEmpty()) return this
+    val settled = fetched.mapNotNull { (it as? OpenCodeTranscriptItem.AssistantMarkdown)?.id?.takeIf(liveText::containsKey) }
+    return if (settled.isEmpty()) this else copy(liveText = liveText - settled)
 }
 
 /** iOS `SessionFeature.messageID(for:)`: the server message an item belongs to. */
@@ -791,29 +814,35 @@ private fun SessionFeature.applyLiveEvent(event: OpenCodeLiveContentEvent, proje
     when (event) {
         is OpenCodeLiveContentEvent.TextStarted -> {
             val id = "${event.messageID}-text-${event.ordinal}"
-            projection.liveText[id] = projection.liveText[id] ?: ""
+            if (projection.items.indexOfLast { it.id == id } < 0) projection.liveText.putIfAbsent(id, "")
             null
         }
         is OpenCodeLiveContentEvent.TextDelta -> {
             val id = "${event.messageID}-text-${event.ordinal}"
             // A row with no accumulator streamed before a gap (a reconnect, or a stream that shed
             // this part's deltas): the deltas it missed are gone, so appending would lose text from
-            // its middle and starting from "" would shrink it to its tail. It stays as it is until
-            // its text ends with the whole text.
-            val text = event.accumulatedText ?: projection.liveText[id]?.let { it + event.delta }
-                ?: event.delta.takeIf { projection.items.none { row -> row.id == id } }
+            // its middle and starting from "" would shrink it to its tail. Wait for a complete prefix or end.
+            val index = projection.items.indexOfLast { it.id == id }
+            val text = when {
+                index >= 0 && !projection.items[index].isInProgressText -> null // Already settled.
+                event.accumulatedText != null -> event.accumulatedText
+                id in projection.liveText -> projection.liveText.getValue(id) + event.delta
+                index < 0 -> event.delta
+                else -> null
+            }
             if (text == null) {
                 null
             } else {
                 projection.liveText[id] = text
-                projection.upsertText(upsertLiveTextChange(id, text, streaming = true, items = projection.items), id)
+                projection.upsertText(upsertLiveTextChange(id, index, text, streaming = true, items = projection.items), id)
             }
         }
         is OpenCodeLiveContentEvent.TextEnded -> {
             val id = "${event.messageID}-text-${event.ordinal}"
-            val insertedID = projection.upsertText(upsertLiveTextChange(id, event.text, items = projection.items), id)
+            val index = projection.items.indexOfLast { it.id == id }
             projection.liveText.remove(id)
-            insertedID
+            if (index >= 0 && !projection.items[index].isInProgressText) null
+            else projection.upsertText(upsertLiveTextChange(id, index, event.text, items = projection.items), id)
         }
         is OpenCodeLiveContentEvent.ToolInputStarted ->
             upsertLiveTool(event.messageID, event.toolID, OpenCodeJSONValue.Str(""), projection) { call ->
@@ -871,26 +900,18 @@ internal enum class LiveUpsert { Unchanged, Replaced, Inserted }
  * iOS `upsertLiveText(id:text:streaming:in:)`. [streaming] text is still arriving: a last line
  * holding only a block's marker waits for its first word (`holdingPendingMarker`). iOS projects
  * Markdown blocks here (`markdownStream.blocks`); the Android item carries its text and the
- * transcript parses it. True when [items] changed.
+ * transcript parses it.
  */
-internal fun SessionFeature.upsertLiveText(
+private fun SessionFeature.upsertLiveTextChange(
     id: String,
-    text: String,
-    streaming: Boolean = false,
-    items: MutableList<OpenCodeTranscriptItem>,
-): Boolean = upsertLiveTextChange(id, text, streaming, items) != LiveUpsert.Unchanged
-
-/** [upsertLiveText], saying whether it inserted the row (iOS returns the inserted ID). */
-internal fun SessionFeature.upsertLiveTextChange(
-    id: String,
+    index: Int,
     text: String,
     streaming: Boolean = false,
     items: MutableList<OpenCodeTranscriptItem>,
 ): LiveUpsert {
     val shown = if (streaming) OpenCodeMarkdownBlock.holdingPendingMarker(text) else text
     if (shown.isBlank()) return LiveUpsert.Unchanged
-    val index = items.indexOfLast { it.id == id }
-    val item = OpenCodeTranscriptItem.AssistantMarkdown(id = id, text = shown)
+    val item = OpenCodeTranscriptItem.AssistantMarkdown(id = id, text = shown, inProgress = streaming)
     if (index >= 0) {
         if (items[index] == item) return LiveUpsert.Unchanged
         items[index] = item

@@ -50,6 +50,38 @@ class SessionFeatureTestsResume {
     private fun isAccepted(action: Action) = action is Action.AcceptedTranscriptUpdated
 
     @Test
+    fun settledRESTPartWinsOverBufferedTextAcrossReadPaths() = sessionTest { h ->
+        val session = testSession(id = "ses_ahead", title = "REST ahead")
+        val rows = listOf(assistant("msg_reply-text-0", "First and final words"))
+        val response = { scope: SessionFeature.AuthoritativeRefresh.Scope ->
+            Action.RefreshResponse(session.id, 1, Result.success(SessionFeature.AuthoritativeRefresh(observed = session, items = rows, scope = scope)))
+        }
+        for (read in listOf(
+            Action.TranscriptResponse(session.id, Result.success(rows)), response(page),
+            response(SessionFeature.AuthoritativeRefresh.Scope.Message("msg_reply")),
+            Action.EarlierHistoryResponse(session.id, 0, "cursor", Result.success(OpenCodeTranscriptPage(rows, null))),
+        )) {
+            val store = h.store(h.makeState(session = session, isRunning = true).copy(
+                refresh = State.Refresh(id = 1, reason = RefreshReason.Reconnect),
+                earlierHistory = State.EarlierHistory.Loading("cursor", true),
+            ))
+            store.exhaustive = false
+            val start = OpenCodeLiveContentEvent.TextStarted("msg_reply", 0)
+            store.send(Action.ContentBatch(session.id, listOf(start, OpenCodeLiveContentEvent.TextDelta("msg_reply", 0, "First"))))
+            store.send(read)
+            assertEquals(rows, store.state.items)
+            assertTrue(store.state.liveText.isEmpty())
+            store.send(Action.ContentBatch(session.id, listOf(start,
+                OpenCodeLiveContentEvent.TextDelta("msg_reply", 0, " and", accumulatedText = "First and"),
+                OpenCodeLiveContentEvent.TextDelta("msg_reply", 0, " and"),
+                OpenCodeLiveContentEvent.TextEnded("msg_reply", 0, "Older boundary"),
+            )))
+            assertEquals(rows, store.state.items)
+            assertTrue(store.state.liveText.isEmpty())
+        }
+    }
+
+    @Test
     fun sessionOpenedMidReplyKeepsPrefixAcrossFirstHistoryRead() = sessionTest { h ->
         val session = testSession(id = "ses_late", title = "Late open")
         val id = "msg_reply-text-0"
@@ -78,7 +110,7 @@ class SessionFeatureTestsResume {
             store.send(Action.ContentBatch(session.id, delivered.toList()))
             if (!historyFirst) store.send(history)
             // The stream is held here, before its end can repair a suffix-only row.
-            assertEquals(listOf(prompt, whole), store.state.items)
+            assertEquals(listOf(prompt, whole.copy(inProgress = true)), store.state.items)
             delivered.clear()
             flush(OpenCodeLiveContentEvent.TextEnded("msg_reply", 0, prefix + tail))
             store.send(Action.ContentBatch(session.id, delivered.toList()))
@@ -89,7 +121,7 @@ class SessionFeatureTestsResume {
     @Test
     fun streamGapRejectsPreGapReadAndReconnectRefetchesWithoutDuplicatingText() = sessionTest { h ->
         val session = testSession(id = "ses_gap", title = "Gap")
-        val partial = assistant("msg_reply-text-0", "Hello")
+        val partial = assistant("msg_reply-text-0", "Hello").copy(inProgress = true)
         val complete = assistant("msg_reply-text-0", "Hello world")
         val state = h.makeState(session = session, cachedItems = listOf(partial)).copy(
             streamIsHealthy = true,
@@ -146,7 +178,7 @@ class SessionFeatureTestsResume {
     fun reconnectMidReplyKeepsTheRowUntilItsTextEnds() = sessionTest { h ->
         val session = testSession(id = "ses_gap", title = "Gap")
         val id = "msg_reply-text-0"
-        val shown = assistant(id, "The first half of a long")
+        val shown = assistant(id, "The first half of a long").copy(inProgress = true)
         val whole = assistant(id, "The first half of a long reply, and its end.")
         val ended = OpenCodeLiveContentEvent.TextEnded(messageID = "msg_reply", ordinal = 0, text = "The first half of a long reply, and its end.")
         val state = h.makeState(session = session, cachedItems = listOf(shown)).copy(

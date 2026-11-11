@@ -189,7 +189,7 @@ class SessionFeatureTests {
                 ),
             ),
         )
-        assertEquals(listOf(markdown("msg_reply-text-0", "Hello")), store.state.items)
+        assertEquals(listOf(markdown("msg_reply-text-0", "Hello").copy(inProgress = true)), store.state.items)
         assertEquals("Hello", store.state.liveText["msg_reply-text-0"])
         assertEquals(0, reads.value)
     }
@@ -399,7 +399,7 @@ class SessionFeatureTests {
         val draft = markdown("msg_b-text-0", "Draft")
         val later = OpenCodeTranscriptItem.UserText(id = "msg_c", text = "Later")
         val settled = markdown("msg_b-text-0", "Final")
-        val streaming = markdown("msg_d-text-0", "Streaming")
+        val streaming = markdown("msg_d-text-0", "Streaming").copy(inProgress = true)
         val tool = OpenCodeTranscriptItem.Tool(
             id = "msg_d-tool-t1",
             call = OpenCodeToolCall(
@@ -478,7 +478,7 @@ class SessionFeatureTests {
     @Test fun reconnectKeepsLiveRowsUntilRESTCanEchoThem() = sessionTest { h ->
         val session = testSession(id = "ses_reconnect", title = "Reconnect")
         val user = OpenCodeTranscriptItem.UserText(id = "msg_user", text = "Check")
-        val text = markdown("msg_reply-text-0", "Checking")
+        val text = markdown("msg_reply-text-0", "Checking").copy(inProgress = true)
         val tool = OpenCodeTranscriptItem.Tool(id = "msg_reply-tool-call", call = toolCall(name = "shell"))
         val state = h.makeState(session = session, cachedItems = listOf(user, text, tool)).copy(
             isExternallyActive = true,

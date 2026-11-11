@@ -1243,7 +1243,11 @@ fun HomeFeature.State.remembering(detail: SessionFeature.State): HomeFeature.Sta
     if (sessions.none { it.id == id } && snapshot.session.parentID == null) return this
     val snapshots = sessionSnapshots.toMutableMap()
     snapshots[id] = snapshot
-    val watermarked = syncingSeenWatermark(detail, id)
+    // Live deltas can arrive between cache publications. Hand the next screen the last visible prefix.
+    val cached = if (detail.items.takeLast(SessionFeature.initialFetchLimit).any { it.isInProgressText } ||
+        transcriptCache[id]?.any { it.isInProgressText } == true
+    ) publishingTranscript(id, detail.cacheableItems) else this
+    val watermarked = cached.syncingSeenWatermark(detail, id)
     val rootID = detail.familyRootID
     if (rootID != null && rootID != id) {
         snapshots[rootID]?.let { root ->

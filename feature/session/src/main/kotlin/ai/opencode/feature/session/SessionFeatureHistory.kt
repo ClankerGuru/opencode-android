@@ -111,6 +111,7 @@ private fun SessionFeature.earlierHistoryResponse(
     val markWasFirst = previousMark != null && previousMark.itemID == s.items.firstOrNull()?.id
     // Only rows this page added can link sessions not looked up yet.
     var added: List<OpenCodeTranscriptItem> = emptyList()
+    var settledCachedText = false
     val page: OpenCodeTranscriptPage? = action.result.getOrNull()
     if (page == null) {
         val error = action.result.exceptionOrNull()?.asClientError() ?: OpenCodeClientError("Something went wrong")
@@ -125,9 +126,20 @@ private fun SessionFeature.earlierHistoryResponse(
             page.items, s.items, before = s.earlierHistoryInsertionID, reachedLoadedItems = reachedLoadedItems,
         ) { it.id }
         if (merged != null) {
-            if (merged != s.items) {
+            s = s.settlingText(page.items)
+            // Older pages keep newer durable values, but a REST text part can finish a live prefix.
+            val fetchedText = page.items.filterIsInstance<OpenCodeTranscriptItem.AssistantMarkdown>().associateBy { it.id }
+            val reconciled = if (fetchedText.isNotEmpty() && merged.any { it.isInProgressText && it.id in fetchedText }) {
+                merged.map { item ->
+                    if (item.isInProgressText && item.id in fetchedText) {
+                        if (item.id in cachedTail) settledCachedText = true
+                        fetchedText.getValue(item.id)
+                    } else item
+                }
+            } else merged
+            if (reconciled != s.items) {
                 added = page.items
-                s = s.copy(items = merged).syncShellToolStatuses()
+                s = s.copy(items = reconciled).syncShellToolStatuses()
             }
             s = s.copy(
                 earlierHistoryInsertionID = page.items.firstOrNull()?.id ?: s.earlierHistoryInsertionID,
@@ -159,7 +171,7 @@ private fun SessionFeature.earlierHistoryResponse(
     PerfTimeline.olderPageApplied(sessionID, exhausted = s.earlierHistory == EarlierHistory.Exhausted, failed = page == null)
     if (page == null) return Reduced(s)
     val mark = s.newMessages
-    val publishes = mark != previousMark || SessionFeature.cacheTailIDs(s) != cachedTail ||
+    val publishes = settledCachedText || mark != previousMark || SessionFeature.cacheTailIDs(s) != cachedTail ||
         (markWasFirst && mark != null && mark.itemID != s.items.firstOrNull()?.id)
     return Reduced(
         s,

@@ -92,7 +92,10 @@ internal fun HomeFeature.reduceDrawer(state: State, action: Action): HomeReduced
             if (!canCacheBackgroundTranscript(s, action.sessionID)) return Reduced(s)
             s = s.copy(transcriptReadAt = s.transcriptReadAt + (action.sessionID to dependency(DateClient).now()))
             s = s.notingUnopenedCopy(action.sessionID)
-            s = s.publishingTranscript(action.sessionID, items).persistingTranscriptCache(action.sessionID)
+            val refreshed = if (action.sessionID in s.activeSessionIDs) {
+                SessionFeature.preservingInProgressText(items, s.transcriptCache[action.sessionID].orEmpty())
+            } else items
+            s = s.publishingTranscript(action.sessionID, refreshed).persistingTranscriptCache(action.sessionID)
             return Reduced(s)
         }
 

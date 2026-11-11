@@ -46,7 +46,7 @@ class SessionReconciliationScanTests {
     @Test fun mergeWithAStreamedPartLinksOnlyTheWindow() {
         val older = history(800)
         val window = older.takeLast(29) + OpenCodeTranscriptItem.AssistantMarkdown(id = "msg_live-text-0", text = "Settled")
-        val streamed = OpenCodeTranscriptItem.AssistantMarkdown(id = "msg_live-text-1", text = "Streaming")
+        val streamed = OpenCodeTranscriptItem.AssistantMarkdown(id = "msg_live-text-1", text = "Streaming", inProgress = true)
         val tail = OpenCodeTranscriptItem.UserText(id = "msg_steer", text = "Steer")
         val existing = older + window.last() + streamed + tail
         val fetched = window + tail
@@ -59,7 +59,7 @@ class SessionReconciliationScanTests {
 
     /** A window that doesn't overlap still places a held part, after the row it followed. */
     @Test fun mergeWithNoOverlapStillPlacesHeldParts() {
-        val existing = history(5) + OpenCodeTranscriptItem.AssistantMarkdown(id = "msg_live-text-0", text = "")
+        val existing = history(5) + OpenCodeTranscriptItem.AssistantMarkdown(id = "msg_live-text-0", text = "", inProgress = true)
         val fetched = listOf(OpenCodeTranscriptItem.UserText(id = "msg_new", text = "New"))
         val merged = SessionFeature.mergeTranscript(fetched = fetched, existing = existing, projectedMessageIDs = setOf("msg_live"))
         assertEquals(ids(history(5)) + listOf("msg_live-text-0", "msg_new"), ids(merged))
@@ -70,7 +70,7 @@ class SessionReconciliationScanTests {
         val first = OpenCodeTranscriptItem.AssistantMarkdown(id = "msg_a-text-0", text = "")
         val other = OpenCodeTranscriptItem.UserText(id = "msg_b", text = "B")
         val window = OpenCodeTranscriptItem.UserText(id = "msg_w", text = "W")
-        val held = OpenCodeTranscriptItem.AssistantMarkdown(id = "msg_a-text-1", text = "")
+        val held = OpenCodeTranscriptItem.AssistantMarkdown(id = "msg_a-text-1", text = "", inProgress = true)
         val merged = SessionFeature.mergeTranscript(
             fetched = listOf(window),
             existing = listOf(first, other, window, held),

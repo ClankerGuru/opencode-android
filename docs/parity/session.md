@@ -4,6 +4,8 @@ Module: `:feature:session`. iOS folders: `OpenCode/Session/`. 47 files, 24,329 l
 
 Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and what it maps to>`. Fill in the Kotlin file(s) as you port; see [README.md](README.md).
 
+**Streaming text and REST:** A live assistant row carries the iOS `inProgress` marker through drawer and family transcript caches. While a session runs, reads retain an omitted prefix in transcript order. Reopening after a stream gap keeps that prefix until a complete socket prefix, the part’s end, or REST supplies the text. A REST text row retires its accumulator; buffered starts, deltas and ends leave the settled row intact.
+
 | iOS file | Lines | Kotlin file(s) | Status | Notes |
 | --- | ---: | --- | --- | --- |
 | `OpenCode/Session/AgentActivity/ActivityGyro.swift` | 978 | `agentactivity/ActivityGyro.kt`, `AgentActivitySource.kt` (AgentActivity enum) | done |  |

@@ -239,10 +239,10 @@ class SessionFeatureTestsInbox {
             ),
         )
         val streamed = markdown("msg_1-text-0", "The fixes are in.")
-        assertEquals(listOf(noticeReply, pendingNotice, streamed), store.state.items)
+        assertEquals(listOf(noticeReply, pendingNotice, streamed.copy(inProgress = true)), store.state.items)
 
         history(store, listOf(noticeReply))
-        assertEquals("A page from before delivery keeps the order", listOf(noticeReply, pendingNotice, streamed), store.state.items)
+        assertEquals("A page from before delivery keeps the order", listOf(noticeReply, pendingNotice, streamed.copy(inProgress = true)), store.state.items)
 
         history(store, listOf(noticeReply, pendingNotice, streamed))
         assertEquals(listOf(noticeReply, pendingNotice, streamed), store.state.items)
@@ -303,7 +303,7 @@ class SessionFeatureTestsInbox {
             ),
         )
         val text = markdown("msg_1-text-0", "The screenshot matches.")
-        assertEquals("delivered=$delivered", listOf(noticeReply, read, pendingNotice, text), store.state.items)
+        assertEquals("delivered=$delivered", listOf(noticeReply, read, pendingNotice, text.copy(inProgress = true)), store.state.items)
         val shown = TranscriptEntry.build(store.state.visibleItems, isRunning = true)
         assertEquals(listOf("msg_0-text-0", "group-msg_1-tool-read", "msg_1-text-0"), shown.map { it.id })
 
