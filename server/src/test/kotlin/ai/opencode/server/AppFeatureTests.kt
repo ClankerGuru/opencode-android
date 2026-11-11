@@ -212,6 +212,30 @@ class AppFeatureTests {
     }
 
     @Test
+    fun anUnusableAddressInAPairingCodeIsNamedWithoutItsSecrets() {
+        val code = "Ab3_x-9QAb3_x-9QAb3_x-"
+        // `opencode pair --url` behind a reverse proxy at a path: the one address can't work.
+        val withPath = """{"code":"$code","urls":["http://192.168.1.10:4096","https://box.example/opencode"]}"""
+        assertNull(OpenCodePairingLink.decode(withPath))
+        assertEquals(
+            OpenCodePairingLink.UnusableAddress("https://box.example/opencode", "has a path, and the server must be at the root of its address"),
+            OpenCodePairingLink.unusableAddress(withPath),
+        )
+        val withSecrets = "opencode://pair?code=$code&url=" + java.net.URLEncoder.encode("https://kit:hunter2@box.example/?token=abc", "UTF-8")
+        assertNull(OpenCodePairingLink.decode(withSecrets))
+        assertEquals(
+            OpenCodePairingLink.UnusableAddress("https://box.example/", "includes a user name or password"),
+            OpenCodePairingLink.unusableAddress(withSecrets),
+        )
+        assertEquals("doesn’t start with http:// or https://", OpenCodePairingLink.unusableAddress("""{"code":"$code","urls":["ftp://box.example"]}""")?.reason)
+        assertEquals("has a port outside 1–65535", OpenCodePairingLink.unusableAddress("""{"code":"$code","urls":["http://box.example:70000"]}""")?.reason)
+        // Not a pairing code at all, a bad code, or nothing wrong with the addresses: no address to name.
+        assertNull(OpenCodePairingLink.unusableAddress("https://box.example/opencode"))
+        assertNull(OpenCodePairingLink.unusableAddress("""{"code":"bad!code","urls":["https://box.example/opencode"]}"""))
+        assertNull(OpenCodePairingLink.unusableAddress("""{"code":"$code","urls":["https://box.example"]}"""))
+    }
+
+    @Test
     fun alreadyUsedPairingCodeReportsClearErrorWithoutRetrying() = runTest {
         val consumed = AtomicBoolean(false)
         val fixture = WireFixture { request ->
@@ -235,6 +259,33 @@ class AppFeatureTests {
             assertEquals(401, error.statusCode)
             assertEquals("This pairing code expired or was already used. Run `opencode pair --remote` again.", error.message)
             assertEquals(2, fixture.requests.count { it.path == "/auth/connect/synth_code_1" })
+        } finally {
+            fixture.close()
+        }
+    }
+
+    @Test
+    fun pairingRedemptionPrefersTheCodesAddressesAndKeepsReportedOnesAsFallbacks() = runTest {
+        val tunnel = "https://k7f3m2qz9x.opentunnel.dev"
+        val fixture = WireFixture { request ->
+            when (request.route) {
+                "GET /auth/connect/synth_code_2" -> Reply.Json(200, """{"token":"1790000000.synthetic_token_signature"}""")
+                "GET /api/info" -> Reply.Json(
+                    200,
+                    """{"version":"2.0.0","pid":1,"urls":["http://127.0.0.1:4096","http://192.168.1.10:4096","$tunnel/"],"paths":{"tmp":"/tmp"}}""",
+                )
+                else -> Reply.status(404)
+            }
+        }
+        try {
+            // `opencode pair --url <address>`: the code lists only the address the person chose.
+            val link = OpenCodePairingLink.decode("""{"code":"synth_code_2","urls":["${fixture.server.url}"]}""")
+            val server = OpenCodeClient.liveValue.redeemPairing(link!!)
+            assertEquals(fixture.server.url, server.url)
+            assertEquals(listOf(fixture.server.url), server.preferredURLs)
+            assertEquals("Reported addresses stay as fallbacks, without loopback", listOf("http://192.168.1.10:4096", tunnel), server.alternateURLs)
+            // The fixture's name is an internet address, so the LAN one isn't held back; the tunnel is.
+            assertEquals(listOf(fixture.server.url, "http://192.168.1.10:4096"), server.firstAttemptURLs)
         } finally {
             fixture.close()
         }

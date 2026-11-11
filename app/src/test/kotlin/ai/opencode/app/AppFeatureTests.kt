@@ -1106,6 +1106,20 @@ class AppFeatureTests {
     }
 
     @Test
+    fun aPairingCodeWithAnUnusableAddressSaysWhichAndWhy() = runTest {
+        val store = store(shared.appState())
+        store.exhaustive = false
+        store.send(AppFeature.Action.PairingCodeScanned("""{"code":"Ab3_x-9QAb3_x-9QAb3_x-","urls":["https://box.example/opencode"]}"""))
+        assertEquals(
+            "Couldn’t use “https://box.example/opencode” from this pairing code: it has a path, and the server must be at the root of its address.",
+            store.state.errorMessage,
+        )
+        assertTrue(savedServers.isEmpty())
+        assertNull(store.state.connectionAttempt)
+        store.finish()
+    }
+
+    @Test
     fun malformedLinkShowsAnErrorWithoutSavingCredentials() = runTest {
         val store = store(shared.appState())
         store.exhaustive = false

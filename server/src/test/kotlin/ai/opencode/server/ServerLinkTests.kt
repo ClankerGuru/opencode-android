@@ -98,6 +98,80 @@ class ServerLinkTests {
         assertEquals(lan, store.probe(saved).url)
     }
 
+    // Preferred addresses (#62901: a code from `opencode pair --url` kept connecting over the
+    // OpenTunnel address the server reported). Android only until iOS makes the same change.
+
+    /** Paired from `opencode pair --url <tailnet>`: the server also reported its LAN and tunnel addresses. */
+    private val tunnel = "https://k7f3m2qz9x.opentunnel.dev"
+    private val pairedByURL = OpenCodeServer(
+        url = tailnet, username = "opencode", password = "1790000000.token",
+        alternateURLs = listOf(lan, tunnel), preferredURLs = listOf(tailnet),
+    )
+
+    @Test fun thePairedAddressWinsWhenItAnswersEvenIfAReportedOneIsFaster() = runTest {
+        val calls = Collections.synchronizedList(mutableListOf<String>())
+        val store = ServerLinkStore(health = { server ->
+            calls += server.url
+            delay(if (server.url == tailnet) 400.milliseconds else 5.milliseconds)
+        })
+        assertEquals(tailnet, store.probe(pairedByURL).url)
+        assertEquals("Reported addresses wait out the head start", listOf(tailnet), calls.toList())
+    }
+
+    @Test fun reportedAddressesAreTriedOnceThePairedOneHasHadItsHeadStart() = runTest {
+        val tailnetCancelled = AtomicBoolean(false)
+        val started = testScheduler.currentTime
+        val store = ServerLinkStore(health = { server ->
+            when (server.url) {
+                tailnet -> try {
+                    delay(30.seconds)
+                } catch (cancelled: CancellationException) {
+                    tailnetCancelled.set(true)
+                    throw cancelled
+                }
+                lan -> delay(5.milliseconds)
+                else -> delay(150.milliseconds)
+            }
+        })
+        val winner = store.probe(pairedByURL)
+        assertEquals(lan, winner.url)
+        assertEquals(ServerLinkStore.preferredHeadStart.inWholeMilliseconds + 5, testScheduler.currentTime - started)
+        assertTrue("The paired address still in flight is cancelled", tailnetCancelled.get())
+        assertEquals(listOf(tailnet), winner.preferredURLs)
+    }
+
+    @Test fun reportedAddressesAreTriedAtOnceWhenEveryPairedOneFails() = runTest {
+        val started = testScheduler.currentTime
+        val store = ServerLinkStore(health = { server ->
+            if (server.url == tailnet) {
+                delay(10.milliseconds)
+                throw OpenCodeClientError.unreachable(TransportFailure.NotSent)
+            }
+            delay(if (server.url == tunnel) 20.milliseconds else 30.seconds)
+            if (server.url == lan) throw OpenCodeClientError.unreachable(TransportFailure.TimedOut)
+        })
+        assertEquals(tunnel, store.probe(pairedByURL).url)
+        assertEquals(30L, testScheduler.currentTime - started)
+    }
+
+    @Test fun aCodeWithOnlyTheTunnelStillLetsADirectAddressWinAtHome() = runTest {
+        // The desktop's QR and `opencode pair --remote` name only the tunnel.
+        val pairedByTunnel = pairedByURL.copy(url = tunnel, alternateURLs = listOf(lan, tailnet), preferredURLs = listOf(tunnel))
+        assertEquals(listOf(tunnel, lan, tailnet), pairedByTunnel.firstAttemptURLs)
+        val store = ServerLinkStore(health = { server -> delay(if (server.url == lan) 5.milliseconds else 150.milliseconds) })
+        assertEquals(lan, store.probe(pairedByTunnel).url)
+        // A tailnet address the code named holds back both the LAN and the tunnel.
+        assertEquals(listOf(tailnet), pairedByURL.firstAttemptURLs)
+    }
+
+    @Test fun aPreferredAddressThatIsNoLongerSavedOrEveryAddressPreferredRacesAsBefore() = runTest {
+        val store = ServerLinkStore(health = { server -> delay(if (server.url == tunnel) 5.milliseconds else 150.milliseconds) })
+        assertEquals(tunnel, store.probe(pairedByURL.copy(preferredURLs = listOf("http://10.9.9.9:4096"))).url)
+        assertEquals(emptyList<String>(), pairedByURL.copy(preferredURLs = pairedByURL.candidateURLs).preferredCandidateURLs)
+        assertEquals(tunnel, ServerLinkStore(health = { server -> delay(if (server.url == tunnel) 5.milliseconds else 150.milliseconds) })
+            .probe(pairedByURL.copy(preferredURLs = pairedByURL.candidateURLs)).url)
+    }
+
     @Test fun aForeignAnswerOnTheLANNeverBeatsTheRealServer() = runTest {
         val foreignAnswers = listOf(
             OpenCodeClientError("The server returned HTTP 302.", statusCode = 302),
@@ -407,6 +481,29 @@ class ServerLinkTests {
             assertEquals("Mini", savedServer.value?.name)
             assertEquals(listOf(lan), savedServers.value.map { it.url })
         }
+    }
+
+    @Test fun preferredAddressesAreSavedAndAServerSavedWithoutThemStillLoads() {
+        val values = DependencyValues.testing().update { this[SharedStore] = SharedStore.inMemory() }
+        DependencyValues.withValues(values) {
+            val savedServer = shared(ServerSharedKeys.savedServer)
+            val savedServers = shared(ServerSharedKeys.savedServers)
+            pairedByURL.remember()
+            // Reconnecting at another address keeps the paired order and the preference.
+            pairedByURL.at(lan).remember()
+            assertEquals(listOf(tailnet), savedServer.value?.preferredURLs)
+            assertEquals(tailnet, savedServer.value?.url)
+            assertEquals(listOf(pairedByURL), savedServers.value)
+        }
+        // Entries saved before preferred addresses were kept read back with none, so they race as before.
+        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false }
+        val old = json.decodeFromString(
+            OpenCodeServer.serializer(),
+            """{"url":"$lan","username":"opencode","password":"1790000000.token","alternateURLs":["$tailnet"],"name":"Adams Mini","headers":[]}""",
+        )
+        assertEquals(saved, old)
+        assertEquals(emptyList<String>(), old.preferredCandidateURLs)
+        assertEquals(pairedByURL, json.decodeFromString(OpenCodeServer.serializer(), json.encodeToString(OpenCodeServer.serializer(), pairedByURL)))
     }
 
     // Network path

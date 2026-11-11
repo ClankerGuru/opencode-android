@@ -34,6 +34,7 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.BinaryBitmap
 import com.google.zxing.DecodeHintType
 import com.google.zxing.MultiFormatReader
+import com.google.zxing.LuminanceSource
 import com.google.zxing.NotFoundException
 import com.google.zxing.PlanarYUVLuminanceSource
 import com.google.zxing.ReaderException
@@ -154,7 +155,10 @@ private class QRCameraSession(private val once: Boolean, private val onScanned: 
  * ZXing over a frame's luminance plane: QR codes only, as iOS's `metadataObjectTypes = [.qr]`, in
  * either polarity. AVFoundation also reads light-on-dark codes, which is how OpenCode Desktop draws
  * its pairing code in dark mode and how `opencode pair` looks in a light-theme terminal; ZXing
- * tries them only with `ALSO_INVERTED` (QA QR-01).
+ * tries them only with `ALSO_INVERTED` (QA QR-01). That flips the binarized frame, so a dark
+ * page's quiet zone, which the binarizer reads as white, turns black and small codes are missed.
+ * A frame nothing was found in is read again with its luminance inverted before binarizing, which
+ * keeps the quiet zone: dark Desktop codes then read from as far away as light ones.
  */
 private class QRDecoder {
     private val reader = MultiFormatReader().apply {
@@ -164,6 +168,9 @@ private class QRDecoder {
                 DecodeHintType.ALSO_INVERTED to true,
             ),
         )
+    }
+    private val invertedReader = MultiFormatReader().apply {
+        setHints(mapOf(DecodeHintType.POSSIBLE_FORMATS to listOf(BarcodeFormat.QR_CODE)))
     }
     private var buffer = ByteArray(0)
 
@@ -175,6 +182,10 @@ private class QRDecoder {
         val source = plane.buffer.duplicate().apply { rewind() }
         source.get(buffer, 0, minOf(size, source.remaining()))
         val luminance = PlanarYUVLuminanceSource(buffer, rowStride, image.height, 0, 0, image.width, image.height, false)
+        return read(reader, luminance) ?: read(invertedReader, luminance.invert())
+    }
+
+    private fun read(reader: MultiFormatReader, luminance: LuminanceSource): String? {
         return try {
             reader.decodeWithState(BinaryBitmap(HybridBinarizer(luminance))).text
         } catch (_: NotFoundException) {
