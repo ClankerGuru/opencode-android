@@ -143,29 +143,33 @@ fun FloatingCallStageContent(
         val now = currentLayout()
         val full = now.fullness
         val below = (now.bloom.y + now.bloom.radius).toFloat()
-        val statusTop = below + lerp(8f, 34f, full)
-        val transcriptTop = statusTop + 26
         val controlsBottom = lerp(14f, 40f, full)
         val row = max(44f, floatingCallControlDiameter(full))
-        val transcriptHeight = max(0f, now.height - controlsBottom - row - 12 - transcriptTop)
         val lineWidth = max(0f, min(now.width, now.lineWidth) - 48)
         val width = now.width.dp.roundToPx().coerceAtLeast(0)
         val height = now.height.dp.roundToPx().coerceAtLeast(0)
         fun px(value: Float) = value.dp.roundToPx()
         fun widthOnly(value: Int) = Constraints(minWidth = value, maxWidth = value)
         val grabber = measurables[0].measure(Constraints())
-        val header = measurables[1].measure(Constraints.fixed(width, px(48f)))
+        // At least a tap target tall, taller when large text needs it.
+        val header = measurables[1].measure(Constraints(minWidth = width, maxWidth = width, minHeight = px(48f)))
         val detailsText = measurables[2].measure(widthOnly(width))
         val statusText = measurables[3].measure(widthOnly(width))
-        val transcript = measurables[4].measure(Constraints.fixed(px(lineWidth), px(transcriptHeight).coerceAtLeast(0)))
+        // Below the bloom, then each line below the one above it, so large text pushes down
+        // rather than overlapping.
+        val detailsY = px(below + 10)
+        val statusY = max(px(below + lerp(8f, 34f, full)), detailsY + (detailsText.height * full).toInt())
+        val transcriptY = max(statusY + px(26f), statusY + statusText.height + px(6f))
+        val transcriptHeight = max(0, px(now.height - controlsBottom - row - 12) - transcriptY)
+        val transcript = measurables[4].measure(Constraints.fixed(px(lineWidth), transcriptHeight))
         val controlsWidth = max(0, width - px(20f))
         val controls = measurables[5].measure(Constraints.fixed(controlsWidth, px(CONTROL_DIAMETER)))
         layout(width, height) {
             grabber.place((width - grabber.width) / 2, px(6f))
             header.place(0, px(lerp(14f, 16f, full)))
-            detailsText.place(0, px(below + 10))
-            statusText.place(0, px(statusTop))
-            transcript.place((width - transcript.width) / 2, px(transcriptTop))
+            detailsText.place(0, detailsY)
+            statusText.place(0, statusY)
+            transcript.place((width - transcript.width) / 2, transcriptY)
             // The controls grow toward the sheet's size about their centre line.
             controls.place(px(10f), px(now.height - controlsBottom - row / 2) - controls.height / 2)
         }

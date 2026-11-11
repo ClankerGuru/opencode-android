@@ -509,10 +509,28 @@ data class FloatingCallStageGeometry(
         )
     }
 
+    /**
+     * The card's bloom, shrunk and raised when the card is too short for it (landscape) so the
+     * status, transcript and controls below it never overlap it.
+     */
+    val cardBloomFitted: Bloom get() = fitted(cardBloom, cardFrame.height.toDouble(), cardChromeBelow)
+
+    /** The sheet's bloom, fitted to the sheet's height on screen the same way. */
+    val fullBloomFitted: Bloom get() = fitted(fullBloom, screenHeight - fullTop, fullChromeBelow)
+
+    private fun fitted(bloom: Bloom, height: Double, below: Double): Bloom {
+        val room = height - below
+        if (bloom.y + bloom.radius <= room) return bloom
+        val radius = max(minBloomRadius, (room - headerBottom) / 2)
+        return Bloom(y = max(headerBottom + radius, room - radius), radius = radius)
+    }
+
     /** The dot field's bloom in the shape: filling the orb, centred near the card's top, then smaller and higher as the sheet fills. */
     fun bloom(frame: Rect): BloomCircle {
         val card = cardness(frame)
         val full = fullness(frame)
+        val cardBloom = cardBloomFitted
+        val fullBloom = fullBloomFitted
         val y = lerp(cardBloom.y, fullBloom.y, full)
         val radius = lerp(cardBloom.radius, fullBloom.radius, full)
         val cy = lerp(lerp(frame.center.y.toDouble(), frame.top + cardBloom.y, card), frame.top + y, full)
@@ -556,6 +574,13 @@ data class FloatingCallStageGeometry(
 
     companion object {
         const val minSpan = 120.0
+
+        // What `FloatingCallStageContent` lays out above and below the bloom: the header, then
+        // the status, the transcript's top gap and the controls row with its margins.
+        private const val headerBottom = 66.0
+        private const val cardChromeBelow = 114.0
+        private const val fullChromeBelow = 174.0
+        private const val minBloomRadius = 28.0
     }
 }
 

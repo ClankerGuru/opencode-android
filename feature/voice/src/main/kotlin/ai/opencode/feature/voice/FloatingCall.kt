@@ -1563,8 +1563,8 @@ private class FloatingCallSurfaceLook(private val model: FloatingCallSurfaceMode
         val box = contentBox()
         val layoutFull = if (asCard()) 0.0 else full()
         val bloom = FloatingCallStageGeometry.Bloom(
-            y = lerp(geometry.cardBloom.y, geometry.fullBloom.y, layoutFull),
-            radius = lerp(geometry.cardBloom.radius, geometry.fullBloom.radius, layoutFull),
+            y = lerp(geometry.cardBloomFitted.y, geometry.fullBloomFitted.y, layoutFull),
+            radius = lerp(geometry.cardBloomFitted.radius, geometry.fullBloomFitted.radius, layoutFull),
         )
         return FloatingCallStageContentLayout(box.width, box.height, layoutFull.toFloat(), bloom, lineWidth = geometry.cardFrame.width)
     }
