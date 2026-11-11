@@ -18,6 +18,7 @@ import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
@@ -120,6 +121,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -981,7 +983,42 @@ private class FloatingCallSurfaceModel(
         motion.endDrag(stage, settled.velocity, reduceMotion)
     }
 
+    // MARK: System back
+
+    /** A predictive back gesture is pulling the card or sheet down a little, toward the stage below. */
+    private var backPulling = false
+
+    fun backStarted() {
+        if (dragMode != null || motion.isDragging || motion.landing != null || store.state.phase.isTerminal) return
+        backPulling = true
+        motion.beginDrag(0.0, stageGeometry())
+    }
+
+    fun backProgressed(progress: Float) {
+        if (!backPulling) return
+        motion.drag(BACK_PULL * progress, stageGeometry())
+    }
+
+    /** Back steps one stage down (iOS has no back; TalkBack's dismiss does the same). */
+    fun backCommitted() {
+        val next = store.state.floatingStage.stage.previous
+        if (backPulling) {
+            backPulling = false
+            motion.endDrag(next ?: store.state.floatingStage.stage, 0.0, reduceMotion)
+        }
+        send(FloatingCallStageFeature.Action.StepBack)
+    }
+
+    fun backCancelled() {
+        if (!backPulling) return
+        backPulling = false
+        motion.endDrag(store.state.floatingStage.stage, 0.0, reduceMotion)
+    }
+
     companion object {
+        /** How far a predictive back gesture pulls the shape down before it lets go, in dp. */
+        const val BACK_PULL = 56.0
+
         /** Android's minimum touch target (iOS 44 pt). */
         const val MIN_TOUCH = 48f
     }
@@ -1138,6 +1175,17 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
     OnChange(stage) { model.grow(it) }
     OnChange(keyboardTop != null) { if (it) model.keyboardRose() }
     OnChange(keyboardTop) { model.keyboardMoved(it) }
+    // System back steps the card or sheet down, a predictive back pulling it a little first.
+    PredictiveBackHandler(enabled = stage != FloatingCallStage.orb && !terminal) { events ->
+        model.backStarted()
+        try {
+            events.collect { model.backProgressed(it.progress) }
+            model.backCommitted()
+        } catch (cancelled: CancellationException) {
+            model.backCancelled()
+            throw cancelled
+        }
+    }
     val panelRequest = center.panelRequest
     OnChange(panelRequest.count) { count ->
         if (count != model.lastPanelRequest) {
