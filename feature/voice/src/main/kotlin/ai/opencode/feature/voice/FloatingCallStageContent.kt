@@ -25,6 +25,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,92 +68,113 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 
 /**
+ * Where the card's or sheet's content is laid out this frame (dp): its size, how far it is laid
+ * out as the full sheet, and the bloom's centre and radius there.
+ *
+ * @param fullness 0 laid out as the card, 1 as the full sheet.
+ * @param lineWidth the card's width: the transcript keeps it on the sheet too, so its lines never
+ * re-wrap as the shape grows or shrinks.
+ */
+data class FloatingCallStageContentLayout(
+    val width: Float,
+    val height: Float,
+    val fullness: Float,
+    val bloom: FloatingCallStageGeometry.Bloom,
+    val lineWidth: Float = width,
+)
+
+/**
  * What the card and the full sheet show, laid out at the size it's given (iOS
  * `FloatingCallStageContent`): the session and duration above the bloom, the call's details (full
  * sheet only) and status below it, the live transcript, and the controls. The shape's surface and
  * dot field are drawn by the floating call's surface. Sizes in dp.
  *
- * @param fullness 0 laid out as the card, 1 as the full sheet.
- * @param bloom the bloom's centre and radius at this layout.
+ * [layout] is read while measuring and drawing, not composing: a drag between the card and the
+ * sheet moves and resizes it every frame without recomposing anything inside it.
  */
 @Composable
 fun FloatingCallStageContent(
     store: VoiceStoreOf,
-    width: Float,
-    height: Float,
-    fullness: Float,
-    bloom: FloatingCallStageGeometry.Bloom,
+    layout: () -> FloatingCallStageContentLayout,
     status: String,
     onMinimize: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val full = fullness
-    val below = (bloom.y + bloom.radius).toFloat()
-    val statusTop = below + lerp(8f, 34f, full)
-    val transcriptTop = statusTop + 26
-    val controlsBottom = lerp(14f, 40f, full)
-    val diameter = lerp(54f, 62f, full)
-    val row = max(44f, diameter)
-    val transcriptHeight = max(0f, height - controlsBottom - row - 12 - transcriptTop)
+    val currentLayout by rememberUpdatedState(layout)
+    val detailsHidden by remember { derivedStateOf { currentLayout().fullness < 0.5f } }
     val details by store.observe { "${it.resolvedEngine.title} · ${it.directoryName}" }
-    Box(modifier.requiredSize(width.dp, height.dp)) {
-        // It drags: up to the sheet, down to the orb.
-        Box(
-            Modifier
-                .offset(x = ((width - 36) / 2).dp, y = 6.dp)
-                .size(36.dp, 5.dp)
-                .background(OpenCodeTheme.colors.tertiaryText, CircleShape)
-                .clearAndSetSemantics {},
-        )
-        FloatingCallStageHeader(
-            store = store,
-            status = status,
-            onMinimize = onMinimize,
-            modifier = Modifier
-                .offset(y = lerp(14f, 16f, full).dp)
-                .requiredSize(width.dp, 48.dp),
-        )
-        Text(
-            details,
-            style = OpenCodeTextStyles.footnote,
-            color = OpenCodeTheme.colors.tertiaryText,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .offset(y = (below + 10).dp)
-                .width(width.dp)
-                // In once the status has moved down clear of it.
-                .alpha(smooth(0.7f, 1f, full))
-                .then(if (full < 0.5f) Modifier.semantics { hideFromAccessibility() } else Modifier),
-        )
-        Text(
-            status,
-            style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium),
-            color = OpenCodeTheme.colors.secondaryText,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .offset(y = statusTop.dp)
-                .width(width.dp)
-                .testTag("floating-call-status"),
-        )
-        FloatingCallTranscript(
-            store,
-            Modifier
-                .offset(x = 24.dp, y = transcriptTop.dp)
-                .requiredSize(max(0f, width - 48).dp, transcriptHeight.dp),
-        )
-        FloatingCallStageControls(
-            store = store,
-            diameter = diameter,
-            modifier = Modifier
-                .offset(x = 10.dp, y = (height - controlsBottom - row).dp)
-                .requiredSize(max(0f, width - 20).dp, row.dp),
-        )
+    Layout(
+        content = {
+            // It drags: up to the sheet, down to the orb.
+            Box(
+                Modifier
+                    .size(36.dp, 5.dp)
+                    .background(OpenCodeTheme.colors.tertiaryText, CircleShape)
+                    .clearAndSetSemantics {},
+            )
+            FloatingCallStageHeader(store = store, status = status, onMinimize = onMinimize)
+            Text(
+                details,
+                style = OpenCodeTextStyles.footnote,
+                color = OpenCodeTheme.colors.tertiaryText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    // In once the status has moved down clear of it.
+                    .graphicsLayer { alpha = smooth(0.7f, 1f, currentLayout().fullness) }
+                    .then(if (detailsHidden) Modifier.semantics { hideFromAccessibility() } else Modifier),
+            )
+            Text(
+                status,
+                style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium),
+                color = OpenCodeTheme.colors.secondaryText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.testTag("floating-call-status"),
+            )
+            FloatingCallTranscript(store)
+            FloatingCallStageControls(store = store, scale = { floatingCallControlDiameter(currentLayout().fullness) / CONTROL_DIAMETER })
+        },
+        modifier = modifier,
+    ) { measurables, _ ->
+        val now = currentLayout()
+        val full = now.fullness
+        val below = (now.bloom.y + now.bloom.radius).toFloat()
+        val statusTop = below + lerp(8f, 34f, full)
+        val transcriptTop = statusTop + 26
+        val controlsBottom = lerp(14f, 40f, full)
+        val row = max(44f, floatingCallControlDiameter(full))
+        val transcriptHeight = max(0f, now.height - controlsBottom - row - 12 - transcriptTop)
+        val lineWidth = max(0f, min(now.width, now.lineWidth) - 48)
+        val width = now.width.dp.roundToPx().coerceAtLeast(0)
+        val height = now.height.dp.roundToPx().coerceAtLeast(0)
+        fun px(value: Float) = value.dp.roundToPx()
+        fun widthOnly(value: Int) = Constraints(minWidth = value, maxWidth = value)
+        val grabber = measurables[0].measure(Constraints())
+        val header = measurables[1].measure(Constraints.fixed(width, px(48f)))
+        val detailsText = measurables[2].measure(widthOnly(width))
+        val statusText = measurables[3].measure(widthOnly(width))
+        val transcript = measurables[4].measure(Constraints.fixed(px(lineWidth), px(transcriptHeight).coerceAtLeast(0)))
+        val controlsWidth = max(0, width - px(20f))
+        val controls = measurables[5].measure(Constraints.fixed(controlsWidth, px(CONTROL_DIAMETER)))
+        layout(width, height) {
+            grabber.place((width - grabber.width) / 2, px(6f))
+            header.place(0, px(lerp(14f, 16f, full)))
+            detailsText.place(0, px(below + 10))
+            statusText.place(0, px(statusTop))
+            transcript.place((width - transcript.width) / 2, px(transcriptTop))
+            // The controls grow toward the sheet's size about their centre line.
+            controls.place(px(10f), px(now.height - controlsBottom - row / 2) - controls.height / 2)
+        }
     }
 }
+
+/** The card's control circles, and the sheet's, a little bigger. */
+private const val CONTROL_DIAMETER = 54f
+
+private fun floatingCallControlDiameter(fullness: Float): Float = lerp(CONTROL_DIAMETER, 62f, fullness)
 
 @Composable
 private fun FloatingCallStageHeader(store: VoiceStoreOf, status: String, onMinimize: () -> Unit, modifier: Modifier = Modifier) {
@@ -193,7 +216,8 @@ private fun FloatingCallStageHeader(store: VoiceStoreOf, status: String, onMinim
 
 /** One row of equal circles on one baseline; names only for TalkBack. */
 @Composable
-private fun FloatingCallStageControls(store: VoiceStoreOf, diameter: Float, modifier: Modifier = Modifier) {
+private fun FloatingCallStageControls(store: VoiceStoreOf, scale: () -> Float, modifier: Modifier = Modifier) {
+    val diameter = CONTROL_DIAMETER
     val isMuted by store.observe { it.isMuted }
     val isLive by store.observe { it.phase == VoiceFeature.State.Phase.Live }
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
@@ -201,13 +225,14 @@ private fun FloatingCallStageControls(store: VoiceStoreOf, diameter: Float, modi
             name = if (isMuted) "Unmute" else "Mute",
             symbol = if (isMuted) SFSymbol.MicSlashFill else SFSymbol.MicFill,
             diameter = diameter,
+            scale = scale,
             isOn = isMuted,
             isEnabled = isLive,
         ) { store.send(VoiceFeature.Action.MuteTapped) }
-        FloatingCallControl(name = "Pause", symbol = SFSymbol.PauseFill, diameter = diameter, isPlaceholder = true) {}
-        FloatingCallControl(name = "Camera", symbol = SFSymbol.VideoFill, diameter = diameter, isPlaceholder = true) {}
-        FloatingCallControl(name = "Add", symbol = SFSymbol.Plus, diameter = diameter, isPlaceholder = true) {}
-        FloatingCallControl(name = "End voice call", symbol = SFSymbol.PhoneDownFill, diameter = diameter, isDestructive = true) {
+        FloatingCallControl(name = "Pause", symbol = SFSymbol.PauseFill, diameter = diameter, scale = scale, isPlaceholder = true) {}
+        FloatingCallControl(name = "Camera", symbol = SFSymbol.VideoFill, diameter = diameter, scale = scale, isPlaceholder = true) {}
+        FloatingCallControl(name = "Add", symbol = SFSymbol.Plus, diameter = diameter, scale = scale, isPlaceholder = true) {}
+        FloatingCallControl(name = "End voice call", symbol = SFSymbol.PhoneDownFill, diameter = diameter, scale = scale, isDestructive = true) {
             store.send(VoiceFeature.Action.EndPressed)
         }
     }
