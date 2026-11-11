@@ -93,6 +93,18 @@ class CaptionRevealTests {
         assertEquals(listOf(1.0), reveal.lines[0].revealedAt)
     }
 
+    @Test fun aRevisedLineSwapsItsShownWordsInPlace() {
+        var reveal = CaptionReveal()
+        reveal = reveal.sync(listOf(CaptionTarget(id = "delegator-progress", isUser = false, text = "Reading the tests")))
+        reveal = reveal.revealNext(1.0)
+        reveal = reveal.revealNext(2.0)
+        reveal = reveal.revealNext(3.0)
+        reveal = reveal.sync(listOf(CaptionTarget(id = "delegator-progress", isUser = false, text = "Running the retry tests")))
+        assertEquals(listOf(1.0, 2.0, 3.0), reveal.lines[0].revealedAt)
+        assertEquals(4, reveal.lines[0].revealable)
+        reveal = reveal.sync(listOf(CaptionTarget(id = "delegator-progress", isUser = false, text = "Done")))
+        assertEquals(listOf(1.0), reveal.lines[0].revealedAt)
+    }
 }
 
 class VoiceAudioQualityTests {

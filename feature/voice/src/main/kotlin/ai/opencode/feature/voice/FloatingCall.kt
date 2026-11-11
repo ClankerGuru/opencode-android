@@ -18,6 +18,7 @@ import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
@@ -34,6 +35,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
@@ -43,9 +46,9 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
@@ -56,33 +59,43 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.shadow.Shadow
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
@@ -91,6 +104,7 @@ import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.node.CompositionLocalConsumerModifierNode
 import androidx.compose.ui.node.GlobalPositionAwareModifierNode
@@ -106,8 +120,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
-import androidx.compose.ui.semantics.dismiss
 import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.dismiss
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -116,10 +130,19 @@ import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import java.time.Duration
+import java.time.Instant
 import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.hypot
+import kotlin.math.max
+import kotlin.math.min
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -127,12 +150,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.time.Duration
-import java.time.Instant
-import kotlin.math.abs
-import kotlin.math.hypot
-import kotlin.math.max
-import kotlin.math.min
 
 // Port of iOS `OpenCode/Voice/FloatingCall.swift` (f657969b, "One Shape"): the call floats over
 // the app as one shape that is the orb at rest, the card, and the sheet. The composer's phone
@@ -574,7 +591,6 @@ private class FloatingCallSurfaceModel(
     var window: FloatingCallWindowContent? = null
     var dismissKeyboard: () -> Unit = {}
     var density = 1f
-    var dim = 0.0
     var root: LayoutCoordinates? = null
     var shapeCoordinates: LayoutCoordinates? = null
 
@@ -802,8 +818,11 @@ private class FloatingCallSurfaceModel(
         return FloatingCallTouchArea.None
     }
 
+    /** How much the session behind dims as the sheet fills. */
+    fun dimAmount(): Double = FloatingCallStageTunables.dim.value * (motion.progress - 1).coerceIn(0.0, 1.0) * motion.opacity
+
     fun dimTapped() {
-        if (dim > 0.001) send(FloatingCallStageFeature.Action.StepBack)
+        if (dimAmount() > 0.001) send(FloatingCallStageFeature.Action.StepBack)
     }
 
     private fun toOverlay(local: Offset): Offset {
@@ -924,23 +943,28 @@ private class FloatingCallSurfaceModel(
             val tracker = VelocityTracker()
             tracker.addPosition(down.uptimeMillis, start)
             var began = false
+            var ended = false
             try {
                 while (true) {
                     val event = awaitPointerEvent()
                     val change = event.changes.firstOrNull { it.id == down.id } ?: break
                     val location = toOverlay(change.position)
                     tracker.addPosition(change.uptimeMillis, location)
-                    if (change.changedToUpIgnoreConsumed()) {
-                        if (began) shapeEnded(tracker.calculateVelocity().y)
-                        break
-                    }
+                    // A quick flick can arrive whole with its lift: it still moves the shape.
                     if (!began && (change.position - down.position).getDistance() >= slop) began = true
                     if (began) {
                         shapeChanged(location, location - start)
                         if (dragMode == FloatingCallDragMode.stage) change.consume()
                     }
+                    if (change.changedToUpIgnoreConsumed()) {
+                        ended = true
+                        if (began) shapeEnded(tracker.calculateVelocity().y)
+                        break
+                    }
                 }
             } finally {
+                // Cancelled (the system took the touch, the shape went away): it still settles on a stage.
+                if (began && !ended) shapeEnded(0f)
                 dragMode = null
             }
         }
@@ -981,7 +1005,42 @@ private class FloatingCallSurfaceModel(
         motion.endDrag(stage, settled.velocity, reduceMotion)
     }
 
+    // MARK: System back
+
+    /** A predictive back gesture is pulling the card or sheet down a little, toward the stage below. */
+    private var backPulling = false
+
+    fun backStarted() {
+        if (dragMode != null || motion.isDragging || motion.landing != null || store.state.phase.isTerminal) return
+        backPulling = true
+        motion.beginDrag(0.0, stageGeometry())
+    }
+
+    fun backProgressed(progress: Float) {
+        if (!backPulling) return
+        motion.drag(BACK_PULL * progress, stageGeometry())
+    }
+
+    /** Back steps one stage down (iOS has no back; TalkBack's dismiss does the same). */
+    fun backCommitted() {
+        val next = store.state.floatingStage.stage.previous
+        if (backPulling) {
+            backPulling = false
+            motion.endDrag(next ?: store.state.floatingStage.stage, 0.0, reduceMotion)
+        }
+        send(FloatingCallStageFeature.Action.StepBack)
+    }
+
+    fun backCancelled() {
+        if (!backPulling) return
+        backPulling = false
+        motion.endDrag(store.state.floatingStage.stage, 0.0, reduceMotion)
+    }
+
     companion object {
+        /** How far a predictive back gesture pulls the shape down before it lets go, in dp. */
+        const val BACK_PULL = 56.0
+
         /** Android's minimum touch target (iOS 44 pt). */
         const val MIN_TOUCH = 48f
     }
@@ -1095,21 +1154,26 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
     val restArea = FloatingCallRestArea(screen, safeArea, composerTop, restSize, keyboardTop)
     val restFrame = restArea.frame(model.place)
     val geometry = floatingCallStageGeometry(restArea, restFrame)
-    val shaping = motion.isActive
-    val lifting = !shaping && connect.frame != null
-    val restingFrame = float.position?.let { restArea.frame(centeredAt = it) } ?: restFrame
-    val frame = if (shaping) motion.frame(geometry) else connect.frame ?: restingFrame
-    val short = min(frame.width, frame.height).toDouble()
-    val radii = if (shaping) geometry.radii(frame) else FloatingCallStageGeometry.Radii(short / 2, short / 2)
+    // Where the shape is this frame changes every frame it moves: it's read only while laying out
+    // and drawing ([frameOf], [FloatingCallSurfaceLook]), and only what switches a part on or off
+    // is read here, so a drag or a flight recomposes nothing.
+    val look = remember(model) { FloatingCallSurfaceLook(model) }
+    look.geometry = geometry
+    look.restArea = restArea
+    look.restFrame = restFrame
+    look.screen = screen
+    val frameOf = look::frame
+    val shaping by remember(look) { derivedStateOf { motion.isActive } }
+    val lifting = !shaping && look.isLifting
     val lifted = connect.isBreakingOut || float.isHeld
-    // Looking like the composer's button, it casts no shadow of its own.
-    val buttonLook = max(if (lifting) connect.button else 0.0, model.landedAmount(frame))
-    val trailing = frame.center.x > screen.width / 2
-    val dim = FloatingCallStageTunables.dim.value * (motion.progress - 1).coerceIn(0.0, 1.0) * motion.opacity
-    val touchArea = model.touchArea(frame, terminal)
+    val trailing = look.isTrailing
+    val dimmed = look.isDimmed
+    val touchKind = look.touchKind(terminal)
+    LaunchedEffect(look, window, terminal) {
+        if (window == null) return@LaunchedEffect
+        snapshotFlow { model.touchArea(look.frame(), terminal) }.collect { if (window.touchArea != it) window.touchArea = it }
+    }
     SideEffect {
-        model.dim = dim
-        if (window != null && window.touchArea != touchArea) window.touchArea = touchArea
         if (center.card != geometry.cardFrame) center.card = geometry.cardFrame
         val orbLayout = FloatingCallOrbLayout(screen, safeArea, restSize)
         if (center.orbLayout != orbLayout) center.orbLayout = orbLayout
@@ -1138,6 +1202,17 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
     OnChange(stage) { model.grow(it) }
     OnChange(keyboardTop != null) { if (it) model.keyboardRose() }
     OnChange(keyboardTop) { model.keyboardMoved(it) }
+    // System back steps the card or sheet down, a predictive back pulling it a little first.
+    PredictiveBackHandler(enabled = stage != FloatingCallStage.orb && !terminal) { events ->
+        model.backStarted()
+        try {
+            events.collect { model.backProgressed(it.progress) }
+            model.backCommitted()
+        } catch (cancelled: CancellationException) {
+            model.backCancelled()
+            throw cancelled
+        }
+    }
     val panelRequest = center.panelRequest
     OnChange(panelRequest.count) { count ->
         if (count != model.lastPanelRequest) {
@@ -1166,16 +1241,16 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
                 }
             },
     ) {
-        if (dim > 0.001) {
+        if (dimmed) {
             // The session behind dims as the sheet fills.
             Box(
                 Modifier
                     .placed(0f, 0f, screen.width, screen.height)
-                    .background(Color.Black.copy(alpha = dim.toFloat()))
+                    .drawBehind { drawRect(Color.Black.copy(alpha = model.dimAmount().toFloat().coerceIn(0f, 1f))) }
                     .clearAndSetSemantics {},
             )
         }
-        if (touchArea == FloatingCallTouchArea.Everywhere) {
+        if (touchKind == FloatingCallTouchKind.everywhere) {
             // With the sheet up the window takes every touch; a tap on the dimmed session steps back.
             Box(
                 Modifier
@@ -1187,9 +1262,12 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
 
         // The tag beside the orb naming the session the call now talks to. It appears on micro
         // and scales about itself.
-        val tagVisible = model.tagShown && !lifting && float.position == null && !shaping
+        val tagVisible = model.tagShown && !lifting && look.isResting && !shaping
         Box(
-            Modifier.placed(if (trailing) frame.left - 10 - 280 else frame.right + 10, frame.center.y - 18, 280f, 36f),
+            Modifier.placed {
+                val frame = frameOf()
+                Rect(Offset(if (trailing) frame.left - 10 - 280 else frame.right + 10, frame.center.y - 18), Size(280f, 36f))
+            },
             contentAlignment = if (trailing) Alignment.CenterEnd else Alignment.CenterStart,
         ) {
             val micro = MotionTransition.micro(reduceMotion)
@@ -1203,179 +1281,163 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
             }
         }
 
-        val shape = RoundedCornerShape(
-            topStart = max(0.0, radii.top).toFloat().dp,
-            topEnd = max(0.0, radii.top).toFloat().dp,
-            bottomEnd = max(0.0, radii.bottom).toFloat().dp,
-            bottomStart = max(0.0, radii.bottom).toFloat().dp,
-        )
-        val shadow = (if (lifted) FloatingCallTunables.liftShadow.value else FloatingCallTunables.restShadow.value) / 2 * (1 - buttonLook)
-        val alpha = model.opacity.value * motion.opacity.toFloat()
+        val shape = look.shape
+        val restShadow = if (lifted) FloatingCallTunables.liftShadow.value else FloatingCallTunables.restShadow.value
         // Resting as the orb, a touch holds it from touch-down; grown, a drag steps the card and sheet.
         val gestures = when {
-            touchArea == FloatingCallTouchArea.None -> Modifier
+            touchKind == FloatingCallTouchKind.none -> Modifier
             shaping -> Modifier.pointerInput(model, "shape") { with(model) { shapeDrag() } }
             else -> Modifier.pointerInput(model, "orb") { with(model) { orbDrag() } }
         }
-        // The grown card's soft shadow, all round (the elevation shadow barely reaches its top edge).
-        val cardShadow = if (shaping) geometry.cardness(frame) * (1 - buttonLook) else 0.0
-        val cardShadowColor = Color.Black.copy(alpha = (if (OpenCodeTheme.colors.isDark) 0.5f else 0.1f) * cardShadow.toFloat() * alpha)
+        val darkShadow = OpenCodeTheme.colors.isDark
         val cardBorder = VoiceCallSurfaceDefaults.cardBorder
+        val cardFill = VoiceCallSurfaceDefaults.card
         Box(
             Modifier
-                .placed(frame.left, frame.top, frame.width, frame.height)
+                .placed { frameOf() }
                 .onPlaced { model.shapeCoordinates = it }
-                .dropShadow(shape, Shadow(radius = 20.dp, color = cardShadowColor, offset = DpOffset(0.dp, 3.dp)))
-                .graphicsLayer {
-                    this.alpha = alpha
-                    this.shape = shape
-                    clip = true
-                    shadowElevation = max(0.0, shadow).toFloat().dp.toPx()
+                // The grown card's soft shadow, all round (the elevation shadow barely reaches its top edge).
+                .dropShadow(shape) {
+                    radius = 20.dp.toPx()
+                    offset = Offset(0f, 3.dp.toPx())
+                    color = Color.Black.copy(alpha = (if (darkShadow) 0.5f else 0.1f) * look.cardShadow().toFloat() * look.alpha())
                 }
-                .background(VoiceCallSurfaceDefaults.card)
-                .drawWithContent {
-                    drawContent()
-                    val edge = cardBorder.copy(alpha = cardBorder.alpha * (1 - buttonLook).toFloat())
-                    drawOutline(shape.createOutline(size, layoutDirection, this), edge, style = Stroke(1.dp.toPx()))
+                .graphicsLayer {
+                    alpha = look.alpha()
+                    this.shape = shape
+                    // The orb's own shadow hands over to the card's, so the card never wears both.
+                    shadowElevation = max(0.0, restShadow / 2 * (1 - look.buttonLook()) * (1 - look.cardShadow())).toFloat().dp.toPx()
                 }
                 .then(gestures),
         ) {
-            FloatingCallStack(Modifier.fillMaxSize()) {
-                val rest = restFrame
-                val rides = shaping || lifting || float.position != null
-                val grown = if (shaping) geometry.cardness(frame) else 0.0
-                val full = if (shaping) geometry.fullness(frame) else 0.0
-                // The small face hands over to the bigger field as the orb starts to grow.
-                val faceShown = 1 - smooth(0.03, 0.15, grown)
-                val bloomShown = smooth(0.0, 0.12, grown)
-                val restControls = !shaping || (motion.target == FloatingCallStage.orb && motion.progress < 0.05 && motion.landing == null)
-                val contentMounted = if (motion.landing == null) motion.progress > 0.01 || motion.target != FloatingCallStage.orb else motion.content > 0
-
-                // The sheet's backing deepens as it fills, so its text reads over anything.
-                val backing = lerp(FloatingCallStageTunables.cardFill.value, FloatingCallStageTunables.sheetFill.value, full) * grown
-                if (backing > 0) {
-                    Box(
-                        Modifier
-                            .placed(0f, 0f, frame.width, frame.height)
-                            .background(VoiceCallSurfaceDefaults.card.copy(alpha = backing.toFloat().coerceIn(0f, 1f))),
-                    )
-                }
+            val rides = shaping || lifting || !look.isResting
+            // Growing, the orb's face keeps its own size and is scaled with the shape, as it is lifting out of the call button.
+            val outer = {
+                val frame = frameOf()
+                if (rides) Rect(Offset.Zero, frame.size) else look.restFrame.translate(-frame.left, -frame.top)
+            }
+            // The shape's own layers, clipped to it; the orb's controls and the call button ride
+            // above, so the mute badge can sit over the orb's rim (iOS's controls layer).
+            FloatingCallStack(
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        this.shape = shape
+                        clip = true
+                    }
+                    .background(cardFill)
+                    .drawBehind {
+                        // The sheet's backing deepens as it fills, so its text reads over anything.
+                        val backing = look.backing()
+                        if (backing > 0) drawRect(cardFill.copy(alpha = backing.toFloat().coerceIn(0f, 1f)))
+                    }
+                    .drawWithContent {
+                        drawContent()
+                        val edge = cardBorder.copy(alpha = cardBorder.alpha * (1 - look.buttonLook()).toFloat())
+                        drawOutline(shape.createOutline(size, layoutDirection, this), edge, style = Stroke(1.dp.toPx()))
+                    },
+            ) {
+                val contentMounted = look.isContentMounted
 
                 if (model.bloomMounted) {
                     // The orb's dot field grown with the shape: one disc near the card's top, smaller
                     // and higher as the sheet fills. It keeps one size and moves with the bloom.
-                    val bloom = geometry.bloom(frame)
-                    val originX = bloom.centerX - screen.width / 2
-                    val originY = bloom.centerY - FIELD_ABOVE
-                    val bottom = min(geometry.visible(frame).bottom.toDouble(), bloom.centerY + bloom.radius * lerp(4.0, 1.35, full))
-                    val placed = LivingOrbBloom(
-                        center = Offset(screen.width / 2, FIELD_ABOVE.toFloat()),
-                        radius = bloom.radius.toFloat(),
-                        bottom = (bottom - originY).toFloat(),
-                        fade = if (full > 0) 40f else 0.5f,
-                        visible = frame.translate(-originX.toFloat(), -originY.toFloat()),
-                    )
                     LivingOrbView(
-                        orbConfig.copy(bloom = placed),
+                        orbConfig,
                         Modifier
-                            .placed((originX - frame.left).toFloat(), (originY - frame.top).toFloat(), screen.width, FIELD_HEIGHT)
-                            .graphicsLayer { this.alpha = bloomShown.toFloat() }
+                            .placed {
+                                val (origin, _) = look.bloom()
+                                val frame = frameOf()
+                                Rect(Offset(origin.x - frame.left, origin.y - frame.top), Size(screen.width, FIELD_HEIGHT))
+                            }
+                            .graphicsLayer { alpha = look.bloomShown().toFloat() }
                             .clearAndSetSemantics {},
-                        isHidden = bloomShown <= 0,
+                        isHidden = look.isBloomHidden,
+                        bloom = { look.bloom().second },
                     )
                 }
 
-                // Growing, the orb's face keeps its own size and is scaled with the shape, as it is lifting out of the call button.
-                val faceScale = if ((shaping || lifting) && style == FloatingCallStyle.orb) min(frame.width / max(1f, rest.width), frame.height / max(1f, rest.height)) else 1f
-                val outerWidth = if (rides) frame.width else rest.width
-                val outerHeight = if (rides) frame.height else rest.height
-                val outerX = if (rides) 0f else rest.left - frame.left
-                val outerY = if (rides) 0f else rest.top - frame.top
-                val faceWidth = if (faceScale != 1f) rest.width else outerWidth
-                val faceHeight = if (faceScale != 1f) rest.height else outerHeight
+                val scalesFace = (shaping || lifting) && style == FloatingCallStyle.orb
                 Box(
                     Modifier
-                        .placed(outerX, outerY, outerWidth, outerHeight)
-                        .graphicsLayer { this.alpha = faceShown.toFloat() }
+                        .placed(outer)
+                        .graphicsLayer { alpha = look.faceShown().toFloat() }
                         .clearAndSetSemantics {},
                     contentAlignment = Alignment.Center,
                 ) {
                     FloatingCallRestFace(
                         style = style,
                         orbSize = restSize.height,
-                        trailing = restingFrame.center.x > screen.width / 2,
+                        trailing = look.restsTrailing,
                         config = orbConfig,
-                        isHidden = faceShown <= 0,
+                        isHidden = look.isFaceHidden,
+                        modifier = if (scalesFace) {
+                            Modifier
+                                .requiredSize(restFrame.width.dp, restFrame.height.dp)
+                                .graphicsLayer {
+                                    val frame = frameOf()
+                                    val rest = look.restFrame
+                                    val scale = min(frame.width / max(1f, rest.width), frame.height / max(1f, rest.height))
+                                    scaleX = scale
+                                    scaleY = scale
+                                }
+                        } else {
+                            Modifier.fillMaxSize()
+                        },
+                    )
+                }
+                if (contentMounted) {
+                    // The card's content is laid out at the card's size and pinned to the growing shape's
+                    // bottom corner, revealed as the shape grows over it; past the card it lays out on the shape.
+                    val interactive = look.isContentInteractive
+                    FloatingCallStageContent(
+                        store = store,
+                        layout = look::contentLayout,
+                        status = statusText,
+                        onMinimize = { model.send(FloatingCallStageFeature.Action.MinimizeTapped) },
                         modifier = Modifier
-                            .requiredSize(max(0f, faceWidth).dp, max(0f, faceHeight).dp)
-                            .graphicsLayer {
-                                scaleX = faceScale
-                                scaleY = faceScale
+                            .placed {
+                                val frame = frameOf()
+                                look.contentBox().translate(-frame.left, -frame.top)
+                            }
+                            .graphicsLayer { alpha = look.contentShown().toFloat() }
+                            .then(if (interactive) Modifier else Modifier.blocksTouches())
+                            .semantics {
+                                // Already the sheet: nothing to expand to.
+                                if (stage != FloatingCallStage.full) {
+                                    customActions = listOf(
+                                        CustomAccessibilityAction("Expand") {
+                                            model.send(FloatingCallStageFeature.Action.Requested(FloatingCallStage.full))
+                                            true
+                                        },
+                                    )
+                                }
                             },
                     )
                 }
-                if (restControls) {
+            }
+            FloatingCallStack(Modifier.fillMaxSize()) {
+                if (look.showsRestControls) {
                     FloatingCallRestControls(
                         style = style,
                         orbSize = restSize.height,
-                        trailing = restingFrame.center.x > screen.width / 2,
+                        trailing = look.restsTrailing,
                         isMuted = isMuted,
                         statusText = statusText,
                         reduceMotion = reduceMotion,
                         isEnabled = !lifting,
                         onExpand = model::expand,
                         onEnd = { store.send(VoiceFeature.Action.EndPressed) },
-                        modifier = Modifier.placed(outerX, outerY, outerWidth, outerHeight),
+                        modifier = Modifier.placed(outer),
                     )
                 }
-
-                if (contentMounted) {
-                    // The card's content is laid out at the card's size and pinned to the growing shape's
-                    // bottom corner, revealed as the shape grows over it; past the card it lays out on the shape.
-                    val card = geometry.cardFrame
-                    val asCard = if (motion.landing == null) motion.progress <= 1 else frame.height <= card.height + 0.5f
-                    val box = if (asCard) {
-                        Rect(Offset(if (geometry.trailing) frame.right - card.width else frame.left, frame.bottom - card.height), card.size)
-                    } else {
-                        geometry.visible(frame)
-                    }
-                    val layoutFull = if (asCard) 0.0 else full
-                    val bloom = FloatingCallStageGeometry.Bloom(
-                        y = lerp(geometry.cardBloom.y, geometry.fullBloom.y, layoutFull),
-                        radius = lerp(geometry.cardBloom.radius, geometry.fullBloom.radius, layoutFull),
-                    )
-                    val shown = (if (asCard) smooth(0.35, 0.92, grown) else 1.0) * motion.content
-                    val interactive = motion.target != FloatingCallStage.orb && motion.landing == null
-                    FloatingCallStageContent(
-                        store = store,
-                        width = box.width,
-                        height = box.height,
-                        fullness = layoutFull.toFloat(),
-                        bloom = bloom,
-                        status = statusText,
-                        onMinimize = { model.send(FloatingCallStageFeature.Action.MinimizeTapped) },
-                        modifier = Modifier
-                            .placed(box.left - frame.left, box.top - frame.top, box.width, box.height)
-                            .graphicsLayer { this.alpha = shown.toFloat() }
-                            .then(if (interactive) Modifier else Modifier.blocksTouches())
-                            .semantics {
-                                customActions = listOf(
-                                    CustomAccessibilityAction("Expand") {
-                                        model.send(FloatingCallStageFeature.Action.Requested(FloatingCallStage.full))
-                                        true
-                                    },
-                                )
-                            },
-                    )
-                }
-
                 // The composer's call button: the shape starts as it, the light giving way to the
                 // dark spinner as its glyph spins up, and landing it takes the button's look again.
-                if (buttonLook > 0) {
+                if (look.showsButton) {
                     Box(
                         Modifier
-                            .placed(0f, 0f, frame.width, frame.height)
-                            .graphicsLayer { this.alpha = buttonLook.toFloat() }
+                            .placed { Rect(Offset.Zero, frameOf().size) }
+                            .graphicsLayer { alpha = look.buttonLook().toFloat() }
                             .background(OpenCodeTheme.colors.text, CircleShape)
                             .clearAndSetSemantics {},
                         contentAlignment = Alignment.Center,
@@ -1392,6 +1454,176 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
             }
         }
     }
+}
+
+/** The kinds of [FloatingCallTouchArea], without the frame that moves every frame. */
+private enum class FloatingCallTouchKind { none, everywhere, frame }
+
+/**
+ * Everything about the floating call's shape that follows it frame by frame, read while laying
+ * out and drawing (a lambda in a layout, offset, layer or draw modifier), so a drag or a flight
+ * recomposes nothing. The flags that switch a part on or off are derived states: composition
+ * reads them, and they change only when the part does.
+ */
+@Stable
+private class FloatingCallSurfaceLook(private val model: FloatingCallSurfaceModel) {
+    var geometry by mutableStateOf<FloatingCallStageGeometry?>(null)
+    var restArea by mutableStateOf<FloatingCallRestArea?>(null)
+    var restFrame by mutableStateOf(Rect.Zero)
+    var screen by mutableStateOf(Size.Zero)
+
+    private val motion get() = model.motion
+    private val connect get() = model.connect
+    private val float get() = model.float
+
+    private fun shaping() = motion.isActive
+
+    private fun restingFrame(): Rect {
+        val at = float.position ?: return restFrame
+        return restArea?.frame(centeredAt = at) ?: restFrame
+    }
+
+    fun frame(): Rect {
+        val geometry = geometry
+        if (shaping() && geometry != null) return motion.frame(geometry)
+        return connect.frame ?: restingFrame()
+    }
+
+    private fun grown(): Double {
+        val geometry = geometry ?: return 0.0
+        return if (shaping()) geometry.cardness(frame()) else 0.0
+    }
+
+    private fun full(): Double {
+        val geometry = geometry ?: return 0.0
+        return if (shaping()) geometry.fullness(frame()) else 0.0
+    }
+
+    /** The shape's outline: its corners round as the card's and the sheet's, a circle as the orb. */
+    val shape = object : Shape {
+        override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+            val geometry = geometry
+            val frame = frame()
+            val short = min(frame.width, frame.height).toDouble()
+            val radii = if (shaping() && geometry != null) geometry.radii(frame) else FloatingCallStageGeometry.Radii(short / 2, short / 2)
+            val top = with(density) { max(0.0, radii.top).toFloat().dp.toPx() }
+            val bottom = with(density) { max(0.0, radii.bottom).toFloat().dp.toPx() }
+            return Outline.Rounded(
+                RoundRect(
+                    rect = Rect(Offset.Zero, size),
+                    topLeft = CornerRadius(top),
+                    topRight = CornerRadius(top),
+                    bottomRight = CornerRadius(bottom),
+                    bottomLeft = CornerRadius(bottom),
+                ),
+            )
+        }
+    }
+
+    fun alpha(): Float = model.opacity.value * motion.opacity.toFloat()
+
+    /** Looking like the composer's button, it casts no shadow of its own. */
+    fun buttonLook(): Double {
+        val lifting = !shaping() && connect.frame != null
+        return max(if (lifting) connect.button else 0.0, model.landedAmount(frame()))
+    }
+
+    fun cardShadow(): Double {
+        val geometry = geometry ?: return 0.0
+        return if (shaping()) geometry.cardness(frame()) * (1 - buttonLook()) else 0.0
+    }
+
+    fun backing(): Double = lerp(FloatingCallStageTunables.cardFill.value, FloatingCallStageTunables.sheetFill.value, full()) * grown()
+
+    /** The small face hands over to the bigger field as the orb starts to grow. */
+    fun faceShown(): Double = 1 - smooth(0.03, 0.15, grown())
+
+    fun bloomShown(): Double = smooth(0.0, 0.12, grown())
+
+    /** The bloom's field's top-left corner, in the overlay, and the bloom placed in it. */
+    fun bloom(): Pair<Offset, LivingOrbBloom> {
+        val geometry = geometry ?: return Offset.Zero to LivingOrbBloom(Offset.Zero, 0f, 0f, 0f, Rect.Zero)
+        val frame = frame()
+        val full = full()
+        val bloom = geometry.bloom(frame)
+        val originX = bloom.centerX - screen.width / 2
+        val originY = bloom.centerY - FIELD_ABOVE
+        val bottom = min(geometry.visible(frame).bottom.toDouble(), bloom.centerY + bloom.radius * lerp(4.0, 1.35, full))
+        val placed = LivingOrbBloom(
+            center = Offset(screen.width / 2, FIELD_ABOVE.toFloat()),
+            radius = bloom.radius.toFloat(),
+            bottom = (bottom - originY).toFloat(),
+            fade = if (full > 0) 40f else 0.5f,
+            visible = frame.translate(-originX.toFloat(), -originY.toFloat()),
+        )
+        return Offset(originX.toFloat(), originY.toFloat()) to placed
+    }
+
+    /** Laid out as the card (pinned to the shape's bottom corner) or on the sheet's visible part. */
+    private fun asCard(): Boolean {
+        val geometry = geometry ?: return true
+        return if (motion.landing == null) motion.progress <= 1 else frame().height <= geometry.cardFrame.height + 0.5f
+    }
+
+    fun contentBox(): Rect {
+        val geometry = geometry ?: return Rect.Zero
+        val frame = frame()
+        val card = geometry.cardFrame
+        if (!asCard()) return geometry.visible(frame)
+        return Rect(Offset(if (geometry.trailing) frame.right - card.width else frame.left, frame.bottom - card.height), card.size)
+    }
+
+    fun contentLayout(): FloatingCallStageContentLayout {
+        val geometry = geometry ?: return FloatingCallStageContentLayout(0f, 0f, 0f, FloatingCallStageGeometry.Bloom(0.0, 0.0))
+        val box = contentBox()
+        val layoutFull = if (asCard()) 0.0 else full()
+        val bloom = FloatingCallStageGeometry.Bloom(
+            y = lerp(geometry.cardBloomFitted.y, geometry.fullBloomFitted.y, layoutFull),
+            radius = lerp(geometry.cardBloomFitted.radius, geometry.fullBloomFitted.radius, layoutFull),
+        )
+        return FloatingCallStageContentLayout(box.width, box.height, layoutFull.toFloat(), bloom, lineWidth = geometry.cardFrame.width)
+    }
+
+    fun contentShown(): Double = (if (asCard()) smooth(0.35, 0.92, grown()) else 1.0) * motion.content
+
+    val isLifting by derivedStateOf { connect.frame != null }
+    val isResting by derivedStateOf { float.position == null }
+    val isTrailing by derivedStateOf { frame().center.x > screen.width / 2 }
+    val restsTrailing by derivedStateOf { restingFrame().center.x > screen.width / 2 }
+    val isDimmed by derivedStateOf { model.dimAmount() > 0.001 }
+    val isFaceHidden by derivedStateOf { faceShown() <= 0 }
+    val isBloomHidden by derivedStateOf { bloomShown() <= 0 }
+    val showsButton by derivedStateOf { buttonLook() > 0 }
+    val showsRestControls by derivedStateOf {
+        !shaping() || (motion.target == FloatingCallStage.orb && motion.progress < 0.05 && motion.landing == null)
+    }
+    val isContentMounted by derivedStateOf {
+        if (motion.landing == null) motion.progress > 0.01 || motion.target != FloatingCallStage.orb else motion.content > 0
+    }
+    val isContentInteractive by derivedStateOf { motion.target != FloatingCallStage.orb && motion.landing == null }
+    private val touch = mutableMapOf<Boolean, State<FloatingCallTouchKind>>()
+
+    fun touchKind(terminal: Boolean): FloatingCallTouchKind {
+        val state = touch.getOrPut(terminal) {
+            derivedStateOf {
+                when (model.touchArea(frame(), terminal)) {
+                    FloatingCallTouchArea.None -> FloatingCallTouchKind.none
+                    FloatingCallTouchArea.Everywhere -> FloatingCallTouchKind.everywhere
+                    is FloatingCallTouchArea.Frame -> FloatingCallTouchKind.frame
+                }
+            }
+        }
+        return state.value
+    }
+}
+
+/** [placed] where [rect] says, read while laying out: it can move and resize every frame without recomposing. */
+private fun Modifier.placed(rect: () -> Rect): Modifier = layout { measurable, _ ->
+    val now = rect()
+    val width = max(0f, now.width).dp.roundToPx()
+    val height = max(0f, now.height).dp.roundToPx()
+    val placeable = measurable.measure(Constraints.fixed(width, height))
+    layout(width, height) { placeable.place(now.left.dp.roundToPx(), now.top.dp.roundToPx()) }
 }
 
 /** Above the bloom's centre and the room below it in its field: enough for the card and the sheet's field at any stage between. */
@@ -1519,6 +1751,8 @@ private fun FloatingCallEndButton(diameter: Float, isEnabled: Boolean, onEnd: ()
     Box(
         modifier
             .size(FloatingCallSurfaceModel.MIN_TOUCH.dp)
+            // The press shows on the round button, not the square touch target around it.
+            .clip(CircleShape)
             .clickable(enabled = isEnabled, role = Role.Button, onClick = onEnd)
             .semantics { contentDescription = "End voice call" },
         contentAlignment = Alignment.Center,
@@ -1555,6 +1789,8 @@ private fun FloatingCallTag(text: String) {
  * glyph sits on one line.
  *
  * @param isPlaceholder shown so the layout can be judged; needs plumbing that isn't built yet.
+ * @param scale how much bigger the circle is drawn than [diameter], read while drawing: the card's
+ * controls grow toward the sheet's without being laid out again.
  */
 @Composable
 internal fun RowScope.FloatingCallControl(
@@ -1565,6 +1801,7 @@ internal fun RowScope.FloatingCallControl(
     isEnabled: Boolean = true,
     isDestructive: Boolean = false,
     isPlaceholder: Boolean = false,
+    scale: () -> Float = { 1f },
     action: () -> Unit,
 ) {
     val active = !isPlaceholder && isEnabled
@@ -1585,11 +1822,13 @@ internal fun RowScope.FloatingCallControl(
     )
     val tint = if (isDestructive) Color.White else if (isOn) background else text
     val shape = RoundedCornerShape(OpenCodeRadius.panel)
+    // The whole share of the row takes the tap; the press shows on the plate only.
+    val interaction = remember { MutableInteractionSource() }
     Box(
         Modifier
             .weight(1f)
             .heightIn(min = max(48f, diameter).dp)
-            .clickable(enabled = active, role = Role.Button, onClick = action)
+            .clickable(interactionSource = interaction, indication = null, enabled = active, role = Role.Button, onClick = action)
             .semantics {
                 contentDescription = name
                 if (isPlaceholder) stateDescription = "Not available in this prototype"
@@ -1603,8 +1842,15 @@ internal fun RowScope.FloatingCallControl(
         Box(
             Modifier
                 .size(diameter.dp)
+                .graphicsLayer {
+                    val grown = scale()
+                    scaleX = grown
+                    scaleY = grown
+                }
                 .alpha(plateDim)
+                .clip(shape)
                 .background(fill, shape)
+                .indication(interaction, ripple())
                 .border(1.dp, edge, shape),
             contentAlignment = Alignment.Center,
         ) {
@@ -1636,9 +1882,20 @@ internal fun FloatingCallDuration(connectedAt: Instant?, status: String, modifie
         maxLines = 1,
         modifier = modifier.clearAndSetSemantics {
             contentDescription = "Call duration"
-            stateDescription = text
+            // TalkBack reads "1:05" as a time of day; say how long it's been.
+            stateDescription = if (connectedAt == null) text else floatingCallSpokenDuration(seconds)
         },
     )
+}
+
+/** A call's length as TalkBack should say it: "1 minute, 5 seconds". */
+internal fun floatingCallSpokenDuration(seconds: Long): String {
+    val minutes = seconds / 60
+    val rest = seconds % 60
+    val secondsText = if (rest == 1L) "1 second" else "$rest seconds"
+    if (minutes == 0L) return secondsText
+    val minutesText = if (minutes == 1L) "1 minute" else "$minutes minutes"
+    return "$minutesText, $secondsText"
 }
 
 private fun lerp(a: Double, b: Double, t: Double): Double = a + (b - a) * t

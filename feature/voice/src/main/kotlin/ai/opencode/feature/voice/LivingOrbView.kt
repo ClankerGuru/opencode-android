@@ -103,9 +103,10 @@ data class LivingOrbBloom(
  * glass looks the same in light and dark.
  *
  * @param isHidden faded out behind the panel: no drawing.
+ * @param bloom where the bloom is this frame, read as each frame renders (overrides `config.bloom`).
  */
 @Composable
-fun LivingOrbView(config: LivingOrbConfig, modifier: Modifier = Modifier, isHidden: Boolean = false) {
+fun LivingOrbView(config: LivingOrbConfig, modifier: Modifier = Modifier, isHidden: Boolean = false, bloom: (() -> LivingOrbBloom?)? = null) {
     // iOS `.onAppear { WispOrbTunables.register() }`.
     LaunchedEffect(Unit) { WispOrbTunables.register() }
     val reduceMotion = rememberReduceMotion()
@@ -115,9 +116,12 @@ fun LivingOrbView(config: LivingOrbConfig, modifier: Modifier = Modifier, isHidd
     var size by remember { mutableStateOf(IntSize.Zero) }
     var frame by remember { mutableIntStateOf(0) }
     val currentConfig by rememberUpdatedState(config)
+    val currentBloom by rememberUpdatedState(bloom)
 
     fun configure() {
-        renderer.config = currentConfig
+        // A bloom that moves every frame is read here, each frame, rather than recomposing.
+        val bloomNow = currentBloom
+        renderer.config = if (bloomNow != null) currentConfig.copy(bloom = bloomNow()) else currentConfig
         renderer.tuning = WispOrbTuning.current
         renderer.isStill = reduceMotion
     }
