@@ -26,6 +26,7 @@ import android.view.MotionEvent
 import android.view.ViewGroup
 import android.view.Window
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import ai.opencode.devtools.DevTools
 import ai.opencode.devtools.DevToolsOverlay
 import androidx.activity.compose.setContent
@@ -37,6 +38,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.lifecycleScope
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.system.SessionWindowTarget
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -130,6 +133,7 @@ class MainActivity : ComponentActivity() {
             PerfTimeline.appLaunched()
             PerfFrameSampler.startIfRequested()
         }
+        keepCallOnBack()
         setContent { DevToolsOverlay { AppView(store) } }
         window.decorView.viewTreeObserver.addOnTouchModeChangeListener { inTouchMode ->
             touchModeLeft = if (inTouchMode) null else TouchModeExit(SystemClock.uptimeMillis(), currentFocus != null)
@@ -141,6 +145,24 @@ class MainActivity : ComponentActivity() {
         if (root.follows) followShownSession()
         // A recreated activity already handled its launch intent.
         if (savedInstanceState == null) handle(intent)
+    }
+
+    /**
+     * Back out of the app with a call live puts the window behind the others instead of closing
+     * it, as Home does, so the call (and its orb or card) is there on coming back; closing it
+     * would leave the call running with nothing in the app to show or end it. Added before
+     * the content, so every back the app handles itself comes first.
+     */
+    private fun keepCallOnBack() {
+        val callback = object : OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                moveTaskToBack(true)
+            }
+        }
+        onBackPressedDispatcher.addCallback(this, callback)
+        lifecycleScope.launch {
+            store.states.map { it.hasLiveCall }.distinctUntilChanged().collect { callback.isEnabled = it }
+        }
     }
 
     /**
