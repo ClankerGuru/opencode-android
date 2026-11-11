@@ -116,8 +116,8 @@ internal fun SessionFeature.appendInfo(state: State, text: String): State =
     state.copy(items = state.items + OpenCodeTranscriptItem.Info(id = "info-${uuid.next()}", text = text))
 
 /**
- * iOS `SessionFeature.backgroundHintDelay`: how long a shell or subagent must block the run before it
- * can be moved to the background (the TUI's `BACKGROUND_TOOL_HINT_DELAY`), in seconds.
+ * How long a shell must block the run before the UI offers to move it to the background
+ * (iOS `SessionFeature.backgroundHintDelay`, the TUI's `BACKGROUND_TOOL_HINT_DELAY`), in seconds.
  */
 internal const val backgroundHintDelay: Double = 3.0
 

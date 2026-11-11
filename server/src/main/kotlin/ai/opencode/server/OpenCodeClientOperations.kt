@@ -17,7 +17,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * A voice call's steer moves the session's running shells and subagents to the background
+ * A voice call's steer moves the session's blocking shells to the background
  * first. Silent and tried once: the steer goes either way.
  */
 suspend fun OpenCodeClient.moveToBackgroundBeforeSteer(server: OpenCodeServer, sessionID: String) {

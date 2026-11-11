@@ -42,7 +42,7 @@ import kotlin.time.Duration.Companion.seconds
 /**
  * Port of iOS `DrawerActivityTests.swift`: the drawer's running indicators, matched to the TUI
  * and the desktop app: a root shows Working while it or any session in its family runs
- * (subagents moved to the background run their own sessions); shells don't count. Plus
+ * (subagents run their own sessions); shells don't count. Plus
  * `DrawerDotTests` (the drawer button's dot).
  *
  * Stores run their effects in `backgroundScope` (iOS `skipInFlightEffects`). iOS's
@@ -107,8 +107,7 @@ class DrawerActivityTests {
         }
         store.exhaustive = false
 
-        // The subagent starts while its parent is open, then the parent's own run ends: it
-        // moved the subagent to the background.
+        // The subagent starts while its parent is open and stays active across the switch.
         store.send(HomeFeature.Action.ServerEvent(OpenCodeServerEvent.ExecutionStarted(child.id)))
         assertEquals(parent.id, store.state.activeSessionParents[child.id])
         assertEquals(Indicator.running, store.state.indicator(parent))
@@ -285,8 +284,7 @@ class DrawerActivityTests {
         val store = TestStore(state, HomeFeature(), backgroundScope) {
             this[Clock] = ImmediateClock()
             this[OpenCodeClient] = OpenCodeClient.testValue.copy(
-                // The root's own run ended after moving its subagent to the background; the
-                // subagent's session keeps running.
+                // The root's own run ended; its subagent's session keeps running.
                 homeSnapshot = { snapshot(listOf(root, shellOwner), active = setOf("ses_child"), parents = mapOf("ses_child" to root.id)) },
                 homeAttention = { _, _, _ -> emptySet() },
                 transcript = { _, _, _ -> emptyList() },

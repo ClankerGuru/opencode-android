@@ -375,7 +375,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
 
         /**
          * Like the TUI and the desktop app, a root is busy while it or anything in its family runs:
-         * subagents moved to the background keep running their own sessions. Shells don't count.
+         * subagents run in their own sessions. Shells don't count.
          */
         val busySessionIDs: Set<String>
             get() = if (activeSessionIDs.isEmpty()) emptySet() else parentSources.busy(activeSessionIDs)
