@@ -1,10 +1,8 @@
 package ai.opencode.core.ui
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
@@ -13,7 +11,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -29,9 +26,6 @@ object OpenCodeButtonDefaults {
     val height: Dp = 48.dp
 
     val contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
-
-    /** The desktop's button radius (`--radius-md`-ish 8 at phone size), not a capsule. */
-    val shape: Shape = RoundedCornerShape(OpenCodeRadius.fill)
 }
 
 /**
@@ -61,7 +55,7 @@ fun OpenCodePrimaryButton(
         onClick = onClick,
         modifier = modifier.heightIn(min = OpenCodeButtonDefaults.height),
         enabled = enabled,
-        shape = OpenCodeButtonDefaults.shape,
+        shape = OpenCodeShape.control,
         colors = colors,
         contentPadding = OpenCodeButtonDefaults.contentPadding,
         content = content,
@@ -102,8 +96,8 @@ fun OpenCodeSecondaryButton(
         onClick = onClick,
         modifier = modifier.heightIn(min = OpenCodeButtonDefaults.height),
         enabled = enabled,
-        shape = OpenCodeButtonDefaults.shape,
-        border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
+        shape = OpenCodeShape.control,
+        border = OpenCodeSurfaces.border,
         colors = colors,
         contentPadding = OpenCodeButtonDefaults.contentPadding,
         content = content,

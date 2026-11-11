@@ -1,7 +1,7 @@
 package ai.opencode.feature.settings.serverdetails
 
 import ai.opencode.core.ui.OpenCodeSearchField
-import ai.opencode.core.ui.OpenCodeSheetDefaults
+import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.motion.Motion
@@ -99,7 +99,7 @@ internal fun ServerDetailsTray(
         sheetState = sheetState,
         containerColor = OpenCodeTheme.colors.groupedCanvas,
         dragHandle = { OpenCodeSheetHandle() },
-        shape = OpenCodeSheetDefaults.shape,
+        shape = OpenCodeShape.sheetTop,
     ) {
         when (tray) {
             ServerDetailsFeature.Tray.Mcp -> MCPServersTray(state, send, close)
