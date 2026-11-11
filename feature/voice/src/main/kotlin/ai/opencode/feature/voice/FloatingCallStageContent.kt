@@ -28,7 +28,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -242,7 +241,6 @@ fun FloatingCallTranscript(store: VoiceStoreOf, modifier: Modifier = Modifier) {
     }
     var now by remember { mutableDoubleStateOf(transcriptNow()) }
     val queueChanged = remember { Channel<Unit>(Channel.CONFLATED) }
-    val latestReveal by rememberUpdatedState(reveal)
 
     val animationEnd = reveal.lastReveal + CaptionWordRenderer.duration
     val isActive = lifecycle.isAtLeast(Lifecycle.State.RESUMED)
@@ -262,7 +260,9 @@ fun FloatingCallTranscript(store: VoiceStoreOf, modifier: Modifier = Modifier) {
         queueChanged.trySend(Unit)
         for (signal in queueChanged) {
             while (true) {
-                val wait = latestReveal.nextRevealDelay(transcriptNow()) ?: break
+                // Reads the state itself: a value remembered at composition goes stale while this
+                // loop runs without suspending, and then it never ends.
+                val wait = reveal.nextRevealDelay(transcriptNow()) ?: break
                 if (wait > 0) delay((wait * 1000).roundToInt().toLong().coerceAtLeast(1))
                 reveal = reveal.revealNext(transcriptNow())
             }

@@ -15,4 +15,6 @@ dependencies {
     implementation(libs.media3.exoplayer)
     // The real VoiceHapticEngine (Vibrator, ProcessLifecycleOwner) in the ported teardown test.
     testImplementation(libs.robolectric)
+    // A ComponentActivity to compose the call transcript in (FloatingCallTranscriptTests).
+    testImplementation(libs.androidx.activity.compose)
 }
