@@ -280,7 +280,6 @@ private fun SettingsRootPage(store: SettingsStore) {
         store.send(SettingsFeature.Action.PagePushed(page))
     }
 
-    // The main page keeps its icons, as the desktop's settings sidebar does.
     CompositionLocalProvider(LocalSettingsRowIcons provides true) {
         SettingsPageScaffold(title = "Settings", store = store) {
             item(key = "connection", contentType = "connection") {
