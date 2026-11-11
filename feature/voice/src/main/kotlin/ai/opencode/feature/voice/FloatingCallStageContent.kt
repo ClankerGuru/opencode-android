@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.MeasurePolicy
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -318,11 +319,21 @@ fun FloatingCallTranscript(store: VoiceStoreOf, modifier: Modifier = Modifier) {
             .testTag("floating-call-transcript"),
         contentAlignment = Alignment.BottomStart,
     ) {
-        // The column keeps its own height, hung from the bottom of the room it's given.
+        // The column keeps its own height, hung from the bottom of the room it's given, and glides
+        // up when it grows rather than jumping a line.
+        val glide = remember { FloatingCallTranscriptGlide() }
         Column(
             Modifier
                 .fillMaxWidth()
-                .wrapContentHeight(align = Alignment.Bottom, unbounded = true),
+                .wrapContentHeight(align = Alignment.Bottom, unbounded = true)
+                .layout { measurable, constraints ->
+                    val placeable = measurable.measure(constraints)
+                    val measuredAt = transcriptNow()
+                    glide.measured(placeable.height, measuredAt, glides = !reduceMotion && animationEnd - measuredAt >= FloatingCallTranscriptGlide.duration)
+                    layout(placeable.width, placeable.height) {
+                        placeable.placeWithLayer(0, 0) { translationY = glide.offset(now) }
+                    }
+                },
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (lines.isEmpty()) {
@@ -344,6 +355,42 @@ fun FloatingCallTranscript(store: VoiceStoreOf, modifier: Modifier = Modifier) {
                 }
             }
         }
+    }
+}
+
+/**
+ * The transcript column's rise: when a word wraps or a line starts, the column grows by a line
+ * and, hung from the bottom, would jump up at once; instead it starts where it was and eases up
+ * while the word fades in. A shrink (settled lines trimmed) is never glided.
+ */
+private class FloatingCallTranscriptGlide {
+    private var height = -1
+    private var from = 0f
+    private var startedAt = Double.NEGATIVE_INFINITY
+
+    fun measured(newHeight: Int, now: Double, glides: Boolean) {
+        if (height >= 0 && newHeight > height && glides) {
+            from = offset(now) + (newHeight - height)
+            startedAt = now
+        } else if (newHeight != height) {
+            from = 0f
+            startedAt = Double.NEGATIVE_INFINITY
+        }
+        height = newHeight
+    }
+
+    /** How far below its place the column is drawn at [now] (px). */
+    fun offset(now: Double): Float {
+        val progress = (now - startedAt) / duration
+        if (progress >= 1) return 0f
+        if (progress <= 0) return from
+        val remaining = 1 - progress
+        return from * (remaining * remaining * remaining).toFloat()
+    }
+
+    companion object {
+        /** Shorter than a word's fade, so the reveal's frame clock outlasts it. */
+        const val duration = 0.3
     }
 }
 
