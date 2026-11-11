@@ -162,7 +162,7 @@ fun PairingScannerView(
                     !isCameraAvailable -> PairingScannerFallback(
                         symbol = "camera.metering.unknown",
                         title = "No Camera Available",
-                        message = "Copy the link that `opencode pair --remote` prints on your computer, then paste it here.",
+                        message = "Copy the link that `opencode pair` prints on your computer, then paste it here.",
                         settings = false,
                         onOpenSettings = camera.openSettings,
                         onPaste = ::paste,
@@ -171,7 +171,7 @@ fun PairingScannerView(
                     isAccessDenied -> PairingScannerFallback(
                         symbol = "camera.fill",
                         title = "Camera Access Is Off",
-                        message = "Allow camera access in Settings to scan the QR code, or paste the link that `opencode pair --remote` prints.",
+                        message = "Allow camera access in Settings to scan the QR code, or paste the link that `opencode pair` prints.",
                         settings = true,
                         onOpenSettings = camera.openSettings,
                         onPaste = ::paste,
@@ -192,7 +192,7 @@ fun PairingScannerView(
                 confirmButton = { TextButton(onClick = { pasteFailed = false }) { Text("OK") } },
                 title = { Text("Nothing to Paste") },
                 text = {
-                    Text("Your clipboard doesn’t have a pairing link. Copy the link that opencode pair --remote prints, then try again.")
+                    Text("Your clipboard doesn’t have a pairing link. Copy the link that opencode pair prints, then try again.")
                 },
             )
         }
@@ -234,11 +234,11 @@ private fun PairingViewfinder(modifier: Modifier = Modifier) {
             Text("Point your camera at the QR code", style = OpenCodeTextStyles.headline, color = OpenCodeTheme.colors.text, textAlign = TextAlign.Center)
             Text(
                 buildAnnotatedString {
-                    append("Run ")
+                    append("On your computer, open OpenCode’s Settings → Pairing, or run ")
                     withStyle(SpanStyle(fontFamily = OpenCodeFonts.monospace, fontSize = 14.sp, color = OpenCodeTheme.colors.text)) {
-                        append("opencode pair --remote")
+                        append("opencode pair")
                     }
-                    append(" on your computer to show it.")
+                    append(" in a terminal.")
                 },
                 style = OpenCodeTextStyles.subheadline,
                 color = OpenCodeTheme.colors.secondaryText,
