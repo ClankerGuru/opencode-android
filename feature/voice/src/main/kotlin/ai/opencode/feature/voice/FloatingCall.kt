@@ -35,6 +35,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
@@ -57,6 +59,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -76,6 +79,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.dropShadow
@@ -1301,25 +1305,37 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
                 .graphicsLayer {
                     alpha = look.alpha()
                     this.shape = shape
-                    clip = true
                     shadowElevation = max(0.0, restShadow / 2 * (1 - look.buttonLook())).toFloat().dp.toPx()
-                }
-                .background(cardFill)
-                .drawBehind {
-                    // The sheet's backing deepens as it fills, so its text reads over anything.
-                    val backing = look.backing()
-                    if (backing > 0) drawRect(cardFill.copy(alpha = backing.toFloat().coerceIn(0f, 1f)))
-                }
-                .drawWithContent {
-                    drawContent()
-                    val edge = cardBorder.copy(alpha = cardBorder.alpha * (1 - look.buttonLook()).toFloat())
-                    drawOutline(shape.createOutline(size, layoutDirection, this), edge, style = Stroke(1.dp.toPx()))
                 }
                 .then(gestures),
         ) {
-            FloatingCallStack(Modifier.fillMaxSize()) {
-                val rides = shaping || lifting || !look.isResting
-                val restControls = look.showsRestControls
+            val rides = shaping || lifting || !look.isResting
+            // Growing, the orb's face keeps its own size and is scaled with the shape, as it is lifting out of the call button.
+            val outer = {
+                val frame = frameOf()
+                if (rides) Rect(Offset.Zero, frame.size) else look.restFrame.translate(-frame.left, -frame.top)
+            }
+            // The shape's own layers, clipped to it; the orb's controls and the call button ride
+            // above, so the mute badge can sit over the orb's rim (iOS's controls layer).
+            FloatingCallStack(
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        this.shape = shape
+                        clip = true
+                    }
+                    .background(cardFill)
+                    .drawBehind {
+                        // The sheet's backing deepens as it fills, so its text reads over anything.
+                        val backing = look.backing()
+                        if (backing > 0) drawRect(cardFill.copy(alpha = backing.toFloat().coerceIn(0f, 1f)))
+                    }
+                    .drawWithContent {
+                        drawContent()
+                        val edge = cardBorder.copy(alpha = cardBorder.alpha * (1 - look.buttonLook()).toFloat())
+                        drawOutline(shape.createOutline(size, layoutDirection, this), edge, style = Stroke(1.dp.toPx()))
+                    },
+            ) {
                 val contentMounted = look.isContentMounted
 
                 if (model.bloomMounted) {
@@ -1340,12 +1356,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
                     )
                 }
 
-                // Growing, the orb's face keeps its own size and is scaled with the shape, as it is lifting out of the call button.
                 val scalesFace = (shaping || lifting) && style == FloatingCallStyle.orb
-                val outer = {
-                    val frame = frameOf()
-                    if (rides) Rect(Offset.Zero, frame.size) else look.restFrame.translate(-frame.left, -frame.top)
-                }
                 Box(
                     Modifier
                         .placed(outer)
@@ -1374,21 +1385,6 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
                         },
                     )
                 }
-                if (restControls) {
-                    FloatingCallRestControls(
-                        style = style,
-                        orbSize = restSize.height,
-                        trailing = look.restsTrailing,
-                        isMuted = isMuted,
-                        statusText = statusText,
-                        reduceMotion = reduceMotion,
-                        isEnabled = !lifting,
-                        onExpand = model::expand,
-                        onEnd = { store.send(VoiceFeature.Action.EndPressed) },
-                        modifier = Modifier.placed(outer),
-                    )
-                }
-
                 if (contentMounted) {
                     // The card's content is laid out at the card's size and pinned to the growing shape's
                     // bottom corner, revealed as the shape grows over it; past the card it lays out on the shape.
@@ -1415,7 +1411,22 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
                             },
                     )
                 }
-
+            }
+            FloatingCallStack(Modifier.fillMaxSize()) {
+                if (look.showsRestControls) {
+                    FloatingCallRestControls(
+                        style = style,
+                        orbSize = restSize.height,
+                        trailing = look.restsTrailing,
+                        isMuted = isMuted,
+                        statusText = statusText,
+                        reduceMotion = reduceMotion,
+                        isEnabled = !lifting,
+                        onExpand = model::expand,
+                        onEnd = { store.send(VoiceFeature.Action.EndPressed) },
+                        modifier = Modifier.placed(outer),
+                    )
+                }
                 // The composer's call button: the shape starts as it, the light giving way to the
                 // dark spinner as its glyph spins up, and landing it takes the button's look again.
                 if (look.showsButton) {
@@ -1736,6 +1747,8 @@ private fun FloatingCallEndButton(diameter: Float, isEnabled: Boolean, onEnd: ()
     Box(
         modifier
             .size(FloatingCallSurfaceModel.MIN_TOUCH.dp)
+            // The press shows on the round button, not the square touch target around it.
+            .clip(CircleShape)
             .clickable(enabled = isEnabled, role = Role.Button, onClick = onEnd)
             .semantics { contentDescription = "End voice call" },
         contentAlignment = Alignment.Center,
@@ -1805,11 +1818,13 @@ internal fun RowScope.FloatingCallControl(
     )
     val tint = if (isDestructive) Color.White else if (isOn) background else text
     val shape = RoundedCornerShape(OpenCodeRadius.panel)
+    // The whole share of the row takes the tap; the press shows on the plate only.
+    val interaction = remember { MutableInteractionSource() }
     Box(
         Modifier
             .weight(1f)
             .heightIn(min = max(48f, diameter).dp)
-            .clickable(enabled = active, role = Role.Button, onClick = action)
+            .clickable(interactionSource = interaction, indication = null, enabled = active, role = Role.Button, onClick = action)
             .semantics {
                 contentDescription = name
                 if (isPlaceholder) stateDescription = "Not available in this prototype"
@@ -1829,7 +1844,9 @@ internal fun RowScope.FloatingCallControl(
                     scaleY = grown
                 }
                 .alpha(plateDim)
+                .clip(shape)
                 .background(fill, shape)
+                .indication(interaction, ripple())
                 .border(1.dp, edge, shape),
             contentAlignment = Alignment.Center,
         ) {
