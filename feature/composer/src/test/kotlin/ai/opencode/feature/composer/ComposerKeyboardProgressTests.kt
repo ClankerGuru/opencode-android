@@ -61,6 +61,12 @@ class ComposerKeyboardProgressTests {
         assertFalse(keyboard(source = 0, target = 900, ime = 900).isAnimating)
     }
 
+    /** HyperOS can leave the source taller than the keys at rest; the gap above them stays whole. */
+    @Test fun keysRestingUpAreFullyUpWhateverTheSourceSays() {
+        assertEquals(1f, keyboard(source = 1000, target = 900, ime = 900).progress)
+        assertEquals(0.5f, keyboard(source = 1000, target = 900, ime = 500).progress)
+    }
+
     @Test fun keysOnTheirWayAreAnimating() {
         assertTrue(keyboard(source = 0, target = 900, ime = 0).isAnimating)
         assertTrue(keyboard(source = 0, target = 900, ime = 300).isAnimating)

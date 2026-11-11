@@ -2,6 +2,7 @@
 
 package ai.opencode.feature.session
 
+import ai.opencode.core.ui.bottomSafeArea
 import ai.opencode.core.ui.inContainer
 import ai.opencode.feature.composer.composerWindowTouches
 import ai.opencode.core.dependencies.dependency
@@ -78,8 +79,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
@@ -365,7 +364,7 @@ fun SessionView(
                     Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .navigationBarsPadding()
+                        .windowInsetsPadding(WindowInsets.bottomSafeArea)
                         .imePadding()
                         .padding(bottom = if (onCatchUpOpen == null) 0.dp else CATCH_UP_COMPOSER_CLEARANCE.dp)
                         // The room between the status bar and the keyboard (iOS `requestPanelInputs.room`):
@@ -758,7 +757,7 @@ private fun RequestPanelRoomProbe(host: SessionComposerHost, modifier: Modifier)
     var height by remember { mutableIntStateOf(0) }
     // A Catch Up card's own edges, not the window's ([inContainer]).
     val top = WindowInsets.statusBarsIgnoringVisibility.inContainer().getTop(density)
-    val bottom = maxOf(WindowInsets.ime.inContainer().getBottom(density), WindowInsets.navigationBars.inContainer().getBottom(density))
+    val bottom = maxOf(WindowInsets.ime.inContainer().getBottom(density), WindowInsets.bottomSafeArea.inContainer().getBottom(density))
     Box(modifier.onSizeChanged { height = it.height })
     SideEffect {
         val room = with(density) { (height - top - bottom).coerceAtLeast(0).toDp().value }

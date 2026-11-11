@@ -1,6 +1,7 @@
 package ai.opencode.feature.session
 
 import ai.opencode.core.ui.OpenCodeSheetHandleDefaults
+import ai.opencode.core.ui.bottomSafeArea
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.rememberReduceMotion
@@ -44,7 +45,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -771,7 +771,7 @@ internal fun SessionPhotoSheetEnvironment(
     val reduceMotion = rememberReduceMotion()
     // The session's own space: a Catch Up card's edges, not the window's ([inContainer]).
     val ime = WindowInsets.ime.inContainer().getBottom(density)
-    val navigation = WindowInsets.navigationBars.inContainer().getBottom(density)
+    val navigation = WindowInsets.bottomSafeArea.inContainer().getBottom(density)
     SideEffect {
         state.env = SessionPhotoSheetState.Env(
             store = store,

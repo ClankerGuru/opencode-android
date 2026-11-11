@@ -2,8 +2,11 @@ package ai.opencode.core.ui
 
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.exclude
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.unit.dp
 
 /**
  * How far the window's edges lie outside the container the content is laid out in: a Catch Up
@@ -31,3 +34,18 @@ fun WindowInsets.inContainer(): WindowInsets {
     if (outside === NoContainerInsets) return this
     return exclude(outside)
 }
+
+/** The least room [bottomSafeArea] leaves under content resting on the bottom edge. */
+val MinimumBottomSafeArea = 8.dp
+
+/**
+ * The navigation bar's bottom inset, but never less than [MinimumBottomSafeArea]: what content
+ * resting on the bottom edge (the composer) stands on, like iOS's bottom safe area. Android-only:
+ * every iPhone this app runs on has a 34 pt home-indicator safe area, but HyperOS with the
+ * gesture hint hidden (and other phones) reports a 0 navigation bar, which left the composer
+ * flush on the screen's edge. Gesture navigation (24 dp) and three-button navigation (48 dp) are
+ * taller than the floor, so they're unchanged. Code that places things against the composer's
+ * resting position reads this, not `navigationBars`, so it doesn't drift by the floor.
+ */
+val WindowInsets.Companion.bottomSafeArea: WindowInsets
+    @Composable get() = navigationBars.union(WindowInsets(bottom = MinimumBottomSafeArea))
