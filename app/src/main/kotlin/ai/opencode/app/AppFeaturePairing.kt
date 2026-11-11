@@ -12,6 +12,7 @@ import ai.opencode.core.store.cancellable
 import ai.opencode.core.ui.ThisDevice
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.notices.AccessibilityAnnouncer
+import ai.opencode.server.LocalNetworkPermission
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodePairingLink
@@ -146,9 +147,11 @@ internal fun redeem(link: OpenCodePairingLink, state: AppFeature.State): Reduced
         connectionAttempt = attempt,
     )
     val client = dependency(OpenCodeClient)
+    val localNetwork = dependency(LocalNetworkPermission)
     return Reduced(
         next,
         Effect.run<AppFeature.Action> { send ->
+            if (localNetwork.blocks(normalized.server)) localNetwork.request()
             val result = try {
                 Result.success(client.redeemPairing(normalized))
             } catch (error: OpenCodeClientError) {

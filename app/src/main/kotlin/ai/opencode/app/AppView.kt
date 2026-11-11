@@ -24,6 +24,7 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconButton
 import ai.opencode.core.ui.OpenCodeIconButtonStyle
 import ai.opencode.core.ui.OpenCodeMinTapTarget
+import ai.opencode.core.ui.OpenCodePrimaryButton
 import ai.opencode.core.ui.OpenCodeSecondaryButton
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
@@ -650,6 +651,7 @@ private fun errorTitle(phase: AppFeature.FailureContext.Phase?, context: AppFeat
 private fun ConnectionErrorCard(store: StoreOf<AppFeature.State, AppFeature.Action>, message: String, announces: Boolean) {
     val phase by store.observe { it.errorPhase }
     val context by store.observe { it.errorContext }
+    val needsLocalNetwork by store.observe { it.errorNeedsLocalNetwork }
     var didCopy by remember(message) { mutableStateOf(false) }
     val title = errorTitle(phase, context)
     val secondary = OpenCodeTheme.colors.secondaryText
@@ -682,6 +684,9 @@ private fun ConnectionErrorCard(store: StoreOf<AppFeature.State, AppFeature.Acti
                         Text("OpenCode ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", style = OpenCodeTextStyles.footnote, color = secondary)
                     }
                 }
+            }
+            if (needsLocalNetwork) {
+                OpenCodePrimaryButton(onClick = { store.send(AppFeature.Action.LocalNetworkSettingsTapped) }) { Text("Open Settings") }
             }
             OpenCodeSecondaryButton(onClick = {
                 store.state.errorReport(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE.toString(), java.time.Instant.now())?.let {
