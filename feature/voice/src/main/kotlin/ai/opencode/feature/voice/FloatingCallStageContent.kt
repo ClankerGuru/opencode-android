@@ -363,11 +363,8 @@ private fun floatingCallWordFlow(spaceWidth: Int) = MeasurePolicy { measurables,
     var rowY = 0
     var rowHeight = 0
     val placed = measurables.map { measurable ->
-        var placeable = measurable.measure(Constraints())
-        if (placeable.width > width) {
-            // A word wider than the line wraps within its own row.
-            placeable = measurable.measure(Constraints(maxWidth = width))
-        }
+        // Measured once, as Compose requires: a word wider than the line wraps within its own row.
+        val placeable = measurable.measure(Constraints(maxWidth = width))
         if (x > 0 && x + spaceWidth + placeable.width > width) {
             rowY += rowHeight
             rowHeight = 0

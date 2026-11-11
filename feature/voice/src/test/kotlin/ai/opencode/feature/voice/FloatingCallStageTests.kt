@@ -620,4 +620,14 @@ class FloatingCallTranscriptTests {
         store.flow.value = store.flow.value.copy(liveAssistantText = "Checking the upload test now and the retry test ")
         idle(50)
     }
+
+    /** A path or link longer than the line wraps within its own row instead of crashing. */
+    @Test fun aWordWiderThanTheLineWrapsInItsOwnRow() {
+        val word = "/Users/kit/project/packages/opencode/src/session/" + "deeply/nested/".repeat(20) + "upload.test.ts"
+        val store = CaptionStore(
+            VoiceFeature.State(VoiceFeatureTestSupport.server, VoiceFeatureTestSupport.session).copy(liveAssistantText = "Open $word please "),
+        )
+        compose(store, width = 160)
+        idle(2_000)
+    }
 }
