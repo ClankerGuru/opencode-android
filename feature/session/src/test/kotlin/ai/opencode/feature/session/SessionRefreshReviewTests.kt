@@ -158,9 +158,10 @@ class SessionRefreshReviewTests {
     }
 
     @Test fun serverIdleSettlesAnAdmittedSendUnlessALocalPromptStillWaits() {
+        val unfinishedReply = text.copy(inProgress = true)
         for (pending in listOf("none", "submitting", "queued", "echoed")) sessionTest { h ->
             val next = OpenCodeTranscriptItem.UserText(id = "msg_next", text = "Next")
-            var state = h.state(cachedItems = listOf(user, text)).copy(
+            var state = h.state(cachedItems = listOf(user, unfinishedReply)).copy(
                 isAwaitingReply = true,
                 isExternallyActive = true,
                 projectedMessageIDs = setOf("msg_reply"),
@@ -185,7 +186,7 @@ class SessionRefreshReviewTests {
             assertEquals("pending=$pending", pending == "submitting" || pending == "queued", store.state.isAwaitingReply)
             assertEquals(
                 "pending=$pending",
-                if (pending == "echoed") listOf(user, next) else if (pending == "none") listOf(user) else listOf(user, text),
+                if (pending == "echoed") listOf(user, next) else if (pending == "none") listOf(user) else listOf(user, unfinishedReply),
                 store.state.items,
             )
             store.finish()
