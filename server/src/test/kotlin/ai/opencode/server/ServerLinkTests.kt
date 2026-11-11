@@ -167,7 +167,7 @@ class ServerLinkTests {
     @Test fun aPreferredAddressThatIsNoLongerSavedOrEveryAddressPreferredRacesAsBefore() = runTest {
         val store = ServerLinkStore(health = { server -> delay(if (server.url == tunnel) 5.milliseconds else 150.milliseconds) })
         assertEquals(tunnel, store.probe(pairedByURL.copy(preferredURLs = listOf("http://10.9.9.9:4096"))).url)
-        assertEquals(emptyList<String>(), pairedByURL.copy(preferredURLs = pairedByURL.candidateURLs).preferredCandidateURLs)
+        assertEquals(pairedByURL.candidateURLs, pairedByURL.copy(preferredURLs = pairedByURL.candidateURLs).firstAttemptURLs)
         assertEquals(tunnel, ServerLinkStore(health = { server -> delay(if (server.url == tunnel) 5.milliseconds else 150.milliseconds) })
             .probe(pairedByURL.copy(preferredURLs = pairedByURL.candidateURLs)).url)
     }
@@ -502,7 +502,7 @@ class ServerLinkTests {
             """{"url":"$lan","username":"opencode","password":"1790000000.token","alternateURLs":["$tailnet"],"name":"Adams Mini","headers":[]}""",
         )
         assertEquals(saved, old)
-        assertEquals(emptyList<String>(), old.preferredCandidateURLs)
+        assertEquals(old.candidateURLs, old.firstAttemptURLs)
         assertEquals(pairedByURL, json.decodeFromString(OpenCodeServer.serializer(), json.encodeToString(OpenCodeServer.serializer(), pairedByURL)))
     }
 

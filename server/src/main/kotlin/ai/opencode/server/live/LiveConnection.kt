@@ -70,9 +70,9 @@ internal suspend fun requestRedeemPairing(link: OpenCodePairingLink): OpenCodeSe
     // Other reachable addresses (LAN, tailnet) let the phone reconnect when it changes
     // networks. The server's own list is optional: an older server without it still pairs.
     val reported = try { request<InfoPayload>("/api/info", server = server).urls ?: emptyList() } catch (_: OpenCodeClientError) { emptyList() }
-    // The code's own addresses come first and are preferred: one `opencode pair --url` named is
-    // used whenever it answers, even when the tunnel the server also reports answers sooner.
-    val preferred = usableAddresses(listOf(server.url) + candidates)
+    // The code's own addresses are preferred: one `opencode pair --url` named is used whenever
+    // it answers, even when the tunnel the server also reports answers sooner.
+    val preferred = usableAddresses(candidates)
     val alternates = usableAddresses(candidates + reported).filter { it != server.url }
     return server.copy(alternateURLs = alternates, preferredURLs = preferred)
 }

@@ -80,26 +80,14 @@ data class OpenCodeServer(
     }
 
     /**
-     * The [candidateURLs] in [preferredURLs], in order, tried before the rest. Empty when there's
-     * nothing to prefer: no preference, none of them still saved, or every address preferred.
-     */
-    val preferredCandidateURLs: List<String>
-        get() {
-            val candidates = candidateURLs
-            val preferred = candidates.filter { it in preferredURLs }
-            if (preferred.size == candidates.size) return emptyList()
-            return preferred
-        }
-
-    /**
-     * The addresses an address race tries at once; the rest wait for [preferredCandidateURLs] to
-     * fail or run out their head start. Every address when nothing is preferred. A code that names
-     * only relayed addresses (the desktop's and `opencode pair --remote`'s tunnel) doesn't hold the
-     * server's direct ones back: a LAN or tailnet address that answers is the same server, faster.
+     * The addresses an address race tries at once; the rest wait ([ServerLinkStore.race]). A
+     * pairing code's own addresses when any is still saved, plus the server's direct ones when the
+     * code named only relayed ones (the desktop's and `opencode pair --remote`'s tunnel): a LAN or
+     * tailnet address that answers is the same server, faster. Otherwise every address.
      */
     val firstAttemptURLs: List<String>
         get() {
-            val preferred = preferredCandidateURLs
+            val preferred = candidateURLs.filter { it in preferredURLs }
             if (preferred.isEmpty()) return candidateURLs
             val preferredIsDirect = preferred.any { ConnectionRoute.of(it).isDirect }
             val first = mutableListOf<String>()
