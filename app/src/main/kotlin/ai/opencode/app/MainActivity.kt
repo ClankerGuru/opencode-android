@@ -4,6 +4,7 @@ import ai.opencode.feature.system.LeftToRight
 import ai.opencode.feature.system.NotificationDestination
 import ai.opencode.feature.system.SystemAction
 import ai.opencode.feature.system.share.ShareConversation
+import ai.opencode.server.LocalNetworkPermission
 import ai.opencode.server.OpenCodePairingLink
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.diagnostics.PerfFrameSampler
@@ -61,6 +62,11 @@ class MainActivity : ComponentActivity() {
     private val microphoneLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         microphoneRequest?.complete(granted)
         microphoneRequest = null
+    }
+    private var localNetworkRequest: CompletableDeferred<Boolean>? = null
+    private val localNetworkLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        localNetworkRequest?.complete(granted)
+        localNetworkRequest = null
     }
     private var removeRequesters: List<() -> Unit> = emptyList()
 
@@ -180,7 +186,16 @@ class MainActivity : ComponentActivity() {
                 granted
             },
             dependency(DictationPermissionClient).register { requestMicrophone() },
+            dependency(LocalNetworkPermission).register { requestLocalNetwork() },
         )
+    }
+
+    private suspend fun requestLocalNetwork(): Boolean {
+        val pending = localNetworkRequest ?: CompletableDeferred<Boolean>().also {
+            localNetworkRequest = it
+            localNetworkLauncher.launch(LocalNetworkPermission.PERMISSION)
+        }
+        return pending.await()
     }
 
     private suspend fun requestMicrophone(): Boolean {

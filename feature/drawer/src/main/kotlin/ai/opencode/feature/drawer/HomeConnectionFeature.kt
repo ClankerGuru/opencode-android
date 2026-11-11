@@ -13,6 +13,7 @@ import ai.opencode.core.store.cancellable
 import ai.opencode.feature.session.ServerFlowTunables
 import ai.opencode.server.ConnectionRoute
 import ai.opencode.server.EventStreamOverflow
+import ai.opencode.server.LocalNetworkPermission
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
@@ -282,7 +283,15 @@ class HomeConnectionFeature : Reducer<HomeConnectionFeature.State, HomeConnectio
         }
 
         Action.RetryConnectionTapped -> {
-            if (state.credentialsRejected) Reduced(state) else resync(state, visible = true, reason = ServerLinkReset.Retry)
+            val localNetwork = dependency(LocalNetworkPermission)
+            if (state.credentialsRejected) {
+                Reduced(state)
+            } else if (localNetwork.blocks(state.server)) {
+                // Android 17 local network access is off: ask again, else open Settings.
+                Reduced(state, Effect.run { send -> if (localNetwork.request()) send(Action.RetryConnectionTapped) else localNetwork.openSettings() })
+            } else {
+                resync(state, visible = true, reason = ServerLinkReset.Retry)
+            }
         }
 
         Action.ReconnectingGraceElapsed -> {
