@@ -72,7 +72,8 @@ class EventBatcher(
     private var isTerminated = false
 
     /** This connection's accumulated text per part, as the reducer accumulates it. */
-    private val liveText = HashMap<String, String>()
+    private data class PartText(val text: String, val fromStart: Boolean)
+    private val liveText = LinkedHashMap<String, PartText>()
 
     /** The buffer's free slots after the last emission, and when that was measured. */
     private var remaining = capacity
@@ -93,45 +94,47 @@ class EventBatcher(
      * durable goes. Emitting them would fill the buffer and drop the connection for everyone (a
      * reconnect gap, and a backoff of up to 15 s).
      */
-    private fun shedding(events: List<OpenCodeLiveContentEvent>, sessionID: String): List<OpenCodeLiveContentEvent> {
-        if (!isUnderPressure || isFocused(sessionID)) return events
+    private fun prepare(events: List<OpenCodeLiveContentEvent>, sessionID: String): List<OpenCodeLiveContentEvent> {
+        val shed = isUnderPressure && !isFocused(sessionID)
         val kept = ArrayList<OpenCodeLiveContentEvent>(events.size)
         for (event in events) {
-            when (event) {
-                is OpenCodeLiveContentEvent.TextDelta -> liveText.remove("${event.messageID}-text-${event.ordinal}")
-                is OpenCodeLiveContentEvent.ReasoningDelta, is OpenCodeLiveContentEvent.ToolInputDelta -> Unit
-                else -> kept.add(event)
-            }
-        }
-        shedDeltas += events.size - kept.size
-        if (kept.isEmpty()) shedBatches += 1
-        return kept
-    }
-
-    /** Mirrors the session reducer's text handling. */
-    private fun prepareMarkdown(events: List<OpenCodeLiveContentEvent>) {
-        for (event in events) {
-            when (event) {
+            val prepared = when (event) {
                 is OpenCodeLiveContentEvent.TextStarted -> {
                     val id = "${event.messageID}-text-${event.ordinal}"
-                    liveText[id] = liveText[id] ?: ""
+                    liveText.putIfAbsent(id, PartText("", fromStart = true))
+                    event
                 }
                 is OpenCodeLiveContentEvent.TextDelta -> {
                     val id = "${event.messageID}-text-${event.ordinal}"
-                    val text = (liveText[id] ?: "") + event.delta
-                    liveText[id] = text
+                    val previous = liveText[id]
+                    // Keep a small complete prefix even if delivery is shed. An abandoned part
+                    // mustn't grow without bound while the collector is under pressure.
+                    if (shed && (previous?.fromStart != true || previous.text.length > MAX_SHED_TEXT_CHARS - event.delta.length)) {
+                        liveText.remove(id)
+                        continue
+                    }
+                    val text = previous?.text.orEmpty() + event.delta
+                    val complete = previous?.fromStart == true
+                    liveText[id] = PartText(text, complete)
+                    if (shed) continue
                     hooks.prepareMarkdown(id, text, true)
+                    if (complete) event.copy(accumulatedText = text) else event
                 }
                 is OpenCodeLiveContentEvent.TextEnded -> {
                     val id = "${event.messageID}-text-${event.ordinal}"
                     liveText.remove(id)
                     hooks.prepareMarkdown(id, event.text, false)
+                    event
                 }
-                else -> Unit
+                is OpenCodeLiveContentEvent.ReasoningDelta, is OpenCodeLiveContentEvent.ToolInputDelta -> if (shed) continue else event
+                else -> event
             }
+            kept += prepared
         }
-        // A part that never ends (a dropped run) mustn't grow without bound.
-        if (liveText.size > 32) liveText.keys.minOrNull()?.let(liveText::remove)
+        while (liveText.size > 32) liveText.remove(liveText.keys.first())
+        shedDeltas += events.size - kept.size
+        if (kept.isEmpty()) shedBatches += 1
+        return kept
     }
 
     fun receive(event: OpenCodeServerEvent) {
@@ -189,9 +192,8 @@ class EventBatcher(
     }
 
     private fun emitBatch(sessionID: String, events: List<OpenCodeLiveContentEvent>) {
-        val kept = shedding(events, sessionID)
+        val kept = prepare(events, sessionID)
         if (kept.isEmpty()) return
-        prepareMarkdown(kept)
         emitLocked(OpenCodeServerEvent.ContentBatch(sessionID, kept))
     }
 
@@ -227,5 +229,6 @@ class EventBatcher(
         /** The event stream's buffer size (iOS `EventBatcher.bufferCapacity`). */
         const val BUFFER_CAPACITY = 128
         private const val BATCH_LIMIT = 256
+        private const val MAX_SHED_TEXT_CHARS = 64 * 1024
     }
 }

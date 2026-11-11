@@ -800,12 +800,11 @@ private fun SessionFeature.applyLiveEvent(event: OpenCodeLiveContentEvent, proje
             // this part's deltas): the deltas it missed are gone, so appending would lose text from
             // its middle and starting from "" would shrink it to its tail. It stays as it is until
             // its text ends with the whole text.
-            val accumulated = projection.liveText[id]
-                ?: if (projection.items.none { it.id == id }) "" else null
-            if (accumulated == null) {
+            val text = event.accumulatedText ?: projection.liveText[id]?.let { it + event.delta }
+                ?: event.delta.takeIf { projection.items.none { row -> row.id == id } }
+            if (text == null) {
                 null
             } else {
-                val text = accumulated + event.delta
                 projection.liveText[id] = text
                 projection.upsertText(upsertLiveTextChange(id, text, streaming = true, items = projection.items), id)
             }

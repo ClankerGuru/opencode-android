@@ -22,6 +22,9 @@ import ai.opencode.feature.session.SessionTestSupport.settle
 import ai.opencode.feature.session.SessionTestSupport.testServer
 import ai.opencode.feature.session.SessionTestSupport.testSession
 import ai.opencode.server.OpenCodeClient
+import ai.opencode.server.EventBatcher
+import ai.opencode.server.EventEmission
+import ai.opencode.server.OpenCodeServerEvent
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeLiveContentEvent
 import ai.opencode.server.model.OpenCodeContextReading
@@ -45,6 +48,43 @@ class SessionFeatureTestsResume {
 
     private fun isRefreshResponse(action: Action) = action is Action.RefreshResponse
     private fun isAccepted(action: Action) = action is Action.AcceptedTranscriptUpdated
+
+    @Test
+    fun sessionOpenedMidReplyKeepsPrefixAcrossFirstHistoryRead() = sessionTest { h ->
+        val session = testSession(id = "ses_late", title = "Late open")
+        val id = "msg_reply-text-0"
+        val prefix = "BEGIN-NORTH|echo "
+        val tail = "echo|TAIL"
+        val prompt = user("msg_prompt", "Prompt")
+        val whole = assistant(id, prefix + tail)
+        for (historyFirst in listOf(false, true)) {
+            var focused = false
+            val delivered = mutableListOf<OpenCodeLiveContentEvent>()
+            val batcher = EventBatcher(scope = h.scope, clock = TestClock(), isFocused = { focused }, emit = { batch ->
+                if (focused) delivered += (batch as OpenCodeServerEvent.ContentBatch).events
+                EventEmission.Enqueued(remaining = EventBatcher.BUFFER_CAPACITY)
+            })
+            fun flush(vararg events: OpenCodeLiveContentEvent) {
+                batcher.receive(OpenCodeServerEvent.ContentBatch(session.id, events.toList()))
+                batcher.flush()
+            }
+            flush(OpenCodeLiveContentEvent.TextStarted("msg_reply", 0), OpenCodeLiveContentEvent.TextDelta("msg_reply", 0, prefix))
+            val store = h.store(h.makeState(session = session, initialTranscriptRequestIsExternal = true, isRunning = true))
+            store.exhaustive = false
+            focused = true
+            val history = Action.TranscriptResponse(session.id, Result.success(listOf(prompt)))
+            if (historyFirst) store.send(history)
+            flush(OpenCodeLiveContentEvent.TextDelta("msg_reply", 0, "echo"), OpenCodeLiveContentEvent.TextDelta("msg_reply", 0, "|TAIL"))
+            store.send(Action.ContentBatch(session.id, delivered.toList()))
+            if (!historyFirst) store.send(history)
+            // The stream is held here, before its end can repair a suffix-only row.
+            assertEquals(listOf(prompt, whole), store.state.items)
+            delivered.clear()
+            flush(OpenCodeLiveContentEvent.TextEnded("msg_reply", 0, prefix + tail))
+            store.send(Action.ContentBatch(session.id, delivered.toList()))
+            assertEquals(listOf(prompt, whole), store.state.items)
+        }
+    }
 
     @Test
     fun streamGapRejectsPreGapReadAndReconnectRefetchesWithoutDuplicatingText() = sessionTest { h ->

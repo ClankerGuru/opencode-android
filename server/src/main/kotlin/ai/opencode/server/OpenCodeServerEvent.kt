@@ -85,7 +85,13 @@ sealed interface OpenCodeLiveContentEvent {
     data class StepStreamed(override val messageID: String) : OpenCodeLiveContentEvent
     data class StepEnded(override val messageID: String) : OpenCodeLiveContentEvent
     data class TextStarted(override val messageID: String, val ordinal: Int) : OpenCodeLiveContentEvent
-    data class TextDelta(override val messageID: String, val ordinal: Int, val delta: String) : OpenCodeLiveContentEvent
+    data class TextDelta(
+        override val messageID: String,
+        val ordinal: Int,
+        val delta: String,
+        /** Includes this delta when the socket observed the part from its start. */
+        val accumulatedText: String? = null,
+    ) : OpenCodeLiveContentEvent
     data class TextEnded(override val messageID: String, val ordinal: Int, val text: String) : OpenCodeLiveContentEvent
     data class ReasoningStarted(override val messageID: String, val ordinal: Int) : OpenCodeLiveContentEvent
     data class ReasoningDelta(override val messageID: String, val ordinal: Int, val delta: String) : OpenCodeLiveContentEvent
@@ -141,7 +147,8 @@ sealed interface OpenCodeLiveContentEvent {
 
     /** `this` followed by [next] as a single delta, when both stream into the same part. */
     fun appendingDelta(next: OpenCodeLiveContentEvent): OpenCodeLiveContentEvent? = when {
-        this is TextDelta && next is TextDelta && messageID == next.messageID && ordinal == next.ordinal ->
+        this is TextDelta && next is TextDelta && accumulatedText == null && next.accumulatedText == null &&
+            messageID == next.messageID && ordinal == next.ordinal ->
             TextDelta(messageID, ordinal, delta + next.delta)
         this is ReasoningDelta && next is ReasoningDelta && messageID == next.messageID && ordinal == next.ordinal ->
             ReasoningDelta(messageID, ordinal, delta + next.delta)
