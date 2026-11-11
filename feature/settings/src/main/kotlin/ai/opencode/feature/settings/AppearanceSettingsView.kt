@@ -3,6 +3,7 @@ package ai.opencode.feature.settings
 import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.ui.OpenCodeTopBar
 import ai.opencode.core.ui.OpenCodeTopBarBackButton
+import ai.opencode.core.ui.rememberOverscrollIfContentScrolls
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.ui.AppTheme
@@ -31,6 +32,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
@@ -172,7 +174,10 @@ fun ThemesSettingsView(store: SettingsStore) {
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding())) {
+            val themesList = rememberLazyListState()
             LazyColumn(
+                state = themesList,
+                overscrollEffect = rememberOverscrollIfContentScrolls(themesList),
                 contentPadding = PaddingValues(
                     top = with(density) { headerHeight.toDp() } + AppearanceTunables.softEdgeHeight + 4.dp,
                     bottom = padding.calculateBottomPadding() + 24.dp,
