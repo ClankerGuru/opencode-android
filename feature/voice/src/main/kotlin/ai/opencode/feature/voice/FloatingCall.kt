@@ -1305,7 +1305,8 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
                 .graphicsLayer {
                     alpha = look.alpha()
                     this.shape = shape
-                    shadowElevation = max(0.0, restShadow / 2 * (1 - look.buttonLook())).toFloat().dp.toPx()
+                    // The orb's own shadow hands over to the card's, so the card never wears both.
+                    shadowElevation = max(0.0, restShadow / 2 * (1 - look.buttonLook()) * (1 - look.cardShadow())).toFloat().dp.toPx()
                 }
                 .then(gestures),
         ) {
@@ -1402,12 +1403,15 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
                             .graphicsLayer { alpha = look.contentShown().toFloat() }
                             .then(if (interactive) Modifier else Modifier.blocksTouches())
                             .semantics {
-                                customActions = listOf(
-                                    CustomAccessibilityAction("Expand") {
-                                        model.send(FloatingCallStageFeature.Action.Requested(FloatingCallStage.full))
-                                        true
-                                    },
-                                )
+                                // Already the sheet: nothing to expand to.
+                                if (stage != FloatingCallStage.full) {
+                                    customActions = listOf(
+                                        CustomAccessibilityAction("Expand") {
+                                            model.send(FloatingCallStageFeature.Action.Requested(FloatingCallStage.full))
+                                            true
+                                        },
+                                    )
+                                }
                             },
                     )
                 }
@@ -1878,9 +1882,20 @@ internal fun FloatingCallDuration(connectedAt: Instant?, status: String, modifie
         maxLines = 1,
         modifier = modifier.clearAndSetSemantics {
             contentDescription = "Call duration"
-            stateDescription = text
+            // TalkBack reads "1:05" as a time of day; say how long it's been.
+            stateDescription = if (connectedAt == null) text else floatingCallSpokenDuration(seconds)
         },
     )
+}
+
+/** A call's length as TalkBack should say it: "1 minute, 5 seconds". */
+internal fun floatingCallSpokenDuration(seconds: Long): String {
+    val minutes = seconds / 60
+    val rest = seconds % 60
+    val secondsText = if (rest == 1L) "1 second" else "$rest seconds"
+    if (minutes == 0L) return secondsText
+    val minutesText = if (minutes == 1L) "1 minute" else "$minutes minutes"
+    return "$minutesText, $secondsText"
 }
 
 private fun lerp(a: Double, b: Double, t: Double): Double = a + (b - a) * t

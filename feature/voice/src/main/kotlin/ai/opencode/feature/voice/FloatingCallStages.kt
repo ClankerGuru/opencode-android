@@ -14,6 +14,7 @@ import ai.opencode.core.tuning.AnimationTimeScale
 import ai.opencode.core.tuning.Tunable
 import ai.opencode.core.tuning.TunableSpring
 import ai.opencode.core.tuning.TuningStore
+import ai.opencode.core.ui.OpenCodeRadius
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,8 +49,9 @@ object FloatingCallStageTunables {
     val covers = Tunable("call.stage.covers", "Card covers the composer", default = true)
     val coverHeight = Tunable("call.stage.coverHeight", "Covering card height", default = 560.0, range = 300.0..720.0, step = 2.0)
     val coverInset = Tunable("call.stage.coverInset", "Covering card bottom margin", default = 12.0, range = 0.0..40.0, step = 1.0)
-    val cardRadius = Tunable("call.stage.cardRadius", "Card corner radius", default = 36.0, range = 12.0..56.0, step = 1.0)
-    val fullRadius = Tunable("call.stage.fullRadius", "Sheet corner radius", default = 38.0, range = 12.0..56.0, step = 1.0)
+    // The design system's sheet radius (iOS follows the device's corners: 36 and 38).
+    val cardRadius = Tunable("call.stage.cardRadius", "Card corner radius", default = OpenCodeRadius.sheet.value.toDouble(), range = 12.0..56.0, step = 1.0)
+    val fullRadius = Tunable("call.stage.fullRadius", "Sheet corner radius", default = OpenCodeRadius.sheet.value.toDouble(), range = 12.0..56.0, step = 1.0)
     val cardBloomY = Tunable("call.stage.cardBloomY", "Card bloom centre", default = 166.0, range = 100.0..260.0, step = 1.0)
     val cardBloomRadius = Tunable("call.stage.cardBloomRadius", "Card bloom radius", default = 96.0, range = 40.0..160.0, step = 1.0)
     val fullBloomY = Tunable("call.stage.fullBloomY", "Sheet bloom centre", default = 150.0, range = 80.0..260.0, step = 1.0)

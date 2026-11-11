@@ -283,10 +283,11 @@ class FloatingCallStageTests {
     @Test fun cornersRoundAsTheOrbThenSquareAtTheSheetsFoot() {
         val orb = geometry.radii(geometry.frame(0.0))
         assertTrue(orb.top == 32.0 && orb.bottom == 32.0)
+        // The design system's sheet radius here; iOS follows the device's corners (36 and 38).
         val card = geometry.radii(geometry.frame(1.0))
-        assertTrue(card.top == 36.0 && card.bottom == 36.0)
+        assertTrue(card.top == 16.0 && card.bottom == 16.0)
         val sheet = geometry.radii(geometry.frame(2.0))
-        assertTrue(sheet.top == 38.0 && sheet.bottom == 0.0)
+        assertTrue(sheet.top == 16.0 && sheet.bottom == 0.0)
     }
 
     @Test fun theBloomFillsTheOrbThenSettlesAtTheTop() {
