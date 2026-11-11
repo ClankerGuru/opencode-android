@@ -1,8 +1,7 @@
 # Releasing
 
 Mirrors iOS (`opencode-ios/docs/releasing.md`): releases go through GitHub Releases only.
-Pushing `main` doesn't release to Play by itself. Merge into `main` and release only when Ryan
-asks or approves.
+Pushing `main` doesn't release to Play by itself.
 
 ## Branches
 
