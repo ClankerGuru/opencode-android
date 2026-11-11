@@ -1,7 +1,14 @@
 # Releasing
 
 Mirrors iOS (`opencode-ios/docs/releasing.md`): releases go through GitHub Releases only.
-Pushing `main` doesn't release to Play. Push and release only when Ryan asks or approves.
+Pushing `main` doesn't release to Play by itself. Merge into `main` and release only when Ryan
+asks or approves.
+
+## Branches
+
+Feature branch → PR into `dev` → `dev` merged into `main` (a PR from `dev` into `main`, merge
+commit). `main` is production: the scheduled release ships whatever is on it. A push to `dev`
+only runs `scripts/check.sh`; it never tags, uploads to Play or publishes `main-latest`.
 
 ## Cutting a release
 

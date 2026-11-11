@@ -1,13 +1,15 @@
 # OpenCode Android: agent rules
 
 A native Android port of the OpenCode iOS app (Kotlin, Jetpack Compose, Material 3 Expressive).
-Lives at github.com/anomalyco/opencode-android (private). Push only when Ryan asks.
-CI (`.github/workflows/android.yml`) runs `scripts/check.sh` on every PR and push; a push to
-`main` only publishes the debug APK as the `main-latest` pre-release. As on iOS, releases go
-through GitHub Releases only: `gh release create "v$(scripts/version.sh <sha>)" --target
-"$(git rev-parse <sha>)" --generate-notes` ships to Google Play internal testing (and open
-testing once `PLAY_OPEN_TESTING` is on). `scheduled-release.yml` releases `main` at noon and
-6 p.m. Central, as on iOS; cut one by hand only when Ryan asks
+Lives at github.com/anomalyco/opencode-android (private). Work goes on a feature branch → PR
+into `dev`; `dev` is merged into `main` (production) for release, only when Ryan asks.
+CI (`.github/workflows/android.yml`) runs `scripts/check.sh` on every PR and on pushes to `dev`
+and `main`; a push to `main` also publishes the debug APK as the `main-latest` pre-release.
+As on iOS, releases go through GitHub Releases only: `gh release create
+"v$(scripts/version.sh <sha>)" --target "$(git rev-parse <sha>)" --generate-notes` ships to
+Google Play internal testing (and open testing once `PLAY_OPEN_TESTING` is on).
+`scheduled-release.yml` releases `main` at noon and 6 p.m. Central, as on iOS; cut one by hand
+only when Ryan asks
 ([docs/releasing.md](docs/releasing.md)).
 
 ## The iOS app is the source of truth
@@ -142,9 +144,10 @@ Add a new library only with a one-line justification here.
 
 ## Commits
 
-- Commit every completed, verified change on `main`, one coherent change per commit. The
-  message says what changed, why, and what was verified (commands run, emulator checks); call
-  out removed or replaced behaviour.
+- Commit every completed, verified change on a feature branch and open a PR into `dev` (never
+  commit to `main` directly), one coherent change per commit. The message says what changed,
+  why, and what was verified (commands run, emulator checks); call out removed or replaced
+  behaviour.
 - In this shared checkout stage only the files you own (`git add <paths>`), never `git add -A`.
   Don't amend, rebase, stash, or reset other agents' work.
 - Never commit secrets, `local.properties`, `google-services.json`, keystores, or private
