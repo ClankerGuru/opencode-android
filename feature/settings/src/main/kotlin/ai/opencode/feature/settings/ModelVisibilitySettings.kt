@@ -225,7 +225,7 @@ fun ModelVisibilitySettingsView(store: SettingsStore) {
                         }) {
                             ProviderIcon(provider.id, Modifier.size(20.dp), provider.canonicalID, tint = OpenCodeTheme.colors.secondaryText)
                             Text(provider.title, style = SettingsText.title, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
-                            Text(state.summary(provider, visibility), style = SettingsText.title, color = OpenCodeTheme.colors.secondaryText)
+                            Text(state.summary(provider, visibility), style = SettingsText.summary, color = OpenCodeTheme.colors.secondaryText)
                         }
                     }
                 }

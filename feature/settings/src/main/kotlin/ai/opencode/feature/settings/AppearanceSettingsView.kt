@@ -129,14 +129,16 @@ fun AppearanceSettingsView(store: SettingsStore) {
                         Text("Theme", style = SettingsText.title, color = OpenCodeTheme.colors.text)
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             swatch()
-                            Text(appTheme.title, style = SettingsText.title, color = OpenCodeTheme.colors.secondaryText)
+                            Text(appTheme.title, style = SettingsText.summary, color = OpenCodeTheme.colors.secondaryText)
+                            SettingsDropdownChevron()
                         }
                     }
                 } else {
                     Text("Theme", style = SettingsText.title, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         swatch()
-                        Text(appTheme.title, style = SettingsText.title, color = OpenCodeTheme.colors.secondaryText, maxLines = 1)
+                        Text(appTheme.title, style = SettingsText.summary, color = OpenCodeTheme.colors.secondaryText, maxLines = 1)
+                        SettingsDropdownChevron()
                     }
                 }
             }

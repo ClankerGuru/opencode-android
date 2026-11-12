@@ -210,9 +210,8 @@ fun VoiceSettingsView(store: SettingsStore) {
                     }
                 }
                 if (divider()) SettingsDivider()
-                SettingsRow(
+                SettingsChoiceRow(
                     "Voice",
-                    symbol = null,
                     value = CallVoicePicker.rowValue(state.callVoice, state.voiceEngine),
                 ) { store.send(SettingsFeature.Action.PagePushed(SettingsPage.CallVoicePicker)) }
                 if (state.showsDelegatorRow) {

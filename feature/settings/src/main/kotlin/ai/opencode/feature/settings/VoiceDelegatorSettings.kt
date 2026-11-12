@@ -94,7 +94,7 @@ val VoiceSettingsFeature.State.delegatorRowValue: String
 /** Settings › Voice › Delegator row. */
 @Composable
 internal fun VoiceDelegatorSettingsRow(state: VoiceSettingsFeature.State, onClick: () -> Unit) {
-    SettingsRow("Delegator", symbol = null, value = state.delegatorRowValue, onClick = onClick)
+    SettingsChoiceRow("Delegator", value = state.delegatorRowValue, onClick = onClick)
 }
 
 /**
