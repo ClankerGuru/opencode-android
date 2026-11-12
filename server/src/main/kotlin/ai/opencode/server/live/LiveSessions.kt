@@ -129,9 +129,10 @@ private suspend fun requestRootSessions(
         .data.map(::session).filterNot { it.isArchived }
 }
 
-/** Desktop's Archived list: archived root sessions, newest first. */
-internal suspend fun requestArchivedSessions(server: OpenCodeServer, limit: Int): List<OpenCodeSession> {
-    val query = listOf("parentID" to "null", "archived" to "true", "order" to "desc", "limit" to limit.toString())
+/** Desktop's Archived list and its search: archived root sessions, newest first. */
+internal suspend fun requestArchivedSessions(server: OpenCodeServer, search: String, limit: Int): List<OpenCodeSession> {
+    val query = mutableListOf("parentID" to "null", "archived" to "true", "order" to "desc", "limit" to limit.toString())
+    if (search.isNotEmpty()) query += "search" to search
     return request<DataPayload<List<SessionPayload>>>("/api/session", query = query, server = server).data.map(::session)
 }
 

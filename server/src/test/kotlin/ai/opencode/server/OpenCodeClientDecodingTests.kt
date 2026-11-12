@@ -209,7 +209,7 @@ class OpenCodeClientDecodingTests {
         }
     }
 
-    /** The Archived list asks for archived roots; Unarchive patches `archived: false`. */
+    /** The Archived page asks for archived roots, searched on the server; Unarchive patches `archived: false`. */
     @Test
     fun archivedSessionsListAndUnarchive() = runTest {
         val archived = """{"id":"ses_archived","projectID":"p","title":"Old","location":{"directory":"/project"},"time":{"updated":2000,"archived":1500}}"""
@@ -221,15 +221,19 @@ class OpenCodeClientDecodingTests {
             }
         }
         withFixture(fixture) {
-            val listed = OpenCodeClient.liveValue.archivedSessions(fixture.server, 50)
+            val listed = OpenCodeClient.liveValue.archivedSessions(fixture.server, "", 50)
             assertEquals(listOf("ses_archived"), listed.map { it.id })
             val list = fixture.requests[0]
             assertEquals("true", list.queryValue("archived"))
             assertEquals("null", list.queryValue("parentID"))
             assertEquals("50", list.queryValue("limit"))
+            assertEquals(null, list.queryValue("search"))
+
+            OpenCodeClient.liveValue.archivedSessions(fixture.server, "old", 50)
+            assertEquals("old", fixture.requests[1].queryValue("search"))
 
             OpenCodeClient.liveValue.unarchiveSession(fixture.server, "ses_archived")
-            assertEquals(json("""{"archived":false}"""), fixture.requests[1].json())
+            assertEquals(json("""{"archived":false}"""), fixture.requests[2].json())
         }
     }
 

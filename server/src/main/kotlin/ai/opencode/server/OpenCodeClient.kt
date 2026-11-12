@@ -201,8 +201,8 @@ data class OpenCodeClient(
     val archiveSession: suspend (server: OpenCodeServer, sessionID: String) -> Unit,
     /** Unarchives the session (`PATCH {archived: false}`), as desktop's Unarchive does. */
     val unarchiveSession: suspend (server: OpenCodeServer, sessionID: String) -> Unit,
-    /** The newest archived root sessions (`archived=true`), as desktop's Archived list. */
-    val archivedSessions: suspend (server: OpenCodeServer, limit: Int) -> List<OpenCodeSession>,
+    /** The newest archived root sessions (`archived=true`) matching `search` (all when empty), as desktop's Archived list. */
+    val archivedSessions: suspend (server: OpenCodeServer, search: String, limit: Int) -> List<OpenCodeSession>,
     /** Turns Always Notify on (with the phone's callback URL) or off (null), keeping other metadata. */
     val setAlwaysNotify: suspend (server: OpenCodeServer, sessionID: String, callbackURL: String?) -> Unit,
     /** Queues a compaction; it runs after the session's current run. */
@@ -399,7 +399,7 @@ data class OpenCodeClient(
                     moveSession = { _, _, _ -> throw OpenCodeClientError("Unstubbed") },
                     archiveSession = { _, _ -> unimplemented("archiveSession") },
                     unarchiveSession = { _, _ -> unimplemented("unarchiveSession") },
-                    archivedSessions = { _, _ -> unimplemented("archivedSessions") },
+                    archivedSessions = { _, _, _ -> unimplemented("archivedSessions") },
                     setAlwaysNotify = { _, _, _ -> unimplemented("setAlwaysNotify") },
                     compactSession = { _, _ -> unimplemented("compactSession") },
                     stageRevert = { _, _, _ -> unimplemented("stageRevert") },

@@ -193,7 +193,7 @@ fun DrawerListSessionCell(
         }
     }
 
-    val held = hold.isHeld || row.isLifted
+    val held = hold.isDragActive || row.isLifted
     val raisedSurface = if (colors.isDark) MaterialTheme.colorScheme.surfaceContainerHigh else colors.canvas
     // The raised surface leaves on swap's exit once a hold lets go (iOS `settleAfterMenu`), and a
     // dropped row puts its surface down the same way, shadowless (iOS `land()`).

@@ -43,8 +43,11 @@ class InboxSidebarFeature : Reducer<InboxSidebarFeature.State, InboxSidebarFeatu
          */
         val archivedIDs: Set<String> = emptySet(),
         val archiveError: String? = null,
-        /** The server's archived sessions, newest first (the Archived section). */
+        /** The server's archived sessions, newest first (the Archived page). */
         val archived: List<OpenCodeSession> = emptyList(),
+        /** The Archived page's search, and the server's matches once they land (null while it's empty). */
+        val archivedSearch: String = "",
+        val archivedMatches: List<OpenCodeSession>? = null,
         /** Unarchives in flight: hidden from the Archived section at once. */
         val unarchivingIDs: Set<String> = emptySet(),
     )
@@ -57,7 +60,9 @@ class InboxSidebarFeature : Reducer<InboxSidebarFeature.State, InboxSidebarFeatu
         data object ArchiveErrorCleared : Action
         data object ArchivedListRequested : Action
         data class ArchivedListResponse(val sessions: List<OpenCodeSession>) : Action
-        /** Home opens it (it isn't in the session list). */
+        data class ArchivedSearchChanged(val text: String) : Action
+        data class ArchivedSearchResponse(val search: String, val sessions: List<OpenCodeSession>) : Action
+        /** Home lists it (it isn't in the session list) for the tap or delete that follows. */
         data class ArchivedRowTapped(val sessionID: String) : Action
         data class UnarchiveTapped(val sessionID: String, val title: String) : Action
         data class UnarchiveResponse(val sessionID: String, val title: String, val error: OpenCodeClientError?) : Action
@@ -67,6 +72,7 @@ class InboxSidebarFeature : Reducer<InboxSidebarFeature.State, InboxSidebarFeatu
         data class Archive(val sessionID: String) : CancelID
         data object ArchiveError : CancelID
         data object ArchivedList : CancelID
+        data object ArchivedSearch : CancelID
         data class Unarchive(val sessionID: String) : CancelID
     }
 
@@ -117,7 +123,7 @@ class InboxSidebarFeature : Reducer<InboxSidebarFeature.State, InboxSidebarFeatu
                 state,
                 Effect.run<Action> { send ->
                     try {
-                        send(Action.ArchivedListResponse(client.archivedSessions(server, ARCHIVED_LIMIT)))
+                        send(Action.ArchivedListResponse(client.archivedSessions(server, "", ARCHIVED_LIMIT)))
                     } catch (error: OpenCodeClientError) {
                         AppLog.network.notice { "Archived list failed: ${error.logSummary}" }
                     }
@@ -126,6 +132,34 @@ class InboxSidebarFeature : Reducer<InboxSidebarFeature.State, InboxSidebarFeatu
         }
 
         is Action.ArchivedListResponse -> Reduced(state.copy(status = state.status.copy(archived = action.sessions)))
+
+        // As desktop's: the server searches every archived session, not just the 50 listed.
+        is Action.ArchivedSearchChanged -> {
+            val search = action.text.trim()
+            val status = state.status.copy(archivedSearch = action.text)
+            if (search.isEmpty()) {
+                Reduced(state.copy(status = status.copy(archivedMatches = null)), Effect.cancel(CancelID.ArchivedSearch))
+            } else {
+                val client = dependency(OpenCodeClient)
+                val clock = dependency(Clock)
+                val server = state.server
+                Reduced(
+                    state.copy(status = status),
+                    Effect.run<Action> { send ->
+                        clock.sleep(HomeFeature.sessionSearchDebounce)
+                        try {
+                            send(Action.ArchivedSearchResponse(search, client.archivedSessions(server, search, ARCHIVED_LIMIT)))
+                        } catch (error: OpenCodeClientError) {
+                            AppLog.network.notice { "Archived search failed: ${error.logSummary}" }
+                        }
+                    }.cancellable(CancelID.ArchivedSearch, cancelInFlight = true),
+                )
+            }
+        }
+
+        is Action.ArchivedSearchResponse ->
+            if (action.search != state.status.archivedSearch.trim()) Reduced(state)
+            else Reduced(state.copy(status = state.status.copy(archivedMatches = action.sessions)))
 
         is Action.ArchivedRowTapped -> Reduced(state)
 
@@ -159,7 +193,14 @@ class InboxSidebarFeature : Reducer<InboxSidebarFeature.State, InboxSidebarFeatu
             val status = state.status.copy(unarchivingIDs = state.status.unarchivingIDs - action.sessionID)
             val error = action.error
             if (error == null) {
-                Reduced(state.copy(status = status.copy(archived = status.archived.filter { it.id != action.sessionID })))
+                Reduced(
+                    state.copy(
+                        status = status.copy(
+                            archived = status.archived.filter { it.id != action.sessionID },
+                            archivedMatches = status.archivedMatches?.filter { it.id != action.sessionID },
+                        ),
+                    ),
+                )
             } else {
                 AppLog.network.notice { "Unarchive failed: ${error.logSummary}" }
                 failed(state.copy(status = status), "Couldn’t unarchive “${action.title}”. ${error.message}")
@@ -294,7 +335,10 @@ fun HomeFeature.State.inboxSidebarRows(): List<InboxSidebarRow> {
     }
 }
 
-/** The Archived section: the server's archived sessions, minus any being restored or already back in the list. */
+/**
+ * The Archived page: the server's archived sessions (or its search's matches), minus any being
+ * restored or deleted, or already back in the list.
+ */
 fun HomeFeature.State.inboxSidebarArchivedRows(): List<InboxSidebarRow> {
     val status = inboxSidebarStatus
     val listed = HashSet<String>()
@@ -302,8 +346,8 @@ fun HomeFeature.State.inboxSidebarArchivedRows(): List<InboxSidebarRow> {
         listed.add(session.id)
     }
     val rows = mutableListOf<InboxSidebarRow>()
-    for (session in status.archived) {
-        if (session.id in status.unarchivingIDs || session.id in listed) continue
+    for (session in status.archivedMatches ?: status.archived) {
+        if (session.id in status.unarchivingIDs || session.id in listed || session.id in recentlyDeletedIDs) continue
         rows.add(
             InboxSidebarRow(
                 id = session.id,
@@ -324,6 +368,7 @@ fun HomeFeature.State.inboxSidebarArchivedRows(): List<InboxSidebarRow> {
  */
 internal fun HomeFeature.State.listingArchivedSession(sessionID: String): HomeFeature.State {
     if (sessions.any { it.id == sessionID }) return this
-    val session = inboxSidebarStatus.archived.firstOrNull { it.id == sessionID } ?: return this
+    val status = inboxSidebarStatus
+    val session = (status.archivedMatches.orEmpty() + status.archived).firstOrNull { it.id == sessionID } ?: return this
     return copy(sessions = listOf(session) + sessions)
 }
