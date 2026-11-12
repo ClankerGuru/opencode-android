@@ -5,6 +5,7 @@ import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.ui.OpenCodeRadius
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.foundation.shape.RoundedCornerShape
 import ai.opencode.feature.drawer.style.drawerCanvas
 import ai.opencode.core.dependencies.dependency
@@ -27,6 +28,9 @@ import ai.opencode.feature.drawer.list.DrawerListActions
 import ai.opencode.feature.drawer.list.DrawerListInputs
 import ai.opencode.feature.drawer.list.DrawerListView
 import ai.opencode.feature.drawer.list.ArchivedPage
+import ai.opencode.feature.drawer.list.archivedBeneath
+import ai.opencode.feature.drawer.list.archivedPage
+import ai.opencode.feature.drawer.list.rememberArchivedTransition
 import ai.opencode.feature.drawer.list.DeleteSelectionConfirmation
 import ai.opencode.feature.drawer.list.archivedSelectionActions
 import ai.opencode.feature.drawer.list.DrawerPinDrag
@@ -120,6 +124,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.max
 import kotlin.math.min
 
@@ -230,8 +235,19 @@ fun HomeDrawer(
             }
         }
     }
-    // The Archived page: back (system back, or once the selection has ended) returns to the list.
-    BackHandler(enabled = viewState.showsArchived) { viewState.showsArchived = false }
+    // The Archived page: back (system back, or once the selection has ended) returns to the list,
+    // and a predictive back drag moves the page with the finger.
+    val archivedTransition = rememberArchivedTransition(viewState.showsArchived, reducedMotion)
+    PredictiveBackHandler(enabled = viewState.showsArchived) { events ->
+        try {
+            events.collect { archivedTransition.back.snapTo(it.progress) }
+            viewState.showsArchived = false
+        } catch (cancel: CancellationException) {
+            // Let go before the system's threshold: the page settles back.
+            archivedTransition.back.animateTo(0f, MotionRole.Layout.animation(MotionPhase.Enter, reducedMotion))
+            throw cancel
+        }
+    }
     BackHandler(enabled = selection.isActive) { selection.clear() }
     // The bar keeps its last count while it leaves.
     var shownCount by remember { mutableIntStateOf(0) }
@@ -289,7 +305,8 @@ fun HomeDrawer(
             bottom = controlsHeight.dp + insetBottom + footerBottom + DrawerTunables.bottomGap,
         )
         // TalkBack reads only the Archived page while it covers the list and its title band.
-        val beneathArchived = if (viewState.showsArchived) Modifier.clearAndSetSemantics {} else Modifier
+        val beneathArchived = (if (viewState.showsArchived) Modifier.clearAndSetSemantics {} else Modifier)
+            .archivedBeneath(archivedTransition, reducedMotion)
         // Inbox Sidebar (experimental, iOS 338d8d92): the sessions as an inbox.
         if (inboxSidebarOn) InboxSidebarList(
             store = store,
@@ -377,7 +394,7 @@ fun HomeDrawer(
             }
         }
 
-        if (viewState.showsArchived) ArchivedPage(
+        if (viewState.showsArchived || archivedTransition.isVisible) ArchivedPage(
             store = store,
             checkedIDs = selection.ids,
             select = { id ->
@@ -391,7 +408,7 @@ fun HomeDrawer(
             held = selection::toggle,
             onBack = { viewState.showsArchived = false },
             contentPadding = PaddingValues(top = insetTop + DrawerHeaderTop, bottom = listPadding.calculateBottomPadding()),
-            modifier = Modifier.swallowingTouches(),
+            modifier = Modifier.archivedPage(archivedTransition, reducedMotion).swallowingTouches(),
             header = if (selection.isActive) {
                 { DrawerSelectionBar(count = selection.ids.size, onClose = selection::clear, actions = archivedSelectionActions(store, selection), overflow = emptyList()) }
             } else {

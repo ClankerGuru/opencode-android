@@ -1,5 +1,7 @@
 package ai.opencode.feature.drawer.list
 
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.core.ui.OpenCodeIcon
@@ -15,6 +17,11 @@ import ai.opencode.feature.drawer.inboxSidebarArchivedRows
 import ai.opencode.feature.drawer.style.DrawerMetrics
 import ai.opencode.feature.drawer.style.DrawerTunables
 import ai.opencode.feature.drawer.style.drawerCanvas
+import androidx.compose.animation.core.Animatable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -138,5 +145,62 @@ internal fun ArchivedPage(
                 }
             }
         }
+    }
+}
+
+/**
+ * The Archived page's slide (Material's shared axis X): [progress] runs 0 (the list) to 1 (the
+ * page), and [back] follows a predictive back drag from 0 to 1.
+ */
+@Stable
+internal class ArchivedTransition {
+    val progress = Animatable(0f)
+    val back = Animatable(0f)
+    val isVisible: Boolean get() = progress.value > 0f
+}
+
+@Composable
+internal fun rememberArchivedTransition(shown: Boolean, reduceMotion: Boolean): ArchivedTransition {
+    val transition = remember { ArchivedTransition() }
+    LaunchedEffect(shown) {
+        if (shown) {
+            transition.back.snapTo(0f)
+            transition.progress.animateTo(1f, MotionRole.Layout.animation(MotionPhase.Enter, reduceMotion))
+        } else {
+            transition.progress.animateTo(0f, MotionRole.Collapse.animation(MotionPhase.Exit, reduceMotion))
+            transition.back.snapTo(0f)
+        }
+    }
+    return transition
+}
+
+private val ArchivedSlide = 30.dp
+
+/** How far [value] has gone from [from] to [to], from 0 to 1. */
+private fun part(value: Float, from: Float, to: Float): Float = ((value - from) / (to - from)).coerceIn(0f, 1f)
+
+/** The list and its title band: they slide a little left and fade out; a back drag shows them again. */
+internal fun Modifier.archivedBeneath(transition: ArchivedTransition, reduceMotion: Boolean): Modifier = graphicsLayer {
+    val p = transition.progress.value
+    if (p == 0f) return@graphicsLayer
+    val back = part(transition.back.value, 0f, 0.3f)
+    if (!reduceMotion) translationX = -ArchivedSlide.toPx() * p * (1f - back)
+    alpha = maxOf(1f - part(p, 0f, 0.35f), back)
+}
+
+/** The page: it slides in from the right; a back drag shrinks it toward 90% and rounds its corners. */
+internal fun Modifier.archivedPage(transition: ArchivedTransition, reduceMotion: Boolean): Modifier = graphicsLayer {
+    val p = transition.progress.value
+    alpha = part(p, 0.35f, 1f)
+    if (reduceMotion) return@graphicsLayer
+    // The system reports about a third of the way by mid-screen, so the page is fully shrunk by half way.
+    val back = part(transition.back.value, 0f, 0.5f)
+    val scale = 1f - 0.1f * back
+    translationX = ArchivedSlide.toPx() * (1f - p) + 24.dp.toPx() * back
+    scaleX = scale
+    scaleY = scale
+    if (back > 0f) {
+        clip = true
+        shape = RoundedCornerShape((16f * part(back, 0f, 0.2f) / scale).dp)
     }
 }
