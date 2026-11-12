@@ -69,7 +69,12 @@ class DrawerRowInteraction(
      * selection; never a finger that scrolls the list.
      */
     val pressed: () -> Unit,
-    val menu: () -> List<DrawerRowMenuItem>,
+    val menu: () -> List<DrawerRowMenuItem> = { emptyList() },
+    /**
+     * Android: the hold chooses the row for selection mode ([DrawerSelection]) in place of the
+     * menu; a drag growing out of the hold takes it back.
+     */
+    val held: (() -> Unit)? = null,
     /** The list is scrolling or flinging (iOS `Coordinator.isMoving`). */
     val isListMoving: () -> Boolean = { false },
     /** The held finger moved: the drag begins at [fingerInList] (dp, the list's coordinates). */
@@ -178,9 +183,10 @@ fun Modifier.drawerRowInteraction(
             }
             if (touch == DrawerRowTouch.Taken) return@awaitEachGesture
 
-            // The hold: the menu over the lifted row.
+            // The hold: the menu over the lifted row, or the row chosen.
             haptics.play(Haptic.tap)
-            hold.isMenuVisible = true
+            val held = current.held
+            if (held != null) held() else hold.isMenuVisible = true
             var start: Offset? = null
             var dragging = false
             var last: PointerInputChange? = null
@@ -212,6 +218,7 @@ fun Modifier.drawerRowInteraction(
                 val begin = current.beginDrag
                 if (current.reorderable && begin != null && (change.position - origin).getDistance() > slop) {
                     hold.dismissMenu()
+                    held?.invoke()
                     hold.isDragActive = true
                     dragging = true
                     current.lifted(current.sessionID)

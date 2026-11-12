@@ -66,6 +66,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -81,11 +82,12 @@ import kotlin.math.roundToInt
 
 /**
  * iOS `InboxSidebarList.swift` (Inbox Sidebar, experimental): the drawer's sessions as an inbox,
- * one item per session. Tapping opens the session; holding it opens its [menu].
+ * one item per session. Tapping opens the session; holding it chooses it ([DrawerSelection]).
  *
  * Android: iOS swipes these rows (Mark as Read, Archive); here a sideways swipe stays the
- * drawer's, as in any navigation drawer, and the actions are in the hold menu. The sessions the
- * server has archived follow under a collapsed Archived row, muted, to open or unarchive.
+ * drawer's, as in any navigation drawer, and the actions are in selection mode's bar. The sessions
+ * the server has archived follow under a collapsed Archived row, muted, to open or unarchive
+ * from their hold [menu].
  */
 @Composable
 internal fun InboxSidebarList(
@@ -93,9 +95,11 @@ internal fun InboxSidebarList(
     selectedSessionID: String?,
     headerScroll: DrawerHeaderScrollState,
     contentPadding: PaddingValues,
+    checkedIDs: Set<String>,
     select: (String) -> Unit,
+    held: (String) -> Unit,
     openCatchUp: () -> Unit,
-    menu: (row: InboxSidebarRow, archived: Boolean) -> List<DrawerRowMenuItem>,
+    menu: (archivedRow: InboxSidebarRow) -> List<DrawerRowMenuItem>,
     modifier: Modifier = Modifier,
 ) {
     val rows by store.observe { it.inboxSidebarRows() }
@@ -184,8 +188,9 @@ internal fun InboxSidebarList(
                     now = now,
                     selected = row.id == selectedSessionID,
                     archived = false,
+                    checked = if (checkedIDs.isEmpty()) null else row.id in checkedIDs,
                     select = { select(row.id) },
-                    menu = { menu(row, false) },
+                    held = { held(row.id) },
                 )
             }
             if (archivedRows.isNotEmpty()) {
@@ -228,7 +233,7 @@ internal fun InboxSidebarList(
                                 store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.ArchivedRowTapped(row.id)))
                                 select(row.id)
                             },
-                            menu = { menu(row, true) },
+                            menu = { menu(row) },
                         )
                     }
                 }
@@ -248,7 +253,8 @@ internal fun InboxSidebarList(
 }
 
 /**
- * One session: a tap opens it, a hold raises it under its menu, as on the regular drawer's rows
+ * One session: a tap opens it (or, while selecting, chooses it) and a hold chooses it, as on the
+ * regular drawer's rows; an archived row's hold raises it under its menu
  * ([drawerRowInteraction]). A sideways swipe is left to the drawer, so a left swipe closes it.
  */
 @Composable
@@ -258,7 +264,9 @@ private fun InboxSidebarMenuRow(
     selected: Boolean,
     archived: Boolean,
     select: () -> Unit,
-    menu: () -> List<DrawerRowMenuItem>,
+    checked: Boolean? = null,
+    held: (() -> Unit)? = null,
+    menu: () -> List<DrawerRowMenuItem> = { emptyList() },
 ) {
     val colors = OpenCodeTheme.colors
     val hold = remember(row.id) { DrawerRowHoldState() }
@@ -266,6 +274,12 @@ private fun InboxSidebarMenuRow(
     val currentSelect by rememberUpdatedState(select)
     val currentMenu by rememberUpdatedState(menu)
     val raisedSurface = if (colors.isDark) MaterialTheme.colorScheme.surfaceContainerHigh else colors.canvas
+    // While the drawer selects, the chosen rows' tint stands in for the open session's.
+    val tint = when {
+        checked == true -> checkedRowTint()
+        checked == null && selected -> colors.text.copy(alpha = 0.08f)
+        else -> Color.Transparent
+    }
     val surface = remember { Animatable(0f) }
     LaunchedEffect(hold.isHeld) {
         if (hold.isHeld) surface.snapTo(1f) else surface.animateTo(0f, MotionRole.Swap.animation(MotionPhase.Exit))
@@ -281,7 +295,7 @@ private fun InboxSidebarMenuRow(
             .drawBehind {
                 if (surface.value > 0f) drawRect(raisedSurface.copy(alpha = raisedSurface.alpha * surface.value.coerceIn(0f, 1f)))
             }
-            .background(if (selected) colors.text.copy(alpha = 0.08f) else Color.Transparent)
+            .background(tint)
             .drawerRowInteraction(
                 interaction = DrawerRowInteraction(
                     sessionID = row.id,
@@ -289,6 +303,7 @@ private fun InboxSidebarMenuRow(
                     select = { currentSelect() },
                     pressed = {},
                     menu = { currentMenu() },
+                    held = held,
                 ),
                 hold = hold,
                 list = { null },
@@ -298,6 +313,12 @@ private fun InboxSidebarMenuRow(
                 testTag = "inbox-row-${row.id}"
                 role = Role.Button
                 onClick { currentSelect(); true }
+                if (held != null && checked == null) onLongClick("Select") { held(); true }
+                when (checked) {
+                    true -> stateDescription = "Selected"
+                    false -> stateDescription = "Not Selected"
+                    null -> Unit
+                }
                 // TalkBack can't hold a row, so its menu items are the row's actions too.
                 val actions = mutableListOf<CustomAccessibilityAction>()
                 for (item in menu()) {
@@ -306,7 +327,7 @@ private fun InboxSidebarMenuRow(
                 customActions = actions
             },
     ) {
-        InboxSidebarRowView(row, now, Modifier.graphicsLayer { alpha = if (archived) InboxSidebarMetrics.archivedAlpha else 1f })
+        InboxSidebarRowView(row, now, checked, Modifier.graphicsLayer { alpha = if (archived) InboxSidebarMetrics.archivedAlpha else 1f })
         // Anchored on the row so the menu opens beside the held row.
         DrawerRowMenu(hold) { currentMenu() }
     }
@@ -314,7 +335,7 @@ private fun InboxSidebarMenuRow(
 
 /** iOS `InboxSidebarRowView`: dot, title and age, project, then what the session needs. */
 @Composable
-internal fun InboxSidebarRowView(row: InboxSidebarRow, now: Instant, modifier: Modifier = Modifier) {
+internal fun InboxSidebarRowView(row: InboxSidebarRow, now: Instant, checked: Boolean?, modifier: Modifier = Modifier) {
     val colors = OpenCodeTheme.colors
     val age = InboxSidebarRow.age(row.updatedAt, now)
     val description = buildList {
@@ -338,12 +359,17 @@ internal fun InboxSidebarRowView(row: InboxSidebarRow, now: Instant, modifier: M
             },
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Box(
-            Modifier
-                .padding(top = 7.dp)
-                .size(8.dp)
-                .background(if (row.unread) colors.signal else Color.Transparent, CircleShape),
-        )
+        if (checked != null) {
+            // The check takes the unread dot's place while the drawer selects.
+            SelectionCheck(checked, Modifier.padding(top = 2.dp), size = 18.dp)
+        } else {
+            Box(
+                Modifier
+                    .padding(top = 7.dp)
+                    .size(8.dp)
+                    .background(if (row.unread) colors.signal else Color.Transparent, CircleShape),
+            )
+        }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             // iOS: Text + Spacer(minLength: 8) + age. The title takes all the width the age
             // leaves (a second weighted spacer would cap it at half), so the age stays trailing.

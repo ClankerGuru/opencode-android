@@ -4,9 +4,12 @@ import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.ui.OpenCodeRadius
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.shape.RoundedCornerShape
 import ai.opencode.feature.drawer.style.drawerCanvas
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.haptics.Haptic
+import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.shared
@@ -22,12 +25,14 @@ import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.core.ui.rememberHighContrast
 import ai.opencode.feature.drawer.list.DrawerListActions
 import ai.opencode.feature.drawer.list.DrawerListInputs
-import ai.opencode.feature.drawer.list.DrawerListRow
 import ai.opencode.feature.drawer.list.DrawerListView
+import ai.opencode.feature.drawer.list.DeleteSelectionConfirmation
 import ai.opencode.feature.drawer.list.DrawerPinDrag
 import ai.opencode.feature.drawer.list.DrawerRowMenuItem
+import ai.opencode.feature.drawer.list.DrawerSelectionBar
 import ai.opencode.feature.drawer.list.InboxSidebarList
 import ai.opencode.feature.drawer.list.rememberInboxSidebarOn
+import ai.opencode.feature.drawer.list.selectionActions
 import ai.opencode.feature.drawer.motion.DrawerControlsTrace
 import ai.opencode.feature.drawer.motion.DrawerControlsTraceView
 import ai.opencode.feature.drawer.motion.DrawerKeyboardMonitor
@@ -52,8 +57,6 @@ import ai.opencode.feature.drawer.switcher.ServerFlowTitle
 import ai.opencode.feature.drawer.switcher.drawerTitleServers
 import ai.opencode.feature.session.ComposerTunables
 import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
-import ai.opencode.feature.system.SessionWindowTarget
-import ai.opencode.feature.system.WindowsClient
 import ai.opencode.feature.voice.FloatingCallCenter
 import ai.opencode.feature.voice.floatingCallDrawerButton
 import ai.opencode.server.ServerSharedKeys
@@ -119,8 +122,8 @@ import kotlin.math.min
 
 /*
  * Port of iOS `HomeView+Drawer.swift`: the drawer's chrome (its title, which is the server
- * switcher, and search; New Session and Settings at its bottom), the list's inputs and the rows'
- * hold menus. The container (`SessionDrawerContainer`) places [HomeDrawer] in its drawer slot;
+ * switcher, and search; New Session and Settings at its bottom), the list's inputs and selection
+ * mode's bar. The container (`SessionDrawerContainer`) places [HomeDrawer] in its drawer slot;
  * the view-local state iOS keeps on `HomeView` lives in [HomeViewState].
  *
  * The title and search, and New Session and Settings, lie over the list rather than beside it:
@@ -210,17 +213,35 @@ fun HomeDrawer(
     val controlsReach = (controlsHeight * DrawerTunables.controlsReach.coerceIn(0f, 1f)).dp
     val footerBottom = DrawerFooterBottom
 
+    // Selection mode: while rows are chosen a tap adds or removes one, and system back, ✕ or the
+    // drawer closing ends it.
+    val selection = viewState.selection
+    val haptics = remember { dependency(HapticsClient) }
+    val select: (String) -> Unit = remember(viewState) {
+        { id ->
+            if (selection.isActive) {
+                haptics.play(Haptic.selection)
+                selection.toggle(id)
+            } else {
+                viewState.selectSession(id)
+            }
+        }
+    }
+    BackHandler(enabled = selection.isActive) { selection.clear() }
+    LaunchedEffect(isDrawerVisible) { if (!isDrawerVisible) selection.clear() }
+
     val inputs = DrawerListInputs(
         selectedSessionID = selectedSessionID,
         reducedMotion = reducedMotion,
         increasedContrast = highContrast,
         alwaysShowsHeaders = DrawerTunables.sectionBreak == DrawerSectionBreak.Header,
         serverSwap = serverSwapTarget,
+        checkedIDs = selection.ids,
     )
     val actions = remember(store, viewState) {
         DrawerListActions(
-            select = viewState::selectSession,
-            menu = { row -> rowMenu(store, row) },
+            select = select,
+            held = selection::toggle,
             openCatchUp = viewState::openCatchUp,
             openWhatsNew = viewState::openWhatsNew,
             hideWhatsNew = { store.send(HomeFeature.Action.WhatsNew(WhatsNewFeature.Action.HideTapped)) },
@@ -246,9 +267,11 @@ fun HomeDrawer(
             selectedSessionID = selectedSessionID,
             headerScroll = viewState.headerScroll,
             contentPadding = listPadding,
-            select = viewState::selectSession,
+            checkedIDs = selection.ids,
+            select = select,
+            held = selection::toggle,
             openCatchUp = viewState::openCatchUp,
-            menu = { row, archived -> inboxRowMenu(store, row, archived) },
+            menu = { row -> archivedRowMenu(store, row) },
             modifier = Modifier.fillMaxSize(),
         ) else DrawerListView(
             store = store,
@@ -300,6 +323,11 @@ fun HomeDrawer(
                     .padding(top = insetTop + DrawerHeaderTop, bottom = DrawerTunables.headerBottom),
                 contentAlignment = Alignment.CenterEnd,
             ) {
+                if (selection.isActive) {
+                    val (main, overflow) = selectionActions(store, selection, pins = !inboxSidebarOn)
+                    DrawerSelectionBar(count = selection.ids.size, onClose = selection::clear, actions = main, overflow = overflow)
+                    return@Box
+                }
                 val titleModifier = Modifier
                     .fillMaxWidth()
                     .padding(start = DrawerMetrics.textInset, end = DrawerSearchPillDefaults.size + DrawerTunables.searchGap)
@@ -361,6 +389,7 @@ fun HomeDrawer(
     }
 
     if (hostsDeleteConfirmation) HomeDeleteConfirmation(store)
+    DeleteSelectionConfirmation(store, selection)
 }
 
 /**
@@ -377,78 +406,12 @@ private fun rememberIsDrawerVisible(store: StoreOf<HomeFeature.State, HomeFeatur
         (if (showsDrawerLabel) viewState.isSessionDrawerPresented || isDrawerOpen else sidebarShown)
 }
 
-/**
- * A row's hold menu (iOS `rowMenu(_:isPinned:)`): Pin or Unpin, Mark as Read or Unread, Mute or
- * Unmute, and Delete (which asks first, [HomeDeleteConfirmation]). Where the device has several
- * windows (a tablet, iOS's iPad), Open in New Window comes first ([WindowsClient]).
- */
-private fun rowMenu(store: StoreOf<HomeFeature.State, HomeFeature.Action>, row: DrawerListRow): List<DrawerRowMenuItem> {
-    val state = store.state
-    val session = row.session
-    val unread = state.isUnread(session)
-    val muted = state.isMuted(session.id)
-    val isPinned = row.isPinnedSection
-    return newWindowMenu(state, session.id) + listOf(
-        DrawerRowMenuItem(if (isPinned) "Unpin" else "Pin", if (isPinned) SFSymbol.PinSlash else SFSymbol.Pin) {
-            store.send(HomeFeature.Action.TogglePin(session.id))
-        },
-        DrawerRowMenuItem(
-            if (unread) "Mark as Read" else "Mark as Unread",
-            if (unread) SFSymbol.EnvelopeOpen else SFSymbol.EnvelopeBadge,
-        ) {
-            store.send(if (unread) HomeFeature.Action.MarkRead(session.id) else HomeFeature.Action.MarkUnread(session.id))
-        },
-        DrawerRowMenuItem(if (muted) "Unmute" else "Mute", if (muted) SFSymbol.Bell else SFSymbol.BellSlash) {
-            store.send(HomeFeature.Action.ToggleMute(session.id))
-        },
-        DrawerRowMenuItem("Delete", SFSymbol.Trash, destructive = true) {
-            store.send(HomeFeature.Action.DeleteSessionTapped(session.id))
-        },
-    )
-}
-
-/** Multiple Windows (tablet): the session in a window of its own. */
-private fun newWindowMenu(state: HomeFeature.State, sessionID: String): List<DrawerRowMenuItem> {
-    val windows = dependency(WindowsClient)
-    if (!windows.isAvailable()) return emptyList()
-    return listOf(
-        DrawerRowMenuItem("Open in New Window", SFSymbol.MacwindowBadgePlus) {
-            windows.open(SessionWindowTarget(serverID = state.server.persistenceID, sessionID = sessionID))
-        },
-    )
-}
-
-/**
- * An Inbox Sidebar row's hold menu (Android: iOS swipes these rows): [rowMenu]'s items that fit an
- * inbox, Mark as Read only while unread, and Archive before Delete. An archived row offers Unarchive.
- */
-private fun inboxRowMenu(store: StoreOf<HomeFeature.State, HomeFeature.Action>, row: InboxSidebarRow, archived: Boolean): List<DrawerRowMenuItem> {
-    if (archived) {
-        return listOf(
-            DrawerRowMenuItem("Unarchive", SFSymbol.TrayAndArrowDown) {
-                store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.UnarchiveTapped(row.id, row.title)))
-            },
-        )
-    }
-    val state = store.state
-    val muted = state.isMuted(row.id)
-    val items = newWindowMenu(state, row.id).toMutableList()
-    if (row.unread) {
-        items.add(DrawerRowMenuItem("Mark as Read", SFSymbol.EnvelopeOpen) { store.send(HomeFeature.Action.MarkRead(row.id)) })
-    }
-    items.add(
-        DrawerRowMenuItem(if (muted) "Unmute" else "Mute", if (muted) SFSymbol.Bell else SFSymbol.BellSlash) {
-            store.send(HomeFeature.Action.ToggleMute(row.id))
-        },
-    )
-    items.add(
-        DrawerRowMenuItem("Archive", SFSymbol.Archivebox) {
-            store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveTapped(row.id, row.title)))
-        },
-    )
-    items.add(DrawerRowMenuItem("Delete", SFSymbol.Trash, destructive = true) { store.send(HomeFeature.Action.DeleteSessionTapped(row.id)) })
-    return items
-}
+/** An Inbox Sidebar Archived row's hold menu: Unarchive. */
+private fun archivedRowMenu(store: StoreOf<HomeFeature.State, HomeFeature.Action>, row: InboxSidebarRow): List<DrawerRowMenuItem> = listOf(
+    DrawerRowMenuItem("Unarchive", SFSymbol.TrayAndArrowDown) {
+        store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.UnarchiveTapped(row.id, row.title)))
+    },
+)
 
 /**
  * The delete confirmation (iOS `HomeView`'s `confirmationDialog`): “Delete “<title>”?”, This

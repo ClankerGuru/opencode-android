@@ -2,6 +2,7 @@ package ai.opencode.feature.drawer
 
 import ai.opencode.core.store.StoreOf
 import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
+import ai.opencode.feature.drawer.list.DrawerSelection
 import ai.opencode.feature.drawer.motion.DrawerKeyboardHold
 import ai.opencode.feature.drawer.motion.DrawerKeyboardMonitor
 import ai.opencode.feature.drawer.motion.DrawerPanRegions
@@ -50,6 +51,9 @@ class HomeViewState internal constructor(
 
     /** The header shows the search field in place of the title (iOS `search`). */
     val search = DrawerSearchState()
+
+    /** The rows chosen by holding one (Android selection mode; iOS holds a row for its menu). */
+    val selection = DrawerSelection()
 
     /** How far the drawer's list has scrolled beneath its title (iOS `headerScroll`). */
     val headerScroll = DrawerHeaderScrollState()

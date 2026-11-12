@@ -128,10 +128,13 @@ class InboxSidebarTests {
             this[DateClient] = DateClient.constant(date(1_000))
             this[OpenCodeClient] = OpenCodeClient.testValue.offline().copy(archiveSession = { _, id -> archived.append(id) })
         }
+        assertTrue(store.state.drawerSessions.recents.map { it.id }.contains("newest_read"))
         store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveTapped(sessionID = "newest_read", title = "newest_read"))) {
             it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedIDs = setOf("newest_read")))
         }
         assertFalse(store.state.inboxSidebarRows().map { it.id }.contains("newest_read"))
+        // The regular list's rows leave at once too (Archive in selection mode).
+        assertFalse(store.state.drawerSessions.recents.map { it.id }.contains("newest_read"))
         store.receiveArchiveResponse {
             it.withSession("newest_read") { s -> s.copy(archivedMilliseconds = 1_000_000) }.copy(
                 inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedIDs = emptySet(), archived = listOf(it.archivedEntry("newest_read"))),
