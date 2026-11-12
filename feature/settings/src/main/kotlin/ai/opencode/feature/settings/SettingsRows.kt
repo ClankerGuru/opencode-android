@@ -37,8 +37,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SliderColors
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.Typography
@@ -212,27 +210,18 @@ fun SettingsSection(
 }
 
 /**
- * What parts two rows on a section card: on this branch the desktop list's inset hairline (as
- * iOS draws), replacing Material 3 Expressive's 2 dp segmented gap. [inset] is kept so the call
- * sites stay as on iOS.
+ * What parts two rows on a section card: the desktop's `settings-row` hairline, inset to the
+ * card's padding, or with [inset] under an iconed row, starting at the text.
  */
 @Composable
 fun SettingsDivider(inset: Boolean = false) {
-    // The desktop's `settings-row` border: a hairline inset to the card's padding on both sides,
-    // or, under an iconed row, starting at the text like a list inset.
-    var start = 16.dp
-    if (inset && LocalSettingsRowIcons.current) {
-        start = 16.dp + SettingsIconSize + 16.dp
-    }
+    val start = if (inset && LocalSettingsRowIcons.current) 16.dp + SettingsIconSize + 16.dp else 16.dp
     HorizontalDivider(
         Modifier.padding(start = start, end = 16.dp),
-        thickness = SettingsDividerThickness,
+        thickness = 0.5.dp,
         color = OpenCodeTheme.colors.rowDivider,
     )
 }
-
-/** The row divider's weight: the desktop's 0.5 px line is one device pixel on a 2x screen. */
-private val SettingsDividerThickness = 0.5.dp
 
 /** A row's frame: full-width target, 16 dp sides, at least [SettingsRowMinHeight] tall, 16 dp between its parts. */
 @Composable
@@ -496,10 +485,8 @@ fun RowScope.SettingsIconSpacer() {
 
 /**
  * A settings segmented choice, drawn as the desktop's segmented control
- * (`navigation/segmented-control`): a quiet track with a border-base edge, and the chosen
- * segment as a raised base-coloured pill with a border-strong edge and base text; the others
- * are muted text. Corners are 6 dp (`OpenCodeRadius.sm`). Selection stays neutral, as on the
- * desktop. Each segment is a radio button for TalkBack and fills a 48 dp tap height.
+ * (`navigation/segmented-control`). Each segment is a radio button for TalkBack and fills a
+ * 48 dp tap height.
  */
 @Composable
 fun <T> SettingsSegmentedControl(
@@ -527,7 +514,7 @@ fun <T> SettingsSegmentedControl(
                 .background(trackFill, shape)
                 .border(SegmentEdge, colors.rowDivider, shape),
         )
-        Row(Modifier.fillMaxWidth().height(SegmentTapHeight).selectableGroup()) {
+        Row(Modifier.fillMaxWidth().selectableGroup()) {
             for (option in options) {
                 val isSelected = option == selected
                 val fill by animateColorAsState(
@@ -578,16 +565,3 @@ private val SegmentTapHeight = 48.dp
 
 /** The desktop control's 0.5 px edges. */
 private val SegmentEdge = 0.5.dp
-
-/** A settings slider: the filled part and thumb in the selection colour, as the desktop's timeline slider. */
-@Composable
-fun settingsSliderColors(): SliderColors {
-    val colors = OpenCodeTheme.colors
-    return SliderDefaults.colors(
-        thumbColor = colors.selection,
-        activeTrackColor = colors.selection,
-        activeTickColor = colors.onSelection.copy(alpha = 0.6f),
-        inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-        inactiveTickColor = colors.secondaryText.copy(alpha = 0.6f),
-    )
-}

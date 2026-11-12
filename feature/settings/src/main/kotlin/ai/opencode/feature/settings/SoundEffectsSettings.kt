@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -39,6 +41,7 @@ fun SoundEffectsSettingsRows(send: (HomeSettingsFeature.Action) -> Unit) {
     val percent = remember(volume) {
         NumberFormat.getPercentInstance(appFormattingLocale()).apply { maximumFractionDigits = 0 }.format(volume)
     }
+    val colors = OpenCodeTheme.colors
     Column(Modifier.fillMaxWidth()) {
         SettingsValueRow("Volume", percent)
         Row(
@@ -46,13 +49,19 @@ fun SoundEffectsSettingsRows(send: (HomeSettingsFeature.Action) -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            OpenCodeIcon(SFSymbol.SpeakerFill, contentDescription = null, tint = OpenCodeTheme.colors.secondaryText)
+            OpenCodeIcon(SFSymbol.SpeakerFill, contentDescription = null, tint = colors.secondaryText)
             Slider(
                 value = volume.toFloat(),
                 onValueChange = { send(HomeSettingsFeature.Action.SoundEffectsVolumeChanged((it * 10).roundToInt() / 10.0)) },
                 valueRange = 0f..1f,
                 steps = 9,
-                colors = settingsSliderColors(),
+                colors = SliderDefaults.colors(
+                    thumbColor = colors.selection,
+                    activeTrackColor = colors.selection,
+                    activeTickColor = colors.onSelection.copy(alpha = 0.6f),
+                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    inactiveTickColor = colors.secondaryText.copy(alpha = 0.6f),
+                ),
                 modifier = Modifier
                     .weight(1f)
                     .semantics {
@@ -60,7 +69,7 @@ fun SoundEffectsSettingsRows(send: (HomeSettingsFeature.Action) -> Unit) {
                         stateDescription = percent
                     },
             )
-            OpenCodeIcon(SFSymbol.SpeakerWave3Fill, contentDescription = null, tint = OpenCodeTheme.colors.secondaryText)
+            OpenCodeIcon(SFSymbol.SpeakerWave3Fill, contentDescription = null, tint = colors.secondaryText)
         }
     }
     SettingsDivider(inset = false)
