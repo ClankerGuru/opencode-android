@@ -91,7 +91,7 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
         settingsSection(
             key = "experimental-all",
             footer = footerText(
-                "Turns on new experiments as they arrive, but not ones that see your screen or listen in the background.",
+                "Also turns on new ones, except any that see your screen or listen in the background.",
             ),
         ) {
             SettingsToggleRow(

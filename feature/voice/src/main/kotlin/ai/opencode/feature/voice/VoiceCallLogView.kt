@@ -139,7 +139,7 @@ fun VoiceCallLogList(
         modifier = modifier,
         topBar = {
             OpenCodeTopBar(
-                title = { Text("History", modifier = Modifier.semantics { heading() }) },
+                title = { Text("Call History", modifier = Modifier.semantics { heading() }) },
                 navigation = { OpenCodeTopBarBackButton(onClick = onBack) },
                 centerTitle = true,
                 actions = {
@@ -190,7 +190,7 @@ fun VoiceCallLogList(
                 Text("No Voice Calls Yet", style = OpenCodeTextStyles.title2.copy(fontWeight = FontWeight.Bold), color = OpenCodeTheme.colors.text, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "Calls are saved here, on this phone, so you can replay them.",
+                    "Calls are saved on this phone so you can replay them.",
                     style = OpenCodeTextStyles.callout,
                     color = OpenCodeTheme.colors.secondaryText,
                     textAlign = TextAlign.Center,

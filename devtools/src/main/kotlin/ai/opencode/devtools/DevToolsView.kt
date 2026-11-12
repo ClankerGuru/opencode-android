@@ -216,7 +216,7 @@ private fun MainPage(
         item { NavigationRow("Troubleshooting", SFSymbol.WaveformPathEcg) { send(DevToolsFeature.Action.Navigate(DevToolsFeature.Route.Troubleshooting)) } }
         footer(
             if (state.developerMode) "Adds Report a Problem to the session menu and uploads voice calls (kept 30 days)."
-            else "Records timing and network metadata on this phone; nothing is uploaded while Developer Mode is off.",
+            else "Nothing leaves this phone while Developer Mode is off.",
         )
 
         if (state.toolsAvailable) {

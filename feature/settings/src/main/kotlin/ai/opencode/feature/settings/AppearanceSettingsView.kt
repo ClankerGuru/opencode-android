@@ -106,7 +106,7 @@ fun AppearanceSettingsView(store: SettingsStore) {
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
             )
         }
-        settingsSection(key = "theme", header = "Theme") {
+        settingsSection(key = "theme") {
             // The clickable row merges its texts: "Theme", then the theme (iOS's label and value).
             SettingsRowFrame(
                 modifier = returnFocus.on(SettingsPage.Themes),

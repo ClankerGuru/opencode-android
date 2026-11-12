@@ -318,9 +318,7 @@ private fun SettingsRootPage(store: SettingsStore) {
             settingsSection(
                 key = "experimental",
                 footer = {
-                    SettingsFooterText("Unfinished features, diagnostics, and live tuning.")
-                    // iOS stacks the footer's lines 14 apart; the footer column already spaces them 6.
-                    SelectionContainer(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                    SelectionContainer(Modifier.fillMaxWidth()) {
                         Text(
                             AppVersion.current.label,
                             style = OpenCodeTextStyles.footnote.copy(fontFeatureSettings = "tnum"),

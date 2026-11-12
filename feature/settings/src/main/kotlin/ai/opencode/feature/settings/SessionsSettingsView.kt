@@ -25,12 +25,7 @@ fun SessionsSettingsView(store: SettingsStore) {
     val send = { action: HomeSettingsFeature.Action -> store.send(SettingsFeature.Action.Settings(action)) }
 
     SettingsPageScaffold(title = "Sessions", store = store) {
-        // iOS: “⌘↩︎ always sends.”; Android hardware keyboards send with Ctrl+Enter.
-        settingsSection(
-            key = "return",
-            header = "Composer",
-            description = "Ctrl+Enter always sends on a hardware keyboard",
-        ) {
+        settingsSection(key = "return", header = "Composer") {
             SettingsToggleRow(
                 "Return Key Sends",
                 checked = returnKeySends,
@@ -41,7 +36,6 @@ fun SessionsSettingsView(store: SettingsStore) {
             settingsSection(
                 key = "default-agent",
                 header = "New Sessions",
-                description = "Each session remembers the agent you choose",
             ) {
                 val options = buildList {
                     add(SettingsMenuOption("", "Server Default"))

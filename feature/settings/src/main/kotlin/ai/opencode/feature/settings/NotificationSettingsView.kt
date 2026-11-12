@@ -51,13 +51,11 @@ fun NotificationSettingsView(store: SettingsStore) {
         settingsSection(
             key = "permission",
             header = "This $ThisDeviceName",
-            footer = footerText(
-                if (permission == NotificationPermission.Disabled) {
-                    "Notifications are off. Turn on Allow Notifications in Android Settings."
-                } else {
-                    "Notifications pass through a relay that keeps nothing: no account, no history, no logs. Only sessions started on this $ThisDeviceName notify it."
-                },
-            ),
+            footer = if (permission == NotificationPermission.Disabled) {
+                null
+            } else {
+                footerText("Notifications go through a relay that stores nothing. Only sessions started on this $ThisDeviceName notify it.")
+            },
         ) {
             SettingsRowFrame(Modifier.semantics(mergeDescendants = true) {}) {
                 Text("Allow Notifications", style = SettingsText.title, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
@@ -85,14 +83,11 @@ fun NotificationSettingsView(store: SettingsStore) {
         settingsSection(
             key = "server",
             header = "Server",
-            footer = footerText(
-                when {
-                    canSetUp -> "Set Up opens a new session with a prompt asking OpenCode to add the plugin to your global config. Review it, tap Send, then check again."
-                    notifyPlugin == NotifyPluginCheck.Checked(OpenCodeNotifyPluginStatus.Active) ->
-                        "Sessions you start on this $ThisDeviceName notify you when they finish."
-                    else -> "The server needs the OpenCode notify plugin to send notifications."
-                },
-            ),
+            footer = when {
+                canSetUp -> footerText("Opens a session that asks OpenCode to install the plugin. Send it, then check again.")
+                notifyPlugin == NotifyPluginCheck.Checked(OpenCodeNotifyPluginStatus.Active) -> null
+                else -> footerText("The server needs the OpenCode notify plugin.")
+            },
         ) {
             SettingsRowFrame(Modifier.semantics(mergeDescendants = true) {}) {
                 Text("Notify Plugin", style = SettingsText.title, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
@@ -132,7 +127,7 @@ fun NotificationSettingsView(store: SettingsStore) {
         }
         settingsSection(
             key = "in-app",
-            footer = footerText("Names sessions needing your input or finishing at the drawer button."),
+            footer = footerText("Shown on the drawer button."),
         ) {
             SettingsMenuRow(
                 title = "In-App Notices",
