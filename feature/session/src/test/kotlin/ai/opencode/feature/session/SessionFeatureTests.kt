@@ -18,9 +18,12 @@ import ai.opencode.feature.session.SessionTestSupport.sessionTest
 import ai.opencode.feature.session.SessionTestSupport.settle
 import ai.opencode.feature.session.SessionTestSupport.testServer
 import ai.opencode.feature.session.SessionTestSupport.testSession
+import ai.opencode.server.EventBatcher
+import ai.opencode.server.EventEmission
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeLiveContentEvent
+import ai.opencode.server.OpenCodeServerEvent
 import ai.opencode.server.model.OpenCodeImageAttachment
 import ai.opencode.server.model.OpenCodeJSONValue
 import ai.opencode.server.model.OpenCodeModelCatalog
@@ -189,9 +192,46 @@ class SessionFeatureTests {
                 ),
             ),
         )
-        assertEquals(listOf(markdown("msg_reply-text-0", "Hello")), store.state.items)
+        assertEquals(listOf(markdown("msg_reply-text-0", "Hello").copy(inProgress = true)), store.state.items)
         assertEquals("Hello", store.state.liveText["msg_reply-text-0"])
         assertEquals(0, reads.value)
+    }
+
+    @Test fun openingMidReplyProjectsThePrefixIncludingShedDeltas() = sessionTest { h ->
+        val session = testSession(id = "ses_stream", title = "Stream")
+        var focused = false
+        val queued = mutableListOf<OpenCodeServerEvent>()
+        val batcher = EventBatcher(
+            scope = h.scope,
+            clock = TestClock(),
+            capacity = 4,
+            isFocused = { focused },
+            emit = { event ->
+                queued += event
+                EventEmission.Enqueued(remaining = 4 - queued.size)
+            },
+        )
+        fun flush(vararg events: OpenCodeLiveContentEvent) {
+            batcher.receive(OpenCodeServerEvent.ContentBatch(session.id, events.toList()))
+            batcher.flush()
+        }
+        batcher.receive(OpenCodeServerEvent.Connected)
+        flush(OpenCodeLiveContentEvent.TextStarted("m", 0), OpenCodeLiveContentEvent.TextDelta("m", 0, "One"))
+        // Half the buffer is occupied, so the next off-screen batch is shed.
+        flush(OpenCodeLiveContentEvent.TextDelta("m", 0, " two"))
+        focused = true
+        flush(OpenCodeLiveContentEvent.TextDelta("m", 0, " th"), OpenCodeLiveContentEvent.TextDelta("m", 0, "ree"))
+        flush(OpenCodeLiveContentEvent.TextDelta("m", 0, "!"))
+        // Connection and first batch predate opening the detail.
+        val batches = queued.drop(2)
+        val store = h.store(h.makeState(session = session, cachedItems = emptyList()))
+        store.exhaustive = false
+        assertEquals(2, batches.size)
+        for ((batch, expected) in batches.zip(listOf("One two three", "One two three!"))) {
+            val events = (batch as OpenCodeServerEvent.ContentBatch).events
+            store.send(Action.ContentBatch(sessionID = session.id, events = events))
+            assertEquals(listOf(markdown("m-text-0", expected).copy(inProgress = true)), store.state.items)
+        }
     }
 
     @Test fun aRunningMessagesNewPartsStayAheadOfAModelSwitchRecordedMidStep() = sessionTest { h ->
@@ -399,7 +439,7 @@ class SessionFeatureTests {
         val draft = markdown("msg_b-text-0", "Draft")
         val later = OpenCodeTranscriptItem.UserText(id = "msg_c", text = "Later")
         val settled = markdown("msg_b-text-0", "Final")
-        val streaming = markdown("msg_d-text-0", "Streaming")
+        val streaming = markdown("msg_d-text-0", "Streaming").copy(inProgress = true)
         val tool = OpenCodeTranscriptItem.Tool(
             id = "msg_d-tool-t1",
             call = OpenCodeToolCall(

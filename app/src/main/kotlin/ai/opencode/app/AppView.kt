@@ -1,6 +1,6 @@
 package ai.opencode.app
 
-import ai.opencode.core.ui.OpenCodeSheetDefaults
+import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeSurfaces
 import androidx.compose.ui.unit.sp
@@ -24,6 +24,7 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconButton
 import ai.opencode.core.ui.OpenCodeIconButtonStyle
 import ai.opencode.core.ui.OpenCodeMinTapTarget
+import ai.opencode.core.ui.OpenCodePrimaryButton
 import ai.opencode.core.ui.OpenCodeSecondaryButton
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
@@ -326,7 +327,7 @@ private fun PairingActionsButtons(store: StoreOf<AppFeature.State, AppFeature.Ac
             onClick = { store.send(AppFeature.Action.AddServerTapped) },
             container = OpenCodeSurfaces.neutralFill,
             content = colors.text,
-            border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
+            border = OpenCodeSurfaces.border,
         ) { Text("Enter a Server Manually", style = PairingActionLabel, textAlign = TextAlign.Center) }
         PairingActionButton(
             onClick = { store.send(AppFeature.Action.ScanPairingCodeTapped) },
@@ -480,7 +481,7 @@ private fun CopyCommand(command: String, onCopy: (String) -> Unit) {
         color = OpenCodeSurfaces.commandFill,
         // Explicit: the fill matches `surfaceVariant`, whose content colour is the secondary text.
         contentColor = OpenCodeTheme.colors.text,
-        border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
+        border = OpenCodeSurfaces.border,
         // The label stands in for the visible command (cleared below), read once as a button
         // (iOS `.accessibilityLabel("Copy \(command)")` on a `Button`).
         modifier = Modifier.heightIn(min = 48.dp).semantics {
@@ -650,6 +651,7 @@ private fun errorTitle(phase: AppFeature.FailureContext.Phase?, context: AppFeat
 private fun ConnectionErrorCard(store: StoreOf<AppFeature.State, AppFeature.Action>, message: String, announces: Boolean) {
     val phase by store.observe { it.errorPhase }
     val context by store.observe { it.errorContext }
+    val needsLocalNetwork by store.observe { it.errorNeedsLocalNetwork }
     var didCopy by remember(message) { mutableStateOf(false) }
     val title = errorTitle(phase, context)
     val secondary = OpenCodeTheme.colors.secondaryText
@@ -682,6 +684,9 @@ private fun ConnectionErrorCard(store: StoreOf<AppFeature.State, AppFeature.Acti
                         Text("OpenCode ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", style = OpenCodeTextStyles.footnote, color = secondary)
                     }
                 }
+            }
+            if (needsLocalNetwork) {
+                OpenCodePrimaryButton(onClick = { store.send(AppFeature.Action.LocalNetworkSettingsTapped) }) { Text("Open Settings") }
             }
             OpenCodeSecondaryButton(onClick = {
                 store.state.errorReport(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE.toString(), java.time.Instant.now())?.let {
@@ -723,7 +728,7 @@ private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>)
         onDismissRequest = { store.send(AppFeature.Action.CancelEditingTapped) },
         sheetState = sheetState,
         dragHandle = { OpenCodeSheetHandle() },
-        shape = OpenCodeSheetDefaults.shape,
+        shape = OpenCodeShape.sheetTop,
     ) {
         // Its password and headers, out of problem reports and voice screenshots.
         HidesFromScreenshots()

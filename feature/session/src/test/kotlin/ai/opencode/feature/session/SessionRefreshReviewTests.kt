@@ -222,11 +222,11 @@ class SessionRefreshReviewTests {
         assertEquals("A failed wait is not a terminal read", 0, reads.value)
         store.send(Action.RefreshRequested(RefreshReason.Reconnect))
         store.receive(Action.RefreshResponse::class)
-        assertTrue(store.state.items.contains(text))
+        assertTrue(store.state.items.contains(text.copy(inProgress = true)))
         store.send(Action.ExternalRunStateChanged(isRunning = false))
         store.receive(Action.RefreshResponse::class)
         assertFalse(store.state.isRunning)
-        assertFalse(store.state.items.contains(text))
+        assertFalse(store.state.items.any { it.id == text.id })
         store.finish()
     }
 
@@ -356,7 +356,7 @@ class SessionRefreshReviewTests {
             store.send(Action.ContentBatch(session.id, listOf(OpenCodeLiveContentEvent.TextDelta(messageID = "msg_reply", ordinal = 0, delta = "Unpersisted"))))
             assertTrue(store.state.isExternallyActive)
             store.send(response(1, listOf(user), AuthoritativeRefresh.Scope.Page))
-            assertEquals("reason=$reason", listOf(user, text), store.state.items)
+            assertEquals("reason=$reason", listOf(user, text.copy(inProgress = true)), store.state.items)
             store.send(Action.ExternalRunStateChanged(isRunning = false))
             store.receive(Action.RefreshResponse::class)
             assertEquals(listOf(user, text), store.state.items)

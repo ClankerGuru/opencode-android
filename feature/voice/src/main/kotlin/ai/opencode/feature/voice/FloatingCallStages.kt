@@ -14,6 +14,7 @@ import ai.opencode.core.tuning.AnimationTimeScale
 import ai.opencode.core.tuning.Tunable
 import ai.opencode.core.tuning.TunableSpring
 import ai.opencode.core.tuning.TuningStore
+import ai.opencode.core.ui.OpenCodeRadius
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,8 +49,9 @@ object FloatingCallStageTunables {
     val covers = Tunable("call.stage.covers", "Card covers the composer", default = true)
     val coverHeight = Tunable("call.stage.coverHeight", "Covering card height", default = 560.0, range = 300.0..720.0, step = 2.0)
     val coverInset = Tunable("call.stage.coverInset", "Covering card bottom margin", default = 12.0, range = 0.0..40.0, step = 1.0)
-    val cardRadius = Tunable("call.stage.cardRadius", "Card corner radius", default = 36.0, range = 12.0..56.0, step = 1.0)
-    val fullRadius = Tunable("call.stage.fullRadius", "Sheet corner radius", default = 38.0, range = 12.0..56.0, step = 1.0)
+    // The design system's sheet radius (iOS follows the device's corners: 36 and 38).
+    val cardRadius = Tunable("call.stage.cardRadius", "Card corner radius", default = OpenCodeRadius.sheet.value.toDouble(), range = 12.0..56.0, step = 1.0)
+    val fullRadius = Tunable("call.stage.fullRadius", "Sheet corner radius", default = OpenCodeRadius.sheet.value.toDouble(), range = 12.0..56.0, step = 1.0)
     val cardBloomY = Tunable("call.stage.cardBloomY", "Card bloom centre", default = 166.0, range = 100.0..260.0, step = 1.0)
     val cardBloomRadius = Tunable("call.stage.cardBloomRadius", "Card bloom radius", default = 96.0, range = 40.0..160.0, step = 1.0)
     val fullBloomY = Tunable("call.stage.fullBloomY", "Sheet bloom centre", default = 150.0, range = 80.0..260.0, step = 1.0)
@@ -509,10 +511,28 @@ data class FloatingCallStageGeometry(
         )
     }
 
+    /**
+     * The card's bloom, shrunk and raised when the card is too short for it (landscape) so the
+     * status, transcript and controls below it never overlap it.
+     */
+    val cardBloomFitted: Bloom get() = fitted(cardBloom, cardFrame.height.toDouble(), cardChromeBelow)
+
+    /** The sheet's bloom, fitted to the sheet's height on screen the same way. */
+    val fullBloomFitted: Bloom get() = fitted(fullBloom, screenHeight - fullTop, fullChromeBelow)
+
+    private fun fitted(bloom: Bloom, height: Double, below: Double): Bloom {
+        val room = height - below
+        if (bloom.y + bloom.radius <= room) return bloom
+        val radius = max(minBloomRadius, (room - headerBottom) / 2)
+        return Bloom(y = max(headerBottom + radius, room - radius), radius = radius)
+    }
+
     /** The dot field's bloom in the shape: filling the orb, centred near the card's top, then smaller and higher as the sheet fills. */
     fun bloom(frame: Rect): BloomCircle {
         val card = cardness(frame)
         val full = fullness(frame)
+        val cardBloom = cardBloomFitted
+        val fullBloom = fullBloomFitted
         val y = lerp(cardBloom.y, fullBloom.y, full)
         val radius = lerp(cardBloom.radius, fullBloom.radius, full)
         val cy = lerp(lerp(frame.center.y.toDouble(), frame.top + cardBloom.y, card), frame.top + y, full)
@@ -556,6 +576,13 @@ data class FloatingCallStageGeometry(
 
     companion object {
         const val minSpan = 120.0
+
+        // What `FloatingCallStageContent` lays out above and below the bloom: the header, then
+        // the status, the transcript's top gap and the controls row with its margins.
+        private const val headerBottom = 66.0
+        private const val cardChromeBelow = 114.0
+        private const val fullChromeBelow = 174.0
+        private const val minBloomRadius = 28.0
     }
 }
 

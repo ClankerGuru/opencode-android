@@ -178,7 +178,7 @@ private fun CatchUpUndoButton(canUndo: Boolean, onClick: () -> Unit) {
         enabled = canUndo,
         shape = OpenCodeShape.control,
         // The desktop's neutral button: base surface and a hairline.
-        border = androidx.compose.foundation.BorderStroke(1.dp, OpenCodeTheme.colors.border),
+        border = OpenCodeSurfaces.border,
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
         colors = ButtonDefaults.filledTonalButtonColors(
             containerColor = OpenCodeSurfaces.neutralFill,

@@ -95,6 +95,7 @@ private fun eventSource(server: OpenCodeServer, waiting: AtomicInteger): Flow<Op
         hooks = dependency(EventBatcherHooks),
         clock = dependency(Clock),
         isFocused = dependency(EventStreamFocusClient).contains,
+        onOverflow = { close(it) },
     )
     val selfViewReceipts = dependency(SelfViewReceipts)
     val activeCall = AtomicReference<Call?>(null)

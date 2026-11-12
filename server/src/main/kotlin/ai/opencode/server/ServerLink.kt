@@ -14,6 +14,7 @@ import java.util.UUID
 import kotlin.math.roundToInt
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
@@ -28,6 +29,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 // Which of a server's addresses to use right now. A saved server keeps the address order
 // pairing or the person gave it; the address that answered last lives here, in memory, so a
@@ -424,20 +426,26 @@ class ServerLinkStore(
         /** Failures in a row on an address with a live stream before it's forgotten anyway. */
         const val failuresBeforeForgetting = 2
 
+        /** How long [OpenCodeServer.firstAttemptURLs] have to answer before the other addresses are tried too. */
+        val preferredHeadStart: Duration = 1.5.seconds
+
         /**
-         * Every address at once; the first that answers as this server wins and the rest are
-         * cancelled, so no slower attempt keeps a socket open. Saved order doesn't matter: a LAN
-         * address saved first can't hold up a tunnel address that answers sooner. With no winner,
-         * a refused sign-in (401) beats an unreachable address, since retrying can't fix it.
+         * Every address at once, except that those outside [OpenCodeServer.firstAttemptURLs] wait
+         * until those have all failed or had [preferredHeadStart]. The first that answers as this
+         * server wins and the rest are cancelled, so no slower attempt keeps a socket open. With no
+         * winner, a refused sign-in (401) beats an unreachable address, since retrying can't fix it.
          */
         suspend fun race(server: OpenCodeServer, health: suspend (OpenCodeServer) -> Unit): RaceOutcome {
             val candidates = server.candidateURLs
+            val first = server.firstAttemptURLs
             val started = Clock.liveValue.now()
             val result: Result<OpenCodeServer> = coroutineScope {
                 val outcomes = Channel<Result<OpenCodeServer>>(Channel.UNLIMITED)
+                val firstAllFailed = CompletableDeferred<Unit>()
                 for (url in candidates) {
                     val candidate = server.at(url)
                     launch {
+                        if (url !in first) withTimeoutOrNull(preferredHeadStart) { firstAllFailed.await() }
                         val outcome = try {
                             NetworkRetry.policy.withValue(RetryPolicy.once) { health(candidate) }
                             Result.success(candidate)
@@ -455,6 +463,8 @@ class ServerLinkStore(
                         return@coroutineScope outcome
                     }
                     failures += outcome.exceptionOrNull() as OpenCodeClientError
+                    // The other addresses wait, so the first failures are all the first addresses'.
+                    if (failures.size == first.size) firstAllFailed.complete(Unit)
                 }
                 val details = mutableListOf<ConnectionFailureDetail>()
                 for (failure in failures) details += failure.connectionFailures

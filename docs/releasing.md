@@ -1,7 +1,13 @@
 # Releasing
 
 Mirrors iOS (`opencode-ios/docs/releasing.md`): releases go through GitHub Releases only.
-Pushing `main` doesn't release to Play. Push and release only when Ryan asks or approves.
+Pushing `main` doesn't release to Play by itself.
+
+## Branches
+
+Feature branch → PR into `dev` → `dev` merged into `main` (a PR from `dev` into `main`, merge
+commit). `main` is production: the scheduled release ships whatever is on it. A push to `dev`
+only runs `scripts/check.sh`; it never tags, uploads to Play or publishes `main-latest`.
 
 ## Cutting a release
 
@@ -26,6 +32,11 @@ skips `scripts/check.sh` when that commit already passed on `main` (otherwise ru
    the `PLAY_OPEN_TESTING` repo variable is `true`. The same `play` job then puts that bundle
    on the open testing (`beta`) track with `scripts/play-promote.sh`; it doesn't upload it a
    second time. Otherwise it skips with a notice.
+
+Both uploads refuse to commit while Google is reviewing earlier changes (Play's default would
+cancel that review and start it again): the step fails and that track stays as it was. Once
+Publishing overview shows no changes in review, re-run the `play` job, or, if internal testing
+already took the build, let the next release promote a newer one.
 
 Report the tag, the workflow run and the Play version code.
 

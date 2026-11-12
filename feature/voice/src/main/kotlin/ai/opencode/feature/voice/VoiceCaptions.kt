@@ -29,7 +29,8 @@ data class CaptionReveal(
 
     /**
      * Matches lines by ID (or, when the live reply settles under a new ID, by position and
-     * speaker) and keeps the reveal of every unchanged leading word. [revealed] shows
+     * speaker). A line matched by ID keeps the reveal of every word it had shown, revised or not;
+     * one inherited by position keeps only its unchanged leading words. [revealed] shows
      * everything at once, for opening onto a call in progress.
      */
     fun sync(targets: List<CaptionTarget>, revealed: Boolean = false): CaptionReveal {
@@ -44,12 +45,16 @@ data class CaptionReveal(
             val words = target.text.split(Regex("\\s+")).filter { it.isNotEmpty() }
             val hasUnfinishedWord = target.isLive && !(target.text.lastOrNull()?.isWhitespace() ?: true)
             val revealable = if (hasUnfinishedWord) max(0, words.size - 1) else words.size
-            var previous = lines.firstOrNull { it.id == target.id }
+            val sameLine = lines.firstOrNull { it.id == target.id }
+            var previous = sameLine
             if (previous == null && index in lines.indices && lines[index].isUser == target.isUser && lines[index].id !in ids) {
                 previous = lines[index]
             }
             val revealedAt = when {
                 revealed -> List(revealable) { Double.NEGATIVE_INFINITY }
+                // A line revised under its own ID (a correction, a new progress step) swaps its
+                // shown words in place: un-revealing them would blink them out and type them again.
+                sameLine != null -> sameLine.revealedAt.take(revealable)
                 previous != null -> {
                     val unchanged = previous.words.zip(words).takeWhile { (a, b) -> a == b }.size
                     previous.revealedAt.take(min(unchanged, revealable))

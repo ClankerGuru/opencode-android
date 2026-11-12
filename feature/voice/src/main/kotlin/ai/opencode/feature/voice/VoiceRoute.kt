@@ -148,7 +148,7 @@ sealed interface VoiceKeySource {
         get() = when (this) {
             is Phone -> "Calls use your own OpenAI or xAI key."
             is Server -> "Calls use your server’s $providerName key."
-            OpenCode -> "Calls are billed to your server’s OpenCode Console workspace."
+            OpenCode -> "Calls are billed to your OpenCode Console workspace."
         }
 
     val isPhoneKey: Boolean get() = this is Phone

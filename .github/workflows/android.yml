@@ -1,16 +1,16 @@
-# Checks every pull request and push to main (scripts/check.sh: assemble, lint, unit tests).
-# Pushes to main also publish the debug APK as the rolling `main-latest` pre-release
-# (sideloading). Releases go through GitHub Releases only, as on iOS: a `v*` tag (from
-# `gh release create`) builds the release AAB signed with the Play upload key, ships it to
-# Google Play's internal testing track, then promotes it to open testing once the
-# PLAY_OPEN_TESTING repo variable is `true` (docs/releasing.md). A tag whose commit already
-# passed on main skips scripts/check.sh and only builds the release bundle.
+# Checks every pull request and push to dev or main (scripts/check.sh: assemble, lint, unit
+# tests). Pushes to dev only run the check. Pushes to main also publish the debug APK as the
+# rolling `main-latest` pre-release (sideloading). Releases go through GitHub Releases only,
+# as on iOS: a `v*` tag (from `gh release create`) builds the release AAB signed with the Play
+# upload key, ships it to Google Play's internal testing track, then promotes it to open
+# testing once the PLAY_OPEN_TESTING repo variable is `true` (docs/releasing.md). A tag whose
+# commit already passed on main skips scripts/check.sh and only builds the release bundle.
 name: Android
 
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, dev]
     tags: ['v*']
   workflow_dispatch:
 
@@ -67,7 +67,7 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
         with:
-          # Only main writes the cache, so pull requests can't evict it.
+          # Only main writes the cache, so pull requests and dev can't evict it.
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Prefer Google's Maven Central mirror
@@ -216,24 +216,19 @@ jobs:
         with:
           name: opencode-android-aab-${{ env.SHORT }}
 
-      - name: Upload to Google Play internal testing
-        if: env.SHIP == 'true'
-        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
-        with:
-          serviceAccountJsonPlainText: ${{ env.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: ai.opencode.mobilecode
-          releaseFiles: opencode-android-${{ env.SHORT }}.aab
-          mappingFile: opencode-android-${{ env.SHORT }}-mapping.txt
-          releaseName: ${{ env.VERSION }} (${{ github.run_number }})
-          track: internal
-          status: completed
-
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         if: env.SHIP == 'true'
         with:
           path: source
           sparse-checkout: scripts/play-promote.sh
           sparse-checkout-cone-mode: false
+
+      - name: Upload to Google Play internal testing
+        if: env.SHIP == 'true'
+        run: |
+          source/scripts/play-promote.sh ai.opencode.mobilecode internal "${{ github.run_number }}" \
+            "${VERSION} (${{ github.run_number }})" \
+            "opencode-android-${SHORT}.aab" "opencode-android-${SHORT}-mapping.txt"
 
       # Open testing is the public opt-in track, like iOS's External TestFlight group. It stays
       # off until the PLAY_OPEN_TESTING repo variable is `true`: Play needs the store listing,

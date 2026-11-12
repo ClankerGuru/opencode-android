@@ -238,7 +238,7 @@ class SessionFeatureTestsInbox {
                 events = listOf(ai.opencode.server.OpenCodeLiveContentEvent.TextDelta(messageID = "msg_1", ordinal = 0, delta = "The fixes are in.")),
             ),
         )
-        val streamed = markdown("msg_1-text-0", "The fixes are in.")
+        val streamed = markdown("msg_1-text-0", "The fixes are in.").copy(inProgress = true)
         assertEquals(listOf(noticeReply, pendingNotice, streamed), store.state.items)
 
         history(store, listOf(noticeReply))
@@ -302,7 +302,7 @@ class SessionFeatureTestsInbox {
                 events = listOf(ai.opencode.server.OpenCodeLiveContentEvent.TextDelta(messageID = "msg_1", ordinal = 0, delta = "The screenshot matches.")),
             ),
         )
-        val text = markdown("msg_1-text-0", "The screenshot matches.")
+        val text = markdown("msg_1-text-0", "The screenshot matches.").copy(inProgress = true)
         assertEquals("delivered=$delivered", listOf(noticeReply, read, pendingNotice, text), store.state.items)
         val shown = TranscriptEntry.build(store.state.visibleItems, isRunning = true)
         assertEquals(listOf("msg_0-text-0", "group-msg_1-tool-read", "msg_1-text-0"), shown.map { it.id })

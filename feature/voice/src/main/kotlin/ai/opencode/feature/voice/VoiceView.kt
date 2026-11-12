@@ -205,15 +205,8 @@ object VoiceCallSurfaceDefaults {
  * A call surface: the desktop dock's flat fill, a hairline [border] and a small raised shadow
  * (`--v2-elevation-raised`), instead of iOS glass.
  */
-fun Modifier.callSurface(shape: Shape, color: Color, border: Color = Color.Unspecified): Modifier = graphicsLayer {
-    this.shape = shape
-    shadowElevation = 1.5.dp.toPx()
-    clip = false
-}.drawBehind {
-    val outline = shape.createOutline(size, layoutDirection, this)
-    drawOutline(outline, color)
-    if (border.isSpecified) drawOutline(outline, border, style = Stroke(1.dp.toPx()))
-}
+fun Modifier.callSurface(shape: Shape, color: Color, border: Color = Color.Unspecified): Modifier =
+    callSurface({ shape }, color, border)
 
 /** Animated geometry is observed by the layer/draw scopes, never by composition. */
 private fun Modifier.callSurface(shape: () -> Shape, color: Color, border: Color = Color.Unspecified): Modifier = graphicsLayer {

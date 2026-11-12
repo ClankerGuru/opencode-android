@@ -682,7 +682,7 @@ class SessionFeatureTestsLoading {
                 projectedMessageIDs = setOf("msg_live"),
                 lastProjectedMessageID = "msg_live",
                 liveText = mapOf("msg_live-text-0" to "Streaming reply"),
-                items = listOf(assistant("msg_live-text-0", "Streaming reply")),
+                items = listOf(assistant("msg_live-text-0", "Streaming reply").copy(inProgress = true)),
             )
         }
         assertNull(store.state.errorMessage)

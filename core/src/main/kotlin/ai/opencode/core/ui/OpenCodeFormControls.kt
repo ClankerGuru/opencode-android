@@ -27,7 +27,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
@@ -154,7 +153,6 @@ private fun switchColors(): SwitchColors {
     val lightThumb = if (colors.isDark) colors.secondaryText else scheme.surfaceContainerLowest
     val edge = if (colors.isDark) Color.Transparent else Color.Black.copy(alpha = 0.10f)
     return SwitchColors(
-        // On is the desktop's accent fill with a white thumb (`switch.css` checked state).
         checkedTrack = colors.selection,
         checkedThumb = colors.onSelection,
         uncheckedTrack = scheme.surfaceContainerHighest,
@@ -190,14 +188,6 @@ object OpenCodeSheetHandleDefaults {
 
     val color: Color
         @Composable @ReadOnlyComposable get() = OpenCodeTheme.colors.tertiaryText
-}
-
-/**
- * Bottom sheets' container shape: [OpenCodeRadius.sheet] (16 dp) on the top corners, squarer than
- * Material's extra-large sheet corner.
- */
-object OpenCodeSheetDefaults {
-    val shape: Shape = RoundedCornerShape(topStart = OpenCodeRadius.sheet, topEnd = OpenCodeRadius.sheet)
 }
 
 /** [OpenCodeSwitch]'s geometry: the desktop switch's proportions at touch size. */

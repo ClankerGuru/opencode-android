@@ -3,15 +3,9 @@ package ai.opencode.feature.drawer.list
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
-import ai.opencode.core.ui.OpenCodeIcon
-import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,27 +23,26 @@ import androidx.compose.ui.layout.LayoutCoordinates
  * Port of iOS `DrawerRowInteraction.swift`: a drawer row's touches. A tap opens the session; a
  * finger resting on the row for [DRAWER_ROW_PRESS_DELAY_MS], or a tap, tells Home first (`pressed`,
  * so its transcript warms), but never a finger that scrolls the list or lands on a moving one
- * (iOS `Coordinator.pressDelay`); a hold opens the menu
- * over the lifted row; moving the held finger lifts the row to pin, unpin or reorder it
+ * (iOS `Coordinator.pressDelay`); a hold chooses the row (Android: selection mode, where iOS
+ * opens a menu); moving the held finger lifts the row to pin, unpin or reorder it
  * ([DrawerPinDrag]), as iOS's context menu and drag interactions share one view.
  *
  * UIKit's `UIContextMenuInteraction` + `UIDragInteraction` become one pointer handler:
  * - a tap lands on touch-up and only if the drawer's pan never chose the touch (the pan consumes
  *   it in the `Initial` pass, iOS's `shouldRequireFailureOf: DirectionalPanGestureRecognizer`);
- * - the hold (the platform long-press timeout) plays `Haptic.tap` (a menu opening) and shows the
- *   row's menu; the row shows lifted on a raised surface (iOS `DrawerHoldStyle.inPlace`);
- * - moving the held finger past the touch slop closes the menu and starts the drag (iOS's drag
- *   growing out of the menu's lift), which the finger then owns: the list never scrolls under it;
- * - lifting the finger without moving leaves the menu up, as iOS does.
+ * - the hold (the platform long-press timeout) plays `Haptic.tap` and chooses the row ([held]);
+ * - moving the held finger past the touch slop starts the drag (iOS's drag growing out of the
+ *   menu's lift), which the finger then owns: the list never scrolls under it; the row shows
+ *   lifted on a raised surface (iOS `DrawerHoldStyle.inPlace`).
  * iOS's frozen-bitmap lift (`liftView`, `cover`, `LiftTouchObserver`'s late release) exists only
  * because UIKit lifts a snapshot; Compose draws the live row raised, so none of that is needed.
- * Not ported: "Open in New Window" (iPad Multiple Windows; one task on Android), tapping the
- * lifted preview to open the row (the menu is a popup beside the row), the lift trace.
+ * Not ported: the menu (selection mode's bar holds its actions), tapping the lifted preview, the
+ * lift trace.
  * iOS has no swipe actions on drawer rows (a sideways drag reveals the rows' times), so neither
  * does Android.
  */
 
-/** One entry of a row's menu (iOS `UIAction`). */
+/** One of selection mode's actions (iOS `rowMenu`'s `UIAction`). */
 data class DrawerRowMenuItem(
     val title: String,
     val symbol: SFSymbol,
@@ -60,7 +53,7 @@ data class DrawerRowMenuItem(
 /** What a row's touches do, as closures: the row never holds a store. */
 class DrawerRowInteraction(
     val sessionID: String,
-    /** Session rows lift by a long-press drag; other rows only open the menu. */
+    /** Session rows lift by a long-press drag; other rows are only chosen. */
     val reorderable: Boolean,
     val isPinnedSection: Boolean = false,
     val select: () -> Unit,
@@ -69,7 +62,11 @@ class DrawerRowInteraction(
      * selection; never a finger that scrolls the list.
      */
     val pressed: () -> Unit,
-    val menu: () -> List<DrawerRowMenuItem>,
+    /**
+     * Android: the hold chooses the row for selection mode ([DrawerSelection]) in place of the
+     * menu; a drag growing out of the hold takes it back.
+     */
+    val held: () -> Unit,
     /** The list is scrolling or flinging (iOS `Coordinator.isMoving`). */
     val isListMoving: () -> Boolean = { false },
     /** The held finger moved: the drag begins at [fingerInList] (dp, the list's coordinates). */
@@ -90,19 +87,11 @@ const val DRAWER_ROW_PRESS_DELAY_MS = 80L
 /** How a finger's first moments on a row ended. */
 private enum class DrawerRowTouch { Tapped, Taken, Rested }
 
-/** A row's hold: its menu on screen, or a drag under way (iOS `Coordinator.isMenuVisible`/`isDragActive`). */
+/** A row's hold: a drag under way (iOS `Coordinator.isDragActive`). */
 @Stable
 class DrawerRowHoldState {
-    var isMenuVisible: Boolean by mutableStateOf(false)
     var isDragActive: Boolean by mutableStateOf(false)
         internal set
-
-    /** The row reads lifted: its menu is up or it's being dragged. */
-    val isHeld: Boolean get() = isMenuVisible || isDragActive
-
-    fun dismissMenu() {
-        isMenuVisible = false
-    }
 }
 
 /**
@@ -132,8 +121,6 @@ fun Modifier.drawerRowInteraction(
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
             val pointer = down.id
-            // A new touch on the row: an earlier hold's menu never lingers.
-            if (hold.isMenuVisible) hold.dismissMenu()
             val slop = viewConfiguration.touchSlop
 
             // Waits up to [timeoutMillis] for the finger to lift (a tap), or for a drag someone
@@ -178,9 +165,10 @@ fun Modifier.drawerRowInteraction(
             }
             if (touch == DrawerRowTouch.Taken) return@awaitEachGesture
 
-            // The hold: the menu over the lifted row.
+            // The hold: the row chosen.
             haptics.play(Haptic.tap)
-            hold.isMenuVisible = true
+            val held = current.held
+            held()
             var start: Offset? = null
             var dragging = false
             var last: PointerInputChange? = null
@@ -207,36 +195,16 @@ fun Modifier.drawerRowInteraction(
                 }
                 // The hold owns the finger now: neither the list nor the drawer takes it.
                 change.consume()
-                if (!change.pressed) return@awaitEachGesture // The menu stays up.
+                if (!change.pressed) return@awaitEachGesture
                 val origin = start ?: change.position.also { start = it }
                 val begin = current.beginDrag
                 if (current.reorderable && begin != null && (change.position - origin).getDistance() > slop) {
-                    hold.dismissMenu()
+                    held()
                     hold.isDragActive = true
                     dragging = true
                     current.lifted(current.sessionID)
                     begin(toList(change.position))
                 }
-            }
-        }
-    }
-}
-
-/** The row's menu (iOS `rowMenu`'s `UIMenu`), anchored on the row while [hold] shows it. */
-@Composable
-fun DrawerRowMenu(hold: DrawerRowHoldState, items: () -> List<DrawerRowMenuItem>) {
-    DropdownMenu(expanded = hold.isMenuVisible, onDismissRequest = { hold.dismissMenu() }) {
-        if (hold.isMenuVisible) {
-            for (item in items()) {
-                val tint = if (item.destructive) OpenCodeTheme.colors.destructive else OpenCodeTheme.colors.text
-                DropdownMenuItem(
-                    text = { Text(item.title, color = tint) },
-                    leadingIcon = { OpenCodeIcon(item.symbol, contentDescription = null, tint = tint) },
-                    onClick = {
-                        hold.dismissMenu()
-                        item.action()
-                    },
-                )
             }
         }
     }

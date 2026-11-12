@@ -204,7 +204,7 @@ class VoiceServerPickerTests {
             assertEquals(VoiceKeySource.OpenCode, settings.keySource)
             assertEquals("Key on Your Server", settings.keyRowTitle)
             assertEquals("OpenCode", settings.keyBadgeTitle)
-            assertEquals("Calls are billed to your server’s OpenCode Console workspace.", settings.keySource.footer)
+            assertEquals("Calls are billed to your OpenCode Console workspace.", settings.keySource.footer)
 
         }
         shared.set(

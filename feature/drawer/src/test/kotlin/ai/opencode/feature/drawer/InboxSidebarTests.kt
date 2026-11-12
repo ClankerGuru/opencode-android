@@ -89,6 +89,9 @@ class InboxSidebarTests {
     private fun HomeFeature.State.withSession(id: String, change: (OpenCodeSession) -> OpenCodeSession) =
         copy(sessions = sessions.map { if (it.id == id) change(it) else it })
 
+    /** The session as a confirmed archive lists it first under Archived. */
+    private fun HomeFeature.State.archivedEntry(id: String) = sessions.first { it.id == id }.copy(archivedMilliseconds = 1_000_000)
+
     @Test
     fun needsYourInputThenUnreadThenNewestAndArchivedLeftOut() = homeTest { h ->
         val rows = h.state { state() }.inboxSidebarRows()
@@ -125,13 +128,16 @@ class InboxSidebarTests {
             this[DateClient] = DateClient.constant(date(1_000))
             this[OpenCodeClient] = OpenCodeClient.testValue.offline().copy(archiveSession = { _, id -> archived.append(id) })
         }
-        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveSwiped(sessionID = "newest_read", title = "newest_read"))) {
+        assertTrue(store.state.drawerSessions.recents.map { it.id }.contains("newest_read"))
+        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveTapped(sessionID = "newest_read", title = "newest_read"))) {
             it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedIDs = setOf("newest_read")))
         }
         assertFalse(store.state.inboxSidebarRows().map { it.id }.contains("newest_read"))
+        // The regular list's rows leave at once too (Archive in selection mode).
+        assertFalse(store.state.drawerSessions.recents.map { it.id }.contains("newest_read"))
         store.receiveArchiveResponse {
             it.withSession("newest_read") { s -> s.copy(archivedMilliseconds = 1_000_000) }.copy(
-                inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedIDs = emptySet()),
+                inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedIDs = emptySet(), archived = listOf(it.archivedEntry("newest_read"))),
                 locallyViewedMilliseconds = it.locallyViewedMilliseconds + ("newest_read" to 2_000L),
                 sessionReadDates = it.sessionReadDates + (key("newest_read") to date(500)),
             ).settingSeenWatermark(SessionSeenWatermark(itemID = "reply", viewedMilliseconds = 2_000), "newest_read")
@@ -149,7 +155,7 @@ class InboxSidebarTests {
             this[OpenCodeClient] = OpenCodeClient.testValue.offline().copy(archiveSession = { _, _ -> gate.await() })
         }
         assertEquals(listOf("waiting", "unread_new", "unread_old"), store.state.catchUpSessions.map { it.id })
-        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveSwiped(sessionID = "unread_new", title = "unread_new"))) {
+        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveTapped(sessionID = "unread_new", title = "unread_new"))) {
             it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedIDs = setOf("unread_new")))
         }
         // Gone from Catch Up while the request is in flight…
@@ -157,7 +163,7 @@ class InboxSidebarTests {
         gate.yield()
         store.receiveArchiveResponse {
             it.withSession("unread_new") { s -> s.copy(archivedMilliseconds = 1_000_000, viewedMilliseconds = 2_000) }.copy(
-                inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedIDs = emptySet()),
+                inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedIDs = emptySet(), archived = listOf(it.archivedEntry("unread_new"))),
                 locallyViewedMilliseconds = it.locallyViewedMilliseconds + ("unread_new" to 2_000L),
                 sessionReadDates = it.sessionReadDates + (key("unread_new") to date(400)),
             ).settingSeenWatermark(SessionSeenWatermark(itemID = null, viewedMilliseconds = 2_000), "unread_new")
@@ -180,7 +186,7 @@ class InboxSidebarTests {
             )
         }
         store.exhaustive = false
-        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveSwiped(sessionID = "read_old", title = "read_old")))
+        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveTapped(sessionID = "read_old", title = "read_old")))
         store.receiveArchiveResponse()
         assertTrue(store.state.inboxSidebarStatus.archivedIDs.isEmpty())
         assertFalse(store.state.inboxSidebarRows().map { it.id }.contains("read_old"))
@@ -210,7 +216,7 @@ class InboxSidebarTests {
             )
         }
         store.exhaustive = false
-        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveSwiped(sessionID = "read_old", title = "read_old")))
+        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveTapped(sessionID = "read_old", title = "read_old")))
         store.send(Action.SnapshotRefreshed(OpenCodeHomeSnapshot(projects = store.state.projects, sessions = store.state.sessions, activeSessionIDs = setOf("working"))))
         assertFalse(store.state.inboxSidebarRows().map { it.id }.contains("read_old"))
         h.skipInFlightEffects()
@@ -223,7 +229,7 @@ class InboxSidebarTests {
             this[Clock] = clock
             this[OpenCodeClient] = OpenCodeClient.testValue.copy(archiveSession = { _, _ -> throw OpenCodeClientError("Offline") })
         }
-        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveSwiped(sessionID = "working", title = "Working title"))) {
+        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveTapped(sessionID = "working", title = "Working title"))) {
             it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedIDs = setOf("working")))
         }
         store.receiveArchiveResponse {
@@ -250,20 +256,113 @@ class InboxSidebarTests {
                 },
             )
         }
-        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveSwiped(sessionID = "read_old", title = "read_old"))) {
+        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveTapped(sessionID = "read_old", title = "read_old"))) {
             it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedIDs = setOf("read_old")))
         }
-        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveSwiped(sessionID = "read_old", title = "read_old")))
+        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveTapped(sessionID = "read_old", title = "read_old")))
         clock.advance(1.seconds)
         store.receiveArchiveResponse {
             it.withSession("read_old") { s -> s.copy(archivedMilliseconds = 1_000_000) }.copy(
-                inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedIDs = emptySet()),
+                inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedIDs = emptySet(), archived = listOf(it.archivedEntry("read_old"))),
                 locallyViewedMilliseconds = it.locallyViewedMilliseconds + ("read_old" to 2_000L),
                 sessionReadDates = it.sessionReadDates + (key("read_old") to date(100)),
             ).settingSeenWatermark(SessionSeenWatermark(itemID = null, viewedMilliseconds = 2_000), "read_old")
         }
         assertEquals(1, requests.value)
         store.finish()
+    }
+
+    @Test
+    fun theArchivedPageListsTheServersArchivedSessionsAndUnarchiveRestoresOne() = homeTest { h ->
+        val clock = TestClock()
+        val unarchived = LockIsolated<List<String>>(emptyList())
+        val old = session("old_archive", updated = 50, archived = 1_789_440_000_000)
+        // Restored on desktop since the list loaded: it's back in the session list, not under Archived.
+        val restored = session("read_old", updated = 100, archived = 1_789_440_000_000)
+        val store = h.store(h.state { state() }) {
+            this[Clock] = clock
+            this[OpenCodeClient] = OpenCodeClient.testValue.offline().copy(
+                archivedSessions = { _, search, limit ->
+                    assertEquals("", search)
+                    assertEquals(50, limit)
+                    listOf(old, restored)
+                },
+                unarchiveSession = { _, id -> unarchived.append(id) },
+            )
+        }
+        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchivedListRequested))
+        store.receiveBounded(
+            { ((it as? Action.InboxSidebar)?.action) is InboxSidebarFeature.Action.ArchivedListResponse },
+            "inboxSidebar.archivedListResponse",
+        ) { it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(archived = listOf(old, restored))) }
+        assertEquals(listOf("old_archive"), store.state.inboxSidebarArchivedRows().map { it.id })
+
+        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.UnarchiveTapped(sessionID = "old_archive", title = "old_archive"))) {
+            it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(unarchivingIDs = setOf("old_archive")))
+        }
+        assertTrue(store.state.inboxSidebarArchivedRows().isEmpty())
+        store.receiveBounded(
+            { ((it as? Action.InboxSidebar)?.action) is InboxSidebarFeature.Action.UnarchiveResponse },
+            "inboxSidebar.unarchiveResponse",
+        ) { it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(unarchivingIDs = emptySet(), archived = listOf(restored))) }
+        assertEquals(listOf("old_archive"), unarchived.value)
+        // The snapshot it refetches brings the session back to the list.
+        h.skipInFlightEffects()
+    }
+
+    @Test
+    fun searchingArchivedAsksTheServerAndListsItsMatches() = homeTest { h ->
+        val clock = TestClock()
+        val old = session("old_archive", updated = 50, archived = 1_789_440_000_000)
+        val match = session("login_archive", updated = 40, archived = 1_789_440_000_000)
+        val initial = h.state { state() }.let { it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(archived = listOf(old))) }
+        val store = h.store(initial) {
+            this[Clock] = clock
+            this[OpenCodeClient] = OpenCodeClient.testValue.offline().copy(
+                archivedSessions = { _, search, _ ->
+                    assertEquals("login", search)
+                    listOf(match)
+                },
+            )
+        }
+        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchivedSearchChanged("login "))) {
+            it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedSearch = "login "))
+        }
+        clock.advance(HomeFeature.sessionSearchDebounce)
+        store.receiveBounded(
+            { ((it as? Action.InboxSidebar)?.action) is InboxSidebarFeature.Action.ArchivedSearchResponse },
+            "inboxSidebar.archivedSearchResponse",
+        ) { it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedMatches = listOf(match))) }
+        assertEquals(listOf("login_archive"), store.state.inboxSidebarArchivedRows().map { it.id })
+
+        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchivedSearchChanged(""))) {
+            it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedSearch = "", archivedMatches = null))
+        }
+        assertEquals(listOf("old_archive"), store.state.inboxSidebarArchivedRows().map { it.id })
+    }
+
+    @Test
+    fun aFailedUnarchiveKeepsTheSessionArchivedWithAnError() = homeTest { h ->
+        val clock = TestClock()
+        val old = session("old_archive", updated = 50, archived = 1_789_440_000_000)
+        val initial = h.state { state() }.let { it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(archived = listOf(old))) }
+        val store = h.store(initial) {
+            this[Clock] = clock
+            this[OpenCodeClient] = OpenCodeClient.testValue.copy(unarchiveSession = { _, _ -> throw OpenCodeClientError("Offline") })
+        }
+        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.UnarchiveTapped(sessionID = "old_archive", title = "Old title"))) {
+            it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(unarchivingIDs = setOf("old_archive")))
+        }
+        store.receiveBounded(
+            { ((it as? Action.InboxSidebar)?.action) is InboxSidebarFeature.Action.UnarchiveResponse },
+            "inboxSidebar.unarchiveResponse",
+        ) { it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(unarchivingIDs = emptySet(), archiveError = "Couldn’t unarchive “Old title”. Offline")) }
+        assertEquals(listOf("old_archive"), store.state.inboxSidebarArchivedRows().map { it.id })
+        clock.advance(3.seconds)
+        store.receiveBounded(
+            { ((it as? Action.InboxSidebar)?.action) == InboxSidebarFeature.Action.ArchiveErrorCleared },
+            "inboxSidebar.archiveErrorCleared",
+        ) { it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(archiveError = null)) }
     }
 
     @Test

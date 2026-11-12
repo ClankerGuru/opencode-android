@@ -192,7 +192,9 @@ data class DrawerSessions(val pinned: List<OpenCodeSession>, val recents: List<O
  */
 val HomeFeature.State.drawerSessions: DrawerSessions
     get() {
-        val visible = visibleSessions
+        // Sessions being archived leave at once, as the Inbox Sidebar's do.
+        val archiving = inboxSidebarStatus.archivedIDs
+        val visible = if (archiving.isEmpty()) visibleSessions else visibleSessions.filter { it.id !in archiving }
         val prefix = server.persistenceID + "|"
         // This server's pins, by session ID, in order.
         val pinnedIDs = mutableListOf<String>()
@@ -581,6 +583,10 @@ fun HomeFeature.State.purgingSession(sessionID: String): HomeFeature.State {
                 .pruneRequests { it.sessionID == sessionID }
         },
         sessionSnapshotOrder = sessionSnapshotOrder - sessionID,
+        inboxSidebarStatus = inboxSidebarStatus.copy(
+            archived = inboxSidebarStatus.archived.filterNot { it.id == sessionID },
+            archivedMatches = inboxSidebarStatus.archivedMatches?.filterNot { it.id == sessionID },
+        ),
     )
     val serverID = server.persistenceID
     ServerSharedKeys.cachedTranscriptSnapshots().update { it.removeEntry(serverID, sessionID) }

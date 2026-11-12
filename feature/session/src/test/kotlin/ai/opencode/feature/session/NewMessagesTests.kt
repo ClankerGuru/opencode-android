@@ -193,7 +193,7 @@ class NewMessagesTests {
                     projectedMessageIDs = setOf("msg_live"),
                     lastProjectedMessageID = "msg_live",
                     liveText = mapOf("msg_live-text-0" to "Streaming reply"),
-                    items = it.items + OpenCodeTranscriptItem.AssistantMarkdown(id = "msg_live-text-0", text = "Streaming reply"),
+                    items = it.items + OpenCodeTranscriptItem.AssistantMarkdown(id = "msg_live-text-0", text = "Streaming reply", inProgress = true),
                     // In front of the reader: seen, whatever the read after it brings.
                     newMessagesWatched = setOf("msg_live-text-0"),
                 )
@@ -358,7 +358,7 @@ class NewMessagesTests {
     // region Ported from iOS f657969b (the read-receipt and watermark rework)
 
     private val liveID = "msg_live-text-0"
-    private val liveRow: OpenCodeTranscriptItem get() = OpenCodeTranscriptItem.AssistantMarkdown(id = liveID, text = "Streaming reply")
+    private val liveRow: OpenCodeTranscriptItem get() = OpenCodeTranscriptItem.AssistantMarkdown(id = liveID, text = "Streaming reply", inProgress = true)
     private val liveDelta: Action
         get() = Action.ContentBatch(
             sessionID = "ses_live",
@@ -756,7 +756,7 @@ class NewMessagesTests {
             OpenCodeLiveContentEvent.ToolInputStarted(messageID = "msg_live", toolID = "t1", name = "bash"),
             OpenCodeLiveContentEvent.ToolInputDelta(messageID = "msg_live", toolID = "t1", delta = "ls"),
         )
-        val expectedText = OpenCodeTranscriptItem.AssistantMarkdown(id = "msg_live-text-0", text = "Hello world")
+        val expectedText = OpenCodeTranscriptItem.AssistantMarkdown(id = "msg_live-text-0", text = "Hello world", inProgress = true)
         fun bash(input: String): OpenCodeTranscriptItem = OpenCodeTranscriptItem.Tool(
             id = "msg_live-tool-t1",
             call = OpenCodeToolCall(

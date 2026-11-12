@@ -79,10 +79,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import ai.opencode.core.ui.OpenCodeAlertDialog
@@ -365,7 +365,7 @@ fun SessionView(
                     Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .navigationBarsPadding()
+                        .windowInsetsPadding(WindowInsets.bottomSafeArea)
                         .imePadding()
                         .padding(bottom = if (onCatchUpOpen == null) 0.dp else CATCH_UP_COMPOSER_CLEARANCE.dp)
                         // The room between the status bar and the keyboard (iOS `requestPanelInputs.room`):
@@ -432,12 +432,16 @@ fun SessionView(
 internal const val CATCH_UP_COMPOSER_CLEARANCE = 12f
 
 /**
- * The soft bottom edge behind the floating composer (iOS's soft scroll edge under its bottom
- * bar): rows stay fully visible down to the composer surface's top edge, then fade into the
- * canvas over its corner radius, so nothing shows around its rounded corners, beside it or
- * under the navigation bar. The pills, the jump button and a resting orb above the surface keep
- * unfaded rows behind them. A plain canvas gradient that takes no touches and is hidden from
- * TalkBack; the surface's top is read in the draw phase.
+ * What the composer rests on: the navigation bar, but at least 8 dp. Android-only: some phones
+ * (HyperOS with the gesture hint hidden) report a 0 navigation bar, where iOS always has a safe area.
+ */
+internal val WindowInsets.Companion.bottomSafeArea: WindowInsets
+    @Composable get() = navigationBars.union(WindowInsets(bottom = 8.dp))
+
+/**
+ * iOS's soft scroll edge under the composer: rows fade into the canvas over the corner radius
+ * below the composer surface's top, so nothing shows around its corners, beside it or under the
+ * navigation bar.
  */
 @Composable
 private fun SessionBottomScrollEdge(surfaceTopInWindow: () -> Float, modifier: Modifier) {
@@ -758,7 +762,7 @@ private fun RequestPanelRoomProbe(host: SessionComposerHost, modifier: Modifier)
     var height by remember { mutableIntStateOf(0) }
     // A Catch Up card's own edges, not the window's ([inContainer]).
     val top = WindowInsets.statusBarsIgnoringVisibility.inContainer().getTop(density)
-    val bottom = maxOf(WindowInsets.ime.inContainer().getBottom(density), WindowInsets.navigationBars.inContainer().getBottom(density))
+    val bottom = maxOf(WindowInsets.ime.inContainer().getBottom(density), WindowInsets.bottomSafeArea.inContainer().getBottom(density))
     Box(modifier.onSizeChanged { height = it.height })
     SideEffect {
         val room = with(density) { (height - top - bottom).coerceAtLeast(0).toDp().value }

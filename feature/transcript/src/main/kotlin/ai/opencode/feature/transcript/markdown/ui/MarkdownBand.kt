@@ -13,7 +13,6 @@ import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -136,7 +135,7 @@ fun MarkdownBand(
     modifier: Modifier = Modifier,
     rules: TableRules? = null,
     bandModifier: Modifier = Modifier,
-    action: (@Composable BoxScope.() -> Unit)? = null,
+    action: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val colors = OpenCodeTheme.colors

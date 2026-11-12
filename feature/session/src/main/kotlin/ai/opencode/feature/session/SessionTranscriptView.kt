@@ -72,7 +72,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
@@ -244,7 +243,7 @@ fun SessionTranscriptView(
 
     // Against a Catch Up card's own edges, not the window's ([inContainer]).
     val safeTop = WindowInsets.statusBarsIgnoringVisibility.inContainer().asPaddingValues().calculateTopPadding()
-    val bottomObstruction = WindowInsets.ime.union(WindowInsets.navigationBars).inContainer().asPaddingValues().calculateBottomPadding()
+    val bottomObstruction = WindowInsets.ime.union(WindowInsets.bottomSafeArea).inContainer().asPaddingValues().calculateBottomPadding()
     // Separate from the projection, so geometry and jumps never rebuild the configuration.
     CompositionLocalProvider(
         LocalTranscriptRowSlots provides rowSlots,

@@ -134,7 +134,7 @@ internal fun VoiceProviderDetailPage(store: SettingsStore, opensAccount: Boolean
         }
         settingsSection(
             key = "automatic",
-            footer = footerText("When ${active.placeName} isn’t ready, calls use another provider that is."),
+            footer = footerText("When ${active.placeName} isn’t ready, calls use one that is."),
         ) {
             SettingsToggleRow(
                 "Choose Automatically",
@@ -204,7 +204,7 @@ internal fun VoiceProviderAccountPage(store: SettingsStore) {
     // The key, revealed or about to be, out of every screenshot.
     HidesFromScreenshots()
 
-    SettingsPageScaffold(title = "Your Account", store = store) {
+    SettingsPageScaffold(title = "API Key", store = store) {
         item(key = "header") {
             VoiceProviderHeader(
                 option = null,
@@ -215,7 +215,7 @@ internal fun VoiceProviderAccountPage(store: SettingsStore) {
         }
         settingsSection(
             key = "key",
-            footer = footerText("Calls from this phone use your OpenAI account instead of a server."),
+            footer = footerText("Calls use your OpenAI account instead of a server."),
         ) {
             VoiceKeyEditor(state, voice, settings)
         }

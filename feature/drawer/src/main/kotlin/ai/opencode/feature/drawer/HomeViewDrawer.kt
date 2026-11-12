@@ -4,9 +4,13 @@ import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.ui.OpenCodeRadius
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.foundation.shape.RoundedCornerShape
 import ai.opencode.feature.drawer.style.drawerCanvas
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.haptics.Haptic
+import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.shared
@@ -22,12 +26,19 @@ import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.core.ui.rememberHighContrast
 import ai.opencode.feature.drawer.list.DrawerListActions
 import ai.opencode.feature.drawer.list.DrawerListInputs
-import ai.opencode.feature.drawer.list.DrawerListRow
 import ai.opencode.feature.drawer.list.DrawerListView
+import ai.opencode.feature.drawer.list.ArchivedPage
+import ai.opencode.feature.drawer.list.archivedBeneath
+import ai.opencode.feature.drawer.list.archivedPage
+import ai.opencode.feature.drawer.list.rememberArchivedTransition
+import ai.opencode.feature.drawer.list.DeleteSelectionConfirmation
+import ai.opencode.feature.drawer.list.archivedSelectionActions
 import ai.opencode.feature.drawer.list.DrawerPinDrag
-import ai.opencode.feature.drawer.list.DrawerRowMenuItem
+import ai.opencode.feature.drawer.list.DrawerSelectionBar
 import ai.opencode.feature.drawer.list.InboxSidebarList
+import ai.opencode.feature.drawer.list.SelectionHeaderSwap
 import ai.opencode.feature.drawer.list.rememberInboxSidebarOn
+import ai.opencode.feature.drawer.list.selectionActions
 import ai.opencode.feature.drawer.motion.DrawerControlsTrace
 import ai.opencode.feature.drawer.motion.DrawerControlsTraceView
 import ai.opencode.feature.drawer.motion.DrawerKeyboardMonitor
@@ -52,8 +63,6 @@ import ai.opencode.feature.drawer.switcher.ServerFlowTitle
 import ai.opencode.feature.drawer.switcher.drawerTitleServers
 import ai.opencode.feature.session.ComposerTunables
 import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
-import ai.opencode.feature.system.SessionWindowTarget
-import ai.opencode.feature.system.WindowsClient
 import ai.opencode.feature.voice.FloatingCallCenter
 import ai.opencode.feature.voice.floatingCallDrawerButton
 import ai.opencode.server.ServerSharedKeys
@@ -93,6 +102,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -114,13 +124,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.max
 import kotlin.math.min
 
 /*
  * Port of iOS `HomeView+Drawer.swift`: the drawer's chrome (its title, which is the server
- * switcher, and search; New Session and Settings at its bottom), the list's inputs and the rows'
- * hold menus. The container (`SessionDrawerContainer`) places [HomeDrawer] in its drawer slot;
+ * switcher, and search; New Session and Settings at its bottom), the list's inputs and selection
+ * mode's bar. The container (`SessionDrawerContainer`) places [HomeDrawer] in its drawer slot;
  * the view-local state iOS keeps on `HomeView` lives in [HomeViewState].
  *
  * The title and search, and New Session and Settings, lie over the list rather than beside it:
@@ -210,20 +221,73 @@ fun HomeDrawer(
     val controlsReach = (controlsHeight * DrawerTunables.controlsReach.coerceIn(0f, 1f)).dp
     val footerBottom = DrawerFooterBottom
 
+    // Selection mode: while rows are chosen a tap adds or removes one, and system back, ✕ or the
+    // drawer closing ends it.
+    val selection = viewState.selection
+    val haptics = remember { dependency(HapticsClient) }
+    val select: (String) -> Unit = remember(viewState) {
+        { id ->
+            if (selection.isActive) {
+                haptics.play(Haptic.selection)
+                selection.toggle(id)
+            } else {
+                viewState.selectSession(id)
+            }
+        }
+    }
+    // The Archived page: back (system back, or once the selection has ended) returns to the list,
+    // and a predictive back drag moves the page with the finger.
+    val archivedTransition = rememberArchivedTransition(viewState.showsArchived, reducedMotion)
+    PredictiveBackHandler(enabled = viewState.showsArchived) { events ->
+        try {
+            events.collect { archivedTransition.back.snapTo(it.progress) }
+            viewState.showsArchived = false
+        } catch (cancel: CancellationException) {
+            // Let go before the system's threshold: the page settles back.
+            archivedTransition.back.animateTo(0f, MotionRole.Layout.animation(MotionPhase.Enter, reducedMotion))
+            throw cancel
+        }
+    }
+    BackHandler(enabled = selection.isActive) { selection.clear() }
+    // The bar keeps its last count while it leaves.
+    var shownCount by remember { mutableIntStateOf(0) }
+    if (selection.isActive) shownCount = selection.ids.size
+    LaunchedEffect(isDrawerVisible) {
+        if (!isDrawerVisible) {
+            selection.clear()
+            viewState.showsArchived = false
+        }
+    }
+    // Archived's count is fetched each time the drawer shows, so another client's archiving shows too.
+    val serverID by store.observe { it.server.persistenceID }
+    LaunchedEffect(serverID, isDrawerVisible) {
+        if (isDrawerVisible) store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.ArchivedListRequested))
+    }
+    val openArchived: () -> Unit = remember(viewState) {
+        {
+            selection.clear()
+            store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.ArchivedSearchChanged("")))
+            store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.ArchivedListRequested))
+            viewState.showsArchived = true
+        }
+    }
+
     val inputs = DrawerListInputs(
         selectedSessionID = selectedSessionID,
         reducedMotion = reducedMotion,
         increasedContrast = highContrast,
         alwaysShowsHeaders = DrawerTunables.sectionBreak == DrawerSectionBreak.Header,
         serverSwap = serverSwapTarget,
+        checkedIDs = selection.ids,
     )
     val actions = remember(store, viewState) {
         DrawerListActions(
-            select = viewState::selectSession,
-            menu = { row -> rowMenu(store, row) },
+            select = select,
+            held = selection::toggle,
             openCatchUp = viewState::openCatchUp,
             openWhatsNew = viewState::openWhatsNew,
             hideWhatsNew = { store.send(HomeFeature.Action.WhatsNew(WhatsNewFeature.Action.HideTapped)) },
+            openArchived = openArchived,
         )
     }
 
@@ -240,16 +304,21 @@ fun HomeDrawer(
             top = headerHeight.dp + DrawerTunables.topGap,
             bottom = controlsHeight.dp + insetBottom + footerBottom + DrawerTunables.bottomGap,
         )
+        // TalkBack reads only the Archived page while it covers the list and its title band.
+        val beneathArchived = (if (viewState.showsArchived) Modifier.clearAndSetSemantics {} else Modifier)
+            .archivedBeneath(archivedTransition, reducedMotion)
         // Inbox Sidebar (experimental, iOS 338d8d92): the sessions as an inbox.
         if (inboxSidebarOn) InboxSidebarList(
             store = store,
             selectedSessionID = selectedSessionID,
             headerScroll = viewState.headerScroll,
-            panRegions = viewState.panRegions,
             contentPadding = listPadding,
-            select = viewState::selectSession,
+            checkedIDs = selection.ids,
+            select = select,
+            held = selection::toggle,
             openCatchUp = viewState::openCatchUp,
-            modifier = Modifier.fillMaxSize(),
+            openArchived = openArchived,
+            modifier = Modifier.fillMaxSize().then(beneathArchived),
         ) else DrawerListView(
             store = store,
             pinDrag = pinDrag,
@@ -261,7 +330,7 @@ fun HomeDrawer(
             catchUpFocusRequests = viewState.catchUpFocusRequests,
             actions = actions,
             contentPadding = listPadding,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().then(beneathArchived),
             serverSwap = serverSwap,
         )
         // The list as the drawer's pan sees it: between the title band and the controls, which
@@ -284,7 +353,8 @@ fun HomeDrawer(
                 .semantics {
                     isTraversalGroup = true
                     traversalIndex = -1f
-                },
+                }
+                .then(beneathArchived),
         ) {
             // Revealed by the list's scroll, so the list at rest reads clear.
             DrawerHeaderBackdrop(
@@ -300,21 +370,51 @@ fun HomeDrawer(
                     .padding(top = insetTop + DrawerHeaderTop, bottom = DrawerTunables.headerBottom),
                 contentAlignment = Alignment.CenterEnd,
             ) {
-                val titleModifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = DrawerMetrics.textInset, end = DrawerSearchPillDefaults.size + DrawerTunables.searchGap)
-                    .drawerSearchTitleFade(viewState.search)
-                ServerFlowTitle(store = store, motion = serverSwap, onManage = viewState::manageServers, modifier = titleModifier)
-                DrawerSearchPill(
-                    state = viewState.search,
-                    text = search,
-                    onTextChange = { store.send(HomeFeature.Action.SearchChanged(it)) },
-                    reducedMotion = reducedMotion,
-                    onEnd = viewState::endSearch,
-                    keyboardHold = viewState.keyboardHold,
-                )
+                SelectionHeaderSwap(
+                    active = selection.isActive,
+                    bar = {
+                        val (main, overflow) = selectionActions(store, selection, pins = !inboxSidebarOn)
+                        DrawerSelectionBar(count = shownCount, onClose = selection::clear, actions = main, overflow = overflow)
+                    },
+                ) {
+                    val titleModifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = DrawerMetrics.textInset, end = DrawerSearchPillDefaults.size + DrawerTunables.searchGap)
+                        .drawerSearchTitleFade(viewState.search)
+                    ServerFlowTitle(store = store, motion = serverSwap, onManage = viewState::manageServers, modifier = titleModifier)
+                    DrawerSearchPill(
+                        state = viewState.search,
+                        text = search,
+                        onTextChange = { store.send(HomeFeature.Action.SearchChanged(it)) },
+                        reducedMotion = reducedMotion,
+                        onEnd = viewState::endSearch,
+                        keyboardHold = viewState.keyboardHold,
+                    )
+                }
             }
         }
+
+        if (viewState.showsArchived || archivedTransition.isVisible) ArchivedPage(
+            store = store,
+            checkedIDs = selection.ids,
+            select = { id ->
+                if (selection.isActive) {
+                    select(id)
+                } else {
+                    store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.ArchivedRowTapped(id)))
+                    viewState.selectSession(id)
+                }
+            },
+            held = selection::toggle,
+            onBack = { viewState.showsArchived = false },
+            contentPadding = PaddingValues(top = insetTop + DrawerHeaderTop, bottom = listPadding.calculateBottomPadding()),
+            modifier = Modifier.archivedPage(archivedTransition, reducedMotion).swallowingTouches(),
+            header = if (selection.isActive) {
+                { DrawerSelectionBar(count = selection.ids.size, onClose = selection::clear, actions = archivedSelectionActions(store, selection), overflow = emptyList()) }
+            } else {
+                null
+            },
+        )
 
         // New Session and Settings, pinned to the drawer's bottom; they never move with the keyboard.
         Box(
@@ -361,6 +461,7 @@ fun HomeDrawer(
     }
 
     if (hostsDeleteConfirmation) HomeDeleteConfirmation(store)
+    DeleteSelectionConfirmation(store, selection)
 }
 
 /**
@@ -375,47 +476,6 @@ private fun rememberIsDrawerVisible(store: StoreOf<HomeFeature.State, HomeFeatur
     val sidebarShown by store.observe { it.isSidebarShown }
     return viewState.isSceneActive && !catchingUp &&
         (if (showsDrawerLabel) viewState.isSessionDrawerPresented || isDrawerOpen else sidebarShown)
-}
-
-/**
- * A row's hold menu (iOS `rowMenu(_:isPinned:)`): Pin or Unpin, Mark as Read or Unread, Mute or
- * Unmute, and Delete (which asks first, [HomeDeleteConfirmation]). Where the device has several
- * windows (a tablet, iOS's iPad), Open in New Window comes first ([WindowsClient]).
- */
-private fun rowMenu(store: StoreOf<HomeFeature.State, HomeFeature.Action>, row: DrawerListRow): List<DrawerRowMenuItem> {
-    val state = store.state
-    val session = row.session
-    val unread = state.isUnread(session)
-    val muted = state.isMuted(session.id)
-    val isPinned = row.isPinnedSection
-    val windows = dependency(WindowsClient)
-    // Multiple Windows (tablet): the session in a window of its own.
-    val newWindow = if (windows.isAvailable()) {
-        listOf(
-            DrawerRowMenuItem("Open in New Window", SFSymbol.MacwindowBadgePlus) {
-                windows.open(SessionWindowTarget(serverID = state.server.persistenceID, sessionID = session.id))
-            },
-        )
-    } else {
-        emptyList()
-    }
-    return newWindow + listOf(
-        DrawerRowMenuItem(if (isPinned) "Unpin" else "Pin", if (isPinned) SFSymbol.PinSlash else SFSymbol.Pin) {
-            store.send(HomeFeature.Action.TogglePin(session.id))
-        },
-        DrawerRowMenuItem(
-            if (unread) "Mark as Read" else "Mark as Unread",
-            if (unread) SFSymbol.EnvelopeOpen else SFSymbol.EnvelopeBadge,
-        ) {
-            store.send(if (unread) HomeFeature.Action.MarkRead(session.id) else HomeFeature.Action.MarkUnread(session.id))
-        },
-        DrawerRowMenuItem(if (muted) "Unmute" else "Mute", if (muted) SFSymbol.Bell else SFSymbol.BellSlash) {
-            store.send(HomeFeature.Action.ToggleMute(session.id))
-        },
-        DrawerRowMenuItem("Delete", SFSymbol.Trash, destructive = true) {
-            store.send(HomeFeature.Action.DeleteSessionTapped(session.id))
-        },
-    )
 }
 
 /**

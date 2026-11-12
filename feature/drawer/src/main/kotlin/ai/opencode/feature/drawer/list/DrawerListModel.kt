@@ -29,6 +29,8 @@ enum class DrawerListSection { top, pinned, recents }
 sealed interface DrawerListItem {
     data object CatchUp : DrawerListItem
     data object WhatsNew : DrawerListItem
+    /** Under Catch Up while the server has archived sessions (Android; iOS has no Archived page). */
+    data object Archived : DrawerListItem
     data object DeletionError : DrawerListItem
     data class Header(val kind: DrawerSectionHeaderKind) : DrawerListItem
     data class Session(val id: String) : DrawerListItem
@@ -45,6 +47,7 @@ sealed interface DrawerListItem {
         get() = when (this) {
             CatchUp -> "catch-up"
             WhatsNew -> "whats-new"
+            Archived -> "archived"
             DeletionError -> "deletion-error"
             is Header -> "header-${kind.name}"
             is Session -> "session-$id"
@@ -69,6 +72,8 @@ data class DrawerListRow(
     val server: OpenCodeServer,
     val reducedMotion: Boolean,
     val increasedContrast: Boolean,
+    /** Whether the row is chosen while the drawer selects rows ([DrawerSelection]); null when it isn't. */
+    val checked: Boolean? = null,
 ) {
     /** TalkBack's state for the row (iOS `accessibilityValue`). */
     val accessibilityValue: String
@@ -111,6 +116,8 @@ data class DrawerListInputs(
     val alwaysShowsHeaders: Boolean = true,
     /** Server Flow: the server the drawer shows, which may still be connecting. */
     val serverSwap: ServerSwapTarget? = null,
+    /** The rows chosen in selection mode ([DrawerSelection]). */
+    val checkedIDs: Set<String> = emptySet(),
 )
 
 data class DrawerListModel(
@@ -119,6 +126,7 @@ data class DrawerListModel(
     val headerFollows: Map<DrawerSectionHeaderKind, Boolean> = emptyMap(),
     val shortcuts: DrawerListShortcuts = DrawerListShortcuts(),
     val deletionError: String? = null,
+    val archivedCount: Int = 0,
     val serverNote: ServerSwitchNote? = null,
     val search: String = "",
     val footer: DrawerListFooter? = null,
@@ -182,13 +190,17 @@ data class DrawerListModel(
                 catchUpMounted = state.search.isEmpty() && catchUpMounted,
                 whatsNewMounted = state.search.isEmpty() && whatsNewMounted,
             )
-            val showsShortcuts = shortcuts.catchUpMounted || shortcuts.whatsNewMounted
+            val archivedCount = if (state.search.isEmpty()) state.inboxSidebarStatus.archived.size else 0
+            val showsShortcuts = shortcuts.catchUpMounted || shortcuts.whatsNewMounted || archivedCount > 0
 
+            // A failed archive shows where a failed delete does.
+            val error = state.deletionError ?: state.inboxSidebarStatus.archiveError
             val top = buildList {
                 if (serverNote != null && state.search.isEmpty()) add(DrawerListItem.ServerNote)
                 if (shortcuts.catchUpMounted) add(DrawerListItem.CatchUp)
                 if (shortcuts.whatsNewMounted) add(DrawerListItem.WhatsNew)
-                if (state.deletionError != null) add(DrawerListItem.DeletionError)
+                if (archivedCount > 0) add(DrawerListItem.Archived)
+                if (error != null) add(DrawerListItem.DeletionError)
             }
 
             // One pass for both lists (iOS f5636460).
@@ -211,6 +223,7 @@ data class DrawerListModel(
                 server = state.server,
                 reducedMotion = inputs.reducedMotion,
                 increasedContrast = inputs.increasedContrast,
+                checked = if (inputs.checkedIDs.isEmpty()) null else session.id in inputs.checkedIDs,
             )
 
             fun header(kind: DrawerSectionHeaderKind, follows: Boolean): List<DrawerListItem> {
@@ -248,7 +261,8 @@ data class DrawerListModel(
                 rows = rows,
                 headerFollows = headerFollows,
                 shortcuts = shortcuts,
-                deletionError = state.deletionError,
+                deletionError = error,
+                archivedCount = archivedCount,
                 serverNote = serverNote,
                 search = state.search,
                 footer = footer,

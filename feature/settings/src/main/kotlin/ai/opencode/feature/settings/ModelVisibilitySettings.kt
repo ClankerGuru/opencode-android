@@ -207,9 +207,9 @@ fun ModelVisibilitySettingsView(store: SettingsStore) {
                     )
                     SettingsFooterText(
                         if (visibility.mode == ModelVisibility.Mode.hide) {
-                            "Turn off models you never use. The model picker lists the rest."
+                            "Turn off the models you don’t use."
                         } else {
-                            "Turn on only the models you use. The model picker lists just those."
+                            "Turn on just the models you use."
                         },
                         Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
                     )
@@ -225,7 +225,7 @@ fun ModelVisibilitySettingsView(store: SettingsStore) {
                         }) {
                             ProviderIcon(provider.id, Modifier.size(20.dp), provider.canonicalID, tint = OpenCodeTheme.colors.secondaryText)
                             Text(provider.title, style = SettingsText.title, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
-                            Text(state.summary(provider, visibility), style = SettingsText.title, color = OpenCodeTheme.colors.secondaryText)
+                            Text(state.summary(provider, visibility), style = SettingsText.summary, color = OpenCodeTheme.colors.secondaryText)
                         }
                     }
                 }
@@ -235,7 +235,6 @@ fun ModelVisibilitySettingsView(store: SettingsStore) {
                 settingsSection(
                     key = "stale",
                     header = "No Longer Offered",
-                    footer = footerText("Your choices name these, but the server doesn’t offer them now."),
                 ) {
                     stale.all.forEach { id ->
                         SettingsRowFrame {
@@ -303,10 +302,7 @@ fun ModelVisibilityProviderView(store: SettingsStore, providerID: String) {
             )
         }
         if (filter.isEmpty()) {
-            settingsSection(
-                key = "provider",
-                footer = if (!providerShown) footerText("The model picker lists none of this provider’s models.") else null,
-            ) {
+            settingsSection(key = "provider") {
                 SettingsToggleRow(
                     "Show $providerTitle",
                     checked = providerShown,

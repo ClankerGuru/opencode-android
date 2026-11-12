@@ -69,6 +69,9 @@ object TestNetworkBlock {
         val (mock, allowed) = synchronized(lock) { mocks[host] to (realNetworkDepth > 0 || host in loopbackHosts) }
         if (mock == null) {
             if (allowed) return chain.proceed(request)
+            // OkHttp still runs application interceptors for a call cancelled before it started,
+            // often after its fixture closed; it would never reach the network.
+            if (chain.call().isCanceled()) throw IOException("Canceled")
             val scheme = request.url.scheme
             onBlocked(request.method, scheme, host)
             throw ConnectException("Blocked unmocked network request (${request.method} $scheme://$host) in unit test")

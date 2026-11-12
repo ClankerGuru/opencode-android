@@ -1,5 +1,7 @@
 package ai.opencode.feature.composer
 
+import androidx.compose.foundation.lazy.rememberLazyListState
+import ai.opencode.core.ui.rememberOverscrollIfContentScrolls
 import ai.opencode.core.ui.OpenCodeTopBar
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticEffect
@@ -279,8 +281,11 @@ private fun NumberedTextContent(document: PastedTextDocument, wrapsLines: Boolea
     val codeStyle = OpenCodeTextStyles.footnote.copy(fontFamily = OpenCodeFonts.monospace)
     val numberWidth = (document.lines.size.toString().length * 8 + 8).dp
     val horizontal = rememberScrollState()
+    val list = rememberLazyListState()
     SelectionContainer {
         LazyColumn(
+            state = list,
+            overscrollEffect = rememberOverscrollIfContentScrolls(list),
             contentPadding = PaddingValues(12.dp),
             modifier = Modifier
                 .fillMaxSize()
@@ -311,8 +316,14 @@ private fun NumberedTextContent(document: PastedTextDocument, wrapsLines: Boolea
 @Composable
 private fun PlainTextContent(document: PastedTextDocument) {
     val codeStyle = OpenCodeTextStyles.footnote.copy(fontFamily = OpenCodeFonts.monospace)
+    val list = rememberLazyListState()
     SelectionContainer {
-        LazyColumn(contentPadding = PaddingValues(12.dp), modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = list,
+            overscrollEffect = rememberOverscrollIfContentScrolls(list),
+            contentPadding = PaddingValues(12.dp),
+            modifier = Modifier.fillMaxSize(),
+        ) {
             itemsIndexed(document.chunks) { _, chunk ->
                 Text(chunk.removeSuffix("\n"), style = codeStyle, color = OpenCodeTheme.colors.text)
             }

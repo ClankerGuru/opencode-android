@@ -212,10 +212,7 @@ class SessionComposerHost {
      * the composer's top (the jump button, a draft's projects) stands above the orb too.
      */
     var orbClearance by mutableFloatStateOf(0f)
-    /**
-     * The top of the composer's surface in the window, in px (NaN when it isn't shown): where the
-     * session's bottom scroll edge starts, below the pills, the jump button and a resting orb.
-     */
+    /** The composer surface's top in the window, in px (NaN when it isn't shown), for `SessionBottomScrollEdge`. */
     var surfaceTopInWindow by mutableFloatStateOf(Float.NaN)
     /** iOS `toggleAttachmentMenu` (VIEW-PICKERS); null opens nothing. */
     var onPlusTapped: (() -> Unit)? by mutableStateOf(null)

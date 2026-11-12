@@ -3,6 +3,7 @@ package ai.opencode.feature.settings
 import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.ui.OpenCodeTopBar
 import ai.opencode.core.ui.OpenCodeTopBarBackButton
+import ai.opencode.core.ui.rememberOverscrollIfContentScrolls
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.ui.AppTheme
@@ -31,6 +32,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
@@ -104,7 +106,7 @@ fun AppearanceSettingsView(store: SettingsStore) {
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
             )
         }
-        settingsSection(key = "theme", header = "Theme") {
+        settingsSection(key = "theme") {
             // The clickable row merges its texts: "Theme", then the theme (iOS's label and value).
             SettingsRowFrame(
                 modifier = returnFocus.on(SettingsPage.Themes),
@@ -127,14 +129,16 @@ fun AppearanceSettingsView(store: SettingsStore) {
                         Text("Theme", style = SettingsText.title, color = OpenCodeTheme.colors.text)
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             swatch()
-                            Text(appTheme.title, style = SettingsText.title, color = OpenCodeTheme.colors.secondaryText)
+                            Text(appTheme.title, style = SettingsText.summary, color = OpenCodeTheme.colors.secondaryText)
+                            SettingsDropdownChevron()
                         }
                     }
                 } else {
                     Text("Theme", style = SettingsText.title, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         swatch()
-                        Text(appTheme.title, style = SettingsText.title, color = OpenCodeTheme.colors.secondaryText, maxLines = 1)
+                        Text(appTheme.title, style = SettingsText.summary, color = OpenCodeTheme.colors.secondaryText, maxLines = 1)
+                        SettingsDropdownChevron()
                     }
                 }
             }
@@ -172,7 +176,10 @@ fun ThemesSettingsView(store: SettingsStore) {
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding())) {
+            val themesList = rememberLazyListState()
             LazyColumn(
+                state = themesList,
+                overscrollEffect = rememberOverscrollIfContentScrolls(themesList),
                 contentPadding = PaddingValues(
                     top = with(density) { headerHeight.toDp() } + AppearanceTunables.softEdgeHeight + 4.dp,
                     bottom = padding.calculateBottomPadding() + 24.dp,

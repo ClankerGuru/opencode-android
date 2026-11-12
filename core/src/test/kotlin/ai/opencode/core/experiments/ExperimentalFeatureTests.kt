@@ -73,11 +73,8 @@ class ExperimentalFeatureTests {
     @Test
     fun everyExperimentHasACopyForSettings() {
         for (feature in ExperimentalFeature.allCases) {
+            // Android divergence: no summary under the title, so only the title is checked.
             assertTrue(feature.title.isNotEmpty())
-            val summary = feature.summary ?: continue
-            assertTrue(summary.isNotEmpty())
-            assertFalse("One line, no trailing period", summary.endsWith("."))
-            assertTrue("A few words: $summary", summary.split(" ").filter { it.isNotEmpty() }.size <= 6)
         }
         assertEquals("In-App Browser", ExperimentalFeature.inAppBrowser.title)
     }

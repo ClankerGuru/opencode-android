@@ -1,6 +1,25 @@
 package ai.opencode.feature.voice
 
 import ai.opencode.core.motion.MotionFrameAction
+import ai.opencode.core.store.StoreOf
+import android.os.Looper
+import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import org.junit.runner.RunWith
+import org.robolectric.Robolectric
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowChoreographer
+import java.time.Duration
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.server.OpenCodeServer
@@ -14,6 +33,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.After
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import kotlin.math.PI
@@ -262,10 +283,11 @@ class FloatingCallStageTests {
     @Test fun cornersRoundAsTheOrbThenSquareAtTheSheetsFoot() {
         val orb = geometry.radii(geometry.frame(0.0))
         assertTrue(orb.top == 32.0 && orb.bottom == 32.0)
+        // The design system's sheet radius here; iOS follows the device's corners (36 and 38).
         val card = geometry.radii(geometry.frame(1.0))
-        assertTrue(card.top == 36.0 && card.bottom == 36.0)
+        assertTrue(card.top == 16.0 && card.bottom == 16.0)
         val sheet = geometry.radii(geometry.frame(2.0))
-        assertTrue(sheet.top == 38.0 && sheet.bottom == 0.0)
+        assertTrue(sheet.top == 16.0 && sheet.bottom == 0.0)
     }
 
     @Test fun theBloomFillsTheOrbThenSettlesAtTheTop() {
@@ -544,5 +566,69 @@ class FloatingCallConnectTests {
         val turns = motion.glyphAngle / (2 * PI)
         assertTrue("Upright at a whole turn", abs(turns - turns.roundToLong()) < 1e-9)
         assertTrue("Settled soon after it lands", t < 2)
+    }
+}
+
+/**
+ * The transcript composed for real (Android only: iOS has no equivalent crash or hang). It must
+ * keep up with captions arriving after a pause, and lay out a word wider than its line.
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+class FloatingCallTranscriptTests {
+    private class CaptionStore(initial: VoiceFeature.State) : StoreOf<VoiceFeature.State, VoiceFeature.Action> {
+        val flow = MutableStateFlow(initial)
+        override val state: VoiceFeature.State get() = flow.value
+        override val states: Flow<VoiceFeature.State> get() = flow
+        override fun send(action: VoiceFeature.Action) {}
+    }
+
+    // Frames every 16 ms, as on a device (Robolectric's default is every millisecond).
+    @Before fun frameRate() = ShadowChoreographer.setFrameDelay(Duration.ofMillis(16))
+
+    private var composed: ComposeView? = null
+
+    private fun idle(millis: Long) = shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(millis))
+
+    private fun compose(store: CaptionStore, width: Int): ComposeView {
+        val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
+        val view = ComposeView(activity)
+        composed = view
+        activity.setContentView(view)
+        view.setContent {
+            Box(Modifier.size(width.dp, 400.dp)) { FloatingCallTranscript(store, Modifier.fillMaxSize()) }
+        }
+        idle(50)
+        return view
+    }
+
+    // The transcript's frame loop waits for the real clock, which Robolectric's frames never reach.
+    @After fun dispose() = composed?.disposeComposition() ?: Unit
+
+    /**
+     * Words arriving after a pause are revealed at once, without suspending; the reveal loop
+     * must see each word it revealed, or it never ends and the app stops responding.
+     */
+    @Test fun captionsAfterAPauseAreRevealedWithoutHanging() {
+        val store = CaptionStore(VoiceFeature.State(VoiceFeatureTestSupport.server, VoiceFeatureTestSupport.session))
+        compose(store, width = 320)
+        // The reveal runs on the real clock: a real pause makes the next words due at once.
+        Thread.sleep(100)
+        store.flow.value = store.flow.value.copy(liveAssistantText = "Checking the upload test now ")
+        idle(50)
+        Thread.sleep(100)
+        store.flow.value = store.flow.value.copy(liveAssistantText = "Checking the upload test now and the retry test ")
+        idle(50)
+    }
+
+    /** A path or link longer than the line wraps within its own row instead of crashing. */
+    @Test fun aWordWiderThanTheLineWrapsInItsOwnRow() {
+        val word = "/Users/kit/project/packages/opencode/src/session/" + "deeply/nested/".repeat(20) + "upload.test.ts"
+        val store = CaptionStore(
+            VoiceFeature.State(VoiceFeatureTestSupport.server, VoiceFeatureTestSupport.session).copy(liveAssistantText = "Open $word please "),
+        )
+        compose(store, width = 160)
+        idle(2_000)
     }
 }

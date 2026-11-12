@@ -15,8 +15,6 @@ import ai.opencode.feature.drawer.InboxSidebarFeature
 import ai.opencode.feature.drawer.InboxSidebarRow
 import ai.opencode.feature.drawer.catchUpSessions
 import ai.opencode.feature.drawer.inboxSidebarRows
-import ai.opencode.feature.drawer.motion.DrawerPanRegions
-import ai.opencode.feature.drawer.motion.drawerPanRow
 import ai.opencode.feature.drawer.style.DrawerHeaderScrollState
 import ai.opencode.feature.drawer.style.DrawerTunables
 import androidx.compose.foundation.background
@@ -29,6 +27,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -38,34 +37,35 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.time.Instant
 import kotlin.math.max
 import kotlin.math.min
@@ -73,23 +73,27 @@ import kotlin.math.roundToInt
 
 /**
  * iOS `InboxSidebarList.swift` (Inbox Sidebar, experimental): the drawer's sessions as an inbox,
- * one item per session. Tapping opens the session; swiping toward the trailing side marks it
- * read (unread rows only), toward the leading side archives it. iOS's `List` swipe actions →
- * M3 `SwipeToDismissBox`, released past its threshold; the row's drag is its own, not the
- * drawer's (`drawerPanRow`, iOS `DirectionalPanGestureRecognizer.rowsOwnSwipes`).
+ * one item per session. Tapping opens the session; holding it chooses it ([DrawerSelection]).
+ *
+ * Android: iOS swipes these rows (Mark as Read, Archive); here a sideways swipe stays the
+ * drawer's, as in any navigation drawer, and the actions are in selection mode's bar. Archived
+ * sessions are a page of their own ([ArchivedEntryRow], [ArchivedPage]).
  */
 @Composable
 internal fun InboxSidebarList(
     store: StoreOf<HomeFeature.State, HomeFeature.Action>,
     selectedSessionID: String?,
     headerScroll: DrawerHeaderScrollState,
-    panRegions: DrawerPanRegions,
     contentPadding: PaddingValues,
+    checkedIDs: Set<String>,
     select: (String) -> Unit,
+    held: (String) -> Unit,
     openCatchUp: () -> Unit,
+    openArchived: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val rows by store.observe { it.inboxSidebarRows() }
+    val archivedCount by store.observe { it.inboxSidebarStatus.archived.size }
     val catchUpCount by store.observe { it.catchUpSessions.size }
     val archiveError by store.observe { it.inboxSidebarStatus.archiveError }
     val snapshotLoaded by store.observe { it.snapshotLoaded }
@@ -163,17 +167,19 @@ internal fun InboxSidebarList(
                     }
                 }
             }
+            if (archivedCount > 0) {
+                item(key = "inbox-archived") {
+                    ArchivedEntryRow(archivedCount, regularList = false, onClick = openArchived)
+                }
+            }
             items(rows, key = { it.id }) { row ->
-                InboxSidebarSwipeRow(
+                InboxSidebarSessionRow(
                     row = row,
                     now = now,
                     selected = row.id == selectedSessionID,
-                    panRegions = panRegions,
-                    onSelect = { select(row.id) },
-                    onMarkRead = { store.send(HomeFeature.Action.MarkRead(row.id)) },
-                    onArchive = {
-                        store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveSwiped(sessionID = row.id, title = row.title)))
-                    },
+                    checked = if (checkedIDs.isEmpty()) null else row.id in checkedIDs,
+                    select = { select(row.id) },
+                    held = { held(row.id) },
                 )
             }
         }
@@ -190,71 +196,67 @@ internal fun InboxSidebarList(
     }
 }
 
+/**
+ * One session: a tap opens it (or, while selecting, chooses it) and a hold chooses it, as on the
+ * regular drawer's rows ([drawerRowInteraction]). A sideways swipe is left to the drawer, so a
+ * left swipe closes it.
+ */
 @Composable
-private fun InboxSidebarSwipeRow(
+internal fun InboxSidebarSessionRow(
     row: InboxSidebarRow,
     now: Instant,
     selected: Boolean,
-    panRegions: DrawerPanRegions,
-    onSelect: () -> Unit,
-    onMarkRead: () -> Unit,
-    onArchive: () -> Unit,
+    checked: Boolean?,
+    select: () -> Unit,
+    held: () -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
-    val swipe = rememberSwipeToDismissBoxState()
     val colors = OpenCodeTheme.colors
-    SwipeToDismissBox(
-        state = swipe,
-        modifier = Modifier.drawerPanRow(panRegions).testTag("inbox-row-${row.id}"),
-        enableDismissFromStartToEnd = row.unread,
-        backgroundContent = {
-            val toArchive = swipe.dismissDirection == SwipeToDismissBoxValue.EndToStart
-            Row(
-                Modifier
-                    .fillMaxSize()
-                    .background(if (toArchive) InboxSidebarMetrics.archiveTint else InboxSidebarMetrics.markReadTint)
-                    .padding(horizontal = 20.dp),
-                horizontalArrangement = if (toArchive) Arrangement.End else Arrangement.Start,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                OpenCodeIcon(if (toArchive) SFSymbol.Archivebox else SFSymbol.EnvelopeOpen, null, size = 20.dp, tint = Color.White)
-                Spacer(Modifier.width(6.dp))
-                Text(if (toArchive) "Archive" else "Mark as Read", color = Color.White, style = OpenCodeTextStyles.subheadline)
+    val hold = remember(row.id) { DrawerRowHoldState() }
+    val currentSelect by rememberUpdatedState(select)
+    val currentHeld by rememberUpdatedState(held)
+    // While the drawer selects, the chosen rows' tint stands in for the open session's.
+    val openTint = if (checked == null && selected) colors.text.copy(alpha = 0.08f) else Color.Transparent
+    val checkedTint = checkedRowTint()
+    val checkedTintAlpha = rememberCheckedTintAlpha(checked == true)
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .background(openTint)
+            .drawBehind {
+                val tintAlpha = checkedTintAlpha()
+                if (tintAlpha > 0f) drawRect(checkedTint.copy(alpha = checkedTint.alpha * tintAlpha))
             }
-        },
-        onDismiss = { value ->
-            when (value) {
-                SwipeToDismissBoxValue.StartToEnd -> {
-                    onMarkRead()
-                    scope.launch { swipe.reset() }
+            .drawerRowInteraction(
+                interaction = DrawerRowInteraction(
+                    sessionID = row.id,
+                    reorderable = false,
+                    select = { currentSelect() },
+                    pressed = {},
+                    held = { currentHeld() },
+                ),
+                hold = hold,
+                list = { null },
+                row = { null },
+            )
+            .semantics(mergeDescendants = true) {
+                testTag = "inbox-row-${row.id}"
+                role = Role.Button
+                onClick { currentSelect(); true }
+                if (checked == null) onLongClick("Select") { currentHeld(); true }
+                when (checked) {
+                    true -> stateDescription = "Selected"
+                    false -> stateDescription = "Not Selected"
+                    null -> Unit
                 }
-                // Settle before archiving. The row leaves at once, which cancels an animated
-                // reset, and the swipe state is saveable per row key: if the archive fails the row
-                // returns still dismissed, and SwipeToDismissBox calls onDismiss again for it, so
-                // a failing archive retried forever, buzzing an error haptic each time.
-                SwipeToDismissBoxValue.EndToStart -> scope.launch {
-                    swipe.snapTo(SwipeToDismissBoxValue.Settled)
-                    onArchive()
-                }
-                SwipeToDismissBoxValue.Settled -> Unit
-            }
-        },
+            },
     ) {
-        Box(
-            Modifier
-                .background(colors.canvas)
-                .background(if (selected) colors.text.copy(alpha = 0.08f) else Color.Transparent)
-                .clickable(role = Role.Button, onClick = onSelect)
-                .openCodeTapTarget(),
-        ) {
-            InboxSidebarRowView(row, now)
-        }
+        InboxSidebarRowView(row, now, checked)
     }
 }
 
 /** iOS `InboxSidebarRowView`: dot, title and age, project, then what the session needs. */
 @Composable
-internal fun InboxSidebarRowView(row: InboxSidebarRow, now: Instant, modifier: Modifier = Modifier) {
+internal fun InboxSidebarRowView(row: InboxSidebarRow, now: Instant, checked: Boolean?) {
     val colors = OpenCodeTheme.colors
     val age = InboxSidebarRow.age(row.updatedAt, now)
     val description = buildList {
@@ -269,7 +271,7 @@ internal fun InboxSidebarRowView(row: InboxSidebarRow, now: Instant, modifier: M
         add(age)
     }.joinToString(", ")
     Row(
-        modifier
+        Modifier
             .fillMaxWidth()
             .padding(horizontal = InboxSidebarMetrics.edge, vertical = 10.dp)
             .clearAndSetSemantics {
@@ -278,12 +280,16 @@ internal fun InboxSidebarRowView(row: InboxSidebarRow, now: Instant, modifier: M
             },
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Box(
-            Modifier
-                .padding(top = 7.dp)
-                .size(8.dp)
-                .background(if (row.unread) colors.signal else Color.Transparent, CircleShape),
-        )
+        // The check takes the unread dot's place while the drawer selects.
+        SelectionLead(
+            checked = checked,
+            restWidth = 8.dp,
+            selectWidth = 18.dp,
+            checkSize = 18.dp,
+            modifier = Modifier.padding(top = 2.dp).height(18.dp),
+        ) {
+            Box(Modifier.size(8.dp).background(if (row.unread) colors.signal else Color.Transparent, CircleShape))
+        }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             // iOS: Text + Spacer(minLength: 8) + age. The title takes all the width the age
             // leaves (a second weighted spacer would cap it at half), so the age stays trailing.
@@ -324,12 +330,8 @@ internal fun rememberInboxSidebarOn(): Boolean {
     return feature.isActive(stored)
 }
 
-private object InboxSidebarMetrics {
+internal object InboxSidebarMetrics {
     val edge = 20.dp
-    /** iOS `.tint(.blue)` on Mark as Read. */
-    val markReadTint = Color(0xFF0A84FF)
-    /** iOS `.tint(.indigo)` on Archive. */
-    val archiveTint = Color(0xFF5E5CE6)
     /** iOS `.orange` beside Needs your input. */
     val needsInputTint = Color(0xFFFF9F0A)
 }

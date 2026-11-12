@@ -8,6 +8,7 @@ import ai.opencode.server.live.markdownImageCacheKey
 import ai.opencode.server.live.requestActiveSessionParents
 import ai.opencode.server.live.requestAgents
 import ai.opencode.server.live.requestArchiveSession
+import ai.opencode.server.live.requestArchivedSessions
 import ai.opencode.server.live.requestAssistantReply
 import ai.opencode.server.live.requestCancelForm
 import ai.opencode.server.live.requestCancelIntegrationOAuth
@@ -67,6 +68,7 @@ import ai.opencode.server.live.requestStopShell
 import ai.opencode.server.live.requestSwitchAgent
 import ai.opencode.server.live.requestSwitchModel
 import ai.opencode.server.live.requestTranscript
+import ai.opencode.server.live.requestUnarchiveSession
 import ai.opencode.server.live.requestViewSession
 import ai.opencode.server.live.requestWaitForIdle
 import ai.opencode.server.live.subscribeEventsSharingWindows
@@ -197,6 +199,10 @@ data class OpenCodeClient(
     val moveSession: suspend (server: OpenCodeServer, sessionID: String, directory: String) -> Unit,
     /** Archives the session (`PATCH {archived: true}`), as the desktop Inbox does. */
     val archiveSession: suspend (server: OpenCodeServer, sessionID: String) -> Unit,
+    /** Unarchives the session (`PATCH {archived: false}`), as desktop's Unarchive does. */
+    val unarchiveSession: suspend (server: OpenCodeServer, sessionID: String) -> Unit,
+    /** The newest archived root sessions (`archived=true`) matching `search` (all when empty), as desktop's Archived list. */
+    val archivedSessions: suspend (server: OpenCodeServer, search: String, limit: Int) -> List<OpenCodeSession>,
     /** Turns Always Notify on (with the phone's callback URL) or off (null), keeping other metadata. */
     val setAlwaysNotify: suspend (server: OpenCodeServer, sessionID: String, callbackURL: String?) -> Unit,
     /** Queues a compaction; it runs after the session's current run. */
@@ -312,6 +318,8 @@ data class OpenCodeClient(
             renameSession = ::requestRenameSession,
             moveSession = ::requestMoveSession,
             archiveSession = ::requestArchiveSession,
+            unarchiveSession = ::requestUnarchiveSession,
+            archivedSessions = ::requestArchivedSessions,
             setAlwaysNotify = ::requestSetAlwaysNotify,
             compactSession = ::requestCompactSession,
             stageRevert = ::requestStageRevert,
@@ -390,6 +398,8 @@ data class OpenCodeClient(
                     renameSession = { _, _, _ -> unimplemented("renameSession") },
                     moveSession = { _, _, _ -> throw OpenCodeClientError("Unstubbed") },
                     archiveSession = { _, _ -> unimplemented("archiveSession") },
+                    unarchiveSession = { _, _ -> unimplemented("unarchiveSession") },
+                    archivedSessions = { _, _, _ -> unimplemented("archivedSessions") },
                     setAlwaysNotify = { _, _, _ -> unimplemented("setAlwaysNotify") },
                     compactSession = { _, _ -> unimplemented("compactSession") },
                     stageRevert = { _, _, _ -> unimplemented("stageRevert") },
