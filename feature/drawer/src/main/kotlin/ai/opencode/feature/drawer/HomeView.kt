@@ -29,6 +29,7 @@ import ai.opencode.feature.drawer.container.SessionDrawerContainer
 import ai.opencode.feature.drawer.container.SidebarMetrics
 import ai.opencode.feature.drawer.container.clearAndMergeSemantics
 import ai.opencode.feature.drawer.container.rememberSessionDrawerController
+import ai.opencode.feature.drawer.list.LocalDrawerSelection
 import ai.opencode.feature.drawer.motion.DrawerButton
 import ai.opencode.feature.drawer.motion.rememberDrawerKeyboardHold
 import ai.opencode.feature.drawer.motion.rememberDrawerShortcutMotion
@@ -267,7 +268,12 @@ private fun HomeLayout(
             HomeSessionStack(store, view, usesSidebar, containerWidth)
         },
         // The drawer's panel (iOS `sessionDrawer(width:insets:)`); Home hosts the delete confirmation.
-        drawer = { HomeDrawer(store, view, Modifier.fillMaxSize(), hostsDeleteConfirmation = false) },
+        // The drawer's selection reaches the rows' checks, which wave out from the held row.
+        drawer = {
+            CompositionLocalProvider(LocalDrawerSelection provides view.selection) {
+                HomeDrawer(store, view, Modifier.fillMaxSize(), hostsDeleteConfirmation = false)
+            }
+        },
         chrome = {
             val shown = catchUp ?: lastCatchUp[0]
             if (shown != null) {

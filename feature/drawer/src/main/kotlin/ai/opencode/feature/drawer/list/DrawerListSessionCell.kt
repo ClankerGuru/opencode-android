@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -63,6 +62,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTag
@@ -77,7 +77,7 @@ import kotlin.math.min
  * Port of iOS `DrawerListSessionCell.swift`: a drawer session row. The project tile, the fading
  * title, the status (the Working ring or a dot), the selected highlight and the time the reveal
  * slides in all live in the slide, which the time reveal moves; the touch surface
- * ([drawerRowInteraction]: tap, hold menu, lift to pin or reorder) stays put over the row.
+ * ([drawerRowInteraction]: tap, hold to select, lift to pin or reorder) stays put over the row.
  *
  * Per-frame values (the reveal's offset and progress, the pin drag's translation, the card-edge
  * fade) are read in layer and draw blocks only, so neither a reveal nor a drag recomposes a row.
@@ -89,7 +89,8 @@ import kotlin.math.min
 class DrawerListRowActions(
     val select: () -> Unit,
     val pressed: () -> Unit,
-    val menu: () -> List<DrawerRowMenuItem>,
+    /** The hold: the row joins or leaves the selection ([DrawerSelection]). */
+    val held: () -> Unit,
     /** The list is scrolling or flinging: a finger on it isn't a press. */
     val isListMoving: () -> Boolean,
     /** The held finger moved: start the pin drag at this list `y` (dp). */
@@ -147,7 +148,10 @@ fun DrawerListSessionCell(
 
     val emphasis = DrawerRowEmphasis.of(selected = row.selected, muted = row.muted, hasIndicator = row.indicator != Indicator.none)
     val weight = emphasis.weight(DrawerTunables.unreadWeight, DrawerTunables.readWeight)
-    val selection = if (row.selected) DrawerTunables.selection else null
+    // While the drawer selects, the chosen rows' tint stands in for the open session's mark.
+    val selection = if (row.selected && row.checked == null) DrawerTunables.selection else null
+    val checkedTint = checkedRowTint()
+    val checkedTintAlpha = rememberCheckedTintAlpha(row.checked == true)
     val onTint = selection == DrawerSelectionStyle.Tint
     val titleColor = when {
         onTint -> Color.White
@@ -263,6 +267,8 @@ fun DrawerListSessionCell(
                 }
                 .onGloballyPositioned { rowCoordinates[0] = it }
                 .drawBehind {
+                    val tintAlpha = checkedTintAlpha()
+                    if (tintAlpha > 0f) drawRoundRect(checkedTint.copy(alpha = checkedTint.alpha * tintAlpha), cornerRadius = CornerRadius(cornerRadius.toPx()))
                     when {
                         row.isLifted -> drawLiftedRowSurface(raisedSurface, cornerRadius.toPx(), DrawerLiftedRowView.apply(pinDrag.liftProgress))
                         surface.value > 0f -> drawRoundRect(
@@ -278,7 +284,7 @@ fun DrawerListSessionCell(
                         isPinnedSection = row.isPinnedSection,
                         select = { currentActions.select() },
                         pressed = { currentActions.pressed() },
-                        menu = { currentActions.menu() },
+                        held = { currentActions.held() },
                         isListMoving = { currentActions.isListMoving() },
                         beginDrag = { currentActions.beginDrag(it.y) },
                         moveDrag = { point, time -> currentActions.moveDrag(point.y, time) },
@@ -296,10 +302,16 @@ fun DrawerListSessionCell(
                     contentDescription = row.session.title
                     // iOS's `.selected` trait as words: `selected` would make the row checkable,
                     // and TalkBack would offer "double-tap to toggle" on a row that opens.
-                    stateDescription = listOfNotNull(if (row.selected) "Selected" else null, row.accessibilityValue.ifEmpty { null })
-                        .joinToString(", ")
+                    // While the drawer selects, the words say whether the row is chosen.
+                    val chosen = when (row.checked) {
+                        true -> "Selected"
+                        false -> "Not Selected"
+                        null -> if (row.selected) "Selected" else null
+                    }
+                    stateDescription = listOfNotNull(chosen, row.accessibilityValue.ifEmpty { null }).joinToString(", ")
                     role = Role.Button
                     onClick { currentActions.select(); true }
+                    if (row.checked == null) onLongClick("Select") { currentActions.held(); true }
                     customActions = buildList {
                         add(CustomAccessibilityAction(if (row.isPinnedSection) "Unpin" else "Pin") { currentActions.togglePin(); true })
                         add(CustomAccessibilityAction(if (row.unread) "Mark as Read" else "Mark as Unread") { currentActions.toggleRead(); true })
@@ -338,17 +350,24 @@ fun DrawerListSessionCell(
                         .padding(start = DrawerMetrics.textInset, end = DrawerMetrics.trailingInset),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (row.project != null) {
-                        val side = DrawerListProjectTile.side(DrawerTunables.projectIconSize, density.fontScale)
-                        DrawerListProjectTile(
-                            project = row.project,
-                            server = row.server,
-                            muted = row.muted,
-                            side = side,
-                            increasedContrast = row.increasedContrast,
-                            reducedMotion = row.reducedMotion,
-                        )
-                        Spacer(Modifier.width(DrawerTunables.projectIconGap))
+                    // The check takes the project tile's place while the drawer selects.
+                    val side = DrawerListProjectTile.side(DrawerTunables.projectIconSize, density.fontScale)
+                    SelectionLead(
+                        checked = row.checked,
+                        restWidth = if (row.project != null) side + DrawerTunables.projectIconGap else 0.dp,
+                        selectWidth = side + DrawerTunables.projectIconGap,
+                        checkSize = 20.dp,
+                    ) {
+                        if (row.project != null) {
+                            DrawerListProjectTile(
+                                project = row.project,
+                                server = row.server,
+                                muted = row.muted,
+                                side = side,
+                                increasedContrast = row.increasedContrast,
+                                reducedMotion = row.reducedMotion,
+                            )
+                        }
                     }
                     DrawerListTitleView(
                         text = row.session.title,
@@ -383,8 +402,6 @@ fun DrawerListSessionCell(
                     )
                 }
             }
-            // Anchored on the row's frame so the menu opens beside the held row.
-            DrawerRowMenu(hold) { currentActions.menu() }
         }
     }
 }
