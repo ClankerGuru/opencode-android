@@ -70,13 +70,12 @@ class EventBatcherTests {
         }
     }
 
-    @Test fun focusedFlushRecoversAShedPrefixOnlyWhenItWasObservedFromTheStart() = runTest {
-        val s = Stream(backgroundScope, remaining = 1)
-        s.batch("s", TextStarted("m", 0))
-        s.batch("s", TextDelta("m", 0, "NORTH|"), TextDelta("orphan", 0, "post-gap"))
-        s.focused += "s"
-        s.batch("s", TextDelta("m", 0, "TAIL"), TextDelta("orphan", 0, "tail"), TextEnded("orphan", 0, "whole"))
-        assertEquals(listOf(TextStarted("m", 0), TextDelta("m", 0, "TAIL", "NORTH|TAIL"), TextEnded("orphan", 0, "whole")), s.output)
+    @Test fun openingAfterAnOffscreenFlushShowsThePrefixFromTheQueuedBatch() = runTest {
+        val s = Stream(backgroundScope)
+        s.batch("s", TextStarted("m", 0), TextDelta("m", 0, "First"))
+        s.batch("s", TextDelta("m", 0, " second"))
+        // Home consumed the first batch before the detail existed; the queued one carries the prefix.
+        assertEquals(TextDelta("m", 0, " second", "First second"), s.output.last())
     }
 
     @Test fun tooManyUnfinishedPartsIncludingDiscardedPrefixesEndsTheStream() = runTest {

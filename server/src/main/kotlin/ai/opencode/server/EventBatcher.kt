@@ -96,6 +96,9 @@ class EventBatcher(
         get() = remaining <= capacity / 2 && clock.now() - remainingMeasuredAt < 1.seconds
 
     /**
+     * Attach a complete prefix whenever this connection has one: a screen can open between this
+     * flush and delivery. Only focused sessions prepare Markdown.
+     *
      * Under pressure, a session off screen loses its streaming deltas: its rows aren't drawn, and
      * their ends (`TextEnded`, `ToolInputEnded`) and every other event still arrive, so nothing
      * durable goes. Emitting them would fill the buffer and drop the connection for everyone (a

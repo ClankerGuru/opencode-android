@@ -144,9 +144,9 @@ class SessionRefreshReviewTests {
             store.send(Action.RefreshRequested(RefreshReason.Invalidation))
             assertEquals(RefreshReason.RunState, store.state.refresh?.followup)
             assertEquals(setOf("msg_reply"), store.state.projectedMessageIDs)
-            val firstRead = text.copy(text = "First REST value")
-            store.send(response(1, if (targeted) listOf(firstRead, ghost) else listOf(user, firstRead, ghost), if (targeted) AuthoritativeRefresh.Scope.Message("msg_reply") else AuthoritativeRefresh.Scope.Page))
-            assertTrue("R1 settles the text despite the buffered text.ended", store.state.items.contains(firstRead))
+            val stale = OpenCodeTranscriptItem.AssistantMarkdown(id = "msg_reply-text-0", text = "")
+            store.send(response(1, if (targeted) listOf(stale, ghost) else listOf(user, stale, ghost), if (targeted) AuthoritativeRefresh.Scope.Message("msg_reply") else AuthoritativeRefresh.Scope.Page))
+            assertTrue("R1 must replay the raced final text", store.state.items.contains(text))
             assertTrue("R1 must retain the completed tool absent from its snapshot", store.state.items.contains(tool))
             store.receive(Action.RefreshRequested(RefreshReason.RunState))
             finalRead.open()
@@ -158,10 +158,9 @@ class SessionRefreshReviewTests {
     }
 
     @Test fun serverIdleSettlesAnAdmittedSendUnlessALocalPromptStillWaits() {
-        val unfinishedReply = text.copy(inProgress = true)
         for (pending in listOf("none", "submitting", "queued", "echoed")) sessionTest { h ->
             val next = OpenCodeTranscriptItem.UserText(id = "msg_next", text = "Next")
-            var state = h.state(cachedItems = listOf(user, unfinishedReply)).copy(
+            var state = h.state(cachedItems = listOf(user, text)).copy(
                 isAwaitingReply = true,
                 isExternallyActive = true,
                 projectedMessageIDs = setOf("msg_reply"),
@@ -186,7 +185,7 @@ class SessionRefreshReviewTests {
             assertEquals("pending=$pending", pending == "submitting" || pending == "queued", store.state.isAwaitingReply)
             assertEquals(
                 "pending=$pending",
-                if (pending == "echoed") listOf(user, next) else if (pending == "none") listOf(user) else listOf(user, unfinishedReply),
+                if (pending == "echoed") listOf(user, next) else if (pending == "none") listOf(user) else listOf(user, text),
                 store.state.items,
             )
             store.finish()

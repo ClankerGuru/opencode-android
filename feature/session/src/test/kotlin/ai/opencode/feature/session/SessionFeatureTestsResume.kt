@@ -22,9 +22,6 @@ import ai.opencode.feature.session.SessionTestSupport.settle
 import ai.opencode.feature.session.SessionTestSupport.testServer
 import ai.opencode.feature.session.SessionTestSupport.testSession
 import ai.opencode.server.OpenCodeClient
-import ai.opencode.server.EventBatcher
-import ai.opencode.server.EventEmission
-import ai.opencode.server.OpenCodeServerEvent
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeLiveContentEvent
 import ai.opencode.server.model.OpenCodeContextReading
@@ -35,6 +32,8 @@ import ai.opencode.server.model.OpenCodeTranscriptPage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.yield
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
 import org.junit.Test
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -50,78 +49,36 @@ class SessionFeatureTestsResume {
     private fun isAccepted(action: Action) = action is Action.AcceptedTranscriptUpdated
 
     @Test
-    fun settledRESTPartWinsOverBufferedTextAcrossReadPaths() = sessionTest { h ->
-        val session = testSession(id = "ses_ahead", title = "REST ahead")
-        val rows = listOf(assistant("msg_reply-text-0", "First and final words"))
-        val response = { scope: SessionFeature.AuthoritativeRefresh.Scope ->
-            Action.RefreshResponse(session.id, 1, Result.success(SessionFeature.AuthoritativeRefresh(observed = session, items = rows, scope = scope)))
-        }
-        for (read in listOf(
-            Action.TranscriptResponse(session.id, Result.success(rows)), response(page),
-            response(SessionFeature.AuthoritativeRefresh.Scope.Message("msg_reply")),
-            Action.EarlierHistoryResponse(session.id, 0, "cursor", Result.success(OpenCodeTranscriptPage(rows, null))),
-        )) {
-            val store = h.store(h.makeState(session = session, isRunning = true).copy(
-                refresh = State.Refresh(id = 1, reason = RefreshReason.Reconnect),
-                earlierHistory = State.EarlierHistory.Loading("cursor", true),
-            ))
-            store.exhaustive = false
-            val start = OpenCodeLiveContentEvent.TextStarted("msg_reply", 0)
-            store.send(Action.ContentBatch(session.id, listOf(start, OpenCodeLiveContentEvent.TextDelta("msg_reply", 0, "First"))))
-            store.send(read)
-            assertEquals(rows, store.state.items)
-            assertTrue(store.state.liveText.isEmpty())
-            store.send(Action.ContentBatch(session.id, listOf(start,
-                OpenCodeLiveContentEvent.TextDelta("msg_reply", 0, " and", accumulatedText = "First and"),
-                OpenCodeLiveContentEvent.TextDelta("msg_reply", 0, " and"),
-                OpenCodeLiveContentEvent.TextEnded("msg_reply", 0, "Older boundary"),
-            )))
-            assertEquals(rows, store.state.items)
-            assertTrue(store.state.liveText.isEmpty())
-        }
-    }
+    fun cachedReplySurvivesAnOmittingOpenReadBeforeItsFirstDelta() = sessionTest { h ->
+        val session = testSession(id = "ses_cached", title = "Cached reply")
+        val user = user("prompt", "Go")
+        val stale = assistant("reply-text-0", "")
+        val previous = h.store(h.makeState(session = session, cachedItems = listOf(user, stale)))
+        previous.exhaustive = false
+        previous.send(Action.ContentBatch(session.id, listOf(OpenCodeLiveContentEvent.TextDelta("reply", 1, "First words"))))
 
-    @Test
-    fun sessionOpenedMidReplyKeepsPrefixAcrossFirstHistoryRead() = sessionTest { h ->
-        val session = testSession(id = "ses_late", title = "Late open")
-        val id = "msg_reply-text-0"
-        val prefix = "BEGIN-NORTH|echo "
-        val tail = "echo|TAIL"
-        val prompt = user("msg_prompt", "Prompt")
-        val whole = assistant(id, prefix + tail)
-        for (historyFirst in listOf(false, true)) {
-            var focused = false
-            val delivered = mutableListOf<OpenCodeLiveContentEvent>()
-            val batcher = EventBatcher(scope = h.scope, clock = TestClock(), isFocused = { focused }, emit = { batch ->
-                if (focused) delivered += (batch as OpenCodeServerEvent.ContentBatch).events
-                EventEmission.Enqueued(remaining = EventBatcher.BUFFER_CAPACITY)
-            })
-            fun flush(vararg events: OpenCodeLiveContentEvent) {
-                batcher.receive(OpenCodeServerEvent.ContentBatch(session.id, events.toList()))
-                batcher.flush()
-            }
-            flush(OpenCodeLiveContentEvent.TextStarted("msg_reply", 0), OpenCodeLiveContentEvent.TextDelta("msg_reply", 0, prefix))
-            val store = h.store(h.makeState(session = session, initialTranscriptRequestIsExternal = true, isRunning = true))
-            store.exhaustive = false
-            focused = true
-            val history = Action.TranscriptResponse(session.id, Result.success(listOf(prompt)))
-            if (historyFirst) store.send(history)
-            flush(OpenCodeLiveContentEvent.TextDelta("msg_reply", 0, "echo"), OpenCodeLiveContentEvent.TextDelta("msg_reply", 0, "|TAIL"))
-            store.send(Action.ContentBatch(session.id, delivered.toList()))
-            if (!historyFirst) store.send(history)
-            // The stream is held here, before its end can repair a suffix-only row.
-            assertEquals(listOf(prompt, whole.copy(inProgress = true)), store.state.items)
-            delivered.clear()
-            flush(OpenCodeLiveContentEvent.TextEnded("msg_reply", 0, prefix + tail))
-            store.send(Action.ContentBatch(session.id, delivered.toList()))
-            assertEquals(listOf(prompt, whole), store.state.items)
-        }
+        // Home stores the cacheable rows; the new visit has neither the old raw text nor its
+        // projection IDs.
+        val serializer = ListSerializer(OpenCodeTranscriptItem.serializer())
+        val cached = Json.decodeFromString(serializer, Json.encodeToString(serializer, previous.state.cacheableItems))
+        val partial = cached.last()
+        assertTrue(partial.isInProgressText)
+        val store = h.store(h.makeState(session = session, cachedItems = cached, isRunning = true))
+        store.exhaustive = false
+        store.send(Action.TranscriptResponse(session.id, Result.success(listOf(user))))
+        assertEquals(listOf(user, partial), store.state.items)
+        store.send(Action.ContentBatch(session.id, listOf(OpenCodeLiveContentEvent.TextDelta("reply", 1, " tail after gap"))))
+        assertEquals(listOf(user, partial), store.state.items)
+        assertTrue(store.state.liveText.isEmpty())
+        val final = assistant(partial.id, "First words, middle, tail after gap")
+        store.send(Action.TranscriptResponse(session.id, Result.success(listOf(user, final))))
+        assertEquals(listOf(user, final), store.state.items)
     }
 
     @Test
     fun streamGapRejectsPreGapReadAndReconnectRefetchesWithoutDuplicatingText() = sessionTest { h ->
         val session = testSession(id = "ses_gap", title = "Gap")
-        val partial = assistant("msg_reply-text-0", "Hello").copy(inProgress = true)
+        val partial = assistant("msg_reply-text-0", "Hello")
         val complete = assistant("msg_reply-text-0", "Hello world")
         val state = h.makeState(session = session, cachedItems = listOf(partial)).copy(
             streamIsHealthy = true,
@@ -178,7 +135,7 @@ class SessionFeatureTestsResume {
     fun reconnectMidReplyKeepsTheRowUntilItsTextEnds() = sessionTest { h ->
         val session = testSession(id = "ses_gap", title = "Gap")
         val id = "msg_reply-text-0"
-        val shown = assistant(id, "The first half of a long").copy(inProgress = true)
+        val shown = assistant(id, "The first half of a long")
         val whole = assistant(id, "The first half of a long reply, and its end.")
         val ended = OpenCodeLiveContentEvent.TextEnded(messageID = "msg_reply", ordinal = 0, text = "The first half of a long reply, and its end.")
         val state = h.makeState(session = session, cachedItems = listOf(shown)).copy(

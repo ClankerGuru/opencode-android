@@ -73,7 +73,7 @@ internal fun subscribeEvents(server: OpenCodeServer): Flow<OpenCodeServerEvent> 
 
 private fun eventSource(server: OpenCodeServer, waiting: AtomicInteger): Flow<OpenCodeServerEvent> = callbackFlow {
     val batches = EventBatcher(
-        scope = this + Dispatchers.Default,
+        scope = this,
         emit = { event ->
             val queued = waiting.incrementAndGet()
             val result = trySend(event)

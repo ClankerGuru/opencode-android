@@ -238,11 +238,11 @@ class SessionFeatureTestsInbox {
                 events = listOf(ai.opencode.server.OpenCodeLiveContentEvent.TextDelta(messageID = "msg_1", ordinal = 0, delta = "The fixes are in.")),
             ),
         )
-        val streamed = markdown("msg_1-text-0", "The fixes are in.")
-        assertEquals(listOf(noticeReply, pendingNotice, streamed.copy(inProgress = true)), store.state.items)
+        val streamed = markdown("msg_1-text-0", "The fixes are in.").copy(inProgress = true)
+        assertEquals(listOf(noticeReply, pendingNotice, streamed), store.state.items)
 
         history(store, listOf(noticeReply))
-        assertEquals("A page from before delivery keeps the order", listOf(noticeReply, pendingNotice, streamed.copy(inProgress = true)), store.state.items)
+        assertEquals("A page from before delivery keeps the order", listOf(noticeReply, pendingNotice, streamed), store.state.items)
 
         history(store, listOf(noticeReply, pendingNotice, streamed))
         assertEquals(listOf(noticeReply, pendingNotice, streamed), store.state.items)
@@ -302,8 +302,8 @@ class SessionFeatureTestsInbox {
                 events = listOf(ai.opencode.server.OpenCodeLiveContentEvent.TextDelta(messageID = "msg_1", ordinal = 0, delta = "The screenshot matches.")),
             ),
         )
-        val text = markdown("msg_1-text-0", "The screenshot matches.")
-        assertEquals("delivered=$delivered", listOf(noticeReply, read, pendingNotice, text.copy(inProgress = true)), store.state.items)
+        val text = markdown("msg_1-text-0", "The screenshot matches.").copy(inProgress = true)
+        assertEquals("delivered=$delivered", listOf(noticeReply, read, pendingNotice, text), store.state.items)
         val shown = TranscriptEntry.build(store.state.visibleItems, isRunning = true)
         assertEquals(listOf("msg_0-text-0", "group-msg_1-tool-read", "msg_1-text-0"), shown.map { it.id })
 

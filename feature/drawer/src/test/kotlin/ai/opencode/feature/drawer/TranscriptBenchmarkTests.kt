@@ -199,7 +199,7 @@ class TranscriptBenchmarkTests {
             detail(
                 SessionFeature.Action.ContentBatch(
                     openSession.id,
-                    listOf(OpenCodeLiveContentEvent.TextStarted("msg_a2", 0), OpenCodeLiveContentEvent.TextDelta("msg_a2", 0, " more text")),
+                    listOf(OpenCodeLiveContentEvent.TextStarted("msg_a1", 0), OpenCodeLiveContentEvent.TextDelta("msg_a1", 0, " more text")),
                 ),
             ),
         )
@@ -213,7 +213,7 @@ class TranscriptBenchmarkTests {
             visibleItems = vis1, allItems = d1.items, showsWorking = true, failedFinale = false, models = emptyList(),
             sentNow = null, mark = null, now = baseTime,
         )
-        store.send(detail(SessionFeature.Action.ContentBatch(openSession.id, listOf(OpenCodeLiveContentEvent.TextDelta("msg_a2", 0, " and tail delta")))))
+        store.send(detail(SessionFeature.Action.ContentBatch(openSession.id, listOf(OpenCodeLiveContentEvent.TextDelta("msg_a1", 0, " and tail delta")))))
         val d2 = store.state.sessionDetail!!
         val vis2 = cache.resolveVisibleItems(d2.items, d2.visibleLimit, d2.browsingWindowStartID, revertMessageID = null) { d2.visibleItems }
         val (entries2, _) = cache.resolveEntries(

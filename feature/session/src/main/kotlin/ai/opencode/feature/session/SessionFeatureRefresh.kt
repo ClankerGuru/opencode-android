@@ -370,7 +370,16 @@ internal fun SessionFeature.applyAuthoritative(
     state: SessionFeature.State,
     preserveProjection: Boolean,
 ): SessionFeature.State {
-    return acceptWindow(items, pageCursor, state.copy(initialTranscriptIsFresh = true), preserveProjection)
+    var s = acceptWindow(items, pageCursor, state.copy(initialTranscriptIsFresh = true), preserveProjection)
+    // Events received before this request began may describe an unfinished value absent from the
+    // REST projection. Reapply by semantic part ID.
+    if (s.liveText.isNotEmpty()) {
+        val rows = ArrayList(s.items)
+        var changed = false
+        for ((id, text) in s.liveText) if (upsertLiveText(id, text, streaming = true, items = rows)) changed = true
+        if (changed) s = s.copy(items = rows)
+    }
+    return s
 }
 
 /** iOS `acceptWindow(_:pageCursor:into:preserveProjection:)`: adopts a newest-messages window and settles the prompts it echoes. */
@@ -380,7 +389,7 @@ internal fun SessionFeature.acceptWindow(
     state: SessionFeature.State,
     preserveProjection: Boolean? = null,
 ): SessionFeature.State {
-    var s = state.settlingText(items)
+    var s = state
     // A newest window can pass a pending prompt using assistant messages alone. Keep that prompt in
     // paged history rather than appending its targeted echo below the newer replies. Compare
     // messages, not parts: replacing a projected part or removing a notice is not a window jump.
@@ -506,21 +515,20 @@ internal fun SessionFeature.applyAuthoritativeMessage(
     LabMarks.mark("session_data", sessionID = state.session?.id)
     val rows = MessageRows(messageID)
     val indexes = state.items.indices.filter { rows.contains(state.items[it]) }
-    var s = state.settlingText(fetched)
-    val insertion = indexes.firstOrNull() ?: return s
+    val insertion = indexes.firstOrNull() ?: return state
     val last = indexes.last()
     // A durable boundary belongs to a part, not the whole message. A sibling tool can have started
     // before this read (so it is not in racedEvents) and still have no REST payload. Use the same
     // protection as page reads.
     val preserve = preserveProjection ?: (state.isRunning || state.refresh?.followup == RefreshReason.RunState)
     val replacement = if (preserve && messageID in state.projectedMessageIDs) {
-        SessionFeature.mergeTranscript(fetched = fetched, existing = indexes.map { state.items[it] }, projectedMessageIDs = setOf(messageID), complete = true)
+        SessionFeature.mergeTranscript(fetched = fetched, existing = indexes.map { state.items[it] }, projectedMessageIDs = setOf(messageID))
     } else if (preserve) {
         SessionFeature.preservingInProgressText(fetched, indexes.map { state.items[it] })
     } else {
         fetched
     }
-    if (!preserve) s = s.resetLiveProjection()
+    var s = if (!preserve) state.resetLiveProjection() else state
     // A notice shown between this message's parts (a shell finishing after a read, with the next
     // paragraph streamed below it) stays after the part it followed, inside that Used N group.
     // Moved below the whole message it would be an Updates row of its own until a page read placed it.
@@ -544,5 +552,12 @@ internal fun SessionFeature.applyAuthoritativeMessage(
         s = s.copy(items = kept).syncShellToolStatuses()
     }
     s = reconcilePromptEchoes(fetched, s)
+    val prefix = "$messageID-"
+    if (s.liveText.keys.any { it.startsWith(prefix) }) {
+        val rows = ArrayList(s.items)
+        var changed = false
+        for ((id, text) in s.liveText) if (id.startsWith(prefix) && upsertLiveText(id, text, streaming = true, items = rows)) changed = true
+        if (changed) s = s.copy(items = rows)
+    }
     return s.retainRenderedWindowStart(previousFirstID).pinBrowsingWindowIfNeeded()
 }

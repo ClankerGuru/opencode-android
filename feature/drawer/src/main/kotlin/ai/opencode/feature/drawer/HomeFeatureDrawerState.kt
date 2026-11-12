@@ -641,7 +641,6 @@ val HomeFeature.State.viewing: Viewing
 val HomeFeature.State.streamFocusSessionIDs: Set<String>
     get() {
         val ids = LinkedHashSet<String>()
-        selectedTranscriptFetch?.sessionID?.let(ids::add)
         sessionDetail?.session?.id?.let(ids::add)
         for (screen in subagentStack) {
             screen.session?.id?.let(ids::add)

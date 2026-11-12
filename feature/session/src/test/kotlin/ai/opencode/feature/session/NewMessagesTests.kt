@@ -358,7 +358,7 @@ class NewMessagesTests {
     // region Ported from iOS f657969b (the read-receipt and watermark rework)
 
     private val liveID = "msg_live-text-0"
-    private val liveRow get() = OpenCodeTranscriptItem.AssistantMarkdown(id = liveID, text = "Streaming reply")
+    private val liveRow: OpenCodeTranscriptItem get() = OpenCodeTranscriptItem.AssistantMarkdown(id = liveID, text = "Streaming reply", inProgress = true)
     private val liveDelta: Action
         get() = Action.ContentBatch(
             sessionID = "ses_live",
@@ -643,7 +643,7 @@ class NewMessagesTests {
         store.send(liveDelta) {
             it.applyLive().copy(
                 liveText = mapOf(liveID to "Streaming reply"),
-                items = it.items + live.copy(inProgress = true),
+                items = it.items + live,
                 newMessagesBaseline = setOf("m1", "m2"),
                 newMessagesGeneration = 1,
                 newMessages = NewMessagesMark(itemID = liveID, lastItemID = liveID, generation = 1),
@@ -651,7 +651,7 @@ class NewMessagesTests {
         }
         store.send(Action.SceneActiveChanged(true)) { it.copy(isSceneActive = true) }
         store.send(pageRead(listOf(m1, m2, live))) {
-            it.copy(refresh = null, initialTranscriptIsFresh = true, newMessagesBaseline = null, items = listOf(m1, m2, live), liveText = emptyMap())
+            it.copy(refresh = null, initialTranscriptIsFresh = true, newMessagesBaseline = null)
         }
         store.receive(Action.AcceptedTranscriptUpdated(sessionID = "ses_live", items = listOf(m1, m2, live)))
         h.skipInFlightEffects()
@@ -690,7 +690,7 @@ class NewMessagesTests {
         store.send(liveDelta) {
             it.applyLive().copy(
                 liveText = mapOf(liveID to "Streaming reply"),
-                items = it.items + live.copy(inProgress = true),
+                items = it.items + live,
                 newMessagesGeneration = 1,
                 newMessages = NewMessagesMark(itemID = liveID, lastItemID = liveID, generation = 1),
             )
@@ -699,7 +699,7 @@ class NewMessagesTests {
         store.receive(Action.PendingInputsRequested::class)
         store.receive(Action.PendingInputsResponse::class)
         store.send(pageRead(listOf(m1, m2, live))) {
-            it.copy(refresh = null, initialTranscriptIsFresh = true, newMessagesBaseline = null, items = listOf(m1, m2, live), liveText = emptyMap())
+            it.copy(refresh = null, initialTranscriptIsFresh = true, newMessagesBaseline = null)
         }
         store.receive(Action.AcceptedTranscriptUpdated(sessionID = "ses_live", items = listOf(m1, m2, live)))
         h.skipInFlightEffects()
@@ -756,7 +756,7 @@ class NewMessagesTests {
             OpenCodeLiveContentEvent.ToolInputStarted(messageID = "msg_live", toolID = "t1", name = "bash"),
             OpenCodeLiveContentEvent.ToolInputDelta(messageID = "msg_live", toolID = "t1", delta = "ls"),
         )
-        val expectedText = OpenCodeTranscriptItem.AssistantMarkdown(id = "msg_live-text-0", text = "Hello world")
+        val expectedText = OpenCodeTranscriptItem.AssistantMarkdown(id = "msg_live-text-0", text = "Hello world", inProgress = true)
         fun bash(input: String): OpenCodeTranscriptItem = OpenCodeTranscriptItem.Tool(
             id = "msg_live-tool-t1",
             call = OpenCodeToolCall(
@@ -771,7 +771,7 @@ class NewMessagesTests {
         store.send(Action.ContentBatch(sessionID = "ses_live", events = batch)) {
             it.applyLive(baseline = "msg_live-tool-t1").copy(
                 liveText = mapOf("msg_live-text-0" to "Hello world"),
-                items = listOf(m1, m2, expectedText.copy(inProgress = true), expectedTool),
+                items = listOf(m1, m2, expectedText, expectedTool),
                 newMessagesWatched = setOf("msg_live-text-0", "msg_live-tool-t1"),
                 refresh = it.refresh?.copy(
                     racedEvents = listOf(
@@ -783,8 +783,7 @@ class NewMessagesTests {
             )
         }
         store.send(pageRead(listOf(m1, m2, expectedText, startedTool))) {
-            it.copy(refresh = null, initialTranscriptIsFresh = true, newMessagesBaseline = null, newMessagesWatched = emptySet(),
-                items = listOf(m1, m2, expectedText, expectedTool), liveText = emptyMap())
+            it.copy(refresh = null, initialTranscriptIsFresh = true, newMessagesBaseline = null, newMessagesWatched = emptySet())
         }
         store.receive(Action.AcceptedTranscriptUpdated(sessionID = "ses_live", items = listOf(m1, m2, expectedText, expectedTool)))
         h.skipInFlightEffects()

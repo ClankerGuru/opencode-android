@@ -21,7 +21,6 @@ import ai.opencode.feature.drawer.catchup.CatchUpFeature
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.server.CachedTranscriptSnapshots
 import ai.opencode.server.OpenCodeClient
-import ai.opencode.server.OpenCodeLiveContentEvent
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.OpenCodeServerEvent
 import ai.opencode.server.ServerSharedKeys
@@ -105,30 +104,6 @@ class TranscriptCachePersistenceTests {
         send(HomeFeature.Action.TranscriptPrefetched(sessionID = sessionID, items = items)) { state ->
             withDependencies { state.publishingTranscript(sessionID, items).persistingTranscriptCache(sessionID) }
         }
-
-    @Test
-    fun reopeningRunningSessionKeepsPrefixThroughCacheReadAndStreamGap() = World().state {
-        val session = makeSession("running", updatedAt = 100)
-        val other = makeSession("other", updatedAt = 100)
-        val snapshot = OpenCodeHomeSnapshot(emptyList(), listOf(session, other), activeSessionIDs = setOf(session.id))
-        val prompt = OpenCodeTranscriptItem.UserText("msg_user", "Go")
-        val reducer = SessionFeature()
-        val home = HomeFeature.State(server, snapshot).openingDetail(session, listOf(prompt))
-        fun batch(event: OpenCodeLiveContentEvent) = SessionFeature.Action.ContentBatch(session.id, listOf(event))
-        val streaming = reducer.reduce(requireNotNull(home.sessionDetail), batch(OpenCodeLiveContentEvent.TextDelta("msg_reply", 0, "First"))).state
-        val partial = OpenCodeTranscriptItem.AssistantMarkdown("msg_reply-text-0", "First", inProgress = true)
-        val away = home.copy(sessionDetail = streaming).openingDetail(other)
-        assertEquals(listOf(prompt, partial), away.transcriptCache[session.id])
-        val refreshed = HomeFeature().reduce(away.copy(refreshingTranscripts = setOf(session.id)),
-            HomeFeature.Action.CachedTranscriptRefreshed(session.id, listOf(prompt))).state
-        val reopened = requireNotNull(refreshed.openingDetail(session, refreshed.cachedTranscriptItems(session)).sessionDetail)
-        assertTrue(reopened.liveText.isEmpty())
-        val read = reducer.reduce(reopened, SessionFeature.Action.TranscriptResponse(session.id, Result.success(listOf(prompt)))).state
-        val gap = reducer.reduce(read, batch(OpenCodeLiveContentEvent.TextDelta("msg_reply", 0, " last"))).state
-        assertEquals(listOf(prompt, partial), gap.items)
-        val ended = reducer.reduce(gap, batch(OpenCodeLiveContentEvent.TextEnded("msg_reply", 0, "First middle last"))).state
-        assertEquals(listOf(prompt, partial.copy(text = "First middle last", inProgress = false)), ended.items)
-    }
 
     @Test
     fun coldLaunchRestoresRowsAndBaselinesBeforeTheFirstRefreshCanPersist() = runTest {
