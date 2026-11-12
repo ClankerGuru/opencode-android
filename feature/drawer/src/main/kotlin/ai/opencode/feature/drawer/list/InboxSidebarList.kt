@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -48,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
@@ -216,15 +218,17 @@ internal fun InboxSidebarSessionRow(
     val currentSelect by rememberUpdatedState(select)
     val currentHeld by rememberUpdatedState(held)
     // While the drawer selects, the chosen rows' tint stands in for the open session's.
-    val tint = when {
-        checked == true -> checkedRowTint()
-        checked == null && selected -> colors.text.copy(alpha = 0.08f)
-        else -> Color.Transparent
-    }
+    val openTint = if (checked == null && selected) colors.text.copy(alpha = 0.08f) else Color.Transparent
+    val checkedTint = checkedRowTint()
+    val checkedTintAlpha = rememberCheckedTintAlpha(checked == true)
     Box(
         Modifier
             .fillMaxWidth()
-            .background(tint)
+            .background(openTint)
+            .drawBehind {
+                val tintAlpha = checkedTintAlpha()
+                if (tintAlpha > 0f) drawRect(checkedTint.copy(alpha = checkedTint.alpha * tintAlpha))
+            }
             .drawerRowInteraction(
                 interaction = DrawerRowInteraction(
                     sessionID = row.id,
@@ -279,16 +283,15 @@ internal fun InboxSidebarRowView(row: InboxSidebarRow, now: Instant, checked: Bo
             },
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (checked != null) {
-            // The check takes the unread dot's place while the drawer selects.
-            SelectionCheck(checked, Modifier.padding(top = 2.dp), size = 18.dp)
-        } else {
-            Box(
-                Modifier
-                    .padding(top = 7.dp)
-                    .size(8.dp)
-                    .background(if (row.unread) colors.signal else Color.Transparent, CircleShape),
-            )
+        // The check takes the unread dot's place while the drawer selects.
+        SelectionLead(
+            checked = checked,
+            restWidth = 8.dp,
+            selectWidth = 18.dp,
+            checkSize = 18.dp,
+            modifier = Modifier.padding(top = 2.dp).height(18.dp),
+        ) {
+            Box(Modifier.size(8.dp).background(if (row.unread) colors.signal else Color.Transparent, CircleShape))
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             // iOS: Text + Spacer(minLength: 8) + age. The title takes all the width the age

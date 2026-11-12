@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -152,6 +151,7 @@ fun DrawerListSessionCell(
     // While the drawer selects, the chosen rows' tint stands in for the open session's mark.
     val selection = if (row.selected && row.checked == null) DrawerTunables.selection else null
     val checkedTint = checkedRowTint()
+    val checkedTintAlpha = rememberCheckedTintAlpha(row.checked == true)
     val onTint = selection == DrawerSelectionStyle.Tint
     val titleColor = when {
         onTint -> Color.White
@@ -267,7 +267,8 @@ fun DrawerListSessionCell(
                 }
                 .onGloballyPositioned { rowCoordinates[0] = it }
                 .drawBehind {
-                    if (row.checked == true) drawRoundRect(checkedTint, cornerRadius = CornerRadius(cornerRadius.toPx()))
+                    val tintAlpha = checkedTintAlpha()
+                    if (tintAlpha > 0f) drawRoundRect(checkedTint.copy(alpha = checkedTint.alpha * tintAlpha), cornerRadius = CornerRadius(cornerRadius.toPx()))
                     when {
                         row.isLifted -> drawLiftedRowSurface(raisedSurface, cornerRadius.toPx(), DrawerLiftedRowView.apply(pinDrag.liftProgress))
                         surface.value > 0f -> drawRoundRect(
@@ -349,23 +350,24 @@ fun DrawerListSessionCell(
                         .padding(start = DrawerMetrics.textInset, end = DrawerMetrics.trailingInset),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    val checked = row.checked
-                    if (checked != null) {
-                        // The check takes the project tile's place.
-                        val side = DrawerListProjectTile.side(DrawerTunables.projectIconSize, density.fontScale)
-                        Box(Modifier.size(side), contentAlignment = Alignment.Center) { SelectionCheck(checked) }
-                        Spacer(Modifier.width(DrawerTunables.projectIconGap))
-                    } else if (row.project != null) {
-                        val side = DrawerListProjectTile.side(DrawerTunables.projectIconSize, density.fontScale)
-                        DrawerListProjectTile(
-                            project = row.project,
-                            server = row.server,
-                            muted = row.muted,
-                            side = side,
-                            increasedContrast = row.increasedContrast,
-                            reducedMotion = row.reducedMotion,
-                        )
-                        Spacer(Modifier.width(DrawerTunables.projectIconGap))
+                    // The check takes the project tile's place while the drawer selects.
+                    val side = DrawerListProjectTile.side(DrawerTunables.projectIconSize, density.fontScale)
+                    SelectionLead(
+                        checked = row.checked,
+                        restWidth = if (row.project != null) side + DrawerTunables.projectIconGap else 0.dp,
+                        selectWidth = side + DrawerTunables.projectIconGap,
+                        checkSize = 20.dp,
+                    ) {
+                        if (row.project != null) {
+                            DrawerListProjectTile(
+                                project = row.project,
+                                server = row.server,
+                                muted = row.muted,
+                                side = side,
+                                increasedContrast = row.increasedContrast,
+                                reducedMotion = row.reducedMotion,
+                            )
+                        }
                     }
                     DrawerListTitleView(
                         text = row.session.title,
