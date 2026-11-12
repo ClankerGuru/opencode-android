@@ -129,6 +129,12 @@ private suspend fun requestRootSessions(
         .data.map(::session).filterNot { it.isArchived }
 }
 
+/** Desktop's Archived list: archived root sessions, newest first. */
+internal suspend fun requestArchivedSessions(server: OpenCodeServer, limit: Int): List<OpenCodeSession> {
+    val query = listOf("parentID" to "null", "archived" to "true", "order" to "desc", "limit" to limit.toString())
+    return request<DataPayload<List<SessionPayload>>>("/api/session", query = query, server = server).data.map(::session)
+}
+
 internal suspend fun requestGetSession(server: OpenCodeServer, sessionID: String): OpenCodeSession =
     session(request<DataPayload<SessionPayload>>("/api/session/$sessionID", server = server).data)
 
@@ -167,12 +173,18 @@ internal suspend fun requestMoveSession(server: OpenCodeServer, sessionID: Strin
     )
 }
 
-internal suspend fun requestArchiveSession(server: OpenCodeServer, sessionID: String) {
-    // Archiving an archived session changes nothing, so a repeat is safe.
+internal suspend fun requestArchiveSession(server: OpenCodeServer, sessionID: String) =
+    requestSetArchived(server, sessionID, archived = true)
+
+internal suspend fun requestUnarchiveSession(server: OpenCodeServer, sessionID: String) =
+    requestSetArchived(server, sessionID, archived = false)
+
+private suspend fun requestSetArchived(server: OpenCodeServer, sessionID: String, archived: Boolean) {
+    // Setting it again changes nothing, so a repeat is safe.
     perform(
         "/api/session/$sessionID",
         method = "PATCH",
-        body = encodedBody(ArchiveBody(archived = true)),
+        body = encodedBody(ArchiveBody(archived = archived)),
         timeout = 10.seconds,
         idempotency = RequestIdempotency.Idempotent,
         server = server,

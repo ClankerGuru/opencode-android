@@ -209,6 +209,30 @@ class OpenCodeClientDecodingTests {
         }
     }
 
+    /** The Archived list asks for archived roots; Unarchive patches `archived: false`. */
+    @Test
+    fun archivedSessionsListAndUnarchive() = runTest {
+        val archived = """{"id":"ses_archived","projectID":"p","title":"Old","location":{"directory":"/project"},"time":{"updated":2000,"archived":1500}}"""
+        val fixture = WireFixture { request ->
+            when (request.route) {
+                "GET /api/session" -> Reply.Json(200, "{\"data\":[$archived]}")
+                "PATCH /api/session/ses_archived" -> Reply.status(204)
+                else -> Reply.status(404)
+            }
+        }
+        withFixture(fixture) {
+            val listed = OpenCodeClient.liveValue.archivedSessions(fixture.server, 50)
+            assertEquals(listOf("ses_archived"), listed.map { it.id })
+            val list = fixture.requests[0]
+            assertEquals("true", list.queryValue("archived"))
+            assertEquals("null", list.queryValue("parentID"))
+            assertEquals("50", list.queryValue("limit"))
+
+            OpenCodeClient.liveValue.unarchiveSession(fixture.server, "ses_archived")
+            assertEquals(json("""{"archived":false}"""), fixture.requests[1].json())
+        }
+    }
+
     @Test
     fun homeActivityResolvesOnlyActiveAncestorsIncludingNestedChildren() = runTest {
         val responses = mapOf(

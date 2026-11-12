@@ -45,10 +45,19 @@ private fun HomeFeature.coreRoute(state: State, action: Action): Reduced<State, 
     is Action.CatchUp -> reduceCatchUp(state, action.action)
     // The scoped `TraceUploadsFeature` reduces it (`HomeFeature+Composition`).
     is Action.Traces -> Reduced(state)
-    // The scoped `InboxSidebarFeature` owns Archive; Home stamps a confirmed one.
-    is Action.InboxSidebar -> {
-        val response = action.action as? InboxSidebarFeature.Action.ArchiveResponse
-        if (response != null && response.error == null) archiveConfirmed(state, response.sessionID) else Reduced(state)
+    // The scoped `InboxSidebarFeature` owns Archive and Unarchive; Home stamps a confirmed archive
+    // and restores an unarchived one, refetching the list.
+    is Action.InboxSidebar -> when (val inbox = action.action) {
+        is InboxSidebarFeature.Action.ArchiveResponse ->
+            if (inbox.error == null) archiveConfirmed(state, inbox.sessionID) else Reduced(state)
+        is InboxSidebarFeature.Action.ArchivedRowTapped -> Reduced(state.listingArchivedSession(inbox.sessionID))
+        is InboxSidebarFeature.Action.UnarchiveResponse ->
+            if (inbox.error == null) {
+                refreshSnapshot(state.updatingSession(inbox.sessionID) { it.copy(archivedMilliseconds = null) })
+            } else {
+                Reduced(state)
+            }
+        else -> Reduced(state)
     }
 
     Action.NotificationSettingsRequested,
