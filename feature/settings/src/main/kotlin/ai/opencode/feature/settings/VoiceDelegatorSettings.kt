@@ -143,7 +143,10 @@ internal fun VoiceDelegatorSettingsPage(store: SettingsStore) {
                 )
             }
         }
-        settingsSection(key = "mode") {
+        settingsSection(
+            key = "mode",
+            footer = footerText("Built-in runs on OpenAI, without a session. OpenCode Session works in a session on your server."),
+        ) {
             ModeRow(
                 title = "Built-in",
                 isSelected = !choice.usesOpenCodeSession || !isAvailable,
@@ -156,7 +159,11 @@ internal fun VoiceDelegatorSettingsPage(store: SettingsStore) {
             ) { if (!choice.usesOpenCodeSession) select(VoiceDelegatorChoice.AutomaticSession) }
         }
         if (choice.usesOpenCodeSession && isAvailable) {
-            settingsSection(key = "target", header = "Session Target") {
+            settingsSection(
+                key = "target",
+                header = "Session Target",
+                footer = footerText("Automatic uses a “Voice” session on this server. Viewed Session uses the one on screen."),
+            ) {
                 ModeRow(
                     title = "Automatic",
                     isSelected = choice == VoiceDelegatorChoice.AutomaticSession,
