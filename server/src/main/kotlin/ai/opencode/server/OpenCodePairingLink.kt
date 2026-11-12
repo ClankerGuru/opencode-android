@@ -155,7 +155,7 @@ data class OpenCodePairingLink(
         }
 
         /** `https://opencode.ai/pair#<payload>`: base64url JSON in the fragment. Never log the fragment. */
-        private fun decodePairPage(text: String): Listed? {
+        private fun decodePairPage(text: String): Payload? {
             if (!isPairPage(text)) return null
             val parts = UrlParts.parse(text) ?: return null
             if (parts.user != null || parts.password != null || parts.port != null || parts.rawQuery != null) return null
@@ -209,19 +209,17 @@ data class OpenCodePairingLink(
             return decode(url)?.deepLinkURL
         }
 
+        /** A code and its addresses as listed, before [validatedLink] checks them. */
         @Serializable
         private data class Payload(val code: String, val urls: List<String>)
 
-        /** A code and its addresses as listed, before [validatedLink] checks them. */
-        private data class Listed(val code: String, val urls: List<String>)
-
-        private fun decodePayload(text: String): Listed? {
+        private fun decodePayload(text: String): Payload? {
             val payload = try { WireJson.decodeFromString(Payload.serializer(), text) } catch (_: Exception) { return null }
             if (!isCode(payload.code)) return null
-            return Listed(payload.code, payload.urls)
+            return payload
         }
 
-        private fun decodeDeepLink(text: String): Listed? {
+        private fun decodeDeepLink(text: String): Payload? {
             if (!isPairingScheme(text)) return null
             val link = UrlParts.parse(text) ?: return null
             if (link.user != null || link.password != null || link.port != null || link.rawFragment != null) return null
@@ -262,11 +260,11 @@ data class OpenCodePairingLink(
             if (pathCode != null && queryCode != null && pathCode != queryCode) return null
             val code = queryCode ?: pathCode ?: return null
             if (!isCode(code)) return null
-            return Listed(code, rawURLs)
+            return Payload(code, rawURLs)
         }
 
         /** One malformed address rejects the whole code. */
-        private fun validatedLink(listed: Listed): OpenCodePairingLink? {
+        private fun validatedLink(listed: Payload): OpenCodePairingLink? {
             val code = listed.code
             val addresses = listed.urls.map(::normalizedOrigin)
             if (addresses.isEmpty() || addresses.any { it == null }) return null

@@ -14,6 +14,7 @@ import java.util.UUID
 import kotlin.math.roundToInt
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
@@ -24,11 +25,11 @@ import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 // Which of a server's addresses to use right now. A saved server keeps the address order
 // pairing or the person gave it; the address that answered last lives here, in memory, so a
@@ -425,34 +426,26 @@ class ServerLinkStore(
         /** Failures in a row on an address with a live stream before it's forgotten anyway. */
         const val failuresBeforeForgetting = 2
 
-        /**
-         * A pairing code's own addresses ([OpenCodeServer.preferredCandidateURLs]) get this long to
-         * answer before the server's other addresses are tried too. A reachable server answers in
-         * well under a second, even through a relay; an address that's away costs this much more.
-         */
+        /** How long [OpenCodeServer.firstAttemptURLs] have to answer before the other addresses are tried too. */
         val preferredHeadStart: Duration = 1.5.seconds
 
         /**
-         * [OpenCodeServer.firstAttemptURLs] (the pairing code's own addresses) at once, then, once
-         * they have all failed or had [preferredHeadStart] to answer, every other address too; the first that answers as this
-         * server wins and the rest are cancelled, so no slower attempt keeps a socket open. So an
-         * address the code listed (`opencode pair --url`'s) is used when it answers, even when
-         * another the server reported (its OpenTunnel address) would answer sooner. Without
-         * preferred addresses every address starts at once and saved order doesn't matter: a LAN
-         * address saved first can't hold up a tunnel address that answers sooner. With no winner,
-         * a refused sign-in (401) beats an unreachable address, since retrying can't fix it.
+         * Every address at once, except that those outside [OpenCodeServer.firstAttemptURLs] wait
+         * until those have all failed or had [preferredHeadStart]. The first that answers as this
+         * server wins and the rest are cancelled, so no slower attempt keeps a socket open. With no
+         * winner, a refused sign-in (401) beats an unreachable address, since retrying can't fix it.
          */
         suspend fun race(server: OpenCodeServer, health: suspend (OpenCodeServer) -> Unit): RaceOutcome {
             val candidates = server.candidateURLs
             val first = server.firstAttemptURLs
-            val later = candidates.filter { it !in first }
             val started = Clock.liveValue.now()
             val result: Result<OpenCodeServer> = coroutineScope {
-                // A null outcome: the preferred addresses' head start is over.
-                val outcomes = Channel<Result<OpenCodeServer>?>(Channel.UNLIMITED)
-                fun attempt(url: String) {
+                val outcomes = Channel<Result<OpenCodeServer>>(Channel.UNLIMITED)
+                val firstAllFailed = CompletableDeferred<Unit>()
+                for (url in candidates) {
                     val candidate = server.at(url)
                     launch {
+                        if (url !in first) withTimeoutOrNull(preferredHeadStart) { firstAllFailed.await() }
                         val outcome = try {
                             NetworkRetry.policy.withValue(RetryPolicy.once) { health(candidate) }
                             Result.success(candidate)
@@ -462,41 +455,16 @@ class ServerLinkStore(
                         outcomes.send(outcome)
                     }
                 }
-                for (url in first) attempt(url)
-                var headStart: Job? = null
-                if (later.isNotEmpty()) {
-                    headStart = launch {
-                        delay(preferredHeadStart)
-                        outcomes.send(null)
-                    }
-                }
-                var waiting = first.size
-                var laterStarted = later.isEmpty()
                 val failures = mutableListOf<OpenCodeClientError>()
-                while (waiting > 0 || !laterStarted) {
-                    if (!laterStarted && waiting == 0) {
-                        // Every preferred address failed before its head start was over.
-                        headStart?.cancel()
-                        for (url in later) attempt(url)
-                        waiting += later.size
-                        laterStarted = true
-                        continue
-                    }
+                repeat(candidates.size) {
                     val outcome = outcomes.receive()
-                    if (outcome == null) {
-                        if (!laterStarted) {
-                            for (url in later) attempt(url)
-                            waiting += later.size
-                            laterStarted = true
-                        }
-                        continue
-                    }
-                    waiting -= 1
                     if (outcome.isSuccess) {
                         coroutineContext.cancelChildren()
                         return@coroutineScope outcome
                     }
                     failures += outcome.exceptionOrNull() as OpenCodeClientError
+                    // The other addresses wait, so the first failures are all the first addresses'.
+                    if (failures.size == first.size) firstAllFailed.complete(Unit)
                 }
                 val details = mutableListOf<ConnectionFailureDetail>()
                 for (failure in failures) details += failure.connectionFailures
