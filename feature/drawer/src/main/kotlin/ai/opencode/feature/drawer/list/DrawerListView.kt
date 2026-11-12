@@ -106,6 +106,7 @@ class DrawerListActions(
     val openCatchUp: () -> Unit,
     val openWhatsNew: () -> Unit,
     val hideWhatsNew: () -> Unit,
+    val openArchived: () -> Unit,
 )
 
 @Stable
@@ -523,6 +524,7 @@ fun DrawerListView(
                         hideWhatsNew = { currentActions.hideWhatsNew() },
                         returnFocus = returnFocus.takeIf { item == DrawerListItem.CatchUp },
                     )
+                    DrawerListItem.Archived -> ArchivedEntryRow(current.archivedCount, regularList = true, onClick = { currentActions.openArchived() })
                     DrawerListItem.DeletionError -> DrawerListDeletionErrorRow(current.deletionError.orEmpty())
                     is DrawerListItem.Header -> DrawerListHeaderCell(item.kind, pinDrag)
                     DrawerListItem.Empty -> DrawerListEmptyRow(current.search)
@@ -666,7 +668,7 @@ private fun stabilized(previous: DrawerListModel, next: DrawerListModel): Drawer
 }
 
 private fun contentType(item: DrawerListItem): Int = when (item) {
-    DrawerListItem.CatchUp, DrawerListItem.WhatsNew -> 0
+    DrawerListItem.CatchUp, DrawerListItem.WhatsNew, DrawerListItem.Archived -> 0
     DrawerListItem.DeletionError -> 1
     is DrawerListItem.Header -> 2
     is DrawerListItem.Session -> 3

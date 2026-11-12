@@ -11,6 +11,7 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.InboxSidebarFeature
+import ai.opencode.feature.drawer.inboxSidebarArchivedRows
 import ai.opencode.feature.drawer.isMuted
 import ai.opencode.feature.drawer.isPinned
 import ai.opencode.feature.drawer.isUnread
@@ -118,6 +119,7 @@ internal fun DrawerSelectionBar(
                 style = OpenCodeIconButtonStyle.Standard,
             )
         }
+        if (overflow.isEmpty()) return@Row
         // The menu hangs from ⋮'s right edge, so it stays inside the drawer.
         var buttonWidth by remember { mutableIntStateOf(0) }
         var menuWidth by remember { mutableIntStateOf(0) }
@@ -228,6 +230,34 @@ internal fun selectionActions(
         )
     }
     return main to overflow
+}
+
+/** The Archived page's chosen sessions: Unarchive and Delete. Each action ends the selection. */
+internal fun archivedSelectionActions(
+    store: StoreOf<HomeFeature.State, HomeFeature.Action>,
+    selection: DrawerSelection,
+): List<DrawerRowMenuItem> {
+    val rows = store.state.inboxSidebarArchivedRows().filter { it.id in selection.ids }
+    return listOf(
+        DrawerRowMenuItem("Unarchive", SFSymbol.TrayAndArrowDown) {
+            for (row in rows) {
+                store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.UnarchiveTapped(row.id, row.title)))
+            }
+            selection.clear()
+        },
+        DrawerRowMenuItem("Delete", SFSymbol.Trash) {
+            // Delete reads the sessions Home lists, so the archived ones join it first.
+            for (row in rows) {
+                store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.ArchivedRowTapped(row.id)))
+            }
+            if (rows.size == 1) {
+                store.send(HomeFeature.Action.DeleteSessionTapped(rows[0].id))
+                selection.clear()
+            } else {
+                selection.confirmingDelete = true
+            }
+        },
+    )
 }
 
 /** Deleting several sessions asks once, in the single delete's words (`HomeDeleteConfirmation`). */

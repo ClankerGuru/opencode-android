@@ -26,9 +26,10 @@ import ai.opencode.core.ui.rememberHighContrast
 import ai.opencode.feature.drawer.list.DrawerListActions
 import ai.opencode.feature.drawer.list.DrawerListInputs
 import ai.opencode.feature.drawer.list.DrawerListView
+import ai.opencode.feature.drawer.list.ArchivedPage
 import ai.opencode.feature.drawer.list.DeleteSelectionConfirmation
+import ai.opencode.feature.drawer.list.archivedSelectionActions
 import ai.opencode.feature.drawer.list.DrawerPinDrag
-import ai.opencode.feature.drawer.list.DrawerRowMenuItem
 import ai.opencode.feature.drawer.list.DrawerSelectionBar
 import ai.opencode.feature.drawer.list.InboxSidebarList
 import ai.opencode.feature.drawer.list.rememberInboxSidebarOn
@@ -227,8 +228,28 @@ fun HomeDrawer(
             }
         }
     }
+    // The Archived page: back (system back, or once the selection has ended) returns to the list.
+    BackHandler(enabled = viewState.showsArchived) { viewState.showsArchived = false }
     BackHandler(enabled = selection.isActive) { selection.clear() }
-    LaunchedEffect(isDrawerVisible) { if (!isDrawerVisible) selection.clear() }
+    LaunchedEffect(isDrawerVisible) {
+        if (!isDrawerVisible) {
+            selection.clear()
+            viewState.showsArchived = false
+        }
+    }
+    // Archived's count is fetched each time the drawer shows, so another client's archiving shows too.
+    val serverID by store.observe { it.server.persistenceID }
+    LaunchedEffect(serverID, isDrawerVisible) {
+        if (isDrawerVisible) store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.ArchivedListRequested))
+    }
+    val openArchived: () -> Unit = remember(viewState) {
+        {
+            selection.clear()
+            store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.ArchivedSearchChanged("")))
+            store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.ArchivedListRequested))
+            viewState.showsArchived = true
+        }
+    }
 
     val inputs = DrawerListInputs(
         selectedSessionID = selectedSessionID,
@@ -245,6 +266,7 @@ fun HomeDrawer(
             openCatchUp = viewState::openCatchUp,
             openWhatsNew = viewState::openWhatsNew,
             hideWhatsNew = { store.send(HomeFeature.Action.WhatsNew(WhatsNewFeature.Action.HideTapped)) },
+            openArchived = openArchived,
         )
     }
 
@@ -261,6 +283,8 @@ fun HomeDrawer(
             top = headerHeight.dp + DrawerTunables.topGap,
             bottom = controlsHeight.dp + insetBottom + footerBottom + DrawerTunables.bottomGap,
         )
+        // TalkBack reads only the Archived page while it covers the list and its title band.
+        val beneathArchived = if (viewState.showsArchived) Modifier.clearAndSetSemantics {} else Modifier
         // Inbox Sidebar (experimental, iOS 338d8d92): the sessions as an inbox.
         if (inboxSidebarOn) InboxSidebarList(
             store = store,
@@ -271,8 +295,8 @@ fun HomeDrawer(
             select = select,
             held = selection::toggle,
             openCatchUp = viewState::openCatchUp,
-            menu = { row -> archivedRowMenu(store, row) },
-            modifier = Modifier.fillMaxSize(),
+            openArchived = openArchived,
+            modifier = Modifier.fillMaxSize().then(beneathArchived),
         ) else DrawerListView(
             store = store,
             pinDrag = pinDrag,
@@ -284,7 +308,7 @@ fun HomeDrawer(
             catchUpFocusRequests = viewState.catchUpFocusRequests,
             actions = actions,
             contentPadding = listPadding,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().then(beneathArchived),
             serverSwap = serverSwap,
         )
         // The list as the drawer's pan sees it: between the title band and the controls, which
@@ -307,7 +331,8 @@ fun HomeDrawer(
                 .semantics {
                     isTraversalGroup = true
                     traversalIndex = -1f
-                },
+                }
+                .then(beneathArchived),
         ) {
             // Revealed by the list's scroll, so the list at rest reads clear.
             DrawerHeaderBackdrop(
@@ -343,6 +368,28 @@ fun HomeDrawer(
                 )
             }
         }
+
+        if (viewState.showsArchived) ArchivedPage(
+            store = store,
+            checkedIDs = selection.ids,
+            select = { id ->
+                if (selection.isActive) {
+                    select(id)
+                } else {
+                    store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.ArchivedRowTapped(id)))
+                    viewState.selectSession(id)
+                }
+            },
+            held = selection::toggle,
+            onBack = { viewState.showsArchived = false },
+            contentPadding = PaddingValues(top = insetTop + DrawerHeaderTop, bottom = listPadding.calculateBottomPadding()),
+            modifier = Modifier.swallowingTouches(),
+            header = if (selection.isActive) {
+                { DrawerSelectionBar(count = selection.ids.size, onClose = selection::clear, actions = archivedSelectionActions(store, selection), overflow = emptyList()) }
+            } else {
+                null
+            },
+        )
 
         // New Session and Settings, pinned to the drawer's bottom; they never move with the keyboard.
         Box(
@@ -405,13 +452,6 @@ private fun rememberIsDrawerVisible(store: StoreOf<HomeFeature.State, HomeFeatur
     return viewState.isSceneActive && !catchingUp &&
         (if (showsDrawerLabel) viewState.isSessionDrawerPresented || isDrawerOpen else sidebarShown)
 }
-
-/** An Inbox Sidebar Archived row's hold menu: Unarchive. */
-private fun archivedRowMenu(store: StoreOf<HomeFeature.State, HomeFeature.Action>, row: InboxSidebarRow): List<DrawerRowMenuItem> = listOf(
-    DrawerRowMenuItem("Unarchive", SFSymbol.TrayAndArrowDown) {
-        store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.UnarchiveTapped(row.id, row.title)))
-    },
-)
 
 /**
  * The delete confirmation (iOS `HomeView`'s `confirmationDialog`): “Delete “<title>”?”, This

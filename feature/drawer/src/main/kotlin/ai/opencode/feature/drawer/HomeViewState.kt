@@ -55,6 +55,9 @@ class HomeViewState internal constructor(
     /** The rows chosen by holding one (Android selection mode; iOS holds a row for its menu). */
     val selection = DrawerSelection()
 
+    /** The drawer shows its Archived page over the list (Android; iOS has no Archived page). */
+    var showsArchived: Boolean by mutableStateOf(false)
+
     /** How far the drawer's list has scrolled beneath its title (iOS `headerScroll`). */
     val headerScroll = DrawerHeaderScrollState()
 

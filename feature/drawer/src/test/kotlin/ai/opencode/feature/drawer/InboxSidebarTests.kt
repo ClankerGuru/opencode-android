@@ -273,7 +273,7 @@ class InboxSidebarTests {
     }
 
     @Test
-    fun theArchivedSectionListsTheServersArchivedSessionsAndUnarchiveRestoresOne() = homeTest { h ->
+    fun theArchivedPageListsTheServersArchivedSessionsAndUnarchiveRestoresOne() = homeTest { h ->
         val clock = TestClock()
         val unarchived = LockIsolated<List<String>>(emptyList())
         val old = session("old_archive", updated = 50, archived = 1_789_440_000_000)
@@ -282,7 +282,8 @@ class InboxSidebarTests {
         val store = h.store(h.state { state() }) {
             this[Clock] = clock
             this[OpenCodeClient] = OpenCodeClient.testValue.offline().copy(
-                archivedSessions = { _, limit ->
+                archivedSessions = { _, search, limit ->
+                    assertEquals("", search)
                     assertEquals(50, limit)
                     listOf(old, restored)
                 },
@@ -307,6 +308,37 @@ class InboxSidebarTests {
         assertEquals(listOf("old_archive"), unarchived.value)
         // The snapshot it refetches brings the session back to the list.
         h.skipInFlightEffects()
+    }
+
+    @Test
+    fun searchingArchivedAsksTheServerAndListsItsMatches() = homeTest { h ->
+        val clock = TestClock()
+        val old = session("old_archive", updated = 50, archived = 1_789_440_000_000)
+        val match = session("login_archive", updated = 40, archived = 1_789_440_000_000)
+        val initial = h.state { state() }.let { it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(archived = listOf(old))) }
+        val store = h.store(initial) {
+            this[Clock] = clock
+            this[OpenCodeClient] = OpenCodeClient.testValue.offline().copy(
+                archivedSessions = { _, search, _ ->
+                    assertEquals("login", search)
+                    listOf(match)
+                },
+            )
+        }
+        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchivedSearchChanged("login "))) {
+            it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedSearch = "login "))
+        }
+        clock.advance(HomeFeature.sessionSearchDebounce)
+        store.receiveBounded(
+            { ((it as? Action.InboxSidebar)?.action) is InboxSidebarFeature.Action.ArchivedSearchResponse },
+            "inboxSidebar.archivedSearchResponse",
+        ) { it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedMatches = listOf(match))) }
+        assertEquals(listOf("login_archive"), store.state.inboxSidebarArchivedRows().map { it.id })
+
+        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchivedSearchChanged(""))) {
+            it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedSearch = "", archivedMatches = null))
+        }
+        assertEquals(listOf("old_archive"), store.state.inboxSidebarArchivedRows().map { it.id })
     }
 
     @Test

@@ -583,6 +583,10 @@ fun HomeFeature.State.purgingSession(sessionID: String): HomeFeature.State {
                 .pruneRequests { it.sessionID == sessionID }
         },
         sessionSnapshotOrder = sessionSnapshotOrder - sessionID,
+        inboxSidebarStatus = inboxSidebarStatus.copy(
+            archived = inboxSidebarStatus.archived.filterNot { it.id == sessionID },
+            archivedMatches = inboxSidebarStatus.archivedMatches?.filterNot { it.id == sessionID },
+        ),
     )
     val serverID = server.persistenceID
     ServerSharedKeys.cachedTranscriptSnapshots().update { it.removeEntry(serverID, sessionID) }
