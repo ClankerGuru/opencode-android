@@ -439,12 +439,9 @@ internal val WindowInsets.Companion.bottomSafeArea: WindowInsets
     @Composable get() = navigationBars.union(WindowInsets(bottom = 8.dp))
 
 /**
- * The soft bottom edge behind the floating composer (iOS's soft scroll edge under its bottom
- * bar): rows stay fully visible down to the composer surface's top edge, then fade into the
- * canvas over its corner radius, so nothing shows around its rounded corners, beside it or
- * under the navigation bar. The pills, the jump button and a resting orb above the surface keep
- * unfaded rows behind them. A plain canvas gradient that takes no touches and is hidden from
- * TalkBack; the surface's top is read in the draw phase.
+ * iOS's soft scroll edge under the composer: rows fade into the canvas over the corner radius
+ * below the composer surface's top, so nothing shows around its corners, beside it or under the
+ * navigation bar.
  */
 @Composable
 private fun SessionBottomScrollEdge(surfaceTopInWindow: () -> Float, modifier: Modifier) {
