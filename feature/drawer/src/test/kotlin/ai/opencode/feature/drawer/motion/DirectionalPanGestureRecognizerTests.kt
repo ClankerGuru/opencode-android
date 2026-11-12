@@ -83,32 +83,8 @@ class DirectionalPanGestureRecognizerTests {
             Row(DirectionalPan.TouchOrigin.Content(horizontalScrollerOwnsRightwardDrag = false), false, 3f, 2f, DirectionalPan.Decision.Wait),
         )
         for (row in rows) {
-            assertEquals(row.toString(), row.expected, decide(row.origin, row.presented, row.dx, row.dy, BackSwipeRules.decisionDistance.value, false))
+            assertEquals(row.toString(), row.expected, decide(row.origin, row.presented, row.dx, row.dy, BackSwipeRules.decisionDistance.value))
         }
-    }
-
-    /**
-     * Inbox Sidebar rows have swipe actions: either way, the drag is theirs,
-     * while the list's gaps, the chrome and the card still close the drawer.
-     */
-    @Test
-    fun inboxSidebarRowsKeepTheirSwipes() {
-        val distance = BackSwipeRules.decisionDistance.value
-        val decide = { origin: DirectionalPan.TouchOrigin, dx: Float ->
-            DirectionalPan.decision(origin, presented = true, dx = dx, dy = 1f, decisionDistance = distance, rowsOwnSwipes = true)
-        }
-        assertEquals(DirectionalPan.Decision.Fail, decide(DirectionalPan.TouchOrigin.DrawerRow, -20f))
-        assertEquals(DirectionalPan.Decision.Fail, decide(DirectionalPan.TouchOrigin.DrawerRow, 20f))
-        assertEquals(DirectionalPan.Decision.Begin, decide(DirectionalPan.TouchOrigin.DrawerList, -20f))
-        assertEquals(DirectionalPan.Decision.Begin, decide(DirectionalPan.TouchOrigin.DrawerChrome, -20f))
-        assertEquals(DirectionalPan.Decision.Begin, decide(DirectionalPan.TouchOrigin.ExposedCard, -20f))
-        assertEquals(
-            DirectionalPan.Decision.Begin,
-            DirectionalPan.decision(
-                DirectionalPan.TouchOrigin.Content(horizontalScrollerOwnsRightwardDrag = false),
-                presented = false, dx = 20f, dy = 1f, decisionDistance = distance, rowsOwnSwipes = true,
-            ),
-        )
     }
 }
 

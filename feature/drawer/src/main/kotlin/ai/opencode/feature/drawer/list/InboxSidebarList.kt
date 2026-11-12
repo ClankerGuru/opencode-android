@@ -2,6 +2,8 @@ package ai.opencode.feature.drawer.list
 
 import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.experiments.key
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
@@ -15,10 +17,9 @@ import ai.opencode.feature.drawer.InboxSidebarFeature
 import ai.opencode.feature.drawer.InboxSidebarRow
 import ai.opencode.feature.drawer.catchUpSessions
 import ai.opencode.feature.drawer.inboxSidebarRows
-import ai.opencode.feature.drawer.motion.DrawerPanRegions
-import ai.opencode.feature.drawer.motion.drawerPanRow
 import ai.opencode.feature.drawer.style.DrawerHeaderScrollState
 import ai.opencode.feature.drawer.style.DrawerTunables
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,34 +39,39 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.time.Instant
 import kotlin.math.max
 import kotlin.math.min
@@ -73,20 +79,20 @@ import kotlin.math.roundToInt
 
 /**
  * iOS `InboxSidebarList.swift` (Inbox Sidebar, experimental): the drawer's sessions as an inbox,
- * one item per session. Tapping opens the session; swiping toward the trailing side marks it
- * read (unread rows only), toward the leading side archives it. iOS's `List` swipe actions →
- * M3 `SwipeToDismissBox`, released past its threshold; the row's drag is its own, not the
- * drawer's (`drawerPanRow`, iOS `DirectionalPanGestureRecognizer.rowsOwnSwipes`).
+ * one item per session. Tapping opens the session; holding it opens its [menu].
+ *
+ * Android: iOS swipes these rows (Mark as Read, Archive); here a sideways swipe stays the
+ * drawer's, as in any navigation drawer, and the actions are in the hold menu.
  */
 @Composable
 internal fun InboxSidebarList(
     store: StoreOf<HomeFeature.State, HomeFeature.Action>,
     selectedSessionID: String?,
     headerScroll: DrawerHeaderScrollState,
-    panRegions: DrawerPanRegions,
     contentPadding: PaddingValues,
     select: (String) -> Unit,
     openCatchUp: () -> Unit,
+    menu: (InboxSidebarRow) -> List<DrawerRowMenuItem>,
     modifier: Modifier = Modifier,
 ) {
     val rows by store.observe { it.inboxSidebarRows() }
@@ -164,16 +170,12 @@ internal fun InboxSidebarList(
                 }
             }
             items(rows, key = { it.id }) { row ->
-                InboxSidebarSwipeRow(
+                InboxSidebarMenuRow(
                     row = row,
                     now = now,
                     selected = row.id == selectedSessionID,
-                    panRegions = panRegions,
-                    onSelect = { select(row.id) },
-                    onMarkRead = { store.send(HomeFeature.Action.MarkRead(row.id)) },
-                    onArchive = {
-                        store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveSwiped(sessionID = row.id, title = row.title)))
-                    },
+                    select = { select(row.id) },
+                    menu = { menu(row) },
                 )
             }
         }
@@ -190,65 +192,67 @@ internal fun InboxSidebarList(
     }
 }
 
+/**
+ * One session: a tap opens it, a hold raises it under its menu, as on the regular drawer's rows
+ * ([drawerRowInteraction]). A sideways swipe is left to the drawer, so a left swipe closes it.
+ */
 @Composable
-private fun InboxSidebarSwipeRow(
+private fun InboxSidebarMenuRow(
     row: InboxSidebarRow,
     now: Instant,
     selected: Boolean,
-    panRegions: DrawerPanRegions,
-    onSelect: () -> Unit,
-    onMarkRead: () -> Unit,
-    onArchive: () -> Unit,
+    select: () -> Unit,
+    menu: () -> List<DrawerRowMenuItem>,
 ) {
-    val scope = rememberCoroutineScope()
-    val swipe = rememberSwipeToDismissBoxState()
     val colors = OpenCodeTheme.colors
-    SwipeToDismissBox(
-        state = swipe,
-        modifier = Modifier.drawerPanRow(panRegions).testTag("inbox-row-${row.id}"),
-        enableDismissFromStartToEnd = row.unread,
-        backgroundContent = {
-            val toArchive = swipe.dismissDirection == SwipeToDismissBoxValue.EndToStart
-            Row(
-                Modifier
-                    .fillMaxSize()
-                    .background(if (toArchive) InboxSidebarMetrics.archiveTint else InboxSidebarMetrics.markReadTint)
-                    .padding(horizontal = 20.dp),
-                horizontalArrangement = if (toArchive) Arrangement.End else Arrangement.Start,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                OpenCodeIcon(if (toArchive) SFSymbol.Archivebox else SFSymbol.EnvelopeOpen, null, size = 20.dp, tint = Color.White)
-                Spacer(Modifier.width(6.dp))
-                Text(if (toArchive) "Archive" else "Mark as Read", color = Color.White, style = OpenCodeTextStyles.subheadline)
+    val hold = remember(row.id) { DrawerRowHoldState() }
+    val rowCoordinates = remember(row.id) { arrayOfNulls<LayoutCoordinates>(1) }
+    val currentSelect by rememberUpdatedState(select)
+    val currentMenu by rememberUpdatedState(menu)
+    val raisedSurface = if (colors.isDark) MaterialTheme.colorScheme.surfaceContainerHigh else colors.canvas
+    val surface = remember { Animatable(0f) }
+    LaunchedEffect(hold.isHeld) {
+        if (hold.isHeld) surface.snapTo(1f) else surface.animateTo(0f, MotionRole.Swap.animation(MotionPhase.Exit))
+    }
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                shadowElevation = 8.dp.toPx() * surface.value
+                clip = false
             }
-        },
-        onDismiss = { value ->
-            when (value) {
-                SwipeToDismissBoxValue.StartToEnd -> {
-                    onMarkRead()
-                    scope.launch { swipe.reset() }
-                }
-                // Settle before archiving. The row leaves at once, which cancels an animated
-                // reset, and the swipe state is saveable per row key: if the archive fails the row
-                // returns still dismissed, and SwipeToDismissBox calls onDismiss again for it, so
-                // a failing archive retried forever, buzzing an error haptic each time.
-                SwipeToDismissBoxValue.EndToStart -> scope.launch {
-                    swipe.snapTo(SwipeToDismissBoxValue.Settled)
-                    onArchive()
-                }
-                SwipeToDismissBoxValue.Settled -> Unit
+            .onGloballyPositioned { rowCoordinates[0] = it }
+            .drawBehind {
+                if (surface.value > 0f) drawRect(raisedSurface.copy(alpha = raisedSurface.alpha * surface.value.coerceIn(0f, 1f)))
             }
-        },
+            .background(if (selected) colors.text.copy(alpha = 0.08f) else Color.Transparent)
+            .drawerRowInteraction(
+                interaction = DrawerRowInteraction(
+                    sessionID = row.id,
+                    reorderable = false,
+                    select = { currentSelect() },
+                    pressed = {},
+                    menu = { currentMenu() },
+                ),
+                hold = hold,
+                list = { null },
+                row = { rowCoordinates[0] },
+            )
+            .semantics(mergeDescendants = true) {
+                testTag = "inbox-row-${row.id}"
+                role = Role.Button
+                onClick { currentSelect(); true }
+                // TalkBack can't hold a row, so its menu items are the row's actions too.
+                val actions = mutableListOf<CustomAccessibilityAction>()
+                for (item in menu()) {
+                    actions.add(CustomAccessibilityAction(item.title) { item.action(); true })
+                }
+                customActions = actions
+            },
     ) {
-        Box(
-            Modifier
-                .background(colors.canvas)
-                .background(if (selected) colors.text.copy(alpha = 0.08f) else Color.Transparent)
-                .clickable(role = Role.Button, onClick = onSelect)
-                .openCodeTapTarget(),
-        ) {
-            InboxSidebarRowView(row, now)
-        }
+        InboxSidebarRowView(row, now)
+        // Anchored on the row so the menu opens beside the held row.
+        DrawerRowMenu(hold) { currentMenu() }
     }
 }
 
@@ -326,10 +330,6 @@ internal fun rememberInboxSidebarOn(): Boolean {
 
 private object InboxSidebarMetrics {
     val edge = 20.dp
-    /** iOS `.tint(.blue)` on Mark as Read. */
-    val markReadTint = Color(0xFF0A84FF)
-    /** iOS `.tint(.indigo)` on Archive. */
-    val archiveTint = Color(0xFF5E5CE6)
     /** iOS `.orange` beside Needs your input. */
     val needsInputTint = Color(0xFFFF9F0A)
 }

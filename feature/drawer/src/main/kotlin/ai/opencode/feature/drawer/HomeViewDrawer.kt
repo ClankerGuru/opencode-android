@@ -245,10 +245,10 @@ fun HomeDrawer(
             store = store,
             selectedSessionID = selectedSessionID,
             headerScroll = viewState.headerScroll,
-            panRegions = viewState.panRegions,
             contentPadding = listPadding,
             select = viewState::selectSession,
             openCatchUp = viewState::openCatchUp,
+            menu = { row -> inboxRowMenu(store, row) },
             modifier = Modifier.fillMaxSize(),
         ) else DrawerListView(
             store = store,
@@ -388,18 +388,7 @@ private fun rowMenu(store: StoreOf<HomeFeature.State, HomeFeature.Action>, row: 
     val unread = state.isUnread(session)
     val muted = state.isMuted(session.id)
     val isPinned = row.isPinnedSection
-    val windows = dependency(WindowsClient)
-    // Multiple Windows (tablet): the session in a window of its own.
-    val newWindow = if (windows.isAvailable()) {
-        listOf(
-            DrawerRowMenuItem("Open in New Window", SFSymbol.MacwindowBadgePlus) {
-                windows.open(SessionWindowTarget(serverID = state.server.persistenceID, sessionID = session.id))
-            },
-        )
-    } else {
-        emptyList()
-    }
-    return newWindow + listOf(
+    return newWindowMenu(state, session.id) + listOf(
         DrawerRowMenuItem(if (isPinned) "Unpin" else "Pin", if (isPinned) SFSymbol.PinSlash else SFSymbol.Pin) {
             store.send(HomeFeature.Action.TogglePin(session.id))
         },
@@ -416,6 +405,42 @@ private fun rowMenu(store: StoreOf<HomeFeature.State, HomeFeature.Action>, row: 
             store.send(HomeFeature.Action.DeleteSessionTapped(session.id))
         },
     )
+}
+
+/** Multiple Windows (tablet): the session in a window of its own. */
+private fun newWindowMenu(state: HomeFeature.State, sessionID: String): List<DrawerRowMenuItem> {
+    val windows = dependency(WindowsClient)
+    if (!windows.isAvailable()) return emptyList()
+    return listOf(
+        DrawerRowMenuItem("Open in New Window", SFSymbol.MacwindowBadgePlus) {
+            windows.open(SessionWindowTarget(serverID = state.server.persistenceID, sessionID = sessionID))
+        },
+    )
+}
+
+/**
+ * An Inbox Sidebar row's hold menu (Android: iOS swipes these rows): [rowMenu]'s items that fit an
+ * inbox, Mark as Read only while unread, and Archive before Delete.
+ */
+private fun inboxRowMenu(store: StoreOf<HomeFeature.State, HomeFeature.Action>, row: InboxSidebarRow): List<DrawerRowMenuItem> {
+    val state = store.state
+    val muted = state.isMuted(row.id)
+    val items = newWindowMenu(state, row.id).toMutableList()
+    if (row.unread) {
+        items.add(DrawerRowMenuItem("Mark as Read", SFSymbol.EnvelopeOpen) { store.send(HomeFeature.Action.MarkRead(row.id)) })
+    }
+    items.add(
+        DrawerRowMenuItem(if (muted) "Unmute" else "Mute", if (muted) SFSymbol.Bell else SFSymbol.BellSlash) {
+            store.send(HomeFeature.Action.ToggleMute(row.id))
+        },
+    )
+    items.add(
+        DrawerRowMenuItem("Archive", SFSymbol.Archivebox) {
+            store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveTapped(row.id, row.title)))
+        },
+    )
+    items.add(DrawerRowMenuItem("Delete", SFSymbol.Trash, destructive = true) { store.send(HomeFeature.Action.DeleteSessionTapped(row.id)) })
+    return items
 }
 
 /**
