@@ -12,6 +12,7 @@ import ai.opencode.core.store.cancellable
 import ai.opencode.core.ui.ThisDevice
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.notices.AccessibilityAnnouncer
+import ai.opencode.server.LocalNetworkPermission
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodePairingLink
@@ -67,7 +68,12 @@ internal fun landPairing(arrival: PairingArrival?, server: OpenCodeServer, asked
 /** A pasted or scanned code, as a target to redeem, or as the reason it isn't one. */
 internal fun validatePairing(text: String): Result<OpenCodePairingLink> {
     val link = OpenCodePairingLink.decodeCopied(text)
-        ?: return Result.failure(OpenCodeClientError(invalidPairingCodeMessage))
+    if (link == null) {
+        // A code with one address the app can't use names it, rather than "isn't a pairing code".
+        val unusable = OpenCodePairingLink.unusableAddress(text)
+            ?: return Result.failure(OpenCodeClientError(invalidPairingCodeMessage))
+        return Result.failure(OpenCodeClientError(unusableAddressMessage(unusable)))
+    }
     // `opencode pair` reports whatever the service is bound to. If that's only loopback, no
     // amount of retrying will help — say so precisely.
     if (link.isLoopback) return Result.failure(OpenCodeClientError(loopbackPairingMessage))
@@ -141,9 +147,11 @@ internal fun redeem(link: OpenCodePairingLink, state: AppFeature.State): Reduced
         connectionAttempt = attempt,
     )
     val client = dependency(OpenCodeClient)
+    val localNetwork = dependency(LocalNetworkPermission)
     return Reduced(
         next,
         Effect.run<AppFeature.Action> { send ->
+            if (localNetwork.blocks(normalized.server)) localNetwork.request()
             val result = try {
                 Result.success(client.redeemPairing(normalized))
             } catch (error: OpenCodeClientError) {
@@ -156,6 +164,9 @@ internal fun redeem(link: OpenCodePairingLink, state: AppFeature.State): Reduced
 
 internal const val invalidPairingCodeMessage =
     "That isn’t an OpenCode pairing code. Run opencode pair --remote on your computer, then scan its QR code or paste the link it prints."
+
+internal fun unusableAddressMessage(unusable: OpenCodePairingLink.UnusableAddress): String =
+    "Couldn’t use “${unusable.address}” from this pairing code: it ${unusable.reason}."
 
 internal val loopbackPairingMessage: String
     get() = "That server only listens on localhost, so this ${ThisDevice.casualName} can’t reach it. Run opencode pair --remote on your computer instead, which works from any network."

@@ -1,6 +1,5 @@
 package ai.opencode.feature.composer.plusmenu
 
-import ai.opencode.core.ui.OpenCodeSheetDefaults
 import ai.opencode.core.ui.OpenCodeSheetHandleDefaults
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.dependency
@@ -613,7 +612,7 @@ fun PlusPhotoSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         dragHandle = { PlusPhotoSheetGrabber(isExpanded = isExpanded, onToggle = ::toggleExpand) },
-        shape = OpenCodeSheetDefaults.shape,
+        shape = OpenCodeShape.sheetTop,
     ) {
         PhotoLibraryAccessHost()
         var hiddenBottom by remember { mutableFloatStateOf(0f) }

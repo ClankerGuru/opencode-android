@@ -12,7 +12,7 @@ internal val WhatsNewShipped.stopRunsYourSteer: WhatsNewEntry
         title = "Steer While It Works",
         symbol = "arrow.turn.up.right",
         tint = Tint.indigo,
-        summary = "Send while the agent works and it reads your message at its next step, moving long commands and subagents to the background first.",
+        summary = "Send while the agent works and it reads your message at its next step, moving long commands to the background first.",
         details = listOf(
             "Touch and hold Send to choose Steer or Queue for one message.",
             "Hold a waiting message to move it to the queue or delete it.",

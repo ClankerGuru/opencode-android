@@ -17,6 +17,8 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.OpenCodeTopBar
 import ai.opencode.core.ui.OpenCodeTopBarBackButton
+import ai.opencode.core.ui.rememberOpenCodeLargeTopBarScrollBehavior
+import ai.opencode.core.ui.rememberOverscrollIfContentScrolls
 import ai.opencode.core.ui.ThemeSharedKeys
 import ai.opencode.core.ui.AccessibilityFocusRequest
 import ai.opencode.core.ui.accessibilityFocusRequest
@@ -209,7 +211,7 @@ fun SettingsPageScaffold(
     val scrollBehavior = if (drawsOwnTitle) {
         TopAppBarDefaults.pinnedScrollBehavior()
     } else {
-        TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+        rememberOpenCodeLargeTopBarScrollBehavior(listState)
     }
     val back: @Composable () -> Unit = {
         OpenCodeTopBarBackButton(onClick = { store.send(SettingsFeature.Action.BackTapped) })
@@ -260,6 +262,7 @@ fun SettingsPageScaffold(
                 state = listState,
                 contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp),
                 modifier = Modifier.fillMaxSize(),
+                overscrollEffect = rememberOverscrollIfContentScrolls(listState),
                 content = content,
             )
         }
@@ -280,7 +283,6 @@ private fun SettingsRootPage(store: SettingsStore) {
         store.send(SettingsFeature.Action.PagePushed(page))
     }
 
-    // The main page keeps its icons, as the desktop's settings sidebar does.
     CompositionLocalProvider(LocalSettingsRowIcons provides true) {
         SettingsPageScaffold(title = "Settings", store = store) {
             item(key = "connection", contentType = "connection") {

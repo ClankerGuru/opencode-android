@@ -3,7 +3,6 @@ package ai.opencode.feature.composer
 import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.ui.openCodeHairline
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.foundation.BorderStroke
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.server.model.OpenCodePermissionRequest
@@ -134,7 +133,7 @@ internal fun RequestPermissionButton(
         FilledTonalButton(
             onClick, sized, enabled, shape = shape,
             colors = ButtonDefaults.filledTonalButtonColors(containerColor = OpenCodeSurfaces.neutralFill, contentColor = OpenCodeTheme.colors.text),
-            border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
+            border = OpenCodeSurfaces.border,
             contentPadding = padding, content = content,
         )
     }

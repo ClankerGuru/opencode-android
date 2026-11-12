@@ -46,6 +46,7 @@ import ai.opencode.feature.voice.VoiceCallLogClient
 import ai.opencode.feature.voice.VoiceCallServiceClient
 import ai.opencode.server.CachedHomeSnapshot
 import ai.opencode.server.ConnectionFailureDetail
+import ai.opencode.server.LocalNetworkPermission
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.ServerLinkClient
 import ai.opencode.server.OpenCodeClientError
@@ -114,6 +115,8 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         val editingSavedServer: OpenCodeServer? = null,
         /** Addresses discovered from a pairing code, tried alongside `serverURL`. */
         val alternateURLs: List<String> = emptyList(),
+        /** The pairing code's own addresses, preferred over the others (`OpenCodeServer.preferredURLs`). */
+        val preferredURLs: List<String> = emptyList(),
         val isScanningPairingCode: Boolean = false,
         val pendingPairing: PendingPairing? = null,
         val ignoredPendingPairingCount: Int = 0,
@@ -134,6 +137,8 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                 val message: String,
                 val phase: FailureContext.Phase = FailureContext.Phase.Connect,
                 val context: FailureContext? = null,
+                /** Android 17's local network access is off for this server; Settings can turn it on. */
+                val localNetworkDenied: Boolean = false,
             ) : Connection
             /** Left the session list on purpose to pick a server; must not auto-reconnect. */
             data object Picking : Connection
@@ -176,6 +181,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                         val headerName = header.name.trim()
                         if (headerName.isEmpty()) null else OpenCodeServer.Header(headerName, header.value.trim())
                     },
+                    preferredURLs = preferredURLs,
                 )
             }
 
@@ -194,7 +200,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                 if (address.isEmpty()) return "Optional"
                 var target = server.copy(name = null, url = address)
                 val original = editingSavedServer
-                if (original != null && address != original.url) target = target.copy(alternateURLs = emptyList())
+                if (original != null && address != original.url) target = target.copy(alternateURLs = emptyList(), preferredURLs = emptyList())
                 return target.friendlyName
             }
 
@@ -236,6 +242,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         val errorMessage: String? get() = (connection as? Connection.Failed)?.message
         val errorContext: FailureContext? get() = (connection as? Connection.Failed)?.context
         val errorPhase: FailureContext.Phase? get() = (connection as? Connection.Failed)?.let { it.context?.phase ?: it.phase }
+        val errorNeedsLocalNetwork: Boolean get() = (connection as? Connection.Failed)?.localNetworkDenied == true
 
         /** Fills the connection form with a complete target. */
         fun load(server: OpenCodeServer): State = copy(
@@ -243,6 +250,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
             username = server.username,
             password = server.password,
             alternateURLs = server.alternateURLs,
+            preferredURLs = server.preferredURLs,
             serverName = server.name ?: "",
             headers = server.headers,
         )
@@ -475,6 +483,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         data class PairingRedeemed(val attemptID: Int, val result: Result<OpenCodeServer>) : Action
         data class HealthResponse(val attemptID: Int, val result: Result<OpenCodeServer>) : Action
         data class CopyTextTapped(val text: String) : Action
+        data object LocalNetworkSettingsTapped : Action
         data class Home(val action: HomeFeature.Action) : Action
         data class Welcome(val action: WelcomeFeature.Action) : Action
         data class ClientTools(val action: ClientToolsFeature.Action) : Action
@@ -651,6 +660,10 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         }
         Action.PairingErrorDismissed -> Reduced(state.copy(pairingError = null))
         is Action.PairingRedeemed -> pairingRedeemed(state, action)
+        Action.LocalNetworkSettingsTapped -> {
+            val localNetwork = dependency(LocalNetworkPermission)
+            Reduced(state, Effect.run { localNetwork.openSettings() })
+        }
         is Action.CopyTextTapped -> {
             if (action.text.isEmpty()) Reduced(state)
             else {
@@ -693,7 +706,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         val original = next.editingSavedServer
         // A changed address replaces the old one; stale pairing alternates must not silently
         // reconnect to the address the user just edited.
-        if (original != null && next.serverURL != original.url) next = next.copy(alternateURLs = emptyList())
+        if (original != null && next.serverURL != original.url) next = next.copy(alternateURLs = emptyList(), preferredURLs = emptyList())
         next = next.copy(manualEntryDraft = next.server)
         // A server added from the drawer is switched to like a saved one; an edit of the server
         // in use reconnects it, which ends its Home first.
@@ -917,10 +930,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
             return Reduced(
                 state.copy(
                     connectionAttempt = null,
-                    connection = State.Connection.Failed(
-                        message = clientError.message,
-                        context = FailureContext.of(attempt.server, FailureContext.Phase.Pair, action.attemptID, clientError.connectionFailures),
-                    ),
+                    connection = failed(clientError, attempt.server, FailureContext.of(attempt.server, FailureContext.Phase.Pair, action.attemptID, clientError.connectionFailures)),
                 ),
             )
         }
@@ -941,10 +951,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
             return Reduced(
                 state.copy(
                     connectionAttempt = null,
-                    connection = State.Connection.Failed(
-                        message = clientError.message,
-                        context = FailureContext.of(attempt.server, FailureContext.Phase.Connect, action.attemptID, clientError.connectionFailures),
-                    ),
+                    connection = failed(clientError, attempt.server, FailureContext.of(attempt.server, FailureContext.Phase.Connect, action.attemptID, clientError.connectionFailures)),
                 ).withoutHome(),
             )
         }
@@ -1075,7 +1082,10 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         next = next.copy(connection = State.Connection.Connecting, connectionGeneration = generation, connectionAttempt = attempt)
         if (!keepingHome) next = next.withoutHome()
         val link = dependency(ServerLinkClient)
+        val localNetwork = dependency(LocalNetworkPermission)
         val health = Effect.run<Action> { send ->
+            // Android 17 asks on the first local network connection, as iOS does.
+            if (localNetwork.blocks(attempt.server)) localNetwork.request()
             val result = try {
                 Result.success(link.probe(attempt.server))
             } catch (error: OpenCodeClientError) {
@@ -1091,6 +1101,12 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                 health.cancellable(CancelID.Health, cancelInFlight = true),
             ),
         )
+    }
+
+    /** A failure while local network access is off says so, instead of the bare timeout. */
+    private fun failed(error: OpenCodeClientError, server: OpenCodeServer, context: FailureContext): State.Connection.Failed {
+        if (!dependency(LocalNetworkPermission).blocks(server)) return State.Connection.Failed(message = error.message, context = context)
+        return State.Connection.Failed(message = LocalNetworkPermission.DENIED_MESSAGE, context = context, localNetworkDenied = true)
     }
 
     companion object {

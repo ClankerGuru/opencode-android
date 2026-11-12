@@ -35,6 +35,13 @@ data class OpenCodeServer(
     val name: String? = null,
     /** Sent with every request to this server (a proxy such as Cloudflare Access may need them). */
     val headers: List<Header> = emptyList(),
+    /**
+     * The addresses the pairing code itself listed (`opencode pair --url`'s address, say), as
+     * opposed to those the server reported once paired. When one of them answers it's used, even
+     * if another answers sooner ([ServerLinkStore.race]). Empty for a server typed in or saved
+     * before this was kept: every address is equal, as before.
+     */
+    val preferredURLs: List<String> = emptyList(),
 ) {
     @Serializable
     data class Header(val name: String, val value: String) {
@@ -71,6 +78,28 @@ data class OpenCodeServer(
         if (preferred == null || preferred.persistenceID != persistenceID) return this
         return copy(url = preferred.url, alternateURLs = preferred.alternateURLs)
     }
+
+    /**
+     * The addresses an address race tries at once; the rest wait ([ServerLinkStore.race]). A
+     * pairing code's own addresses when any is still saved, plus the server's direct ones when the
+     * code named only relayed ones (the desktop's and `opencode pair --remote`'s tunnel): a LAN or
+     * tailnet address that answers is the same server, faster. Otherwise every address.
+     */
+    val firstAttemptURLs: List<String>
+        get() {
+            val preferred = candidateURLs.filter { it in preferredURLs }
+            if (preferred.isEmpty()) return candidateURLs
+            val preferredIsDirect = preferred.any { ConnectionRoute.of(it).isDirect }
+            val first = mutableListOf<String>()
+            for (candidate in candidateURLs) {
+                if (candidate in preferred) {
+                    first += candidate
+                } else if (!preferredIsDirect && ConnectionRoute.of(candidate).isDirect) {
+                    first += candidate
+                }
+            }
+            return first
+        }
 
     fun at(url: String): OpenCodeServer = copy(url = url, alternateURLs = candidateURLs.filter { it != url })
 
@@ -285,6 +314,9 @@ enum class ConnectionRoute(val rawValue: String) {
     LocalNetwork("Local Network"),
     Loopback("Loopback"),
     Internet("Internet");
+
+    /** Straight to the computer (a LAN or tailnet address), not through a relay or the internet. */
+    val isDirect: Boolean get() = this == Tailscale || this == LocalNetwork
 
     companion object {
         fun of(url: String): ConnectionRoute = HostAddress.ofUrl(url)?.route ?: Internet

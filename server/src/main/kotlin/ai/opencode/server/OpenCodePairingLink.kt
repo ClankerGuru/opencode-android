@@ -80,12 +80,45 @@ data class OpenCodePairingLink(
     /** No candidate is reachable from another device. */
     val isLoopback: Boolean get() = candidateOrigins.all(OpenCodeServer::isLoopback)
 
+    /** An address in a pairing code the app can't use, and why ([reason] finishes “it …”). */
+    data class UnusableAddress(val address: String, val reason: String)
+
     companion object {
         fun decode(text: String): OpenCodePairingLink? {
             val trimmed = text.trimmedWhitespace()
-            if (trimmed.startsWith("{")) return decodePayload(trimmed)
-            return decodeDeepLink(trimmed) ?: decodePairPage(trimmed) ?: decodeLink(trimmed)
+            if (trimmed.startsWith("{")) return decodePayload(trimmed)?.let(::validatedLink)
+            return decodeDeepLink(trimmed)?.let(::validatedLink)
+                ?: decodePairPage(trimmed)?.let(::validatedLink)
+                ?: decodeLink(trimmed)
         }
+
+        /**
+         * The first address that keeps [text], an otherwise well-formed pairing code, from
+         * decoding; null when it isn't one or every address is fine. For the error only: one
+         * unusable address still rejects the whole code.
+         */
+        fun unusableAddress(text: String): UnusableAddress? {
+            val trimmed = text.trimmedWhitespace()
+            val raw = if (trimmed.startsWith("{")) decodePayload(trimmed) else decodeDeepLink(trimmed) ?: decodePairPage(trimmed)
+            if (raw == null) return null
+            for (address in raw.urls) {
+                val reason = originProblem(address) ?: continue
+                return UnusableAddress(shownAddress(address), reason)
+            }
+            return null
+        }
+
+        /** [address] as an error may show it: no user name, password, query or fragment, at most 80 characters. */
+        private fun shownAddress(address: String): String {
+            var shown = address.trimmedWhitespace()
+            val end = shown.indexOfFirst { it == '?' || it == '#' }
+            if (end >= 0) shown = shown.substring(0, end)
+            shown = shown.replace(userInfo, "://")
+            if (shown.length > 80) shown = shown.take(79) + "…"
+            return shown
+        }
+
+        private val userInfo = Regex("""://[^/]*@""")
 
         /**
          * [decode], or else the pairing link in text as people copy it (QA FB-02): wrapped across
@@ -122,7 +155,7 @@ data class OpenCodePairingLink(
         }
 
         /** `https://opencode.ai/pair#<payload>`: base64url JSON in the fragment. Never log the fragment. */
-        private fun decodePairPage(text: String): OpenCodePairingLink? {
+        private fun decodePairPage(text: String): Payload? {
             if (!isPairPage(text)) return null
             val parts = UrlParts.parse(text) ?: return null
             if (parts.user != null || parts.password != null || parts.port != null || parts.rawQuery != null) return null
@@ -176,17 +209,17 @@ data class OpenCodePairingLink(
             return decode(url)?.deepLinkURL
         }
 
+        /** A code and its addresses as listed, before [validatedLink] checks them. */
         @Serializable
         private data class Payload(val code: String, val urls: List<String>)
 
-        /** One malformed address rejects the whole code. */
-        private fun decodePayload(text: String): OpenCodePairingLink? {
+        private fun decodePayload(text: String): Payload? {
             val payload = try { WireJson.decodeFromString(Payload.serializer(), text) } catch (_: Exception) { return null }
             if (!isCode(payload.code)) return null
-            return validatedLink(payload.code, payload.urls)
+            return payload
         }
 
-        private fun decodeDeepLink(text: String): OpenCodePairingLink? {
+        private fun decodeDeepLink(text: String): Payload? {
             if (!isPairingScheme(text)) return null
             val link = UrlParts.parse(text) ?: return null
             if (link.user != null || link.password != null || link.port != null || link.rawFragment != null) return null
@@ -227,11 +260,13 @@ data class OpenCodePairingLink(
             if (pathCode != null && queryCode != null && pathCode != queryCode) return null
             val code = queryCode ?: pathCode ?: return null
             if (!isCode(code)) return null
-            return validatedLink(code, rawURLs)
+            return Payload(code, rawURLs)
         }
 
-        private fun validatedLink(code: String, rawURLs: List<String>): OpenCodePairingLink? {
-            val addresses = rawURLs.map(::normalizedOrigin)
+        /** One malformed address rejects the whole code. */
+        private fun validatedLink(listed: Payload): OpenCodePairingLink? {
+            val code = listed.code
+            val addresses = listed.urls.map(::normalizedOrigin)
             if (addresses.isEmpty() || addresses.any { it == null }) return null
             val origins = addresses.filterNotNull().distinct()
             return OpenCodePairingLink(origins[0], code, origins.drop(1))
@@ -252,15 +287,24 @@ data class OpenCodePairingLink(
 
         /** A server base URL normalized to its origin: HTTP(S), a host, no credentials, query, fragment or path. */
         private fun normalizedOrigin(address: String): String? {
+            if (originProblem(address) != null) return null
             val parts = UrlParts.parse(address) ?: return null
             val scheme = parts.scheme?.lowercase() ?: return null
-            if (scheme != "http" && scheme != "https") return null
-            if (parts.host.isNullOrEmpty() || parts.user != null || parts.password != null) return null
-            if (parts.rawQuery != null || parts.rawFragment != null) return null
-            parts.port?.let { if (it !in 1..65535) return null }
-            if (parts.path.isNotEmpty() && parts.path != "/") return null
             val authority = (parts.rawAuthority ?: return null).removeSuffix(":")
             return "$scheme://$authority"
+        }
+
+        /** Why [address] can't be a server's base URL, finishing “it …”; null when it can. */
+        private fun originProblem(address: String): String? {
+            val parts = UrlParts.parse(address) ?: return "isn’t a web address"
+            val scheme = parts.scheme?.lowercase()
+            if (scheme != "http" && scheme != "https") return "doesn’t start with http:// or https://"
+            if (parts.host.isNullOrEmpty() || parts.rawAuthority == null) return "has no host name"
+            if (parts.user != null || parts.password != null) return "includes a user name or password"
+            if (parts.rawQuery != null || parts.rawFragment != null) return "has a query or fragment"
+            parts.port?.let { if (it !in 1..65535) return "has a port outside 1–65535" }
+            if (parts.path.isNotEmpty() && parts.path != "/") return "has a path, and the server must be at the root of its address"
+            return null
         }
 
         private fun originDedupKey(origin: String): String {

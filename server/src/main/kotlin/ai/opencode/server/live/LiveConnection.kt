@@ -70,12 +70,24 @@ internal suspend fun requestRedeemPairing(link: OpenCodePairingLink): OpenCodeSe
     // Other reachable addresses (LAN, tailnet) let the phone reconnect when it changes
     // networks. The server's own list is optional: an older server without it still pairs.
     val reported = try { request<InfoPayload>("/api/info", server = server).urls ?: emptyList() } catch (_: OpenCodeClientError) { emptyList() }
-    val seen = hashSetOf(server.url)
-    val alternates = (candidates + reported)
-        .map { it.trim('/') }
-        .filter { !OpenCodeServer.isLoopback(it) && OpenCodeServer(url = it, username = "", password = "").endpoint("/") != null }
-        .filter { seen.add(it) }
-    return server.copy(alternateURLs = alternates)
+    // The code's own addresses are preferred: one `opencode pair --url` named is used whenever
+    // it answers, even when the tunnel the server also reports answers sooner.
+    val preferred = usableAddresses(candidates)
+    val alternates = usableAddresses(candidates + reported).filter { it != server.url }
+    return server.copy(alternateURLs = alternates, preferredURLs = preferred)
+}
+
+/** Addresses without a trailing slash, loopback or anything that isn't an HTTP(S) address, deduplicated. */
+private fun usableAddresses(addresses: List<String>): List<String> {
+    val seen = hashSetOf<String>()
+    val usable = mutableListOf<String>()
+    for (address in addresses) {
+        val trimmed = address.trim('/')
+        if (OpenCodeServer.isLoopback(trimmed)) continue
+        if (OpenCodeServer(url = trimmed, username = "", password = "").endpoint("/") == null) continue
+        if (seen.add(trimmed)) usable += trimmed
+    }
+    return usable
 }
 
 /** The most telling reason no address redeemed the code: a server that answered beats one that couldn't be reached. */
