@@ -11,10 +11,9 @@ import kotlin.math.abs
  * Catch Up-style horizontal drags. System back (edge swipe, predictive back) is Android's;
  * screens handle it with `PredictiveBackHandler`/`BackHandler`, never a custom edge pan.
  *
- * iOS's UIKit recogniser plumbing (`BackPanGestureRecognizer`, `SystemBackSwipeGate`,
- * selection-handle and scroller hit tests) has no Android counterpart: Compose's nested
- * scrolling gives horizontal scrollers priority, and text selection handles consume their
- * own drags.
+ * iOS's UIKit recogniser plumbing (`BackPanGestureRecognizer`, `SystemBackSwipeGate`) has no
+ * Android counterpart. Its scroller and selection-handle hit tests are regions the drawer's pan
+ * tests a touch against (`DrawerPanExclusion` in `DrawerSeams.kt`).
  */
 object BackSwipeRules {
     /** How far from the leading edge a touch always belongs to the back/drawer gesture (iOS 28 pt). */

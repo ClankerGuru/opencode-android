@@ -14,7 +14,7 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.input.pointer.util.addPointerInputChange
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -39,8 +39,8 @@ import kotlin.math.abs
  *
  * UIKit's hit-test walk becomes [DrawerPanRegions]: the drawer, its list, the card, Catch Up's
  * drag card, horizontal scrollers and controls register their layout nodes with the modifiers
- * below, and the pan tests the touch against them (layer transforms included). Not ported:
- * iOS's text selection handle test (Compose selection handles consume their own drags).
+ * below, and the pan tests the touch against them (layer transforms included). The transcript's
+ * selection handles register with `Modifier.drawerPanSelectionHandles`, iOS's selection handle test.
  */
 object DirectionalPan {
     enum class Decision {
@@ -120,6 +120,7 @@ sealed interface DrawerPanEvent {
 @Stable
 class DrawerPanRegions : DrawerPanExclusion {
     internal class Scroller(val coordinates: LayoutCoordinates, val canScrollBackward: () -> Boolean, val canScrollForward: () -> Boolean)
+    internal class SelectionHandles(val coordinates: LayoutCoordinates, val handleClaims: (Offset) -> Boolean)
 
     internal var drawer: LayoutCoordinates? = null
     internal var card: LayoutCoordinates? = null
@@ -129,9 +130,14 @@ class DrawerPanRegions : DrawerPanExclusion {
     internal val scrollers = HashMap<Any, Scroller>()
     internal val claims = HashMap<Any, LayoutCoordinates>()
     internal val exclusions = HashMap<Any, LayoutCoordinates>()
+    internal val selectionHandles = HashMap<Any, SelectionHandles>()
 
     override fun updateExclusion(id: Any, coordinates: LayoutCoordinates?) {
         if (coordinates == null) exclusions.remove(id) else exclusions[id] = coordinates
+    }
+
+    override fun updateSelectionHandles(id: Any, coordinates: LayoutCoordinates?, handleClaims: (Offset) -> Boolean) {
+        if (coordinates == null) selectionHandles.remove(id) else selectionHandles[id] = SelectionHandles(coordinates, handleClaims)
     }
 
     override fun updateHorizontalScroller(
@@ -149,6 +155,15 @@ class DrawerPanRegions : DrawerPanExclusion {
 
     internal fun isExcluded(pan: LayoutCoordinates, point: Offset): Boolean =
         exclusions.values.any { contains(it, pan, point) }
+
+    /** Whether [point] (px in [pan]) lands on a text selection's handle (iOS `BackSwipeRules.selectionHandleClaims`). */
+    internal fun selectionHandleClaims(pan: LayoutCoordinates, point: Offset): Boolean {
+        for (handles in selectionHandles.values) {
+            if (!contains(handles.coordinates, pan, point)) continue
+            if (handles.handleClaims(handles.coordinates.localPositionOf(pan, point))) return true
+        }
+        return false
+    }
 
     internal fun contains(region: LayoutCoordinates?, pan: LayoutCoordinates, point: Offset): Boolean {
         if (region == null || !region.isAttached || !pan.isAttached) return false
@@ -240,6 +255,8 @@ fun Modifier.drawerDirectionalPan(
                 if (!presented && onExposedCard && regions.isExcluded(pan, point)) {
                     return@awaitEachGesture
                 }
+                // A text selection's handle drags the handle, even at the edge.
+                if (!presented && regions.selectionHandleClaims(pan, point)) return@awaitEachGesture
                 if (!presented && !cardSwipe && isContentPushed()) return@awaitEachGesture
                 val startedAtEdge = !presented && !cardSwipe &&
                     (if (rtl) point.x >= size.width - edgeWidth else point.x <= edgeWidth)
@@ -309,7 +326,7 @@ fun Modifier.drawerDirectionalPan(
                             // Children see this move next; one that consumes it before the pan chose
                             // (a long press's drag, a text selection) began a hold.
                             val final = awaitPointerEvent(PointerEventPass.Final)
-                            if (final.changes.any { it.id == pointerId && it.positionChange() != Offset.Zero && it.isConsumed }) {
+                            if (final.changes.any { it.id == pointerId && it.positionChangeIgnoreConsumed() != Offset.Zero && it.isConsumed }) {
                                 holdBegan = true
                             }
                         }

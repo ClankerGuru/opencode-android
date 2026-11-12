@@ -312,6 +312,10 @@ private class PageHorizontalScrollers(private val drawer: DrawerPanExclusion?) :
         drawer?.updateExclusion(id, coordinates)
     }
 
+    override fun updateSelectionHandles(id: Any, coordinates: LayoutCoordinates?, handleClaims: (Offset) -> Boolean) {
+        drawer?.updateSelectionHandles(id, coordinates, handleClaims)
+    }
+
     override fun updateHorizontalScroller(
         id: Any,
         coordinates: LayoutCoordinates?,
