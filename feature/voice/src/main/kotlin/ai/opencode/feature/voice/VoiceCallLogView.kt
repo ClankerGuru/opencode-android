@@ -2,6 +2,7 @@ package ai.opencode.feature.voice
 
 import ai.opencode.core.ui.OpenCodeTopBar
 import ai.opencode.core.ui.OpenCodeTopBarBackButton
+import ai.opencode.core.ui.rememberOverscrollIfContentScrolls
 import ai.opencode.core.ui.appFormattingLocale
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -196,7 +197,13 @@ fun VoiceCallLogList(
                 )
             }
         } else {
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = padding) {
+            val historyList = rememberLazyListState()
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                state = historyList,
+                contentPadding = padding,
+                overscrollEffect = rememberOverscrollIfContentScrolls(historyList),
+            ) {
                 items(logs, key = { it.id.toString() }) { log ->
                     VoiceCallLogRow(
                         log = log,

@@ -113,7 +113,8 @@ fun OpenCodeTopBar(
  * 24 sp medium) scrolls up under the bar as the list scrolls, Material's exit-until-collapsed
  * behaviour, and the bar's own title and hairline fade in as it goes. Replaces Material 3
  * Expressive's `LargeFlexibleTopAppBar`; [scrollBehavior] must be
- * `TopAppBarDefaults.exitUntilCollapsedScrollBehavior()`, connected to the page's nested scroll.
+ * [rememberOpenCodeLargeTopBarScrollBehavior] (exit-until-collapsed, only while the page can
+ * scroll), connected to the page's nested scroll.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
