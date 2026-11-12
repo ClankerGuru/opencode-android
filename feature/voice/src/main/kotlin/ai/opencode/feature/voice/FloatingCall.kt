@@ -66,7 +66,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -1157,7 +1156,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
     // Where the shape is this frame changes every frame it moves: it's read only while laying out
     // and drawing ([frameOf], [FloatingCallSurfaceLook]), and only what switches a part on or off
     // is read here, so a drag or a flight recomposes nothing.
-    val look = remember(model) { FloatingCallSurfaceLook(model) }
+    val look = remember(model) { FloatingCallSurfaceLook(model, geometry, restArea) }
     look.geometry = geometry
     look.restArea = restArea
     look.restFrame = restFrame
@@ -1168,7 +1167,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
     val lifted = connect.isBreakingOut || float.isHeld
     val trailing = look.isTrailing
     val dimmed = look.isDimmed
-    val touchKind = look.touchKind(terminal)
+    val touchKind by remember(look, terminal) { derivedStateOf { look.touchKind(terminal) } }
     LaunchedEffect(look, window, terminal) {
         if (window == null) return@LaunchedEffect
         snapshotFlow { model.touchArea(look.frame(), terminal) }.collect { if (window.touchArea != it) window.touchArea = it }
@@ -1466,9 +1465,13 @@ private enum class FloatingCallTouchKind { none, everywhere, frame }
  * reads them, and they change only when the part does.
  */
 @Stable
-private class FloatingCallSurfaceLook(private val model: FloatingCallSurfaceModel) {
-    var geometry by mutableStateOf<FloatingCallStageGeometry?>(null)
-    var restArea by mutableStateOf<FloatingCallRestArea?>(null)
+private class FloatingCallSurfaceLook(
+    private val model: FloatingCallSurfaceModel,
+    geometry: FloatingCallStageGeometry,
+    restArea: FloatingCallRestArea,
+) {
+    var geometry by mutableStateOf(geometry)
+    var restArea by mutableStateOf(restArea)
     var restFrame by mutableStateOf(Rect.Zero)
     var screen by mutableStateOf(Size.Zero)
 
@@ -1480,32 +1483,24 @@ private class FloatingCallSurfaceLook(private val model: FloatingCallSurfaceMode
 
     private fun restingFrame(): Rect {
         val at = float.position ?: return restFrame
-        return restArea?.frame(centeredAt = at) ?: restFrame
+        return restArea.frame(centeredAt = at)
     }
 
     fun frame(): Rect {
-        val geometry = geometry
-        if (shaping() && geometry != null) return motion.frame(geometry)
+        if (shaping()) return motion.frame(geometry)
         return connect.frame ?: restingFrame()
     }
 
-    private fun grown(): Double {
-        val geometry = geometry ?: return 0.0
-        return if (shaping()) geometry.cardness(frame()) else 0.0
-    }
+    private fun grown(): Double = if (shaping()) geometry.cardness(frame()) else 0.0
 
-    private fun full(): Double {
-        val geometry = geometry ?: return 0.0
-        return if (shaping()) geometry.fullness(frame()) else 0.0
-    }
+    private fun full(): Double = if (shaping()) geometry.fullness(frame()) else 0.0
 
     /** The shape's outline: its corners round as the card's and the sheet's, a circle as the orb. */
     val shape = object : Shape {
         override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
-            val geometry = geometry
             val frame = frame()
             val short = min(frame.width, frame.height).toDouble()
-            val radii = if (shaping() && geometry != null) geometry.radii(frame) else FloatingCallStageGeometry.Radii(short / 2, short / 2)
+            val radii = if (shaping()) geometry.radii(frame) else FloatingCallStageGeometry.Radii(short / 2, short / 2)
             val top = with(density) { max(0.0, radii.top).toFloat().dp.toPx() }
             val bottom = with(density) { max(0.0, radii.bottom).toFloat().dp.toPx() }
             return Outline.Rounded(
@@ -1528,10 +1523,7 @@ private class FloatingCallSurfaceLook(private val model: FloatingCallSurfaceMode
         return max(if (lifting) connect.button else 0.0, model.landedAmount(frame()))
     }
 
-    fun cardShadow(): Double {
-        val geometry = geometry ?: return 0.0
-        return if (shaping()) geometry.cardness(frame()) * (1 - buttonLook()) else 0.0
-    }
+    fun cardShadow(): Double = grown() * (1 - buttonLook())
 
     fun backing(): Double = lerp(FloatingCallStageTunables.cardFill.value, FloatingCallStageTunables.sheetFill.value, full()) * grown()
 
@@ -1542,7 +1534,6 @@ private class FloatingCallSurfaceLook(private val model: FloatingCallSurfaceMode
 
     /** The bloom's field's top-left corner, in the overlay, and the bloom placed in it. */
     fun bloom(): Pair<Offset, LivingOrbBloom> {
-        val geometry = geometry ?: return Offset.Zero to LivingOrbBloom(Offset.Zero, 0f, 0f, 0f, Rect.Zero)
         val frame = frame()
         val full = full()
         val bloom = geometry.bloom(frame)
@@ -1560,13 +1551,10 @@ private class FloatingCallSurfaceLook(private val model: FloatingCallSurfaceMode
     }
 
     /** Laid out as the card (pinned to the shape's bottom corner) or on the sheet's visible part. */
-    private fun asCard(): Boolean {
-        val geometry = geometry ?: return true
-        return if (motion.landing == null) motion.progress <= 1 else frame().height <= geometry.cardFrame.height + 0.5f
-    }
+    private fun asCard(): Boolean =
+        if (motion.landing == null) motion.progress <= 1 else frame().height <= geometry.cardFrame.height + 0.5f
 
     fun contentBox(): Rect {
-        val geometry = geometry ?: return Rect.Zero
         val frame = frame()
         val card = geometry.cardFrame
         if (!asCard()) return geometry.visible(frame)
@@ -1574,7 +1562,6 @@ private class FloatingCallSurfaceLook(private val model: FloatingCallSurfaceMode
     }
 
     fun contentLayout(): FloatingCallStageContentLayout {
-        val geometry = geometry ?: return FloatingCallStageContentLayout(0f, 0f, 0f, FloatingCallStageGeometry.Bloom(0.0, 0.0))
         val box = contentBox()
         val layoutFull = if (asCard()) 0.0 else full()
         val bloom = FloatingCallStageGeometry.Bloom(
@@ -1601,19 +1588,11 @@ private class FloatingCallSurfaceLook(private val model: FloatingCallSurfaceMode
         if (motion.landing == null) motion.progress > 0.01 || motion.target != FloatingCallStage.orb else motion.content > 0
     }
     val isContentInteractive by derivedStateOf { motion.target != FloatingCallStage.orb && motion.landing == null }
-    private val touch = mutableMapOf<Boolean, State<FloatingCallTouchKind>>()
 
-    fun touchKind(terminal: Boolean): FloatingCallTouchKind {
-        val state = touch.getOrPut(terminal) {
-            derivedStateOf {
-                when (model.touchArea(frame(), terminal)) {
-                    FloatingCallTouchArea.None -> FloatingCallTouchKind.none
-                    FloatingCallTouchArea.Everywhere -> FloatingCallTouchKind.everywhere
-                    is FloatingCallTouchArea.Frame -> FloatingCallTouchKind.frame
-                }
-            }
-        }
-        return state.value
+    fun touchKind(terminal: Boolean): FloatingCallTouchKind = when (model.touchArea(frame(), terminal)) {
+        FloatingCallTouchArea.None -> FloatingCallTouchKind.none
+        FloatingCallTouchArea.Everywhere -> FloatingCallTouchKind.everywhere
+        is FloatingCallTouchArea.Frame -> FloatingCallTouchKind.frame
     }
 }
 
