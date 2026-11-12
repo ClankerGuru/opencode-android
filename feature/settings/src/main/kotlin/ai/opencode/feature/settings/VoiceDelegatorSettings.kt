@@ -146,13 +146,11 @@ internal fun VoiceDelegatorSettingsPage(store: SettingsStore) {
         settingsSection(key = "mode") {
             ModeRow(
                 title = "Built-in",
-                subtitle = "Runs on OpenAI, without a session",
                 isSelected = !choice.usesOpenCodeSession || !isAvailable,
             ) { select(VoiceDelegatorChoice.BuiltIn) }
             SettingsDivider()
             ModeRow(
                 title = "OpenCode Session",
-                subtitle = "Works in a session on your server",
                 isSelected = choice.usesOpenCodeSession && isAvailable,
                 isEnabled = isAvailable,
             ) { if (!choice.usesOpenCodeSession) select(VoiceDelegatorChoice.AutomaticSession) }
@@ -161,18 +159,16 @@ internal fun VoiceDelegatorSettingsPage(store: SettingsStore) {
             settingsSection(key = "target", header = "Session Target") {
                 ModeRow(
                     title = "Automatic",
-                    subtitle = "Uses a “Voice” session on this server",
                     isSelected = choice == VoiceDelegatorChoice.AutomaticSession,
                 ) { select(VoiceDelegatorChoice.AutomaticSession) }
                 SettingsDivider()
                 ModeRow(
                     title = "Viewed Session",
-                    subtitle = "Uses the session on screen",
                     isSelected = choice == VoiceDelegatorChoice.ViewedSession,
                 ) { select(VoiceDelegatorChoice.ViewedSession) }
                 if (otherServerPick != null) {
                     SettingsDivider()
-                    ModeRow(title = otherServerPick.displayTitle, subtitle = "Picked on another server", isSelected = true) {}
+                    ModeRow(title = otherServerPick.displayTitle, isSelected = true) {}
                 }
             }
             val server = state.connectedServer
@@ -230,7 +226,7 @@ private fun DelegatorNote(text: String, symbol: SFSymbol, color: androidx.compos
 @Composable
 private fun ModeRow(
     title: String,
-    subtitle: String?,
+    subtitle: String? = null,
     isSelected: Boolean,
     isEnabled: Boolean = true,
     onClick: () -> Unit,
