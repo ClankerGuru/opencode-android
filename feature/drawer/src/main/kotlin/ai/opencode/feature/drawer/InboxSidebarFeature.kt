@@ -46,7 +46,7 @@ class InboxSidebarFeature : Reducer<InboxSidebarFeature.State, InboxSidebarFeatu
     data class State(val server: OpenCodeServer, val status: Status = Status())
 
     sealed interface Action {
-        data class ArchiveSwiped(val sessionID: String, val title: String) : Action
+        data class ArchiveTapped(val sessionID: String, val title: String) : Action
         data class ArchiveResponse(val sessionID: String, val title: String, val error: OpenCodeClientError?) : Action
         data object ArchiveErrorCleared : Action
     }
@@ -57,7 +57,7 @@ class InboxSidebarFeature : Reducer<InboxSidebarFeature.State, InboxSidebarFeatu
     }
 
     override fun reduce(state: State, action: Action): Reduced<State, Action> = when (action) {
-        is Action.ArchiveSwiped -> {
+        is Action.ArchiveTapped -> {
             val sessionID = action.sessionID
             if (sessionID in state.status.archivedIDs) {
                 Reduced(state)

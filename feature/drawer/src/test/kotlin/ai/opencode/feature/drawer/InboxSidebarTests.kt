@@ -125,7 +125,7 @@ class InboxSidebarTests {
             this[DateClient] = DateClient.constant(date(1_000))
             this[OpenCodeClient] = OpenCodeClient.testValue.offline().copy(archiveSession = { _, id -> archived.append(id) })
         }
-        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveSwiped(sessionID = "newest_read", title = "newest_read"))) {
+        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveTapped(sessionID = "newest_read", title = "newest_read"))) {
             it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedIDs = setOf("newest_read")))
         }
         assertFalse(store.state.inboxSidebarRows().map { it.id }.contains("newest_read"))
@@ -149,7 +149,7 @@ class InboxSidebarTests {
             this[OpenCodeClient] = OpenCodeClient.testValue.offline().copy(archiveSession = { _, _ -> gate.await() })
         }
         assertEquals(listOf("waiting", "unread_new", "unread_old"), store.state.catchUpSessions.map { it.id })
-        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveSwiped(sessionID = "unread_new", title = "unread_new"))) {
+        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveTapped(sessionID = "unread_new", title = "unread_new"))) {
             it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedIDs = setOf("unread_new")))
         }
         // Gone from Catch Up while the request is in flight…
@@ -180,7 +180,7 @@ class InboxSidebarTests {
             )
         }
         store.exhaustive = false
-        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveSwiped(sessionID = "read_old", title = "read_old")))
+        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveTapped(sessionID = "read_old", title = "read_old")))
         store.receiveArchiveResponse()
         assertTrue(store.state.inboxSidebarStatus.archivedIDs.isEmpty())
         assertFalse(store.state.inboxSidebarRows().map { it.id }.contains("read_old"))
@@ -210,7 +210,7 @@ class InboxSidebarTests {
             )
         }
         store.exhaustive = false
-        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveSwiped(sessionID = "read_old", title = "read_old")))
+        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveTapped(sessionID = "read_old", title = "read_old")))
         store.send(Action.SnapshotRefreshed(OpenCodeHomeSnapshot(projects = store.state.projects, sessions = store.state.sessions, activeSessionIDs = setOf("working"))))
         assertFalse(store.state.inboxSidebarRows().map { it.id }.contains("read_old"))
         h.skipInFlightEffects()
@@ -223,7 +223,7 @@ class InboxSidebarTests {
             this[Clock] = clock
             this[OpenCodeClient] = OpenCodeClient.testValue.copy(archiveSession = { _, _ -> throw OpenCodeClientError("Offline") })
         }
-        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveSwiped(sessionID = "working", title = "Working title"))) {
+        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveTapped(sessionID = "working", title = "Working title"))) {
             it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedIDs = setOf("working")))
         }
         store.receiveArchiveResponse {
@@ -250,10 +250,10 @@ class InboxSidebarTests {
                 },
             )
         }
-        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveSwiped(sessionID = "read_old", title = "read_old"))) {
+        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveTapped(sessionID = "read_old", title = "read_old"))) {
             it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedIDs = setOf("read_old")))
         }
-        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveSwiped(sessionID = "read_old", title = "read_old")))
+        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveTapped(sessionID = "read_old", title = "read_old")))
         clock.advance(1.seconds)
         store.receiveArchiveResponse {
             it.withSession("read_old") { s -> s.copy(archivedMilliseconds = 1_000_000) }.copy(

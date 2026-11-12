@@ -12,7 +12,6 @@ import ai.opencode.feature.drawer.catchup.CatchUpStage
 import ai.opencode.feature.drawer.catchup.CatchUpStageProxy
 import ai.opencode.feature.drawer.catchup.rememberCatchUpStackController
 import ai.opencode.feature.drawer.list.LocalDrawerHidden
-import ai.opencode.feature.drawer.list.rememberInboxSidebarOn
 import ai.opencode.feature.drawer.motion.DrawerCorner
 import ai.opencode.feature.drawer.motion.DrawerDepth
 import ai.opencode.feature.drawer.motion.DrawerDim
@@ -292,8 +291,6 @@ fun SessionDrawerContainer(
     val chromeBackground = if (isDark) Color(0.04f, 0.04f, 0.04f, 1f) else colors.userBubble
     val borderColor = CatchUpMetrics.borderColor(isDark, colors.border)
     val borderWidthPx = if (isDark) with(density) { 1.dp.toPx() } else 1f
-    // Inbox Sidebar rows swipe Mark as Read and Archive themselves (iOS `rowsOwnSwipes`).
-    val inboxSidebarOn = rememberInboxSidebarOn()
     // Where the card's or drawer's input focus goes when the container takes it away (QA AD-01).
     // `clearFocus` also drops the view's own focus; out of touch mode (after any key, TalkBack's
     // Back included) the window gives it straight back, and TalkBack follows that input-focus
@@ -314,7 +311,6 @@ fun SessionDrawerContainer(
                 isContentPushed = { pushed },
                 // Beside a sidebar the drawer doesn't move; Catch Up's stack runs its own swipe.
                 enabled = { controller.sidebarShown == null && controller.catchUp == null },
-                rowsOwnSwipes = { inboxSidebarOn },
                 onTouchDown = motion::touchDown,
             ) { event ->
                 if (!controller.acceptsPan(event)) return@drawerDirectionalPan
