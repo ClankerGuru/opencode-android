@@ -16,6 +16,7 @@ import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.InboxSidebarFeature
 import ai.opencode.feature.drawer.InboxSidebarRow
 import ai.opencode.feature.drawer.catchUpSessions
+import ai.opencode.feature.drawer.inboxSidebarArchivedRows
 import ai.opencode.feature.drawer.inboxSidebarRows
 import ai.opencode.feature.drawer.style.DrawerHeaderScrollState
 import ai.opencode.feature.drawer.style.DrawerTunables
@@ -47,6 +48,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -82,7 +84,8 @@ import kotlin.math.roundToInt
  * one item per session. Tapping opens the session; holding it opens its [menu].
  *
  * Android: iOS swipes these rows (Mark as Read, Archive); here a sideways swipe stays the
- * drawer's, as in any navigation drawer, and the actions are in the hold menu.
+ * drawer's, as in any navigation drawer, and the actions are in the hold menu. The sessions the
+ * server has archived follow under a collapsed Archived row, muted, to open or unarchive.
  */
 @Composable
 internal fun InboxSidebarList(
@@ -92,10 +95,16 @@ internal fun InboxSidebarList(
     contentPadding: PaddingValues,
     select: (String) -> Unit,
     openCatchUp: () -> Unit,
-    menu: (InboxSidebarRow) -> List<DrawerRowMenuItem>,
+    menu: (row: InboxSidebarRow, archived: Boolean) -> List<DrawerRowMenuItem>,
     modifier: Modifier = Modifier,
 ) {
     val rows by store.observe { it.inboxSidebarRows() }
+    val archivedRows by store.observe { it.inboxSidebarArchivedRows() }
+    val serverID by store.observe { it.server.persistenceID }
+    var archivedExpanded by rememberSaveable(serverID) { mutableStateOf(false) }
+    LaunchedEffect(serverID) {
+        store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.ArchivedListRequested))
+    }
     val catchUpCount by store.observe { it.catchUpSessions.size }
     val archiveError by store.observe { it.inboxSidebarStatus.archiveError }
     val snapshotLoaded by store.observe { it.snapshotLoaded }
@@ -174,9 +183,55 @@ internal fun InboxSidebarList(
                     row = row,
                     now = now,
                     selected = row.id == selectedSessionID,
+                    archived = false,
                     select = { select(row.id) },
-                    menu = { menu(row) },
+                    menu = { menu(row, false) },
                 )
+            }
+            if (archivedRows.isNotEmpty()) {
+                item(key = "inbox-archived") {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp)
+                            .clickable(role = Role.Button) {
+                                archivedExpanded = !archivedExpanded
+                                if (archivedExpanded) {
+                                    store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.ArchivedListRequested))
+                                }
+                            }
+                            .openCodeTapTarget()
+                            .semantics { stateDescription = if (archivedExpanded) "Expanded" else "Collapsed" }
+                            .testTag("inbox-archived")
+                            .padding(horizontal = InboxSidebarMetrics.edge),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        OpenCodeIcon(SFSymbol.Archivebox, contentDescription = null, tint = colors.secondaryText)
+                        Text("Archived", style = OpenCodeTextStyles.body, color = colors.secondaryText, modifier = Modifier.weight(1f))
+                        OpenCodeIcon(
+                            if (archivedExpanded) SFSymbol.ChevronUp else SFSymbol.ChevronDown,
+                            contentDescription = null,
+                            size = 20.dp,
+                            tint = colors.secondaryText,
+                        )
+                    }
+                }
+                if (archivedExpanded) {
+                    items(archivedRows, key = { "archived-${it.id}" }) { row ->
+                        InboxSidebarMenuRow(
+                            row = row,
+                            now = now,
+                            selected = row.id == selectedSessionID,
+                            archived = true,
+                            select = {
+                                store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.ArchivedRowTapped(row.id)))
+                                select(row.id)
+                            },
+                            menu = { menu(row, true) },
+                        )
+                    }
+                }
             }
         }
         if (rows.isEmpty() && snapshotLoaded) {
@@ -201,6 +256,7 @@ private fun InboxSidebarMenuRow(
     row: InboxSidebarRow,
     now: Instant,
     selected: Boolean,
+    archived: Boolean,
     select: () -> Unit,
     menu: () -> List<DrawerRowMenuItem>,
 ) {
@@ -250,7 +306,7 @@ private fun InboxSidebarMenuRow(
                 customActions = actions
             },
     ) {
-        InboxSidebarRowView(row, now)
+        InboxSidebarRowView(row, now, Modifier.graphicsLayer { alpha = if (archived) InboxSidebarMetrics.archivedAlpha else 1f })
         // Anchored on the row so the menu opens beside the held row.
         DrawerRowMenu(hold) { currentMenu() }
     }
@@ -330,6 +386,8 @@ internal fun rememberInboxSidebarOn(): Boolean {
 
 private object InboxSidebarMetrics {
     val edge = 20.dp
+    /** Archived rows read muted, as on desktop. */
+    const val archivedAlpha = 0.5f
     /** iOS `.orange` beside Needs your input. */
     val needsInputTint = Color(0xFFFF9F0A)
 }

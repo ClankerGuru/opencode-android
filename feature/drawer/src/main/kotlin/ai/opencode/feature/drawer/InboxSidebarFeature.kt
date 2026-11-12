@@ -19,6 +19,7 @@ import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeProject
+import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import java.time.Duration
 import java.time.Instant
@@ -30,7 +31,8 @@ import kotlin.time.Duration.Companion.seconds
 /**
  * Inbox Sidebar (experimental): the drawer as an inbox, one item per session, sorted Needs your
  * input, then unread, then newest. Rows come from Home's state ([HomeFeature.State.inboxSidebarRows]);
- * this reducer owns Archive, the one action Home doesn't already have.
+ * this reducer owns Archive and Unarchive, the actions Home doesn't already have.
+ * Android: archived sessions can be restored, as on desktop (iOS can't).
  */
 class InboxSidebarFeature : Reducer<InboxSidebarFeature.State, InboxSidebarFeature.Action> {
     data class Status(
@@ -41,6 +43,10 @@ class InboxSidebarFeature : Reducer<InboxSidebarFeature.State, InboxSidebarFeatu
          */
         val archivedIDs: Set<String> = emptySet(),
         val archiveError: String? = null,
+        /** The server's archived sessions, newest first (the Archived section). */
+        val archived: List<OpenCodeSession> = emptyList(),
+        /** Unarchives in flight: hidden from the Archived section at once. */
+        val unarchivingIDs: Set<String> = emptySet(),
     )
 
     data class State(val server: OpenCodeServer, val status: Status = Status())
@@ -49,11 +55,19 @@ class InboxSidebarFeature : Reducer<InboxSidebarFeature.State, InboxSidebarFeatu
         data class ArchiveTapped(val sessionID: String, val title: String) : Action
         data class ArchiveResponse(val sessionID: String, val title: String, val error: OpenCodeClientError?) : Action
         data object ArchiveErrorCleared : Action
+        data object ArchivedListRequested : Action
+        data class ArchivedListResponse(val sessions: List<OpenCodeSession>) : Action
+        /** Home opens it (it isn't in the session list). */
+        data class ArchivedRowTapped(val sessionID: String) : Action
+        data class UnarchiveTapped(val sessionID: String, val title: String) : Action
+        data class UnarchiveResponse(val sessionID: String, val title: String, val error: OpenCodeClientError?) : Action
     }
 
     sealed interface CancelID {
         data class Archive(val sessionID: String) : CancelID
         data object ArchiveError : CancelID
+        data object ArchivedList : CancelID
+        data class Unarchive(val sessionID: String) : CancelID
     }
 
     override fun reduce(state: State, action: Action): Reduced<State, Action> = when (action) {
@@ -90,24 +104,88 @@ class InboxSidebarFeature : Reducer<InboxSidebarFeature.State, InboxSidebarFeatu
                 Reduced(next)
             } else {
                 AppLog.network.notice { "Archive failed: ${error.logSummary}" }
-                dependency(HapticsClient).play(Haptic.error)
-                val clock = dependency(Clock)
-                Reduced(
-                    next.copy(status = next.status.copy(archiveError = "Couldn’t archive “${action.title}”. ${error.message}")),
-                    Effect.run<Action> { send ->
-                        clock.sleep(3.seconds)
-                        send(Action.ArchiveErrorCleared)
-                    }.cancellable(CancelID.ArchiveError, cancelInFlight = true),
-                )
+                failed(next, "Couldn’t archive “${action.title}”. ${error.message}")
             }
         }
 
         Action.ArchiveErrorCleared -> Reduced(state.copy(status = state.status.copy(archiveError = null)))
+
+        Action.ArchivedListRequested -> {
+            val client = dependency(OpenCodeClient)
+            val server = state.server
+            Reduced(
+                state,
+                Effect.run<Action> { send ->
+                    try {
+                        send(Action.ArchivedListResponse(client.archivedSessions(server, ARCHIVED_LIMIT)))
+                    } catch (error: OpenCodeClientError) {
+                        AppLog.network.notice { "Archived list failed: ${error.logSummary}" }
+                    }
+                }.cancellable(CancelID.ArchivedList, cancelInFlight = true),
+            )
+        }
+
+        is Action.ArchivedListResponse -> Reduced(state.copy(status = state.status.copy(archived = action.sessions)))
+
+        is Action.ArchivedRowTapped -> Reduced(state)
+
+        is Action.UnarchiveTapped -> {
+            val sessionID = action.sessionID
+            if (sessionID in state.status.unarchivingIDs) {
+                Reduced(state)
+            } else {
+                dependency(HapticsClient).play(Haptic.tap)
+                val client = dependency(OpenCodeClient)
+                val server = state.server
+                val title = action.title
+                Reduced(
+                    state.copy(status = state.status.copy(unarchivingIDs = state.status.unarchivingIDs + sessionID, archiveError = null)),
+                    Effect.merge(
+                        Effect.cancel(CancelID.ArchiveError),
+                        Effect.run<Action> { send ->
+                            try {
+                                client.unarchiveSession(server, sessionID)
+                                send(Action.UnarchiveResponse(sessionID, title, null))
+                            } catch (error: OpenCodeClientError) {
+                                send(Action.UnarchiveResponse(sessionID, title, error))
+                            }
+                        }.cancellable(CancelID.Unarchive(sessionID), cancelInFlight = true),
+                    ),
+                )
+            }
+        }
+
+        is Action.UnarchiveResponse -> {
+            val status = state.status.copy(unarchivingIDs = state.status.unarchivingIDs - action.sessionID)
+            val error = action.error
+            if (error == null) {
+                Reduced(state.copy(status = status.copy(archived = status.archived.filter { it.id != action.sessionID })))
+            } else {
+                AppLog.network.notice { "Unarchive failed: ${error.logSummary}" }
+                failed(state.copy(status = status), "Couldn’t unarchive “${action.title}”. ${error.message}")
+            }
+        }
+    }
+
+    /** Shows [message] over the list for a few seconds. */
+    private fun failed(state: State, message: String): Reduced<State, Action> {
+        dependency(HapticsClient).play(Haptic.error)
+        val clock = dependency(Clock)
+        return Reduced(
+            state.copy(status = state.status.copy(archiveError = message)),
+            Effect.run<Action> { send ->
+                clock.sleep(3.seconds)
+                send(Action.ArchiveErrorCleared)
+            }.cancellable(CancelID.ArchiveError, cancelInFlight = true),
+        )
     }
 
     companion object {
         /** The Inbox Sidebar switch (iOS `ExperimentalFeature.inboxSidebar`, off by default). */
         val experiment: ExperimentalFeature get() = ExperimentalFeature.inboxSidebar
+
+        /** As many archived sessions as desktop's Archived list shows. */
+        const val ARCHIVED_LIMIT = 50
     }
 }
 
@@ -164,15 +242,18 @@ data class InboxSidebarRow(
 }
 
 /**
- * The server archived it: mirror `time.archived` until the next snapshot replaces it, and read it,
- * so it leaves Catch Up and the unread count.
+ * The server archived it: mirror `time.archived` until the next snapshot replaces it, read it, so it
+ * leaves Catch Up and the unread count, and list it first under Archived.
  */
 internal fun HomeFeature.archiveConfirmed(state: HomeFeature.State, sessionID: String): Reduced<HomeFeature.State, HomeFeature.Action> {
     val index = state.sessions.indexOfFirst { it.id == sessionID }
     if (index < 0) return Reduced(state)
     val session = state.sessions[index].copy(archivedMilliseconds = dependency(DateClient).now().toEpochMilli())
     val sessions = state.sessions.toMutableList().also { it[index] = session }
-    val next = state.copy(sessions = sessions).markingReadLocally(session).clearingUnseenBaseline(sessionID)
+    val status = state.inboxSidebarStatus
+    val archived = listOf(session) + status.archived.filter { it.id != sessionID }
+    val next = state.copy(sessions = sessions, inboxSidebarStatus = status.copy(archived = archived))
+        .markingReadLocally(session).clearingUnseenBaseline(sessionID)
     return Reduced(next, acknowledgeView(session, next.server))
 }
 
@@ -211,4 +292,38 @@ fun HomeFeature.State.inboxSidebarRows(): List<InboxSidebarRow> {
             else -> b.updatedAt.compareTo(a.updatedAt)
         }
     }
+}
+
+/** The Archived section: the server's archived sessions, minus any being restored or already back in the list. */
+fun HomeFeature.State.inboxSidebarArchivedRows(): List<InboxSidebarRow> {
+    val status = inboxSidebarStatus
+    val listed = HashSet<String>()
+    for (session in visibleSessions) {
+        listed.add(session.id)
+    }
+    val rows = mutableListOf<InboxSidebarRow>()
+    for (session in status.archived) {
+        if (session.id in status.unarchivingIDs || session.id in listed) continue
+        rows.add(
+            InboxSidebarRow(
+                id = session.id,
+                title = session.title,
+                project = OpenCodeProject.resolved(session, projects).name.ifEmpty { null },
+                line = InboxSidebarRow.Line.None,
+                unread = false,
+                updatedAt = session.updatedAt,
+            ),
+        )
+    }
+    return rows
+}
+
+/**
+ * An archived session joins the session list (still archived, so no list shows it) for the tap
+ * that follows to open it, as a tapped session link does.
+ */
+internal fun HomeFeature.State.listingArchivedSession(sessionID: String): HomeFeature.State {
+    if (sessions.any { it.id == sessionID }) return this
+    val session = inboxSidebarStatus.archived.firstOrNull { it.id == sessionID } ?: return this
+    return copy(sessions = listOf(session) + sessions)
 }

@@ -248,7 +248,7 @@ fun HomeDrawer(
             contentPadding = listPadding,
             select = viewState::selectSession,
             openCatchUp = viewState::openCatchUp,
-            menu = { row -> inboxRowMenu(store, row) },
+            menu = { row, archived -> inboxRowMenu(store, row, archived) },
             modifier = Modifier.fillMaxSize(),
         ) else DrawerListView(
             store = store,
@@ -420,9 +420,16 @@ private fun newWindowMenu(state: HomeFeature.State, sessionID: String): List<Dra
 
 /**
  * An Inbox Sidebar row's hold menu (Android: iOS swipes these rows): [rowMenu]'s items that fit an
- * inbox, Mark as Read only while unread, and Archive before Delete.
+ * inbox, Mark as Read only while unread, and Archive before Delete. An archived row offers Unarchive.
  */
-private fun inboxRowMenu(store: StoreOf<HomeFeature.State, HomeFeature.Action>, row: InboxSidebarRow): List<DrawerRowMenuItem> {
+private fun inboxRowMenu(store: StoreOf<HomeFeature.State, HomeFeature.Action>, row: InboxSidebarRow, archived: Boolean): List<DrawerRowMenuItem> {
+    if (archived) {
+        return listOf(
+            DrawerRowMenuItem("Unarchive", SFSymbol.TrayAndArrowDown) {
+                store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.UnarchiveTapped(row.id, row.title)))
+            },
+        )
+    }
     val state = store.state
     val muted = state.isMuted(row.id)
     val items = newWindowMenu(state, row.id).toMutableList()
