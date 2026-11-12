@@ -155,6 +155,26 @@ class SessionSwitchTests {
         h.skipInFlightEffects()
     }
 
+    @Test
+    fun offscreenHistoryRefreshKeepsTheUnfinishedReplyForReopening() = homeTest { h ->
+        var home = h.homeState()
+        home = home.copy(activeSessionIDs = home.activeSessionIDs + "root")
+        val user = OpenCodeTranscriptItem.UserText(id = "message", text = "Inspect the build")
+        val stale = OpenCodeTranscriptItem.AssistantMarkdown(id = "reply-text-0", text = "")
+        val partial = OpenCodeTranscriptItem.AssistantMarkdown(id = "reply-text-1", text = "Checking", inProgress = true)
+        home = home.updatingDetail { it.copy(items = listOf(user, stale, partial)) }
+        home = h.update(home) { it.openingDetail(session("other"), cachedItems = emptyList()) }
+        assertEquals(listOf(user, stale, partial), home.transcriptCache["root"])
+        home = home.copy(refreshingTranscripts = home.refreshingTranscripts + "root")
+        val store = h.store(home)
+        store.exhaustive = false
+        store.send(Action.CachedTranscriptRefreshed("root", listOf(user)))
+        assertFalse("root" in store.state.refreshingTranscripts)
+        store.send(Action.SessionTapped("root"))
+        assertEquals(listOf(user, partial), store.state.sessionDetail?.items)
+        h.skipInFlightEffects()
+    }
+
     private fun form(id: String = "form", owner: String = "root") = OpenCodeFormRequest(
         id = id,
         sessionID = owner,

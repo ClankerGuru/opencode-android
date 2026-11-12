@@ -407,7 +407,7 @@ internal fun SessionFeature.acceptWindow(
     val nonDurableIDs = s.projectedMessageIDs + s.echoedPromptIDs + s.optimisticPromptIDs + s.failedSends.ids
     val pendingNoticeIDs = s.pendingNoticeIDs
     fun isDurable(item: OpenCodeTranscriptItem): Boolean =
-        !item.id.startsWith("info-") && item.id !in pendingNoticeIDs &&
+        !item.isInProgressText && !item.id.startsWith("info-") && item.id !in pendingNoticeIDs &&
             (nonDurableIDs.isEmpty() || SessionFeature.messageID(item) !in nonDurableIDs)
     // From the top until a durable row outside the window: in a long session that's the first
     // row, not every row.
@@ -471,6 +471,7 @@ internal fun SessionFeature.acceptWindow(
         echoedPromptIDs = s.echoedPromptIDs,
         pendingNoticeIDs = s.pendingNoticeIDs,
         complete = complete,
+        preserveInProgressText = preserve,
     )
     if (!complete && !s.isLoadingEarlier && pageCursor != null && allDurableRowsInWindow && merged.firstOrNull()?.id == firstFetchedID) {
         val next = pageCursor.next
@@ -522,6 +523,8 @@ internal fun SessionFeature.applyAuthoritativeMessage(
     val preserve = preserveProjection ?: (state.isRunning || state.refresh?.followup == RefreshReason.RunState)
     val replacement = if (preserve && messageID in state.projectedMessageIDs) {
         SessionFeature.mergeTranscript(fetched = fetched, existing = indexes.map { state.items[it] }, projectedMessageIDs = setOf(messageID))
+    } else if (preserve) {
+        SessionFeature.preservingInProgressText(fetched, indexes.map { state.items[it] })
     } else {
         fetched
     }

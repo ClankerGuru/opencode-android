@@ -157,6 +157,7 @@ sealed interface OpenCodePromptSource {
 @Serializable
 sealed interface OpenCodeTranscriptItem {
     val id: String
+    val isInProgressText: Boolean get() = this is AssistantMarkdown && inProgress
 
     /** [source] is set when an agent sent it. */
     @Serializable @SerialName("userText")
@@ -171,7 +172,7 @@ sealed interface OpenCodeTranscriptItem {
 
     /** Trimmed, non-empty Markdown of one assistant text part. */
     @Serializable @SerialName("assistantMarkdown")
-    data class AssistantMarkdown(override val id: String, val text: String) : OpenCodeTranscriptItem
+    data class AssistantMarkdown(override val id: String, val text: String, val inProgress: Boolean = false) : OpenCodeTranscriptItem
 
     @Serializable @SerialName("tool")
     data class Tool(override val id: String, val call: OpenCodeToolCall) : OpenCodeTranscriptItem

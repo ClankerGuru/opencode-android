@@ -43,6 +43,7 @@ internal fun SessionFeature.Companion.mergeTranscript(
     echoedPromptIDs: Set<String> = emptySet(),
     pendingNoticeIDs: Set<String> = emptySet(),
     complete: Boolean = false,
+    preserveInProgressText: Boolean = false,
 ): List<OpenCodeTranscriptItem> {
     if (!complete && fetched.isEmpty()) return existing
     val windowIDs = fetched.mapTo(HashSet(fetched.size)) { it.id }
@@ -81,7 +82,8 @@ internal fun SessionFeature.Companion.mergeTranscript(
         if (item.id in windowIDs) {
             hasServerRows = true
         } else if (index >= (windowStart ?: 0) &&
-            (item.id in pendingNoticeIDs || (protectedMessages.isNotEmpty() && messageID(item) in protectedMessages))
+            ((preserveInProgressText && item.isInProgressText) || item.id in pendingNoticeIDs ||
+                (protectedMessages.isNotEmpty() && messageID(item) in protectedMessages))
         ) {
             retainedIDs += item.id
         } else if (item.id.startsWith("info-") || isOptimistic(item)) {
@@ -163,6 +165,19 @@ internal fun SessionFeature.Companion.mergeTranscript(
     buckets[merged.size]?.let(result::addAll)
     result += trailing
     return result
+}
+
+/**
+ * A replacement read (one message, or Home's bounded cache) carries only unfinished text across.
+ * Matching rows anchor it in read order.
+ */
+fun SessionFeature.Companion.preservingInProgressText(
+    fetched: List<OpenCodeTranscriptItem>, existing: List<OpenCodeTranscriptItem>,
+): List<OpenCodeTranscriptItem> {
+    if (existing.none { it.isInProgressText }) return fetched
+    val ids = fetched.mapTo(HashSet()) { it.id }
+    val anchorsAndText = existing.filter { it.isInProgressText || it.id in ids }
+    return mergeTranscript(fetched, anchorsAndText, preserveInProgressText = true)
 }
 
 /** iOS `SessionFeature.messageID(for:)`: the server message an item belongs to. */
@@ -801,11 +816,16 @@ private fun SessionFeature.applyLiveEvent(event: OpenCodeLiveContentEvent, proje
             // its middle and starting from "" would shrink it to its tail. It stays as it is until
             // its text ends with the whole text.
             val accumulated = projection.liveText[id]
-                ?: if (projection.items.none { it.id == id }) "" else null
-            if (accumulated == null) {
+            val text = when {
+                // The socket may have streamed for a while before this screen opened.
+                event.accumulatedText != null -> event.accumulatedText
+                accumulated != null -> accumulated + event.delta
+                projection.items.none { it.id == id } -> event.delta
+                else -> null
+            }
+            if (text == null) {
                 null
             } else {
-                val text = accumulated + event.delta
                 projection.liveText[id] = text
                 projection.upsertText(upsertLiveTextChange(id, text, streaming = true, items = projection.items), id)
             }
@@ -891,7 +911,7 @@ internal fun SessionFeature.upsertLiveTextChange(
     val shown = if (streaming) OpenCodeMarkdownBlock.holdingPendingMarker(text) else text
     if (shown.isBlank()) return LiveUpsert.Unchanged
     val index = items.indexOfLast { it.id == id }
-    val item = OpenCodeTranscriptItem.AssistantMarkdown(id = id, text = shown)
+    val item = OpenCodeTranscriptItem.AssistantMarkdown(id = id, text = shown, inProgress = streaming)
     if (index >= 0) {
         if (items[index] == item) return LiveUpsert.Unchanged
         items[index] = item

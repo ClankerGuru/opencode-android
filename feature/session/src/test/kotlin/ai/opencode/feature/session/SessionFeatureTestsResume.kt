@@ -32,6 +32,8 @@ import ai.opencode.server.model.OpenCodeTranscriptPage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.yield
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
 import org.junit.Test
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -45,6 +47,33 @@ class SessionFeatureTestsResume {
 
     private fun isRefreshResponse(action: Action) = action is Action.RefreshResponse
     private fun isAccepted(action: Action) = action is Action.AcceptedTranscriptUpdated
+
+    @Test
+    fun cachedReplySurvivesAnOmittingOpenReadBeforeItsFirstDelta() = sessionTest { h ->
+        val session = testSession(id = "ses_cached", title = "Cached reply")
+        val user = user("prompt", "Go")
+        val stale = assistant("reply-text-0", "")
+        val previous = h.store(h.makeState(session = session, cachedItems = listOf(user, stale)))
+        previous.exhaustive = false
+        previous.send(Action.ContentBatch(session.id, listOf(OpenCodeLiveContentEvent.TextDelta("reply", 1, "First words"))))
+
+        // Home stores the cacheable rows; the new visit has neither the old raw text nor its
+        // projection IDs.
+        val serializer = ListSerializer(OpenCodeTranscriptItem.serializer())
+        val cached = Json.decodeFromString(serializer, Json.encodeToString(serializer, previous.state.cacheableItems))
+        val partial = cached.last()
+        assertTrue(partial.isInProgressText)
+        val store = h.store(h.makeState(session = session, cachedItems = cached, isRunning = true))
+        store.exhaustive = false
+        store.send(Action.TranscriptResponse(session.id, Result.success(listOf(user))))
+        assertEquals(listOf(user, partial), store.state.items)
+        store.send(Action.ContentBatch(session.id, listOf(OpenCodeLiveContentEvent.TextDelta("reply", 1, " tail after gap"))))
+        assertEquals(listOf(user, partial), store.state.items)
+        assertTrue(store.state.liveText.isEmpty())
+        val final = assistant(partial.id, "First words, middle, tail after gap")
+        store.send(Action.TranscriptResponse(session.id, Result.success(listOf(user, final))))
+        assertEquals(listOf(user, final), store.state.items)
+    }
 
     @Test
     fun streamGapRejectsPreGapReadAndReconnectRefetchesWithoutDuplicatingText() = sessionTest { h ->

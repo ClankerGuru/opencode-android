@@ -3,6 +3,7 @@ package ai.opencode.server
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.log.AppLog
+import ai.opencode.server.model.utf8Length
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
@@ -65,6 +66,7 @@ class EventBatcher(
     private val flushInterval: Duration = 75.milliseconds,
     private val capacity: Int = BUFFER_CAPACITY,
     private val isFocused: (String) -> Boolean = { true },
+    private val onOverflow: (EventStreamOverflow) -> Unit = { throw it },
 ) {
     private val lock = Any()
     private val pending = LinkedHashMap<String, MutableList<OpenCodeLiveContentEvent>>()
@@ -72,7 +74,13 @@ class EventBatcher(
     private var isTerminated = false
 
     /** This connection's accumulated text per part, as the reducer accumulates it. */
-    private val liveText = HashMap<String, String>()
+    private class PartText(val sessionID: String, val fromStart: Boolean) {
+        val text = StringBuilder()
+        var bytes = 0L
+    }
+    private val liveText = LinkedHashMap<String, PartText>()
+    /** A gap in delivery without a recoverable prefix: wait for the authoritative TextEnded. */
+    private val discarded = mutableSetOf<String>()
 
     /** The buffer's free slots after the last emission, and when that was measured. */
     private var remaining = capacity
@@ -88,50 +96,69 @@ class EventBatcher(
         get() = remaining <= capacity / 2 && clock.now() - remainingMeasuredAt < 1.seconds
 
     /**
+     * Attach a complete prefix whenever this connection has one: a screen can open between this
+     * flush and delivery. Only focused sessions prepare Markdown.
+     *
      * Under pressure, a session off screen loses its streaming deltas: its rows aren't drawn, and
      * their ends (`TextEnded`, `ToolInputEnded`) and every other event still arrive, so nothing
      * durable goes. Emitting them would fill the buffer and drop the connection for everyone (a
      * reconnect gap, and a backoff of up to 15 s).
      */
-    private fun shedding(events: List<OpenCodeLiveContentEvent>, sessionID: String): List<OpenCodeLiveContentEvent> {
-        if (!isUnderPressure || isFocused(sessionID)) return events
+    private fun prepare(events: List<OpenCodeLiveContentEvent>, sessionID: String): List<OpenCodeLiveContentEvent> {
+        val focused = isFocused(sessionID)
+        val shed = !focused && isUnderPressure
         val kept = ArrayList<OpenCodeLiveContentEvent>(events.size)
         for (event in events) {
-            when (event) {
-                is OpenCodeLiveContentEvent.TextDelta -> liveText.remove("${event.messageID}-text-${event.ordinal}")
-                is OpenCodeLiveContentEvent.ReasoningDelta, is OpenCodeLiveContentEvent.ToolInputDelta -> Unit
-                else -> kept.add(event)
-            }
-        }
-        shedDeltas += events.size - kept.size
-        if (kept.isEmpty()) shedBatches += 1
-        return kept
-    }
-
-    /** Mirrors the session reducer's text handling. */
-    private fun prepareMarkdown(events: List<OpenCodeLiveContentEvent>) {
-        for (event in events) {
-            when (event) {
+            val prepared = when (event) {
                 is OpenCodeLiveContentEvent.TextStarted -> {
                     val id = "${event.messageID}-text-${event.ordinal}"
-                    liveText[id] = liveText[id] ?: ""
+                    if (id !in discarded) liveText.getOrPut(id) { PartText(sessionID, fromStart = true) }
+                    event
                 }
                 is OpenCodeLiveContentEvent.TextDelta -> {
                     val id = "${event.messageID}-text-${event.ordinal}"
-                    val text = (liveText[id] ?: "") + event.delta
-                    liveText[id] = text
-                    hooks.prepareMarkdown(id, text, true)
+                    if (id in discarded) continue
+                    val part = liveText.getOrPut(id) { PartText(sessionID, fromStart = false) }
+                    part.bytes += utf8Length(event.delta)
+                    if ((shed && !part.fromStart) || (!focused && part.bytes > OFFSCREEN_PART_BYTE_LIMIT)) {
+                        discard(id)
+                        continue
+                    }
+                    part.text.append(event.delta)
+                    if (shed) continue
+                    if (!part.fromStart && !focused) event else {
+                        val text = part.text.toString()
+                        if (focused) hooks.prepareMarkdown(id, text, true)
+                        if (part.fromStart) event.copy(accumulatedText = text) else event
+                    }
                 }
                 is OpenCodeLiveContentEvent.TextEnded -> {
                     val id = "${event.messageID}-text-${event.ordinal}"
                     liveText.remove(id)
-                    hooks.prepareMarkdown(id, event.text, false)
+                    discarded.remove(id)
+                    if (focused) hooks.prepareMarkdown(id, event.text, false)
+                    event
                 }
-                else -> Unit
+                is OpenCodeLiveContentEvent.ReasoningDelta, is OpenCodeLiveContentEvent.ToolInputDelta -> if (shed) continue else event
+                else -> event
             }
+            kept += prepared
         }
-        // A part that never ends (a dropped run) mustn't grow without bound.
-        if (liveText.size > 32) liveText.keys.minOrNull()?.let(liveText::remove)
+        if (liveText.size > OFFSCREEN_PART_LIMIT) {
+            // LinkedHashMap preserves start order. Only offscreen accumulators share this budget.
+            val offscreen = liveText.mapNotNull { (id, part) -> id.takeUnless { isFocused(part.sessionID) } }
+            for (i in 0 until offscreen.size - OFFSCREEN_PART_LIMIT) discard(offscreen[i])
+        }
+        if (shed) {
+            shedDeltas += events.size - kept.size
+            if (kept.isEmpty()) shedBatches += 1
+        }
+        return kept
+    }
+
+    private fun discard(id: String) {
+        liveText.remove(id)
+        discarded.add(id)
     }
 
     fun receive(event: OpenCodeServerEvent) {
@@ -189,9 +216,14 @@ class EventBatcher(
     }
 
     private fun emitBatch(sessionID: String, events: List<OpenCodeLiveContentEvent>) {
-        val kept = shedding(events, sessionID)
+        val kept = prepare(events, sessionID)
+        if (liveText.size + discarded.size > UNFINISHED_PART_LIMIT) {
+            AppLog.stream.notice { "Event buffer overflow: too many unfinished text parts" }
+            terminate()
+            onOverflow(EventStreamOverflow())
+            return
+        }
         if (kept.isEmpty()) return
-        prepareMarkdown(kept)
         emitLocked(OpenCodeServerEvent.ContentBatch(sessionID, kept))
     }
 
@@ -221,11 +253,15 @@ class EventBatcher(
         flushJob = null
         pending.clear()
         liveText.clear()
+        discarded.clear()
     }
 
     companion object {
         /** The event stream's buffer size (iOS `EventBatcher.bufferCapacity`). */
         const val BUFFER_CAPACITY = 128
         private const val BATCH_LIMIT = 256
+        private const val OFFSCREEN_PART_BYTE_LIMIT = 512 * 1024
+        private const val OFFSCREEN_PART_LIMIT = 32
+        private const val UNFINISHED_PART_LIMIT = 1024
     }
 }
