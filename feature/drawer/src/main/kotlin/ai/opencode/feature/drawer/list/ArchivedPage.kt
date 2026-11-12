@@ -72,7 +72,7 @@ internal fun ArchivedEntryRow(count: Int, regularList: Boolean, onClick: () -> U
 
 /**
  * The Archived page over the drawer's list: back, the title and Search Archived (the server
- * searches, as on desktop), then the archived sessions, muted. A tap opens one; a hold, or a tap
+ * searches, as on desktop), then the archived sessions. A tap opens one; a hold, or a tap
  * while selecting, chooses it, and the selection bar ([header]) takes the title's place.
  */
 @Composable
@@ -122,7 +122,6 @@ internal fun ArchivedPage(
                     row = row,
                     now = now,
                     selected = false,
-                    archived = true,
                     checked = if (checkedIDs.isEmpty()) null else row.id in checkedIDs,
                     select = { select(row.id) },
                     held = { held(row.id) },

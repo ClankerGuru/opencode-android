@@ -51,7 +51,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -178,7 +177,6 @@ internal fun InboxSidebarList(
                     row = row,
                     now = now,
                     selected = row.id == selectedSessionID,
-                    archived = false,
                     checked = if (checkedIDs.isEmpty()) null else row.id in checkedIDs,
                     select = { select(row.id) },
                     held = { held(row.id) },
@@ -201,14 +199,13 @@ internal fun InboxSidebarList(
 /**
  * One session: a tap opens it (or, while selecting, chooses it) and a hold chooses it, as on the
  * regular drawer's rows ([drawerRowInteraction]). A sideways swipe is left to the drawer, so a
- * left swipe closes it. [archived] rows (the Archived page) are muted.
+ * left swipe closes it.
  */
 @Composable
 internal fun InboxSidebarSessionRow(
     row: InboxSidebarRow,
     now: Instant,
     selected: Boolean,
-    archived: Boolean,
     checked: Boolean?,
     select: () -> Unit,
     held: () -> Unit,
@@ -253,13 +250,13 @@ internal fun InboxSidebarSessionRow(
                 }
             },
     ) {
-        InboxSidebarRowView(row, now, checked, Modifier.graphicsLayer { alpha = if (archived) InboxSidebarMetrics.archivedAlpha else 1f })
+        InboxSidebarRowView(row, now, checked)
     }
 }
 
 /** iOS `InboxSidebarRowView`: dot, title and age, project, then what the session needs. */
 @Composable
-internal fun InboxSidebarRowView(row: InboxSidebarRow, now: Instant, checked: Boolean?, modifier: Modifier = Modifier) {
+internal fun InboxSidebarRowView(row: InboxSidebarRow, now: Instant, checked: Boolean?) {
     val colors = OpenCodeTheme.colors
     val age = InboxSidebarRow.age(row.updatedAt, now)
     val description = buildList {
@@ -274,7 +271,7 @@ internal fun InboxSidebarRowView(row: InboxSidebarRow, now: Instant, checked: Bo
         add(age)
     }.joinToString(", ")
     Row(
-        modifier
+        Modifier
             .fillMaxWidth()
             .padding(horizontal = InboxSidebarMetrics.edge, vertical = 10.dp)
             .clearAndSetSemantics {
@@ -335,8 +332,6 @@ internal fun rememberInboxSidebarOn(): Boolean {
 
 internal object InboxSidebarMetrics {
     val edge = 20.dp
-    /** Archived rows read muted, as on desktop. */
-    const val archivedAlpha = 0.5f
     /** iOS `.orange` beside Needs your input. */
     val needsInputTint = Color(0xFFFF9F0A)
 }
