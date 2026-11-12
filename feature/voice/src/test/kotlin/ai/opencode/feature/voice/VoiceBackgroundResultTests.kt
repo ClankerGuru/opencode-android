@@ -316,18 +316,18 @@ class VoiceBackgroundResultTests {
         announced.value
     }
 
-    /**
-     * A request that reads the session that started the work holds its
-     * result like that session's own, so its answer goes first.
-     */
+    /** Voice follows reported launches across server versions and reads the parent's own text. */
     @Test fun runMessagesDecodeLaunchesAndCompletions() {
         val json = """
         {"data":[
           {"id":"s1","type":"synthetic","text":"<subagent …>","description":"Eye tracking research","metadata":{"source":"subagent","childID":"ses_eye","agent":"General","state":"completed"}},
           {"id":"a1","type":"assistant","content":[
-            {"type":"reasoning","text":"Background it."},
-            {"type":"tool","id":"t1","name":"subagent","state":{"status":"completed","input":{"background":true,"description":"Eye tracking research","prompt":"…"},"metadata":{"sessionID":"ses_eye","status":"running"},"content":[{"type":"text","text":"working"}]}},
-            {"type":"tool","id":"t2","name":"subagent","state":{"status":"completed","input":{"description":"Inline"},"metadata":{"sessionID":"ses_inline"}}},
+            {"type":"reasoning","text":"Delegate it."},
+            {"type":"tool","id":"t1","name":"subagent","state":{"status":"completed","input":{"description":"Eye tracking research","prompt":"…"},"metadata":{"sessionID":"ses_eye","status":"running"},"content":[{"type":"text","text":"The subagent will report back."}]}},
+            {"type":"tool","id":"t2","name":"task","state":{"status":"completed","input":{"background":true},"metadata":{"sessionID":"ses_legacy"}}},
+            {"type":"tool","id":"t3","name":"subagent","state":{"status":"completed","input":{"notify":false},"metadata":{"sessionID":"ses_silent","status":"running"}}},
+            {"type":"tool","id":"t4","name":"subagent","state":{"status":"completed","input":{"description":"Inline"},"metadata":{"sessionID":"ses_inline"}}},
+            {"type":"tool","id":"t5","name":"subagent","state":{"status":"completed","input":{},"metadata":{"sessionID":"ses_done","status":"completed"}}},
             {"type":"text","text":"I've started it."}
           ]},
           {"id":"msg_eye","type":"user","text":"Research eye tracking"}
@@ -338,7 +338,10 @@ class VoiceBackgroundResultTests {
         assertEquals(
             listOf(
                 OpenCodeRunMessage(id = "msg_eye", type = "user", text = "Research eye tracking"),
-                OpenCodeRunMessage(id = "a1", type = "assistant", text = "I've started it.", launches = listOf(OpenCodeRunMessage.Launch(sessionID = "ses_eye", description = "Eye tracking research"))),
+                OpenCodeRunMessage(id = "a1", type = "assistant", text = "I've started it.", launches = listOf(
+                    OpenCodeRunMessage.Launch(sessionID = "ses_eye", description = "Eye tracking research"),
+                    OpenCodeRunMessage.Launch(sessionID = "ses_legacy", description = null),
+                )),
                 OpenCodeRunMessage(id = "s1", type = "synthetic", completedChildID = "ses_eye"),
             ),
             page.messages,

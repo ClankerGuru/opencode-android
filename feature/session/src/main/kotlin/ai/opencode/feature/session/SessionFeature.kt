@@ -431,7 +431,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
 
         data class TaskIdentity(val serverID: String, val visit: Int, val sessionID: String?)
 
-        /** A running shell or subagent tool the current run is waiting on. */
+        /** A running shell tool the current run is waiting on. */
         data class ForegroundWork(val key: String, val startedAt: Instant?)
 
         // endregion

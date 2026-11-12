@@ -601,7 +601,7 @@ internal fun SessionFeature.submit(
 }
 
 /**
- * A steer moves the run's running shells and subagents to the background first, so the agent reads
+ * A steer moves blocking shells to the background first, so the agent reads
  * it next. Claimed once: work already moved, or being moved, isn't again.
  */
 internal fun claimAutoBackground(messageID: String, state: State): Pair<State, String?> {

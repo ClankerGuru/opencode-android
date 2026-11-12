@@ -297,13 +297,16 @@ class TranscriptBenchmarkTests {
         // A window of the same count with the same tail settles the earlier shell tool and turns
         // the second item into a subagent tool.
         val completedShellTool = tool("msg_1-tool-call_sh", "call_sh", "shell", OpenCodeToolCall.Status.Completed, mapOf("shellID" to OpenCodeJSONValue.Str("sh_1")))
-        val subagentTool = tool("msg_1-tool-call_sub", "call_sub", "subagent", OpenCodeToolCall.Status.Running, mapOf("sessionID" to OpenCodeJSONValue.Str("ses_sub_1")))
+        val subagentTool = tool(
+            "msg_1-tool-call_sub", "call_sub", "subagent", OpenCodeToolCall.Status.Completed,
+            mapOf("sessionID" to OpenCodeJSONValue.Str("ses_sub_1"), "status" to OpenCodeJSONValue.Str("running")),
+        )
         store.send(SessionFeature.Action.TranscriptResponse(session.id, Result.success(listOf(completedShellTool, subagentTool, tailMarkdown))))
         assertEquals(OpenCodeToolCall.Status.Completed, store.state.shellToolStatuses["sh_1"])
         assertEquals(listOf("sh_1"), store.state.backgroundShells.map { it.id })
         assertEquals(setOf("ses_sub_1"), store.state.subagentToolSessionIDs)
 
-        // A live tool through a content batch updates the subagent IDs too.
+        // Older task calls can also supply the child ID in a progress event.
         store.send(
             SessionFeature.Action.ContentBatch(
                 session.id,

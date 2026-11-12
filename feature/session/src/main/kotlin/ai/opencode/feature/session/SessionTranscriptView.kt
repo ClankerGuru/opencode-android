@@ -865,7 +865,7 @@ fun WorkingIndicator(activity: WorkingActivity, modifier: Modifier = Modifier) {
  * after the Done or Failed flash the indicator blurs and shrinks into the copy glyph's centre
  * while the glyph sharpens in where the reply's copy button then takes over.
  *
- * While a shell or subagent has blocked the run for three seconds, the line's trailing end offers
+ * Once a shell has blocked the run for three seconds, the line's trailing end offers
  * Move to Background when [showsMoveToBackground] (`MoveToBackground.showsManualAction`, off).
  */
 @Composable
