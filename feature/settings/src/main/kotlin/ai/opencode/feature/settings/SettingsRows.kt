@@ -147,17 +147,18 @@ val SettingsRowMinHeight = 56.dp
 
 /**
  * One section of an inset-grouped Settings list: a header (sentence case, in the accent colour as
- * Android's Settings shows one), the rows on a rounded card parted by [SettingsDivider] gaps, and
- * a footer.
+ * Android's Settings shows one), a [description] line under it as the desktop has, the rows on a
+ * rounded card parted by [SettingsDivider] gaps, and a footer.
  */
 fun LazyListScope.settingsSection(
     key: Any,
     header: String? = null,
+    description: String? = null,
     footer: (@Composable ColumnScope.() -> Unit)? = null,
     rows: @Composable ColumnScope.() -> Unit,
 ) {
     item(key = key, contentType = "settings-section") {
-        SettingsSection(header = header, footer = footer, rows = rows)
+        SettingsSection(header = header, description = description, footer = footer, rows = rows)
     }
 }
 
@@ -178,6 +179,7 @@ fun SettingsFooterText(text: String, modifier: Modifier = Modifier) {
 fun SettingsSection(
     modifier: Modifier = Modifier,
     header: String? = null,
+    description: String? = null,
     footer: (@Composable ColumnScope.() -> Unit)? = null,
     rows: @Composable ColumnScope.() -> Unit,
 ) {
@@ -187,8 +189,13 @@ fun SettingsSection(
                 header,
                 style = SettingsText.header,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp).semantics { heading() },
+                modifier = Modifier
+                    .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = if (description != null) 2.dp else 8.dp)
+                    .semantics { heading() },
             )
+        }
+        if (description != null) {
+            SettingsFooterText(description, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp))
         }
         // The desktop's card: flat fill inside a hairline border, small radius.
         Surface(
@@ -280,11 +287,39 @@ fun SettingsRow(
     value: String? = null,
     modifier: Modifier = Modifier,
     showsChevron: Boolean = true,
+    badge: String? = null,
     onClick: (() -> Unit)? = null,
 ) {
     SettingsRowFrame(modifier, onClick = onClick) {
         if (symbol != null) SettingsIcon(symbol, tint)
         SettingsRowText(title, value, Modifier.weight(1f))
+        if (badge != null) SettingsBadge(badge)
+    }
+}
+
+/** A row's status as a small pill (subtle fill, hairline) at its end (“2 On”), as the desktop's settings badges. */
+@Composable
+fun SettingsBadge(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        style = OpenCodeTextStyles.caption1,
+        color = OpenCodeTheme.colors.secondaryText,
+        maxLines = 1,
+        modifier = modifier
+            .background(OpenCodeTheme.colors.inlineCodeFill, RoundedCornerShape(OpenCodeRadius.sm))
+            .border(1.dp, OpenCodeTheme.colors.border, RoundedCornerShape(OpenCodeRadius.sm))
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    )
+}
+
+/**
+ * A choice that opens its own page (Voice › Voice, Delegator): laid out as a [SettingsMenuRow],
+ * the title, then the value and the dropdown chevron at the row's end.
+ */
+@Composable
+fun SettingsChoiceRow(title: String, value: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    SettingsRowFrame(modifier, onClick = onClick) {
+        SettingsTitleAndValue(title, value)
     }
 }
 
@@ -297,8 +332,8 @@ fun SettingsValueRow(title: String, value: String, modifier: Modifier = Modifier
 }
 
 /**
- * iOS `Toggle` in a Settings list, optionally with a [SettingsIcon] and a [summary] (the
- * Experimental rows). The whole row toggles. The switch shows a check while on, as Android's
+ * iOS `Toggle` in a Settings list, optionally with a [SettingsIcon] (the Experimental rows). The
+ * whole row toggles. The switch shows a check while on, as Android's
  * Settings switches do.
  */
 @Composable
@@ -309,7 +344,6 @@ fun SettingsToggleRow(
     modifier: Modifier = Modifier,
     symbol: String? = null,
     tint: SettingsTint = SettingsTint.Gray,
-    summary: String? = null,
     enabled: Boolean = true,
 ) {
     SettingsRowFrame(
@@ -320,7 +354,7 @@ fun SettingsToggleRow(
         onClick = null,
     ) {
         if (symbol != null) SettingsIcon(symbol, tint)
-        SettingsRowText(title, summary, Modifier.weight(1f))
+        SettingsRowText(title, null, Modifier.weight(1f))
         OpenCodeSwitch(checked = checked, onCheckedChange = null, enabled = enabled)
     }
 }
@@ -352,8 +386,8 @@ data class SettingsMenuOption<T>(val value: T, val title: String, val caption: S
 /**
  * iOS `SettingsMenuRow`: a choice in a Settings list: the title, then the value at the row's end
  * in the secondary colour. iOS ends it with an
- * up-and-down chevron; Android uses Material's dropdown arrow. The whole row opens the menu (a
- * Material dropdown with checkmarks).
+ * up-and-down chevron; Android uses the desktop select's thin chevron-down. The whole row opens
+ * the menu (a Material dropdown with checkmarks).
  * [sections] groups options under headers (Voice › Model's provider groups); a single unnamed
  * section is a flat list.
  */
@@ -368,7 +402,6 @@ fun <T> SettingsMenuRow(
     accessibilityLabel: String = title,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val stacked = isAccessibilitySize()
     Box(modifier) {
         SettingsRowFrame(
             Modifier.semantics(mergeDescendants = true) {
@@ -377,17 +410,7 @@ fun <T> SettingsMenuRow(
             },
             onClick = { expanded = true },
         ) {
-            if (stacked) {
-                // iOS at accessibility sizes: the value goes under the title.
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    SettingsRowText(title, summary = null)
-                    SettingsMenuValue(value)
-                }
-            } else {
-                // The title takes what's left; the value keeps to the end, ellipsized past its cap.
-                SettingsRowText(title, summary = null, modifier = Modifier.weight(1f))
-                SettingsMenuValue(value, Modifier.widthIn(max = SettingsMenuValueMaxWidth))
-            }
+            SettingsTitleAndValue(title, value)
         }
         TrailingDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             sections.forEachIndexed { index, (header, options) ->
@@ -428,13 +451,28 @@ fun <T> SettingsMenuRow(
     }
 }
 
+/** A choice row's title, then its value at the end; at accessibility sizes the value goes under the title, as iOS. */
+@Composable
+private fun RowScope.SettingsTitleAndValue(title: String, value: String) {
+    if (isAccessibilitySize()) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            SettingsRowText(title, summary = null)
+            SettingsMenuValue(value)
+        }
+    } else {
+        // The title takes what's left; the value keeps to the end, ellipsized past its cap.
+        SettingsRowText(title, summary = null, modifier = Modifier.weight(1f))
+        SettingsMenuValue(value, Modifier.widthIn(max = SettingsMenuValueMaxWidth))
+    }
+}
+
 /** The widest a [SettingsMenuRow]'s value grows before it's ellipsized. */
 private val SettingsMenuValueMaxWidth = 168.dp
 
-/** A [SettingsMenuRow]'s value and its dropdown arrow. */
+/** A [SettingsMenuRow]'s value and its dropdown chevron. */
 @Composable
 private fun SettingsMenuValue(value: String, modifier: Modifier = Modifier) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
             value,
             style = SettingsText.summary,
@@ -443,8 +481,14 @@ private fun SettingsMenuValue(value: String, modifier: Modifier = Modifier) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false),
         )
-        OpenCodeIcon(SFSymbol.ArrowtriangleDownFill, contentDescription = null, size = 24.dp, tint = OpenCodeTheme.colors.secondaryText)
+        SettingsDropdownChevron()
     }
+}
+
+/** The desktop select's thin, muted chevron-down that ends a choice row. */
+@Composable
+fun SettingsDropdownChevron() {
+    OpenCodeIcon(SFSymbol.ChevronDown, contentDescription = null, size = 16.dp, tint = OpenCodeTheme.colors.secondaryText)
 }
 
 /**

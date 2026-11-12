@@ -94,7 +94,7 @@ val VoiceSettingsFeature.State.delegatorRowValue: String
 /** Settings › Voice › Delegator row. */
 @Composable
 internal fun VoiceDelegatorSettingsRow(state: VoiceSettingsFeature.State, onClick: () -> Unit) {
-    SettingsRow("Delegator", symbol = null, value = state.delegatorRowValue, onClick = onClick)
+    SettingsChoiceRow("Delegator", value = state.delegatorRowValue, onClick = onClick)
 }
 
 /**
@@ -137,42 +137,45 @@ internal fun VoiceDelegatorSettingsPage(store: SettingsStore) {
         } else if (otherServerPick != null) {
             settingsSection(key = "other-server") {
                 DelegatorNote(
-                    "“${otherServerPick.displayTitle}” is on another server. Choose a session on this server, or switch servers before starting a call.",
+                    "“${otherServerPick.displayTitle}” is on another server. Pick one on this server, or switch servers.",
                     SFSymbol.ExclamationmarkTriangle,
                     SettingsTint.Orange.color(),
                 )
             }
         }
-        settingsSection(key = "mode", footer = footerText("Applies to your next call.")) {
+        settingsSection(
+            key = "mode",
+            footer = footerText("Built-in runs on OpenAI, without a session. OpenCode Session works in a session on your server."),
+        ) {
             ModeRow(
                 title = "Built-in",
-                subtitle = "Runs GPT-Live’s stateless delegator on OpenAI",
                 isSelected = !choice.usesOpenCodeSession || !isAvailable,
             ) { select(VoiceDelegatorChoice.BuiltIn) }
             SettingsDivider()
             ModeRow(
                 title = "OpenCode Session",
-                subtitle = "Steers a session on your connected OpenCode server",
                 isSelected = choice.usesOpenCodeSession && isAvailable,
                 isEnabled = isAvailable,
             ) { if (!choice.usesOpenCodeSession) select(VoiceDelegatorChoice.AutomaticSession) }
         }
         if (choice.usesOpenCodeSession && isAvailable) {
-            settingsSection(key = "target", header = "Session Target") {
+            settingsSection(
+                key = "target",
+                header = "Session Target",
+                footer = footerText("Automatic uses a “Voice” session on this server. Viewed Session uses the one on screen."),
+            ) {
                 ModeRow(
                     title = "Automatic",
-                    subtitle = "Finds or creates a “Voice” session on this server",
                     isSelected = choice == VoiceDelegatorChoice.AutomaticSession,
                 ) { select(VoiceDelegatorChoice.AutomaticSession) }
                 SettingsDivider()
                 ModeRow(
                     title = "Viewed Session",
-                    subtitle = "Uses whichever session is open on your screen",
                     isSelected = choice == VoiceDelegatorChoice.ViewedSession,
                 ) { select(VoiceDelegatorChoice.ViewedSession) }
                 if (otherServerPick != null) {
                     SettingsDivider()
-                    ModeRow(title = otherServerPick.displayTitle, subtitle = "Picked on another server", isSelected = true) {}
+                    ModeRow(title = otherServerPick.displayTitle, isSelected = true) {}
                 }
             }
             val server = state.connectedServer
@@ -181,14 +184,14 @@ internal fun VoiceDelegatorSettingsPage(store: SettingsStore) {
                     OpenCodeSearchField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        placeholder = "Filter sessions",
+                        placeholder = "Search Sessions",
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                     )
                 }
                 settingsSection(
                     key = "sessions",
                     header = "Pick a Session",
-                    footer = footerText("Picking an existing session keeps its current model."),
+                    footer = footerText("A picked session keeps its model."),
                 ) {
                     if (filteredSessions.isEmpty()) {
                         SettingsRowFrame {
@@ -230,7 +233,7 @@ private fun DelegatorNote(text: String, symbol: SFSymbol, color: androidx.compos
 @Composable
 private fun ModeRow(
     title: String,
-    subtitle: String?,
+    subtitle: String? = null,
     isSelected: Boolean,
     isEnabled: Boolean = true,
     onClick: () -> Unit,

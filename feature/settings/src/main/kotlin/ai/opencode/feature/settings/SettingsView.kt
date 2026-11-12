@@ -19,7 +19,6 @@ import ai.opencode.core.ui.OpenCodeTopBar
 import ai.opencode.core.ui.OpenCodeTopBarBackButton
 import ai.opencode.core.ui.rememberOpenCodeLargeTopBarScrollBehavior
 import ai.opencode.core.ui.rememberOverscrollIfContentScrolls
-import ai.opencode.core.ui.ThemeSharedKeys
 import ai.opencode.core.ui.AccessibilityFocusRequest
 import ai.opencode.core.ui.accessibilityFocusRequest
 import ai.opencode.core.ui.rememberAccessibilityFocusRequest
@@ -30,7 +29,6 @@ import ai.opencode.feature.settings.serverdetails.ServerDetailsPage
 import ai.opencode.feature.settings.whatsnew.WhatsNewDetailPage
 import ai.opencode.feature.settings.whatsnew.WhatsNewListPage
 import ai.opencode.feature.settings.whatsnew.WhatsNewSmallerListPage
-import ai.opencode.feature.system.notifications.NotificationPermission
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Box
@@ -272,7 +270,6 @@ fun SettingsPageScaffold(
 /** Settings' root page (iOS `SessionSettingsView.page`). */
 @Composable
 private fun SettingsRootPage(store: SettingsStore) {
-    val appTheme by remember { shared(ThemeSharedKeys.appTheme).flow }.collectAsState()
     val voiceModeEnabled by remember { shared(SharedKeys.voiceModeEnabled).flow }.collectAsState()
     val developerMode by remember { shared(SharedKeys.developerMode).flow }.collectAsState()
     val hideModels by remember { shared(ExperimentalFeature.hideModels.key).flow }.collectAsState()
@@ -295,7 +292,7 @@ private fun SettingsRootPage(store: SettingsStore) {
             }
             // Preferences: Appearance, Sessions, Models, Voice and Notifications.
             settingsSection(key = "preferences") {
-                SettingsRow("Appearance", "paintpalette.fill", SettingsTint.Purple, value = appTheme.title, modifier = returnFocus.on(SettingsPage.Appearance)) {
+                SettingsRow("Appearance", "paintpalette.fill", SettingsTint.Purple, modifier = returnFocus.on(SettingsPage.Appearance)) {
                     push(SettingsPage.Appearance)
                 }
                 SettingsDivider(inset = true)
@@ -305,18 +302,14 @@ private fun SettingsRootPage(store: SettingsStore) {
                     SettingsRow("Models", "cpu", SettingsTint.Teal, modifier = returnFocus.on(SettingsPage.Models)) { push(SettingsPage.Models) }
                 }
                 SettingsDivider(inset = true)
-                SettingsRow("Voice", "waveform", SettingsTint.Indigo, value = if (voiceModeEnabled) "On" else "Off", modifier = returnFocus.on(SettingsPage.Voice)) {
+                SettingsRow("Voice", "waveform", SettingsTint.Indigo, modifier = returnFocus.on(SettingsPage.Voice), badge = if (voiceModeEnabled) "On" else null) {
                     push(SettingsPage.Voice)
                 }
-                notificationPermission?.let { permission ->
+                if (notificationPermission != null) {
                     SettingsDivider(inset = true)
-                    SettingsRow(
-                        "Notifications",
-                        "bell.badge.fill",
-                        SettingsTint.Red,
-                        value = if (permission == NotificationPermission.Enabled) "On" else "Off",
-                        modifier = returnFocus.on(SettingsPage.Notifications),
-                    ) { push(SettingsPage.Notifications) }
+                    SettingsRow("Notifications", "bell.badge.fill", SettingsTint.Red, modifier = returnFocus.on(SettingsPage.Notifications)) {
+                        push(SettingsPage.Notifications)
+                    }
                 }
             }
             settingsSection(key = "whats-new") {
@@ -325,9 +318,7 @@ private fun SettingsRootPage(store: SettingsStore) {
             settingsSection(
                 key = "experimental",
                 footer = {
-                    SettingsFooterText("Unfinished features, diagnostics, and live tuning.")
-                    // iOS stacks the footer's lines 14 apart; the footer column already spaces them 6.
-                    SelectionContainer(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                    SelectionContainer(Modifier.fillMaxWidth()) {
                         Text(
                             AppVersion.current.label,
                             style = OpenCodeTextStyles.footnote.copy(fontFeatureSettings = "tnum"),
@@ -340,7 +331,7 @@ private fun SettingsRootPage(store: SettingsStore) {
             ) {
                 ExperimentalSettingsRow(returnFocus.on(SettingsPage.Experimental())) { push(SettingsPage.Experimental()) }
                 SettingsDivider(inset = true)
-                SettingsRow("Developer", "hammer.fill", SettingsTint.Teal, value = if (developerMode) "On" else "Off", modifier = returnFocus.on(SettingsPage.Developer)) {
+                SettingsRow("Developer", "hammer.fill", SettingsTint.Teal, modifier = returnFocus.on(SettingsPage.Developer), badge = if (developerMode) "On" else null) {
                     push(SettingsPage.Developer)
                 }
             }

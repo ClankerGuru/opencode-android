@@ -169,7 +169,8 @@ fun VoiceSettingsView(store: SettingsStore) {
         if (state.voiceModeEnabled) {
             settingsSection(
                 key = "configuration",
-                footer = { SettingsFooterText(keySource.footer) },
+                header = "Call Setup",
+                description = keySource.footer.removeSuffix("."),
             ) {
                 var first = true
                 fun divider() = if (first) { first = false; false } else true
@@ -210,9 +211,8 @@ fun VoiceSettingsView(store: SettingsStore) {
                     }
                 }
                 if (divider()) SettingsDivider()
-                SettingsRow(
+                SettingsChoiceRow(
                     "Voice",
-                    symbol = null,
                     value = CallVoicePicker.rowValue(state.callVoice, state.voiceEngine),
                 ) { store.send(SettingsFeature.Action.PagePushed(SettingsPage.CallVoicePicker)) }
                 if (state.showsDelegatorRow) {
@@ -221,7 +221,7 @@ fun VoiceSettingsView(store: SettingsStore) {
                 }
             }
         }
-        settingsSection(key = "options") {
+        settingsSection(key = "options", header = "Calls") {
             if (state.voiceModeEnabled && showsRaiseToTalk) {
                 SettingsToggleRow(
                     "Raise to Talk",
@@ -355,10 +355,10 @@ fun CallVoicePickerView(store: SettingsStore) {
     DisposableEffect(voice) { onDispose { voice.send(VoiceSettingsFeature.Action.VoicePickerDisappeared) } }
     val settings = { action: HomeSettingsFeature.Action -> store.send(SettingsFeature.Action.Settings(action)) }
     val footer = when {
-        !state.canPreviewVoices -> "Add your ${state.activeProvider.displayName} key in Voice settings to preview voices."
+        !state.canPreviewVoices -> "Add your ${state.activeProvider.displayName} key to preview voices."
         CallVoicePicker.isMissing(state.callVoice, engine) ->
-            "${state.callVoice.title} isn’t available on ${engine.title}, so calls use ${selected.title}. Applies to your next call."
-        else -> "Applies to your next call."
+            "${state.callVoice.title} isn’t available on ${engine.title}, so calls use ${selected.title}."
+        else -> null
     }
 
     SettingsPageScaffold(title = "Voice", store = store) {
@@ -370,7 +370,7 @@ fun CallVoicePickerView(store: SettingsStore) {
                 }
             }
         }
-        settingsSection(key = "voices", footer = footerText(footer)) {
+        settingsSection(key = "voices", footer = footer?.let { footerText(it) }) {
             CallVoice.supported(engine).forEachIndexed { index, option ->
                 if (index > 0) SettingsDivider()
                 VoiceRow(

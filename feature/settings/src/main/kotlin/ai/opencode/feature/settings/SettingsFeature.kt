@@ -45,7 +45,7 @@ sealed interface SettingsPage {
     data object Voice : SettingsPage
     /** Settings › Voice › Voice Provider (iOS `VoiceProviderDetailPage`, Server Voice); [opensAccount] pushes Your Account over it. */
     data class VoiceProvider(val opensAccount: Boolean = false) : SettingsPage
-    /** Settings › Voice › Voice Provider › Your Account (iOS `VoiceProviderAccountPage`). */
+    /** Settings › Voice › Voice Provider › API Key (iOS `VoiceProviderAccountPage`). */
     data object VoiceAccount : SettingsPage
     /** Settings › Voice › Delegator (iOS `VoiceDelegatorSettingsPage`, OpenCode Session Delegator). */
     data object VoiceDelegator : SettingsPage

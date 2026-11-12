@@ -11,7 +11,7 @@ import ai.opencode.core.experiments.ExperimentalGroup
  * Drawer and Settings all read it; Settings owns the list UI.
  *
  * The entries are the whole list, in Settings order, as iOS's enum cases are; each one carries
- * its title, group, symbol and summary (iOS `row`). [allCases] is iOS `allCases`.
+ * its title, group and symbol (iOS `row`; Android drops iOS's summary: the rows are titles only). [allCases] is iOS `allCases`.
  *
  * Code reads it with `dependency(ExperimentalFeatures)(feature)` (reducers) or
  * `shared(experimental(feature))` (views).
@@ -28,8 +28,6 @@ enum class ExperimentalFeature(
     val group: ExperimentalGroup?,
     /** SF Symbol name (iOS `systemImage`), drawn through `OpenCodeIcons`. */
     val symbol: String,
-    /** A few words under the title, only when they add something to it. */
-    val summary: String? = null,
     /**
      * Removed on iOS but still read by modules whose port of the removal hasn't landed. Not in
      * [allCases], never listed, never on.
@@ -43,20 +41,18 @@ enum class ExperimentalFeature(
     joinsAll: Boolean = true,
 ) {
     // Composer
-    agentSelection("agent-selection", "Agent Selection", ExperimentalGroup.composer, "person.crop.circle", "Choose Build, Plan, or your own"),
+    agentSelection("agent-selection", "Agent Selection", ExperimentalGroup.composer, "person.crop.circle"),
     hideModels("hide-models", "Hide Unused Models", ExperimentalGroup.composer, "eye.slash"),
 
     // Calls
     backgroundCallIntent(
         "background-call-intent", "Background Call Shortcut", ExperimentalGroup.calls, "button.programmable",
-        "Calls start without opening the app",
         // Starts the microphone with the app in the background.
         joinsAll = false,
     ),
     voiceSessionDelegator("voice-session-delegator", "OpenCode Session Delegator", ExperimentalGroup.calls, "bubble.left.and.bubble.right"),
     shareScreenWithAgents(
         "share-screen-with-agents", "Share Screen with Agents", ExperimentalGroup.calls, "rectangle.on.rectangle",
-        "Agents may ask to see it",
         // Sends a picture of the app to the agent.
         joinsAll = false,
     ),
@@ -65,29 +61,28 @@ enum class ExperimentalFeature(
     inboxSidebar("inbox-sidebar", "Inbox Sidebar", ExperimentalGroup.drawer, "tray"),
     sessionLiveActivity(
         "session-live-activity", "Session Live Updates", ExperimentalGroup.drawer, "platter.filled.top.iphone",
-        "Follow runs in a live notification",
     ),
-    soundEffects("sound-effects", "Sound Effects", ExperimentalGroup.drawer, "speaker.wave.2.fill", "Soft sounds for replies and requests"),
+    soundEffects("sound-effects", "Sound Effects", ExperimentalGroup.drawer, "speaker.wave.2.fill"),
 
     // Transcript
     inAppBrowser("in-app-browser", "In-App Browser", ExperimentalGroup.transcript, "safari"),
 
     // Settings › Developer › Playgrounds, beside Show Welcome
-    welcomePreview("welcome-preview", "Welcome Preview", null, "hand.wave", "The new first-run welcome"),
+    welcomePreview("welcome-preview", "Welcome Preview", null, "hand.wave"),
 
     // Removed on iOS; kept only until the modules that still read them port the removal.
 
     /** iOS cd6be7c6 removed the Since You Left experiment. Never on. */
     @Deprecated("Removed on iOS (cd6be7c6)")
-    sinceYouLeft("since-you-left", "Since You Left", ExperimentalGroup.transcript, "clock.arrow.circlepath", "Recap activity since you left", isRetired = true),
+    sinceYouLeft("since-you-left", "Since You Left", ExperimentalGroup.transcript, "clock.arrow.circlepath", isRetired = true),
 
     /** iOS c75d4a1e removed the Session Switcher experiment. Never on; its switch is cleared at launch. */
     @Deprecated("Removed on iOS (c75d4a1e)")
-    sessionSwitcher("session-switcher", "Session Switcher", ExperimentalGroup.drawer, "square.stack", "Swipe sideways or up through sessions", isRetired = true),
+    sessionSwitcher("session-switcher", "Session Switcher", ExperimentalGroup.drawer, "square.stack", isRetired = true),
 
     /** iOS c75d4a1e removed Title Is the Switch. Never on; its switch is cleared at launch. */
     @Deprecated("Removed on iOS (c75d4a1e)")
-    serverTitleSwitch("server-title-switch", "Title Is the Switch", ExperimentalGroup.drawer, "server.rack", "Connect and switch from the title", isRetired = true),
+    serverTitleSwitch("server-title-switch", "Title Is the Switch", ExperimentalGroup.drawer, "server.rack", isRetired = true),
     ;
 
     val id: String get() = rawValue
