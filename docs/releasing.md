@@ -33,6 +33,11 @@ skips `scripts/check.sh` when that commit already passed on `main` (otherwise ru
    on the open testing (`beta`) track with `scripts/play-promote.sh`; it doesn't upload it a
    second time. Otherwise it skips with a notice.
 
+Both uploads refuse to commit while Google is reviewing earlier changes (Play's default would
+cancel that review and start it again): the step fails and that track stays as it was. Once
+Publishing overview shows no changes in review, re-run the `play` job, or, if internal testing
+already took the build, let the next release promote a newer one.
+
 Report the tag, the workflow run and the Play version code.
 
 ## What a push to main does
