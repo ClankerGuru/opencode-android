@@ -332,8 +332,8 @@ fun SettingsValueRow(title: String, value: String, modifier: Modifier = Modifier
 }
 
 /**
- * iOS `Toggle` in a Settings list, optionally with a [SettingsIcon] and a [summary] (the
- * Experimental rows). The whole row toggles. The switch shows a check while on, as Android's
+ * iOS `Toggle` in a Settings list, optionally with a [SettingsIcon] (the Experimental rows). The
+ * whole row toggles. The switch shows a check while on, as Android's
  * Settings switches do.
  */
 @Composable
@@ -344,7 +344,6 @@ fun SettingsToggleRow(
     modifier: Modifier = Modifier,
     symbol: String? = null,
     tint: SettingsTint = SettingsTint.Gray,
-    summary: String? = null,
     enabled: Boolean = true,
 ) {
     SettingsRowFrame(
@@ -355,7 +354,7 @@ fun SettingsToggleRow(
         onClick = null,
     ) {
         if (symbol != null) SettingsIcon(symbol, tint)
-        SettingsRowText(title, summary, Modifier.weight(1f))
+        SettingsRowText(title, null, Modifier.weight(1f))
         OpenCodeSwitch(checked = checked, onCheckedChange = null, enabled = enabled)
     }
 }

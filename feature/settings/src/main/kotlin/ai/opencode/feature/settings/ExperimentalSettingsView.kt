@@ -90,7 +90,9 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
     SettingsPageScaffold(title = "Experimental", store = store, listState = listState) {
         settingsSection(
             key = "experimental-all",
-            description = "Includes new ones, but not screen or mic access",
+            footer = footerText(
+                "Turns on new experiments as they arrive, but not ones that see your screen or listen in the background.",
+            ),
         ) {
             SettingsToggleRow(
                 title = "All Experiments",
@@ -119,7 +121,7 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
     }
 }
 
-/** One experiment's switch: its tinted symbol, title, and any few words. */
+/** One experiment's switch: its tinted symbol and title. */
 @Composable
 fun ExperimentalFeatureToggle(
     feature: ExperimentalFeature,
@@ -139,7 +141,6 @@ fun ExperimentalFeatureToggle(
         onCheckedChange = onChange,
         symbol = feature.symbol,
         tint = feature.group?.tint ?: SettingsTint.Indigo,
-        summary = feature.summary,
         modifier = Modifier.background(highlight),
     )
 }
