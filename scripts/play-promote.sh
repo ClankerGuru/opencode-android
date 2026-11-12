@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
-# Puts an already-uploaded bundle on another Google Play track, e.g. promotes the build CI just
+# Puts a bundle on a Google Play track: uploads it first when given a bundle and its R8 mapping
+# (CI's internal testing upload), otherwise promotes one Play already has, e.g. the build CI just
 # shipped to internal testing onto open testing (`beta`), like iOS's External TestFlight group.
-#   PLAY_SERVICE_ACCOUNT_JSON='{…}' scripts/play-promote.sh <package> <track> <versionCode> <release name>
-# Play keeps every uploaded bundle, so this only edits the track; uploading the same versionCode
-# again would be rejected. Needs curl, jq and openssl. Never prints the key or the access token.
+#   PLAY_SERVICE_ACCOUNT_JSON='{…}' scripts/play-promote.sh <package> <track> <versionCode> <release name> [<bundle> <mapping>]
+# Play keeps every uploaded bundle, so promoting only edits the track; uploading the same
+# versionCode again would be rejected. Fails, changing nothing, while Google is reviewing earlier
+# changes. Needs curl, jq and openssl. Never prints the key or the access token.
 set -euo pipefail
 
-if [[ $# -ne 4 ]]; then
-  echo "usage: $0 <package> <track> <versionCode> <release name>" >&2
+if [[ $# -ne 4 && $# -ne 6 ]]; then
+  echo "usage: $0 <package> <track> <versionCode> <release name> [<bundle> <mapping>]" >&2
   exit 64
 fi
-package=$1 track=$2 version_code=$3 release_name=$4
+package=$1 track=$2 version_code=$3 release_name=$4 bundle=${5:-} mapping=${6:-}
 api="https://androidpublisher.googleapis.com/androidpublisher/v3/applications/$package"
+upload_api="https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/$package"
 
 : "${PLAY_SERVICE_ACCOUNT_JSON:?PLAY_SERVICE_ACCOUNT_JSON is not set}"
 client_email=$(jq -r '.client_email // empty' <<<"$PLAY_SERVICE_ACCOUNT_JSON")
@@ -60,18 +63,26 @@ token=$(call "$token_uri" -X POST \
   --data-urlencode "assertion=$header.$claims.$signature" | jq -r '.access_token')
 auth=(-H "Authorization: Bearer $token")
 
-# put_on_track <status>: one edit that sets the track's release and commits it. Each step
-# returns on failure itself: `set -e` doesn't apply inside a function called as an `if` test.
+# put_on_track <status>: one edit that uploads the bundle (if given), sets the track's release and
+# commits it. Each step returns on failure itself: `set -e` doesn't apply inside a function called
+# as an `if` test.
 put_on_track() {
   local edit release
   edit=$(call "$api/edits" -X POST "${auth[@]}" -H 'Content-Type: application/json' -d '{}' | jq -r '.id') || return 1
+  if [[ -n "$bundle" ]]; then
+    call "$upload_api/edits/$edit/bundles?uploadType=media" -X POST "${auth[@]}" \
+      -H 'Content-Type: application/octet-stream' --data-binary "@$bundle" >/dev/null || return 1
+    call "$upload_api/edits/$edit/apks/$version_code/deobfuscationFiles/proguard?uploadType=media" -X POST \
+      "${auth[@]}" -H 'Content-Type: application/octet-stream' --data-binary "@$mapping" >/dev/null || return 1
+  fi
   release=$(jq -cn --arg track "$track" --arg name "$release_name" --arg code "$version_code" --arg status "$1" '{
     track: $track,
     releases: [{name: $name, versionCodes: [$code], status: $status}]
   }') || return 1
   call "$api/edits/$edit/tracks/$track" -X PUT "${auth[@]}" -H 'Content-Type: application/json' \
     -d "$release" >/dev/null || return 1
-  call "$api/edits/$edit:commit" -X POST "${auth[@]}" >/dev/null || return 1
+  # Play's default commit cancels a review in progress and starts it again from the beginning.
+  call "$api/edits/$edit:commit?changesInReviewBehavior=ERROR_IF_IN_REVIEW" -X POST "${auth[@]}" >/dev/null || return 1
 }
 
 errors=$(mktemp)
@@ -83,6 +94,9 @@ elif grep -q 'Only releases with status draft may be created on draft app' "$err
   # tracks. Leave this one as the track's draft for someone to send for review in Play Console.
   put_on_track draft
   echo "::warning::$release_name (versionCode $version_code) is a draft on the $track track: the app hasn't passed its first review, so send it for review in Play Console (Publishing overview)."
+elif grep -q 'CHANGES_ALREADY_IN_REVIEW' "$errors"; then
+  echo "::error::Google is still reviewing earlier changes, so nothing was sent: $release_name (versionCode $version_code) isn't on the $track track. Try again once Play Console's Publishing overview shows no changes in review."
+  exit 1
 else
   cat "$errors" >&2
   exit 1
