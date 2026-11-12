@@ -31,6 +31,7 @@ import ai.opencode.feature.drawer.list.DrawerPinDrag
 import ai.opencode.feature.drawer.list.DrawerRowMenuItem
 import ai.opencode.feature.drawer.list.DrawerSelectionBar
 import ai.opencode.feature.drawer.list.InboxSidebarList
+import ai.opencode.feature.drawer.list.SelectionHeaderSwap
 import ai.opencode.feature.drawer.list.rememberInboxSidebarOn
 import ai.opencode.feature.drawer.list.selectionActions
 import ai.opencode.feature.drawer.motion.DrawerControlsTrace
@@ -96,6 +97,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -228,6 +230,9 @@ fun HomeDrawer(
         }
     }
     BackHandler(enabled = selection.isActive) { selection.clear() }
+    // The bar keeps its last count while it leaves.
+    var shownCount by remember { mutableIntStateOf(0) }
+    if (selection.isActive) shownCount = selection.ids.size
     LaunchedEffect(isDrawerVisible) { if (!isDrawerVisible) selection.clear() }
 
     val inputs = DrawerListInputs(
@@ -323,24 +328,27 @@ fun HomeDrawer(
                     .padding(top = insetTop + DrawerHeaderTop, bottom = DrawerTunables.headerBottom),
                 contentAlignment = Alignment.CenterEnd,
             ) {
-                if (selection.isActive) {
-                    val (main, overflow) = selectionActions(store, selection, pins = !inboxSidebarOn)
-                    DrawerSelectionBar(count = selection.ids.size, onClose = selection::clear, actions = main, overflow = overflow)
-                    return@Box
+                SelectionHeaderSwap(
+                    active = selection.isActive,
+                    bar = {
+                        val (main, overflow) = selectionActions(store, selection, pins = !inboxSidebarOn)
+                        DrawerSelectionBar(count = shownCount, onClose = selection::clear, actions = main, overflow = overflow)
+                    },
+                ) {
+                    val titleModifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = DrawerMetrics.textInset, end = DrawerSearchPillDefaults.size + DrawerTunables.searchGap)
+                        .drawerSearchTitleFade(viewState.search)
+                    ServerFlowTitle(store = store, motion = serverSwap, onManage = viewState::manageServers, modifier = titleModifier)
+                    DrawerSearchPill(
+                        state = viewState.search,
+                        text = search,
+                        onTextChange = { store.send(HomeFeature.Action.SearchChanged(it)) },
+                        reducedMotion = reducedMotion,
+                        onEnd = viewState::endSearch,
+                        keyboardHold = viewState.keyboardHold,
+                    )
                 }
-                val titleModifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = DrawerMetrics.textInset, end = DrawerSearchPillDefaults.size + DrawerTunables.searchGap)
-                    .drawerSearchTitleFade(viewState.search)
-                ServerFlowTitle(store = store, motion = serverSwap, onManage = viewState::manageServers, modifier = titleModifier)
-                DrawerSearchPill(
-                    state = viewState.search,
-                    text = search,
-                    onTextChange = { store.send(HomeFeature.Action.SearchChanged(it)) },
-                    reducedMotion = reducedMotion,
-                    onEnd = viewState::endSearch,
-                    keyboardHold = viewState.keyboardHold,
-                )
             }
         }
 

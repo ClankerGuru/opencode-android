@@ -1,6 +1,10 @@
 package ai.opencode.feature.drawer.list
 
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionReduce
+import ai.opencode.core.motion.MotionRole
+import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.ui.OpenCodeAlertDialog
 import ai.opencode.core.ui.OpenCodeIcon
@@ -8,6 +12,7 @@ import ai.opencode.core.ui.OpenCodeIconButton
 import ai.opencode.core.ui.OpenCodeIconButtonStyle
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.InboxSidebarFeature
@@ -16,6 +21,7 @@ import ai.opencode.feature.drawer.isPinned
 import ai.opencode.feature.drawer.isUnread
 import ai.opencode.feature.system.SessionWindowTarget
 import ai.opencode.feature.system.WindowsClient
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -30,15 +36,18 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
@@ -68,7 +77,13 @@ class DrawerSelection {
         ids = emptySet()
         confirmingDelete = false
     }
+
+    /** Where the held row's check sat (root pixels, vertical centre) as selection began: the other rows' checks follow out from it ([SelectionLead]). */
+    var originY: Float? = null
 }
+
+/** The drawer's [DrawerSelection], for the rows' [SelectionLead]. */
+internal val LocalDrawerSelection = staticCompositionLocalOf<DrawerSelection?> { null }
 
 /** A chosen row's background, the same in both lists: the accent, faint. */
 @Composable
@@ -81,12 +96,28 @@ internal fun checkedRowTint(): Color {
 @Composable
 internal fun SelectionCheck(checked: Boolean, modifier: Modifier = Modifier, size: Dp = 20.dp) {
     val colors = OpenCodeTheme.colors
-    if (checked) {
-        Box(modifier.size(size).background(colors.signal, CircleShape), contentAlignment = Alignment.Center) {
+    val reduce = rememberReduceMotion()
+    // The fill pops in over the ring when the row is chosen, and shrinks away when it isn't.
+    val fill = remember { Animatable(if (checked) 1f else 0f) }
+    LaunchedEffect(checked) {
+        val spec = if (checked) MotionRole.MicroIn.animation<Float>(MotionPhase.Enter, reduce)
+        else MotionRole.MicroOut.animation(MotionPhase.Exit, reduce)
+        fill.animateTo(if (checked) 1f else 0f, spec)
+    }
+    Box(modifier.size(size).border(1.5.dp, colors.tertiaryText, CircleShape)) {
+        Box(
+            Modifier
+                .matchParentSize()
+                .graphicsLayer {
+                    alpha = fill.value.coerceIn(0f, 1f)
+                    scaleX = MotionReduce.scale(fill.value, reduce)
+                    scaleY = scaleX
+                }
+                .background(colors.signal, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
             OpenCodeIcon(SFSymbol.Checkmark, contentDescription = null, size = size * 0.65f, tint = Color.White)
         }
-    } else {
-        Box(modifier.size(size).border(1.5.dp, colors.tertiaryText, CircleShape))
     }
 }
 
@@ -103,11 +134,10 @@ internal fun DrawerSelectionBar(
     var overflowOpen by remember { mutableStateOf(false) }
     Row(modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
         OpenCodeIconButton(SFSymbol.Xmark, contentDescription = "Cancel Selection", onClick = onClose, style = OpenCodeIconButtonStyle.Standard)
-        Text(
+        RollingNumber(
             "$count Selected",
-            style = OpenCodeTextStyles.headline.copy(fontFeatureSettings = "tnum"),
+            style = OpenCodeTextStyles.headline,
             color = colors.text,
-            maxLines = 1,
             modifier = Modifier.weight(1f).padding(start = 4.dp),
         )
         for (item in actions) {
