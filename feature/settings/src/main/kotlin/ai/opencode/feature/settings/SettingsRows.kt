@@ -147,17 +147,18 @@ val SettingsRowMinHeight = 56.dp
 
 /**
  * One section of an inset-grouped Settings list: a header (sentence case, in the accent colour as
- * Android's Settings shows one), the rows on a rounded card parted by [SettingsDivider] gaps, and
- * a footer.
+ * Android's Settings shows one), a [description] line under it as the desktop has, the rows on a
+ * rounded card parted by [SettingsDivider] gaps, and a footer.
  */
 fun LazyListScope.settingsSection(
     key: Any,
     header: String? = null,
+    description: String? = null,
     footer: (@Composable ColumnScope.() -> Unit)? = null,
     rows: @Composable ColumnScope.() -> Unit,
 ) {
     item(key = key, contentType = "settings-section") {
-        SettingsSection(header = header, footer = footer, rows = rows)
+        SettingsSection(header = header, description = description, footer = footer, rows = rows)
     }
 }
 
@@ -178,6 +179,7 @@ fun SettingsFooterText(text: String, modifier: Modifier = Modifier) {
 fun SettingsSection(
     modifier: Modifier = Modifier,
     header: String? = null,
+    description: String? = null,
     footer: (@Composable ColumnScope.() -> Unit)? = null,
     rows: @Composable ColumnScope.() -> Unit,
 ) {
@@ -187,8 +189,13 @@ fun SettingsSection(
                 header,
                 style = SettingsText.header,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp).semantics { heading() },
+                modifier = Modifier
+                    .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = if (description != null) 2.dp else 8.dp)
+                    .semantics { heading() },
             )
+        }
+        if (description != null) {
+            SettingsFooterText(description, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp))
         }
         // The desktop's card: flat fill inside a hairline border, small radius.
         Surface(
@@ -280,12 +287,29 @@ fun SettingsRow(
     value: String? = null,
     modifier: Modifier = Modifier,
     showsChevron: Boolean = true,
+    badge: String? = null,
     onClick: (() -> Unit)? = null,
 ) {
     SettingsRowFrame(modifier, onClick = onClick) {
         if (symbol != null) SettingsIcon(symbol, tint)
         SettingsRowText(title, value, Modifier.weight(1f))
+        if (badge != null) SettingsBadge(badge)
     }
+}
+
+/** A row's status as a small pill (subtle fill, hairline) at its end (“2 On”), as the desktop's settings badges. */
+@Composable
+fun SettingsBadge(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        style = OpenCodeTextStyles.caption1,
+        color = OpenCodeTheme.colors.secondaryText,
+        maxLines = 1,
+        modifier = modifier
+            .background(OpenCodeTheme.colors.inlineCodeFill, RoundedCornerShape(OpenCodeRadius.sm))
+            .border(1.dp, OpenCodeTheme.colors.border, RoundedCornerShape(OpenCodeRadius.sm))
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    )
 }
 
 /**

@@ -29,7 +29,7 @@ fun SessionsSettingsView(store: SettingsStore) {
         settingsSection(
             key = "return",
             header = "Composer",
-            footer = footerText("Ctrl+Enter always sends on a hardware keyboard."),
+            description = "Ctrl+Enter always sends on a hardware keyboard",
         ) {
             SettingsToggleRow(
                 "Return Key Sends",
@@ -40,7 +40,8 @@ fun SessionsSettingsView(store: SettingsStore) {
         if (ExperimentalFeature.agentSelection.isActive(agentSelection)) {
             settingsSection(
                 key = "default-agent",
-                footer = footerText("New sessions start with this agent. Each session remembers the one you choose."),
+                header = "New Sessions",
+                description = "Each session remembers the agent you choose",
             ) {
                 val options = buildList {
                     add(SettingsMenuOption("", "Server Default"))

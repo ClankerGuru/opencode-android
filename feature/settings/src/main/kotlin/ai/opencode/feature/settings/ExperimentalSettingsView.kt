@@ -90,9 +90,7 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
     SettingsPageScaffold(title = "Experimental", store = store, listState = listState) {
         settingsSection(
             key = "experimental-all",
-            footer = footerText(
-                "Turns on new experiments as they arrive, but not ones that see your screen or listen in the background.",
-            ),
+            description = "Includes new ones, but not screen or mic access",
         ) {
             SettingsToggleRow(
                 title = "All Experiments",
@@ -151,12 +149,20 @@ private fun highlightSpec(highlighted: Boolean, reduceMotion: Boolean): Animatio
     if (highlighted) snap() else MotionRole.Dim.animation(MotionPhase.Exit, reduceMotion)
 
 /**
- * iOS `ExperimentalSettingsRow`: Settings' row into Experimental. Android divergence: no count of
- * experiments turned on, as the root's other rows show no value.
+ * iOS `ExperimentalSettingsRow`: Settings' row into Experimental, counting experiments turned on
+ * (“2 On”), or “All On” while All Experiments is. Android divergence: the count is a badge.
  */
 @Composable
 fun ExperimentalSettingsRow(modifier: Modifier = Modifier, onClick: () -> Unit) {
-    SettingsRow("Experimental", "flask.fill", SettingsTint.Gray, modifier = modifier, onClick = onClick)
+    val all by remember { shared(AllExperiments.key).flow }.collectAsState()
+    val features = ExperimentalGroup.entries.flatMap { it.features }
+    val enabled = features.map { feature -> remember(feature) { shared(feature.key).flow }.collectAsState().value }
+    var on = 0
+    for ((index, feature) in features.withIndex()) {
+        if (enabled[index]) on += 1
+    }
+    val badge = if (all) "All On" else if (on == 0) null else "$on On"
+    SettingsRow("Experimental", "flask.fill", SettingsTint.Gray, modifier = modifier, badge = badge, onClick = onClick)
 }
 
 val ExperimentalGroup.tint: SettingsTint

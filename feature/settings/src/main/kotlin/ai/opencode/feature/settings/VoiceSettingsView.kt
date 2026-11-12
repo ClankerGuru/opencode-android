@@ -169,7 +169,8 @@ fun VoiceSettingsView(store: SettingsStore) {
         if (state.voiceModeEnabled) {
             settingsSection(
                 key = "configuration",
-                footer = { SettingsFooterText(keySource.footer) },
+                header = "Call Setup",
+                description = keySource.footer.removeSuffix("."),
             ) {
                 var first = true
                 fun divider() = if (first) { first = false; false } else true
@@ -220,7 +221,7 @@ fun VoiceSettingsView(store: SettingsStore) {
                 }
             }
         }
-        settingsSection(key = "options") {
+        settingsSection(key = "options", header = "Calls") {
             if (state.voiceModeEnabled && showsRaiseToTalk) {
                 SettingsToggleRow(
                     "Raise to Talk",

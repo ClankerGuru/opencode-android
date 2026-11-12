@@ -6,6 +6,7 @@ import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.PageTransitions
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.StoreOf
@@ -269,6 +270,8 @@ fun SettingsPageScaffold(
 /** Settings' root page (iOS `SessionSettingsView.page`). */
 @Composable
 private fun SettingsRootPage(store: SettingsStore) {
+    val voiceModeEnabled by remember { shared(SharedKeys.voiceModeEnabled).flow }.collectAsState()
+    val developerMode by remember { shared(SharedKeys.developerMode).flow }.collectAsState()
     val hideModels by remember { shared(ExperimentalFeature.hideModels.key).flow }.collectAsState()
     val notificationPermission by store.observe { it.notificationPermission }
     val returnFocus = rememberSettingsReturnFocus(store, page = null)
@@ -299,7 +302,7 @@ private fun SettingsRootPage(store: SettingsStore) {
                     SettingsRow("Models", "cpu", SettingsTint.Teal, modifier = returnFocus.on(SettingsPage.Models)) { push(SettingsPage.Models) }
                 }
                 SettingsDivider(inset = true)
-                SettingsRow("Voice", "waveform", SettingsTint.Indigo, modifier = returnFocus.on(SettingsPage.Voice)) {
+                SettingsRow("Voice", "waveform", SettingsTint.Indigo, modifier = returnFocus.on(SettingsPage.Voice), badge = if (voiceModeEnabled) "On" else null) {
                     push(SettingsPage.Voice)
                 }
                 if (notificationPermission != null) {
@@ -330,7 +333,7 @@ private fun SettingsRootPage(store: SettingsStore) {
             ) {
                 ExperimentalSettingsRow(returnFocus.on(SettingsPage.Experimental())) { push(SettingsPage.Experimental()) }
                 SettingsDivider(inset = true)
-                SettingsRow("Developer", "hammer.fill", SettingsTint.Teal, modifier = returnFocus.on(SettingsPage.Developer)) {
+                SettingsRow("Developer", "hammer.fill", SettingsTint.Teal, modifier = returnFocus.on(SettingsPage.Developer), badge = if (developerMode) "On" else null) {
                     push(SettingsPage.Developer)
                 }
             }
