@@ -1,6 +1,6 @@
 package ai.opencode.feature.composer
 
-import ai.opencode.core.ui.OpenCodeSheetDefaults
+import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import android.view.KeyEvent
 import android.view.Window
@@ -122,7 +122,7 @@ fun OpenCodeBottomSheet(
             onDismissRequest,
             modifier,
             sheetState,
-            shape = OpenCodeSheetDefaults.shape,
+            shape = OpenCodeShape.sheetTop,
             dragHandle = dragHandle,
             content = content,
         )
@@ -183,7 +183,7 @@ private fun InWindowSheet(
             modifier = modifier.align(Alignment.TopCenter).consumeWindowInsets(offsetInsets),
             state = sheetState,
             onDismissRequest = onDismissRequest,
-            shape = OpenCodeSheetDefaults.shape,
+            shape = OpenCodeShape.sheetTop,
             dragHandle = dragHandle,
             contentWindowInsets = { BottomSheetDefaults.modalWindowInsets },
             tonalElevation = 0.dp,

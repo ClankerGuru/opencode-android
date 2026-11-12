@@ -1,7 +1,5 @@
 package ai.opencode.core.ui
 
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.IconButton
@@ -106,12 +104,12 @@ fun OpenCodeIconButton(
                 onClick = onClick,
                 modifier = face,
                 enabled = enabled,
-                shape = RoundedCornerShape(OpenCodeRadius.card),
+                shape = OpenCodeShape.card,
                 colors = IconButtonDefaults.outlinedIconButtonColors(
                     containerColor = container,
                     contentColor = tint?.highContrastForeground() ?: OpenCodeTheme.colors.text,
                 ),
-                border = if (tint == null) BorderStroke(1.dp, OpenCodeTheme.colors.border) else null,
+                border = if (tint == null) OpenCodeSurfaces.border else null,
             ) {
                 OpenCodeIcon(symbol, contentDescription = contentDescription, size = iconSize)
             }

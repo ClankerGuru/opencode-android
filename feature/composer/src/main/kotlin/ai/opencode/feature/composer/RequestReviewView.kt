@@ -1,6 +1,6 @@
 package ai.opencode.feature.composer
 
-import ai.opencode.core.ui.OpenCodeSheetDefaults
+import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeSwitch
 import ai.opencode.core.dependencies.dependency
@@ -85,7 +85,7 @@ fun RequestReviewSheet(
         sheetState = sheetState,
         containerColor = OpenCodeTheme.colors.canvas,
         dragHandle = { OpenCodeSheetHandle() },
-        shape = OpenCodeSheetDefaults.shape,
+        shape = OpenCodeShape.sheetTop,
     ) {
         RequestReviewView(dock, context, dismissMessage, send, onClose, onOpenURL)
     }
