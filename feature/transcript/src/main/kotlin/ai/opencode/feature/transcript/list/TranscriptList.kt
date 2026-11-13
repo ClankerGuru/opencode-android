@@ -9,6 +9,7 @@ import ai.opencode.core.touch.TouchRecovery
 import ai.opencode.core.touch.rememberTouchRecovery
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.drawerPanSelectionHandles
 import ai.opencode.core.ui.inContainer
 import ai.opencode.feature.media.AgentImageViewport
 import ai.opencode.feature.media.AgentImageVisibility
@@ -548,6 +549,7 @@ private fun TranscriptListContent(
                 .onPlaced { replySelection.container = it }
                 .transcriptReplySelectionGestures(replySelection)
                 .transcriptReplySelectionHandles(replySelection)
+                .drawerPanSelectionHandles { point -> replySelection.handleAt(point) != null }
                 .then(if (showsMagnifier) Modifier.magnifier(sourceCenter = { replySelection.magnifierCenter }) else Modifier),
         ) {
             SharedTextContextMenus {

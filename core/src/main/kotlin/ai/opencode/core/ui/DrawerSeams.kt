@@ -8,6 +8,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalFocusManager
@@ -107,6 +108,13 @@ interface DrawerPanExclusion {
         canScrollBackward: () -> Boolean,
         canScrollForward: () -> Boolean,
     ) {}
+
+    /**
+     * Records ([coordinates] non-null) or clears the text selection named [id]; [handleClaims]
+     * says whether a touch (px in [coordinates]) lands on one of its handles. The drawer's pan
+     * never starts from a handle on the shut card (iOS `BackSwipeRules.selectionHandleClaims`).
+     */
+    fun updateSelectionHandles(id: Any, coordinates: LayoutCoordinates?, handleClaims: (Offset) -> Boolean) {}
 }
 
 /** The drawer's pan regions, provided by the drawer container around the card. */
@@ -133,6 +141,25 @@ fun Modifier.drawerPanHorizontalScroller(canScrollBackward: () -> Boolean, canSc
             onDispose { exclusion.updateHorizontalScroller(id, null, { false }, { false }) }
         }
         Modifier.onGloballyPositioned { exclusion.updateHorizontalScroller(id, it, { backward.value() }, { forward.value() }) }
+    }
+}
+
+/**
+ * This element draws a text selection's handles: a touch [handleClaims] (px in this element)
+ * drags the handle, even at the leading edge, and never opens the session drawer
+ * (iOS `BackSwipeRules.selectionHandleClaims`).
+ */
+fun Modifier.drawerPanSelectionHandles(handleClaims: (Offset) -> Boolean): Modifier = composed {
+    val exclusion = LocalDrawerPanExclusion.current
+    if (exclusion == null) {
+        Modifier
+    } else {
+        val id = remember { Any() }
+        val claims = rememberUpdatedState(handleClaims)
+        DisposableEffect(exclusion) {
+            onDispose { exclusion.updateSelectionHandles(id, null) { false } }
+        }
+        Modifier.onGloballyPositioned { exclusion.updateSelectionHandles(id, it) { point -> claims.value(point) } }
     }
 }
 
