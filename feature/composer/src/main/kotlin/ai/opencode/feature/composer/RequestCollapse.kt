@@ -307,7 +307,7 @@ internal class RequestFold(initial: Float) {
                 state,
                 Orientation.Vertical,
                 enabled = enabled,
-                startDragImmediately = gesture.isMidway,
+                startDragImmediately = progress.isRunning,
                 onDragStopped = { velocity -> ended(formID, velocity) },
             )
     }
