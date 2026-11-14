@@ -40,6 +40,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -714,6 +715,7 @@ fun JumpToLatestPill(
     veiled: () -> Boolean = { false },
 ) {
     val reduceMotion = rememberReduceMotion()
+    val scrollToLatestDescription = stringResource(R.string.session_scroll_to_latest_description)
     val presence = remember { Animatable(if (isShown) 1f else 0f) }
     var mounted by remember { mutableStateOf(isShown) }
     LaunchedEffect(isShown, reduceMotion) {
@@ -759,7 +761,7 @@ fun JumpToLatestPill(
                             if (isShown && !veiled()) {
                                 Modifier
                                     .clickable(interactionSource = interactions, indication = null, role = Role.Button, onClick = onClick)
-                                    .semantics { contentDescription = "Scroll to latest" }
+                                    .semantics { contentDescription = scrollToLatestDescription }
                                     .testTag("scroll-to-latest")
                             } else {
                                 Modifier.clearAndSetSemantics { }

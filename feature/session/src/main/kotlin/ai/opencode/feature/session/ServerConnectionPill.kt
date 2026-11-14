@@ -43,6 +43,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -166,6 +167,7 @@ fun ServerConnectionPill(
     val offersEdit = notice.kind == ServerConnectionNotice.Kind.signInFailed
     var menuShown by remember { mutableStateOf(false) }
     val fontScale = LocalDensity.current.fontScale
+    val editServerLabel = stringResource(R.string.session_server_edit)
     Box(modifier) {
         // The desktop's floating chip: flat fill, hairline ring, small radius.
         Surface(
@@ -185,7 +187,7 @@ fun ServerConnectionPill(
                     notice.detail?.let { stateDescription = it }
                     onClick(label = notice.action?.lowercase()) { onAction(notice.primary); true }
                     if (offersEdit) {
-                        customActions = listOf(CustomAccessibilityAction("Edit Server…") { onAction(ServerConnectionNotice.Action.editServer); true })
+                        customActions = listOf(CustomAccessibilityAction(editServerLabel) { onAction(ServerConnectionNotice.Action.editServer); true })
                     }
                 }
                 .testTag("server-connection-pill"),
@@ -220,7 +222,7 @@ fun ServerConnectionPill(
         }
         DropdownMenu(expanded = menuShown && offersEdit, onDismissRequest = { menuShown = false }) {
             DropdownMenuItem(
-                text = { Text("Edit Server…") },
+                text = { Text(editServerLabel) },
                 leadingIcon = { OpenCodeIcon(SFSymbol.Pencil, contentDescription = null) },
                 onClick = {
                     menuShown = false

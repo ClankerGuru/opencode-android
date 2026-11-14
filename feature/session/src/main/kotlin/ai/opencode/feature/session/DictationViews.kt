@@ -2,6 +2,7 @@ package ai.opencode.feature.session
 
 import ai.opencode.feature.composer.DictationDrag
 import ai.opencode.feature.composer.DictationHoldTracker
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionSpring
@@ -68,6 +69,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -343,16 +345,16 @@ fun DictationScopeBar(
                     showsProgress = finishing,
                     enabled = p.isLocked && !p.isFinishing,
                     // Not “Stop”: during a run that's the composer's Stop for the run.
-                    label = if (finishing) "Finishing dictation" else "Stop recording",
+                    label = if (finishing) stringResource(R.string.session_dictation_finishing_description) else stringResource(R.string.session_dictation_stop_recording_description),
                     hidden = !p.isLocked || p.isLeaving,
                     order = 0f,
-                    hint = "Put the words in your message",
+                    hint = stringResource(R.string.session_dictation_stop_recording_hint),
                     onClick = { guarded(onStop) },
                 )
             }
             Spacer(Modifier.width(DictationBarPose.spacing.dp))
             DictationLockedReveal(isLocked = p.isLocked, reducedMotion = p.reducedMotion) {
-                val sendLabel = if (p.isSending) "Sending message" else "Send"
+                val sendLabel = if (p.isSending) stringResource(R.string.session_sending_message_description) else stringResource(CoreR.string.common_send)
                 val button: @Composable (Modifier, Boolean) -> Unit = { extra, tappable ->
                     RoundBarButton(
                         symbol = SFSymbol.ArrowUp,
@@ -375,8 +377,8 @@ fun DictationScopeBar(
                     DeliveryMenu(
                         onSend = { delivery -> guarded { onSend(delivery) } },
                         enabled = p.isLocked && !p.isSending,
-                        clickLabel = if (isRunning) "Steer at the next step" else null,
-                        longClickLabel = if (isRunning) "Queue after this response" else null,
+                        clickLabel = if (isRunning) stringResource(R.string.session_delivery_steer_label) else null,
+                        longClickLabel = if (isRunning) stringResource(R.string.session_delivery_queue_label) else null,
                     ) { menuModifier ->
                         button(menuModifier, false)
                     }
@@ -494,12 +496,12 @@ fun DeliveryMenu(
         )
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
-                text = { Text("Steer") },
+                text = { Text(stringResource(R.string.session_delivery_steer)) },
                 leadingIcon = { OpenCodeIcon(SFSymbol.ArrowTurnUpRight, contentDescription = null, size = 20.dp) },
                 onClick = { expanded = false; sendNow(OpenCodeDelivery.Steer) },
             )
             DropdownMenuItem(
-                text = { Text("Queue") },
+                text = { Text(stringResource(R.string.session_delivery_queue)) },
                 leadingIcon = { OpenCodeIcon(SFSymbol.TextBadgePlus, contentDescription = null, size = 20.dp) },
                 onClick = { expanded = false; sendNow(OpenCodeDelivery.Queue) },
             )

@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeSearchField
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeShape
@@ -69,6 +70,7 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -251,7 +253,7 @@ fun DraftProjectList(
                             chosen = rowIsChosen,
                             ownHighlight = reducedMotion,
                             iconWidth = iconWidth,
-                            hint = if (isComposing) "Choose where the session starts" else null,
+                            hint = if (isComposing) stringResource(R.string.session_draft_project_choose_label) else null,
                             onClick = { if (isComposing) onAll() else onPick(project) },
                             tag = "draft-project-row",
                             takesTouches = !hidden,
@@ -264,7 +266,7 @@ fun DraftProjectList(
             if (!onlyKept || kept == shown.size) {
                 DraftProjectFade(isHidden = isComposing && kept != shown.size, reducedMotion = reducedMotion) { hidden ->
                     DraftProjectRow(
-                        title = if (shown.isEmpty()) "Choose Folder…" else "All Projects",
+                        title = if (shown.isEmpty()) stringResource(R.string.session_project_choose_folder) else stringResource(R.string.session_project_all_projects),
                         symbol = if (shown.isEmpty()) SFSymbol.FolderBadgePlus else SFSymbol.Magnifyingglass,
                         chosen = false,
                         ownHighlight = reducedMotion,
@@ -299,6 +301,7 @@ private fun DraftProjectRow(
 ) {
     // Reduce Motion: the row's own highlight cross-fades in place (iOS `layout`, the reduced fade).
     val highlight by animateFloatAsState(if (chosen && ownHighlight) 1f else 0f, Motion.reduced.animation(reduceMotion = true), label = "draftProjectHighlight")
+    val selectedDescription = stringResource(R.string.session_project_selected_description)
     Row(
         Modifier
             .fillMaxWidth()
@@ -312,7 +315,7 @@ private fun DraftProjectRow(
             .clearAndSetSemantics {
                 // iOS's `.isSelected` trait as words: `selected` would make the row checkable,
                 // and TalkBack would offer "double-tap to toggle" on a row that picks.
-                if (chosen) stateDescription = "Selected"
+                if (chosen) stateDescription = selectedDescription
                 contentDescription = title
             },
         verticalAlignment = Alignment.CenterVertically,
@@ -481,8 +484,8 @@ private fun ProjectList(
     // iOS `.screenName("Project Picker")` names the screen for Scrawl recordings, not for TalkBack.
     Column(Modifier.fillMaxWidth()) {
         SheetTitleBar(
-            title = "Project",
-            leading = { TextButton(onClick = onCancel) { Text("Cancel") } },
+            title = stringResource(R.string.session_project_picker_title),
+            leading = { TextButton(onClick = onCancel) { Text(stringResource(CoreR.string.common_cancel)) } },
         )
         SearchField(projectFilter, onProjectFilterChange)
         Box(Modifier.fillMaxWidth().weight(1f, fill = false)) {
@@ -504,7 +507,7 @@ private fun ProjectList(
                                 .padding(horizontal = ProjectPickerTunables.rowInset, vertical = ProjectPickerTunables.rowPadding),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("Choose Folder…", style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.accent, modifier = Modifier.weight(1f))
+                            Text(stringResource(R.string.session_project_choose_folder), style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.accent, modifier = Modifier.weight(1f))
                             Box(Modifier.width(ProjectPickerTunables.accessoryWidth), contentAlignment = Alignment.Center) {
                                 OpenCodeIcon(SFSymbol.FolderBadgePlus, contentDescription = null, size = 20.dp, tint = OpenCodeTheme.colors.accent)
                             }
@@ -514,6 +517,7 @@ private fun ProjectList(
                 }
                 items(projects, key = { it.id + "|" + it.directory }) { project ->
                     val chosen = isChosen(project, draftProject)
+                    val selectedDescription = stringResource(R.string.session_project_selected_description)
                     Row(
                         Modifier
                             .fillMaxWidth()
@@ -525,7 +529,7 @@ private fun ProjectList(
                             .clearAndSetSemantics {
                                 contentDescription = project.name
                                 // iOS's `.isSelected` trait as words, not a checkable `selected`.
-                                stateDescription = listOfNotNull(if (chosen) "Selected" else null, project.directory).joinToString(", ")
+                                stateDescription = listOfNotNull(if (chosen) selectedDescription else null, project.directory).joinToString(", ")
                                 role = Role.Button
                             },
                         verticalAlignment = Alignment.CenterVertically,
@@ -556,11 +560,13 @@ fun FolderBrowserView(store: StoreOf<FolderBrowserFeature.State, FolderBrowserFe
     var filter by rememberSaveable(route) { mutableStateOf("") }
     val directory = state.directory(route)
     val listing = state.listings[route]
+    val selectFolderDescription = stringResource(R.string.session_folder_select_description)
+    val pathDescription = stringResource(R.string.session_folder_path_description)
     LaunchedEffect(route) { store.send(FolderBrowserFeature.Action.FolderAppeared(route)) }
     Column(Modifier.fillMaxWidth()) {
         var menuOpen by remember { mutableStateOf(false) }
         SheetTitleBar(
-            title = directory?.let(FolderBrowserFeature::name) ?: "Folder",
+            title = directory?.let(FolderBrowserFeature::name) ?: stringResource(R.string.session_folder_title),
             onTitleClick = if (directory != null) ({ menuOpen = true }) else null,
             titleMenu = {
                 if (directory != null) {
@@ -579,17 +585,17 @@ fun FolderBrowserView(store: StoreOf<FolderBrowserFeature.State, FolderBrowserFe
                 }
             },
             leading = {
-                TextButton(onClick = { store.send(FolderBrowserFeature.Action.RoutesChanged(state.routes.dropLast(1))) }) { Text("Back") }
+                TextButton(onClick = { store.send(FolderBrowserFeature.Action.RoutesChanged(state.routes.dropLast(1))) }) { Text(stringResource(CoreR.string.common_back)) }
             },
             trailing = {
                 TextButton(
                     onClick = { store.send(FolderBrowserFeature.Action.SelectTapped(route)) },
                     enabled = state.canSelect(route),
                     modifier = Modifier.semantics {
-                        contentDescription = "Select Folder"
+                        contentDescription = selectFolderDescription
                         stateDescription = directory ?: ""
                     },
-                ) { Text("Select", fontWeight = FontWeight.SemiBold) }
+                ) { Text(stringResource(R.string.session_folder_select), fontWeight = FontWeight.SemiBold) }
             },
         )
         SearchField(filter, { filter = it })
@@ -603,7 +609,7 @@ fun FolderBrowserView(store: StoreOf<FolderBrowserFeature.State, FolderBrowserFe
                 modifier = Modifier
                     .padding(horizontal = 20.dp, vertical = 8.dp)
                     .semantics {
-                        contentDescription = "Path"
+                        contentDescription = pathDescription
                         stateDescription = directory
                     },
             )
@@ -634,12 +640,12 @@ fun FolderBrowserView(store: StoreOf<FolderBrowserFeature.State, FolderBrowserFe
                 null, FolderBrowserFeature.Listing.Loading -> Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 is FolderBrowserFeature.Listing.Failed -> Unavailable(
                     symbol = SFSymbol.ExclamationmarkTriangle,
-                    title = "Couldn’t Open Folder",
+                    title = stringResource(R.string.session_folder_open_failed_title),
                     description = listing.message,
-                    action = "Try Again" to { store.send(FolderBrowserFeature.Action.RetryTapped(route)) },
+                    action = stringResource(CoreR.string.common_try_again) to { store.send(FolderBrowserFeature.Action.RetryTapped(route)) },
                 )
                 is FolderBrowserFeature.Listing.Loaded -> if (folders.isEmpty()) {
-                    if (filter.isEmpty()) Unavailable(SFSymbol.Folder, "No Folders") else SearchUnavailable(filter)
+                    if (filter.isEmpty()) Unavailable(SFSymbol.Folder, stringResource(R.string.session_folder_empty_title)) else SearchUnavailable(filter)
                 }
             }
         }
@@ -693,7 +699,7 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
     OpenCodeSearchField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = "Search",
+        placeholder = stringResource(CoreR.string.common_search),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
     )
 }
@@ -701,7 +707,7 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
 /** iOS `ContentUnavailableView.search(text:)`. */
 @Composable
 private fun SearchUnavailable(text: String) {
-    Unavailable(SFSymbol.Magnifyingglass, "No Results for “$text”", "Check the spelling or try a new search.")
+    Unavailable(SFSymbol.Magnifyingglass, stringResource(R.string.session_folder_search_empty_title, text), stringResource(R.string.session_folder_search_empty_message))
 }
 
 /** iOS `ContentUnavailableView`. */

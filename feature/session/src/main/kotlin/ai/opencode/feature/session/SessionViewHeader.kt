@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.motion.transitionBlur
 
 import ai.opencode.core.motion.Motion
@@ -91,6 +92,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -242,7 +244,7 @@ internal fun SessionHeaderControls(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
             model.backToRootID?.let { rootID ->
-                FloatingControl(SFSymbol.ArrowUturnBackward, "Back to main session") { store.send(Action.FamilyPicked(rootID)) }
+                FloatingControl(SFSymbol.ArrowUturnBackward, stringResource(R.string.session_back_to_main_description)) { store.send(Action.FamilyPicked(rootID)) }
             }
             when {
                 // It fades into the slot a draft kept for it.
@@ -285,7 +287,7 @@ private val asideSmooth = MotionSpring(0.35, 0.0)
 private fun BackControl(onBack: () -> Unit) {
     OpenCodeIconButton(
         symbol = SFSymbol.ChevronBackward,
-        contentDescription = "Back",
+        contentDescription = stringResource(CoreR.string.common_back),
         onClick = onBack,
         size = headerButtonSize,
         style = OpenCodeIconButtonStyle.Standard,
@@ -335,23 +337,23 @@ private fun HeaderTitle(
     // Auto Rename's new title waits for the breath to ease back to full; another session switched
     // in place shows its own title at once.
     BreathingTitleHold(identity = model.identity, title = latestTitle, isBreathing = model.isSyncing) { title, animates ->
-        val subtitle = if (model.autoRenameFailed) "Couldn’t rename" else project
+        val subtitle = if (model.autoRenameFailed) stringResource(R.string.session_sheet_rename_failed) else project
         val onClick: () -> Unit = onCatchUpOpen
             ?: {
                 if (!model.isDraft) returnsFocusAfterInfo = true
                 store.send(if (model.isDraft) Action.ProjectButtonTapped else Action.SessionInfoTapped)
             }
         val hint = when {
-            onCatchUpOpen != null -> "Open the session and leave Catch Up"
-            model.isDraft -> if (model.canChooseProject) "Choose where the session starts" else null
-            else -> "Show session details"
+            onCatchUpOpen != null -> stringResource(R.string.session_header_open_from_catch_up_label)
+            model.isDraft -> if (model.canChooseProject) stringResource(R.string.session_draft_project_choose_label) else null
+            else -> stringResource(R.string.session_header_show_details_label)
         }
         val value = if (model.isDraft) {
             ""
         } else {
             listOfNotNull(
-                if (model.isBusy) "Running" else "Idle",
-                if (model.isResyncing) "Syncing" else if (model.refreshFailed) "Last known" else null,
+                if (model.isBusy) stringResource(R.string.session_activity_running_description) else stringResource(R.string.session_header_idle_description),
+                if (model.isResyncing) stringResource(R.string.session_header_syncing_description) else if (model.refreshFailed) stringResource(R.string.session_header_last_known_description) else null,
             ).joinToString(", ")
         }
         // Android divergence: the title sits on the bar itself (no capsule); a press shows the
@@ -453,7 +455,7 @@ private fun SessionMenuButton(store: StoreOf<State, Action>, model: SessionHeade
     Box(Modifier.onGloballyPositioned { anchorBottom = it.boundsInWindow().bottom.toInt() }) {
         OpenCodeIconButton(
             symbol = SFSymbol.Ellipsis,
-            contentDescription = "More",
+            contentDescription = stringResource(R.string.session_menu_more_description),
             onClick = { expanded = true },
             size = headerButtonSize,
             style = OpenCodeIconButtonStyle.Standard,
@@ -473,7 +475,7 @@ private fun SessionMenuButton(store: StoreOf<State, Action>, model: SessionHeade
             expanded = expanded,
             anchorBottom = { anchorBottom },
             onDismiss = { expanded = false },
-            title = model.sessionTitle ?: "Session",
+            title = model.sessionTitle ?: stringResource(R.string.session_untitled_title),
             renameTitle = model.renameTitle,
             listContext = listContext,
             more = more,
@@ -576,7 +578,7 @@ private fun SessionMenu(
         }
         listContext.isPinned?.let { isPinned ->
             MenuItem(
-                if (isPinned) "Unpin" else "Pin",
+                if (isPinned) stringResource(R.string.session_unpin) else stringResource(R.string.session_pin),
                 if (isPinned) SFSymbol.PinSlash else SFSymbol.Pin,
                 Modifier.accessibilityFocusTarget(firstRow),
             ) {
@@ -584,45 +586,47 @@ private fun SessionMenu(
             }
         }
         MenuItem(
-            "Rename",
+            stringResource(CoreR.string.common_rename),
             SFSymbol.Pencil,
             if (listContext.isPinned == null) Modifier.accessibilityFocusTarget(firstRow) else Modifier,
         ) { menu(SessionSheetFeature.Action.RenameTapped(currentTitle = renameTitle)) }
-        MenuItem("Copy Session ID", SFSymbol.SquareOnSquare) { menu(SessionSheetFeature.Action.CopySessionIDTapped) }
+        MenuItem(stringResource(R.string.session_copy_session_id), SFSymbol.SquareOnSquare) { menu(SessionSheetFeature.Action.CopySessionIDTapped) }
         if (listContext.isPinned != null) {
             MenuItem(
-                if (listContext.isUnread) "Mark as Read" else "Mark as Unread",
+                if (listContext.isUnread) stringResource(R.string.session_mark_as_read) else stringResource(R.string.session_mark_as_unread),
                 if (listContext.isUnread) SFSymbol.EnvelopeOpen else SFSymbol.EnvelopeBadge,
             ) { menu(SessionSheetFeature.Action.ReadTapped) }
-            MenuItem(if (listContext.isMuted) "Unmute" else "Mute", if (listContext.isMuted) SFSymbol.Bell else SFSymbol.BellSlash) {
+            MenuItem(if (listContext.isMuted) stringResource(R.string.session_unmute) else stringResource(R.string.session_mute), if (listContext.isMuted) SFSymbol.Bell else SFSymbol.BellSlash) {
                 menu(SessionSheetFeature.Action.MuteTapped)
             }
         }
         HorizontalDivider()
-        MenuItem("Compact", SFSymbol.RectangleCompressVertical) { menu(SessionSheetFeature.Action.CompactTapped) }
-        MenuItem("Fork", SFSymbol.ArrowTriangleBranch) { menu(SessionSheetFeature.Action.ForkTapped) }
+        MenuItem(stringResource(R.string.session_compact), SFSymbol.RectangleCompressVertical) { menu(SessionSheetFeature.Action.CompactTapped) }
+        MenuItem(stringResource(R.string.session_fork), SFSymbol.ArrowTriangleBranch) { menu(SessionSheetFeature.Action.ForkTapped) }
+        val exportExpandedState = stringResource(R.string.session_menu_export_expanded_description)
+        val exportCollapsedState = stringResource(R.string.session_menu_export_collapsed_description)
         DropdownMenuItem(
-            text = { Text("Export") },
+            text = { Text(stringResource(R.string.session_export)) },
             leadingIcon = { OpenCodeIcon(SFSymbol.SquareAndArrowUp, contentDescription = null, size = OpenCodeIconSize.small) },
             trailingIcon = {
                 OpenCodeIcon(if (exportOpen) SFSymbol.ChevronUp else SFSymbol.ChevronDown, contentDescription = null, size = OpenCodeIconSize.small)
             },
             onClick = { exportOpen = !exportOpen },
-            modifier = Modifier.semantics { stateDescription = if (exportOpen) "Expanded" else "Collapsed" },
+            modifier = Modifier.semantics { stateDescription = if (exportOpen) exportExpandedState else exportCollapsedState },
         )
         if (exportOpen) {
             DropdownMenuItem(
-                text = { Text("Markdown") },
+                text = { Text(stringResource(R.string.session_export_markdown)) },
                 onClick = { menu(SessionSheetFeature.Action.ExportTapped(OpenCodeExportFormat.Markdown, title)) },
                 contentPadding = PaddingWithIndent,
             )
             DropdownMenuItem(
-                text = { Text("JSON") },
+                text = { Text(stringResource(R.string.session_export_json)) },
                 onClick = { menu(SessionSheetFeature.Action.ExportTapped(OpenCodeExportFormat.Json, title)) },
                 contentPadding = PaddingWithIndent,
             )
         }
-        MenuItem("Session Info", SFSymbol.InfoCircle) { send(Action.SessionInfoTapped) }
+        MenuItem(stringResource(R.string.session_info), SFSymbol.InfoCircle) { send(Action.SessionInfoTapped) }
         if (developerMode) {
             MenuItem("Report a Problem", SFSymbol.ExclamationmarkBubble, Modifier.testTag("session-menu-report-problem")) {
                 send(Action.ReportProblemTapped)
@@ -632,7 +636,7 @@ private fun SessionMenu(
             HorizontalDivider()
             val red = OpenCodeTheme.colors.destructive
             DropdownMenuItem(
-                text = { Text("Delete Session", color = red) },
+                text = { Text(stringResource(R.string.session_delete_session), color = red) },
                 leadingIcon = { OpenCodeIcon(SFSymbol.Trash, contentDescription = null, size = OpenCodeIconSize.small, tint = red) },
                 onClick = { menu(SessionSheetFeature.Action.DeleteTapped) },
             )

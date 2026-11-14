@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Agent activity glyph -->
+    <string name="session_activity_running_description">Running</string>
+    <!-- Background work panel -->
+    <string name="session_background_work_show_label">Show running subagents and shells</string>
+    <string name="session_background_work_collapsed_description">Collapsed</string>
+    <string name="session_background_work_subagents_title">Subagents</string>
+    <string name="session_background_work_open_subagent_label">Open the subagent’s session</string>
+    <string name="session_background_work_shells_title">Shells</string>
+    <string name="session_background_work_show_shell_label">Show the shell’s output</string>
+    <!-- Jump to latest -->
+    <string name="session_scroll_to_latest_description">Scroll to latest</string>
+    <!-- Dictation bar -->
+    <string name="session_dictation_finishing_description">Finishing dictation</string>
+    <string name="session_dictation_stop_recording_description">Stop recording</string>
+    <string name="session_dictation_stop_recording_hint">Put the words in your message</string>
+    <string name="session_sending_message_description">Sending message</string>
+    <string name="session_delivery_steer_label">Steer at the next step</string>
+    <string name="session_delivery_queue_label">Queue after this response</string>
+    <string name="session_delivery_steer">Steer</string>
+    <string name="session_delivery_queue">Queue</string>
+    <!-- Draft project picker -->
+    <string name="session_draft_project_choose_label">Choose where the session starts</string>
+    <string name="session_project_choose_folder">Choose Folder…</string>
+    <string name="session_project_all_projects">All Projects</string>
+    <string name="session_project_selected_description">Selected</string>
+    <string name="session_project_picker_title">Project</string>
+    <!-- Folder browser -->
+    <string name="session_folder_select_description">Select Folder</string>
+    <string name="session_folder_path_description">Path</string>
+    <string name="session_folder_title">Folder</string>
+    <string name="session_folder_select">Select</string>
+    <string name="session_folder_open_failed_title">Couldn’t Open Folder</string>
+    <string name="session_folder_empty_title">No Folders</string>
+    <string name="session_folder_search_empty_title">No Results for “%1$s”</string>
+    <string name="session_folder_search_empty_message">Check the spelling or try a new search.</string>
+    <!-- Server connection pill -->
+    <string name="session_server_edit">Edit Server…</string>
+    <!-- Starter prompts -->
+    <string name="session_starter_prompts_title">Try Asking</string>
+    <string name="session_starter_prompt_pick_label">Type it into the message</string>
+    <!-- Session sheet -->
+    <string name="session_sheet_rename_failed">Couldn’t rename</string>
+    <string name="session_sheet_status_description">Status</string>
+    <string name="session_rename_title">Rename Session</string>
+    <string name="session_untitled_title">Session</string>
+    <string name="session_pin">Pin</string>
+    <string name="session_pinned">Pinned</string>
+    <string name="session_unread">Unread</string>
+    <string name="session_mute">Mute</string>
+    <string name="session_muted">Muted</string>
+    <string name="session_compact">Compact</string>
+    <string name="session_fork">Fork</string>
+    <string name="session_toggle_on_description">On</string>
+    <string name="session_toggle_off_description">Off</string>
+    <string name="session_export">Export</string>
+    <string name="session_export_markdown">Markdown</string>
+    <string name="session_export_json">JSON</string>
+    <string name="session_sheet_model">Model</string>
+    <string name="session_sheet_context">Context</string>
+    <string name="session_sheet_unknown_description">Unknown</string>
+    <string name="session_sheet_context_tokens">%1$s tokens</string>
+    <string name="session_sheet_cost">Cost</string>
+    <string name="session_always_notify">Always Notify</string>
+    <string name="session_always_notify_message_phone">Notify this phone whenever a reply finishes, even ones you didn’t send from here.</string>
+    <string name="session_always_notify_message_tablet">Notify this tablet whenever a reply finishes, even ones you didn’t send from here.</string>
+    <string name="session_delete_session">Delete Session</string>
+    <string name="session_rename_placeholder">Title</string>
+    <string name="session_auto_rename">Auto Rename</string>
+    <string name="session_delete_confirm_title">Delete “%1$s”?</string>
+    <string name="session_delete_confirm_message">This removes the session from the server for all clients.</string>
+    <!-- Transcript -->
+    <string name="session_move_to_background">Move to Background</string>
+    <string name="session_move_to_background_hint">Keep the running work going in the background so the agent reads your next message</string>
+    <!-- Attachments -->
+    <string name="session_attachment_add_image_failed_title">Couldn’t Add Image</string>
+    <string name="session_attachment_upload">Upload</string>
+    <string name="session_attachment_remove_image_description">Remove image attachment %1$d</string>
+    <string name="session_attachment_remove_description">Remove %1$s</string>
+    <string name="session_attachment_file_description">File attachment %1$s</string>
+    <string name="session_attachment_cancel_upload_description">Cancel upload of %1$s</string>
+    <string name="session_attachment_open_photo_label">Open the photo full screen</string>
+    <string name="session_attachment_image_description">Image attachment %1$d</string>
+    <string name="session_attachment_video_description">Video attachment %1$d</string>
+    <!-- Composer controls -->
+    <string name="session_answer_own_description">Your own answer</string>
+    <string name="session_answer_own_type_label">Type or dictate your own answer</string>
+    <string name="session_answer_own_clear_label">Set your words aside</string>
+    <string name="session_answer_own_choose_label">Answer with your words</string>
+    <string name="session_answer_decline_with_words_label">Tell the agent what to do instead</string>
+    <string name="session_answer_required_description">Choose an answer or type your own</string>
+    <string name="session_dictate_message_description">Dictate message</string>
+    <string name="session_dictate_message_hint">Dictate into your message, or touch and hold to record and send</string>
+    <string name="session_send_waiting_for_uploads_description">Sending after uploads finish</string>
+    <string name="session_steer_message_description">Steer message</string>
+    <string name="session_stopping_description">Stopping</string>
+    <string name="session_start_voice_call">Start Voice Call</string>
+    <string name="session_dictation_stop_description">Stop dictation</string>
+    <!-- Composer -->
+    <string name="session_requests_load_failed_title">Couldn’t Load Requests</string>
+    <plurals name="session_queued_count">
+        <item quantity="one">%1$d queued</item>
+        <item quantity="other">%1$d queued</item>
+    </plurals>
+    <string name="session_queued_show_label">Show messages waiting for this response to finish</string>
+    <plurals name="session_queued_messages_description">
+        <item quantity="one">%1$d queued message</item>
+        <item quantity="other">%1$d queued messages</item>
+    </plurals>
+    <string name="session_dictation_preparing">Preparing dictation…</string>
+    <string name="session_message_placeholder">Message</string>
+    <!-- Session header -->
+    <string name="session_back_to_main_description">Back to main session</string>
+    <string name="session_header_open_from_catch_up_label">Open the session and leave Catch Up</string>
+    <string name="session_header_show_details_label">Show session details</string>
+    <string name="session_header_idle_description">Idle</string>
+    <string name="session_header_syncing_description">Syncing</string>
+    <string name="session_header_last_known_description">Last known</string>
+    <string name="session_menu_more_description">More</string>
+    <string name="session_unpin">Unpin</string>
+    <string name="session_copy_session_id">Copy Session ID</string>
+    <string name="session_mark_as_read">Mark as Read</string>
+    <string name="session_mark_as_unread">Mark as Unread</string>
+    <string name="session_unmute">Unmute</string>
+    <string name="session_menu_export_expanded_description">Expanded</string>
+    <string name="session_menu_export_collapsed_description">Collapsed</string>
+    <string name="session_info">Session Info</string>
+    <!-- Session screen -->
+    <string name="session_load_failed_title">Couldn’t Load Session</string>
+    <string name="session_location_share_failed_title">Couldn’t Share Location</string>
+    <!-- Photo sheet -->
+    <string name="session_photo_sheet_grabber_description">Sheet Grabber</string>
+    <string name="session_photo_sheet_full_description">Full</string>
+    <string name="session_photo_sheet_half_description">Half</string>
+    <!-- Shell output -->
+    <string name="session_shell_stop_confirm_title">Stop This Shell?</string>
+    <string name="session_shell_stop_confirm_message">The command ends now. The output shown here stays until you close it.</string>
+    <string name="session_shell_stop">Stop Shell</string>
+    <string name="session_shell_copy_output">Copy Output</string>
+    <string name="session_shell_share_output">Share Output</string>
+    <string name="session_shell_earlier_output_hidden">Earlier output hidden</string>
+    <string name="session_shell_showing_last_output">Showing the last 4 MB</string>
+    <string name="session_shell_load_earlier">Load Earlier</string>
+    <string name="session_shell_output_unavailable_title">Output Unavailable</string>
+    <string name="session_shell_output_unavailable_message">The server no longer has this shell’s output.</string>
+    <string name="session_shell_no_output_yet_title">No Output Yet</string>
+    <string name="session_shell_no_output_title">No Output</string>
+    <string name="session_shell_no_output_yet_message">Output appears here as the command writes it.</string>
+    <string name="session_shell_status_stopping">Stopping…</string>
+    <string name="session_shell_status_unavailable">Unavailable</string>
+    <string name="session_shell_status_interrupted">Interrupted</string>
+    <string name="session_shell_status_timed_out">Timed out</string>
+    <string name="session_shell_status_exited_with_code">Exited with code %1$d</string>
+    <string name="session_shell_status_exited">Exited</string>
+    <plurals name="session_shell_elapsed_hours">
+        <item quantity="one">%1$d hour</item>
+        <item quantity="other">%1$d hours</item>
+    </plurals>
+    <plurals name="session_shell_elapsed_minutes">
+        <item quantity="one">%1$d minute</item>
+        <item quantity="other">%1$d minutes</item>
+    </plurals>
+    <plurals name="session_shell_elapsed_seconds">
+        <item quantity="one">%1$d second</item>
+        <item quantity="other">%1$d seconds</item>
+    </plurals>
+</resources>

@@ -107,6 +107,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -927,6 +928,7 @@ private fun WorkingLine(
 ) {
     val copyLayer = rememberGraphicsLayer()
     val indicatorLayer = rememberGraphicsLayer()
+    val moveToBackgroundLabel = stringResource(R.string.session_move_to_background)
     Box {
         ReplyCopyGlyph.Glyph(
             Modifier
@@ -972,7 +974,7 @@ private fun WorkingLine(
                     }
                 }
                 .semantics(mergeDescendants = true) {
-                    if (offersMove) customActions = listOf(CustomAccessibilityAction("Move to Background") { onMove(); true })
+                    if (offersMove) customActions = listOf(CustomAccessibilityAction(moveToBackgroundLabel) { onMove(); true })
                 },
         )
     }
@@ -986,6 +988,8 @@ private fun MoveToBackgroundAction(activity: WorkingActivity, onMove: () -> Unit
     val workingStyle = TranscriptFonts.metaFont(FontWeight.Medium)
     val labelStyle = TranscriptFonts.metaFont()
     val iconSize = 16.dp
+    val moveToBackgroundLabel = stringResource(R.string.session_move_to_background)
+    val moveToBackgroundHint = stringResource(R.string.session_move_to_background_hint)
     BoxWithConstraints {
         val density = LocalDensity.current
         // Working's footprint (orb slot + its text) and the 12 dp before the action, without a
@@ -994,7 +998,7 @@ private fun MoveToBackgroundAction(activity: WorkingActivity, onMove: () -> Unit
         val working = remember(activity.needsInput, workingStyle, density) {
             measurer.measure(if (activity.needsInput) "Needs your input" else "Working", workingStyle).size.width
         }
-        val title = remember(labelStyle, density) { measurer.measure("Move to Background", labelStyle, maxLines = 1).size.width }
+        val title = remember(labelStyle, moveToBackgroundLabel, density) { measurer.measure(moveToBackgroundLabel, labelStyle, maxLines = 1).size.width }
         val showsTitle = with(density) {
             val reserved = (26 * fontScale).dp + working.toDp() + 12.dp
             val label = iconSize + 6.dp + title.toDp()
@@ -1007,10 +1011,10 @@ private fun MoveToBackgroundAction(activity: WorkingActivity, onMove: () -> Unit
                 .clickable(
                     role = Role.Button,
                     // iOS `accessibilityHint`: TalkBack's click label.
-                    onClickLabel = "Keep the running work going in the background so the agent reads your next message",
+                    onClickLabel = moveToBackgroundHint,
                     onClick = onMove,
                 )
-                .semantics { contentDescription = "Move to Background" }
+                .semantics { contentDescription = moveToBackgroundLabel }
                 .testTag("move-to-background"),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End),
@@ -1018,7 +1022,7 @@ private fun MoveToBackgroundAction(activity: WorkingActivity, onMove: () -> Unit
             OpenCodeIcon(SFSymbol.TrayAndArrowDown, contentDescription = null, size = iconSize, tint = OpenCodeTheme.colors.secondaryText)
             if (showsTitle) {
                 Text(
-                    "Move to Background",
+                    moveToBackgroundLabel,
                     style = labelStyle,
                     color = OpenCodeTheme.colors.secondaryText,
                     maxLines = 1,

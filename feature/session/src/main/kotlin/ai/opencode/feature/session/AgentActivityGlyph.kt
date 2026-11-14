@@ -24,6 +24,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -127,11 +128,12 @@ fun AgentActivityGlyph(
 
     val label = shown.label
     val isFinal = shown.isFinal
+    val runningDescription = stringResource(R.string.session_activity_running_description)
     Canvas(
         modifier
             .size(size)
             .semantics {
-                contentDescription = if (isFinal) label else "Running"
+                contentDescription = if (isFinal) label else runningDescription
                 stateDescription = if (isFinal) "" else label
             },
     ) {

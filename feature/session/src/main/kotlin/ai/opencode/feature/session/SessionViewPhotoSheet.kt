@@ -74,6 +74,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -709,6 +710,9 @@ private fun PhotoSheetGrabber(
     val density = LocalDensity.current.density
     val currentDrag by rememberUpdatedState(onDrag)
     val currentEnded by rememberUpdatedState(onDragEnded)
+    val grabberDescription = stringResource(R.string.session_photo_sheet_grabber_description)
+    val fullState = stringResource(R.string.session_photo_sheet_full_description)
+    val halfState = stringResource(R.string.session_photo_sheet_half_description)
     Box(
         Modifier
             .fillMaxWidth()
@@ -736,8 +740,8 @@ private fun PhotoSheetGrabber(
             // Ahead of the clearing below, which would drop its marker.
             .accessibilityFocusRequest(focusRequest)
             .clearAndSetSemantics {
-                contentDescription = "Sheet Grabber"
-                stateDescription = if (isExpanded) "Full" else "Half"
+                contentDescription = grabberDescription
+                stateDescription = if (isExpanded) fullState else halfState
                 role = Role.Button
                 testTag = "plus-photo-grabber"
                 onClick { onToggle(); true }
