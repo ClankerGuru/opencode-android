@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
@@ -56,6 +57,7 @@ import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -221,10 +223,10 @@ fun AttachmentPickerButton(
     }
     val glyphColor = if (cancelArmed) Color.White else OpenCodeTheme.colors.text
     val label = when {
-        isDictating -> "Cancel dictation"
-        isLoading -> "Adding attachment"
-        isOpen -> "Close"
-        else -> "Add attachment"
+        isDictating -> stringResource(R.string.composer_plus_cancel_dictation_description)
+        isLoading -> stringResource(R.string.composer_plus_adding_attachment_description)
+        isOpen -> stringResource(CoreR.string.common_close)
+        else -> stringResource(R.string.composer_plus_add_attachment_description)
     }
     val enabled = if (isDictating) dictation?.isEnabled != false else !isLoading
 

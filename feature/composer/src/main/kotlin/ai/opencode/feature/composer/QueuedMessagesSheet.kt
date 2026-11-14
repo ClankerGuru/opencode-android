@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.files.AttachmentFileType
@@ -66,6 +67,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -121,13 +124,13 @@ fun QueuedMessagesSheet(
         ) {
             Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
                 Text(
-                    "Queued Messages",
+                    stringResource(R.string.composer_queued_title),
                     style = OpenCodeTextStyles.headline,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.align(Alignment.Center).semantics { heading() },
                 )
                 IconButton(onClick = onClose, modifier = Modifier.align(Alignment.CenterEnd).testTag("queued-messages-close")) {
-                    OpenCodeIcon(SFSymbol.Xmark, contentDescription = "Close")
+                    OpenCodeIcon(SFSymbol.Xmark, contentDescription = stringResource(CoreR.string.common_close))
                 }
             }
             if (messages.isEmpty()) {
@@ -140,7 +143,7 @@ fun QueuedMessagesSheet(
                         .padding(vertical = 24.dp),
                 ) {
                     OpenCodeIcon(SFSymbol.Tray, contentDescription = null, size = OpenCodeIconSize.large, tint = OpenCodeTheme.colors.secondaryText)
-                    Text("No Queued Messages", style = OpenCodeTextStyles.headline)
+                    Text(stringResource(R.string.composer_queued_empty), style = OpenCodeTextStyles.headline)
                 }
             } else {
                 LazyColumn(
@@ -212,9 +215,17 @@ fun QueuedMessageRow(
     val offset = remember { Animatable(0f) }
     var width by remember { mutableStateOf(0) }
     val revealPx = with(LocalDensity.current) { SWIPE_REVEAL.toPx() }
+    val singleImageText = stringResource(R.string.composer_queued_image)
+    val imagesText = pluralStringResource(R.plurals.composer_queued_images, input.images.size, input.images.size)
+    val positionText = stringResource(R.string.composer_queued_position, number, count)
+    val sendNowText = stringResource(R.string.composer_queued_send_now)
+    val copyText = stringResource(CoreR.string.common_copy)
+    val cancelMessageText = stringResource(R.string.composer_queued_cancel_message)
+    val showLessText = stringResource(R.string.composer_queued_show_less)
+    val showMoreText = stringResource(R.string.composer_queued_show_more)
 
     val accessibilityText = buildList {
-        if (input.images.isNotEmpty()) add(if (input.images.size == 1) "Image" else "${input.images.size} images")
+        if (input.images.isNotEmpty()) add(if (input.images.size == 1) singleImageText else imagesText)
         input.files.forEach { add(it.name) }
         input.input.inlineFiles.forEach { file -> add(file.pasted?.let { "${file.name}, ${it.length}" } ?: file.name) }
         if (text.isNotEmpty()) add(text)
@@ -228,7 +239,7 @@ fun QueuedMessageRow(
             Row(Modifier.matchParentSize()) {
                 if (offset.value > 0f) {
                     SwipeAction(
-                        label = "Send Now",
+                        label = sendNowText,
                         symbol = SFSymbol.ArrowUp,
                         fill = MaterialTheme.colorScheme.surfaceContainerHighest,
                         onClick = { settle(0f); onSendNow() },
@@ -237,7 +248,7 @@ fun QueuedMessageRow(
                 } else {
                     Spacer(Modifier.weight(1f))
                     SwipeAction(
-                        label = "Cancel Message",
+                        label = cancelMessageText,
                         symbol = SFSymbol.Trash,
                         fill = MaterialTheme.colorScheme.outline,
                         onClick = { settle(0f); onCancel() },
@@ -279,16 +290,16 @@ fun QueuedMessageRow(
                             if (offset.value != 0f) settle(0f) else if (canExpand) expanded = !expanded
                         },
                         onLongClick = { menuOpen = true },
-                        onClickLabel = if (canExpand) (if (expanded) "Show Less" else "Show More") else null,
+                        onClickLabel = if (canExpand) (if (expanded) showLessText else showMoreText) else null,
                     )
                     .semantics(mergeDescendants = false) {
                         contentDescription = accessibilityText
-                        stateDescription = "Queued message $number of $count"
+                        stateDescription = positionText
                         customActions = buildList {
-                            add(CustomAccessibilityAction("Send Now") { onSendNow(); true })
-                            if (input.text.isNotEmpty()) add(CustomAccessibilityAction("Copy") { onCopy(); true })
-                            add(CustomAccessibilityAction("Cancel Message") { onCancel(); true })
-                            if (canExpand) add(CustomAccessibilityAction(if (expanded) "Show Less" else "Show More") { expanded = !expanded; true })
+                            add(CustomAccessibilityAction(sendNowText) { onSendNow(); true })
+                            if (input.text.isNotEmpty()) add(CustomAccessibilityAction(copyText) { onCopy(); true })
+                            add(CustomAccessibilityAction(cancelMessageText) { onCancel(); true })
+                            if (canExpand) add(CustomAccessibilityAction(if (expanded) showLessText else showMoreText) { expanded = !expanded; true })
                         }
                     }
                     .testTag("queued-message-$number")
@@ -347,19 +358,19 @@ fun QueuedMessageRow(
         content()
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
             DropdownMenuItem(
-                text = { Text("Send Now") },
+                text = { Text(sendNowText) },
                 leadingIcon = { OpenCodeIcon(SFSymbol.ArrowUp, contentDescription = null) },
                 onClick = { menuOpen = false; onSendNow() },
             )
             if (input.text.isNotEmpty()) {
                 DropdownMenuItem(
-                    text = { Text("Copy") },
+                    text = { Text(copyText) },
                     leadingIcon = { OpenCodeIcon(SFSymbol.DocOnDoc, contentDescription = null) },
                     onClick = { menuOpen = false; onCopy() },
                 )
             }
             DropdownMenuItem(
-                text = { Text("Cancel Message") },
+                text = { Text(cancelMessageText) },
                 leadingIcon = { OpenCodeIcon(SFSymbol.Trash, contentDescription = null) },
                 onClick = { menuOpen = false; onCancel() },
             )
@@ -392,6 +403,8 @@ private fun SwipeAction(label: String, symbol: SFSymbol, fill: androidx.compose.
 
 @Composable
 private fun QueuedRowActions(onCancel: () -> Unit, onSendNow: () -> Unit, modifier: Modifier = Modifier) {
+    val cancelMessageText = stringResource(R.string.composer_queued_cancel_message)
+    val sendNowText = stringResource(R.string.composer_queued_send_now)
     Row(modifier) {
         Box(
             contentAlignment = Alignment.Center,
@@ -399,7 +412,7 @@ private fun QueuedRowActions(onCancel: () -> Unit, onSendNow: () -> Unit, modifi
                 .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
                 .clip(CircleShape)
                 .clickable(onClick = onCancel)
-                .semantics { contentDescription = "Cancel Message" },
+                .semantics { contentDescription = cancelMessageText },
         ) {
             OpenCodeIcon(SFSymbol.Trash, contentDescription = null, tint = OpenCodeTheme.colors.secondaryText)
         }
@@ -409,7 +422,7 @@ private fun QueuedRowActions(onCancel: () -> Unit, onSendNow: () -> Unit, modifi
                 .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
                 .clip(CircleShape)
                 .clickable(onClick = onSendNow)
-                .semantics { contentDescription = "Send Now" },
+                .semantics { contentDescription = sendNowText },
         ) {
             Box(
                 contentAlignment = Alignment.Center,
@@ -455,7 +468,7 @@ private fun QueuedAttachments(input: OpenCodeQueuedInput, server: OpenCodeServer
             val pasted = file.pasted
             QueuedChip(
                 when {
-                    file.isUnavailable -> "${file.name} · Media unavailable"
+                    file.isUnavailable -> stringResource(R.string.composer_queued_media_unavailable, file.name)
                     pasted != null -> "${file.name} · ${pasted.length}"
                     else -> file.name
                 },

@@ -68,7 +68,7 @@ class DictationRecordingService : Service() {
         if (manager.getNotificationChannel(CHANNEL) == null) {
             // Same channel the system area creates (`SystemNotificationChannels.DICTATION`).
             manager.createNotificationChannel(
-                NotificationChannel(CHANNEL, "Recording", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                NotificationChannel(CHANNEL, getString(R.string.composer_dictation_channel_name), NotificationManager.IMPORTANCE_DEFAULT).apply {
                     setSound(null, null)
                     enableVibration(false)
                     setShowBadge(false)
@@ -82,7 +82,7 @@ class DictationRecordingService : Service() {
             .setOnlyAlertOnce(true)
             .setOngoing(true)
             .setContentTitle("OpenCode")
-            .setContentText("Recording")
+            .setContentText(getString(R.string.composer_dictation_notification_text))
             .setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_DEFERRED)
         packageManager.getLaunchIntentForPackage(packageName)?.let { launch ->
             launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)

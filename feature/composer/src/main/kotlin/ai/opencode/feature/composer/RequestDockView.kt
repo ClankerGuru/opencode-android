@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
@@ -84,6 +85,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -256,6 +259,7 @@ fun RequestDockView(
         runCatching { focus.requestFocus() }
     }
     val idle = dock.respondingRequestIDs.isEmpty()
+    val dismissText = stringResource(CoreR.string.common_dismiss)
     LaunchedEffect(idle) {
         val id = dock.dockRequestID
         if (idle && id != null && dock.requestFailures[id] == RequestDockFeature.State.RequestFailure.Reply) state.sentAction = null
@@ -301,7 +305,7 @@ fun RequestDockView(
                 .semantics {
                     if (leaving) hideFromAccessibility()
                     // TalkBack's escape: dismiss at once, as × does (Deny, for a permission).
-                    customActions = listOf(CustomAccessibilityAction("Dismiss") { send(RequestDockFeature.Action.DismissTapped); true })
+                    customActions = listOf(CustomAccessibilityAction(dismissText) { send(RequestDockFeature.Action.DismissTapped); true })
                 },
         ) {
             val scope = DockScope(
@@ -490,6 +494,8 @@ private class DockScope(
     ) {
         val colors = OpenCodeTheme.colors
         val idle = dock.respondingRequestIDs.isEmpty()
+        val backText = stringResource(CoreR.string.common_back)
+        val needsInputText = stringResource(R.string.composer_request_needs_input_description, spoken)
         // Top-aligned, each item centred in its own 48 dp, so × stays on the corner arc however tall larger text makes the row.
         Row(
             Modifier.fillMaxWidth().padding(top = RequestDockMetrics.headerTop).heightIn(min = 48.dp),
@@ -502,8 +508,8 @@ private class DockScope(
                         .outset(start = 14.dp, end = 8.dp)
                         .size(48.dp)
                         // The panel's `.disabled(responding)` covers Back too.
-                        .clickable(enabled = enabled && !busy, onClickLabel = "Back", role = Role.Button, onClick = onBack)
-                        .semantics { contentDescription = "Back" }
+                        .clickable(enabled = enabled && !busy, onClickLabel = backText, role = Role.Button, onClick = onBack)
+                        .semantics { contentDescription = backText }
                         .testTag("request-back"),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -521,7 +527,7 @@ private class DockScope(
                         .focusRequester(focus)
                         .focusable()
                         .semantics {
-                            contentDescription = "Needs your input, $spoken"
+                            contentDescription = needsInputText
                             heading()
                         },
                 )
@@ -532,11 +538,11 @@ private class DockScope(
                 val leaves = if (fold == null) Modifier else Modifier.graphicsLayer { alpha = RequestCollapseFade.opacity(fold(), isBar = false, window = 0f..0.3f) }
                 Box(Modifier.heightIn(min = 48.dp).then(leaves), contentAlignment = Alignment.Center) {
                     RollingNumber(
-                        text = "${page + 1} of $count",
+                        text = stringResource(R.string.composer_request_page_progress, page + 1, count),
                         style = OpenCodeTextStyles.footnote.copy(fontFeatureSettings = "tnum"),
                         color = colors.secondaryText,
                         alignment = RollingNumberAlignment.End,
-                        accessibilityLabel = "Question ${page + 1} of $count",
+                        accessibilityLabel = stringResource(R.string.composer_request_page_progress_description, page + 1, count),
                     )
                 }
             }
@@ -549,16 +555,17 @@ private class DockScope(
     fun CloseButton(busy: Boolean) {
         val colors = OpenCodeTheme.colors
         val idle = dock.respondingRequestIDs.isEmpty()
+        val dismissText = stringResource(CoreR.string.common_dismiss)
         // Where iOS centres it on the corner arc; the desktop's small corner keeps that place.
         Box(
             Modifier
                 .outset(end = RequestDockMetrics.edge - RequestDockMetrics.headerTop)
                 .size(48.dp)
                 // iOS hint “Tells the agent what’s in your answer instead”: TalkBack reads “Double-tap to tell…”.
-                .clickable(enabled = enabled && idle && !busy, onClickLabel = "Tell the agent what’s in your answer instead", role = Role.Button) {
+                .clickable(enabled = enabled && idle && !busy, onClickLabel = stringResource(R.string.composer_request_dismiss_action), role = Role.Button) {
                     send(RequestDockFeature.Action.DismissTapped)
                 }
-                .semantics { contentDescription = "Dismiss" }
+                .semantics { contentDescription = dismissText }
                 .testTag("request-dismiss"),
             contentAlignment = Alignment.Center,
         ) {
@@ -582,6 +589,8 @@ private class DockScope(
         val colors = OpenCodeTheme.colors
         var open by remember { mutableStateOf(false) }
         val count = dock.reviewRequestIDs.size
+        val pendingText = stringResource(R.string.composer_request_pending_description)
+        val questionText = stringResource(R.string.composer_request_question)
         Box {
             Row(
                 Modifier
@@ -589,7 +598,7 @@ private class DockScope(
                     .heightIn(min = 48.dp)
                     .clickable(enabled = enabled && dock.respondingRequestIDs.isEmpty(), role = Role.Button) { open = true }
                     .semantics {
-                        contentDescription = "Pending requests"
+                        contentDescription = pendingText
                         stateDescription = "$count"
                     }
                     .testTag("request-queue"),
@@ -601,7 +610,7 @@ private class DockScope(
             }
             DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
                 for (form in dock.formRequests) {
-                    val title = if (form.isQuestion) form.fields.firstOrNull()?.title?.ifEmpty { null } ?: "Question" else form.title
+                    val title = if (form.isQuestion) form.fields.firstOrNull()?.title?.ifEmpty { null } ?: questionText else form.title
                     DropdownMenuItem(text = { Text(title) }, onClick = {
                         open = false
                         send(RequestDockFeature.Action.ReviewRequestSelected(form.id))
@@ -621,12 +630,13 @@ private class DockScope(
 
     @Composable
     fun FormPanel(form: OpenCodeFormRequest, answers: Map<String, OpenCodeFormValue>, storedPage: Int) {
+        val collapseText = stringResource(R.string.composer_request_collapse_action)
         val fields = form.activeFields(answers)
         val pageCount = if (form.isQuestion) fields.size else 1
         val page = min(storedPage, max(pageCount - 1, 0))
         val field = fields.getOrNull(page)
         val caption = captionText(
-            if (form.isQuestion) field?.title?.ifEmpty { null } ?: "Question" else form.title,
+            if (form.isQuestion) field?.title?.ifEmpty { null } ?: stringResource(R.string.composer_request_question) else form.title,
             form.sessionID,
             form.mcpServer,
         )
@@ -656,7 +666,7 @@ private class DockScope(
                         .then(
                             if (collapsed) Modifier.clearAndSetSemantics {}
                             else Modifier.semantics {
-                                customActions = listOf(CustomAccessibilityAction("Collapse") { fold.settle(form.id, collapsed = true); true })
+                                customActions = listOf(CustomAccessibilityAction(collapseText) { fold.settle(form.id, collapsed = true); true })
                             },
                         ),
                 ) {
@@ -727,7 +737,8 @@ private class DockScope(
     ) {
         val colors = OpenCodeTheme.colors
         val left = RequestCollapse.remaining(form, answers)
-        val count = if (form.isQuestion && left > 0) "$left ${if (left == 1) "question" else "questions"} left" else null
+        val count = if (form.isQuestion && left > 0) pluralStringResource(R.plurals.composer_request_questions_left, left, left) else null
+        val needsInputText = stringResource(R.string.composer_request_needs_input_description, caption)
         Row(
             Modifier.fillMaxWidth().padding(top = RequestDockMetrics.headerTop, bottom = 6.dp).heightIn(min = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -739,10 +750,10 @@ private class DockScope(
                     .heightIn(min = 48.dp)
                     .outset(start = 12.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .clickable(enabled = enabled, onClickLabel = "Show the question", role = Role.Button, onClick = onExpand)
+                    .clickable(enabled = enabled, onClickLabel = stringResource(R.string.composer_request_expand_action), role = Role.Button, onClick = onExpand)
                     .padding(start = 12.dp)
                     .semantics(mergeDescendants = true) {
-                        contentDescription = "Needs your input, $caption"
+                        contentDescription = needsInputText
                         if (count != null) stateDescription = count
                     }
                     .testTag("request-expand"),
@@ -889,7 +900,7 @@ private class DockScope(
             }
             if (multiple) {
                 Text(
-                    "Choose one or more",
+                    stringResource(R.string.composer_request_choose_multiple),
                     style = OpenCodeTextStyles.footnote,
                     color = colors.secondaryText,
                     modifier = entrance.padding(bottom = 4.dp),
@@ -928,7 +939,7 @@ private class DockScope(
         val colors = OpenCodeTheme.colors
         val caption = captionText("", form.sessionID, form.mcpServer)
         Column(Modifier.fillMaxWidth()) {
-            Header(AnnotatedString(caption.ifEmpty { "Form" }), spoken = caption.ifEmpty { form.title }, closes = true, busy = responding(form.id))
+            Header(AnnotatedString(caption.ifEmpty { stringResource(R.string.composer_request_form) }), spoken = caption.ifEmpty { form.title }, closes = true, busy = responding(form.id))
             Text(form.title, style = OpenCodeTextStyles.body, color = colors.text, modifier = Modifier.fillMaxWidth())
             ErrorLines(form.id, isForm = true)
             Box(Modifier.fillMaxWidth().padding(vertical = 10.dp), contentAlignment = Alignment.CenterEnd) {
@@ -936,7 +947,7 @@ private class DockScope(
                     onClick = { send(RequestDockFeature.Action.SheetTapped(form.id)) },
                     enabled = enabled && !responding(form.id),
                     modifier = Modifier.testTag("request-review"),
-                ) { Text("Review", maxLines = 1) }
+                ) { Text(stringResource(R.string.composer_request_review), maxLines = 1) }
             }
         }
     }
@@ -1005,6 +1016,11 @@ private class DockScope(
             Motion.layout.animation(if (expanded) MotionPhase.Enter else MotionPhase.Exit, reducedMotion),
             label = "summaryChevron",
         )
+        val expandedText = stringResource(R.string.composer_request_summary_expanded)
+        val collapsedText = stringResource(R.string.composer_request_summary_collapsed)
+        val hideDetailsText = stringResource(R.string.composer_request_summary_hide_action)
+        val showCommandText = stringResource(R.string.composer_request_summary_show_command_action)
+        val showDetailsText = stringResource(R.string.composer_request_summary_show_details_action)
         val chevron = if (reducedMotion && expanded) SFSymbol.ChevronUp else SFSymbol.ChevronDown
         val textStyle = if (summary.isCode) RequestTranscriptMetrics.toolFont else OpenCodeTextStyles.subheadline
         val firstLine = with(LocalDensity.current) { if (textStyle.lineHeight.isSp) textStyle.lineHeight.toDp() else 0.dp }
@@ -1018,8 +1034,8 @@ private class DockScope(
                 }
                 .clearAndSetSemantics {
                     contentDescription = summary.text
-                    stateDescription = if (expanded) "Expanded" else "Collapsed"
-                    onClick(label = if (expanded) "Hide the details" else "Show the full ${if (summary.isCode) "command" else "details"}") {
+                    stateDescription = if (expanded) expandedText else collapsedText
+                    onClick(label = if (expanded) hideDetailsText else if (summary.isCode) showCommandText else showDetailsText) {
                         state.expandedPermissionID = if (expanded) null else permission.id
                         true
                     }
@@ -1050,6 +1066,7 @@ private class DockScope(
         val busy = responding(permission.id)
         val actionsEnabled = enabled && !busy
         val save = permission.save?.takeIf { it.isNotEmpty() }
+        val showScopeText = stringResource(R.string.composer_request_show_scope_action)
         // Side by side, one size, while the titles fit; stacked at larger sizes.
         SideBySideOrStacked(spacing = 8.dp) {
             RequestPermissionButton(
@@ -1060,7 +1077,7 @@ private class DockScope(
                     send(RequestDockFeature.Action.PermissionReplyTapped(permission.id, OpenCodePermissionReply.Once))
                 },
                 modifier = Modifier.testTag("request-allow-once"),
-            ) { ButtonLabel("Allow Once", sending = busy && state.sentAction == DockAction.Once) }
+            ) { ButtonLabel(stringResource(R.string.composer_request_allow_once), sending = busy && state.sentAction == DockAction.Once) }
             if (save != null) {
                 val scope = save.joinToString(", ")
                 Box {
@@ -1074,13 +1091,13 @@ private class DockScope(
                             .semantics {
                                 stateDescription = scope
                                 // iOS hint “Shows what won’t ask again”.
-                                onClick(label = "Show what won’t ask again") {
+                                onClick(label = showScopeText) {
                                     if (actionsEnabled) state.scopeShownForID = permission.id
                                     actionsEnabled
                                 }
                             }
                             .testTag("request-always"),
-                    ) { ButtonLabel("Always Allow", sending = busy && state.sentAction == DockAction.Always) }
+                    ) { ButtonLabel(stringResource(R.string.composer_request_always_allow), sending = busy && state.sentAction == DockAction.Always) }
                     if (state.scopeShownForID == permission.id) {
                         Popup(
                             popupPositionProvider = with(LocalDensity.current) { remember(density) { AbovePositionProvider(16.dp.roundToPx()) } },
@@ -1108,6 +1125,7 @@ private class DockScope(
 
     @Composable
     fun ButtonLabel(title: String, sending: Boolean) {
+        val sendingText = stringResource(R.string.composer_request_sending_description)
         // With the button's own padding, a 48 dp target.
         Box(Modifier.fillMaxWidth().heightIn(min = RequestTunables.labelHeight), contentAlignment = Alignment.Center) {
             Text(
@@ -1118,7 +1136,7 @@ private class DockScope(
             )
             if (sending) {
                 CircularProgressIndicator(
-                    Modifier.size(18.dp).semantics { contentDescription = "Sending" },
+                    Modifier.size(18.dp).semantics { contentDescription = sendingText },
                     color = LocalContentColor.current,
                     strokeWidth = 2.dp,
                 )

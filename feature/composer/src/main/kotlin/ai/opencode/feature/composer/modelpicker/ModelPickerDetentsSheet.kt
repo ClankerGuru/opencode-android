@@ -6,6 +6,7 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.composer.OpenCodeBottomSheet
+import ai.opencode.feature.composer.R
 import android.view.accessibility.AccessibilityManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -49,6 +50,7 @@ import androidx.compose.ui.input.pointer.util.addPointerInputChange
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
@@ -197,7 +199,7 @@ internal fun FavoriteSwipeBox(
             ) {
                 OpenCodeIcon(if (isFavorite) SFSymbol.StarSlash else favoriteSymbol, null, size = 20.dp, tint = Color.White)
                 Spacer(Modifier.width(6.dp))
-                Text(if (isFavorite) "Unfavorite" else "Favorite", color = Color.White, style = OpenCodeTextStyles.subheadline)
+                Text(if (isFavorite) stringResource(R.string.composer_model_unfavorite) else stringResource(R.string.composer_model_favorite), color = Color.White, style = OpenCodeTextStyles.subheadline)
             }
         },
         onDismiss = { value ->

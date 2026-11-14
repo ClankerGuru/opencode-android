@@ -9,6 +9,7 @@ import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.composer.R
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateContentSize
@@ -36,6 +37,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -78,7 +81,8 @@ fun PlusPhotoPillControl(
     // The last count with picks, so Add keeps its label while it fades out after Add or Back.
     var shownCount by remember { mutableIntStateOf(count.coerceAtLeast(1)) }
     if (count > 0) shownCount = count
-    val title = if (count == 0) "All Photos" else addTitle(count)
+    val title = if (count == 0) stringResource(R.string.composer_photo_all_photos) else addTitle(count)
+    val moreOptionsText = stringResource(R.string.composer_photo_more_options_action)
     val tap = { if (count > 0) onAdd() else onAllPhotos() }
 
     Box(
@@ -87,7 +91,7 @@ fun PlusPhotoPillControl(
             role = Role.Button
             testTag = if (count > 0) "plus-photo-add" else "plus-photo-all-photos"
             onClick { tap(); true }
-            if (hasMenu) onLongClick(label = "More Options") { menuOpen = true; true }
+            if (hasMenu) onLongClick(label = moreOptionsText) { menuOpen = true; true }
         },
     ) {
         AnimatedContent(
@@ -114,7 +118,7 @@ fun PlusPhotoPillControl(
                 )
             } else {
                 PhotoFootButton(
-                    text = "All Photos",
+                    text = stringResource(R.string.composer_photo_all_photos),
                     container = OpenCodeSurfaces.neutralFill,
                     content = OpenCodeTheme.colors.text,
                     border = OpenCodeTheme.colors.border,
@@ -127,7 +131,7 @@ fun PlusPhotoPillControl(
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
             if (count > 0) {
                 DropdownMenuItem(
-                    text = { Text("All Photos") },
+                    text = { Text(stringResource(R.string.composer_photo_all_photos)) },
                     leadingIcon = { OpenCodeIcon(SFSymbol.PhotoOnRectangle, contentDescription = null) },
                     onClick = {
                         menuOpen = false
@@ -137,7 +141,7 @@ fun PlusPhotoPillControl(
             }
             if (isLimited) {
                 DropdownMenuItem(
-                    text = { Text("Select More Photos…") },
+                    text = { Text(stringResource(R.string.composer_photo_select_more)) },
                     leadingIcon = { OpenCodeIcon(SFSymbol.PhotoBadgePlus, contentDescription = null) },
                     onClick = {
                         menuOpen = false
@@ -149,7 +153,8 @@ fun PlusPhotoPillControl(
     }
 }
 
-private fun addTitle(count: Int): String = if (count == 1) "Add 1 Photo" else "Add $count Photos"
+@Composable
+private fun addTitle(count: Int): String = pluralStringResource(R.plurals.composer_photo_add_title, count, count)
 
 /** A desktop button (accent or neutral) that also takes a long press, which `Button` can't. */
 @OptIn(ExperimentalFoundationApi::class)

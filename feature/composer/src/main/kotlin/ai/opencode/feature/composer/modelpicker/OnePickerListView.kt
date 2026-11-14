@@ -8,6 +8,7 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.composer.R
 import ai.opencode.server.model.OpenCodeModel
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -64,6 +65,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -310,6 +313,8 @@ private fun OnePickerSectionHeader(title: String, isFirst: Boolean) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun OnePickerRowCell(item: OnePickerRowItem, actions: OnePickerListActions, modifier: Modifier = Modifier) {
+    val removeFavoriteText = stringResource(R.string.composer_model_remove_favorite_action)
+    val addFavoriteText = stringResource(R.string.composer_model_add_favorite_action)
     val colors = OpenCodeTheme.colors
     val reduceMotion = rememberReduceMotion()
     val interaction = remember { MutableInteractionSource() }
@@ -379,7 +384,7 @@ private fun OnePickerRowCell(item: OnePickerRowItem, actions: OnePickerListActio
                                 selected = item.isCurrent
                                 onClick { actions.onPickModel(item); true }
                                 customActions = listOf(
-                                    CustomAccessibilityAction(if (item.isFavorite) "Remove from Favorites" else "Add to Favorites") {
+                                    CustomAccessibilityAction(if (item.isFavorite) removeFavoriteText else addFavoriteText) {
                                         toggleFavorite(); true
                                     },
                                 )
@@ -436,6 +441,9 @@ private fun OnePickerLevelButton(item: OnePickerRowItem, onPickLevel: (String?) 
     var menuOpen by remember { mutableStateOf(false) }
     val tint = if (item.hasParsedSearchLevel) colors.text else colors.text.copy(alpha = item.levelAlpha.toFloat())
     val step = { by: Int -> onPickLevel(scale.stepped(item.shownLevel, by)) }
+    val levelDescription = stringResource(R.string.composer_model_level_description, item.shortName)
+    val higherLevelText = stringResource(R.string.composer_model_level_higher_action)
+    val lowerLevelText = stringResource(R.string.composer_model_level_lower_action)
     Box {
         Row(
             Modifier
@@ -444,11 +452,11 @@ private fun OnePickerLevelButton(item: OnePickerRowItem, onPickLevel: (String?) 
                 .padding(end = 10.dp)
                 .clickable(role = Role.Button) { menuOpen = true }
                 .semantics {
-                    contentDescription = "${item.shortName} thinking level"
+                    contentDescription = levelDescription
                     stateDescription = item.levelLabel
                     customActions = listOf(
-                        CustomAccessibilityAction("Higher Thinking Level") { step(1); true },
-                        CustomAccessibilityAction("Lower Thinking Level") { step(-1); true },
+                        CustomAccessibilityAction(higherLevelText) { step(1); true },
+                        CustomAccessibilityAction(lowerLevelText) { step(-1); true },
                     )
                 }
                 .testTag("${item.idPrefix}-level-${item.model.id}")
@@ -486,18 +494,19 @@ private fun OnePickerLevelButton(item: OnePickerRowItem, onPickLevel: (String?) 
 /** iOS `OnePickerShowAllCell`: a neutral Show All / Show Fewer row with the hidden count. */
 @Composable
 private fun OnePickerShowAllRow(footer: OnePickerFooterSnapshot, onTap: () -> Unit) {
-    val title = if (footer.showsAll) "Show Fewer Models" else "Show All Models"
+    val title = if (footer.showsAll) stringResource(R.string.composer_model_show_fewer) else stringResource(R.string.composer_model_show_all)
+    val hiddenText = pluralStringResource(R.plurals.composer_model_hidden_count, footer.hiddenCount, footer.hiddenCount)
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 44.dp)
             .clickable(role = Role.Button, onClick = onTap)
-            .semantics { contentDescription = title; stateDescription = "${footer.hiddenCount} hidden" }
+            .semantics { contentDescription = title; stateDescription = hiddenText }
             .testTag("model-show-all")
             .padding(horizontal = 22.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(title, style = OpenCodeTextStyles.subheadline, fontWeight = FontWeight.Medium, color = OpenCodeTheme.colors.secondaryText, modifier = Modifier.weight(1f))
-        Text("${footer.hiddenCount} hidden", style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.tertiaryText)
+        Text(hiddenText, style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.tertiaryText)
     }
 }

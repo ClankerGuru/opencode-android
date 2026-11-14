@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -73,6 +74,8 @@ fun ComposerFileChip(
     cornerRadius: Dp = ComposerFileChip.cornerRadius,
 ) {
     val retries = file.isFailed && canRetry
+    val retryDescription = stringResource(R.string.composer_file_retry_description, file.name)
+    val fileDescription = stringResource(R.string.composer_file_attachment_description, file.name)
     FileAttachmentCard(
         name = file.name,
         symbolName = AttachmentFileType.symbolName(file.name, file.mime),
@@ -84,7 +87,7 @@ fun ComposerFileChip(
             .background(MaterialTheme.colorScheme.surfaceContainerHighest)
             .then(if (retries) Modifier.clickable(role = Role.Button, onClick = onRetry) else Modifier)
             .clearAndSetSemantics {
-                contentDescription = if (retries) "Retry uploading ${file.name}" else "File attachment ${file.name}"
+                contentDescription = if (retries) retryDescription else fileDescription
                 stateDescription = ComposerFileChip.statusDescription(file)
                 testTag = "pending-file-${file.name}"
                 if (retries) {
@@ -95,7 +98,7 @@ fun ComposerFileChip(
     ) {
         when (val status = file.status) {
             is ComposerFileAttachment.Status.Uploading -> Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                FileAttachmentDetail("Uploading ${ComposerFileChip.percent(file.progress)}")
+                FileAttachmentDetail(stringResource(R.string.composer_file_uploading_progress, ComposerFileChip.percent(file.progress)))
                 LinearProgressIndicator(
                     progress = { file.progress.toFloat() },
                     modifier = Modifier.widthIn(max = 120.dp).fillMaxWidth(),

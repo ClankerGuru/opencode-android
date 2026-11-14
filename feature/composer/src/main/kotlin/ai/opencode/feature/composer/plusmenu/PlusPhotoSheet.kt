@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer.plusmenu
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeSheetHandleDefaults
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.dependency
@@ -28,6 +29,7 @@ import ai.opencode.feature.composer.ComposerMorphTunables
 import ai.opencode.feature.composer.LocalComposerMorphContentActive
 import ai.opencode.feature.composer.PickerTunables
 import ai.opencode.feature.composer.PlusMenuTunables
+import ai.opencode.feature.composer.R
 import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.res.Configuration
@@ -113,6 +115,8 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -671,6 +675,9 @@ private fun PlusPhotoSheetGrabber(
     val currentOnDragEnded by rememberUpdatedState(onDragEnded)
     val currentOnDragCancelled by rememberUpdatedState(onDragCancelled)
     val inset = PlusMenuTunables.GRID_INSET
+    val grabberDescription = stringResource(R.string.composer_sheet_grabber_description)
+    val fullText = stringResource(R.string.composer_photo_sheet_full)
+    val halfText = stringResource(R.string.composer_photo_sheet_half)
     Box(
         Modifier
             // Over the photos it takes only its own width, so the top row keeps its taps.
@@ -691,8 +698,8 @@ private fun PlusPhotoSheetGrabber(
             )
             .clickable(onClickLabel = null, role = Role.Button, onClick = onToggle)
             .clearAndSetSemantics {
-                contentDescription = "Sheet Grabber"
-                stateDescription = if (isExpanded) "Full" else "Half"
+                contentDescription = grabberDescription
+                stateDescription = if (isExpanded) fullText else halfText
                 role = Role.Button
                 testTag = "plus-photo-grabber"
                 onClick { onToggle(); true }
@@ -847,6 +854,7 @@ fun PlusPhotoSheetContent(
     // Over the grid: the photos sit `gridInset` from the glass on every side and the grabber
     // floats on the top row. Otherwise in its own band above the grid.
     val grabberOver = PickerTunables.PHOTO_GRABBER_OVER_GRID
+    val photosDescription = stringResource(R.string.composer_photo_grid_description)
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
@@ -917,7 +925,7 @@ fun PlusPhotoSheetContent(
                     ),
                 )
                 .semantics {
-                    contentDescription = "Photos"
+                    contentDescription = photosDescription
                     testTag = "plus-photo-grid"
                 },
         ) {
@@ -958,6 +966,7 @@ fun PlusPhotoSheetContent(
 
 @Composable
 private fun PlusCameraTile(camera: PlusCameraPresentation, active: Boolean, onCamera: () -> Unit) {
+    val cameraDescription = stringResource(R.string.composer_photo_camera_description)
     DisposableEffect(camera, active) {
         camera.mounted = active
         onDispose { camera.mounted = false }
@@ -968,7 +977,7 @@ private fun PlusCameraTile(camera: PlusCameraPresentation, active: Boolean, onCa
             .background(MaterialTheme.colorScheme.surfaceContainerHighest)
             .onGloballyPositioned { if (active) camera.tile = it.boundsOnScreen() }
             .clickable(onClickLabel = null, role = Role.Button, onClick = onCamera)
-            .semantics { contentDescription = "Camera" },
+            .semantics { contentDescription = cameraDescription },
         contentAlignment = Alignment.Center,
     ) {
         OpenCodeIcon(SFSymbol.Camera, contentDescription = null, size = 28.dp, tint = OpenCodeTheme.colors.text)
@@ -984,14 +993,14 @@ private fun DeniedNotice(onOpenSettings: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text("Photo access is off", style = OpenCodeTextStyles.headline, color = OpenCodeTheme.colors.text)
+        Text(stringResource(R.string.composer_photo_access_off_title), style = OpenCodeTextStyles.headline, color = OpenCodeTheme.colors.text)
         Text(
-            "Allow access in Settings to pick photos here.",
+            stringResource(R.string.composer_photo_access_off_message),
             style = OpenCodeTextStyles.subheadline,
             color = OpenCodeTheme.colors.secondaryText,
             textAlign = TextAlign.Center,
         )
-        OpenCodeSecondaryButton(text = "Open Settings", onClick = onOpenSettings)
+        OpenCodeSecondaryButton(text = stringResource(CoreR.string.common_open_settings), onClick = onOpenSettings)
     }
 }
 
@@ -1030,20 +1039,21 @@ fun PlusPhotoSheetFoot(
         border = OpenCodeSurfaces.border,
         shadowElevation = OpenCodeSurfaces.raisedShadow,
     ) {
+        val returnText = stringResource(R.string.composer_photo_return_action)
         Row(
             Modifier.padding(horizontal = PlusPhotoSheetFootDefaults.PADDING.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             OpenCodeIconButton(
                 symbol = SFSymbol.ChevronBackward,
-                contentDescription = "Back",
+                contentDescription = stringResource(CoreR.string.common_back),
                 onClick = onBack,
                 // A bare glyph: the toolbar is its surface.
                 style = OpenCodeIconButtonStyle.Standard,
                 // iOS `accessibilityHint("Returns to attachment options")`: TalkBack reads “Double-tap to return…”.
                 modifier = Modifier.semantics {
                     testTag = "plus-photo-back"
-                    onClick(label = "Return to attachment options") { onBack(); true }
+                    onClick(label = returnText) { onBack(); true }
                 },
             )
             Spacer(Modifier.weight(1f).width(12.dp))
@@ -1163,6 +1173,9 @@ private fun PlusPhotoTile(
     )
     val washColor = MaterialTheme.colorScheme.background
     val description = listOfNotNull(photo.formattedDuration, photo.created?.let(tileDateFormatter.withLocale(appFormattingLocale())::format)).joinToString(", ")
+    val videoText = stringResource(R.string.composer_photo_tile_video_description)
+    val photoText = stringResource(R.string.composer_photo_tile_photo_description)
+    val limitText = pluralStringResource(R.plurals.composer_photo_limit, AttachmentPickerButton.MAX_PHOTO_SELECTION, AttachmentPickerButton.MAX_PHOTO_SELECTION)
     Box(
         Modifier
             .aspectRatio(1f)
@@ -1193,9 +1206,9 @@ private fun PlusPhotoTile(
             }
             .clickable(interactionSource = interaction, indication = null, enabled = !inFlight, role = Role.Button, onClick = onTap)
             .clearAndSetSemantics {
-                contentDescription = if (photo.isVideo) "Video" else "Photo"
+                contentDescription = if (photo.isVideo) videoText else photoText
                 stateDescription = if (full) {
-                    listOf(description, "${AttachmentPickerButton.MAX_PHOTO_SELECTION} photos is the most you can add")
+                    listOf(description, limitText)
                         .filter { it.isNotEmpty() }.joinToString(", ")
                 } else {
                     description

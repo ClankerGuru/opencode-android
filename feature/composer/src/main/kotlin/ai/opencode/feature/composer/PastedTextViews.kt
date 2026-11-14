@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.R as CoreR
 import androidx.compose.foundation.lazy.rememberLazyListState
 import ai.opencode.core.ui.rememberOverscrollIfContentScrolls
 import ai.opencode.core.ui.OpenCodeTopBar
@@ -56,6 +57,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -96,7 +98,7 @@ fun PastedTextCard(
             .width(width)
             .heightIn(min = height ?: 0.dp)
             .background(fill, shape)
-            .clickable(onClickLabel = "Open the text", role = Role.Button, onClick = onOpen)
+            .clickable(onClickLabel = stringResource(R.string.composer_pasted_text_open_action), role = Role.Button, onClick = onOpen)
             .semantics {
                 contentDescription = PastedText.NAME
                 stateDescription = summary.summary
@@ -207,14 +209,14 @@ fun PastedTextViewer(
                     }
                 },
                 navigation = {
-                    TextButton(onClick = onDone, modifier = Modifier.semantics { testTag = "pasted-text-done" }) { Text("Done") }
+                    TextButton(onClick = onDone, modifier = Modifier.semantics { testTag = "pasted-text-done" }) { Text(stringResource(CoreR.string.common_done)) }
                 },
                 actions = {
                     if (!summary.opensAsPlainText) {
                         IconButton(onClick = { wrapsLines = !wrapsLines }) {
                             OpenCodeIcon(
                                 if (wrapsLines) SFSymbol.ArrowLeftAndRightTextVertical else SFSymbol.TextWordSpacing,
-                                contentDescription = if (wrapsLines) "Don’t Wrap Lines" else "Wrap Lines",
+                                contentDescription = if (wrapsLines) stringResource(R.string.composer_pasted_text_unwrap_description) else stringResource(R.string.composer_pasted_text_wrap_description),
                             )
                         }
                     }
@@ -228,11 +230,11 @@ fun PastedTextViewer(
                     ) {
                         OpenCodeIcon(
                             if (copied) SFSymbol.Checkmark else SFSymbol.DocOnDoc,
-                            contentDescription = if (copied) "Copied" else "Copy",
+                            contentDescription = if (copied) stringResource(CoreR.string.common_copied) else stringResource(CoreR.string.common_copy),
                         )
                     }
                     IconButton(onClick = { onShare(text) }) {
-                        OpenCodeIcon(SFSymbol.SquareAndArrowUp, contentDescription = "Share")
+                        OpenCodeIcon(SFSymbol.SquareAndArrowUp, contentDescription = stringResource(CoreR.string.common_share))
                     }
                 },
             )

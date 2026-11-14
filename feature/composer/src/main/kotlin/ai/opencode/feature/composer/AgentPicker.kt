@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -123,6 +124,7 @@ fun AgentChip(
     var open by remember { mutableStateOf(false) }
     // Mounted as the composer expands: the list is fresh before it opens.
     LaunchedEffect(Unit) { onOpen() }
+    val chooseAgentDescription = stringResource(R.string.composer_agent_choose_description)
     val secondary = OpenCodeTheme.colors.secondaryText
     // The whole menu moves its target down and its ink back up (iOS e16d3e8e), so the menu
     // drops from the lowered target too.
@@ -132,7 +134,7 @@ fun AgentChip(
                 .clickable(enabled = enabled, role = Role.Button) { open = true }
                 .heightIn(min = 48.dp)
                 .clearAndSetSemantics {
-                    contentDescription = "Choose agent"
+                    contentDescription = chooseAgentDescription
                     stateDescription = name
                     role = Role.DropdownList
                 }
@@ -147,11 +149,11 @@ fun AgentChip(
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             if (agents.isEmpty()) {
-                DropdownMenuItem(text = { Text("Loading Agents…") }, onClick = {}, enabled = false)
+                DropdownMenuItem(text = { Text(stringResource(R.string.composer_agent_loading)) }, onClick = {}, enabled = false)
             } else {
                 // One “Agent” section (menu order fixed, as `.menuOrder(.fixed)`).
                 Text(
-                    "Agent",
+                    stringResource(R.string.composer_agent_section_title),
                     style = OpenCodeTextStyles.footnote,
                     color = secondary,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp).semantics { heading() },
@@ -206,15 +208,17 @@ fun DefaultAgentSection(
     val selection by selectionShared.flow.collectAsState()
     val agents by agentsShared.flow.collectAsState()
     var open by remember { mutableStateOf(false) }
+    val serverDefault = stringResource(R.string.composer_agent_server_default)
+    val defaultAgentTitle = stringResource(R.string.composer_agent_default_title)
 
     data class Option(val id: String, val title: String)
     val options = buildList {
-        add(Option("", "Server Default"))
+        add(Option("", serverDefault))
         agents.forEach { add(Option(it.id, it.displayName)) }
         // A saved agent this server doesn't list stays choosable.
         if (selection.isNotEmpty() && agents.none { it.id == selection }) add(Option(selection, AgentDisplayName.titleCased(selection)))
     }
-    val current = options.firstOrNull { it.id == selection }?.title ?: "Server Default"
+    val current = options.firstOrNull { it.id == selection }?.title ?: serverDefault
 
     Column(modifier.fillMaxWidth()) {
         Box {
@@ -225,14 +229,14 @@ fun DefaultAgentSection(
                     .heightIn(min = 48.dp)
                     .padding(horizontal = 16.dp)
                     .clearAndSetSemantics {
-                        contentDescription = "Default Agent"
+                        contentDescription = defaultAgentTitle
                         stateDescription = current
                         role = Role.DropdownList
                     }
                     .testTag("settings-default-agent"),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Default Agent", style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
+                Text(defaultAgentTitle, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
                 Text(current, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.secondaryText)
                 OpenCodeIcon(SFSymbol.ChevronUpChevronDown, null, size = 14.dp, tint = OpenCodeTheme.colors.secondaryText, modifier = Modifier.padding(start = 4.dp))
             }
@@ -252,7 +256,7 @@ fun DefaultAgentSection(
             }
         }
         Text(
-            "New sessions start with this agent. Each session remembers the one you choose.",
+            stringResource(R.string.composer_agent_default_footer),
             style = OpenCodeTextStyles.footnote,
             color = OpenCodeTheme.colors.secondaryText,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),

@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticEffect
 import ai.opencode.core.log.AppLog
@@ -97,6 +98,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.ViewConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -213,9 +215,9 @@ fun AttachmentCameraView(
                 ) {
                     Text(message, style = OpenCodeTextStyles.subheadline, textAlign = TextAlign.Center, color = Color.White)
                     if (camera.needsSettings) {
-                        CameraMessageButton("Open Settings", onClick = camera::openSettings)
+                        CameraMessageButton(stringResource(CoreR.string.common_open_settings), onClick = camera::openSettings)
                     } else if (camera.canRetry) {
-                        CameraMessageButton("Try Again", onClick = camera::activate)
+                        CameraMessageButton(stringResource(CoreR.string.common_try_again), onClick = camera::activate)
                     }
                 }
             }
@@ -267,6 +269,7 @@ private fun AttachmentCameraPreview(camera: AttachmentCameraState, isInteractive
     val request = camera.capture.surfaceRequest
     val zoom = camera.zoom
     val canAdjust = camera.canCapture && zoom?.canZoom == true
+    val viewfinderDescription = stringResource(R.string.composer_camera_viewfinder_description)
     val base = LocalViewConfiguration.current
     val viewConfiguration = remember(base) {
         object : ViewConfiguration by base {
@@ -281,7 +284,7 @@ private fun AttachmentCameraPreview(camera: AttachmentCameraState, isInteractive
                 if (canAdjust && zoom != null) {
                     val shown = zoom.displayed(camera.zoomState.shownFactor)
                     Modifier.semantics {
-                        contentDescription = "Viewfinder"
+                        contentDescription = viewfinderDescription
                         stateDescription = CameraZoomModel.label(shown, active = true)
                         progressBarRangeInfo = ProgressBarRangeInfo(
                             current = camera.zoomState.shownFactor.toFloat(),
@@ -386,6 +389,7 @@ fun AttachmentCameraControls(
 ) {
     val inert = if (canCapture) 1f else 0.35f
     val reduceMotion = rememberReduceMotion()
+    val takePhotoDescription = stringResource(R.string.composer_camera_take_photo_description)
     CompositionLocalProvider(LocalContentColor provides Color.White) {
         Column(modifier.fillMaxSize()) {
             Row(
@@ -397,7 +401,7 @@ fun AttachmentCameraControls(
                 if (flash != null) {
                     CameraCircleButton(
                         symbol = flash.systemImage,
-                        label = "Flash",
+                        label = stringResource(R.string.composer_camera_flash_description),
                         value = flash.accessibilityValue,
                         tint = if (flash == AttachmentCameraFlash.Off) Color.White else CameraYellow,
                         enabled = canCapture,
@@ -414,7 +418,7 @@ fun AttachmentCameraControls(
                     exit = MotionTransition.micro(reduceMotion).exit,
                 ) {
                     Text(
-                        "AE/AF Lock",
+                        stringResource(R.string.composer_camera_focus_lock),
                         color = Color.Black,
                         style = OpenCodeTextStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
                         modifier = Modifier
@@ -448,7 +452,7 @@ fun AttachmentCameraControls(
                     .padding(start = 20.dp, end = 20.dp, bottom = 18.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                CameraCircleButton(symbol = SFSymbol.Xmark, label = "Close camera", onClick = onClose)
+                CameraCircleButton(symbol = SFSymbol.Xmark, label = stringResource(R.string.composer_camera_close_description), onClick = onClose)
                 Spacer(Modifier.weight(1f))
                 // Android camera apps' shutter size (iOS: 58 pt). The face is sized after the tap
                 // target, which measures what follows it with no minimum: an empty Box sized before
@@ -460,7 +464,7 @@ fun AttachmentCameraControls(
                         .clickable(enabled = canCapture, role = Role.Button, onClick = onShutter)
                         .openCodeTapTarget()
                         .clearAndSetSemantics {
-                            contentDescription = "Take photo"
+                            contentDescription = takePhotoDescription
                             role = Role.Button
                             if (!canCapture) disabled()
                             onClick { onShutter(); true }
@@ -472,7 +476,7 @@ fun AttachmentCameraControls(
                 )
                 Spacer(Modifier.weight(1f))
                 if (canFlip) {
-                    CameraCircleButton(symbol = SFSymbol.ArrowTriangle2Circlepath, label = "Switch Camera", enabled = canCapture, onClick = onFlip)
+                    CameraCircleButton(symbol = SFSymbol.ArrowTriangle2Circlepath, label = stringResource(R.string.composer_camera_switch_description), enabled = canCapture, onClick = onFlip)
                 } else {
                     Spacer(Modifier.size(48.dp))
                 }
