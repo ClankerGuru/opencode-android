@@ -15,8 +15,12 @@ import ai.opencode.server.model.OpenCodeShell
 import ai.opencode.server.model.OpenCodeShellOutputPage
 import ai.opencode.server.model.PromptContext
 import ai.opencode.server.model.nonEmpty
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration.Companion.seconds
@@ -46,10 +50,22 @@ private suspend fun requestLocationPendingRequests(server: OpenCodeServer, direc
     return OpenCodePendingRequests(permissions.getOrThrow().data, forms.getOrThrow().data)
 }
 
+internal const val CONCURRENT_ATTENTION_DIRECTORIES = 4
+
+private suspend fun requestLocationPendingRequests(server: OpenCodeServer, directories: List<String>): List<OpenCodePendingRequests> {
+    val slots = Semaphore(CONCURRENT_ATTENTION_DIRECTORIES)
+    return coroutineScope {
+        val reads = mutableListOf<Deferred<OpenCodePendingRequests>>()
+        for (directory in directories) {
+            reads += async { slots.withPermit { requestLocationPendingRequests(server, directory) } }
+        }
+        reads.awaitAll()
+    }
+}
+
 internal suspend fun requestHomeAttention(server: OpenCodeServer, roots: List<OpenCodeSession>, directories: List<String>): Set<String> {
     val pendingSessionIDs = LinkedHashSet<String>()
-    for (directory in directories) {
-        val requests = requestLocationPendingRequests(server, directory)
+    for (requests in requestLocationPendingRequests(server, directories)) {
         pendingSessionIDs += requests.permissions.map { it.sessionID }
         pendingSessionIDs += requests.forms.map { it.sessionID }.filter { it != "global" }
     }
