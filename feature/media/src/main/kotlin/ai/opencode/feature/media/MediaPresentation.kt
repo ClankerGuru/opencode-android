@@ -1,5 +1,7 @@
 package ai.opencode.feature.media
 
+import ai.opencode.core.store.Store
+
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionRole
@@ -431,7 +433,7 @@ class MediaFlightAccessory(
  * drag down fades them out. One viewer at a time.
  *
  * [MediaView] owns the presenter and provides it as [LocalMediaPresenter] to the content it
- * hosts; the transcript image viewer goes through the store ([presentImage]).
+ * hosts; the transcript image viewer goes through the store ([presentPreview]).
  */
 @Stable
 class MediaPresenter internal constructor() {
@@ -446,10 +448,9 @@ class MediaPresenter internal constructor() {
     )
 
     internal var presentation: Presentation? by mutableStateOf(null)
-    internal var imageViewerIsUp: () -> Boolean = { false }
-    internal var sendImage: (TranscriptImagePreview, ImageDrawingAdd?) -> Unit = { _, _ -> }
+    internal var reducesMotion = false
 
-    val isPresenting: Boolean get() = presentation != null || imageViewerIsUp()
+    val isPresenting: Boolean get() = presentation != null
 
     /**
      * Presents [content] full screen; ignored while a viewer is up. [flightAccessories] are the
@@ -479,10 +480,17 @@ class MediaPresenter internal constructor() {
         return true
     }
 
-    /** The transcript image viewer, through [MediaFeature]; [addDrawing] is the opener's prompt for Draw on Image, null hides it. */
-    fun presentImage(preview: TranscriptImagePreview, addDrawing: ImageDrawingAdd? = null) {
-        if (presentation != null) return
-        sendImage(preview, addDrawing)
+    /** A store per presentation, so the opening prompt and its cancellable effects end together. */
+    fun presentPreview(preview: TranscriptImagePreview, addDrawing: ImageDrawingAdd? = null) {
+        if (isPresenting) return
+        val file = preview.pages.firstOrNull { it.id == preview.id }?.file
+        val store = Store(
+            FullscreenViewerFeature.State(preview, allowsDrawing = addDrawing != null),
+            FullscreenViewerFeature(addDrawing),
+        )
+        present(preview.id, file?.reference?.kind?.isMedia ?: true, reducesMotion, onDismiss = store::close) { viewer ->
+            FullscreenViewer(store, viewer)
+        }
     }
 
     companion object {

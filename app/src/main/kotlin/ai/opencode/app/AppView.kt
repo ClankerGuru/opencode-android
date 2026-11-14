@@ -14,7 +14,6 @@ import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.shared
-import ai.opencode.core.store.Store
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.core.store.rememberScope
@@ -38,7 +37,6 @@ import ai.opencode.core.ui.rememberAccessibilityFocusRequest
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.HomeView
 import ai.opencode.feature.drawer.notices.AccessibilityAnnouncer
-import ai.opencode.feature.media.MediaFeature
 import ai.opencode.feature.media.MediaView
 import ai.opencode.feature.settings.onboarding.WelcomeFeature
 import ai.opencode.feature.settings.onboarding.WelcomeView
@@ -185,10 +183,8 @@ fun AppView(store: StoreOf<AppFeature.State, AppFeature.Action>) {
                     state = { it.home ?: HomeFeature.State.placeholder(OpenCodeServer(url = "", username = "", password = "")) },
                     action = AppFeature.Action::Home,
                 )
-                // The app's one media root: the transcript image viewer and
-                // file/diagram/pasted-text viewers cover the whole Home.
-                val media = remember { Store(MediaFeature.State(), MediaFeature()) }
-                MediaView(media) { HomeView(home, welcomeMark = painterResource(R.drawable.opencode_app_mark)) }
+                // The app's one media root: the fullscreen viewer covers the whole Home.
+                MediaView { HomeView(home, welcomeMark = painterResource(R.drawable.opencode_app_mark)) }
             } else if (showsWelcome) {
                 val welcome = store.rememberScope<AppFeature.State, AppFeature.Action, WelcomeFeature.State, WelcomeFeature.Action>(
                     state = { it.welcome },

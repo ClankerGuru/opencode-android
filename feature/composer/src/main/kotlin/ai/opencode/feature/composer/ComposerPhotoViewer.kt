@@ -14,7 +14,7 @@ import ai.opencode.feature.media.ImageDrawingAdd
 import ai.opencode.feature.media.MediaFlightAccessory
 import ai.opencode.feature.media.MediaZoomSources
 import ai.opencode.feature.media.TranscriptImagePreview
-import ai.opencode.feature.media.TranscriptImageViewerFeature
+import ai.opencode.feature.media.FullscreenViewerFeature
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import android.content.Context
 import android.graphics.Bitmap
@@ -42,7 +42,7 @@ import kotlin.math.roundToInt
  * The composer's pending photos in the transcript's full-screen viewer: the same flight out of the
  * tile and back, paging and zoom, plus each photo's dimensions and size and a Remove action.
  *
- * The viewer's Remove (`TranscriptImageViewerFeature.State.allowsRemove`, `removeTapped`, the
+ * The viewer's Remove (`FullscreenViewerFeature.State.allowsRemove`, `removeTapped`, the
  * `removed` delegate, `isDiscarded`) and the flight's accessories (`MediaFlightAccessory`) are
  * `:feature:media`'s; [ComposerPhotoViewerFeature] hands a removed page back to the composer.
  */
@@ -212,8 +212,8 @@ object ComposerPhotoViewer {
         preview: TranscriptImagePreview,
         addDrawing: ImageDrawingAdd? = null,
         remove: (String) -> Unit,
-    ): Store<TranscriptImageViewerFeature.State, TranscriptImageViewerFeature.Action> = Store(
-        TranscriptImageViewerFeature.State(preview, isShowingControls = true, allowsRemove = true, allowsDrawing = addDrawing != null),
+    ): Store<FullscreenViewerFeature.State, FullscreenViewerFeature.Action> = Store(
+        FullscreenViewerFeature.State(preview, isShowingControls = true, allowsRemove = true, allowsDrawing = addDrawing != null),
         ComposerPhotoViewerFeature(addDrawing, remove),
     )
 }
@@ -225,15 +225,15 @@ object ComposerPhotoViewer {
 class ComposerPhotoViewerFeature(
     addDrawing: ImageDrawingAdd? = null,
     private val remove: (String) -> Unit,
-) : Reducer<TranscriptImageViewerFeature.State, TranscriptImageViewerFeature.Action> {
-    private val viewer = TranscriptImageViewerFeature(addDrawing)
+) : Reducer<FullscreenViewerFeature.State, FullscreenViewerFeature.Action> {
+    private val viewer = FullscreenViewerFeature(addDrawing)
 
     override fun reduce(
-        state: TranscriptImageViewerFeature.State,
-        action: TranscriptImageViewerFeature.Action,
-    ): Reduced<TranscriptImageViewerFeature.State, TranscriptImageViewerFeature.Action> {
+        state: FullscreenViewerFeature.State,
+        action: FullscreenViewerFeature.Action,
+    ): Reduced<FullscreenViewerFeature.State, FullscreenViewerFeature.Action> {
         val reduced = viewer.reduce(state, action)
-        val removed = (action as? TranscriptImageViewerFeature.Action.Delegate)?.action as? TranscriptImageViewerFeature.Action.DelegateAction.Removed
+        val removed = (action as? FullscreenViewerFeature.Action.Delegate)?.action as? FullscreenViewerFeature.Action.DelegateAction.Removed
             ?: return reduced
         val id = ComposerPhotoViewer.attachmentID(removed.id) ?: return reduced
         return Reduced(reduced.state, Effect.merge(reduced.effect, Effect.run { _ -> remove(id) }))
