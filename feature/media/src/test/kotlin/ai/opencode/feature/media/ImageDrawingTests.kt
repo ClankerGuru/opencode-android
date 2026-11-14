@@ -199,6 +199,23 @@ class ImageDrawingFeatureTests {
     private fun drawing(action: ImageDrawingFeature.Action) =
         FullscreenViewerFeature.Action.Drawing(PresentationAction.Presented(action))
 
+    @Test fun theMovieEditorUsesTheCapturedFrameOnlyWhileItsPageIsCurrent() = runTest {
+        val poster = image
+        val frame = Bitmap.createBitmap(32, 24, Bitmap.Config.ARGB_8888)
+        val page = TranscriptImagePreview.Page("movie", poster, "Video", isVideo = true)
+        val offered = Locked(listOf<OpenCodeOutgoingAttachment>())
+        val store = viewer(page = page, offered = offered)
+        val captured = FullscreenViewerFeature.Action.DrawCapturedFrame(page.id, frame)
+        store.send(FullscreenViewerFeature.Action.DrawCapturedFrame("another movie", frame))
+        store.send(captured) { it.copy(drawing = ImageDrawingFeature.State(frame)) }
+        assertTrue(store.state.drawing?.image === frame)
+        assertTrue(store.state.selectedPage?.image === poster)
+        store.send(FullscreenViewerFeature.Action.CloseTapped) { it.copy(isDismissed = true, drawing = null) }
+        store.send(captured)
+        store.finish()
+        assertTrue(offered.current.isEmpty())
+    }
+
     @Test fun drawOpensOnlyOnADecodedImageForAPromptThatTakesIt() = runTest {
         val offered = Locked(listOf<OpenCodeOutgoingAttachment>())
         viewer(allowsDrawing = false, offered = offered).send(FullscreenViewerFeature.Action.DrawTapped)
