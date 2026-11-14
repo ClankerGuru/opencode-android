@@ -109,6 +109,15 @@ already wired by its parent; keep those names.
   `OpenCodeIconButton` for icon controls.
 - Unfinished features stay behind Experimental, off by default, as on iOS.
 
+## Comments
+
+- Default to no comment. Never explain a fix, a past bug or what the code used to do
+  ("was X", "otherwise this would…", "iOS does Y, so here…"). That belongs in the commit
+  message and PR description.
+- Comment only what the current code can't say itself, in one short line, such as a
+  non-obvious platform constraint. Don't restate the code.
+- Don't match the surrounding comment density; existing comments aren't a template.
+
 ## Dependencies
 
 All coordinates live in `gradle/libs.versions.toml`; modules reference catalog entries only.
