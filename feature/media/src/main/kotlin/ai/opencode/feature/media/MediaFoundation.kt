@@ -11,6 +11,7 @@ import ai.opencode.server.model.OpenCodeImageAttachment
 import android.content.ComponentCallbacks2
 import android.content.res.Configuration
 import android.graphics.Bitmap
+import android.net.Uri
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import java.security.MessageDigest
@@ -79,6 +80,12 @@ data class TranscriptImagePreview(val id: String, val pages: List<Page>, val ser
         /** The app wrote [label] itself ("Image 1 of 3"), so it isn't a name worth showing as a title. */
         val labelIsPlaceholder: Boolean = false,
         val file: AgentFileDestination? = null,
+        val videoURL: Uri? = null,
+        val imageSource: SessionVisualImageSource? = null,
+        /** Immutable encoded bytes, kept so distant pages can release their full-size pixels. */
+        val original: ByteArray? = null,
+        val hasDecodedOriginal: Boolean = false,
+        val originalFailed: Boolean = false,
         val showsSource: Boolean = false,
     ) {
         constructor(file: AgentFileDestination) : this(
@@ -90,23 +97,15 @@ data class TranscriptImagePreview(val id: String, val pages: List<Page>, val ser
             file = file,
         )
 
-        // iOS `Page: Equatable`: every field, and the image by identity or by its pixels.
-        override fun equals(other: Any?): Boolean =
-            other is Page &&
-                other.id == id &&
-                other.file == file &&
-                other.showsSource == showsSource &&
-                other.label == label &&
-                other.detail == detail &&
-                other.mediaHash == mediaHash &&
-                other.name == name &&
-                other.isUnavailable == isUnavailable &&
-                other.isVideo == isVideo &&
-                other.loadFailed == loadFailed &&
-                other.labelIsPlaceholder == labelIsPlaceholder &&
-                (other.image === image || (other.image != null && image != null && other.image.sameAs(image)))
+        val usesFileViewer: Boolean get() = file != null || videoURL != null
+        val originalPending: Boolean get() = original != null && !hasDecodedOriginal && !originalFailed
 
-        override fun hashCode(): Int = id.hashCode() * 31 + label.hashCode()
+        // Snapshots compare arrays and bitmaps by identity: never scan pixels on the UI thread.
+        override fun hashCode(): Int = id.hashCode()
+
+        internal fun evicted(): Page = if (image != null && !usesFileViewer && !isUnavailable && !originalFailed &&
+            (original != null || mediaHash != null || imageSource != null)
+        ) copy(image = null, hasDecodedOriginal = false) else this
     }
 
     constructor(file: AgentFileDestination, server: OpenCodeServer) : this(file.reference.zoomSourceID, listOf(Page(file)), server)
@@ -127,12 +126,10 @@ data class TranscriptImagePreview(val id: String, val pages: List<Page>, val ser
             server: OpenCodeServer? = null,
         ): TranscriptImagePreview? {
             val items = attachments.mapNotNull { attachment ->
-                val image = CachedImage.decoded(attachment.id, attachment.data, attachment.mediaHash)
-                when {
-                    image != null -> attachment to image
-                    attachment.mediaHash != null || attachment.isUnavailable -> attachment to null
-                    else -> null
-                }
+                val image = CachedImage.cached(attachment.id, attachment.mediaHash)
+                if (image != null || attachment.data.isNotEmpty() || attachment.mediaHash != null || attachment.isUnavailable) {
+                    attachment to image
+                } else null
             }
             if (items.none { it.first.id == selectedID }) return null
             return TranscriptImagePreview(
@@ -142,6 +139,8 @@ data class TranscriptImagePreview(val id: String, val pages: List<Page>, val ser
                         id = attachment.id,
                         image = image,
                         label = attachment.name ?: localized(R.string.media_image_page_label, label, index + 1, items.size),
+                        original = attachment.data.takeIf { it.isNotEmpty() },
+                        hasDecodedOriginal = image != null && attachment.data.isNotEmpty(),
                         mediaHash = attachment.mediaHash,
                         name = attachment.name,
                         isUnavailable = attachment.isUnavailable || MediaReferenceResolver.isUnavailable(attachment, server),
