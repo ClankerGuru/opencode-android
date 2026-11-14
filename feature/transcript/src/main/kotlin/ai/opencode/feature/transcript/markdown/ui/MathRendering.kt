@@ -1,6 +1,7 @@
 package ai.opencode.feature.transcript.markdown.ui
 
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import ai.opencode.feature.transcript.selection.LocalTranscriptReplySelection
 import ai.opencode.feature.transcript.selection.TranscriptSelectionLeafKey
@@ -25,6 +26,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.stateDescription
@@ -137,6 +139,7 @@ fun MathDisplayView(math: OpenCodeMarkdownBlock.MathBlock, selection: Transcript
     val rendered = remember(math.source, fontSizePx) { MathRenderer.render(math.source, fontSizePx, display = true) }
     // In a reply a hold selects the equation; a hold on one already selected lifts it to drag
     // as its TeX (iOS `.transcriptDragSource(.code(source: math.raw, language: "tex"))`).
+    val equationDescription = stringResource(R.string.transcript_equation_description)
     var drag: Modifier = Modifier
     if (selection != null) {
         drag = Modifier.transcriptDragSource(
@@ -147,7 +150,7 @@ fun MathDisplayView(math: OpenCodeMarkdownBlock.MathBlock, selection: Transcript
     }
     MarkdownBand(
         modifier.clearAndSetSemantics {
-            contentDescription = "Equation"
+            contentDescription = equationDescription
             stateDescription = math.source
         },
         bandModifier = drag,

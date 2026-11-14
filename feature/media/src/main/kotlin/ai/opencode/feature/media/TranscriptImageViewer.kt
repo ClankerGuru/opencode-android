@@ -1,5 +1,6 @@
 package ai.opencode.feature.media
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
@@ -72,6 +73,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -500,7 +502,7 @@ fun TranscriptImageViewer(
             ) {
                 OpenCodeIconButton(
                     symbol = SFSymbol.Xmark,
-                    contentDescription = "Close",
+                    contentDescription = stringResource(CoreR.string.common_close),
                     onClick = { store.send(TranscriptImageViewerFeature.Action.CloseTapped) },
                     modifier = Modifier.testTag("image-gallery-close"),
                     style = OpenCodeIconButtonStyle.Circle,
@@ -550,7 +552,7 @@ fun TranscriptImageViewer(
             ) {
                 OpenCodeIconButton(
                     symbol = SFSymbol.Trash,
-                    contentDescription = "Remove",
+                    contentDescription = stringResource(CoreR.string.common_remove),
                     onClick = { store.send(TranscriptImageViewerFeature.Action.RemoveTapped) },
                     modifier = Modifier.testTag("image-gallery-remove"),
                     style = OpenCodeIconButtonStyle.Circle,
@@ -576,7 +578,7 @@ fun TranscriptImageViewer(
                     ) {
                         OpenCodeIconButton(
                             symbol = SFSymbol.SquareAndArrowDown,
-                            contentDescription = "Save to Photos",
+                            contentDescription = stringResource(R.string.media_viewer_save_to_photos_description),
                             onClick = { store.send(TranscriptImageViewerFeature.Action.SaveTapped) },
                             modifier = Modifier.testTag("image-gallery-save"),
                             style = OpenCodeIconButtonStyle.Standard,
@@ -584,7 +586,7 @@ fun TranscriptImageViewer(
                         )
                         OpenCodeIconButton(
                             symbol = SFSymbol.SquareAndArrowUp,
-                            contentDescription = "Share",
+                            contentDescription = stringResource(CoreR.string.common_share),
                             onClick = { store.send(TranscriptImageViewerFeature.Action.ShareTapped) },
                             modifier = Modifier.testTag("image-gallery-share"),
                             style = OpenCodeIconButtonStyle.Standard,

@@ -11,17 +11,17 @@ Google Play internal testing (and open testing once `PLAY_OPEN_TESTING` is on).
 `scheduled-release.yml` releases `main` at noon and 6 p.m. Central, as on iOS; run it
 by hand (`gh workflow run scheduled-release.yml`) to release sooner ([docs/releasing.md](docs/releasing.md)).
 
-## The iOS app is the source of truth
+## The iOS app is a reference
 
-- iOS repo: `/Users/vogel/dev/opencode-ios` (read-only; never modify it). Read the Swift, not
-  just the docs: docs drift, the code doesn't.
-- Behave exactly like iOS: features, flows, states, copy (UI vocabulary, “Couldn’t …” error copy
-  with the typographic apostrophe, Title Case rules), server contract, retry policy, logging
-  privacy, haptic vocabulary, timings, thresholds and constants. Port logic file by file,
-  translating Swift idioms to idiomatic Kotlin; keep iOS type and function names where they
-  still make sense so the two codebases diff side by side.
+- The app started as a port of the iOS app, and most of its code still mirrors it. Android may
+  differ from iOS where that makes it a better Android app (for example, translations).
+- iOS repo: `/Users/vogel/dev/opencode-ios` (read-only; never modify it). When porting or
+  comparing, read the Swift, not just the docs: docs drift, the code doesn't.
+- Ported code keeps iOS type and function names where they still make sense, so the two
+  codebases diff side by side. Copy keeps one voice: the same UI vocabulary, “Couldn’t …” error
+  copy with the typographic apostrophe, and Title Case rules.
 - Track every iOS file in `docs/parity/<area>.md` (see [docs/parity/README.md](docs/parity/README.md))
-  and update the row in the same commit.
+  and update the row in the same commit. Where Android differs on purpose, say so in the row.
 - Visuals follow the OpenCode desktop design system (`packages/ui` in the opencode repo), not
   iOS: Inter for UI text and IBM Plex Mono for code and tool output (bundled, OFL), the
   desktop's type scale in sp, flat surfaces with hairline borders instead of tonal elevation
@@ -30,7 +30,6 @@ by hand (`gh workflow run scheduled-release.yml`) to release sooner ([docs/relea
   (`OpenCodeAlertDialog`, floating fill + `openCodeHairline`) rather than raw Material
   colours or capsules. Behaviour stays Android: Material components' structure, system back
   and predictive back, sheets, IME, TalkBack semantics, ≥48 dp targets and font scaling.
-  Android looks different from iOS on purpose; behaviour, flows and copy still follow iOS.
   SF Symbols → Material Symbols via `OpenCodeIcons`; BerkeleyMono only for the wordmark. No
   glass/blur imitation, no web views as the app shell, no React Native/Flutter/KMP UI.
 
@@ -108,6 +107,13 @@ already wired by its parent; keep those names.
   defaults to a capsule); dialogs use `OpenCodeAlertDialog`. Touch targets ≥ 48dp (`Modifier.openCodeTapTarget`, after `clickable`),
   `OpenCodeIconButton` for icon controls.
 - Unfinished features stay behind Experimental, off by default, as on iOS.
+- UI text lives in string resources, not Kotlin literals, so it can be translated: each module's
+  `src/main/res/values/strings.xml`, with names prefixed by the module (`composer_`, `session_`,
+  …) because resource names are global. Shared words (Cancel, Done, …) are `common_*` in
+  `core/src/main/res/values/strings_common.xml`, read elsewhere as `CoreR.string.common_cancel`
+  (`import ai.opencode.core.R as CoreR`). One resource per sentence with positional placeholders
+  (`%1$s`), never joined pieces; counts use `<plurals>`. Logs, model prompts, wire values and
+  developer-only screens stay literals.
 
 ## Comments
 
@@ -165,9 +171,9 @@ Add a new library only with a one-line justification here.
 
 - Port the iOS unit tests (`/Users/vogel/dev/opencode-ios/OpenCodeTests/`) into each module's
   `src/test` (JVM, exhaustive `TestStore` like iOS's `TestStore`), keeping iOS test names so the
-  suites diff side by side. A ported test that fails is a parity bug: fix the code, not the test,
-  unless the iOS behaviour itself can't exist on Android (then delete it and note why in the
-  parity row).
+  suites diff side by side. When a ported test fails, work out whether the code is wrong or
+  Android differs on purpose; for a deliberate difference, change or delete the test and note
+  why in the parity row.
 - Other new test files (beyond ports of iOS tests) still need the coordinator's approval.
 - Isolation (iOS `TestIsolationGuard`): under JVM unit tests `DependencyValues.root` resolves
   `testValue`s, so even code outside a `TestStore` never reaches live storage or the network.

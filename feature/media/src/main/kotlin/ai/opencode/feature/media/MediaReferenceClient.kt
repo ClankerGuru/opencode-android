@@ -41,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -483,8 +484,9 @@ fun MediaAttachmentUnavailableView(
     onRetry: (() -> Unit)? = null,
     isTransientFailure: Boolean = false,
 ) {
-    val displayTitle = name?.trim()?.takeIf { it.isNotEmpty() } ?: "Image"
-    val subtitle = if (isTransientFailure) "Couldn’t load image" else "Media unavailable"
+    val displayTitle = name?.trim()?.takeIf { it.isNotEmpty() } ?: stringResource(R.string.media_image_title)
+    val subtitle = if (isTransientFailure) stringResource(R.string.media_image_load_failed) else stringResource(R.string.media_unavailable)
+    val tryAgainLabel = stringResource(R.string.media_try_again_label)
     val fill = MaterialTheme.colorScheme.surfaceContainerHigh
     val secondary = OpenCodeTheme.colors.secondaryText
     val retry = onRetry?.takeIf { isTransientFailure }
@@ -494,7 +496,7 @@ fun MediaAttachmentUnavailableView(
         testTag = "media-unavailable"
         if (retry != null) {
             role = Role.Button
-            onClick(label = "Try again") { retry(); true }
+            onClick(label = tryAgainLabel) { retry(); true }
         }
     }
     if (compact) {

@@ -32,6 +32,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
@@ -148,7 +149,7 @@ fun PermissionScopeConfirm(save: List<String>, confirm: () -> Unit, modifier: Mo
     val colors = OpenCodeTheme.colors
     Column(modifier.width(280.dp).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            "Won’t ask again for",
+            stringResource(R.string.composer_request_scope_title),
             style = OpenCodeTextStyles.footnote.copy(fontWeight = FontWeight.Medium),
             color = colors.secondaryText,
         )
@@ -166,7 +167,7 @@ fun PermissionScopeConfirm(save: List<String>, confirm: () -> Unit, modifier: Mo
         }
         RequestPermissionButton(primary = true, onClick = confirm, modifier = Modifier.fillMaxWidth().testTag("request-always-confirm")) {
             Text(
-                "Always Allow",
+                stringResource(R.string.composer_request_always_allow),
                 style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
                 maxLines = 1,
             )

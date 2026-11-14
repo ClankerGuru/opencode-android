@@ -15,6 +15,7 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.excludedFromDrawerPan
 import ai.opencode.core.ui.openCodeTapTarget
+import ai.opencode.feature.composer.R
 import ai.opencode.server.model.ModelProviderGroup
 import ai.opencode.server.model.ModelSearch
 import ai.opencode.server.model.OpenCodeModel
@@ -86,6 +87,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -756,6 +758,9 @@ private fun OnePickerGrabber(
 ) {
     val density = LocalDensity.current
     val detent = controller.detent
+    val grabberDescription = stringResource(R.string.composer_sheet_grabber_description)
+    val compactText = stringResource(R.string.composer_model_grabber_compact_action)
+    val expandText = stringResource(R.string.composer_model_grabber_expand_action)
     Box(
         Modifier
             .fillMaxWidth()
@@ -774,10 +779,10 @@ private fun OnePickerGrabber(
                 )
             }
             .clearAndSetSemantics {
-                contentDescription = "Sheet Grabber"
+                contentDescription = grabberDescription
                 stateDescription = detent.accessibilityValue
                 role = Role.Button
-                onClick(if (detent == ModelListDetent.Large) "Make the picker compact" else "Expand the picker") {
+                onClick(if (detent == ModelListDetent.Large) compactText else expandText) {
                     if (!isSheetFallback) controller.toggleDetent()
                     true
                 }
@@ -820,6 +825,7 @@ private fun OnePickerSearchBar(
     val text = state.modelFilter
     var sheetDragging by remember { mutableStateOf(false) }
     val hasTrailing = text.isNotEmpty() || focused
+    val searchModelsText = stringResource(R.string.composer_model_search_placeholder)
     Box(
         Modifier
             .fillMaxWidth()
@@ -862,7 +868,7 @@ private fun OnePickerSearchBar(
         ) {
             OpenCodeIcon(SFSymbol.Magnifyingglass, null, size = OpenCodeTextFieldDefaults.iconSize, tint = fieldColors.icon)
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                if (text.isEmpty()) Text("Search Models", style = OpenCodeTextFieldDefaults.textStyle, color = fieldColors.placeholder, maxLines = 1)
+                if (text.isEmpty()) Text(searchModelsText, style = OpenCodeTextFieldDefaults.textStyle, color = fieldColors.placeholder, maxLines = 1)
                 BasicTextField(
                     value = text,
                     onValueChange = { onEvent(ModelPickerEvent.FilterChanged(it)) },
@@ -875,16 +881,16 @@ private fun OnePickerSearchBar(
                         .fillMaxWidth()
                         .focusRequester(focusRequester)
                         .onFocusChanged { onFocusChanged(it.isFocused) }
-                        .semantics { contentDescription = "Search Models" }
+                        .semantics { contentDescription = searchModelsText }
                         .testTag("model-search"),
                 )
             }
             if (text.isNotEmpty()) {
-                OnePickerSearchButton(SFSymbol.XmarkCircleFill, "Clear search", "model-search-clear") {
+                OnePickerSearchButton(SFSymbol.XmarkCircleFill, stringResource(R.string.composer_model_clear_search_description), "model-search-clear") {
                     onEvent(ModelPickerEvent.FilterChanged(""))
                 }
             } else if (focused) {
-                OnePickerSearchButton(SFSymbol.KeyboardChevronCompactDown, "Hide keyboard", "model-search-hide-keyboard", onHideKeyboard)
+                OnePickerSearchButton(SFSymbol.KeyboardChevronCompactDown, stringResource(R.string.composer_model_hide_keyboard_description), "model-search-hide-keyboard", onHideKeyboard)
             }
         }
     }

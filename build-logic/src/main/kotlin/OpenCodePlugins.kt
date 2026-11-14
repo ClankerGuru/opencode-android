@@ -40,6 +40,8 @@ private fun CommonExtension.configureCommon() {
     compileOptions.targetCompatibility = JavaVersion.VERSION_17
     buildFeatures.compose = true
     testOptions.unitTests.isReturnDefaultValues = true
+    // Robolectric tests render screens that read strings.xml.
+    testOptions.unitTests.isIncludeAndroidResources = true
     lint.abortOnError = true
     lint.warningsAsErrors = false
     lint.checkDependencies = false

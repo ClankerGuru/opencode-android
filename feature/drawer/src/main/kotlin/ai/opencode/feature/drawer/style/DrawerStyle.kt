@@ -9,6 +9,7 @@ import ai.opencode.core.ui.OpenCodeIconSize
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.drawer.R
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -48,6 +49,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -514,11 +516,12 @@ fun DrawerEmptyPinDropZone(
     val accent = colors.accent
     val primary = colors.text
     val rowFont = DrawerTunables.rowFont.font
+    val dropToPin = stringResource(R.string.drawer_drop_to_pin)
     Column(
         modifier
             .fillMaxSize()
             .testTag("drawer-empty-pin-drop-zone")
-            .clearAndSetSemantics { contentDescription = "Drop to Pin" },
+            .clearAndSetSemantics { contentDescription = dropToPin },
     ) {
         EmptyPinHeader(progress = openProgress, headerHeight = headerHeight)
         Row(
@@ -562,7 +565,7 @@ fun DrawerEmptyPinDropZone(
                 )
             }
             Text(
-                "Drop to Pin",
+                dropToPin,
                 style = rowFont.copy(fontWeight = if (hovered) FontWeight.Medium else FontWeight.Normal),
                 color = if (hovered) primary else colors.secondaryText,
                 maxLines = 1,
@@ -591,7 +594,7 @@ private fun EmptyPinHeader(progress: Float, headerHeight: Dp) {
                 Modifier.heightIn(min = DrawerTunables.sectionHeight).graphicsLayer { alpha = progress.coerceIn(0f, 1f) },
                 contentAlignment = Alignment.BottomStart,
             ) {
-                DrawerSectionTitle("Pinned")
+                DrawerSectionTitle(stringResource(R.string.drawer_section_pinned))
             }
         }
     } else {

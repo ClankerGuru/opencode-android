@@ -1,5 +1,6 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.motion.Motion
@@ -30,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
@@ -147,11 +149,12 @@ private class ShownRows {
 /** iOS `VoiceScreenRequestCard`: “Share Screen?”, its reason, ✕ and Share. */
 @Composable
 private fun ScreenRequestRow(request: ClientToolCall, send: (VoiceFeature.Action) -> Unit) {
-    val detail = request.reason ?: "Voice wants to see your screen"
-    val spoken = listOfNotNull("Needs your input. Voice wants to see your screen", request.reason).joinToString(". ")
+    val reason = request.reason
+    val detail = reason ?: stringResource(R.string.voice_screen_request_detail)
+    val spoken = if (reason != null) stringResource(R.string.voice_screen_request_spoken_with_reason, reason) else stringResource(R.string.voice_screen_request_spoken)
     CallRow(
         symbol = SFSymbol.RectangleOnRectangle,
-        title = "Share Screen?",
+        title = stringResource(R.string.voice_screen_request_title),
         detail = detail,
         detailLines = 2,
         spoken = spoken,
@@ -159,7 +162,7 @@ private fun ScreenRequestRow(request: ClientToolCall, send: (VoiceFeature.Action
     ) {
         OpenCodeIconButton(
             SFSymbol.Xmark,
-            "Not Now",
+            stringResource(CoreR.string.common_not_now),
             onClick = { send(VoiceFeature.Action.ScreenRequest(VoiceScreenRequestFeature.Action.NotNowTapped)) },
             style = OpenCodeIconButtonStyle.Standard,
             modifier = Modifier.semantics { testTag = "voice-screen-request-not-now" },
@@ -168,7 +171,7 @@ private fun ScreenRequestRow(request: ClientToolCall, send: (VoiceFeature.Action
             onClick = { send(VoiceFeature.Action.ScreenRequest(VoiceScreenRequestFeature.Action.ShareTapped)) },
             modifier = Modifier.semantics { testTag = "voice-screen-request-share" },
             shape = OpenCodeShape.control,
-        ) { Text("Share") }
+        ) { Text(stringResource(CoreR.string.common_share)) }
     }
 }
 
@@ -178,7 +181,7 @@ private fun OpenLinkRow(request: ClientToolCall, send: (VoiceFeature.Action) -> 
     val title = VoiceOpenLinkFeature.cardTitle(request.title)
     val link = VoiceOpenLinkFeature.link(request)
     val host = if (link is VoiceOpenLinkFeature.Link.Valid) VoiceOpenLinkFeature.displayHost(link.url) else null
-    val spoken = listOfNotNull("Needs your input. $title", host).joinToString(" ")
+    val spoken = if (host != null) stringResource(R.string.voice_open_link_spoken_with_host, title, host) else stringResource(R.string.voice_open_link_spoken, title)
     CallRow(
         symbol = SFSymbol.ArrowUpForwardApp,
         title = title,
@@ -189,7 +192,7 @@ private fun OpenLinkRow(request: ClientToolCall, send: (VoiceFeature.Action) -> 
     ) {
         OpenCodeIconButton(
             SFSymbol.Xmark,
-            "Not Now",
+            stringResource(CoreR.string.common_not_now),
             onClick = { send(VoiceFeature.Action.OpenLink(VoiceOpenLinkFeature.Action.NotNowTapped)) },
             style = OpenCodeIconButtonStyle.Standard,
             modifier = Modifier.semantics { testTag = "voice-open-link-not-now" },
@@ -198,7 +201,7 @@ private fun OpenLinkRow(request: ClientToolCall, send: (VoiceFeature.Action) -> 
             onClick = { send(VoiceFeature.Action.OpenLink(VoiceOpenLinkFeature.Action.OpenTapped)) },
             modifier = Modifier.semantics { testTag = "voice-open-link-open" },
             shape = OpenCodeShape.control,
-        ) { Text("Open") }
+        ) { Text(stringResource(R.string.voice_open_link_open)) }
     }
 }
 
@@ -208,7 +211,7 @@ private fun CallAudioRow(track: CallAudioTrack, isPaused: Boolean, send: (VoiceF
     CallRow(
         symbol = SFSymbol.MusicNote,
         title = track.title,
-        detail = if (isPaused) "Paused" else "Playing on the call",
+        detail = if (isPaused) stringResource(R.string.voice_audio_paused) else stringResource(R.string.voice_audio_playing),
         detailLines = 1,
         spoken = null,
         tag = "voice-audio-row",
@@ -216,14 +219,14 @@ private fun CallAudioRow(track: CallAudioTrack, isPaused: Boolean, send: (VoiceF
         val toggle = if (isPaused) VoiceCallAudioFeature.Action.ResumeTapped else VoiceCallAudioFeature.Action.PauseTapped
         OpenCodeIconButton(
             if (isPaused) SFSymbol.PlayFill else SFSymbol.PauseFill,
-            if (isPaused) "Play Audio" else "Pause Audio",
+            if (isPaused) stringResource(R.string.voice_audio_play) else stringResource(R.string.voice_audio_pause),
             onClick = { send(VoiceFeature.Action.CallAudio(toggle)) },
             style = OpenCodeIconButtonStyle.Standard,
             modifier = Modifier.semantics { testTag = "voice-audio-pause" },
         )
         OpenCodeIconButton(
             SFSymbol.StopFill,
-            "Stop Audio",
+            stringResource(R.string.voice_audio_stop),
             onClick = { send(VoiceFeature.Action.CallAudio(VoiceCallAudioFeature.Action.StopTapped)) },
             style = OpenCodeIconButtonStyle.Standard,
             modifier = Modifier.semantics { testTag = "voice-audio-stop" },

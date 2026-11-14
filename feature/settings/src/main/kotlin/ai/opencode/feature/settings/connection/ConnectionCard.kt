@@ -10,6 +10,7 @@ import ai.opencode.core.store.observe
 import ai.opencode.core.ui.AlertTextFields
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.RollingNumberAlignment
@@ -21,6 +22,7 @@ import ai.opencode.core.ui.accessibilityFocusRequest
 import ai.opencode.core.ui.accessibilityFocusTarget
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.settings.ConnectionStatus
+import ai.opencode.feature.settings.R
 import ai.opencode.feature.settings.SettingsButtonRow
 import ai.opencode.feature.settings.SettingsDivider
 import ai.opencode.feature.settings.SettingsFeature
@@ -85,6 +87,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -210,6 +213,7 @@ private fun ConnectionCardContent(
     // a new word is still read; the number stays on screen and on the server page's Status row.
     val accessibilityValue = listOf(rememberSettledSpokenWord(presentation.spokenWord), monitor.server.host, monitor.route.rawValue)
         .joinToString(", ")
+    val showServerLabel = stringResource(R.string.settings_connection_show_server_label)
 
     // Where the inline action sits: reserved after the status, the real button drawn over the card
     // (outside its click and its merged semantics), as iOS's `RetryReservation`.
@@ -234,7 +238,7 @@ private fun ConnectionCardContent(
                     contentDescription = monitor.name
                     stateDescription = accessibilityValue
                     role = Role.Button
-                    onClick(label = "Show the server") { onOpen(); true }
+                    onClick(label = showServerLabel) { onOpen(); true }
                 },
         ) {
             ConnectionScopeView(
@@ -546,7 +550,7 @@ private fun StatusLine(presentation: ConnectionStatusPresentation, style: Connec
                 Text("·", style = textStyle, color = OpenCodeTheme.colors.tertiaryText)
             }
             RollingNumber(
-                text = "$milliseconds ms",
+                text = stringResource(R.string.settings_connection_milliseconds, milliseconds),
                 style = textStyle,
                 color = color,
                 motion = millisecondsRoll,
@@ -613,7 +617,7 @@ fun ServerPage(store: SettingsStore) {
     val error by store.observe { it.connectionErrorMessage }
     val current = server
     if (current == null) {
-        SettingsPageScaffold(title = "Server", store = store) {}
+        SettingsPageScaffold(title = stringResource(R.string.settings_server_title), store = store) {}
         return
     }
     val monitor = rememberConnectionMonitor(store, current, ConnectionMonitor.link(status, switchingTo, credentialsRejected))
@@ -622,6 +626,7 @@ fun ServerPage(store: SettingsStore) {
     val send = { delegate: SettingsDelegate -> store.send(SettingsFeature.Action.Delegate(delegate)) }
     var renaming by remember { mutableStateOf(false) }
     var nameDraft by remember { mutableStateOf("") }
+    val addressLabel = stringResource(R.string.settings_server_address)
 
     SettingsPageScaffold(title = monitor.name, store = store) {
         item(key = "server-status", contentType = "settings-section") {
@@ -633,10 +638,10 @@ fun ServerPage(store: SettingsStore) {
                 StatusRow(presentation)
                 SettingsDivider()
                 SettingsRowFrame(Modifier.clearAndSetSemantics {
-                    contentDescription = "Address"
+                    contentDescription = addressLabel
                     stateDescription = monitor.server.host
                 }) {
-                    LabeledContent("Address", Modifier.weight(1f)) {
+                    LabeledContent(addressLabel, Modifier.weight(1f)) {
                         SelectionContainer {
                             Text(
                                 monitor.server.host,
@@ -649,19 +654,19 @@ fun ServerPage(store: SettingsStore) {
                     }
                 }
                 SettingsDivider()
-                SettingsValueRow("Connection", monitor.route.rawValue)
+                SettingsValueRow(stringResource(R.string.settings_server_connection), monitor.route.rawValue)
                 monitor.version?.let { version ->
                     SettingsDivider()
-                    SettingsValueRow("Version", version)
+                    SettingsValueRow(stringResource(R.string.settings_server_version), version)
                 }
                 when (presentation.status) {
                     ConnectionHealth.Status.offline -> {
                         SettingsDivider()
-                        SettingsButtonRow("Retry", onClick = { monitor.retry { send(SettingsDelegate.RetryConnection) } })
+                        SettingsButtonRow(stringResource(CoreR.string.common_retry), onClick = { monitor.retry { send(SettingsDelegate.RetryConnection) } })
                     }
                     ConnectionHealth.Status.signInFailed -> {
                         SettingsDivider()
-                        SettingsButtonRow("Edit Server…", onClick = { send(SettingsDelegate.EditServer(current)) })
+                        SettingsButtonRow(stringResource(R.string.settings_server_edit_server), onClick = { send(SettingsDelegate.EditServer(current)) })
                     }
                     else -> Unit
                 }
@@ -685,7 +690,7 @@ fun ServerPage(store: SettingsStore) {
         }
         item(key = "server-rename", contentType = "settings-section") {
             SettingsSection {
-                SettingsButtonRow("Rename Server…", onClick = {
+                SettingsButtonRow(stringResource(R.string.settings_server_rename_server_ellipsis), onClick = {
                     nameDraft = current.name ?: ""
                     renaming = true
                 })
@@ -696,10 +701,10 @@ fun ServerPage(store: SettingsStore) {
     if (renaming) {
         OpenCodeAlertDialog(
             onDismissRequest = { renaming = false },
-            title = { Text("Rename Server") },
+            title = { Text(stringResource(R.string.settings_server_rename_title)) },
             text = {
                 Column {
-                    Text("Only this ${ai.opencode.core.ui.ThisDevice.name} uses the name. Leave it blank for “${current.friendlyName}”.")
+                    Text(stringResource(R.string.settings_server_rename_message, ai.opencode.core.ui.ThisDevice.name, current.friendlyName))
                     OpenCodeTextField(
                         value = nameDraft,
                         onValueChange = { nameDraft = it },
@@ -715,9 +720,9 @@ fun ServerPage(store: SettingsStore) {
                 TextButton(onClick = {
                     renaming = false
                     send(SettingsDelegate.RenameServer(current, nameDraft))
-                }) { Text("Save") }
+                }) { Text(stringResource(CoreR.string.common_save)) }
             },
-            dismissButton = { TextButton(onClick = { renaming = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { renaming = false }) { Text(stringResource(CoreR.string.common_cancel)) } },
         )
     }
 }
@@ -744,18 +749,19 @@ private fun StatusRow(presentation: ConnectionStatusPresentation) {
         spoken.text = live
     }
     val text = spoken.text
+    val statusLabel = stringResource(R.string.settings_server_status)
     SettingsRowFrame(Modifier.accessibilityFocusTarget(focus).clearAndSetSemantics {
-        contentDescription = "Status"
+        contentDescription = statusLabel
         stateDescription = text
     }) {
-        LabeledContent("Status", Modifier.weight(1f)) {
+        LabeledContent(statusLabel, Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 OpenCodeIcon(presentation.symbol, contentDescription = null, size = 18.dp, tint = color)
                 val body = SettingsText.title.copy(fontFeatureSettings = "tnum")
                 val milliseconds = presentation.milliseconds
                 if (milliseconds != null) {
                     RollingNumber(
-                        text = "${presentation.word} · $milliseconds ms",
+                        text = stringResource(R.string.settings_server_status_milliseconds, presentation.word, milliseconds),
                         style = body,
                         color = color,
                         motion = millisecondsRoll,

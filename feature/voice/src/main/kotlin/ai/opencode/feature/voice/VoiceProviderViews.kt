@@ -1,5 +1,6 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.tuning.Tunable
 import ai.opencode.core.tuning.TuningStore
 import ai.opencode.core.ui.OpenCodeIcon
@@ -34,6 +35,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -250,7 +252,7 @@ fun VoiceProviderFailureCard(
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    "Couldn’t Start Call",
+                    stringResource(R.string.voice_failure_start_title),
                     style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
                     modifier = Modifier.semantics { heading() },
                 )
@@ -276,6 +278,7 @@ fun VoiceProviderFailureCard(
 /** A failed call's ×: Close, as the bar's End. */
 @Composable
 fun VoiceFailureCloseButton(action: () -> Unit, modifier: Modifier = Modifier) {
+    val closeDescription = stringResource(CoreR.string.common_close)
     Box(
         modifier
             // iOS's negative padding (-12 vertical, -10 trailing): the target reaches into the
@@ -290,7 +293,7 @@ fun VoiceFailureCloseButton(action: () -> Unit, modifier: Modifier = Modifier) {
             }
             .clickable(interactionSource = null, indication = null, role = Role.Button, onClick = action)
             .openCodeTapTarget()
-            .semantics { contentDescription = "Close"; role = Role.Button },
+            .semantics { contentDescription = closeDescription; role = Role.Button },
         contentAlignment = Alignment.Center,
     ) {
         OpenCodeIcon(SFSymbol.Xmark, null, tint = OpenCodeTheme.colors.secondaryText, size = 18.dp)

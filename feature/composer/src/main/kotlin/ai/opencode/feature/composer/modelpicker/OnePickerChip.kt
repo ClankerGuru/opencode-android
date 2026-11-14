@@ -10,6 +10,7 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.excludedFromDrawerPan
 import ai.opencode.core.ui.openCodeTapTarget
+import ai.opencode.feature.composer.R
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateContentSize
@@ -31,6 +32,7 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -73,6 +75,7 @@ fun OnePickerChip(
 ) {
     val reduceMotion = rememberReduceMotion()
     val density = LocalDensity.current
+    val chooseModelDescription = stringResource(R.string.composer_model_choose_description)
     val key = OnePickerChip.ModelKey(state)
     val scale = state.currentLevelScale
     val levelLabel = state.currentChipLevelLabel
@@ -103,7 +106,7 @@ fun OnePickerChip(
             .heightIn(min = 48.dp)
             .animateContentSize(if (animates) Motion.layout.animation(reduceMotion = reduceMotion) else snap())
             .clearAndSetSemantics {
-                contentDescription = "Choose model"
+                contentDescription = chooseModelDescription
                 stateDescription = value
                 role = Role.Button
                 onClick { if (isEnabled) onOpen(); isEnabled }

@@ -75,6 +75,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Density
 import kotlin.math.max
 import kotlin.math.min
@@ -95,9 +96,10 @@ fun AppearanceSettingsView(store: SettingsStore) {
     val send = { action: HomeSettingsFeature.Action -> store.send(SettingsFeature.Action.Settings(action)) }
     // QA U-02: Back from the Theme picker puts TalkBack back on the Theme row.
     val returnFocus = rememberSettingsReturnFocus(store, page = SettingsPage.Appearance)
+    val modeHeader = stringResource(R.string.settings_appearance_mode_header)
 
-    SettingsPageScaffold(title = "Appearance", store = store) {
-        settingsSection(key = "mode", header = "Mode") {
+    SettingsPageScaffold(title = stringResource(R.string.settings_appearance_title), store = store) {
+        settingsSection(key = "mode", header = modeHeader) {
             SettingsSegmentedControl(
                 options = AppearanceColorScheme.entries,
                 selected = scheme,
@@ -126,7 +128,7 @@ fun AppearanceSettingsView(store: SettingsStore) {
                 if (isAccessibilitySize()) {
                     // iOS stacks the label over the swatch and value at the accessibility sizes.
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Theme", style = SettingsText.title, color = OpenCodeTheme.colors.text)
+                        Text(stringResource(R.string.settings_appearance_theme), style = SettingsText.title, color = OpenCodeTheme.colors.text)
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             swatch()
                             Text(appTheme.title, style = SettingsText.summary, color = OpenCodeTheme.colors.secondaryText)
@@ -134,7 +136,7 @@ fun AppearanceSettingsView(store: SettingsStore) {
                         }
                     }
                 } else {
-                    Text("Theme", style = SettingsText.title, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
+                    Text(stringResource(R.string.settings_appearance_theme), style = SettingsText.title, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         swatch()
                         Text(appTheme.title, style = SettingsText.summary, color = OpenCodeTheme.colors.secondaryText, maxLines = 1)
@@ -168,7 +170,7 @@ fun ThemesSettingsView(store: SettingsStore) {
         containerColor = colors.groupedCanvas,
         topBar = {
             OpenCodeTopBar(
-                title = { Text("Themes", modifier = Modifier.semantics { heading() }) },
+                title = { Text(stringResource(R.string.settings_themes_title), modifier = Modifier.semantics { heading() }) },
                 navigation = { OpenCodeTopBarBackButton(onClick = { store.send(SettingsFeature.Action.BackTapped) }) },
                 centerTitle = true,
                 containerColor = canvas,
@@ -385,11 +387,12 @@ val LocalAppearanceTranscriptPreview = staticCompositionLocalOf<(@Composable () 
 private fun AppearanceTranscriptPreview(theme: AppTheme, isDark: Boolean) {
     val rows = LocalAppearanceTranscriptPreview.current
     val density = LocalDensity.current
+    val previewDescription = stringResource(R.string.settings_themes_preview_description)
     Box(
         Modifier
             .fillMaxWidth()
             .clearAndSetSemantics {
-                contentDescription = "Transcript preview"
+                contentDescription = previewDescription
                 stateDescription = theme.title
             }
             // iOS `.allowsHitTesting(false)`: the preview takes no touches.
@@ -428,7 +431,7 @@ private fun ImitationTranscriptPreview(theme: AppTheme, isDark: Boolean) {
                 shape = RoundedCornerShape(OpenCodeRadius.card),
             ) {
                 Text(
-                    "Help me improve the session screen. Show me what you find and explain the changes.",
+                    stringResource(R.string.settings_themes_preview_user_message),
                     style = SettingsText.title,
                     color = v.text.color,
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),

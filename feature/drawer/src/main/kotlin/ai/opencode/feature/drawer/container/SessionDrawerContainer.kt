@@ -6,6 +6,7 @@ import ai.opencode.core.motion.rememberFrameDurationSeconds
 import ai.opencode.core.ui.LocalDrawerKeyboardSignals
 import ai.opencode.core.ui.LocalDrawerPanExclusion
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.feature.drawer.R
 import ai.opencode.feature.drawer.catchup.CatchUpMetrics
 import ai.opencode.feature.drawer.catchup.CatchUpStack
 import ai.opencode.feature.drawer.catchup.CatchUpStage
@@ -92,6 +93,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalGraphicsContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -286,6 +288,7 @@ fun SessionDrawerContainer(
     // which stays put under a scrim, instead of the session sliding aside as iOS's card does.
     val modal = sidebarShown == null
     val scrimColor = if (modal) MaterialTheme.colorScheme.scrim.copy(alpha = MODAL_SCRIM_ALPHA) else DrawerScrim.color(isDark, colors.highContrast)
+    val closeDrawerDescription = stringResource(R.string.drawer_close_description)
     // A Catch Up morph poses the drawer itself (its scale is set); it isn't following the motion then.
     val drawerPosed by remember(controller) { derivedStateOf { !controller.drawerScale.floatValue.isNaN() } }
     val chromeBackground = if (isDark) Color(0.04f, 0.04f, 0.04f, 1f) else colors.userBubble
@@ -632,7 +635,7 @@ fun SessionDrawerContainer(
                         .then(
                             if (scrimInteractive && contentHidden) {
                                 Modifier.semantics {
-                                    contentDescription = "Close session list"
+                                    contentDescription = closeDrawerDescription
                                     role = Role.Button
                                     onClick { controller.closeDrawer() }
                                 }

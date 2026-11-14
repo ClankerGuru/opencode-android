@@ -1,5 +1,6 @@
 package ai.opencode.feature.media
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeTopBar
 import ai.opencode.core.ui.OpenCodeTopBarBackButton
 import ai.opencode.core.motion.rememberReduceMotion
@@ -76,6 +77,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -253,7 +255,7 @@ private fun AgentFilePageContent(
                 title = { AgentFileTitle(reference.name, model.locationLabel) },
                 navigation = {
                     if (isRoot) {
-                        TextButton(onClick = onDone, modifier = Modifier.testTag("agent-file-done")) { Text("Done") }
+                        TextButton(onClick = onDone, modifier = Modifier.testTag("agent-file-done")) { Text(stringResource(CoreR.string.common_done)) }
                     } else {
                         OpenCodeTopBarBackButton(onClick = onBack)
                     }
@@ -263,7 +265,7 @@ private fun AgentFilePageContent(
                         IconButton(onClick = { showsSource = !showsSource }, modifier = Modifier.testTag("agent-file-source-toggle")) {
                             OpenCodeIcon(
                                 if (showsSource) "doc.richtext" else "chevron.left.forwardslash.chevron.right",
-                                contentDescription = if (showsSource) "Show Preview" else "Show Source",
+                                contentDescription = if (showsSource) stringResource(R.string.media_file_show_preview_description) else stringResource(R.string.media_file_show_source_description),
                             )
                         }
                     }
@@ -271,13 +273,13 @@ private fun AgentFilePageContent(
                         IconButton(onClick = model::toggleWrapLines) {
                             OpenCodeIcon(
                                 if (wrapsLines) "arrow.left.and.right.text.vertical" else "text.word.spacing",
-                                contentDescription = if (wrapsLines) "Don’t Wrap Lines" else "Wrap Lines",
+                                contentDescription = if (wrapsLines) stringResource(R.string.media_file_unwrap_lines_description) else stringResource(R.string.media_file_wrap_lines_description),
                             )
                         }
                     }
                     if (pip != null && pip.isSupported) {
                         IconButton(onClick = pip::start, modifier = Modifier.testTag("agent-file-pip-start")) {
-                            OpenCodeIcon("pip.enter", contentDescription = "Start Picture in Picture")
+                            OpenCodeIcon("pip.enter", contentDescription = stringResource(R.string.media_file_start_pip_description))
                         }
                     }
                     if (phase is AgentFileViewerModel.Phase.Ready) ShareControl(model)
@@ -295,7 +297,7 @@ private fun AgentFilePageContent(
             contentAlignment = Alignment.Center,
         ) {
             when (phase) {
-                AgentFileViewerModel.Phase.Opening -> StatusView(reference, detail = "Opening…", progress = null)
+                AgentFileViewerModel.Phase.Opening -> StatusView(reference, detail = stringResource(R.string.media_file_opening), progress = null)
                 is AgentFileViewerModel.Phase.Downloading -> StatusView(
                     reference,
                     detail = progressText(phase.received, phase.expected),
@@ -314,9 +316,9 @@ private fun AgentFilePageContent(
     model.shareError?.let { error ->
         OpenCodeAlertDialog(
             onDismissRequest = { model.shareError = null },
-            title = { Text("Couldn’t Share File") },
+            title = { Text(stringResource(R.string.media_file_share_failed_title)) },
             text = { Text(error.detail) },
-            confirmButton = { TextButton(onClick = { model.shareError = null }) { Text("OK") } },
+            confirmButton = { TextButton(onClick = { model.shareError = null }) { Text(stringResource(CoreR.string.common_ok)) } },
         )
     }
 }
@@ -346,12 +348,13 @@ private fun ShareControl(model: AgentFileViewerModel) {
     val progress = model.shareProgress
     if (progress != null) {
         val text = progressText(progress.received, progress.expected)
+        val downloadingDescription = stringResource(R.string.media_file_share_downloading_description)
         Box(Modifier.size(48.dp).testTag("agent-file-share-progress"), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(
                 modifier = Modifier
                     .size(20.dp)
                     .semantics {
-                        contentDescription = "Downloading to share"
+                        contentDescription = downloadingDescription
                         stateDescription = text
                     },
                 strokeWidth = 2.dp,
@@ -359,7 +362,7 @@ private fun ShareControl(model: AgentFileViewerModel) {
         }
     } else {
         IconButton(onClick = model::share, modifier = Modifier.testTag("agent-file-share")) {
-            OpenCodeIcon("square.and.arrow.up", contentDescription = "Share")
+            OpenCodeIcon("square.and.arrow.up", contentDescription = stringResource(CoreR.string.common_share))
         }
     }
 }
@@ -482,13 +485,13 @@ private fun ConfirmLargeView(reference: AgentFileReference, size: Long, onDownlo
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(TranscriptMetrics.compact)) {
             Text(reference.name, style = OpenCodeTextStyles.headline, textAlign = TextAlign.Center)
             Text(
-                "This file is ${fileSizeText(size)}. Download it to view it on this device?",
+                stringResource(R.string.media_file_confirm_large_message, fileSizeText(size)),
                 style = OpenCodeTextStyles.subheadline,
                 color = OpenCodeTheme.colors.secondaryText,
                 textAlign = TextAlign.Center,
             )
         }
-        OpenCodePrimaryButton(text = "Download", onClick = onDownload)
+        OpenCodePrimaryButton(text = stringResource(R.string.media_file_download), onClick = onDownload)
     }
 }
 
@@ -509,7 +512,7 @@ private fun FailedView(error: AgentFileError, onRetry: () -> Unit) {
         Text(error.title, style = OpenCodeTextStyles.title2, textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
         Text(error.detail, style = OpenCodeTextStyles.subheadline, color = OpenCodeTheme.colors.secondaryText, textAlign = TextAlign.Center)
         Spacer(Modifier.size(TranscriptMetrics.compact))
-        OpenCodeSecondaryButton(text = "Try Again", onClick = onRetry)
+        OpenCodeSecondaryButton(text = stringResource(CoreR.string.common_try_again), onClick = onRetry)
     }
 }
 
@@ -526,11 +529,11 @@ private fun ExternalDocumentView(reference: AgentFileReference, noAppOpens: Bool
             Text(reference.name, style = OpenCodeTextStyles.headline, textAlign = TextAlign.Center)
             Text(reference.typeLabel, style = OpenCodeTextStyles.subheadline, color = OpenCodeTheme.colors.secondaryText)
         }
-        OpenCodePrimaryButton(text = "Open in Another App", onClick = onOpen)
+        OpenCodePrimaryButton(text = stringResource(R.string.media_file_open_in_another_app), onClick = onOpen)
         if (noAppOpens) {
             // Android only: nothing installed opens this type (Share still saves it to Files).
             Text(
-                "No app on this device can open this file. Share it to save it or send it elsewhere.",
+                stringResource(R.string.media_file_no_app_message),
                 style = OpenCodeTextStyles.footnote,
                 color = OpenCodeTheme.colors.secondaryText,
                 textAlign = TextAlign.Center,
@@ -562,12 +565,13 @@ private fun AgentPdfView(document: AgentPdfDocument, modifier: Modifier) {
                 val bitmap by produceState<android.graphics.Bitmap?>(null, document, index, widthPx) {
                     value = document.render(index, widthPx)
                 }
+                val pageDescription = stringResource(R.string.media_file_pdf_page_description, index + 1, document.pageCount)
                 Box(
                     Modifier
                         .fillMaxWidth()
                         .aspectRatio(document.pageAspects[index].coerceAtLeast(0.05f))
                         .background(Color.White)
-                        .semantics { contentDescription = "Page ${index + 1} of ${document.pageCount}" },
+                        .semantics { contentDescription = pageDescription },
                 ) {
                     bitmap?.let {
                         Image(it.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds)
@@ -639,6 +643,7 @@ private fun PlayerControls(player: Player, modifier: Modifier) {
     var scrubbing by remember { mutableStateOf<Float?>(null) }
     val duration = progress.durationMs.coerceAtLeast(0)
     val position = scrubbing?.toLong() ?: progress.currentPositionMs
+    val playbackPositionDescription = stringResource(R.string.media_player_position_description)
     Column(
         modifier
             .fillMaxWidth()
@@ -656,7 +661,7 @@ private fun PlayerControls(player: Player, modifier: Modifier) {
             valueRange = 0f..maxOf(duration, 1).toFloat(),
             enabled = duration > 0,
             colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Color.White),
-            modifier = Modifier.semantics { contentDescription = "Playback position" },
+            modifier = Modifier.semantics { contentDescription = playbackPositionDescription },
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(timeText(position), style = OpenCodeTextStyles.caption1.copy(fontFeatureSettings = "tnum"), color = Color.White)
@@ -664,7 +669,7 @@ private fun PlayerControls(player: Player, modifier: Modifier) {
             IconButton(onClick = playPause::onClick, enabled = playPause.isEnabled) {
                 OpenCodeIcon(
                     if (playPause.showPlay) "play.fill" else "pause.fill",
-                    contentDescription = if (playPause.showPlay) "Play" else "Pause",
+                    contentDescription = if (playPause.showPlay) stringResource(R.string.media_player_play) else stringResource(R.string.media_player_pause),
                     tint = Color.White,
                 )
             }

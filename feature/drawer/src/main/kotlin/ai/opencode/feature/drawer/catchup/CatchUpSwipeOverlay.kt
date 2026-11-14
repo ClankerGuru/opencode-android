@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -37,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.MotionTunables
 import ai.opencode.core.ui.OpenCodeTextStyles
+import ai.opencode.feature.drawer.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -137,7 +139,7 @@ internal fun CatchUpSwipeOverlay(state: CatchUpBadgeState, opaque: Boolean, modi
         ) {
             CatchUpProgressCircle(state, tint, isRead)
             Text(
-                text = if (isRead) "Mark as\nRead" else "Keep\nUnread",
+                text = if (isRead) stringResource(R.string.drawer_catch_up_swipe_mark_read) else stringResource(R.string.drawer_catch_up_swipe_keep_unread),
                 style = OpenCodeTextStyles.title1.copy(fontWeight = FontWeight.Bold, fontSize = 28.sp),
                 color = Color.White,
                 textAlign = if (isRead) TextAlign.Start else TextAlign.End,

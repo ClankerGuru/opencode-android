@@ -10,6 +10,7 @@ import androidx.glance.material3.ColorProviders as MaterialColorProviders
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.system.ControlDirectoryStore
+import ai.opencode.feature.system.R
 import ai.opencode.feature.system.intents.OpenCodeControlKind
 import ai.opencode.feature.system.intents.SessionControlValue
 import ai.opencode.feature.system.SessionDirectory
@@ -141,7 +142,7 @@ abstract class OpenCodeTileService : TileService() {
 class StartCallTileService : OpenCodeTileService() {
     override val kind = OpenCodeControlKind.START_CALL
     override val symbol = SFSymbol.Waveform
-    override fun label(value: SessionControlValue) = "Start Call"
+    override fun label(value: SessionControlValue) = getString(R.string.system_start_call)
     override fun subtitle(value: SessionControlValue): String? =
         OpenCodeControls.directory(this).current?.lastViewed?.title ?: value.title
 }
@@ -158,7 +159,7 @@ class OpenSessionTileService : OpenCodeTileService() {
 class NewSessionTileService : OpenCodeTileService() {
     override val kind = OpenCodeControlKind.NEW_SESSION
     override val symbol = SFSymbol.SquareAndPencil
-    override fun label(value: SessionControlValue) = "New Session"
+    override fun label(value: SessionControlValue) = getString(R.string.system_new_session)
     override fun subtitle(value: SessionControlValue): String? = null
 }
 

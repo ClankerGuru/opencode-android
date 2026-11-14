@@ -112,6 +112,7 @@ import androidx.compose.ui.node.GlobalPositionAwareModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -771,6 +772,8 @@ fun BackgroundWorkPresentation(
         val hidden = isCovered
         val hiddenAlpha by androidx.compose.animation.core.animateFloatAsState(if (hidden) 0f else 1f, Motion.reducedFadeSpec(), label = "hidden")
         val summary = BackgroundWorkSummary.summary(rowAgents, rowShells)
+        val showWorkLabel = stringResource(R.string.session_background_work_show_label)
+        val collapsedDescription = stringResource(R.string.session_background_work_collapsed_description)
         val surfaceColor = OpenCodeSurfaces.color
         val shape = remember { BackgroundWorkShape(BackgroundWorkMotion.panelRadius) }
 
@@ -854,7 +857,7 @@ fun BackgroundWorkPresentation(
                                 Modifier
                                     // iOS `CapsuleDragsTranscript`: a vertical drag on the capsule scrolls the transcript.
                                     .passesDragsToTranscript(transcript)
-                                    .clickable(onClickLabel = "Show running subagents and shells") {
+                                    .clickable(onClickLabel = showWorkLabel) {
                                         onToggle()
                                         onPresentedChange(!isPresented)
                                     }
@@ -862,7 +865,7 @@ fun BackgroundWorkPresentation(
                                     .semantics {
                                         contentDescription = summary
                                         // Open, the panel replaces it, so it only ever reads collapsed.
-                                        stateDescription = "Collapsed"
+                                        stateDescription = collapsedDescription
                                     }
                             } else {
                                 Modifier.clearAndSetSemantics { }
@@ -1004,12 +1007,12 @@ private fun BackgroundWorkRows(
 ) {
     Column(modifier.fillMaxWidth().padding(vertical = 10.dp)) {
         if (agents.isNotEmpty()) {
-            SectionHeader("Subagents", Modifier.accessibilityFocusRequest(focusRequest))
+            SectionHeader(stringResource(R.string.session_background_work_subagents_title), Modifier.accessibilityFocusRequest(focusRequest))
             for (agent in agents) {
                 androidx.compose.runtime.key(agent.id) {
                     BackgroundWorkRow(
                         title = agent.title,
-                        accessibilityHint = "Open the subagent’s session",
+                        accessibilityHint = stringResource(R.string.session_background_work_open_subagent_label),
                         onTap = { onOpenSubagent(agent.id) },
                         modifier = Modifier.testTag("background-subagent-${agent.id}"),
                     ) {
@@ -1027,7 +1030,7 @@ private fun BackgroundWorkRows(
             HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 6.dp), color = OpenCodeTheme.colors.border)
         }
         if (shells.isNotEmpty()) {
-            SectionHeader("Shells", if (agents.isEmpty()) Modifier.accessibilityFocusRequest(focusRequest) else Modifier)
+            SectionHeader(stringResource(R.string.session_background_work_shells_title), if (agents.isEmpty()) Modifier.accessibilityFocusRequest(focusRequest) else Modifier)
             for (shell in shells) {
                 androidx.compose.runtime.key(shell.id) {
                     BackgroundWorkRow(
@@ -1035,7 +1038,7 @@ private fun BackgroundWorkRows(
                         isCommand = true,
                         startedAt = shell.startedAt,
                         isLive = isLive,
-                        accessibilityHint = "Show the shell’s output",
+                        accessibilityHint = stringResource(R.string.session_background_work_show_shell_label),
                         onTap = { onOpenShell(shell.id) },
                         modifier = Modifier.testTag("background-shell-${shell.id}"),
                     ) {

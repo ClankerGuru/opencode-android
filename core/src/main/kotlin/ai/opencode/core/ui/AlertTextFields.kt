@@ -1,6 +1,8 @@
 package ai.opencode.core.ui
 
+import ai.opencode.core.R
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 
 /**
  * iOS `AlertTextFields`: text fields in alerts (Rename Session, Rename Server, Paste the Code)
@@ -16,7 +18,7 @@ object AlertTextFields {
         return {
             OpenCodeIconButton(
                 SFSymbol.XmarkCircleFill,
-                contentDescription = "Clear text",
+                contentDescription = stringResource(R.string.core_alert_text_field_clear_description),
                 onClick = onClear,
                 style = OpenCodeIconButtonStyle.Standard,
                 iconSize = OpenCodeIconSize.small,

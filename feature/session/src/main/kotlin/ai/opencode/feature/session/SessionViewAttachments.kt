@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.dependencies.PasteboardClient
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.files.AttachmentFileType
@@ -113,6 +114,7 @@ import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalGraphicsContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -410,9 +412,9 @@ fun SessionAttachmentAlerts(importer: SessionAttachmentImporter) {
     if (error != null) {
         OpenCodeAlertDialog(
             onDismissRequest = { importer.attachmentError = null },
-            title = { Text("Couldn’t Add Image") },
+            title = { Text(stringResource(R.string.session_attachment_add_image_failed_title)) },
             text = { Text(error) },
-            confirmButton = { TextButton(onClick = { importer.attachmentError = null }) { Text("OK") } },
+            confirmButton = { TextButton(onClick = { importer.attachmentError = null }) { Text(stringResource(CoreR.string.common_ok)) } },
         )
     }
     val upload = importer.largeUpload
@@ -421,8 +423,8 @@ fun SessionAttachmentAlerts(importer: SessionAttachmentImporter) {
             onDismissRequest = importer::cancelLargeUpload,
             title = { Text(upload.title) },
             text = { Text(upload.message) },
-            confirmButton = { TextButton(onClick = importer::confirmLargeUpload) { Text("Upload") } },
-            dismissButton = { TextButton(onClick = importer::cancelLargeUpload) { Text("Cancel") } },
+            confirmButton = { TextButton(onClick = importer::confirmLargeUpload) { Text(stringResource(R.string.session_attachment_upload)) } },
+            dismissButton = { TextButton(onClick = importer::cancelLargeUpload) { Text(stringResource(CoreR.string.common_cancel)) } },
         )
     }
 }
@@ -595,7 +597,7 @@ fun PendingAttachmentsRow(
                     // Out of the composer while it's up full screen, like a transcript image.
                     val viewing = ComposerPhotoViewer.isShowing(attachment.id)
                     RemovableAttachment(
-                        label = "Remove image attachment ${index + 1}",
+                        label = stringResource(R.string.session_attachment_remove_image_description, index + 1),
                         identifier = "remove-pending-attachment-$index",
                         reduceMotion = reduceMotion,
                         onRemove = removing(key) { onRemoveAttachment(index) },
@@ -621,7 +623,7 @@ fun PendingAttachmentsRow(
                     }
                 }
                 text != null && summary != null -> RemovableAttachment(
-                    label = "Remove ${PastedText.NAME}",
+                    label = stringResource(R.string.session_attachment_remove_description, PastedText.NAME),
                     identifier = "remove-pasted-text-$index",
                     reduceMotion = reduceMotion,
                     onRemove = removing(key) { onRemoveAttachment(index) },
@@ -643,8 +645,9 @@ fun PendingAttachmentsRow(
                 else -> {
                     // A PDF the selected model reads natively: sent inline, no upload.
                     val name = attachment.name ?: "File"
+                    val fileDescription = stringResource(R.string.session_attachment_file_description, name)
                     RemovableAttachment(
-                        label = "Remove $name",
+                        label = stringResource(R.string.session_attachment_remove_description, name),
                         identifier = "remove-pending-file-$name",
                         reduceMotion = reduceMotion,
                         onRemove = removing(key) { onRemoveAttachment(index) },
@@ -657,7 +660,7 @@ fun PendingAttachmentsRow(
                             height = ComposerFileChip.height,
                             modifier = Modifier
                                 .background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(ComposerFileChip.cornerRadius))
-                                .clearAndSetSemantics { contentDescription = "File attachment $name" }
+                                .clearAndSetSemantics { contentDescription = fileDescription }
                                 .testTag("pending-file-$name"),
                         ) {
                             Text(AttachmentFileType.subtitle(name, attachment.mime, attachment.byteCount ?: attachment.data.size.toLong()))
@@ -685,7 +688,7 @@ fun PendingAttachmentsRow(
         items(files, key = { "file-${it.id}" }) { file ->
             val key = "file-${file.id}"
             RemovableAttachment(
-                label = if (file.isUploading) "Cancel upload of ${file.name}" else "Remove ${file.name}",
+                label = if (file.isUploading) stringResource(R.string.session_attachment_cancel_upload_description, file.name) else stringResource(R.string.session_attachment_remove_description, file.name),
                 identifier = "remove-pending-file-${file.name}",
                 reduceMotion = reduceMotion,
                 onRemove = removing(key) { onRemoveFile(file.id) },
@@ -888,6 +891,9 @@ private fun AttachmentThumbnail(
     server: OpenCodeServer? = null,
 ) {
     val density = LocalDensity.current
+    val openPhotoLabel = stringResource(R.string.session_attachment_open_photo_label)
+    val imageDescription = stringResource(R.string.session_attachment_image_description, index + 1)
+    val videoDescription = stringResource(R.string.session_attachment_video_description, index + 1)
     val target = with(density) { PendingAttachmentMetrics.slotSide.roundToPx() }
     val mediaHash = attachment.mediaHash
     val image by produceState<ImageBitmap?>(null, attachment.id, mediaHash, server?.persistenceID) {
@@ -917,13 +923,13 @@ private fun AttachmentThumbnail(
                         interactionSource = null,
                         indication = null,
                         role = Role.Image,
-                        onClickLabel = "Open the photo full screen",
+                        onClickLabel = openPhotoLabel,
                         onClick = onOpen,
                     )
                 },
             )
             .semantics {
-                contentDescription = if (attachment.videoDuration == null) "Image attachment ${index + 1}" else "Video attachment ${index + 1}"
+                contentDescription = if (attachment.videoDuration == null) imageDescription else videoDescription
                 attachment.videoDuration?.let { stateDescription = LibraryPhoto.formatDuration(it) }
             }
             .testTag("pending-attachment-$index"),

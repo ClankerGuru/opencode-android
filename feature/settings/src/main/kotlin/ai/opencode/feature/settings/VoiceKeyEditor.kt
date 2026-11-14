@@ -23,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -41,6 +42,7 @@ internal fun VoiceKeyEditor(state: VoiceSettingsFeature.State, voice: VoiceStore
     val key = state.voiceEngine.apiKey(state.openAIAPIKey, state.xaiAPIKey).orEmpty()
     val provider = state.activeProvider
     val stacked = isAccessibilitySize()
+    val revealDescription = if (state.revealsKey) stringResource(R.string.settings_voice_key_hide_description) else stringResource(R.string.settings_voice_key_show_description)
     // iOS `.hidesFromScreenshots()` on the editor: the key is a credential.
     HidesFromScreenshots()
     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -65,7 +67,7 @@ internal fun VoiceKeyEditor(state: VoiceSettingsFeature.State, voice: VoiceStore
                         Modifier
                             .clickable(role = Role.Button) { voice.send(VoiceSettingsFeature.Action.ToggleRevealKeyTapped) }
                             .openCodeTapTarget()
-                            .semantics { contentDescription = if (state.revealsKey) "Hide key" else "Show key" },
+                            .semantics { contentDescription = revealDescription },
                         contentAlignment = Alignment.Center,
                     ) {
                         OpenCodeIcon(if (state.revealsKey) SFSymbol.EyeSlash else SFSymbol.Eye, contentDescription = null, tint = OpenCodeTheme.colors.secondaryText)
@@ -79,7 +81,7 @@ internal fun VoiceKeyEditor(state: VoiceSettingsFeature.State, voice: VoiceStore
                 onClick = { voice.send(VoiceSettingsFeature.Action.VerifyKeyTapped) },
                 enabled = state.activeAPIKey.isNotEmpty() && !state.isCheckingKey,
                 shape = OpenCodeShape.control,
-            ) { Text("Verify") }
+            ) { Text(stringResource(R.string.settings_voice_key_verify)) }
         }
         if (stacked) {
             // iOS at accessibility sizes: Verify goes under the field.

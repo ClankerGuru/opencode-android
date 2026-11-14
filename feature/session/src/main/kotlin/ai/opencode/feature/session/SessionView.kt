@@ -2,6 +2,7 @@
 
 package ai.opencode.feature.session
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.inContainer
 import ai.opencode.feature.composer.composerWindowTouches
 import ai.opencode.core.dependencies.dependency
@@ -118,6 +119,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.isTraversalGroup
@@ -928,9 +930,9 @@ private fun LoadFailure(message: String, onRetry: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         OpenCodeIcon(SFSymbol.ExclamationmarkTriangle, contentDescription = null, size = OpenCodeIconSize.hero, tint = OpenCodeTheme.colors.secondaryText)
-        Text("Couldn’t Load Session", style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+        Text(stringResource(R.string.session_load_failed_title), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
         Text(message, style = MaterialTheme.typography.bodyMedium, color = OpenCodeTheme.colors.secondaryText, textAlign = TextAlign.Center)
-        OpenCodeSecondaryButton("Try Again", onClick = onRetry)
+        OpenCodeSecondaryButton(stringResource(CoreR.string.common_try_again), onClick = onRetry)
     }
 }
 
@@ -1000,12 +1002,13 @@ private fun SessionSheets(store: StoreOf<State, Action>, listContext: SessionLis
                         phase = if (status == SessionSheetStatus.Idle) SubagentActivity.Phase.idle else SubagentActivity.Phase.running,
                         needsInput = status == SessionSheetStatus.Waiting,
                     )
+                    val statusDescription = stringResource(R.string.session_sheet_status_description)
                     CompositionLocalProvider(
                         LocalAgentActivityScope provides "${sheet.state.server.persistenceID}|${details.session?.id ?: "draft"}|sheet",
                     ) {
                         AgentActivityGlyph(
                             AgentActivitySource.Subagent(activity),
-                            Modifier.clearAndSetSemantics { contentDescription = "Status"; stateDescription = status.text },
+                            Modifier.clearAndSetSemantics { contentDescription = statusDescription; stateDescription = status.text },
                             size = size,
                         )
                     }
@@ -1088,13 +1091,13 @@ private fun LocationErrorAlert(store: StoreOf<State, Action>) {
     val message = error ?: return
     OpenCodeAlertDialog(
         onDismissRequest = { store.send(Action.locationErrorDismissed) },
-        title = { Text("Couldn’t Share Location") },
+        title = { Text(stringResource(R.string.session_location_share_failed_title)) },
         text = { Text(message) },
         confirmButton = {
-            TextButton(onClick = { store.send(Action.locationErrorDismissed) }) { Text("OK") }
+            TextButton(onClick = { store.send(Action.locationErrorDismissed) }) { Text(stringResource(CoreR.string.common_ok)) }
         },
         dismissButton = if (message == LocationClientError.Denied.message) {
-            { TextButton(onClick = { store.send(Action.locationSettingsTapped) }) { Text("Open Settings") } }
+            { TextButton(onClick = { store.send(Action.locationSettingsTapped) }) { Text(stringResource(CoreR.string.common_open_settings)) } }
         } else {
             null
         },

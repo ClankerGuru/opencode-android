@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -293,6 +294,8 @@ fun AgentImageGallery(
     val laidOut = remember { AgentImageLaidOut() }
     val serverID = server.persistenceID
     val targets = remember(files, directory) { files.map { it.target(directory) } }
+    val notFoundState = stringResource(R.string.media_image_not_found)
+    val loadImageLabel = stringResource(R.string.media_image_load_label)
     fun key(target: AgentFileReference.Target) = AgentImageKey(serverID, target.absolutePath)
     fun sighting(target: AgentFileReference.Target) = AgentImageSighting(key(target), occurrence)
     fun request(target: AgentFileReference.Target): AgentImageRequest? =
@@ -449,7 +452,7 @@ fun AgentImageGallery(
                                     AgentImageStatusCard.Status.NotFound,
                                     Modifier.clearAndSetSemantics {
                                         contentDescription = file.name
-                                        stateDescription = "Not found"
+                                        stateDescription = notFoundState
                                         testTag = "agent-image-not-found"
                                     },
                                 )
@@ -463,7 +466,7 @@ fun AgentImageGallery(
                                 AgentImageStatusCard.Status.Outside,
                                 Modifier
                                     .clip(RoundedCornerShape(TranscriptMetrics.cardCornerRadius))
-                                    .clickable(onClickLabel = "Load the image", role = Role.Button) {
+                                    .clickable(onClickLabel = loadImageLabel, role = Role.Button) {
                                         targets[segment.index]?.let { previews.allow(key(it)) }
                                     }
                                     // The button's own label and value, not the card's text (iOS `.accessibilityLabel` on the Button).
@@ -472,7 +475,7 @@ fun AgentImageGallery(
                                         contentDescription = file.name
                                         stateDescription = value
                                         testTag = "agent-image-outside"
-                                        onClick(label = "Load the image") {
+                                        onClick(label = loadImageLabel) {
                                             targets[segment.index]?.let { previews.allow(key(it)) }
                                             true
                                         }
@@ -543,14 +546,15 @@ private fun AgentImageGalleryTile(
 ) {
     val appear = rememberAgentImageAppearance(sighting.mediaID)
     val loaded = entry.phase == AgentImagePreviews.Phase.Loaded
+    val loadingState = stringResource(R.string.media_image_loading_state)
     Box(
         Modifier
             .fillMaxSize()
             .mediaDragSource(drag)
-            .clickable(onClickLabel = "Open the image", role = Role.Button, onClick = onClick)
+            .clickable(onClickLabel = stringResource(R.string.media_image_open_label), role = Role.Button, onClick = onClick)
             .semantics(mergeDescendants = true) {
                 contentDescription = file.name
-                if (!loaded) stateDescription = "Loading"
+                if (!loaded) stateDescription = loadingState
             }
             .testTag("agent-image")
             // A tile fades in where it first appears; the marker under it, so what's drawn is what's read.
@@ -727,7 +731,7 @@ fun AgentImageStatusCard(file: AgentFileReference, status: AgentImageStatusCard.
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                if (notFound) "Not found" else "Tap to load",
+                if (notFound) stringResource(R.string.media_image_not_found) else stringResource(R.string.media_image_tap_to_load),
                 style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium),
                 color = if (notFound) colors.secondaryText else colors.text,
                 maxLines = 1,

@@ -1,8 +1,10 @@
 package ai.opencode.feature.system.widgets
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeSearchField
 import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.feature.system.LeftToRight
+import ai.opencode.feature.system.R
 import ai.opencode.core.ui.OpenCodeAppTheme
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconButton
@@ -46,6 +48,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -128,16 +131,16 @@ private fun ChooseSessionView(directory: SessionDirectory, onChoose: (SessionEnt
             Column {
                 Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 8.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "Choose Session",
+                        stringResource(R.string.system_widget_choose_session_title),
                         style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.weight(1f).semantics { heading() },
                     )
-                    OpenCodeIconButton(SFSymbol.Xmark, contentDescription = "Close", onClick = onClose, style = OpenCodeIconButtonStyle.Standard)
+                    OpenCodeIconButton(SFSymbol.Xmark, contentDescription = stringResource(CoreR.string.common_close), onClick = onClose, style = OpenCodeIconButtonStyle.Standard)
                 }
                 OpenCodeSearchField(
                     value = query,
                     onValueChange = { query = it },
-                    placeholder = "Search",
+                    placeholder = stringResource(CoreR.string.common_search),
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 )
                 LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(bottom = 8.dp)) {

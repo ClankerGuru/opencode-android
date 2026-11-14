@@ -13,6 +13,7 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.rememberHighContrast
+import ai.opencode.feature.drawer.R
 import ai.opencode.feature.session.DrawerBadge
 import ai.opencode.feature.session.InAppNotice
 import androidx.compose.animation.AnimatedContent
@@ -62,6 +63,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -255,6 +257,9 @@ private fun DrawerButtonCapsule(
     }
     // Android divergence: at rest the button is a plain top-app-bar icon (no glass circle); the
     // capsule's fill shows only while it grows into a notice.
+    val openSessionsDescription = stringResource(R.string.drawer_button_open_sessions_description)
+    val attentionState = stringResource(R.string.drawer_button_attention_state)
+    val unreadState = stringResource(R.string.drawer_button_unread_state)
     val fill by animateColorAsState(
         targetValue = if (shown != null && expanded) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
         animationSpec = if (expanded) grow() else fold(),
@@ -274,10 +279,10 @@ private fun DrawerButtonCapsule(
                     .size(size)
                     .clickable(role = Role.Button, onClickLabel = null, onClick = onOpenSessions)
                     .semantics {
-                        contentDescription = "Open sessions"
+                        contentDescription = openSessionsDescription
                         stateDescription = when (badge) {
-                            DrawerBadge.Attention -> "A session needs your input"
-                            DrawerBadge.Unread -> "Unread sessions"
+                            DrawerBadge.Attention -> attentionState
+                            DrawerBadge.Unread -> unreadState
                             null -> ""
                         }
                     },
@@ -301,7 +306,7 @@ private fun DrawerButtonCapsule(
                                 Modifier
                                     .clickable(
                                         role = Role.Button,
-                                        onClickLabel = if (shown.target == InAppNotice.Target.Drawer) "Open sessions" else "Open the session",
+                                        onClickLabel = if (shown.target == InAppNotice.Target.Drawer) stringResource(R.string.drawer_notice_open_sessions_action) else stringResource(R.string.drawer_notice_open_session_action),
                                         onClick = { onNoticeTapped(shown.target) },
                                     )
                                     .semantics { contentDescription = shown.announcement }

@@ -6,6 +6,7 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.appFormattingLocale
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.RowProps
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.TranscriptDisclosureState
@@ -40,6 +41,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -157,19 +159,22 @@ private fun CompactionView(entry: TranscriptEntry, id: String, info: OpenCodeCom
     val isExpanded = expandable && disclosure.isOpen(TranscriptDisclosureState.Kind.Compactions, id)
     val failed = info.status == OpenCodeCompaction.Status.Failed
     val title = when (info.status) {
-        OpenCodeCompaction.Status.Running -> "Compacting context"
-        OpenCodeCompaction.Status.Completed -> if (info.isProvider) "Provider compaction" else "Context compacted"
-        OpenCodeCompaction.Status.Cancelled -> "Compaction cancelled"
-        OpenCodeCompaction.Status.Failed -> "Compaction failed"
+        OpenCodeCompaction.Status.Running -> stringResource(R.string.transcript_compaction_running)
+        OpenCodeCompaction.Status.Completed -> if (info.isProvider) stringResource(R.string.transcript_compaction_provider) else stringResource(R.string.transcript_compaction_completed)
+        OpenCodeCompaction.Status.Cancelled -> stringResource(R.string.transcript_compaction_cancelled)
+        OpenCodeCompaction.Status.Failed -> stringResource(R.string.transcript_compaction_failed)
     }
     val usage = info.inputTokens?.let { input ->
         info.outputTokens?.let { output ->
             val format = NumberFormat.getIntegerInstance(appFormattingLocale())
-            "${format.format(input)} in · ${format.format(output)} out"
+            stringResource(R.string.transcript_compaction_usage, format.format(input), format.format(output))
         }
     }
     val label = listOfNotNull(title, usage).joinToString(", ")
     val toggle = { disclosure.toggle(TranscriptDisclosureState.Kind.Compactions, id, entry.id) }
+    val expandedLabel = stringResource(R.string.transcript_expanded)
+    val collapsedLabel = stringResource(R.string.transcript_collapsed)
+    val showSummaryLabel = stringResource(R.string.transcript_compaction_show_summary_click_label)
     val rule: @Composable (Modifier) -> Unit = { ruleModifier ->
         TranscriptRule(
             ruleModifier,
@@ -195,9 +200,9 @@ private fun CompactionView(entry: TranscriptEntry, id: String, info: OpenCodeCom
                         .clickable(role = Role.Button, onClick = toggle)
                         .clearAndSetSemantics {
                             contentDescription = label
-                            stateDescription = if (isExpanded) "Expanded" else "Collapsed"
+                            stateDescription = if (isExpanded) expandedLabel else collapsedLabel
                             role = Role.Button
-                            onClick("Show the compaction summary") { toggle(); true }
+                            onClick(showSummaryLabel) { toggle(); true }
                         },
                 ),
             )

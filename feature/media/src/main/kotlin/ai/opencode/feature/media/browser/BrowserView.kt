@@ -1,5 +1,6 @@
 package ai.opencode.feature.media
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.dependencies.dependency
@@ -80,6 +81,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -153,6 +155,7 @@ fun BrowserPage(
     val safeArea = WindowInsets.safeDrawing.asPaddingValues()
     val safeTop = safeArea.calculateTopPadding()
     val canvas = OpenCodeTheme.colors.canvas
+    val backToSessionDescription = stringResource(R.string.media_browser_back_to_session_description)
     Box(
         modifier
             .fillMaxSize()
@@ -203,7 +206,7 @@ fun BrowserPage(
                 .windowInsetsPadding(WindowInsets.safeDrawing.union(WindowInsets.statusBars))
                 .padding(start = 12.dp, top = TranscriptMetrics.clustered)
                 .size(BrowserMetrics.controlSize)
-                .semantics { contentDescription = "Back to Session" }
+                .semantics { contentDescription = backToSessionDescription }
                 .testTag("browser-pop"),
         ) {
             Box(contentAlignment = Alignment.Center) {
@@ -277,6 +280,8 @@ private fun disappear(reduceMotion: Boolean): ExitTransition {
 @Composable
 private fun Bar(store: StoreOf<BrowserFeature.State, BrowserFeature.Action>, page: BrowserFeature.State.Snapshot?) {
     val isAsking = page?.isAsking == true
+    val cancelDescription = stringResource(CoreR.string.common_cancel)
+    val askDescription = stringResource(R.string.media_browser_ask_description)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         Surface(
             shape = OpenCodeShape.control,
@@ -289,19 +294,19 @@ private fun Bar(store: StoreOf<BrowserFeature.State, BrowserFeature.Action>, pag
                 .height(BrowserMetrics.barHeight),
         ) {
             Row(Modifier.padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                BarButton("chevron.left", "Back", "browser-back", page?.canGoBack == true) {
+                BarButton("chevron.left", stringResource(CoreR.string.common_back), "browser-back", page?.canGoBack == true) {
                     store.send(BrowserFeature.Action.BackTapped)
                 }
-                BarButton("chevron.right", "Forward", "browser-forward", page?.canGoForward == true) {
+                BarButton("chevron.right", stringResource(R.string.media_browser_forward_description), "browser-forward", page?.canGoForward == true) {
                     store.send(BrowserFeature.Action.ForwardTapped)
                 }
                 Address(page, onTap = { store.send(BrowserFeature.Action.AddressTapped) }, Modifier.weight(1f))
                 if (page != null) {
                     // iOS `ShareLink`: the system's share sheet, presented by the button itself.
-                    BarButton("square.and.arrow.up", "Share", "browser-share", enabled = true) {
+                    BarButton("square.and.arrow.up", stringResource(CoreR.string.common_share), "browser-share", enabled = true) {
                         dependency(LinkShareSheet).present(page.url)
                     }
-                    BarButton("safari", "Open in Browser", "browser-safari", enabled = true) {
+                    BarButton("safari", stringResource(R.string.media_browser_open_in_browser_description), "browser-safari", enabled = true) {
                         store.send(BrowserFeature.Action.SafariTapped)
                     }
                 }
@@ -316,7 +321,7 @@ private fun Bar(store: StoreOf<BrowserFeature.State, BrowserFeature.Action>, pag
             shadowElevation = OpenCodeSurfaces.raisedShadow,
             modifier = Modifier
                 .size(BrowserMetrics.barHeight)
-                .semantics { contentDescription = if (isAsking) "Cancel" else "Ask About This Page" }
+                .semantics { contentDescription = if (isAsking) cancelDescription else askDescription }
                 .testTag("browser-ask"),
         ) {
             // iOS `.contentTransition(.symbolEffect(.replace))`.
@@ -350,6 +355,7 @@ private fun BarButton(systemImage: String, label: String, tag: String, enabled: 
 private fun Address(page: BrowserFeature.State.Snapshot?, onTap: () -> Unit, modifier: Modifier) {
     val title = page?.displayTitle ?: ""
     val url = page?.url
+    val scrollToTopLabel = stringResource(R.string.media_browser_scroll_to_top_label)
     Column(
         modifier
             .heightIn(min = BrowserMetrics.controlSize)
@@ -358,7 +364,7 @@ private fun Address(page: BrowserFeature.State.Snapshot?, onTap: () -> Unit, mod
                 contentDescription = title
                 stateDescription = url ?: ""
                 role = Role.Button
-                onClick(label = "Scroll to the top of the page") {
+                onClick(label = scrollToTopLabel) {
                     onTap()
                     true
                 }
@@ -418,7 +424,7 @@ private fun AskComposer(
                         store.send(BrowserFeature.Action.AskDraftChanged(text))
                     }
                 },
-                placeholder = { Text("Ask about this page") },
+                placeholder = { Text(stringResource(R.string.media_browser_ask_placeholder)) },
                 maxLines = 5,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { send() }),
@@ -434,12 +440,13 @@ private fun AskComposer(
                     .testTag("browser-ask-field"),
             )
             val colors = OpenCodeTheme.colors
+            val sendDescription = stringResource(CoreR.string.common_send)
             Box(
                 Modifier
                     .padding(end = 2.dp, bottom = 4.dp)
                     .clickable(enabled = canSend, role = Role.Button, onClick = ::send)
                     .openCodeTapTarget(BrowserMetrics.controlSize)
-                    .semantics { contentDescription = "Send" }
+                    .semantics { contentDescription = sendDescription }
                     .testTag("browser-ask-send"),
                 contentAlignment = Alignment.Center,
             ) {
@@ -473,10 +480,11 @@ private fun ReplyCapsule(
 ) {
     val goesBack = status.goesBack
     val label = when (status) {
-        BrowserReplyStatus.Ready -> "Reply ready"
-        BrowserReplyStatus.NeedsInput -> "Needs your input"
-        BrowserReplyStatus.Working -> "Working"
+        BrowserReplyStatus.Ready -> stringResource(R.string.media_browser_reply_ready)
+        BrowserReplyStatus.NeedsInput -> stringResource(R.string.media_browser_reply_needs_input)
+        BrowserReplyStatus.Working -> stringResource(R.string.media_browser_reply_working)
     }
+    val goBackLabel = stringResource(R.string.media_browser_go_back_to_session_label)
     Surface(
         shape = OpenCodeShape.control,
         // The desktop floating surface: flat fill, hairline ring.
@@ -485,12 +493,12 @@ private fun ReplyCapsule(
         shadowElevation = OpenCodeSurfaces.raisedShadow,
         modifier = Modifier
             .heightIn(min = BrowserMetrics.controlSize)
-            .then(if (goesBack) Modifier.clickable(role = Role.Button, onClickLabel = "Go back to the session", onClick = close) else Modifier)
+            .then(if (goesBack) Modifier.clickable(role = Role.Button, onClickLabel = goBackLabel, onClick = close) else Modifier)
             .clearAndSetSemantics {
                 contentDescription = label
                 if (goesBack) {
                     role = Role.Button
-                    onClick(label = "Go back to the session") { close(); true }
+                    onClick(label = goBackLabel) { close(); true }
                 }
             }
             .testTag("browser-reply"),
@@ -503,8 +511,8 @@ private fun ReplyCapsule(
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     val secondary = OpenCodeTheme.colors.secondaryText
                     OpenCodeIcon("text.bubble", contentDescription = null, tint = secondary, size = 17.dp)
-                    Text("Reply ready", style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
-                    Text("· Back to read it", style = OpenCodeTextStyles.subheadline, color = secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(stringResource(R.string.media_browser_reply_ready), style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
+                    Text(stringResource(R.string.media_browser_reply_back_to_read), style = OpenCodeTextStyles.subheadline, color = secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }

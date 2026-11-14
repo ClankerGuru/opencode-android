@@ -10,6 +10,7 @@ import ai.opencode.feature.media.LocalLinkPreviewStore
 import ai.opencode.feature.media.MermaidDiagramCard
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.markdown.InlineText
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
@@ -47,6 +48,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -235,7 +237,7 @@ private fun ListItem(
                 Text(" ", style = bodyStyle, color = Color.Transparent)
                 OpenCodeIcon(
                     if (done) SFSymbol.CheckmarkSquareFill else SFSymbol.Square,
-                    contentDescription = if (done) "Done" else "Not done",
+                    contentDescription = if (done) stringResource(R.string.transcript_task_done_description) else stringResource(R.string.transcript_task_not_done_description),
                     size = iconSize,
                     tint = colors.secondaryText,
                     modifier = Modifier.align(Alignment.CenterEnd),

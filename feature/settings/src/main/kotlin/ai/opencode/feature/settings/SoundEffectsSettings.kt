@@ -22,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -42,8 +43,9 @@ fun SoundEffectsSettingsRows(send: (HomeSettingsFeature.Action) -> Unit) {
         NumberFormat.getPercentInstance(appFormattingLocale()).apply { maximumFractionDigits = 0 }.format(volume)
     }
     val colors = OpenCodeTheme.colors
+    val volumeDescription = stringResource(R.string.settings_sound_effects_volume_description)
     Column(Modifier.fillMaxWidth()) {
-        SettingsValueRow("Volume", percent)
+        SettingsValueRow(stringResource(R.string.settings_sound_effects_volume), percent)
         Row(
             Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -65,7 +67,7 @@ fun SoundEffectsSettingsRows(send: (HomeSettingsFeature.Action) -> Unit) {
                 modifier = Modifier
                     .weight(1f)
                     .semantics {
-                        contentDescription = "Sound effects volume"
+                        contentDescription = volumeDescription
                         stateDescription = percent
                     },
             )
@@ -74,7 +76,7 @@ fun SoundEffectsSettingsRows(send: (HomeSettingsFeature.Action) -> Unit) {
     }
     SettingsDivider(inset = false)
     SettingsToggleRow(
-        title = "Send Sound",
+        title = stringResource(R.string.settings_sound_effects_send_sound),
         checked = sendSound,
         onCheckedChange = { send(HomeSettingsFeature.Action.SoundEffectsSendChanged(it)) },
     )

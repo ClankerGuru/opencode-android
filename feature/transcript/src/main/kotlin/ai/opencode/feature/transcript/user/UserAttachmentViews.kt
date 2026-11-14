@@ -7,9 +7,11 @@ import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.drawerPanHorizontalScroller
 import ai.opencode.feature.media.mediaZoomSource
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.TranscriptAction
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.role
@@ -105,6 +107,8 @@ private fun FileChip(file: OpenCodeTranscriptFile, onOpen: ((AgentFileReference)
     val path = file.path
     val shape = corners.shape(TranscriptMetrics.cardCornerRadius)
     val open = if (onOpen != null && path != null) ({ onOpen(AgentFileReference(path)) }) else null
+    val attachedFileDescription = stringResource(R.string.transcript_attached_file_description, file.name)
+    val openFileLabel = stringResource(R.string.transcript_file_open_click_label)
     FileAttachmentCard(
         name = file.name,
         symbolName = AttachmentFileType.symbolName(file.name, file.mime),
@@ -119,9 +123,9 @@ private fun FileChip(file: OpenCodeTranscriptFile, onOpen: ((AgentFileReference)
             )
             .clip(shape)
             .background(cardFill(), shape)
-            .then(if (open != null) Modifier.clickable(onClickLabel = "Open the file", onClick = open) else Modifier)
+            .then(if (open != null) Modifier.clickable(onClickLabel = openFileLabel, onClick = open) else Modifier)
             .semantics(mergeDescendants = true) {
-                contentDescription = "Attached file ${file.name}"
+                contentDescription = attachedFileDescription
                 stateDescription = typeLabel
             },
     ) { FileAttachmentDetail(typeLabel) }
@@ -145,7 +149,7 @@ internal fun PastedTextCard(id: String, text: String, summary: PastedTextSummary
             .clip(shape)
             .background(cardFill(), shape)
             .mediaZoomSource(sourceID, TranscriptMetrics.cardCornerRadius)
-            .clickable(onClickLabel = "Open the text", onClick = open)
+            .clickable(onClickLabel = stringResource(R.string.transcript_pasted_text_open_click_label), onClick = open)
             .padding(horizontal = TranscriptMetrics.standard, vertical = 10.dp)
             .semantics(mergeDescendants = true) {
                 contentDescription = PastedText.NAME
@@ -211,8 +215,14 @@ internal fun SharedLocationCard(
     onOpen: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val title = location.place ?: location.address ?: "Shared Location"
+    val title = location.place ?: location.address ?: stringResource(R.string.transcript_location_shared)
     val subtitle = if (location.place != null) location.address else null
+    val openInMapsLabel = stringResource(R.string.transcript_location_open_in_maps)
+    val locationDescription = if (subtitle != null) {
+        stringResource(R.string.transcript_location_description_with_address, title, subtitle)
+    } else {
+        stringResource(R.string.transcript_location_description, title)
+    }
     val shape = corners.shape(TranscriptMetrics.cardCornerRadius)
     val blue = Color(0xFF0A84FF)
     Column(
@@ -221,11 +231,11 @@ internal fun SharedLocationCard(
             .graphicsLayer { alpha = if (isPending) 0.6f else 1f }
             .clip(shape)
             .background(cardFill())
-            .clickable(onClickLabel = "Open in Maps") { onOpen(location.mapsURL) }
+            .clickable(onClickLabel = openInMapsLabel) { onOpen(location.mapsURL) }
             .clearAndSetSemantics {
-                contentDescription = "Location: $title${subtitle?.let { ", $it" } ?: ""}"
+                contentDescription = locationDescription
                 role = Role.Button
-                onClick("Open in Maps") { onOpen(location.mapsURL); true }
+                onClick(openInMapsLabel) { onOpen(location.mapsURL); true }
             },
     ) {
         // iOS `SharedLocationMap`: a still map under the pin. Android has no MapKit snapshot (the

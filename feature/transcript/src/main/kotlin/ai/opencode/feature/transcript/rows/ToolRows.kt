@@ -9,6 +9,7 @@ import ai.opencode.feature.media.TranscriptImagePreview
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.InlineRowMetrics
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.TranscriptDisclosureState
 import ai.opencode.feature.transcript.TranscriptEntry
@@ -47,6 +48,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -102,17 +105,20 @@ internal fun SubagentToolView(call: OpenCodeToolCall, subagents: Map<String, Tra
         else -> AgentGlyphState.Phase.Done
     }
     val shape = RoundedCornerShape(TranscriptMetrics.cardCornerRadius)
+    val failedLabel = stringResource(R.string.transcript_tool_failed)
+    val runningLabel = stringResource(R.string.transcript_tool_running)
+    val completedLabel = stringResource(R.string.transcript_tool_completed)
     Row(
         modifier
             .fillMaxWidth()
             .heightIn(min = TranscriptMetrics.minimumHitSide)
             .clip(shape)
             .background(colors.userBubble)
-            .clickable(enabled = isKnown, role = Role.Button, onClickLabel = if (isKnown) "Open the subagent’s session" else null) {
+            .clickable(enabled = isKnown, role = Role.Button, onClickLabel = if (isKnown) stringResource(R.string.transcript_subagent_open_click_label) else null) {
                 if (childID != null) context.send(TranscriptAction.SubagentTapped(childID))
             }
             .semantics(mergeDescendants = true) {
-                stateDescription = if (failed) "Failed" else if (running) "Running" else "Completed"
+                stateDescription = if (failed) failedLabel else if (running) runningLabel else completedLabel
             }
             .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -127,7 +133,7 @@ internal fun SubagentToolView(call: OpenCodeToolCall, subagents: Map<String, Tra
                 Text(it, style = OpenCodeTextStyles.subheadline, color = colors.secondaryText)
             }
             if (failed) {
-                Text("Failed", style = OpenCodeTextStyles.caption1.copy(fontWeight = FontWeight.Medium), color = colors.danger)
+                Text(failedLabel, style = OpenCodeTextStyles.caption1.copy(fontWeight = FontWeight.Medium), color = colors.danger)
             }
         }
         if (isKnown) {
@@ -143,10 +149,11 @@ internal fun SubagentToolView(call: OpenCodeToolCall, subagents: Map<String, Tra
 private fun InlineToolGroupHeaderLabel(header: InlineToolGroupHeader, expanded: Boolean, modifier: Modifier = Modifier) {
     val colors = OpenCodeTheme.colors
     val style = TranscriptFonts.metaFont().copy(fontFeatureSettings = "tnum")
+    val failedCount = stringResource(R.string.transcript_tool_group_failed_count, header.failed)
     if (isAccessibilityTextSize()) {
         val text = buildAnnotatedString {
             withStyle(SpanStyle(color = colors.secondaryText)) { append(header.title) }
-            if (header.failed > 0) withStyle(SpanStyle(color = colors.danger)) { append(" · ${header.failed} failed") }
+            if (header.failed > 0) withStyle(SpanStyle(color = colors.danger)) { append(" · $failedCount") }
             header.cue?.let { withStyle(SpanStyle(color = colors.secondaryText)) { append(" · $it") } }
         }
         Text(text, modifier, style = style)
@@ -161,7 +168,7 @@ private fun InlineToolGroupHeaderLabel(header: InlineToolGroupHeader, expanded: 
             // RollingNumber falls back to plain text when it doesn't fit (iOS `ViewThatFits`).
             RollingNumber(header.title, style = style, color = colors.secondaryText)
             if (header.failed > 0) {
-                RollingNumber(" · ${header.failed} failed", style = style, color = colors.danger)
+                RollingNumber(" · $failedCount", style = style, color = colors.danger)
             }
             header.cue?.let {
                 Text(" · $it", style = style, color = colors.secondaryText, maxLines = 1, softWrap = false)
@@ -191,6 +198,9 @@ internal fun InlineToolGroupView(entry: TranscriptEntry, key: String, tools: Lis
     val images = entry.toolImageAttachments
     val header = InlineToolGroupHeader(tools)
     val rows = InlineToolRow.rows(tools)
+    val expandedLabel = stringResource(R.string.transcript_expanded)
+    val collapsedLabel = stringResource(R.string.transcript_collapsed)
+    val toolImageLabel = stringResource(R.string.transcript_tool_image)
     Column(verticalArrangement = Arrangement.spacedBy(TranscriptMetrics.clustered)) {
         InlineToolGroupHeaderLabel(
             header,
@@ -204,7 +214,7 @@ internal fun InlineToolGroupView(entry: TranscriptEntry, key: String, tools: Lis
                         }
                         .clearAndSetSemantics {
                             contentDescription = header.spoken
-                            stateDescription = if (isExpanded) "Expanded" else "Collapsed"
+                            stateDescription = if (isExpanded) expandedLabel else collapsedLabel
                             role = Role.Button
                             onClick { disclosure.toggle(TranscriptDisclosureState.Kind.ToolGroups, key, entry.id, crossFades = true); true }
                         },
@@ -212,7 +222,7 @@ internal fun InlineToolGroupView(entry: TranscriptEntry, key: String, tools: Lis
         )
         if (images.isNotEmpty()) {
             ToolImageMosaic(images) { id ->
-                TranscriptImagePreview.fromAttachments(images, id, "Tool image", context.server)?.let { context.send(TranscriptAction.PreviewImage(it)) }
+                TranscriptImagePreview.fromAttachments(images, id, toolImageLabel, context.server)?.let { context.send(TranscriptAction.PreviewImage(it)) }
             }
         }
         DisclosedBand(isExpanded) {
@@ -240,16 +250,20 @@ private fun InlineRowDisclosure(entry: TranscriptEntry, row: InlineToolRow, bodi
     val disclosure = LocalTranscriptRowContext.current.disclosure
     val expanded = disclosure.isOpen(Kind, row.id)
     val toggle = { disclosure.toggle(Kind, row.id, entry.id, crossFades = true) }
+    val failedLabel = stringResource(R.string.transcript_tool_failed)
+    val runningLabel = stringResource(R.string.transcript_tool_running)
+    val expandedLabel = stringResource(R.string.transcript_expanded)
+    val collapsedLabel = stringResource(R.string.transcript_collapsed)
     Column {
         InlineRowLabel(
             row,
             expanded,
             Modifier
-                .clickable(role = Role.Button, onClickLabel = if (expanded) "Hide tool input and output" else "Show tool input and output", onClick = toggle)
+                .clickable(role = Role.Button, onClickLabel = if (expanded) stringResource(R.string.transcript_tool_hide_click_label) else stringResource(R.string.transcript_tool_show_click_label), onClick = toggle)
                 .semantics(mergeDescendants = true) {
                     stateDescription = listOfNotNull(
-                        if (row.isFailed) "Failed" else if (row.isRunning) "Running" else null,
-                        if (expanded) "Expanded" else "Collapsed",
+                        if (row.isFailed) failedLabel else if (row.isRunning) runningLabel else null,
+                        if (expanded) expandedLabel else collapsedLabel,
                     ).joinToString(", ")
                 },
         )
@@ -324,7 +338,7 @@ private fun RowScope.InlineRowText(row: InlineToolRow, expanded: Boolean, style:
             )
         }
         // Denying is an answer, not a failure.
-        if (row.isDenied) Text("Denied", Modifier.alignByBaseline(), style = style, color = colors.secondaryText)
+        if (row.isDenied) Text(stringResource(R.string.transcript_tool_denied), Modifier.alignByBaseline(), style = style, color = colors.secondaryText)
     }
 }
 
@@ -396,7 +410,7 @@ private fun ToolBody(entry: TranscriptEntry, id: String, call: OpenCodeToolCall)
                             contentAlignment = Alignment.CenterStart,
                         ) {
                             Text(
-                                if (showsAllOutput) "Show Less" else "Show All $outputLines Lines",
+                                if (showsAllOutput) stringResource(R.string.transcript_show_less) else pluralStringResource(R.plurals.transcript_tool_output_show_all, outputLines, outputLines),
                                 style = OpenCodeTextStyles.footnote.copy(fontWeight = FontWeight.Medium),
                                 color = colors.secondaryText,
                             )
@@ -436,7 +450,7 @@ private fun ToolBody(entry: TranscriptEntry, id: String, call: OpenCodeToolCall)
                 val name = file.name
                 val style = OpenCodeTextStyles.footnote.copy(fontWeight = FontWeight.Medium)
                 OpenCodeIcon(file.symbolName, contentDescription = null, size = OpenCodeIconSize.small, tint = colors.secondaryText)
-                Text("Open $name", Modifier.weight(1f), style = style, color = colors.text, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
+                Text(stringResource(R.string.transcript_open_named, name), Modifier.weight(1f), style = style, color = colors.text, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
                 OpenCodeIcon("chevron.right", contentDescription = null, size = 14.dp, tint = colors.tertiaryText)
             }
         }
@@ -465,14 +479,18 @@ private fun InlineQuestionView(entry: TranscriptEntry, id: String, call: OpenCod
     val lines = InlineQuestion.lines(questions, InlineQuestion.options(call), call.questionAnswers, summary.decline != null, summary.reason)
     val toggle = { disclosure.toggle(Kind, id, entry.id, crossFades = true) }
     val style = TranscriptFonts.metaFont()
+    val expandedLabel = stringResource(R.string.transcript_expanded)
+    val collapsedLabel = stringResource(R.string.transcript_collapsed)
+    val hideQuestionLabel = stringResource(R.string.transcript_question_hide_click_label)
+    val showQuestionLabel = stringResource(R.string.transcript_question_show_click_label)
     Column(verticalArrangement = Arrangement.spacedBy(TranscriptMetrics.clustered)) {
         val target = Modifier
             .clickable(role = Role.Button, onClick = toggle)
             .clearAndSetSemantics {
                 contentDescription = summary.spoken
-                stateDescription = if (expanded) "Expanded" else "Collapsed"
+                stateDescription = if (expanded) expandedLabel else collapsedLabel
                 role = Role.Button
-                onClick(if (expanded) "Hide the question" else "Show the question and your answer") { toggle(); true }
+                onClick(if (expanded) hideQuestionLabel else showQuestionLabel) { toggle(); true }
             }
         val headerModifier = Modifier.fillMaxWidth().rowHitTarget(target = target)
         if (isAccessibilityTextSize()) {
@@ -529,7 +547,7 @@ private fun InlineQuestionLine(line: InlineQuestion.Line) {
             )
         }
         if (line.kind == InlineQuestion.Line.Kind.Chosen) {
-            OpenCodeIcon("checkmark", contentDescription = "Chosen", Modifier.align(Alignment.CenterVertically).size(12.dp), size = 12.dp, tint = colors.secondaryText)
+            OpenCodeIcon("checkmark", contentDescription = stringResource(R.string.transcript_question_chosen_description), Modifier.align(Alignment.CenterVertically).size(12.dp), size = 12.dp, tint = colors.secondaryText)
         }
     }
 }

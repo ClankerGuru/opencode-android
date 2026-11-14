@@ -1,8 +1,10 @@
 package ai.opencode.feature.system.intents
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeTextField
 import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.feature.system.LeftToRight
+import ai.opencode.feature.system.R
 import ai.opencode.feature.system.SessionDirectory
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.dependency
@@ -53,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -229,7 +232,7 @@ private fun AskOpenCodeView(
                     )
                     if (state.failed) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                            OpenCodeSecondaryButton("Done", onClick = onCancel)
+                            OpenCodeSecondaryButton(stringResource(CoreR.string.common_done), onClick = onCancel)
                         }
                     }
                     return@Column
@@ -260,12 +263,12 @@ private fun AskOpenCodeView(
                     }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)) {
-                    OpenCodeSecondaryButton("Cancel", onClick = onCancel)
+                    OpenCodeSecondaryButton(stringResource(CoreR.string.common_cancel), onClick = onCancel)
                     OpenCodePrimaryButton(onClick = onSend, enabled = state.canSend) {
                         if (state.isSending) {
                             CircularProgressIndicator(Modifier.heightIn(max = 18.dp), strokeWidth = 2.dp)
                         } else {
-                            Text("Send")
+                            Text(stringResource(CoreR.string.common_send))
                         }
                     }
                 }
@@ -292,7 +295,7 @@ private fun SessionPicker(
             Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(AskOpenCodeIntent.SESSION_TITLE, style = MaterialTheme.typography.labelMedium)
-                    Text(state.session?.title ?: "Last Viewed Session", style = MaterialTheme.typography.bodyLarge, maxLines = 1)
+                    Text(state.session?.title ?: stringResource(R.string.system_last_viewed_session), style = MaterialTheme.typography.bodyLarge, maxLines = 1)
                     state.session?.detail?.let {
                         Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                     }
@@ -311,7 +314,7 @@ private fun SessionPicker(
                     },
                     leadingIcon = { OpenCodeIcon(entity.symbol, contentDescription = null) },
                     trailingIcon = if (entity.id == state.session?.id) {
-                        { OpenCodeIcon(SFSymbol.Checkmark, contentDescription = "Selected") }
+                        { OpenCodeIcon(SFSymbol.Checkmark, contentDescription = stringResource(R.string.system_selected_description)) }
                     } else null,
                     onClick = {
                         expanded = false

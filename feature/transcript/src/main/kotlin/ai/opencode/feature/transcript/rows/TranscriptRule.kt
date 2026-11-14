@@ -1,6 +1,7 @@
 package ai.opencode.feature.transcript.rows
 
 import ai.opencode.core.ui.OpenCodeTextStyles
+import ai.opencode.feature.transcript.R
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.withFrameNanos
@@ -27,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.Constraints
@@ -102,19 +104,21 @@ fun NewMessagesDivider(modifier: Modifier = Modifier, glowStart: Double? = null)
             value = newDividerGlow(glowStart, transcriptNow())
         }
     }
+    val newMessagesDescription = stringResource(R.string.transcript_new_messages_description)
+    val newLabel = stringResource(R.string.transcript_new_messages_label)
     Box(
         modifier
             .padding(vertical = TranscriptMetrics.sectionHalf)
             .testTag("transcript-new-messages")
-            .clearAndSetSemantics { contentDescription = "New messages" },
+            .clearAndSetSemantics { contentDescription = newMessagesDescription },
     ) {
-        TranscriptRule(labelColor = OpenCodeTheme.colors.secondaryText) { Text("New") }
+        TranscriptRule(labelColor = OpenCodeTheme.colors.secondaryText) { Text(newLabel) }
         if (glow > 0f) {
             TranscriptRule(
                 Modifier.matchParentSize().graphicsLayer { alpha = glow },
                 lineColor = OpenCodeTheme.colors.secondaryText,
                 labelColor = OpenCodeTheme.colors.text,
-            ) { Text("New") }
+            ) { Text(newLabel) }
         }
     }
 }

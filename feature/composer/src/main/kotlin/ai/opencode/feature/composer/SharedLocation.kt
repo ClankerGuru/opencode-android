@@ -71,6 +71,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -480,10 +481,15 @@ fun SharedLocationCard(
     /** Tight trailing corners where a sent card meets another surface of its run (`UserSurfaceCorners`). */
     shape: Shape = RoundedCornerShape(SharedLocationCard.cornerRadius),
 ) {
-    val title = location.place ?: location.address ?: "Shared Location"
+    val title = location.place ?: location.address ?: stringResource(R.string.composer_location_shared_title)
     val subtitle = if (location.place != null) location.address else null
     val footerHeight = SharedLocationCard.compactFooterHeight()
-    val label = "Location: $title${subtitle?.let { ", $it" } ?: ""}"
+    val label = if (subtitle != null) {
+        stringResource(R.string.composer_location_card_with_address_description, title, subtitle)
+    } else {
+        stringResource(R.string.composer_location_card_description, title)
+    }
+    val openInMapsText = stringResource(R.string.composer_location_open_in_maps_action)
     Column(
         modifier
             .width(if (compact) SharedLocationCard.compactWidth else SharedLocationCard.fullWidth)
@@ -493,7 +499,7 @@ fun SharedLocationCard(
             .clickable { onOpen(location.mapsURL) }
             .clearAndSetSemantics {
                 contentDescription = label
-                onClick(label = "Open in Maps") { onOpen(location.mapsURL); true }
+                onClick(label = openInMapsText) { onOpen(location.mapsURL); true }
                 testTag = if (compact) "composer-location-card" else "shared-location-card"
             },
     ) {
@@ -685,7 +691,7 @@ fun ComposerLocationAttachment(
                 )
             }
         }
-        val removeLabel = if (location != null) "Remove location" else "Cancel location"
+        val removeLabel = if (location != null) stringResource(R.string.composer_location_remove_description) else stringResource(R.string.composer_location_cancel_description)
         ComposerRemoveBadge(
             label = removeLabel,
             testTag = if (location != null) "remove-pending-location" else "cancel-pending-location",
@@ -697,13 +703,14 @@ fun ComposerLocationAttachment(
 
 @Composable
 private fun LocatingSurface(footerHeight: Dp, cardHeight: Dp, isHidden: Boolean, modifier: Modifier = Modifier) {
+    val findingText = stringResource(R.string.composer_location_finding)
     Column(
         modifier
             .size(SharedLocationCard.compactWidth, cardHeight)
             .then(
                 if (isHidden) Modifier.clearAndSetSemantics {}
                 else Modifier.clearAndSetSemantics {
-                    contentDescription = "Finding Location…"
+                    contentDescription = findingText
                     testTag = "composer-location-card"
                 },
             ),
@@ -724,7 +731,7 @@ private fun LocatingSurface(footerHeight: Dp, cardHeight: Dp, isHidden: Boolean,
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
                 Text(
-                    "Finding Location…",
+                    findingText,
                     style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
                     color = OpenCodeTheme.colors.text,
                     maxLines = 1,
@@ -732,7 +739,7 @@ private fun LocatingSurface(footerHeight: Dp, cardHeight: Dp, isHidden: Boolean,
                 )
             }
             Text(
-                "Current coordinates",
+                stringResource(R.string.composer_location_current_coordinates),
                 style = OpenCodeTextStyles.caption1,
                 color = OpenCodeTheme.colors.secondaryText,
                 maxLines = 1,

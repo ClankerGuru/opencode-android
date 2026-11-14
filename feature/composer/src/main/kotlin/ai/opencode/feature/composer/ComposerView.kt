@@ -49,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -132,7 +133,7 @@ fun ComposerView(
                     Box {
                     if (state.draft.isEmpty()) {
                         Text(
-                            state.requestDock.requestBar(state.draft)?.placeholder ?: "Message",
+                            state.requestDock.requestBar(state.draft)?.placeholder ?: stringResource(R.string.composer_message_placeholder),
                             style = OpenCodeTextStyles.body,
                             color = OpenCodeTheme.colors.tertiaryText,
                             modifier = Modifier.padding(start = 16.dp, top = 16.dp).clearAndSetSemantics {},
@@ -148,7 +149,7 @@ fun ComposerView(
                         onLongTextPaste = if (state.isAnsweringRequest) null else { text ->
                             send(ComposerFeature.Action.Attachments(ComposerAttachmentsFeature.Action.AttachmentAdded(PastedText.attachment(text))))
                         },
-                        accessibilityLabel = state.requestDock.requestBar(state.draft)?.fieldLabel ?: "Message",
+                        accessibilityLabel = state.requestDock.requestBar(state.draft)?.fieldLabel ?: stringResource(R.string.composer_message_placeholder),
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     )
                     }
@@ -272,6 +273,7 @@ private fun AttachmentsRow(state: ComposerFeature.State, send: (ComposerFeature.
     val attachments = state.attachments
     if (!attachments.hasContent && !attachments.isLocating) return
     val scroll = rememberScrollState()
+    val photoDescription = stringResource(R.string.composer_attachment_photo_description)
     Row(
         Modifier
             .fillMaxWidth()
@@ -293,7 +295,7 @@ private fun AttachmentsRow(state: ComposerFeature.State, send: (ComposerFeature.
                         .clip(RoundedCornerShape(16.dp))
                         .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                         .clickable { send(ComposerFeature.Action.Attachments(ComposerAttachmentsFeature.Action.AttachmentRemoved(index))) }
-                        .semantics { contentDescription = attachment.name ?: "Photo" },
+                        .semantics { contentDescription = attachment.name ?: photoDescription },
                     contentAlignment = Alignment.Center,
                 ) {
                     AttachmentThumbnail(attachment)

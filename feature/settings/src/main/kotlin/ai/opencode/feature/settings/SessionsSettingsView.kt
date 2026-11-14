@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.res.stringResource
 
 /**
  * Port of iOS `Settings/SessionsSettingsView.swift` (and `DefaultAgentSection` from
@@ -23,11 +24,14 @@ fun SessionsSettingsView(store: SettingsStore) {
     val defaultAgent by remember { shared(SharedKeys.defaultAgentID).flow }.collectAsState()
     val agents by remember { shared(ServerSharedKeys.knownPrimaryAgents).flow }.collectAsState()
     val send = { action: HomeSettingsFeature.Action -> store.send(SettingsFeature.Action.Settings(action)) }
+    val composerHeader = stringResource(R.string.settings_sessions_composer_header)
+    val newSessionsHeader = stringResource(R.string.settings_sessions_new_sessions_header)
+    val serverDefault = stringResource(R.string.settings_sessions_server_default)
 
-    SettingsPageScaffold(title = "Sessions", store = store) {
-        settingsSection(key = "return", header = "Composer") {
+    SettingsPageScaffold(title = stringResource(R.string.settings_sessions_title), store = store) {
+        settingsSection(key = "return", header = composerHeader) {
             SettingsToggleRow(
-                "Return Key Sends",
+                stringResource(R.string.settings_sessions_return_key_sends),
                 checked = returnKeySends,
                 onCheckedChange = { send(HomeSettingsFeature.Action.ReturnKeySendsChanged(it)) },
             )
@@ -35,10 +39,10 @@ fun SessionsSettingsView(store: SettingsStore) {
         if (ExperimentalFeature.agentSelection.isActive(agentSelection)) {
             settingsSection(
                 key = "default-agent",
-                header = "New Sessions",
+                header = newSessionsHeader,
             ) {
                 val options = buildList {
-                    add(SettingsMenuOption("", "Server Default"))
+                    add(SettingsMenuOption("", serverDefault))
                     agents.forEach { add(SettingsMenuOption(it.id, it.displayName)) }
                     // A saved agent this server doesn't list stays choosable.
                     if (defaultAgent.isNotEmpty() && agents.none { it.id == defaultAgent }) {
@@ -46,8 +50,8 @@ fun SessionsSettingsView(store: SettingsStore) {
                     }
                 }
                 SettingsMenuRow(
-                    title = "Default Agent",
-                    value = options.firstOrNull { it.value == defaultAgent }?.title ?: "Server Default",
+                    title = stringResource(R.string.settings_sessions_default_agent),
+                    value = options.firstOrNull { it.value == defaultAgent }?.title ?: serverDefault,
                     selection = defaultAgent,
                     options = options,
                     onSelect = { send(HomeSettingsFeature.Action.DefaultAgentChanged(it)) },

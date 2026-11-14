@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -62,7 +63,7 @@ fun StarterPromptList(prompts: List<String>, onPick: (String) -> Unit, modifier:
     val iconWidth = with(LocalDensity.current) { (22 * fontScale).dp }
     Column(modifier.testTag("starter-prompts"), verticalArrangement = Arrangement.spacedBy(StarterPromptTunables.headerGap.dp)) {
         Text(
-            "Try Asking",
+            stringResource(R.string.session_starter_prompts_title),
             style = OpenCodeTextStyles.footnote.copy(fontWeight = FontWeight.SemiBold),
             color = OpenCodeTheme.colors.secondaryText,
             modifier = Modifier.padding(start = 17.dp).semantics { heading() },
@@ -72,7 +73,7 @@ fun StarterPromptList(prompts: List<String>, onPick: (String) -> Unit, modifier:
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = 48.dp)
-                    .clickable(role = Role.Button, onClickLabel = "Type it into the message") { onPick(prompt) }
+                    .clickable(role = Role.Button, onClickLabel = stringResource(R.string.session_starter_prompt_pick_label)) { onPick(prompt) }
                     // The bubble lines up with the project folders and the composer's +.
                     .padding(start = 17.dp, end = 16.dp)
                     .testTag("starter-prompt"),

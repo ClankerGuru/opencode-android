@@ -42,6 +42,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -485,6 +486,9 @@ fun ZoomableImagePage(
     }
 
     val zoomed = state.zoomedForAccessibility
+    val zoomedInState = stringResource(R.string.media_zoom_zoomed_in_state)
+    val zoomOutLabel = stringResource(R.string.media_zoom_out_label)
+    val zoomInLabel = stringResource(R.string.media_zoom_in_label)
     Spacer(
         modifier
             .fillMaxSize()
@@ -493,12 +497,12 @@ fun ZoomableImagePage(
             .semantics {
                 contentDescription = label
                 role = Role.Image
-                if (zoomed) stateDescription = "Zoomed in"
+                if (zoomed) stateDescription = zoomedInState
                 customActions = listOf(
                     if (zoomed) {
-                        CustomAccessibilityAction("Zoom Out") { state.zoomOut(scope, reducesMotion); true }
+                        CustomAccessibilityAction(zoomOutLabel) { state.zoomOut(scope, reducesMotion); true }
                     } else {
-                        CustomAccessibilityAction("Zoom In") { state.zoomInAtCentre(scope, reducesMotion); true }
+                        CustomAccessibilityAction(zoomInLabel) { state.zoomInAtCentre(scope, reducesMotion); true }
                     },
                 )
             }

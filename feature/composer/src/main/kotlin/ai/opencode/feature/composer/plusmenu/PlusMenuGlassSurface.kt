@@ -15,6 +15,7 @@ import ai.opencode.feature.composer.AttachmentMenuMotion
 import ai.opencode.feature.composer.AttachmentMenuMeasure
 import ai.opencode.feature.composer.AttachmentMenuRows
 import ai.opencode.feature.composer.PlusMenuTunables
+import ai.opencode.feature.composer.R
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.clickable
@@ -47,6 +48,7 @@ import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.paneTitle
@@ -233,6 +235,7 @@ private fun PlusMenuWindowContent(
     val radius = lerp(end.height / 2, menuRadius, p)
     val shape = RoundedCornerShape(with(density) { radius.toDp() })
     val interactive = isOpen && (!reduceMotion || expanded.value > 0.99f)
+    val attachmentOptionsTitle = stringResource(R.string.composer_plus_menu_title)
 
     Box(Modifier.fillMaxSize()) {
         // The dismissing tap.
@@ -277,7 +280,7 @@ private fun PlusMenuWindowContent(
                             isTraversalGroup = true
                             testTag = "attachment-menu"
                             traversalIndex = -1f
-                            paneTitle = "Attachment options"
+                            paneTitle = attachmentOptionsTitle
                         }
                     } else Modifier.clearAndSetSemantics {},
                 ),

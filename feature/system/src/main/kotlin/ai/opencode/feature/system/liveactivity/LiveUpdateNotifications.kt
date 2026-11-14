@@ -79,7 +79,7 @@ object LiveUpdateNotifications {
             builder.setWhen(start.toEpochMilli()).setUsesChronometer(true)
         }
         if (!ended && call.timerStart == null) builder.setShortCriticalText(call.status)
-        if (call.isMuted && !ended) builder.setContentText("Muted")
+        if (call.isMuted && !ended) builder.setContentText(context.getString(R.string.system_call_muted))
         if (!ended) {
             val progress = NotificationCompat.ProgressStyle()
                 .setStyledByProgress(false)
@@ -93,14 +93,14 @@ object LiveUpdateNotifications {
             builder.addAction(
                 NotificationCompat.Action.Builder(
                     IconCompat.createWithResource(context, if (call.isMuted) SFSymbol.MicSlashFill.drawable else SFSymbol.MicFill.drawable),
-                    if (call.isMuted) "Unmute" else "Mute",
+                    if (call.isMuted) context.getString(R.string.system_call_unmute) else context.getString(R.string.system_call_mute),
                     LiveActivityActionReceiver.command(context, LiveActivityActionReceiver.ACTION_TOGGLE_MUTE),
                 ).build(),
             )
             builder.addAction(
                 NotificationCompat.Action.Builder(
                     IconCompat.createWithResource(context, SFSymbol.PhoneDownFill.drawable),
-                    "End call",
+                    context.getString(R.string.system_call_end),
                     LiveActivityActionReceiver.command(context, LiveActivityActionReceiver.ACTION_END_CALL),
                 ).build(),
             )
@@ -125,7 +125,7 @@ object LiveUpdateNotifications {
             .setOngoing(true)
             .setRequestPromotedOngoing(true)
             .setContentTitle(recording.title)
-            .setContentText(if (recording.isRecording) "Recording" else "Recording stopped")
+            .setContentText(if (recording.isRecording) context.getString(R.string.system_recording_active) else context.getString(R.string.system_recording_stopped))
             .setWhen(recording.startedAt.toEpochMilli())
             .setShowWhen(true)
             .setUsesChronometer(recording.isRecording)
@@ -136,7 +136,7 @@ object LiveUpdateNotifications {
             .addAction(
                 NotificationCompat.Action.Builder(
                     IconCompat.createWithResource(context, SFSymbol.StopFill.drawable),
-                    "Stop recording",
+                    context.getString(R.string.system_recording_stop),
                     LiveActivityActionReceiver.command(context, LiveActivityActionReceiver.ACTION_STOP_DICTATION),
                 ).build(),
             )

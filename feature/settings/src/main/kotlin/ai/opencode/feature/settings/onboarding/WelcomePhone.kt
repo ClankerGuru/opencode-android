@@ -1,6 +1,7 @@
 package ai.opencode.feature.settings.onboarding
 
 import ai.opencode.core.ui.OpenCodeIcon
+import ai.opencode.feature.settings.R
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -40,6 +41,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -205,7 +207,7 @@ private fun PhoneHeader(frame: WelcomeFrame) {
         }
         Column(Modifier.weight(1f).padding(start = 8.dp), verticalArrangement = Arrangement.Center) {
             WelcomeStack(
-                labels = listOf("New Session", WelcomeStory.TITLE),
+                labels = listOf(stringResource(R.string.settings_onboarding_phone_new_session), WelcomeStory.TITLE),
                 weights = if (frame.named) listOf(0.0, 1.0) else listOf(1.0, 0.0),
                 style = TextStyle(fontSize = 17.sp, lineHeight = 21.sp, fontWeight = FontWeight.Medium),
                 color = phoneText,
@@ -289,11 +291,15 @@ private fun UserBubble(text: String, modifier: Modifier) {
 /** The agent's calls, as the transcript's collapsed tool group reads them. */
 @Composable
 private fun ToolGroup(tools: List<String>, modifier: Modifier) {
+    val exploredReadSearch = stringResource(R.string.settings_onboarding_phone_tool_explored_read_search)
+    val exploredRead = stringResource(R.string.settings_onboarding_phone_tool_explored_read)
+    val browser = stringResource(R.string.settings_onboarding_tool_browser)
+    val edit = stringResource(R.string.settings_onboarding_tool_edit)
     val label = buildList {
         val reads = tools.count { it == "read" || it == "grep" }
-        if (reads > 0) add(if (tools.contains("grep")) "Explored 1 read, 1 search" else "Explored 1 read")
-        if (tools.contains("browser")) add("Browser")
-        if (tools.contains("edit")) add("Edit")
+        if (reads > 0) add(if (tools.contains("grep")) exploredReadSearch else exploredRead)
+        if (tools.contains("browser")) add(browser)
+        if (tools.contains("edit")) add(edit)
     }.joinToString(" · ")
     Row(
         modifier.fillMaxWidth().padding(horizontal = WelcomePhone.GUTTER.dp, vertical = WelcomePhone.FLOW_HALF.dp),
@@ -362,7 +368,7 @@ private fun PhoneComposer(frame: WelcomeFrame, reduced: Boolean, voice: WelcomeV
                         ) { OpenCodeIcon("plus", null, size = 22.dp, tint = phoneText) }
                     }
                     Text(
-                        "Message",
+                        stringResource(R.string.settings_onboarding_phone_message_placeholder),
                         style = body(),
                         color = phoneTertiary,
                         modifier = Modifier.padding(start = (WelcomePhone.TEXT_LEADING - WelcomePhone.INNER - WelcomePhone.SLOT).coerceAtLeast(0f).dp).alpha(1 - dictation),

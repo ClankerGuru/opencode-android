@@ -14,6 +14,7 @@ import ai.opencode.feature.media.TranscriptImagePreview
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptLayoutTuning
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import ai.opencode.feature.transcript.markdown.ui.LocalLinkPreviewRow
@@ -39,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -187,6 +189,7 @@ private fun ImageLinkThumbnail(url: String, mediaID: String, maxHeight: Float, o
     }
     // iOS `url.lastPathComponent`, decoded.
     val label = remember(url) { url.toHttpUrlOrNull()?.pathSegments?.lastOrNull { it.isNotEmpty() } ?: url }
+    val openDescription = stringResource(R.string.transcript_open_named, label)
     Box(Modifier.fillMaxWidth()) {
         val size = model.size
         if (size != null) {
@@ -205,7 +208,7 @@ private fun ImageLinkThumbnail(url: String, mediaID: String, maxHeight: Float, o
                             .clip(RoundedCornerShape(TranscriptMetrics.cardCornerRadius))
                             .clickable(onClick = open)
                             .clearAndSetSemantics {
-                                contentDescription = "Open $label"
+                                contentDescription = openDescription
                                 role = Role.Button
                                 testTag = "image-link-preview"
                                 onClick { open(); true }

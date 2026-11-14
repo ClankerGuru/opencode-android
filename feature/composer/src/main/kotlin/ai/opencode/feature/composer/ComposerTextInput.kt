@@ -97,6 +97,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.WindowInfo
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextLayoutResult
@@ -674,7 +675,7 @@ fun ComposerTextInput(
     sendTransition: ComposerSendTransition? = null,
     autocompleteBridge: ComposerAutocompleteTextBridge? = null,
     lineLimit: Int? = null,
-    accessibilityLabel: String = "Message",
+    accessibilityLabel: String = stringResource(R.string.composer_message_placeholder),
     isKeyboardHeld: Boolean = false,
     isHoldingMic: Boolean = false,
     canTakeFocus: Boolean = true,

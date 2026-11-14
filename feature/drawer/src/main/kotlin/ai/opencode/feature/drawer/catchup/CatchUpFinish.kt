@@ -10,6 +10,7 @@ import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.RollingNumberAlignment
 import ai.opencode.core.ui.RollingNumberStyle
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.drawer.R
 import ai.opencode.feature.drawer.style.DrawerMetrics
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
@@ -49,6 +50,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.Dp
@@ -298,6 +300,8 @@ fun DrawerCatchUpFinishedLabel(
 
     val tone = CatchUpMetrics.readColor
     val background = OpenCodeTheme.colors.canvas
+    val catchUpTitle = stringResource(R.string.drawer_catch_up_title)
+    val allCaughtUp = stringResource(R.string.drawer_catch_up_all_caught_up)
     val shape = RoundedCornerShape(cornerRadius)
     val rollStyle = remember(timeline) { RollingNumberStyle.Native.copy(duration = timeline.roll, bounce = 0.0) }
 
@@ -343,7 +347,7 @@ fun DrawerCatchUpFinishedLabel(
                 }
             }
             .padding(start = 10.dp, end = 12.dp)
-            .clearAndSetSemantics { contentDescription = "All Caught Up" },
+            .clearAndSetSemantics { contentDescription = allCaughtUp },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         OpenCodeIcon(
@@ -358,7 +362,7 @@ fun DrawerCatchUpFinishedLabel(
             val oldTitleLayer = rememberGraphicsLayer()
             val newTitleLayer = rememberGraphicsLayer()
             Text(
-                "Catch Up",
+                catchUpTitle,
                 style = textStyle,
                 maxLines = 1,
                 modifier = Modifier.drawWithContent {
@@ -373,7 +377,7 @@ fun DrawerCatchUpFinishedLabel(
                 },
             )
             Text(
-                "All Caught Up",
+                allCaughtUp,
                 style = textStyle,
                 maxLines = 1,
                 modifier = Modifier.drawWithContent {

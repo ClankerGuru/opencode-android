@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.motion.transitionBlur
 
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -71,6 +72,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.platform.testTag
@@ -374,13 +376,14 @@ fun ComposerAutocompletePanel(
     val params = controller.simulation.params
     val panelHeight = AutocompleteSimulation.snapAnchoredSpan(0.0, max(frame.glassLift, frame.restingLift), scale).span
     val pad = AutocompleteSimulation.snapEdge(frame.padding, scale)
+    val suggestionsDescription = stringResource(R.string.composer_autocomplete_suggestions_description)
     Box(
         modifier
             .fillMaxWidth()
             .height(panelHeight.dp)
             .semantics {
                 isTraversalGroup = true
-                contentDescription = "Autocomplete suggestions"
+                contentDescription = suggestionsDescription
             }
             .testTag("composer-autocomplete-list"),
         contentAlignment = Alignment.BottomStart,
@@ -757,7 +760,7 @@ fun AutocompleteChip(
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-                onClickLabel = "Remove",
+                onClickLabel = stringResource(CoreR.string.common_remove),
                 role = Role.Button,
             ) { onActivate(chip.id) }
             .semantics(mergeDescendants = true) { contentDescription = label }

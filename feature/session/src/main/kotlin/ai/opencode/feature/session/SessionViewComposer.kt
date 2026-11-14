@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionPhase
@@ -154,6 +155,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.customActions
@@ -1063,9 +1066,9 @@ private fun SessionComposerEnv.ComposerAreaContent(modifier: Modifier) {
                     ComposerBanner(
                         symbol = SFSymbol.ExclamationmarkTriangleFill,
                         iconTint = androidx.compose.ui.graphics.Color(0xFFFF9500),
-                        title = "Couldn’t Load Requests",
+                        title = stringResource(R.string.session_requests_load_failed_title),
                         detail = shownError.orEmpty(),
-                        action = "Retry",
+                        action = stringResource(CoreR.string.common_retry),
                         onClick = { store.send(Action.refreshRequestsTapped) },
                         modifier = Modifier.semantics { testTag = "request-load-error" },
                     )
@@ -1271,11 +1274,11 @@ private fun SessionComposerEnv.QueuedActivity(hasQueued: Boolean) {
         exit = if (reducedMotion) fadeOut(composerColumnAnimation(opening = false)) else slideOutVertically(composerColumnAnimation(opening = false)) { -it } + fadeOut(composerColumnAnimation(opening = false)),
     ) {
         ComposerPillLabel(
-            title = "$count queued",
+            title = pluralStringResource(R.plurals.session_queued_count, count, count),
             rolls = true,
             onClick = { view.showsQueuedMessages = true },
-            onClickLabel = "Show messages waiting for this response to finish",
-            accessibilityLabel = if (count == 1) "1 queued message" else "$count queued messages",
+            onClickLabel = stringResource(R.string.session_queued_show_label),
+            accessibilityLabel = pluralStringResource(R.plurals.session_queued_messages_description, count, count),
             modifier = Modifier
                 // A queued send's words shrink into it (iOS `scrollEdgeBridge.queuedPillFrame`).
                 .onGloballyPositioned { host.queuedPillFrame = it.boundsInWindow() }
@@ -1775,6 +1778,7 @@ private fun SessionComposerEnv.composerTapped(recording: Boolean) {
 
 @Composable
 private fun SessionComposerEnv.Composer() {
+    val dismissLabel = stringResource(CoreR.string.common_dismiss)
     val (composerExpanded, composerControls) = composerPresentation
     val recording = s.dictationHold != null
     val bar = s.requestBar
@@ -1854,7 +1858,7 @@ private fun SessionComposerEnv.Composer() {
             .semantics {
                 // Answering, escape from the bar's controls dismisses as the panel's × does.
                 if (s.isAnsweringRequest) {
-                    customActions = listOf(CustomAccessibilityAction("Dismiss") { store.send(Action.requestDismissTapped); true })
+                    customActions = listOf(CustomAccessibilityAction(dismissLabel) { store.send(Action.requestDismissTapped); true })
                 }
             },
     ) {
@@ -1959,7 +1963,7 @@ private fun SessionComposerEnv.Composer() {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
-                    Text("Preparing dictation…", style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.secondaryText)
+                    Text(stringResource(R.string.session_dictation_preparing), style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.secondaryText)
                 }
             } else {
                 val error = s.dictationError
@@ -1984,7 +1988,7 @@ private fun SessionComposerEnv.Composer() {
  */
 @Composable
 private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boolean, bar: RequestBar?) {
-    val placeholder = bar?.placeholder ?: "Message"
+    val placeholder = bar?.placeholder ?: stringResource(R.string.session_message_placeholder)
     // iOS `ComposerFieldScope` (3fa29077): the text is read here alone, so a keystroke recomposes
     // the field and not the composer around it.
     val draft by store.observe { it.draft }
@@ -2052,7 +2056,7 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
             returnKeySends = returnKeySends,
             autocompleteBridge = view.autocompleteBridge,
             lineLimit = if (bar == null) null else 4,
-            accessibilityLabel = bar?.fieldLabel ?: "Message",
+            accessibilityLabel = bar?.fieldLabel ?: stringResource(R.string.session_message_placeholder),
             isHoldingMic = s.dictationHold != null,
             sendTransition = host.sendTransition,
             // One Picker in the keyboard's place keeps the field from taking it back.

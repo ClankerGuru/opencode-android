@@ -62,6 +62,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.customActions
@@ -874,7 +875,7 @@ fun LinkPreviewCardContent(url: String, modifier: Modifier = Modifier) {
         }
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
             if (sessionID != null) {
-                Text(SessionLink.title(url) ?: "Session", style = OpenCodeTextStyles.headline, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(SessionLink.title(url) ?: stringResource(R.string.media_link_session_fallback_title), style = OpenCodeTextStyles.headline, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(
                     sessionID,
                     style = OpenCodeTextStyles.footnote.copy(fontFamily = OpenCodeFonts.monospace),

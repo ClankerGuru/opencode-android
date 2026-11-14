@@ -19,6 +19,7 @@ import ai.opencode.core.ui.RollingNumberAlignment
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.accessibilityFocusRequest
 import ai.opencode.core.ui.highContrastForeground
+import ai.opencode.feature.drawer.R
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,6 +53,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -106,7 +109,7 @@ fun CatchUpChrome(
                 contentAlignment = Alignment.Center,
             ) {
                 RollingNumber(
-                    text = "$shownRemaining Left",
+                    text = pluralStringResource(R.plurals.drawer_catch_up_remaining, shownRemaining, shownRemaining),
                     style = OpenCodeTextStyles.headline.copy(fontWeight = FontWeight.SemiBold),
                     alignment = RollingNumberAlignment.Center,
                     modifier = Modifier
@@ -124,7 +127,7 @@ fun CatchUpChrome(
                 ) {
                     OpenCodeIconButton(
                         symbol = SFSymbol.ChevronBackward,
-                        contentDescription = "Leave Catch Up",
+                        contentDescription = stringResource(R.string.drawer_catch_up_leave_description),
                         onClick = onExit,
                         // The stage opens on its first element, as VoiceOver does on a screen change.
                         modifier = Modifier.accessibilityFocusRequest(openFocus),
@@ -154,7 +157,7 @@ fun CatchUpChrome(
                     onClick = { onDismiss(CatchUpDisposition.keepUnread) },
                     enabled = !finished,
                     modifier = Modifier.weight(1f),
-                ) { FittingLabel("Keep Unread") }
+                ) { FittingLabel(stringResource(R.string.drawer_catch_up_keep_unread)) }
                 val readTint = CatchUpMetrics.readControlColor
                 MaterialTheme(
                     colorScheme = MaterialTheme.colorScheme.copy(primary = readTint, onPrimary = readTint.highContrastForeground()),
@@ -163,7 +166,7 @@ fun CatchUpChrome(
                         onClick = { onDismiss(CatchUpDisposition.markRead) },
                         enabled = !finished,
                         modifier = Modifier.weight(1f),
-                    ) { FittingLabel("Mark as Read") }
+                    ) { FittingLabel(stringResource(R.string.drawer_mark_as_read)) }
                 }
             }
         }
@@ -188,7 +191,7 @@ private fun CatchUpUndoButton(canUndo: Boolean, onClick: () -> Unit) {
         ),
         modifier = Modifier.heightIn(min = OpenCodeMinTapTarget).widthIn(min = OpenCodeMinTapTarget),
     ) {
-        Text("Undo", style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
+        Text(stringResource(R.string.drawer_catch_up_undo), style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
     }
 }
 

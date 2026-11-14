@@ -1,5 +1,6 @@
 package ai.opencode.feature.transcript.markdown.ui
 
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.markdown.MarkdownQuote
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import androidx.compose.foundation.layout.Box
@@ -16,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.unit.dp
 
@@ -93,8 +95,9 @@ fun QuoteSelectionContainer(
     // Attached directly to the block's Text semantics (via LocalQuoteAccessibilityAction) rather
     // than an unmerged wrapper Box, matching iOS `.accessibilityAction(named: Text("Quote"))` and
     // avoiding a per-paragraph ancestor semantics node during streaming scroll/growth.
+    val quoteLabel = stringResource(R.string.transcript_quote)
     val quoteAction = remember {
-        CustomAccessibilityAction("Quote") {
+        CustomAccessibilityAction(quoteLabel) {
             currentSource.fullBlockQuoteText()?.let { currentHandler.quote(it) }
             true
         }
