@@ -1,10 +1,12 @@
 package ai.opencode.feature.transcript.markdown.ui
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeMinTapTarget
 import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.feature.transcript.R
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -53,7 +56,7 @@ fun CodeCopyButton(code: String, onCopy: (String) -> Unit) {
     }
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val label = if (copied) "Copied" else "Copy code"
+    val label = if (copied) stringResource(CoreR.string.common_copied) else stringResource(R.string.transcript_code_copy_description)
     val shape = RoundedCornerShape(OpenCodeRadius.xs)
     var face = Modifier
         .padding(top = 6.dp, end = 6.dp)

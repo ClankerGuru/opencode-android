@@ -1,5 +1,6 @@
 package ai.opencode.feature.transcript.selection
 
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.markdown.MarkdownQuote
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -39,6 +40,7 @@ import androidx.compose.ui.node.currentValueOf
 import androidx.compose.ui.node.invalidateDraw
 import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.abs
@@ -790,10 +792,11 @@ internal fun TranscriptReplySelectionMenu(
     val resources = LocalContext.current.resources
     val copyLabel = resources.getString(android.R.string.copy)
     val selectAllLabel = resources.getString(android.R.string.selectAll)
+    val quoteLabel = stringResource(R.string.transcript_quote)
     val currentCopy by rememberUpdatedState(onCopy)
     val currentQuote by rememberUpdatedState(onQuote)
     val currentIsScrolling by rememberUpdatedState(isScrolling)
-    val data = remember(selection, copyLabel, selectAllLabel) {
+    val data = remember(selection, copyLabel, selectAllLabel, quoteLabel) {
         object : TextContextMenuDataProvider {
             override fun position(destinationCoordinates: LayoutCoordinates): Offset {
                 val bounds = contentBounds(destinationCoordinates)
@@ -818,7 +821,7 @@ internal fun TranscriptReplySelectionMenu(
                 }
                 val quoted = selection.quotedText()
                 if (quoted != null && MarkdownQuote.blockquote(quoted) != null) {
-                    items += TextContextMenuItem(key = QuoteKey, label = "Quote") {
+                    items += TextContextMenuItem(key = QuoteKey, label = quoteLabel) {
                         selection.clear()
                         close()
                         currentQuote(quoted)

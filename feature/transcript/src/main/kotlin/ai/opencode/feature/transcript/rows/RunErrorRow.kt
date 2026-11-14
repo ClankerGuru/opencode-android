@@ -9,6 +9,7 @@ import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.feature.media.withinNodeLimit
+import ai.opencode.feature.transcript.R
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -86,6 +88,7 @@ fun RunErrorRow(
     val spacing = scaledDp(8f)
     val colors = OpenCodeTheme.colors
     val haptics = remember { dependency(HapticsClient) }
+    val copyErrorLabel = stringResource(R.string.transcript_run_error_copy)
 
     val line: @Composable (Modifier) -> Unit = { lineModifier ->
         Row(
@@ -93,7 +96,7 @@ fun RunErrorRow(
                 contentDescription = error.line
                 customActions = actions.drop(1).map { action ->
                     CustomAccessibilityAction(menuTitle(action)) { perform(action); true }
-                }.plus(CustomAccessibilityAction("Copy Error") { copy(error.details); true }).withinNodeLimit()
+                }.plus(CustomAccessibilityAction(copyErrorLabel) { copy(error.details); true }).withinNodeLimit()
             },
             horizontalArrangement = Arrangement.spacedBy(spacing),
         ) {
@@ -142,7 +145,7 @@ fun RunErrorRow(
                 overflow = TextOverflow.Ellipsis,
             )
             DropdownMenuItem(
-                text = { Text("Copy Error") },
+                text = { Text(copyErrorLabel) },
                 leadingIcon = { OpenCodeIcon("square.on.square", contentDescription = null) },
                 onClick = { menuOpen = false; copy(error.details) },
             )
@@ -187,19 +190,20 @@ fun UndoneRow(redo: () -> Unit, modifier: Modifier = Modifier) {
     val colors = OpenCodeTheme.colors
     val spacing = scaledDp(8f)
     val glyphSize = scaledDp(18f)
+    val undoHint = stringResource(R.string.transcript_undone_undo_hint)
     Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(
             Modifier
                 .alignByBaseline()
                 // iOS `accessibilityHint`: read after the line.
-                .semantics(mergeDescendants = true) { stateDescription = "Undo is available until you send a new message" },
+                .semantics(mergeDescendants = true) { stateDescription = undoHint },
             horizontalArrangement = Arrangement.spacedBy(spacing),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.width(glyphSize), contentAlignment = Alignment.Center) {
                 OpenCodeIcon("arrow.uturn.backward", contentDescription = null, size = OpenCodeIconSize.small, tint = colors.secondaryText)
             }
-            Text("Reverted from here", style = OpenCodeTextStyles.body, color = colors.secondaryText)
+            Text(stringResource(R.string.transcript_undone_title), style = OpenCodeTextStyles.body, color = colors.secondaryText)
         }
         Spacer(Modifier.weight(1f))
         Row(
@@ -208,7 +212,7 @@ fun UndoneRow(redo: () -> Unit, modifier: Modifier = Modifier) {
                 .rowHitTarget(
                     target = Modifier.clip(OpenCodeShape.control).clickable(
                         role = Role.Button,
-                        onClickLabel = "Restore the reverted messages and files until you send a new message",
+                        onClickLabel = stringResource(R.string.transcript_undone_undo_click_label),
                         onClick = redo,
                     ),
                 ),
@@ -216,7 +220,7 @@ fun UndoneRow(redo: () -> Unit, modifier: Modifier = Modifier) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             OpenCodeIcon("arrow.uturn.forward", contentDescription = null, size = OpenCodeIconSize.small, tint = colors.secondaryText)
-            Text("Undo", style = OpenCodeTextStyles.body, color = colors.secondaryText)
+            Text(stringResource(R.string.transcript_undone_undo), style = OpenCodeTextStyles.body, color = colors.secondaryText)
         }
     }
 }

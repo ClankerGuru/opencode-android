@@ -1,9 +1,11 @@
 package ai.opencode.feature.transcript.user
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeFonts
+import ai.opencode.feature.transcript.R
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -43,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
@@ -114,17 +117,21 @@ fun TranscriptVoiceMessageView(
 ) {
     val reduceMotion = rememberReduceMotion()
     val morphs = LocalPromotionMorph.current
-    val value = listOfNotNull(delegation.displayText, if (delegation.callLogAttached) "Call log attached" else null, pending?.pendingLabel).joinToString(", ")
+    val callLogAttachedLabel = stringResource(R.string.transcript_voice_call_log_attached)
+    val copyLabel = stringResource(CoreR.string.common_copy)
+    val copyFullMessageLabel = stringResource(R.string.transcript_voice_copy_full_message)
+    val voiceMessageDescription = stringResource(R.string.transcript_voice_message_description)
+    val value = listOfNotNull(delegation.displayText, if (delegation.callLogAttached) callLogAttachedLabel else null, pending?.pendingLabel).joinToString(", ")
     val actions = buildList {
-        add(action("Copy") { onCopy(delegation.displayText) })
-        add(action("Copy Full Message") { onCopy(prompt) })
+        add(action(copyLabel) { onCopy(delegation.displayText) })
+        add(action(copyFullMessageLabel) { onCopy(prompt) })
         pendingActions?.let { addAll(it.accessibilityActions().filter { a -> a.label != "Copy" }) }
     }
     Box(
         modifier
             .fillMaxWidth()
             .clearAndSetSemantics {
-                contentDescription = "Voice message"
+                contentDescription = voiceMessageDescription
                 stateDescription = value
                 customActions = actions
             },
@@ -196,7 +203,7 @@ private fun VoiceMessage(
                     when (part) {
                         is VoiceMessageIndicator.LabelPart.Pending -> TranscriptPendingLabel(part.delivery)
                         VoiceMessageIndicator.LabelPart.Voice -> SmallGlyphLabel(
-                            "Voice",
+                            stringResource(R.string.transcript_voice_label),
                             "waveform",
                             style = OpenCodeTextStyles.caption1,
                             color = OpenCodeTheme.colors.secondaryText,
@@ -236,15 +243,15 @@ private fun VoiceMessage(
                     val dismiss = { menu = false }
                     VoicePromptPreview(prompt)
                     HorizontalDivider(color = OpenCodeTheme.colors.border)
-                    UserMenuItem("Copy", "square.on.square", dismiss) { onCopy(delegation.displayText) }
-                    UserMenuItem("Copy Full Message", "doc.plaintext", dismiss) { onCopy(prompt) }
+                    UserMenuItem(stringResource(CoreR.string.common_copy), "square.on.square", dismiss) { onCopy(delegation.displayText) }
+                    UserMenuItem(stringResource(R.string.transcript_voice_copy_full_message), "doc.plaintext", dismiss) { onCopy(prompt) }
                     pendingActions?.QueueAndDelete(dismiss)
                 }
             }
         }
         if (chrome.callLogCaption) {
             SmallGlyphLabel(
-                "Call log attached",
+                stringResource(R.string.transcript_voice_call_log_attached),
                 "paperclip",
                 style = OpenCodeTextStyles.caption1,
                 color = OpenCodeTheme.colors.secondaryText,

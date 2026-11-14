@@ -1,5 +1,6 @@
 package ai.opencode.feature.transcript.user
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
@@ -10,6 +11,7 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.markdown.marked
 import ai.opencode.feature.transcript.markdown.ui.ArrivingText
 import ai.opencode.feature.transcript.markdown.ui.LocalSessionLinks
@@ -35,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.TextToolbar
 import androidx.compose.ui.platform.TextToolbarStatus
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.delay
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -184,9 +187,9 @@ internal fun TranscriptUserBubble(
                     if (pendingActions != null) {
                         pendingActions.Menu(copying = text, dismiss = dismiss, selecting = ::beginSelection)
                     } else if (text.isNotEmpty()) {
-                        UserMenuItem("Copy", "square.on.square", dismiss) { onCopy(text) }
-                        UserMenuItem("Select", "selection.pin.in.out", dismiss, onClick = ::beginSelection)
-                        if (onRevertToHere != null) UserMenuItem("Revert to Here", "arrow.uturn.backward", dismiss, onClick = onRevertToHere)
+                        UserMenuItem(stringResource(CoreR.string.common_copy), "square.on.square", dismiss) { onCopy(text) }
+                        UserMenuItem(stringResource(R.string.transcript_message_select), "selection.pin.in.out", dismiss, onClick = ::beginSelection)
+                        if (onRevertToHere != null) UserMenuItem(stringResource(R.string.transcript_message_revert_to_here), "arrow.uturn.backward", dismiss, onClick = onRevertToHere)
                     }
                 }
             }
@@ -267,7 +270,7 @@ object UserBubbleFold {
             val color = OpenCodeTheme.colors.secondaryText
             val style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold)
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(if (isExpanded) "Show Less" else "Show More", style = style, color = color)
+                Text(if (isExpanded) stringResource(R.string.transcript_show_less) else stringResource(R.string.transcript_show_more), style = style, color = color)
                 OpenCodeIcon(if (isExpanded) "chevron.up" else "chevron.down", contentDescription = null, size = smallGlyph(style), tint = color)
             }
         }
@@ -352,7 +355,7 @@ private fun UserBubbleFoldView(
                 ) { content() }
             },
             {
-                val label = if (fold.isExpanded) "Show Less" else "Show More"
+                val label = if (fold.isExpanded) stringResource(R.string.transcript_show_less) else stringResource(R.string.transcript_show_more)
                 Box(
                     Modifier
                         .clickable(onClick = fold.toggle)

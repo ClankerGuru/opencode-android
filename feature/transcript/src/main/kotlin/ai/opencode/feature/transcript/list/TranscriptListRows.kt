@@ -1,5 +1,6 @@
 package ai.opencode.feature.transcript.list
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.motion.AmbientClock
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionCurve
@@ -15,6 +16,7 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.feature.media.TranscriptMetrics
+import ai.opencode.feature.transcript.R
 import ai.opencode.server.model.OpenCodeQueuedInput
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -43,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.invisibleToUser
@@ -62,6 +65,7 @@ import kotlinx.coroutines.delay
 /** Earlier history: a delayed spinner while paging, the error with Retry, else a 1 dp spacer (iOS `TranscriptHistoryStatusView`). */
 @Composable
 fun TranscriptHistoryStatusView(isLoading: Boolean, error: String?, retry: () -> Unit, modifier: Modifier = Modifier) {
+    val loadingDescription = stringResource(R.string.transcript_history_loading_description)
     Column(
         modifier.fillMaxWidth().padding(vertical = TranscriptMetrics.standard),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -69,11 +73,11 @@ fun TranscriptHistoryStatusView(isLoading: Boolean, error: String?, retry: () ->
     ) {
         when {
             // Every open pages once to learn whether history exists; healthy round trips don't flash activity.
-            isLoading -> DelayedProgressView(Modifier.semantics { contentDescription = "Loading earlier messages" })
+            isLoading -> DelayedProgressView(Modifier.semantics { contentDescription = loadingDescription })
             error != null -> {
                 Text(error, style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.secondaryText, textAlign = TextAlign.Center)
                 TextButton(onClick = retry, modifier = Modifier.heightIn(min = 48.dp)) {
-                    Text("Retry", style = OpenCodeTextStyles.footnote)
+                    Text(stringResource(CoreR.string.common_retry), style = OpenCodeTextStyles.footnote)
                 }
             }
             else -> Spacer(Modifier.height(1.dp).clearAndSetSemantics { invisibleToUser() })
@@ -366,6 +370,7 @@ fun TranscriptEmptyView(
             if (motion.isSettled(now)) MotionFrameAction.Stop else MotionFrameAction.Continue
         }
     }
+    val loadingSessionDescription = stringResource(R.string.transcript_empty_loading_description)
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         Column(
             Modifier.padding(vertical = TranscriptMetrics.standard),
@@ -375,7 +380,7 @@ fun TranscriptEmptyView(
                 MarkLoadingView(
                     loadingSince = loadingSince,
                     isHidden = pulsePaused,
-                    modifier = Modifier.semantics { if (isLoading) contentDescription = "Loading session" else invisibleToUser() },
+                    modifier = Modifier.semantics { if (isLoading) contentDescription = loadingSessionDescription else invisibleToUser() },
                 )
             } else {
                 val glyph = with(LocalDensity.current) { (EmptyStateTunables.glyphSize * fontScale).dp }
@@ -392,7 +397,7 @@ fun TranscriptEmptyView(
             }
             Spacer(Modifier.height(EmptyStateTunables.glyphSpacing.dp))
             Text(
-                "No messages yet",
+                stringResource(R.string.transcript_empty_title),
                 modifier = Modifier.motionBlurReveal(motion.text(now).first.toFloat(), MotionTunables.blurPanel.value, MotionTunables.entranceRise.value, reduceMotion)
                     .then(if (!showsText) Modifier.clearAndSetSemantics { } else Modifier),
                 style = OpenCodeTextStyles.title2.copy(fontWeight = FontWeight.Bold),
@@ -401,7 +406,7 @@ fun TranscriptEmptyView(
             )
             Spacer(Modifier.height(EmptyStateTunables.subtitleSpacing.dp))
             Text(
-                "Start the session below",
+                stringResource(R.string.transcript_empty_subtitle),
                 modifier = Modifier.motionBlurReveal(motion.text(now, true).first.toFloat(), MotionTunables.blurPanel.value, MotionTunables.entranceRise.value, reduceMotion)
                     .then(if (!showsText) Modifier.clearAndSetSemantics { } else Modifier),
                 style = OpenCodeTextStyles.subheadline,
@@ -419,9 +424,10 @@ fun TranscriptEmptyView(
 @Composable
 fun TranscriptQueuedInputView(input: OpenCodeQueuedInput, modifier: Modifier = Modifier) {
     if (!input.isCompaction) return
+    val compactionQueued = stringResource(R.string.transcript_compaction_queued)
     // Admitted but not started; the durable row takes over while running.
     Row(
-        modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = "Compaction queued" },
+        modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = compactionQueued },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(TranscriptMetrics.standard),
     ) {
@@ -429,7 +435,7 @@ fun TranscriptQueuedInputView(input: OpenCodeQueuedInput, modifier: Modifier = M
         Box(Modifier.weight(1f).height(1.dp).background(line))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             OpenCodeIcon("diamond", contentDescription = null, modifier = Modifier.size(11.dp), tint = OpenCodeTheme.colors.tertiaryText)
-            Text("Compaction queued", style = OpenCodeTextStyles.caption1, color = OpenCodeTheme.colors.tertiaryText)
+            Text(compactionQueued, style = OpenCodeTextStyles.caption1, color = OpenCodeTheme.colors.tertiaryText)
         }
         Box(Modifier.weight(1f).height(1.dp).background(line))
     }

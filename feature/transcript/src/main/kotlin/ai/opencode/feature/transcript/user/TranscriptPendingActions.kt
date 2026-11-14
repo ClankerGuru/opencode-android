@@ -1,8 +1,10 @@
 package ai.opencode.feature.transcript.user
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.rows.rowHitTarget
 import ai.opencode.server.model.OpenCodeDelivery
 import androidx.compose.foundation.clickable
@@ -27,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -54,8 +57,8 @@ class TranscriptPendingActions(
     @Composable
     fun Menu(copying: String?, dismiss: () -> Unit, selecting: (() -> Unit)? = null) {
         if (!copying.isNullOrEmpty()) {
-            UserMenuItem("Copy", "square.on.square", dismiss) { copy(copying) }
-            if (selecting != null) UserMenuItem("Select", "selection.pin.in.out", dismiss, onClick = selecting)
+            UserMenuItem(stringResource(CoreR.string.common_copy), "square.on.square", dismiss) { copy(copying) }
+            if (selecting != null) UserMenuItem(stringResource(R.string.transcript_message_select), "selection.pin.in.out", dismiss, onClick = selecting)
         }
         QueueAndDelete(dismiss)
     }
@@ -63,9 +66,9 @@ class TranscriptPendingActions(
     /** Send Now (when stranded), Move to Queue and Delete, after a menu's own Copy. */
     @Composable
     fun QueueAndDelete(dismiss: () -> Unit) {
-        sendNow?.let { UserMenuItem("Send Now", OpenCodeDelivery.Steer.symbolName, dismiss, onClick = it) }
-        UserMenuItem("Move to Queue", OpenCodeDelivery.Queue.symbolName, dismiss, onClick = moveToQueue)
-        UserMenuItem("Delete", "trash", dismiss, destructive = true, onClick = delete)
+        sendNow?.let { UserMenuItem(stringResource(R.string.transcript_pending_send_now), OpenCodeDelivery.Steer.symbolName, dismiss, onClick = it) }
+        UserMenuItem(stringResource(R.string.transcript_pending_move_to_queue), OpenCodeDelivery.Queue.symbolName, dismiss, onClick = moveToQueue)
+        UserMenuItem(stringResource(CoreR.string.common_delete), "trash", dismiss, destructive = true, onClick = delete)
     }
 
     fun accessibilityActions(copying: String? = null): List<CustomAccessibilityAction> = buildList {
@@ -118,9 +121,9 @@ class TranscriptFailedSend(
         } else if (moveTitle != null) {
             UserMenuItem(moveTitle, "folder", dismiss, onClick = move)
         }
-        UserMenuItem("Retry", "arrow.clockwise", dismiss, enabled = !failure.isMoving, onClick = retry)
-        UserMenuItem("Edit", "pencil", dismiss, onClick = edit)
-        UserMenuItem("Delete", "trash", dismiss, destructive = true, onClick = delete)
+        UserMenuItem(stringResource(CoreR.string.common_retry), "arrow.clockwise", dismiss, enabled = !failure.isMoving, onClick = retry)
+        UserMenuItem(stringResource(CoreR.string.common_edit), "pencil", dismiss, onClick = edit)
+        UserMenuItem(stringResource(CoreR.string.common_delete), "trash", dismiss, destructive = true, onClick = delete)
     }
 
     val accessibilityActions: List<CustomAccessibilityAction>
@@ -248,7 +251,7 @@ internal fun TranscriptFailedSendLine(failedSend: TranscriptFailedSend, modifier
         } else {
             val moveTitle = failedSend.moveTitle
             Text(
-                moveTitle ?: "Retry",
+                moveTitle ?: stringResource(CoreR.string.common_retry),
                 style = style.copy(fontWeight = FontWeight.SemiBold),
                 color = OpenCodeTheme.colors.accent,
                 maxLines = 1,

@@ -1,5 +1,6 @@
 package ai.opencode.feature.transcript.markdown.ui
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -10,6 +11,7 @@ import ai.opencode.feature.media.DecodedImageCache
 import ai.opencode.feature.media.TranscriptImagePreview
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.user.TranscriptDragPayload
 import ai.opencode.feature.transcript.user.transcriptDragSource
@@ -51,6 +53,7 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -137,9 +140,11 @@ fun MarkdownImage(
         else -> ImageLoad.Loading
     }
     val shape = RoundedCornerShape(TranscriptMetrics.cardCornerRadius)
+    val imageLabel = stringResource(R.string.transcript_image)
+    val openDescription = if (alt.isEmpty()) stringResource(R.string.transcript_image_open_description) else stringResource(R.string.transcript_open_named, alt)
     when (val load = state) {
         is ImageLoad.Loaded -> {
-            val label = alt.ifEmpty { "Image" }
+            val label = alt.ifEmpty { imageLabel }
             Box(
                 modifier
                     .fillMaxWidth()
@@ -157,14 +162,14 @@ fun MarkdownImage(
                     .clip(shape)
                     .background(colors.userBubble, shape)
                     .clickable { send(TranscriptAction.PreviewImage(TranscriptImagePreview(cacheKey, load.image.asAndroidBitmap(), label))) }
-                    .semantics { contentDescription = "Open ${alt.ifEmpty { "image" }}" },
+                    .semantics { contentDescription = openDescription },
                 contentAlignment = Alignment.Center,
             ) {
                 Image(load.image, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.heightIn(max = 360.dp))
             }
         }
         ImageLoad.Failed -> FailedImageCard(
-            name = fallbackFile?.path?.substringAfterLast('/') ?: alt.ifEmpty { "Image" },
+            name = fallbackFile?.path?.substringAfterLast('/') ?: alt.ifEmpty { imageLabel },
             fallbackFile = fallbackFile,
             onRetry = {
                 if (failed) row.revised()
@@ -205,6 +210,7 @@ private fun FailedImageCard(name: String, fallbackFile: AgentFileReference?, onR
     val send = LocalTranscriptRowContext.current.send
     var menu by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(TranscriptMetrics.cardCornerRadius)
+    val loadFailed = stringResource(R.string.transcript_image_load_failed)
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
         Row(
             Modifier
@@ -213,10 +219,10 @@ private fun FailedImageCard(name: String, fallbackFile: AgentFileReference?, onR
                 .clip(shape)
                 .background(colors.userBubble, shape)
                 // iOS `accessibilityHint("Tries again")`: TalkBack reads “Double-tap to try again”.
-                .combinedClickable(onClickLabel = "Try again", onClick = onRetry, onLongClick = { menu = true })
+                .combinedClickable(onClickLabel = stringResource(R.string.transcript_image_retry_click_label), onClick = onRetry, onLongClick = { menu = true })
                 .semantics {
                     contentDescription = name
-                    stateDescription = "Couldn’t load image"
+                    stateDescription = loadFailed
                     testTag = "markdown-image-failed"
                 }
                 .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -226,19 +232,19 @@ private fun FailedImageCard(name: String, fallbackFile: AgentFileReference?, onR
             OpenCodeIcon(SFSymbol.PhotoBadgeExclamationmark, contentDescription = null, tint = colors.secondaryText)
             Column(Modifier.weight(1f)) {
                 Text(name, style = OpenCodeTextStyles.subheadline, color = colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("Couldn’t load image", style = OpenCodeTextStyles.footnote, color = colors.secondaryText)
+                Text(loadFailed, style = OpenCodeTextStyles.footnote, color = colors.secondaryText)
             }
             OpenCodeIcon(SFSymbol.ArrowClockwise, contentDescription = null, tint = colors.tertiaryText)
         }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
             DropdownMenuItem(
-                text = { Text("Try Again") },
+                text = { Text(stringResource(CoreR.string.common_try_again)) },
                 leadingIcon = { OpenCodeIcon(SFSymbol.ArrowClockwise, contentDescription = null) },
                 onClick = { menu = false; onRetry() },
             )
             if (fallbackFile != null) {
                 DropdownMenuItem(
-                    text = { Text("Open") },
+                    text = { Text(stringResource(R.string.transcript_image_open)) },
                     leadingIcon = { OpenCodeIcon(SFSymbol.DocTextMagnifyingglass, contentDescription = null) },
                     onClick = { menu = false; send(TranscriptAction.OpenFile(fallbackFile)) },
                 )

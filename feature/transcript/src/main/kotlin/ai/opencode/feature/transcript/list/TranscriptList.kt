@@ -21,6 +21,7 @@ import ai.opencode.feature.media.LocalLinkPreviewStore
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptLayoutTuning
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.RowProps
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.TranscriptConfiguration
@@ -116,6 +117,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalGraphicsContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.customActions
@@ -543,6 +545,7 @@ private fun TranscriptListContent(
         ),
     ) {
         val showsMagnifier by remember(replySelection) { derivedStateOf { replySelection.magnifierCenter.isSpecified } }
+        val scrollToTopLabel = stringResource(R.string.transcript_scroll_to_top)
         Box(
             modifier
                 .nestedScroll(controller.nestedScrollConnection)
@@ -562,7 +565,7 @@ private fun TranscriptListContent(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize().testTag("transcript-list")
-                        .semantics { customActions = listOf(CustomAccessibilityAction("Scroll to top", controller::scrollToTop)) }
+                        .semantics { customActions = listOf(CustomAccessibilityAction(scrollToTopLabel, controller::scrollToTop)) }
                         .graphicsLayer { alpha = if (restoreHide.hides) 0f else controller.handoffProgress() }
                         .drawRowExits(
                             exits = rowExits,
@@ -825,7 +828,7 @@ private fun rememberTouchExploration(): Boolean {
 /** Until the session supplies its Working line (activity orb + title), a quiet label. */
 @Composable
 private fun WorkingLineFallback(modifier: Modifier = Modifier) {
-    Text("Working", modifier, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.secondaryText)
+    Text(stringResource(R.string.transcript_working), modifier, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.secondaryText)
 }
 
 /**

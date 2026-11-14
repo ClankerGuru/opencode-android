@@ -1,11 +1,13 @@
 package ai.opencode.feature.transcript.user
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.feature.media.TranscriptImagePreview
 import ai.opencode.feature.media.TranscriptMetrics
+import ai.opencode.feature.transcript.R
 import ai.opencode.server.model.AgentFileReference
 import ai.opencode.server.model.OpenCodeDelivery
 import androidx.compose.animation.AnimatedVisibility
@@ -29,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
@@ -123,11 +126,13 @@ private fun UserMessage(
     // The message's state, once: a failure, or its pending label and any delivery note.
     val status = if (failedSend != null) TranscriptFailedSend.status
     else listOfNotNull(message.pending?.pendingLabel, deliveryNote).joinToString(", ")
+    val copyLabel = stringResource(CoreR.string.common_copy)
+    val revertToHereLabel = stringResource(R.string.transcript_message_revert_to_here)
     val actions = when {
         pendingActions != null -> pendingActions.accessibilityActions(copying = message.displayText)
         failedSend == null -> buildList {
-            if (message.displayText.isNotEmpty()) add(action("Copy") { onCopy(message.displayText) })
-            if (onRevertToHere != null) add(action("Revert to Here", onRevertToHere))
+            if (message.displayText.isNotEmpty()) add(action(copyLabel) { onCopy(message.displayText) })
+            if (onRevertToHere != null) add(action(revertToHereLabel, onRevertToHere))
         }
         else -> emptyList()
     }

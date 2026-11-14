@@ -19,6 +19,7 @@ import ai.opencode.feature.media.SiteIcon
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.media.withinNodeLimit
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.TranscriptDisclosureState
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
@@ -80,6 +81,8 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -234,8 +237,8 @@ fun LinkPreviewMoreButton(count: Int, key: String, entryID: String) {
         if (reducedMotion) snap() else DisclosureMotion.animation(open),
         label = "LinkPreviewMoreChevron",
     )
-    val label = if (open) "Show Fewer Links" else "Show All Links"
-    val value = if (open) "$count of $count links shown" else "${LinkPreviewEntries.shown} of $count links shown"
+    val label = if (open) stringResource(R.string.transcript_link_preview_show_fewer) else stringResource(R.string.transcript_link_preview_show_all)
+    val value = if (open) pluralStringResource(R.plurals.transcript_link_preview_shown, count, count, count) else pluralStringResource(R.plurals.transcript_link_preview_shown, count, LinkPreviewEntries.shown, count)
     val color = OpenCodeTheme.colors.secondaryText
     Row(
         Modifier
@@ -261,7 +264,7 @@ fun LinkPreviewMoreButton(count: Int, key: String, entryID: String) {
         Spacer(Modifier.width(0.dp).height((17f * min(fontScale, 1.35f)).dp))
         AnimatedVisibility(!open, enter = fadeIn(), exit = fadeOut()) {
             Text(
-                "${count - LinkPreviewEntries.shown} more",
+                stringResource(R.string.transcript_link_preview_more, count - LinkPreviewEntries.shown),
                 style = OpenCodeTextStyles.footnote.copy(fontFeatureSettings = "tnum"),
                 color = color,
             )
