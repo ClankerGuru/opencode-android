@@ -33,6 +33,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -585,13 +587,15 @@ fun <T> SettingsSegmentedControl(
                             .background(fill, shape)
                             .border(SegmentEdge, edge, shape),
                     )
-                    Text(
+                    val labelStyle = MaterialTheme.typography.labelLarge
+                    BasicText(
                         title(option),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = text,
+                        style = labelStyle.copy(color = text),
                         maxLines = 1,
+                        softWrap = false,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(horizontal = 12.dp),
+                        autoSize = TextAutoSize.StepBased(minFontSize = labelStyle.fontSize * 0.8f, maxFontSize = labelStyle.fontSize),
+                        modifier = Modifier.padding(horizontal = 8.dp),
                     )
                 }
             }
