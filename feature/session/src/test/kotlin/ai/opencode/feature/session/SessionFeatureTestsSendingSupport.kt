@@ -16,13 +16,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.hours
 
-/**
- * Helpers the iOS `SessionFeatureTests` extensions ported in this group share (`sentID` and
- * `failedSendStore` live in iOS `SessionFeatureTests+FailedSends.swift`; copies here so these
- * files don't depend on that port).
- */
 internal object SessionFeatureTestsSendingSupport {
-    /** iOS `SessionFeatureTests.sentID`: the first message ID `ServerIDClient.incrementing()` mints. */
+    /** The first message ID `ServerIDClient.incrementing()` mints. */
     const val sentID = "msg_00000000000100000000000000"
 
     // `#expect` in kotlin.test's argument order (expected, actual, message), over JUnit's asserts.
@@ -33,9 +28,8 @@ internal object SessionFeatureTestsSendingSupport {
     fun assertNotNull(value: Any?, message: String? = null) = org.junit.Assert.assertNotNull(message, value)
 
     /**
-     * iOS's TestStore reduces every action as it arrives, even with exhaustivity off; this one
-     * reduces them when asked. Reduces what's waiting and lets the effects it starts run up to
-     * their first suspension (e.g. a `TestClock` sleep), as iOS has by the next line.
+     * This TestStore reduces actions when asked, even with exhaustivity off. Reduces what's waiting
+     * and lets the effects it starts run up to their first suspension (e.g. a `TestClock` sleep).
      */
     suspend fun <S, A> TestStore<S, A>.flush() {
         repeat(3) {
@@ -44,7 +38,7 @@ internal object SessionFeatureTestsSendingSupport {
         }
     }
 
-    /** iOS `expectOptimisticSend(_:text:)`: the state a send from an idle session's composer leaves at once. */
+    /** The state a send from an idle session's composer leaves at once. */
     fun expectOptimisticSend(state: SessionFeature.State, text: String = "hello"): SessionFeature.State {
         val messageID = sentID
         val signal = state.workingRunSignal
@@ -63,10 +57,9 @@ internal object SessionFeatureTestsSendingSupport {
             .updateWorkingRun(signal)
     }
 
-    /** iOS `Task.sleep(for: .seconds(3600))` in a stub: a wait the test never sees end. */
+    /** A wait the test never sees end. */
     suspend fun hang() = delay(1.hours)
 
-    /** iOS `AsyncStream<Void>.makeStream()` used as a gate: `for await _ in gate { break }`. */
     class Gate {
         private val channel = Channel<Unit>(Channel.UNLIMITED)
         suspend fun await() {
@@ -83,8 +76,8 @@ internal object SessionFeatureTestsSendingSupport {
     }
 
     /**
-     * iOS `failedSendStore`: a send store whose POSTs follow [attempt] (by its 1-based number) and
-     * whose message reads find the prompt only once [serverHasIt] is set.
+     * A send store whose POSTs follow [attempt] (by its 1-based number) and whose message reads
+     * find the prompt only once [serverHasIt] is set.
      */
     fun SessionTestSupport.Harness.failedSendStore(
         state: SessionFeature.State,

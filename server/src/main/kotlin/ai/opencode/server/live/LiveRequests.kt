@@ -122,7 +122,7 @@ enum class FormStatus {
     @SerialName("cancelled") Cancelled,
 }
 
-/** A form's state on the server: what settled it, if anything did (iOS `FormState`). */
+/** A form's state on the server: what settled it, if anything did. */
 @Serializable
 data class FormState(
     val status: FormStatus,
@@ -130,7 +130,7 @@ data class FormState(
     val message: String? = null,
 )
 
-/** How a reply or dismissal asks a form to settle (iOS `FormSettlement`). */
+/** How a reply or dismissal asks a form to settle. */
 sealed interface FormSettlement {
     data class Answered(val answer: Map<String, OpenCodeFormValue>) : FormSettlement
     data class Cancelled(val message: String?) : FormSettlement
@@ -156,7 +156,7 @@ sealed interface FormSettlement {
 
 @Serializable private data class FormDetail(val state: FormState)
 
-/** Where a form stands on the server now (iOS `requestFormState`). */
+/** Where a form stands on the server now. */
 internal suspend fun requestFormState(server: OpenCodeServer, sessionID: String, formID: String): FormState =
     request<DataPayload<FormDetail>>(
         "/api/session/$sessionID/form/$formID",
@@ -208,7 +208,7 @@ private fun isGone(error: OpenCodeClientError): Boolean = error.statusCode == 40
 private fun settled(error: OpenCodeClientError, message: String): OpenCodeClientError =
     error.copy(message = message, requestSettled = true)
 
-// Shells (iOS `OpenCodeClient+Shells.swift`).
+// Shells.
 
 internal suspend fun requestRunningShells(server: OpenCodeServer, directory: String): List<OpenCodeShell> =
     request<DataPayload<List<ShellInfo>>>("/api/shell", query = locationQuery(directory), server = server)

@@ -8,10 +8,6 @@ import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
 
-/**
- * Port of iOS `ServerIDTests.swift`'s `shareSheetIDsUseTheSameShape` (`ShareSendRequest`); the
- * rest of that file is `:server`'s `ServerIDTests`.
- */
 class ServerIDTests {
     @get:Rule val isolation = TestIsolationRule()
 

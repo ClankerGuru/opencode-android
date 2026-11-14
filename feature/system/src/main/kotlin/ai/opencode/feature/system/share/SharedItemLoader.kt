@@ -16,10 +16,10 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
 /**
- * Port of iOS `SharedItemLoader`: classifies and stages what another app shared
- * (`ACTION_SEND` / `ACTION_SEND_MULTIPLE`: `EXTRA_STREAM` URIs or `ClipData`, plus
- * `EXTRA_TEXT`) while the sender's URI grant is live. Images are re-encoded at once, so only
- * the small JPEG is kept; other files are copied (capped) into `ComposerFiles`.
+ * Classifies and stages what another app shared (`ACTION_SEND` / `ACTION_SEND_MULTIPLE`:
+ * `EXTRA_STREAM` URIs or `ClipData`, plus `EXTRA_TEXT`) while the sender's URI grant is live.
+ * Images are re-encoded at once, so only the small JPEG is kept; other files are copied (capped)
+ * into `ComposerFiles`.
  *
  * Android has no `NSItemProvider` representations to fall back through: a stream is a
  * `content://` URI read once through its grant, and text arrives as text.
@@ -33,7 +33,7 @@ object SharedItemLoader {
         data class Text(val text: String?) : LoadedItem
     }
 
-    /** One shared item, as iOS's `NSItemProvider` (one per attachment). */
+    /** One shared item. */
     sealed interface Provider {
         /** A shared stream; [declaredMime] is the intent's type when it names one concrete type. */
         data class Stream(val uri: Uri, val declaredMime: String?) : Provider
@@ -198,7 +198,7 @@ object SharedItemLoader {
         return base.substring(dot + 1)
     }
 
-    /** `OpenableColumns.DISPLAY_NAME` (iOS `NSItemProvider.suggestedName`). */
+    /** `OpenableColumns.DISPLAY_NAME`. */
     private fun displayName(resolver: ContentResolver, uri: Uri): String? = runCatching {
         resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
             val column = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)

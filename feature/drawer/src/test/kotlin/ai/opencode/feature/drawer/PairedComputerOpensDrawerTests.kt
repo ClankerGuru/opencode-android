@@ -20,8 +20,8 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * Port of iOS `PairedComputerOpensDrawerTests.swift`: a computer paired for the first time opens
- * the drawer on its sessions so the person can pick one; nothing is opened for them.
+ * A computer paired for the first time opens the drawer on its sessions so the person can pick one;
+ * nothing is opened for them.
  */
 class PairedComputerOpensDrawerTests {
     @get:Rule val isolation = TestIsolationRule()

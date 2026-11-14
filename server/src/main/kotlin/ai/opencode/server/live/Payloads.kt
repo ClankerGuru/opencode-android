@@ -36,8 +36,8 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import java.util.Base64
 
-// Wire payloads (iOS `OpenCodeClient+Payloads.swift`). Synthesized `Decodable`s are
-// `@Serializable`; custom `init(from:)`s are JSON-element walkers with the same fallbacks.
+// Wire payloads. Synthesized `Decodable`s are `@Serializable`; custom `init(from:)`s are
+// JSON-element walkers with the same fallbacks.
 
 @Serializable
 internal data class DataPayload<T>(val data: T)
@@ -264,7 +264,7 @@ internal data class MessagesPayload(val data: List<MessagePayload>, val cursor: 
     }
 }
 
-/** A message, decoding only the fields its `type` carries (iOS `MessagePayload.init(from:)`). */
+/** A message, decoding only the fields its `type` carries. */
 internal data class MessagePayload(
     val id: String,
     val type: String,
@@ -415,7 +415,7 @@ internal data class FilePayload(
          */
         const val MAX_PLACEHOLDER_DATA_LENGTH = 4096
 
-        /** The last non-empty `/` component, as Swift's `split(separator: "/").last` (nil when empty). */
+        /** The last non-empty `/` component. */
         private fun cleanName(name: String?): String? = (name ?: "").split("/").lastOrNull { it.isNotEmpty() }
 
         /** Attached images: inline base64, `media:<hash>`, or the unavailable placeholder. Indices count every file. */
@@ -598,7 +598,7 @@ internal data class ToolContentPayload(
     }
 }
 
-// Capabilities (iOS `OpenCodeClient+Capabilities.swift`).
+// Capabilities.
 
 @Serializable
 internal data class LocatedPayload<T>(val location: Location? = null, val data: T) {

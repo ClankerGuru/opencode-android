@@ -5,11 +5,7 @@ import ai.opencode.server.model.AgentFileReference
 import ai.opencode.server.model.SessionLink
 import androidx.compose.runtime.Immutable
 
-/**
- * One rendered Markdown block (iOS `OpenCodeMarkdownBlock`). The block parser ([blocks]) is a
- * port of iOS's self-written parser; inline text is [InlineText], parsed by
- * [InlineMarkdownParser] the way iOS's `AttributedString(markdown:)` reads it.
- */
+/** One rendered Markdown block. Inline text is [InlineText], parsed by [InlineMarkdownParser]. */
 @Immutable
 data class OpenCodeMarkdownBlock(val id: Int, val kind: Kind) {
     sealed interface Kind {
@@ -37,9 +33,9 @@ data class OpenCodeMarkdownBlock(val id: Int, val kind: Kind) {
     data class MathBlock(val source: String, /** The lines as written, delimiters included, for copying. */ val raw: String)
 
     /**
-     * A fenced block with its highlighted tokens. Equality is source and language only: the
-     * tokens are derived from them. [reusing] continues a previous highlight of the same
-     * language whose safe prefix this source still starts with (iOS `init(source:language:reusing:)`).
+     * A fenced block with its highlighted tokens. Equality is source and language only: the tokens
+     * are derived from them. [reusing] continues a previous highlight of the same language whose
+     * safe prefix this source still starts with.
      */
     @Immutable
     class HighlightedCode(val source: String, val language: String?, reusing: HighlightedCode? = null) {
@@ -90,10 +86,10 @@ data class OpenCodeMarkdownBlock(val id: Int, val kind: Kind) {
         }
 
     /**
-     * Inline parsing is a pure function of its source (iOS `OpenCodeMarkdownBlock.InlineCache`).
-     * Share only those results, not block structure: a later character can still turn prose into
-     * a table. Keys are the exact source (Kotlin string equality never folds Unicode), bounded by
-     * entry count and retained UTF-8 bytes, evicted oldest first.
+     * Inline parsing is a pure function of its source. Share only those results, not block
+     * structure: a later character can still turn prose into a table. Keys are the exact source
+     * (Kotlin string equality never folds Unicode), bounded by entry count and retained UTF-8
+     * bytes, evicted oldest first.
      */
     class InlineCache(private val maximumEntries: Int = 512, private val maximumSourceBytes: Int = 128 * 1024) {
         init {
@@ -179,7 +175,7 @@ data class OpenCodeMarkdownBlock(val id: Int, val kind: Kind) {
         }
 
         companion object {
-            /** The process-wide cache (iOS `InlineCache.shared`): pure parse results, no business state. */
+            /** The process-wide cache: pure parse results, no business state. */
             val shared: InlineCache = InlineCache()
         }
     }
@@ -190,7 +186,7 @@ data class OpenCodeMarkdownBlock(val id: Int, val kind: Kind) {
         const val doneTask = "[x]"
         val taskMarkers: List<String> = listOf(openTask, doneTask)
 
-        /** The blocks back as Markdown, for copying a reply (iOS `markdown(from:)`). */
+        /** The blocks back as Markdown, for copying a reply. */
         fun markdown(blocks: List<OpenCodeMarkdownBlock>): String {
             val result = StringBuilder()
             var previousIsListItem = false
@@ -204,7 +200,7 @@ data class OpenCodeMarkdownBlock(val id: Int, val kind: Kind) {
             return result.toString()
         }
 
-        /** Inline formatting back as Markdown: bold, italic, code, and links (iOS `markdown(inline:)`). */
+        /** Inline formatting back as Markdown: bold, italic, code, and links. */
         fun markdown(inline: InlineText): String {
             val result = StringBuilder()
             for (run in inline.runs) {
@@ -226,15 +222,15 @@ data class OpenCodeMarkdownBlock(val id: Int, val kind: Kind) {
 
         /**
          * [text] with CRLF line endings as LF. Models sometimes stream `\r\n` (seen from
-         * opencode/big-pickle on a live server), and lines here split on `\n` never inside
-         * `\r\n` (Swift's Character rule), so a reply's lists and paragraphs collapsed into one
-         * paragraph showing literal `- ` markers. iOS has the same gap; this is a deliberate fix.
+         * opencode/big-pickle on a live server), and lines here split on `\n` never inside `\r\n`,
+         * so a reply's lists and paragraphs collapsed into one paragraph showing literal `- `
+         * markers.
          */
         fun lineFeeds(text: String): String = if (text.indexOf('\r') < 0) text else text.replace("\r\n", "\n")
 
         /**
-         * The blocks of [text] (iOS `blocks(from:inlineCache:reusing:)`). [reusing] is the row's
-         * previous blocks: their code highlights continue instead of starting over.
+         * The blocks of [text]. [reusing] is the row's previous blocks: their code highlights
+         * continue instead of starting over.
          */
         fun blocks(
             text: String,
@@ -298,12 +294,11 @@ data class OpenCodeMarkdownBlock(val id: Int, val kind: Kind) {
             return (hint.ifEmpty { null }) to SwiftText.trimWhitespaceAndNewlines(segment.substring(newline + 1))
         }
 
-        private fun isTick(c: Char): Boolean = c == '`' || c == '\u1FEF' // U+1FEF GREEK VARIA is canonically "`" in Swift.
+        private fun isTick(c: Char): Boolean = c == '`' || c == '\u1FEF' // U+1FEF GREEK VARIA is canonically "`".
 
         /**
-         * The text split at every ```` ``` ```` as Swift's `components(separatedBy: "```")` splits
-         * it: on Characters, so a fence whose last backtick carries a combining mark or joiner is
-         * not a fence.
+         * The text split at every ```` ``` ````, on grapheme clusters, so a fence whose last
+         * backtick carries a combining mark or joiner is not a fence.
          */
         fun codeFenceSegments(text: String): List<String> {
             val n = text.length
@@ -538,9 +533,9 @@ data class OpenCodeMarkdownBlock(val id: Int, val kind: Kind) {
         private val tableCellBreak = Regex("<br\\s*/?>", RegexOption.IGNORE_CASE)
 
         /**
-         * Android divergence: a `<br>` (`<br/>`, `<br />`) in a table cell's prose breaks the
-         * line, as GitHub renders it, since a pipe row can't hold a newline. iOS's Foundation
-         * parser keeps it literal. Code, links and math keep their text; no other HTML is read.
+         * A `<br>` (`<br/>`, `<br />`) in a table cell's prose breaks the line, as GitHub renders
+         * it, since a pipe row can't hold a newline. Code, links and math keep their text; no other
+         * HTML is read.
          */
         private fun tableCellLineBreaks(cell: InlineText): InlineText {
             if (cell.runs.none { it.breaksTableCellLines() }) return cell

@@ -13,7 +13,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Port of iOS `OpenCodeTests/TranscriptEntryTests.swift` (`TranscriptEntryTests`). */
 class TranscriptEntryTests {
     @Test
     fun snapshotTraceDistinguishesFlickerFromNavigationAndOldHistory() {
@@ -379,9 +378,6 @@ class TranscriptEntryTests {
         assertEquals("msg_second", plan.entryStableIDs["user-msg_second"])
     }
 
-    // `TranscriptWindowTests` (same iOS file): only the two `entryStart` tests are transcript
-    // code; the window tests drive `SessionFeature.State` (`:feature:session`).
-
     @Test
     fun entryStartMovesBackToTheStartOfAToolGroupOrASend() {
         val items = listOf(
@@ -407,7 +403,7 @@ class TranscriptEntryTests {
         assertEquals(5, TranscriptEntry.entryStart(5, items))
     }
 
-    // `ReplyEndTests` (same iOS file).
+    // `ReplyEndTests`.
 
     /** The reply's Markdown as Copy serializes it (`ReplyActions`). */
     private fun replyEnds(entries: List<TranscriptEntry>): List<String> = entries.mapNotNull { entry ->
@@ -480,9 +476,6 @@ class TranscriptEntryTests {
         )
     }
 
-    // `TaskListAndExecuteTests` (same iOS file): the task list is transcript Markdown;
-    // `executeRowsNameTheToolsTheirScriptCalls` tests `OpenCodeToolCall` (`:server`).
-
     @Test
     fun taskItemsTakeTheirBoxAsTheMarker() {
         val blocks = OpenCodeMarkdownBlock.blocks(
@@ -528,7 +521,6 @@ class TranscriptEntryTests {
     private fun tool(id: String, name: String = "read"): OpenCodeTranscriptItem =
         OpenCodeTranscriptItem.Tool(id, testCall(callID = "call-$id", name = name))
 
-    /** iOS `OpenCodeToolCall.test(callID:name:status:input:)`. */
     private fun testCall(
         callID: String? = null,
         name: String,

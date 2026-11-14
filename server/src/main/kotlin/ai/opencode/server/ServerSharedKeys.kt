@@ -215,9 +215,8 @@ data class CachedTranscriptSnapshots(
 }
 
 /**
- * Where the transcript cache lives. Live: `filesDir/support/transcript-snapshots.json`,
- * written at most every 500 ms (Android has no locked-device file protection, so iOS's
- * protected-data blocking is dropped; throttling and [flush] remain). Test: in memory.
+ * Where the transcript cache lives. Live: `filesDir/support/transcript-snapshots.json`, written at
+ * most every 500 ms. Test: in memory.
  */
 class TranscriptCachePersistence(
     val identity: String,
@@ -344,16 +343,13 @@ private class TranscriptCacheWriter(private val storage: TranscriptCachePersiste
         snapshot ?: return
         val data = snapshot.encodedForPersistence() ?: return storage.remove()
         if (storage.set(data)) return
-        // Refused (iOS: a locked phone): keep it pending unless a newer one replaced it, so
-        // the next schedule or flush writes it instead of losing it.
+        // Refused: keep it pending unless a newer one replaced it, so the next schedule or flush
+        // writes it.
         synchronized(lock) { if (pending == null) pending = snapshot }
     }
 }
 
-/**
- * The server-typed shared keys of iOS `SharedKeys.swift`. Mutate only from reducers, only
- * when the value changes.
- */
+/** The server-typed shared keys. Mutate only from reducers, only when the value changes. */
 object ServerSharedKeys {
     /** The last successfully connected server, restored on launch. */
     val savedServer = SharedKey.keychain<OpenCodeServer?>("saved-server", null)
@@ -361,20 +357,20 @@ object ServerSharedKeys {
     /** Every server you've connected to, most recent first. */
     val savedServers = SharedKey.keychain<List<OpenCodeServer>>("saved-servers", emptyList())
 
-    /** Agent Selection: the primary agents last listed, for Settings › Composer › Default Agent (iOS `knownPrimaryAgents`). */
+    /** Agent Selection: the primary agents last listed, for Settings › Composer › Default Agent. */
     val knownPrimaryAgents = SharedKey.fileStorage<List<ai.opencode.server.model.OpenCodeAutocompleteAgent>>(
         FileDirectory.Documents,
         "primary-agents.json",
         emptyList(),
     )
 
-    /** Agent Selection: the agent picked in each session (session ID → agent ID; iOS `sessionAgents`). */
+    /** Agent Selection: the agent picked in each session. */
     val sessionAgents = SharedKey.fileStorage<Map<String, String>>(FileDirectory.Documents, "session-agents.json", emptyMap())
 
     /** Each saved server's last Home snapshot, keyed by its persistence ID. */
     val cachedHomeSnapshots = SharedKey.fileStorage<Map<String, CachedHomeSnapshot>>(FileDirectory.Caches, "home-snapshots.json", emptyMap())
 
-    /** The single snapshot builds before [cachedHomeSnapshots] kept (iOS only; kept so the key list matches). */
+    /** The single snapshot builds before [cachedHomeSnapshots] kept. */
     val legacyCachedHomeSnapshot = SharedKey.fileStorage<CachedHomeSnapshot?>(FileDirectory.Caches, "home-snapshot.json", null)
 
     /** In-memory backing of [cachedTranscriptSnapshots]; [TranscriptCachePersistence] owns the disk. */
@@ -384,8 +380,8 @@ object ServerSharedKeys {
     private val persistenceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     /**
-     * The transcript cache (iOS `@Shared(.cachedTranscriptSnapshots)`): loaded once per store
-     * from [TranscriptCachePersistence], and every change scheduled on its 500 ms writer.
+     * The transcript cache: loaded once per store from [TranscriptCachePersistence], and every
+     * change scheduled on its 500 ms writer.
      */
     fun cachedTranscriptSnapshots(): Shared<CachedTranscriptSnapshots> {
         val store = dependency(SharedStore)
@@ -404,13 +400,9 @@ object ServerSharedKeys {
 }
 
 /**
- * Saves this as the last-used server at the top of the list, and marks the install as having
- * paired ([InstallHistory.paired], kept when servers are removed). Unchanged values are not
- * rewritten. An edited address no longer shares an ID with its old entry: replace that entry
- * explicitly ([original]) after the new connection has loaded. An entry already saved under the
- * same addresses keeps its address order: the address that answered this time is
- * [ServerLinkClient]'s, in memory, so a LAN address that won at home is never saved as the one to
- * try first.
+ * Saves this as the last-used server at the top of the list and marks the install as paired. An
+ * edited address gets a new ID: replace the old entry ([original]) after the new connection loads.
+ * A saved entry keeps its address order.
  */
 fun OpenCodeServer.remember(original: OpenCodeServer? = null) {
     val savedServer = shared(ServerSharedKeys.savedServer)

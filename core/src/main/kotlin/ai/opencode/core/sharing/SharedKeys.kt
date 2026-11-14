@@ -9,14 +9,7 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
-/**
- * Port of the primitive-typed keys in iOS `OpenCode/Core/SharedKeys.swift`: same names,
- * defaults and semantics. Keys whose values are server or voice types live with those types:
- * `ai.opencode.server.ServerSharedKeys` (saved servers, Home/transcript caches) and
- * `ai.opencode.feature.voice.VoiceSharedKeys` (engine, provider, voice, transcripts).
- *
- * Read with `shared(SharedKeys.returnKeySends)`; mutate only from reducers.
- */
+/** Keys whose values are server or voice types live with those types. */
 object SharedKeys {
     /** Whether an iPad-wide window shows the sessions sidebar (large-screen Android: list-detail pane). On by default. */
     val sidebarShown = SharedKey.appStorage("sidebar-shown", true)
@@ -36,10 +29,10 @@ object SharedKeys {
     /** Developer Mode: upload voice calls and traces to the log server. Off by default. Keeps the voice-only switch's key. */
     val developerMode = SharedKey.appStorage("voice-call-uploads", false)
 
-    /** Developer Mode's Motion Watch (iOS-only tool; kept so the key list matches). Off by default. */
+    /** Developer Mode's Motion Watch. Off by default. */
     val motionWatch = SharedKey.appStorage("developer-motion-watch", false)
 
-    /** Touch Probe (iOS-only tool; kept so the key list matches). Off by default. */
+    /** Touch Probe. Off by default. */
     val touchProbe = SharedKey.appStorage("diagnostics-touch-probe", false)
 
     /** Demo Mode: voice calls play as media so a recording captures them. Off by default. */
@@ -101,7 +94,7 @@ object SharedKeys {
     /** Remembered reasoning variant per model (`model.id` → variant), restored when picking that model again. */
     val modelVariants = SharedKey.fileStorage<Map<String, String>>(FileDirectory.Documents, "model-variants.json", emptyMap())
 
-    /** Pinned sessions. Keeps iOS's file name so previously followed chats became pins. */
+    /** Pinned sessions. */
     val pinnedSessionKeys = SharedKey.fileStorage<List<String>>(FileDirectory.Documents, "followed-sessions.json", emptyList())
 
     /** Recently picked models (`model.id`), most recent first. */

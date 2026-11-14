@@ -6,7 +6,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
-/** Port of iOS `VoiceTestSupport.swift`: shared voice test helpers. */
+/** Shared voice test helpers. */
 
 /** The JSON body of a voice handoff (the line after the first newline). */
 fun handoffBody(text: String): Map<String, RealtimeJSON>? {
@@ -34,9 +34,8 @@ class Cue<Value>(keys: List<String>) {
 }
 
 /**
- * Port of iOS `FakeVoiceAudioSession` over the Android seam ([VoiceAudioSessionControlling]):
- * `setActive(true)` is [activate], `deactivated` is [deactivate], and the iOS port override is
- * [route]. iOS's engine notes `playbackStarted` on the session; on Android playback restarting
+ * A fake audio session over [VoiceAudioSessionControlling]. Playback restarting is the external
+ * control's `interrupted(false)` (see [FakeExternalAudioControl]). On Android playback restarting
  * is the external control's `interrupted(false)` (see [FakeExternalAudioControl]).
  */
 class FakeVoiceAudioSession(outputPorts: List<Int>) : VoiceAudioSessionControlling {
@@ -45,7 +44,7 @@ class FakeVoiceAudioSession(outputPorts: List<Int>) : VoiceAudioSessionControlli
         data object Deactivated : Event
         data class Route(val atEar: Boolean) : Event
         data object PlaybackStarted : Event
-        /** iOS `volumeChanged`: the call's playback gain (recorded by [RecordingAudioControl]). */
+        /** The call's playback gain (recorded by [RecordingAudioControl]). */
         data class VolumeChanged(val volume: Float) : Event
     }
 
@@ -94,7 +93,7 @@ class FakeExternalAudioControl(private val session: FakeVoiceAudioSession) : Voi
     override fun stop() {}
 }
 
-/** Polls [condition] until it holds or [timeoutMillis] passes (iOS `eventually`). */
+/** Polls [condition] until it holds or [timeoutMillis] passes. */
 suspend fun pollUntil(timeoutMillis: Long = 3_000, condition: () -> Boolean): Boolean {
     val deadline = System.nanoTime() + timeoutMillis * 1_000_000
     while (!condition()) {

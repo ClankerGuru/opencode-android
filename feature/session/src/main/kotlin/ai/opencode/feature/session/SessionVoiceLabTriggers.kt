@@ -21,11 +21,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 
 /**
- * Port of iOS DEBUG `VoiceLabTriggers` (`Voice/VoiceLabTriggers.swift`): while the voice lab runs
- * ([VoiceLabDemo.isEnabled], debug builds only), the visible session acts on the lab's triggers so
- * a test can start a call, open its transcript, or fire Raise to Talk while something covers the
- * call button or bar. iOS posts them as Darwin notifications; here they're broadcasts named
- * [VoiceLabTrigger.notification] (`adb shell am broadcast -a OpenCodeLab.ai.opencode.lab.voice-start`).
+ * While the voice lab runs ([VoiceLabDemo.isEnabled], debug builds only), the visible session acts
+ * on the lab's triggers so a test can start a call, open its transcript, or fire Raise to Talk
+ * while something covers the call button or bar. Triggers are broadcasts named
+ * [VoiceLabTrigger.notification] (`adb shell am broadcast -a
+ * OpenCodeLab.ai.opencode.lab.voice-start`). They're broadcasts named
+ * [VoiceLabTrigger.notification] (`adb shell am broadcast -a
+ * OpenCodeLab.ai.opencode.lab.voice-start`).
  */
 @Composable
 internal fun SessionVoiceLabTriggers(store: StoreOf<SessionFeature.State, SessionFeature.Action>, isEnabled: Boolean) {

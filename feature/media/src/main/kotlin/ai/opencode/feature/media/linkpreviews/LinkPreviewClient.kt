@@ -41,7 +41,7 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-/** First-party metadata for recognised links, and domain-only site icons (iOS `LinkPreviewClient`). */
+/** First-party metadata for recognised links, and domain-only site icons. */
 class LinkPreviewClient(
     /** A fresh result already in memory, without waiting, so a reopened session draws its cards at once. */
     val cached: (LinkPreviewTarget) -> LinkPreviewResult? = { null },
@@ -88,7 +88,7 @@ interface ExpiringCacheEntry {
 
 /**
  * Memory (locked map) and SHA-256 JSON disk cache shared by [LinkPreviewLoader] and
- * [SiteIconLoader] (iOS `CoalescedDiskCache`).
+ * [SiteIconLoader].
  */
 class CoalescedDiskCache<MemoryEntry : ExpiringCacheEntry, DiskRecord : ExpiringCacheEntry>(
     val directory: File?,
@@ -132,7 +132,6 @@ class CoalescedDiskCache<MemoryEntry : ExpiringCacheEntry, DiskRecord : Expiring
         runCatching {
             val text = LinkPreviewJson.encodeToString(serializer, record)
             directory.mkdirs()
-            // Atomic, as iOS `Data.write(options: .atomic)`.
             val temporary = File(directory, "${file.name}.${System.nanoTime()}.tmp")
             temporary.writeText(text)
             if (!temporary.renameTo(file)) temporary.delete()
@@ -161,9 +160,8 @@ class CoalescedDiskCache<MemoryEntry : ExpiringCacheEntry, DiskRecord : Expiring
 }
 
 /**
- * One in-flight resolve per key however many callers ask (iOS `CoalescedLoaderActor.coalesce`).
- * The resolve is unstructured, as iOS's `Task`: a cancelled caller stops waiting, the work
- * finishes for the others and the caches.
+ * One in-flight resolve per key however many callers ask. The resolve is unstructured: a cancelled
+ * caller stops waiting, the work finishes for the others and the caches.
  */
 abstract class CoalescedLoaderActor<Output> {
     private val inFlight = HashMap<String, Deferred<Output>>()
@@ -181,10 +179,10 @@ abstract class CoalescedLoaderActor<Output> {
 }
 
 /**
- * A serial, per-key read queue whose callers own the work (iOS `CoalescedReadQueue`). Cancelling
- * one waiter releases it immediately; cancelling the last also stops the transport. Queued reads
- * have no job until admitted, so they never wait on a cancelled predecessor's job. Progress is
- * replayed to joining waiters.
+ * A serial, per-key read queue whose callers own the work. Cancelling one waiter releases it
+ * immediately; cancelling the last also stops the transport. Queued reads have no job until
+ * admitted, so they never wait on a cancelled predecessor's job. Progress is replayed to joining
+ * waiters.
  */
 class CoalescedReadQueue<Output, Progress>(
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
@@ -283,12 +281,12 @@ class CoalescedReadQueue<Output, Progress>(
     }
 }
 
-/** A preview service request through [LinkPreviewTransport] (iOS `LinkPreviewLoader.Fetch`). */
+/** A preview service request through [LinkPreviewTransport]. */
 typealias LinkPreviewFetch = suspend (Request) -> LinkPreviewResponse
 
 /**
- * Memory and disk caches keyed by the normalised URL, with one request in flight per link
- * however many rows ask (iOS `LinkPreviewLoader`).
+ * Memory and disk caches keyed by the normalised URL, with one request in flight per link however
+ * many rows ask.
  */
 class LinkPreviewLoader(
     private val fetch: LinkPreviewFetch,
@@ -439,7 +437,7 @@ class LinkPreviewLoader(
         const val DISK_LIMIT: Long = 50L shl 20
         private const val SWEEP_INTERVAL: Long = 600L * 1000
 
-        /** The app's cache directory's [name] folder (iOS `URL.cachesDirectory`); null without a context. */
+        /** The app's cache directory's [name] folder; null without a context. */
         internal fun cachesDirectory(name: String): File? =
             runCatching { File(dependency(AppContext).cacheDir, name) }.getOrNull()
 
@@ -455,8 +453,8 @@ class LinkPreviewLoader(
 }
 
 /**
- * Offline link preview fixtures shared by the session lab (`debug.opencode.lab_link_previews`)
- * and in-app playgrounds (iOS `LinkPreviewFixtures`). Fictional authors and example domains only.
+ * Offline link preview fixtures shared by the session lab (`debug.opencode.lab_link_previews`) and
+ * in-app playgrounds. Fictional authors and example domains only.
  */
 object LinkPreviewFixtures {
     fun load(target: LinkPreviewTarget): LinkPreviewResult {
@@ -482,9 +480,9 @@ object LinkPreviewFixtures {
             "example.org.ico" -> iconPNG(side = 16, letter = "D")
             "github.com.ico" -> iconPNG(side = 64, letter = "G", color = gray(0.14f))
             "youtube.com.ico" -> iconPNG(side = 64, letter = "Y", color = Color.argb(1f, 1f, 0f, 0.2f))
-            // Link Icons' lab reply (OC-348): a dark mark like the real one.
+            // Link Icons' lab reply: a dark mark like the real one.
             "vercel.com.ico" -> iconPNG(side = 64, letter = "▲", color = gray(0.06f))
-            // Linear issue links (OC-443): a round white mark with diagonal stripes on a dark square.
+            // Linear issue links: a round white mark with diagonal stripes on a dark square.
             "linear.app.ico" -> linearIconPNG(side = 48)
             else -> null
         }
@@ -631,10 +629,8 @@ object LinkPreviewFixtures {
 }
 
 /**
- * Lab launch switches, read only in debuggable builds. iOS passes launch arguments, user
- * defaults and environment variables (`-lab-link-previews`, `OPENCODE_LAB_SERVER_URL`); Android
- * has no equivalent for an installed app yet, so these are `debug.opencode.*` system properties
- * (`adb shell setprop debug.opencode.lab_link_previews 1`, then relaunch the app).
+ * Lab launch switches as `debug.opencode.*` system properties, read only in debuggable builds (`adb
+ * shell setprop debug.opencode.lab_link_previews 1`, then relaunch).
  */
 internal object LabLaunch {
     val isDebuggable: Boolean by lazy {
@@ -651,17 +647,16 @@ internal object LabLaunch {
 
     fun flag(name: String): Boolean = property(name)?.let { it == "1" || it.equals("true", ignoreCase = true) || it == "YES" } == true
 
-    /** iOS `OPENCODE_LAB_SERVER_URL`: `debug.opencode.lab_server_url`. */
+    /** `debug.opencode.lab_server_url`. */
     val serverURL: String? by lazy { property("debug.opencode.lab_server_url") }
 }
 
 /**
- * `debug.opencode.lab_link_previews` (iOS `-lab-link-previews`): the session lab's fictional X
- * posts, answered after a short delay so the placeholder shows, without touching the network.
- * Site icons go through the real loader, from a stand-in for the icon service: `example.com` has
- * an icon, `example.org` only a 16 px one (so its card keeps the globe).
- * `debug.opencode.lab_link_preview_icons` = 0 serves none; `…_delay` sets the delay in ms
- * (default 700); `…_held` = 1 holds every answer until the
+ * `debug.opencode.lab_link_previews`: the session lab's fictional X posts, answered after a short
+ * delay so the placeholder shows, without touching the network. Site icons go through the real
+ * loader, from a stand-in for the icon service: `example.com` has an icon, `example.org` only a 16
+ * px one (so its card keeps the globe). `debug.opencode.lab_link_preview_icons` = 0 serves none;
+ * `…_delay` sets the delay in ms (default 700); `…_held` = 1 holds every answer until the
  * `ai.opencode.lab-link-previews.release` broadcast.
  */
 internal object LinkPreviewLab {
@@ -698,10 +693,8 @@ internal object LinkPreviewLab {
 }
 
 /**
- * A lab-only barrier so both comparison builds receive metadata at the marked frame,
- * independently of launch, navigation, and scheduling time (iOS `LinkPreviewLabGate`, released by
- * a Darwin notification; here by the `ai.opencode.lab-link-previews.release` broadcast:
- * `adb shell am broadcast -a ai.opencode.lab-link-previews.release`).
+ * A lab-only barrier so both comparison builds receive metadata at the marked frame. Released with
+ * `adb shell am broadcast -a ai.opencode.lab-link-previews.release`.
  */
 private object LinkPreviewLabGate {
     private const val RELEASE = "ai.opencode.lab-link-previews.release"

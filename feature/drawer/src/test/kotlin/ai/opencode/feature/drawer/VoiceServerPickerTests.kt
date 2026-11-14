@@ -19,11 +19,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `VoiceServerPickerTests.swift`'s Home test (`HomeSettingsFeature`, which Home
- * scopes). The routing tests are `:feature:voice`'s (`VoiceServerPickerTests.kt` there); the
- * `VoiceSettingsFeature` ones are `:feature:settings`'.
- */
 class VoiceServerPickerTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -37,7 +32,6 @@ class VoiceServerPickerTests {
      */
     @Test
     fun homeSavesTheChoiceAndAsksTheServerItNames() = runTest {
-        // iOS resets the process-wide shared values; this test has its own store.
         val sharedStore = SharedStore.inMemory()
         val asked = LockIsolated(listOf<String>())
         val store = TestStore(HomeSettingsFeature.State(server = server), HomeSettingsFeature(), this) {
@@ -74,7 +68,7 @@ class VoiceServerPickerTests {
 
         store.send(HomeSettingsFeature.Action.VoiceServerChanged(VoiceServerChoice.Saved(serverID = "srv_gone")))
         store.send(HomeSettingsFeature.Action.CheckServerVoiceSupport)
-        // A stale pick falls back to Automatic, which also asks the connected server's models (iOS ce694097).
+        // A stale pick falls back to Automatic, which also asks the connected server's models.
         store.receive(HomeSettingsFeature.Action.VoiceModelsLoaded(serverID = server.persistenceID, asked = 0, answer = ServerVoiceModelsAnswer.NoAnswer))
         store.receive(HomeSettingsFeature.Action.ServerVoiceSupportLoaded(serverID = server.persistenceID, support = ServerVoiceSupport.supported))
         assertEquals(listOf(studio.persistenceID, server.persistenceID), asked.value)

@@ -31,9 +31,8 @@ import java.text.NumberFormat
 import kotlin.math.roundToInt
 
 /**
- * Port of iOS `Settings/SoundEffectsSettings.swift` (`SoundEffectsSettingsRows`): beneath the
- * Sound Effects switch while it's on, how loud the sounds play (0–100 % in tenths, each new level
- * plays a sample) and whether a send plays one.
+ * Beneath the Sound Effects switch while it's on, how loud the sounds play (0–100 % in tenths, each
+ * new level plays a sample) and whether a send plays one.
  */
 @Composable
 fun SoundEffectsSettingsRows(send: (HomeSettingsFeature.Action) -> Unit) {

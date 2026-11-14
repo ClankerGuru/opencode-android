@@ -20,8 +20,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
 /**
- * iOS `HomeNotificationsFeature.NotifyPluginCheck`, as Settings shows it: Home reads the server's
- * notify plugin and passes the result in [SettingsFeature.Action.NotificationsChanged].
+ * As Settings shows it: Home reads the server's notify plugin and passes the result in
+ * [SettingsFeature.Action.NotificationsChanged].
  */
 sealed interface NotifyPluginCheck {
     data object Checking : NotifyPluginCheck
@@ -30,9 +30,8 @@ sealed interface NotifyPluginCheck {
 }
 
 /**
- * Port of iOS `Settings/NotificationSettingsView.swift`: Settings → Notifications, this phone's
- * permission, whether the server runs the notify plugin (with Set Up with OpenCode to have
- * OpenCode install it, 7969c85c), and the In-App Notices picker.
+ * Settings → Notifications, this phone's permission, whether the server runs the notify plugin
+ * (with Set Up with OpenCode to have OpenCode install it, 7969c85c), and the In-App Notices picker.
  */
 @Composable
 fun NotificationSettingsView(store: SettingsStore) {
@@ -147,5 +146,5 @@ fun NotificationSettingsView(store: SettingsStore) {
     }
 }
 
-/** iOS `ThisDevice.name` (“iPhone”/“iPad”): “phone” or “tablet”. */
+/** “phone” or “tablet”. */
 val ThisDeviceName: String get() = ai.opencode.core.ui.ThisDevice.name

@@ -84,16 +84,15 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /**
- * The queued messages, opened from the queued pill (iOS `QueuedMessagesSheet`, D-59 option 3,
- * Fitted Sheet · Rows): a sheet only as tall as the queue, growing as it does and scrolling
- * once it reaches [QueuedMessagesSheetMetrics.maximumHeight]. Each message is a numbered row
- * of two lines (a tap reads the rest) with quiet trailing icons: ↑ Send Now on a small grey
- * disc and a trash glyph for Cancel Message. A swipe left cancels (a full swipe acts); a swipe
- * right only reveals Send Now, so a careless full swipe never sends. Holding a row offers
+ * The queued messages, opened from the queued pill: a sheet only as tall as the queue, growing as
+ * it does and scrolling once it reaches [QueuedMessagesSheetMetrics.maximumHeight]. Each message is
+ * a numbered row of two lines (a tap reads the rest) with quiet trailing icons: ↑ Send Now on a
+ * small grey disc and a trash glyph for Cancel Message. A swipe left cancels (a full swipe acts); a
+ * swipe right only reveals Send Now, so a careless full swipe never sends. Holding a row offers
  * Send Now, Copy and Cancel Message. Nothing here is red.
  *
- * [displayText] turns a queued voice delegation into its Voice message (iOS
- * `VoiceHandoff.parse(text)?.displayText ?: text`); the session area passes the voice area's parser.
+ * [displayText] turns a queued voice delegation into its Voice message; the session area passes the
+ * voice area's parser.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -104,7 +103,7 @@ fun QueuedMessagesSheet(
     onCancel: (String) -> Unit,
     onClose: () -> Unit,
     displayText: (String) -> String = { it },
-    /** iOS `server`: where a `media:<hash>` thumbnail loads from. */
+    /** Where a `media:<hash>` thumbnail loads from. */
     server: OpenCodeServer? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -151,7 +150,6 @@ fun QueuedMessagesSheet(
                     contentPadding = PaddingValues(top = QueuedMessagesSheetMetrics.listTop, bottom = QueuedMessagesSheetMetrics.listBottom),
                 ) {
                     itemsIndexed(messages, key = { _, input -> input.id }) { index, input ->
-                        // iOS `.animation(Motion.layout.animation(reduceMotion:), value: ids)`.
                         Column(if (reduceMotion) Modifier else Modifier.animateItem(placementSpec = Motion.layout.animation(visibilityThreshold = IntOffset.VisibilityThreshold))) {
                             QueuedMessageRow(
                                 input = input,
@@ -177,7 +175,7 @@ object QueuedMessagesSheetMetrics {
     val listTop = 4.dp
     val listBottom = 12.dp
 
-    /** What a row is taken to be before it has been measured (iOS 76 pt). */
+    /** What a row is taken to be before it has been measured. */
     val estimatedRowHeight = 76.dp
 
 
@@ -185,13 +183,12 @@ object QueuedMessagesSheetMetrics {
     fun maximumHeight(screenHeight: androidx.compose.ui.unit.Dp) = maxOf(screenHeight - 110.dp, 320.dp)
 }
 
-/** How far a swipe reveals its action (the iOS swipe action's width). */
+/** How far a swipe reveals its action. */
 private val SWIPE_REVEAL = 88.dp
 
 /**
- * One queued message (iOS `QueuedMessageRow`): its number in the sending order, two lines of
- * its text (a tap reads the rest) under any attachment chips, and the quiet Cancel Message and
- * Send Now icons trailing it.
+ * One queued message: its number in the sending order, two lines of its text (a tap reads the rest)
+ * under any attachment chips, and the quiet Cancel Message and Send Now icons trailing it.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -378,7 +375,7 @@ fun QueuedMessageRow(
     }
 }
 
-/** iOS `isAccessibilitySize` starts at AX1 (about 1.6× the default text size). */
+/** Accessibility sizes start at AX1 (about 1.6× the default text size). */
 private const val ACCESSIBILITY_FONT_SCALE = 1.6f
 
 /** Past this share of the row's width, a swipe left cancels on release. */
@@ -444,8 +441,8 @@ private fun QueuedAttachments(input: OpenCodeQueuedInput, server: OpenCodeServer
         if (input.images.isNotEmpty()) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 for (image in input.images) {
-                    // iOS `CachedImage(..., compact: true)`: a `media:<hash>` photo loads from the
-                    // server, and one it no longer has shows the unavailable glyph.
+                    // A `media:<hash>` photo loads from the server, and one it no longer has shows
+                    // the unavailable glyph.
                     CachedImage(
                         id = image.id,
                         data = image.data,
@@ -492,7 +489,6 @@ private fun QueuedChip(title: String, symbolName: String) {
             style = OpenCodeTextStyles.subheadline,
             color = OpenCodeTheme.colors.secondaryText,
             maxLines = 1,
-            // iOS `.truncationMode(.middle)`.
             overflow = TextOverflow.MiddleEllipsis,
         )
     }

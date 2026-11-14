@@ -8,8 +8,8 @@ import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.system.share.ReceivedShare
 
 /*
- * Port of iOS `AppFeature+Shares.swift`: share-sheet items, taken from the share inbox when the
- * app becomes active, wait for their server's Home and are handed to it.
+ * Share-sheet items, taken from the share inbox when the app becomes active, wait for their
+ * server's Home and are handed to it.
  */
 
 internal fun AppFeature.receiveShares(shares: List<ReceivedShare>, state: AppFeature.State): Reduced<AppFeature.State, AppFeature.Action> {

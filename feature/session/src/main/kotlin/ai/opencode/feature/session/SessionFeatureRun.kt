@@ -28,8 +28,6 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-// Port of iOS `SessionFeature+Run.swift`.
-
 /** Stop, session creation, and prompt delivery. Null: the action passes on. */
 internal fun SessionFeature.reduceRunLifecycle(
     state: SessionFeature.State,

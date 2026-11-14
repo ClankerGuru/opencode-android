@@ -271,7 +271,7 @@ The voice agent has already acknowledged the request out loud, so lead with the 
     fun serviceInstructions(context: String): String =
         "$instructions\n\nGPT-Live, the voice agent, hands you each request with the recent voice conversation. What the app shows right now (kept current as the screen moves):\n$context"
 
-    /** The tools as JSON with sorted keys (iOS `JSONSerialization` `.sortedKeys`). */
+    /** The tools as JSON with sorted keys. */
     val liveTools: RealtimeJSON get() = sortedKeys(JsonArray(tools))
 
     private fun sortedKeys(json: JsonElement): JsonElement = when (json) {

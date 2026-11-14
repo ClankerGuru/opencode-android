@@ -8,8 +8,8 @@ android {
     testOptions.unitTests.isIncludeAndroidResources = true
 }
 
-// Feature dependencies mirror iOS type references; the graph is acyclic:
-// media, voice, system < transcript, composer, settings < session < drawer < app.
+// The graph is acyclic: media, voice, system < transcript, composer, settings < session < drawer <
+// app.
 dependencies {
     api(project(":feature:media"))
     api(project(":feature:voice"))

@@ -4,8 +4,6 @@ import ai.opencode.feature.settings.whatsnew.entries.whatsNewShippedEntries
 import java.time.LocalDate
 
 /**
- * Port of iOS `Settings/WhatsNew/WhatsNewEntries.swift`.
- *
  * One change in What’s New: a **feature**, listed by day with its own page, or a **smaller
  * change** (a fix or nuance), listed together under Smaller Changes. IDs are permanent: a seen ID
  * never shows as new again, so reword an entry freely but give a new feature a new ID. Merging
@@ -118,10 +116,7 @@ data class WhatsNewEntry(
     }
 }
 
-/**
- * Every shipped entry, one file each in `entries/`; [all] lists them newest first
- * (`entries/WhatsNewShippedList.kt`; iOS generates its list at build time).
- */
+/** Every shipped entry, one file each in `entries/`; [all] lists them newest first. */
 object WhatsNewShipped
 
 /**

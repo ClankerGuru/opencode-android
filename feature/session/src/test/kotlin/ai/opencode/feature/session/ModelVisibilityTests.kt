@@ -18,11 +18,6 @@ import ai.opencode.server.model.OpenCodeSession
 import org.junit.Test
 import java.time.Instant
 
-/**
- * Port of the Pickers half of iOS `ModelVisibilityTests.swift` (Hide Unused Models in
- * `SessionFeature`'s pickers). Rules live in `:server` (`model/ModelVisibilityTests.kt`);
- * Settings › Models in `:feature:settings`.
- */
 class ModelVisibilityTests {
     private val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
     private val other = OpenCodeServer(url = "http://localhost:10", username = "", password = "")

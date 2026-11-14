@@ -109,15 +109,15 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 import kotlin.math.max
 
-// Port of iOS `Session/SessionView+Header.swift`: the header row (drawer or Back, the title
-// capsule, Back to main session and the … session menu), and the session menu's items. The
-// header's Liquid Glass controls are M3 tonal surfaces; the … menu is a Material dropdown that
-// runs the Session sheet's actions without opening it (`Action.SessionMenu`).
+// The header row (drawer or Back, the title capsule, Back to main session and the … session menu),
+// and the session menu's items. The header's Liquid Glass controls are M3 tonal surfaces; the …
+// menu is a Material dropdown that runs the Session sheet's actions without opening it
+// (`Action.SessionMenu`).
 
 /** The header's controls: the 44 pt glass circle, as a 48 dp tonal circle (the minimum target). */
 internal val headerButtonSize: Dp = max(HeaderBlurTunables.buttonSize.value, 48f).dp
 
-/** iOS `dynamicTypeSize.isAccessibilitySize`: the AX sizes start at about 1.65× body. */
+/** The AX sizes start at about 1.65× body. */
 internal fun isAccessibilityFontScale(fontScale: Float): Boolean = fontScale >= 1.65f
 
 /** What the header reads from the session, observed as one value so the header recomposes only when it changes. */
@@ -197,11 +197,11 @@ internal data class SessionHeaderModel(
 }
 
 /**
- * The header row (iOS `headerControls(hostsSessionMenu:)`): the drawer button (or Back on a
- * pushed subagent, nothing on a Catch Up card), the title capsule centred on the header, and the
- * trailing controls. Reports its laid-out height for the backdrop.
+ * The header row: the drawer button (or Back on a pushed subagent, nothing on a Catch Up card), the
+ * title capsule centred on the header, and the trailing controls. Reports its laid-out height for
+ * the backdrop.
  *
- * @param navigationIcon the drawer button Home supplies (iOS `drawerControl`).
+ * @param navigationIcon The drawer button Home supplies.
  * @param onHeaderHeight the row's height in dp, whenever it changes.
  */
 @Composable
@@ -223,14 +223,13 @@ internal fun SessionHeaderControls(
     // While the drawer button's label shows, the title steps aside under it.
     val noticeCoversTitle = onBack == null && listContext.notice != null
 
-    // Android divergence: a Material top app bar (start-aligned title, plain icon buttons, 64 dp
-    // tall) in place of iOS's centred title capsule between glass circles.
+    // A Material top app bar: start-aligned title, plain icon buttons, 64 dp tall.
     Row(
         modifier
             .fillMaxWidth()
             .padding(horizontal = 4.dp)
-            // Measured with the card's top inset, as iOS does, so the scrolled bar and the
-            // transcript's top clear the whole header.
+            // Measured with the card's top inset, so the scrolled bar and the transcript's top
+            // clear the whole header.
             .onSizeChanged { onHeaderHeight(with(density) { it.height.toDp().value }) }
             .padding(top = if (onCatchUpOpen == null) 0.dp else CATCH_UP_COMPOSER_INSET.dp)
             .heightIn(min = TOP_APP_BAR_HEIGHT),
@@ -266,7 +265,6 @@ internal fun SessionHeaderControls(
     }
 }
 
-/** iOS `CatchUpMetrics.composerInset`. */
 private const val CATCH_UP_COMPOSER_INSET = 12f
 
 /** Material 3's small top app bar height. */
@@ -286,7 +284,6 @@ private fun Modifier.steppingAside(aside: Boolean, reducedMotion: Boolean): Modi
         .then(if (aside) Modifier.clearAndSetSemantics {} else Modifier)
 }
 
-/** SwiftUI `.smooth(duration: 0.35)`. */
 private val asideSmooth = MotionSpring(0.35, 0.0)
 
 /** A pushed subagent's way back to its parent, where the drawer button is on the root session: the same circle. */
@@ -307,7 +304,7 @@ internal fun FloatingControl(symbol: SFSymbol, label: String, onClick: () -> Uni
     OpenCodeIconButton(symbol = symbol, contentDescription = label, onClick = onClick, size = headerButtonSize, style = OpenCodeIconButtonStyle.Standard)
 }
 
-/** iOS `headerProjectColor(for:)`: secondary under high contrast, else primary at 75 %. */
+/** Secondary under high contrast, else primary at 75 %. */
 internal fun headerProjectColor(colors: OpenCodeColors): Color =
     if (colors.highContrast) colors.secondaryText else colors.text.copy(alpha = 0.75f)
 
@@ -363,8 +360,8 @@ private fun HeaderTitle(
             val freshness = if (model.isResyncing) stringResource(R.string.session_header_syncing_description) else if (model.refreshFailed) stringResource(R.string.session_header_last_known_description) else null
             if (freshness == null) activity else stringResource(R.string.session_list_two, activity, freshness)
         }
-        // Android divergence: the title sits on the bar itself (no capsule); a press shows the
-        // ripple in a rounded rectangle around it.
+        // The title sits on the bar itself (no capsule); a press shows the ripple in a rounded
+        // rectangle around it.
         Surface(
             shape = MaterialTheme.shapes.medium,
             color = Color.Transparent,
@@ -508,7 +505,7 @@ private const val MENU_FOCUS_DELAY_MS = 150L
 /** Material's menu margin from the window's edge (`MenuVerticalMargin`). */
 private val sessionMenuMargin = 48.dp
 
-/** iOS `sessionMenuItems`: the session's own actions, its work, and deletion. */
+/** The session's own actions, its work, and deletion. */
 @Composable
 private fun SessionMenu(
     expanded: Boolean,
@@ -524,18 +521,17 @@ private fun SessionMenu(
     var exportOpen by remember(expanded) { mutableStateOf(false) }
     fun menu(action: SessionSheetFeature.Action) = send(Action.SessionMenu(action))
     // No title heading: the header already shows it (6bbf321d); exports still name the file by it.
-    // Not focusable: the composer keeps the keyboard while the menu is open, as iOS's Menu leaves
-    // the text view first responder. A focusable popup took focus, so the keyboard left as the
-    // menu was placed against the room above it, and the menu stayed up over the ⋮ (QA D-03).
-    // With the keyboard up the menu still hangs from the ⋮, capped to the room above the keys
-    // (it scrolls), rather than moving up over the button to fit.
-    // A non-focusable popup gets neither Back nor a hardware Escape (QA L-04): both close it here.
+    // Not focusable: the composer keeps the keyboard while the menu is open. A focusable popup took
+    // focus, so the keyboard left as the menu was placed against the room above it, and the menu
+    // stayed up over the ⋮ (QA D-03). With the keyboard up the menu still hangs from the ⋮, capped
+    // to the room above the keys (it scrolls), rather than moving up over the button to fit. A
+    // non-focusable popup gets neither Back nor a hardware Escape (QA L-04): both close it here.
     BackHandler(enabled = expanded, onBack = onDismiss)
     EscapeHandler(enabled = expanded, onEscape = onDismiss)
-    // Accessibility focus isn't input focus, so TalkBack still treats the open menu as a pane, as
-    // VoiceOver does iOS's Menu: the menu takes TalkBack's focus as it opens, the screen behind
-    // then leaves the accessibility tree so swipes stay in the menu (its window otherwise came
-    // after the whole composer), and More gets the focus back as it closes (QA P-02).
+    // Accessibility focus isn't input focus, so TalkBack still treats the open menu as a pane: the
+    // menu takes TalkBack's focus as it opens, the screen behind then leaves the accessibility tree
+    // so swipes stay in the menu (its window otherwise came after the whole composer), and More
+    // gets the focus back as it closes (QA P-02).
     val hostView = LocalView.current
     val context = LocalContext.current
     val talkBack = remember(context) { context.getSystemService(AccessibilityManager::class.java) }

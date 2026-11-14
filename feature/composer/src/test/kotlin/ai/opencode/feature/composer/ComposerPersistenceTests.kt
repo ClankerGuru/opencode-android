@@ -15,27 +15,11 @@ import java.time.Instant
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `ComposerPersistenceTests.swift`.
- *
  * Its tests run the persistence client through the stores that host it. Where
  * a store only forwards to the client (`HomeFeature`'s session deletion calls
  * `removeSession`, `AppFeature`'s server deletion calls `removeServer`; see
  * `HomeFeatureDrawerState.kt` and `AppFeatureServers.kt`), the test calls the
  * client the same way here.
- *
- * Skipped (their assertions are the hosting store's state and effects):
- * → `:feature:session` (`SessionFeature`):
- * `draftAttachmentsAndLocationSurviveTerminationAndRelaunchWithoutWritingStagedFiles`,
- * `answeringPermissionRequestKeepsParkedSessionDraftInPersistence`,
- * `pendingOutboxPromptResumesAfterRelaunchWithSameMessageIDWithoutDuplicate`,
- * `promptThatAlreadyLandedBeforeTerminationReconcilesWithoutResending`,
- * `failedPromptAndBlockedLaneSurviveRelaunchAndRetryInOrderWithSameIDs`,
- * `newSessionDraftSendPreservesDirectoryRestoresInProcessLaneAndReconcilesAfterCreateSession`,
- * `newSessionDraftKilledBetweenCreateSessionAndSettlementResumesCreatedSessionOnRelaunch`;
- * → `:feature:drawer` (`HomeFeature`, with `SessionFeature`):
- * `incomingShareAndKeepDraftMergeIntoPersistedDraftAndDisarmSendLater`,
- * `parkDraftFamilyDraftsAndCatchUpPreserveAttachmentsAndNeverDuplicateOrResurrectDrafts`,
- * `familySwitchDeduplicationSessionCreatedOutboxPromotionAndSubagentCatchUpParking`.
  */
 class ComposerPersistenceTests {
     private val server = OpenCodeServer(url = "http://localhost:9", username = "opencode", password = "pw")
@@ -92,7 +76,7 @@ class ComposerPersistenceTests {
         assertTrue(blobB.exists())
         assertTrue(blobStale.exists())
 
-        // Delete session `ses_1` (iOS: HomeFeature.serverEvent(.sessionDeleted)).
+        // Delete session `ses_1`.
         persistence.removeSession(server.persistenceID, sessionID)
         persistence.flush()
 
@@ -100,7 +84,7 @@ class ComposerPersistenceTests {
         assertFalse("Deleted session's attachment blob is cleaned up", blobA.exists())
         assertEquals("Draft on other server", persistence.loadDraft(otherServer.persistenceID, "ses_other")?.draft?.text)
 
-        // Delete `otherServer` (iOS: AppFeature.serverDeleted).
+        // Delete `otherServer`.
         persistence.removeServer(otherServer.persistenceID)
         persistence.flush()
 

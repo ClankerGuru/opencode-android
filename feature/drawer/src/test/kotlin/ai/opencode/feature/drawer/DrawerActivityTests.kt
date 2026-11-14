@@ -40,19 +40,11 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `DrawerActivityTests.swift`: the drawer's running indicators, matched to the TUI
- * and the desktop app: a root shows Working while it or any session in its family runs
- * (subagents run their own sessions); shells don't count. Plus
- * `DrawerDotTests` (the drawer button's dot).
+ * The drawer's running indicators, matched to the TUI and the desktop app: a root shows Working
+ * while it or any session in its family runs (subagents run their own sessions); shells don't
+ * count. Plus `DrawerDotTests` (the drawer button's dot).
  *
- * Stores run their effects in `backgroundScope` (iOS `skipInFlightEffects`). iOS's
- * `withObservationTracking` probes of `busySessionIDs` become before/after comparisons of
- * [HomeFeature.State.busySessionIDs] (Android observes the state value, not a property).
- *
- * Other modules (`:app`, `AppFeature`):
- * - `aRelaunchShowsCachedRunningStateOnlyWhileItIsFresh`
- * - `theSingleCacheOfEarlierBuildsMovesIntoPerServerCaches`
- * - `DrawerDotTests.restoredSnapshotShowsTheDotAtOnce`
+ * Stores run their effects in `backgroundScope`.
  */
 class DrawerActivityTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -176,7 +168,7 @@ class DrawerActivityTests {
         store.exhaustive = false
 
         store.send(HomeFeature.Action.ServerEvent(OpenCodeServerEvent.ExecutionStarted("ses_grand")))
-        // Android's TestStore reduces effect actions when asked (iOS's does as they arrive).
+        // Android's TestStore reduces effect actions when asked.
         repeat(100) {
             if (reads.size < 2) {
                 store.skipReceivedActions()
@@ -512,7 +504,7 @@ class DrawerActivityTests {
 
     /**
      * A subagent's session reaches the drawer's state (a created event, a family refresh) but
-     * lists only under its parent, not in Recents (TestFlight build 682).
+     * lists only under its parent, not in Recents.
      */
     @Test
     fun recentsListOnlyRootSessions() {

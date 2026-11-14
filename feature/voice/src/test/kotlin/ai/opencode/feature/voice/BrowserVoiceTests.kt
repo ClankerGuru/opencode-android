@@ -19,11 +19,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 
-/**
- * Port of the `VoiceFeature` / `VoiceInstructions` half of iOS `BrowserTests.swift`'s
- * `BrowserVoiceTests`. `aCallStartedOverAPageKnowsIt` (a `SessionFeature` store) is
- * `:feature:session`'s.
- */
 class BrowserVoiceTests {
     private lateinit var h: Harness
     private val server = OpenCodeServer(url = "https://voice.example", username = "", password = "")

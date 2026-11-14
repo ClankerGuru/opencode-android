@@ -41,15 +41,7 @@ import java.io.File
 import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `TraceUploadsFeature` (`Diagnostics/Traces/TraceUploads.swift`): Developer Mode
- * problem reports (Report a Problem in the session menu). Nothing leaves the phone unless the
- * person presses Send. A crash on the previous run is noted locally at launch so the next report
- * includes it. Home (`:feature:drawer`) scopes it as `traces` and hosts [TraceUploadsHost].
- *
- * n/a on Android: Team Feedback enrollment, its invite and tutorial sheets (iOS's three-finger
- * Scrawl recordings are an iOS team tool).
- */
+/** Developer Mode problem reports. Nothing leaves the phone unless the person presses Send. */
 class TraceUploadsFeature : Reducer<TraceUploadsFeature.State, TraceUploadsFeature.Action> {
     data class State(
         /** True when the previous run ended unexpectedly in the foreground, so the next report sent includes the previous run's timeline. */
@@ -141,8 +133,8 @@ class TraceUploadsFeature : Reducer<TraceUploadsFeature.State, TraceUploadsFeatu
                 report == null || report.id != action.id || report.phase != State.Report.Phase.Sending -> Reduced(state)
                 action.ok -> Reduced(state.copy(crashedLastRun = false, report = report.copy(phase = State.Report.Phase.Sent)))
                 report.destination == null || report.deliveredToSession -> Reduced(state.copy(report = report.copy(phase = State.Report.Phase.Failed)))
-                // Otherwise the summary is still on its way to the session: Try Again waits for it
-                // (`SentToSession`), so a retry can't race it.
+                // The summary is still on its way to the session: Try Again waits for it, so a
+                // retry can't race it.
                 else -> Reduced(state)
             }
         }
@@ -277,9 +269,8 @@ class TraceUploadsFeature : Reducer<TraceUploadsFeature.State, TraceUploadsFeatu
     }
 
     /**
-     * Writes the report to a temporary file (iOS `FileManager.default.temporaryDirectory`; Android's
-     * `java.io.tmpdir` is the app's cache directory) and uploads it to the session's directory the
-     * way the composer uploads a file from the + menu.
+     * Writes the report to a temporary file and uploads it to the session's directory as the
+     * composer uploads a file.
      */
     private suspend fun uploadAttachment(bundle: ProblemReportBundle, destination: ProblemReportDestination, client: OpenCodeClient): Attachment {
         val name = ProblemReportBuilder.attachmentName(bundle.report)
@@ -304,7 +295,7 @@ class TraceUploadsFeature : Reducer<TraceUploadsFeature.State, TraceUploadsFeatu
         val RETRY_POLICY: RetryPolicy = RetryPolicy.send
         val TOAST_DURATION = 2.5.seconds
 
-        /** A debug lab asked for crash reports (launch extra `lab-crash-report`, iOS `-lab-crash-report`). */
+        /** A debug lab asked for crash reports. */
         @Volatile var labCrashReport: Boolean = false
 
         /**
@@ -323,7 +314,7 @@ data class ProblemReportDestination(
     val directory: String? = null,
 )
 
-/** iOS `TraceUploader`: uploads a trace under this phone's Developer Mode owner key. */
+/** Uploads a trace under this phone's Developer Mode owner key. */
 class TraceUploader(
     val isEnabled: () -> Boolean = { false },
     val upload: suspend (ProblemReportBundle) -> Boolean = { false },

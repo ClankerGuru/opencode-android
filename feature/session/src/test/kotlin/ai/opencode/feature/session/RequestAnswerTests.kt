@@ -48,19 +48,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Port of iOS `RequestAnswerTests.swift`.
+ * A pending request's panel grows out of the composer, and the composer's row is your own answer.
  *
- * D-31 B: a pending request's panel grows out of the composer, and the
- * composer's row is your own answer.
- *
- * Not ported here (:feature:drawer, `HomeFeature`): `switchingIntoASnapshotDuringACallEndsTheRestoredAnswer`,
- * `aSubagentsFoldedQuestionStaysFoldedWhenOpened`.
- * Not ported here (:feature:composer, `RequestDockFeature` and the fold's pure rules alone):
- * `requestDockFeatureReducesSelectionPagingAndAnswerEditsExhaustively`,
- * `aDockedQuestionFoldsToItsBarAndBackExhaustively`, `aFailedSendsReasonFitsItsOneLine`,
- * `thePanelGestureResets`, `theFoldFollowsTheFingerAndSettlesPastItsThreshold`.
- * UIKit-only probes (text view layout and scroll offsets, `UIColor` trait resolution, a frame-by-frame
- * hosting-controller trace): `inlineRequestBarMultilineDictationKeepsTopAscendersAndPinsToTheEndWithoutStep`,
+ * `inlineRequestBarMultilineDictationKeepsTopAscendersAndPinsToTheEndWithoutStep`,
  * `disabledQuestionBarTrailingControlHasReadableLightContrast`,
  * `requestBarDictationFoldAndUnfoldTraceHasNoStepOrOpaqueControlCollision`.
  */
@@ -321,8 +311,8 @@ class RequestAnswerTests {
             this[OpenCodeClient] = this[OpenCodeClient].copy(
                 uploadFile = { _, _, _, _ -> flowOf(OpenCodeUploadEvent.Finished(path = "/tmp/u/Shot.pdf")) },
             )
-            // iOS stages under the process's temporary directory; Android's staging folder hangs
-            // off the app context's cache, so the finished upload's cleanup needs one.
+            // Android's staging folder hangs off the app context's cache, so the finished upload's
+            // cleanup needs one.
             this[AppContext] = object : ContextWrapper(null) {
                 override fun getCacheDir(): File = File(System.getProperty("java.io.tmpdir") ?: "/tmp")
             }

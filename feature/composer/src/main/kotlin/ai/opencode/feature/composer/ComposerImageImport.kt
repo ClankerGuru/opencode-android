@@ -25,14 +25,9 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
- * The downscale and re-encode applied to every imported image (iOS `SharedImageEncoder`,
- * `System/Share/ShareHandoff.swift`): long edge at most [MAX_PIXEL_SIZE], JPEG at
- * [COMPRESSION_QUALITY]. Rendering a fresh JPEG from decoded pixels drops EXIF, GPS and other
- * metadata (`Bitmap.compress` writes none), and `ImageDecoder` applies the EXIF orientation
- * first, like `kCGImageSourceCreateThumbnailWithTransform`.
- *
- * Local to the composer until it moves down to `:server` or `:core` for the share sheet
- * (`:feature:system`), which must encode identically.
+ * The downscale and re-encode applied to every imported image: long edge at most [MAX_PIXEL_SIZE],
+ * JPEG at [COMPRESSION_QUALITY]. Re-encoding drops EXIF and GPS metadata; `ImageDecoder` applies
+ * the EXIF orientation first.
  */
 object SharedImageEncoder {
     const val MAX_SOURCE_BYTES = 20_000_000
@@ -97,10 +92,8 @@ object ImageAttachmentImporter {
 }
 
 /**
- * Loads a picked, dropped or pasted image's bytes (iOS `ComposerItemProviderLoader`). An image
- * reads as is; a movie becomes its first frame (long edge ≤ 1600, JPEG 0.85), as iOS does for
- * a video dropped where an image is expected; anything else reads its bytes and lets the
- * encoder decide.
+ * Loads a picked, dropped or pasted image's bytes. A movie becomes its first frame (long edge ≤
+ * 1600, JPEG 0.85); anything else reads its bytes and lets the encoder decide.
  */
 object ComposerItemProviderLoader {
     private const val MOVIE_FRAME_MAX = 1600
@@ -148,11 +141,11 @@ object ComposerItemProviderLoader {
 }
 
 /**
- * Where a composer image comes from (iOS `ComposerImageSource`). `NSItemProvider` and
- * `PhotosPickerItem` are both content [Uri]s on Android; `Transferable` images are [Data].
+ * Where a composer image comes from. `NSItemProvider` and `PhotosPickerItem` are both content
+ * [Uri]s on Android; `Transferable` images are [Data].
  */
 sealed interface ComposerImageSource {
-    /** A dropped or pasted item (iOS `.itemProvider`). */
+    /** A dropped or pasted item. */
     data class ItemProvider(val uri: Uri) : ComposerImageSource
 
     /** A photo-picker item; [attachmentID] chosen up front keeps it in sync with the selection. */
@@ -174,9 +167,8 @@ sealed interface ComposerImageSource {
 }
 
 /**
- * Runs one image import at a time; starting another or cancelling supersedes the current one,
- * whose late results are discarded (iOS `ComposerImageImporter`). Callbacks run on the main
- * thread; [isLoading] is Compose state.
+ * Runs one image import at a time; starting another or cancelling supersedes the current one, whose
+ * late results are discarded. Callbacks run on the main thread; [isLoading] is Compose state.
  */
 class ComposerImageImporter(private val scope: CoroutineScope) {
     data class Result(val addedCount: Int = 0, val sawOversizedSource: Boolean = false)
@@ -236,7 +228,7 @@ class ComposerImageImporter(private val scope: CoroutineScope) {
             if (!isActive) return@launch
             cancelHandler = null
             onCompletion(result)
-            // iOS's `defer`: still loading while `onCompletion` runs, unless it superseded this import.
+            // Still loading while `onCompletion` runs, unless it superseded this import.
             if (job === current && isActive) job = null
         }
         job = current

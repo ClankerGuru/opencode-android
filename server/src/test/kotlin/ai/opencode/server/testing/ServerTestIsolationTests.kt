@@ -14,7 +14,6 @@ import org.junit.Rule
 import org.junit.Test
 import java.io.IOException
 
-/** The network half of iOS `TestIsolationGuardTests` (the rest is in `:core`). */
 class ServerTestIsolationTests {
     @get:Rule val isolation = TestIsolationRule()
 

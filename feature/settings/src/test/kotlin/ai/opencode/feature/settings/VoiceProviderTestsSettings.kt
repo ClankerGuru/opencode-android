@@ -26,12 +26,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Settings' half of iOS `VoiceProviderTests`: the two tests on [HomeSettingsFeature] and
- * [VoiceSettingsFeature], which live here on Android (the rest are `:feature:voice`'s
- * `VoiceProviderTests.kt`, and `aReconnectForgetsTheServersModelsAndAnyAnswerStillComing`
- * `:feature:drawer`'s, beside `HomeFeature`). Android says “This Phone” where iOS says “This iPhone”.
- */
 class VoiceProviderTestsSettings {
     @get:Rule val isolation = TestIsolationRule()
 

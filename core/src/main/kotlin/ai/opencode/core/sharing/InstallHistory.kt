@@ -4,10 +4,8 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Port of iOS `InstallHistory` (`OpenCode/App/AppFeature+Migrations.swift`, b13208e9): what this
- * install has been through, recorded on its first launch of a build that knows and kept when
- * servers are removed. In `:core` rather than `:app` because `OpenCodeServer.remember` (`:server`)
- * marks it [paired], and Settings' Welcome reads it.
+ * What this install has been through, kept when servers are removed. In `:core` because `:server`
+ * marks it [paired].
  */
 @Serializable
 enum class InstallHistory(val rawValue: String) {
@@ -27,10 +25,12 @@ enum class InstallHistory(val rawValue: String) {
          */
         val legacyMarkers = listOf("console-sign-in-removed", "voice-engine-migrated-to-gpt-live")
 
-        /** iOS `.installHistory`: `.appStorage("install-history")`, unrecorded by default. Lazy: the enum serializer isn't ready during companion init. */
+        /**
+         * `.appStorage("install-history")`, unrecorded by default. Lazy: the enum serializer isn't
+         * ready during companion init.
+         */
         val key: SharedKey<InstallHistory> by lazy { SharedKey.appStorage("install-history", unrecorded) }
     }
 }
 
-/** iOS `SharedKey.installHistory`. */
 val SharedKeys.installHistory: SharedKey<InstallHistory> get() = InstallHistory.key

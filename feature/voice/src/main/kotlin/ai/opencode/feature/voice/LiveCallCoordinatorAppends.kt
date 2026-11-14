@@ -135,7 +135,7 @@ internal fun LiveCallCoordinator.noteAssistantSpeech(speaking: Boolean, frame: B
     }
 }
 
-/** Appends still waiting for the channel (iOS `pendingAppendCount`, DEBUG). */
+/** Appends still waiting for the channel. */
 internal val LiveCallCoordinator.pendingAppendCount: Int get() = outbound.count
 
 /** FIFO, cancellation-aware batch slot. End turns every queued caller away. */
@@ -367,8 +367,7 @@ private suspend fun LiveCallCoordinator.flushOutbound() {
         }
         val now = clock.now()
         if (nextOutboundDelay(socket.id, now, holdingSlot = true) != null) { scheduleOutboundFlush(); return }
-        // Popped from a copy, as iOS pops from a value: readiness reads the
-        // queue as it stood.
+        // Popped from a copy: readiness reads the queue as it stood.
         val next = outbound.copy()
         val batch = next.popReadyBatch(socket.id) { role -> channelDelay(role, now, holdingSlot = true) == null }
         outbound = next

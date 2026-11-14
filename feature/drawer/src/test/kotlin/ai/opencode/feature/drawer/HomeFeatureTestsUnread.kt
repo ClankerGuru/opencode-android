@@ -16,10 +16,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `HomeFeatureTests+Unread.swift`: opening or marking a session read clears its
- * unread indicator at once.
- */
+/** Opening or marking a session read clears its unread indicator at once. */
 class HomeFeatureTestsUnread {
     @get:Rule val isolation = TestIsolationRule()
 

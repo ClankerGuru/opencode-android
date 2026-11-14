@@ -18,7 +18,7 @@ import ai.opencode.server.model.OpenCodeTranscriptItem
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 
-// Port of iOS `SessionFeature+PendingInputs.swift`: steering and queued messages, and the server's run state.
+// Steering and queued messages, and the server's run state.
 
 /** The inbox: queued and steering messages, and their deliveries. Null: the action passes on. */
 internal fun SessionFeature.reducePendingInputs(state: State, action: Action): Reduced<State, Action>? {
@@ -716,7 +716,10 @@ internal fun SessionFeature.Companion.containsMessage(messageID: String, items: 
 internal fun SessionFeature.Companion.item(item: OpenCodeTranscriptItem, messageID: String): Boolean =
     MessageRows(messageID).contains(item)
 
-/** iOS `SessionFeature.MessageRows`: one message's rows, matched without building a string for every row a scan of the transcript passes. */
+/**
+ * One message's rows, matched without building a string for every row a scan of the transcript
+ * passes.
+ */
 internal class MessageRows(val messageID: String) {
     private val prefix = "$messageID-"
     private val images = "$messageID-images"

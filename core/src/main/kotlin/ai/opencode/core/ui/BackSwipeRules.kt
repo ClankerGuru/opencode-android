@@ -6,26 +6,20 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 
 /**
- * The pure rules behind iOS's rightward "back" pans (`BackSwipeRules`, `BackSwipe.swift`),
- * for the in-app gestures Android still owns: the session drawer's open pan and
- * Catch Up-style horizontal drags. System back (edge swipe, predictive back) is Android's;
- * screens handle it with `PredictiveBackHandler`/`BackHandler`, never a custom edge pan.
- *
- * iOS's UIKit recogniser plumbing (`BackPanGestureRecognizer`, `SystemBackSwipeGate`) has no
- * Android counterpart. Its scroller and selection-handle hit tests are regions the drawer's pan
- * tests a touch against (`DrawerPanExclusion` in `DrawerSeams.kt`).
+ * The pure rules behind rightward back pans, for the drawer's open pan and Catch Up-style drags.
+ * System back stays Android's.
  */
 object BackSwipeRules {
-    /** How far from the leading edge a touch always belongs to the back/drawer gesture (iOS 28 pt). */
+    /** How far from the leading edge a touch always belongs to the back/drawer gesture. */
     val edgeWidth: Dp = 28.dp
 
     /** How long a finger can rest before its later sideways move belongs to the hold (seconds). */
     const val HOLD_THRESHOLD_SECONDS = 0.45
 
-    /** Travel before the pan picks an axis (iOS 8 pt). */
+    /** Travel before the pan picks an axis. */
     val decisionDistance: Dp = 8.dp
 
-    /** How far around a selection handle a touch takes the handle (iOS 24 pt). */
+    /** How far around a selection handle a touch takes the handle. */
     val selectionHandleReach: Dp = 24.dp
 
     enum class Decision { Wait, Begin, Fail }
@@ -55,9 +49,8 @@ object BackSwipeRules {
     }
 
     /**
-     * The release rule every back swipe shares (iOS `BackSwipeSpring.goesBack` →
-     * `MotionRelease.shouldCommit`): a flick decides, otherwise the halfway mark. Pass
-     * [velocity] in dp/s and [offset], [width] in the same unit as each other.
+     * The release rule every back swipe shares. [velocity] in dp/s; [offset] and [width] in one
+     * unit.
      */
     fun goesBack(offset: Float, width: Float, velocity: Float): Boolean =
         MotionRelease.shouldCommit(translation = offset.toDouble(), velocity = velocity.toDouble(), distance = width.toDouble())

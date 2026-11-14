@@ -62,9 +62,8 @@ import androidx.compose.ui.unit.dp
 
 /**
  * The fallback for a form too large for the dock (several fields, or an external step), as a
- * Material bottom sheet (iOS's medium/large detents → partially expanded/expanded). Questions
- * and permissions answer in the dock. The session presents it while its `activePicker` is
- * the requests sheet; [onClose] clears that.
+ * Material bottom sheet. Questions and permissions answer in the dock. The session presents it
+ * while its `activePicker` is the requests sheet; [onClose] clears that.
  *
  * @param dismissMessage what the composer's row holds while answering (it goes with Dismiss, as with the panel's ×), else null.
  * @param onOpenURL opens an external step's link (through the session's URL-opening dependency).
@@ -93,7 +92,7 @@ fun RequestReviewSheet(
     }
 }
 
-/** The request sheet's content (iOS `RequestReviewView`). */
+/** The request sheet's content. */
 @Composable
 fun RequestReviewView(
     dock: RequestDockFeature.State<*>,
@@ -345,6 +344,6 @@ private fun AnswerField(
     }
 }
 
-/** Swift's `Double.formatted()` for a number answer shown back in its field. */
+/** A number answer as shown back in its field. */
 private fun formatTypedNumber(value: Double): String =
     java.text.DecimalFormat("#,##0.######", java.text.DecimalFormatSymbols.getInstance(appFormattingLocale())).format(value)

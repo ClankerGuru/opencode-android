@@ -28,17 +28,6 @@ import org.junit.Test
 import java.time.Instant
 import java.util.UUID
 
-/**
- * Port of iOS `VoiceProviderTests.swift` ("Voice Provider", Server Voice): each provider's
- * state from what its server reports, the order Automatic tries them in, a pick that never
- * moves, and the one sentence and fix a failed call offers.
- *
- * Not here (their stores live in other modules): `aLegacyConnectedPinBecomesTheConnectedServersOwn`
- * (`HomeSettingsFeature`; its `VoicePick` and `pinningConnected` checks are below in
- * `aLegacyConnectedPinResolvesToThatServer`), `aReconnectForgetsTheServersModelsAndAnyAnswerStillComing`
- * (`HomeFeature`) and `theRowNamesTheProviderItsPlaceAndItsState` (`VoiceSettingsFeature`).
- * Android says “This Phone” where iOS says “This iPhone”.
- */
 class VoiceProviderTests {
     private val server = OpenCodeServer(url = "http://127.0.0.1:4096", username = "opencode", password = "secret", name = "My Mac")
     private val studio = OpenCodeServer(url = "http://studio.local:4096", username = "opencode", password = "studio", name = "Studio")
@@ -55,7 +44,7 @@ class VoiceProviderTests {
     /** The first ID the incrementing UUID client hands out: Android's call-presence ID. */
     private val presenceID = UUID(0, 0)
 
-    /** iOS resets the process-wide shared values; each test here gets a fresh in-memory store. */
+    /** Each test here gets a fresh in-memory store. */
     private fun reset(): SpeechTestShared = SpeechTestShared()
 
     /** `server` connected, `servers` saved, `choice` stored. */
@@ -479,9 +468,8 @@ class VoiceProviderTests {
     }
 
     /**
-     * The voice half of iOS `aLegacyConnectedPinBecomesTheConnectedServersOwn`: the pin Home
-     * writes for an earlier “connected server” choice keeps calls on that server after a
-     * switch, and Automatic never becomes a pin.
+     * The pin Home writes for an earlier “connected server” choice keeps calls on that server after
+     * a switch, and Automatic never becomes a pin.
      */
     @Test fun aLegacyConnectedPinResolvesToThatServer() {
         val pinned = VoiceServerChoice.Connected.pinningConnected(server)

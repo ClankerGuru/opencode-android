@@ -19,7 +19,7 @@ import ai.opencode.server.model.OpenCodeTranscriptItem
 import ai.opencode.server.model.PastedText
 import java.io.File
 
-// Port of iOS `SessionFeature+Outbox.swift`: stopped, restored, failed, and retried sends.
+// Stopped, restored, failed, and retried sends.
 
 /** Stop held these back before they were posted: each shows as a failed send with Retry and Delete, kept for screens that open later. */
 internal fun SessionFeature.holdStoppedSends(stopped: List<PendingPrompt>, sessionID: String, state: State): State {

@@ -8,9 +8,8 @@ import org.junit.Test
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * The spoken "still working" line while a delegation is out, on a test
- * clock. Kit's Nov 1 call: "Listening. I've got that.", then about 8 s of
- * tool work with nothing said.
+ * The spoken "still working" line while a delegation is out, on a test clock. I've got that.", then
+ * about 8 s of tool work with nothing said.
  */
 class VoiceProgressLineTests {
     private companion object {

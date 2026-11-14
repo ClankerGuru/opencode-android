@@ -15,7 +15,7 @@ import kotlin.math.sign
 
 // region Catalog & section builder
 
-/** iOS `OnePickerCatalog`: One Picker's sections and its search's level word. */
+/** One Picker's sections and its search's level word. */
 object OnePickerCatalog {
     /**
      * Builds truthful One Picker sections:
@@ -98,10 +98,8 @@ object OnePickerCatalog {
 // region Pure 120 Hz analytical morph & keyboard simulation
 
 /**
- * iOS `OnePickerSimulation`: the pure simulation behind One Picker's glass morph, detents,
- * interactive drag and bottom-search keyboard ride, stepped by the caller each frame. Tested
- * directly at 120 Hz to guarantee zero single-frame jumps and stationary-edge stability (`1/64`
- * two-edge snapping). iOS's is a value type; this one is mutable in place, as its springs are.
+ * The pure simulation behind One Picker's glass morph, detents, interactive drag and bottom-search
+ * keyboard ride, stepped by the caller each frame. Mutable in place, as its springs are.
  */
 class OnePickerSimulation(
     var metrics: Metrics = Metrics(

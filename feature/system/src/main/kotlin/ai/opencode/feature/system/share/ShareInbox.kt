@@ -16,10 +16,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Port of iOS `ShareInboxClient`: the app's side of the share target handoff
- * (ShareHandoff.kt). iOS's `SharedComposerDraft`, `SharedDraftTarget` and
- * `SessionFeature.State.absorb` use composer and session types above this module, so they live
- * with the session area; [ShareTargetsPublication] is built by the drawer (`HomeFeature`).
+ * The app's side of the share target handoff (ShareHandoff.kt). [ShareTargetsPublication] is built
+ * by the drawer (`HomeFeature`).
  */
 class ShareInboxClient(
     /** Removes and returns every pending share, oldest first. */
@@ -122,9 +120,9 @@ fun ShareCredentials.Companion.publish(
 }
 
 /**
- * Where a share lands in the app (iOS `HomeFeature.State.resolvedShareTarget`): its session, or,
- * for a New Session or a session since deleted, a New Session draft ([sessionID] null) in
- * [projectID]. The session area maps it onto its `SharedDraftTarget`.
+ * Where a share lands in the app: its session, or, for a New Session or a session since deleted, a
+ * New Session draft ([sessionID] null) in [projectID]. The session area maps it onto its
+ * `SharedDraftTarget`.
  */
 data class ResolvedShareTarget(val sessionID: String?, val projectID: String?)
 
@@ -138,9 +136,9 @@ fun resolvedShareTarget(target: ShareHandoff.Target, sessions: List<OpenCodeSess
     }
 
 /**
- * iOS `ShareTargetsPublication`: what the share targets are built from, with a cheap equality
- * for change detection that ignores Catch Up's `viewedMilliseconds` / `idleMilliseconds`
- * mutations. The drawer (`HomeFeature.State.shareTargetsPublication`) builds it.
+ * What the share targets are built from, with a cheap equality for change detection that ignores
+ * Catch Up's `viewedMilliseconds` / `idleMilliseconds` mutations. The drawer
+ * (`HomeFeature.State.shareTargetsPublication`) builds it.
  */
 class ShareTargetsPublication(
     val hasConnected: Boolean,

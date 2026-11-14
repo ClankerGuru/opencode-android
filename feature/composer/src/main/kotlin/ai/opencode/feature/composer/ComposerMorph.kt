@@ -32,10 +32,8 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Port of iOS `ComposerMorphTunables` (`Composer/ComposerMorph.swift`, `composer.morph.*`): the
- * composer, or a control in it, morphing into a panel fitted to the keyboard's region (OC-318,
- * OC-354; Grow from Composer, WIP). Baked defaults (lengths in dp, times in seconds); the
- * Tuning Panel registration and the Plus Menu Sheet descriptor lists are n/a.
+ * The composer, or a control in it, morphing into a panel fitted to the keyboard's region. Baked
+ * defaults: lengths in dp, times in seconds.
  */
 object ComposerMorphTunables {
     /** Where a sheet folding into the composer gives its glass up (progress 1 → 0): on the tap it vanished and left the photos as a ghost. */
@@ -52,16 +50,15 @@ object ComposerMorphTunables {
     const val outgoingGrowth = 0.12
     const val contentBlur = 14.0
     /**
-     * Cross-fading with what it grows out of, the content is whole by this share of its reveal
-     * (1 is a plain cross-fade). At 1 both sat half gone and blurred mid-way: a stalled frame
-     * there read as an empty glass blob.
+     * Cross-fading with what it grows out of, the content is whole by this share of its reveal (1
+     * is a plain cross-fade).
      */
     const val photoContentLead = 0.4
     const val exitBlur = 10.0
-    /** iOS's backdrop blur (dp). Not drawn on Android, which dims with a scrim only (see [noBlurDimBoost]). */
+    /** Not drawn on Android, which dims with a scrim only (see [noBlurDimBoost]). */
     const val backdropBlur = 18.0
     /**
-     * iOS Reduce Transparency's dim boost, used when there is no backdrop blur. Android never blurs
+     * Reduce Transparency's dim boost, used when there is no backdrop blur. Android never blurs
      * what's behind a sheet (Material scrims only), so its dim is always boosted.
      */
     const val noBlurDimBoost = 1.6
@@ -87,20 +84,15 @@ object ComposerMorphTunables {
     const val composerSink = 28.0
 
     /**
-     * iOS `DockedKeyboard.animation`, now [Motion.keyboard]: the curve the morph's bottom edge
-     * rides when a keyboard leaves or returns beneath it, and a rest that follows a keyboard
-     * switching on or off. While the IME itself animates, the rest reads `WindowInsets.ime`
-     * frame by frame instead.
+     * The curve the morph's bottom edge rides when a keyboard leaves or returns beneath it. While
+     * the IME animates, the rest reads `WindowInsets.ime` frame by frame instead.
      */
     fun keyboard(): FiniteAnimationSpec<Float> = Motion.keyboard.animation()
 }
 
 /**
- * Port of iOS `ComposerMorph`: whether a morph is open and how far it has grown. A plain
- * object, as on iOS: the surface reads it and only the surface redraws as a finger drags it.
- * One glass travel ([progress]), its bottom edge's own ([bottomProgress], so whatever rides a
- * keyboard stays under the glass), and the content's own clock ([content]) are animated here
- * on [scope]; opening and closing in any order only retarget them.
+ * Whether a morph is open and how far it has grown. A plain object, so only the surface redraws as
+ * a finger drags it. Opening and closing in any order only retarget its springs.
  */
 @Stable
 class ComposerMorph(private val scope: CoroutineScope) {
@@ -111,7 +103,7 @@ class ComposerMorph(private val scope: CoroutineScope) {
         private set
     /** The glass's travel from its source (0) to its rest (1). */
     val progress = Animatable(0f)
-    /** The bottom edge's travel (iOS `bottomOpen`). */
+    /** The bottom edge's travel. */
     val bottomProgress = Animatable(0f)
     /** How much of its content shows (0–1), on its own clock. */
     val content = Animatable(0f)
@@ -145,9 +137,8 @@ class ComposerMorph(private val scope: CoroutineScope) {
         phase = Phase.Open
         scope.launch { progress.animateTo(1f, animation) }
         scope.launch { bottomProgress.animateTo(1f, edge ?: animation) }
-        // Its content arrives a beat after the glass starts to grow, on the same role. The delay
-        // is part of the spec, so a fold that starts meanwhile retargets it (as a later
-        // `withAnimation` does on iOS) instead of a pending arrival landing after it.
+        // Its content arrives a beat after the glass starts to grow. The delay is part of the spec,
+        // so a fold that starts meanwhile retargets it.
         val arrival = Motion.panelOpen.animation<Float>(delaySeconds = contentDelay ?: Motion.contentDelay)
         scope.launch { content.animateTo(1f, arrival) }
     }
@@ -187,9 +178,8 @@ class ComposerMorph(private val scope: CoroutineScope) {
 
     /**
      * Folds back into its source on [animation] from wherever a finger drew it, its bottom edge on
-     * [edge] if given. A photo dismissal keeps content on this clock too ([contentFollowsFold]):
-     * issuing content-out first would start the detached footer fading before the return spring
-     * receives the phase change. [completion] runs once the fold's spring is done (or replaced).
+     * [edge] if given. [contentFollowsFold] keeps content on this clock too. [completion] runs once
+     * the fold's spring is done (or replaced).
      */
     fun fold(
         animation: FiniteAnimationSpec<Float>,
@@ -240,8 +230,7 @@ class ComposerMorph(private val scope: CoroutineScope) {
 
     /**
      * Shrinks back into its source on [animation] ([Motion.panelClose] unless given), drawn until
-     * its spring lands (iOS: until Core Animation reports the fold removed). Armed, it hadn't
-     * grown: it's gone at once. A null [animation] snaps (iOS: a close outside `withAnimation`).
+     * its spring lands. Armed, it's gone at once; a null [animation] snaps.
      */
     fun close(
         reduceMotion: Boolean,
@@ -288,8 +277,8 @@ class ComposerMorph(private val scope: CoroutineScope) {
     }
 
     /**
-     * Animates [drag] (a release springing back, or a fold), starting at [initialVelocity]
-     * (dp/s) so a settle continues the finger (iOS `interpolatingSpring(initialVelocity:)`).
+     * Animates [drag] (a release springing back, or a fold), starting at [initialVelocity] (dp/s)
+     * so a settle continues the finger.
      */
     fun animateDrag(to: Float, animation: FiniteAnimationSpec<Float>?, initialVelocity: Float = 0f) {
         dragTask?.cancel()
@@ -337,10 +326,7 @@ fun rememberComposerMorph(): ComposerMorph {
     return remember { ComposerMorph(scope) }
 }
 
-/**
- * Port of iOS `ComposerMorphGeometry`: where a morph rests, as frames in one coordinate space
- * (root px). Radii in px.
- */
+/** Where a morph rests, as frames in one coordinate space (root px). Radii in px. */
 data class ComposerMorphGeometry(
     /** Where it grows from and folds back into: kept live, so a close retargets if the source moves. */
     val source: Rect,
@@ -450,7 +436,7 @@ data class ComposerMorphGeometry(
             return Rect(rect.left, rect.bottom - height, rect.right, rect.bottom) to 0f
         }
 
-        /** Glass opacity for a morphing sheet (see iOS `glassFade`). */
+        /** Glass opacity for a morphing sheet. */
         fun glassFade(
             progress: Float,
             menuProgress: Float = 0f,

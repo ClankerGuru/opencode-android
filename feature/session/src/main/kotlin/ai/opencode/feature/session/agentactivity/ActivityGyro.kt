@@ -14,30 +14,26 @@ import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-// Port of iOS `Session/AgentActivity/ActivityGyro.swift`: the activity glyph's engine, ported
-// there from `prototypes/activity-glyph/gyro.js` (round 3, Kit's set in `kit-set.json`). Keep it
-// in step with the Swift: the per-state designs live in one table, `ActivityGyro.designs`.
+// The activity glyph's engine. The per-state designs live in one table, `ActivityGyro.designs`.
 //
-// A glyph is up to four strokes on an LED dot sphere. A stroke is the set of dots where
-// dot(p, n) ≈ s: a great circle (s = 0), a smaller circle, or, seen edge-on, a straight line.
-// Windows along it make dashes; a pitch term tilts it into a spiral stripe. Every design is a
-// pose of these same numbers, so a change of state morphs the dots rather than cross-fading them.
+// A glyph is up to four strokes on an LED dot sphere. A stroke is the set of dots where dot(p, n) ≈
+// s: a great circle (s = 0), a smaller circle, or, seen edge-on, a straight line. Windows along it
+// make dashes; a pitch term tilts it into a spiral stripe. Every design is a pose of these same
+// numbers, so a change of state morphs the dots rather than cross-fading them.
 //
-// Angles never double back. Each is unwrapped: it either spins (its speed a spring) or holds a
-// pose. Holding a new pose while moving picks the next equivalent angle ahead, far enough that a
-// critically damped spring decelerates into it without overshooting.
-//
-// `AgentActivity` itself lives in the root package (`AgentActivitySource.kt`), with the models.
+// Angles never double back: each either spins (its speed a spring) or holds a pose, and a new pose
+// picks the next equivalent angle ahead, far enough for a critically damped spring to decelerate
+// into it without overshooting.
 
 enum class ActivityAccent { orange, red, green, blue }
 
 private typealias A = GyroAngleKey
 private typealias K = GyroSpringKey
 
-/** Swift's `.rounded()`: half away from zero. */
+/** Half away from zero. */
 internal fun roundHalfAway(x: Double): Double = if (x >= 0) floor(x + 0.5) else ceil(x - 0.5)
 
-/** A 3-vector (Swift `SIMD3<Double>`). */
+/** A 3-vector. */
 class Vec3(@JvmField val x: Double, @JvmField val y: Double, @JvmField val z: Double) {
     fun dot(o: Vec3): Double = x * o.x + y * o.y + z * o.z
 
@@ -81,7 +77,7 @@ data class GyroSpring(val response: Double, val damping: Double) {
     }
 }
 
-/** A spring-driven value (a Swift struct: [copy] gives an independent one). */
+/** A spring-driven value. */
 class GyroValue(
     var value: Double = 0.0,
     var config: GyroSpring = Gyro.MOVE,
@@ -655,7 +651,7 @@ class ActivityGyro(op: AgentActivity = AgentActivity.idle, val reduceMotion: Boo
             AgentActivity.done to ActivityAccent.green, AgentActivity.handoff to ActivityAccent.blue,
         )
 
-        /** Kit's set (`prototypes/activity-glyph/kit-set.json`), one design per state. */
+        /** One design per state, from `prototypes/activity-glyph/kit-set.json`. */
         val designs: Map<AgentActivity, GyroDesign> by lazy { makeDesigns() }
 
         private fun makeDesigns(): Map<AgentActivity, GyroDesign> {
@@ -873,7 +869,7 @@ data class GyroCell(
 
 /**
  * What one frame draws: per dot its light, freshness, accent and size, and the orb's glow and
- * accent colour weights. Mutable like the Swift value the phosphor rewrites in place.
+ * accent colour weights. Mutable: the phosphor rewrites it in place.
  */
 class GyroField(
     val dots: MutableList<Dot>,
@@ -988,7 +984,7 @@ class GyroPhosphor {
     private class PatternState(val amount: Double, val age: Double)
 
     private var light = DoubleArray(0)
-    /** Each dot's flash heat (iOS `heat`, read by tests). */
+    /** Each dot's flash heat. */
     internal var heat = DoubleArray(0)
         private set
 

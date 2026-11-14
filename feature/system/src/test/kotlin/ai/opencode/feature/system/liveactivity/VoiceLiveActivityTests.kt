@@ -40,15 +40,9 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `VoiceLiveActivityTests.swift`'s commands and `LiveVoiceActivity` tests. Its mapping
- * tests are `:feature:drawer`'s (Home's `liveActivityCall` builds the `VoiceLiveActivity.Call` from
- * `VoiceFeature.State`, which this module can't see), as are its Home tests; the two leaving-Home
- * tests are `:app`'s (`AppFeature`). The intents' half (`intentsSendTheirCommand`) is
- * [VoiceLiveActivityFrameworkTests].
+ * The intents' half (`intentsSendTheirCommand`) is [VoiceLiveActivityFrameworkTests].
  *
- * ActivityKit → `LiveVoiceActivity.System` (Live Update notifications); iOS's
- * `ActivityAuthorizationError` is [LiveUpdateSystem.RequestError]'s reason. The activity runs on
- * the main dispatcher, here [Dispatchers.Unconfined].
+ * The activity runs on the main dispatcher, here [Dispatchers.Unconfined].
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class VoiceLiveActivityTests {
@@ -109,7 +103,6 @@ class VoiceLiveActivityTests {
         fun recorded(name: String) = recorded.filter { it.startsWith("$name ") }
     }
 
-    /** iOS `eventually(timeout:step:)`. */
     private suspend fun eventually(condition: () -> Boolean) {
         repeat(200) {
             if (condition()) return
@@ -123,7 +116,7 @@ class VoiceLiveActivityTests {
         val commands = LiveActivityCommands<VoiceCallCommand>()
         val first = async(start = CoroutineStart.UNDISPATCHED) { commands.stream().take(2).toList() }
         val second = async(start = CoroutineStart.UNDISPATCHED) { commands.stream().take(2).toList() }
-        // Each stream registers its listener once collected (iOS registers on `stream()`).
+        // Each stream registers its listener once collected.
         repeat(5) { yield() }
         commands.send(VoiceCallCommand.ToggleMute)
         commands.send(VoiceCallCommand.End)
@@ -307,7 +300,7 @@ class VoiceLiveActivityTests {
 
     @Test fun returningToTheForegroundRetriesAFailedStart() = runBlocking {
         val fake = FakeActivities()
-        // Refused while the app was away (iOS: ActivityKit only starts activities in the foreground).
+        // Refused while the app was away.
         fake.refusal = LiveUpdateSystem.RequestError("PermissionDenied")
         val activity = LiveVoiceActivity(fake.system(TestClock()))
 
@@ -394,8 +387,7 @@ class VoiceLiveActivityTests {
 }
 
 /**
- * iOS `intentsSendTheirCommand`: the Live Update's buttons (iOS `ToggleVoiceMuteIntent`,
- * `EndVoiceCallIntent`) are [LiveActivityActionReceiver] broadcasts, which send their command
+ * The Live Update's buttons are [LiveActivityActionReceiver] broadcasts, which send their command
  * to `LiveActivityCommands.voiceCall` (Robolectric).
  */
 @RunWith(RobolectricTestRunner::class)

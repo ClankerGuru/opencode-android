@@ -11,11 +11,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Port of iOS `VoiceHandoffParseTests.swift` (`VoiceHandoffParseTests`, `VoiceFramingTests`,
- * `VoiceSteeringInstructionsTests`). Assertions on `TranscriptUserMessage`/`VoiceMessageIndicator`
- * (`:feature:transcript`) are ported with that module's tests.
- */
 class VoiceHandoffParseTests {
     @Test fun readsBackWhatFormatWrote() {
         val prompt = VoiceHandoff.format(instruction = "Check why the upload test is flaky.", transcriptDelta = listOf("user: the upload test", "assistant: On it."))
@@ -190,7 +185,6 @@ class VoiceFramingTests {
             "Looking that up now.", "Working on that.", "Sure", "  ", "",
             "Let me look into that.", "Checking.", "I'm checking on that.", "Let me dig into that.",
             "Checking your sessions.", "Checking with the team.", "Sending that to the session.",
-            // Reactions from Kit's Oct 15 call.
             "Yeah, I heard you.", "Yeah, good call.", "Still digging into that.", "Yeah.", "Makes sense, noted.",
         )) {
             assertNull(ack, VoiceHandoff.framing(ack))
@@ -266,8 +260,8 @@ class VoiceSteeringInstructionsTests {
         }
         val live = VoiceInstructions.build(context, engine = VoiceEngine.gptLive)
         assertTrue(live.contains("When the user is mid-thought or it's a quick follow-up, a simple yeah or nothing at all is fine."))
-        // Kit's Nov 1 call: a long ask ending "Are you listening or no" got
-        // "Listening. I've got that." and nothing about the ask.
+        // A long ask ending "Are you listening or no" got "Listening. I've got that." and nothing
+        // about the ask.
         assertTrue(live.contains("After a long turn, even one that ends by asking whether you're there, name what they asked for; a stock line that names nothing doesn't cover it."))
         assertTrue(live.contains("- Say it once, without saying how the request will be framed or passed on"))
         // One place for what's said around a delegation.
@@ -353,7 +347,7 @@ class VoiceSteeringInstructionsTests {
         )
         assertTrue(realtime.contains("any status or outcome question goes to `delegate` unless a completed result on this call directly answers it"))
         assertTrue(VoiceSessionDelegator.activeCallBlock.contains("Next is X; keep, drop, or note?"))
-        // Short by default, long when asked (Kit, Nov 7: a fixed 1–3 sentences was too rigid).
+        // Short by default, long when asked.
         assertTrue(VoiceSessionDelegator.activeCallBlock.contains("Keep it short by default"))
         assertTrue(VoiceSessionDelegator.activeCallBlock.contains("When they ask for detail, an explanation, a walkthrough, or to be taught something, answer at whatever length it needs"))
         assertFalse(VoiceSessionDelegator.activeCallBlock.contains("1–3"))

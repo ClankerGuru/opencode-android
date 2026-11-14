@@ -36,9 +36,8 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * iOS `OnePickerTunables` (`modelPicker.one.*`): One Picker's layout metrics and options at
- * their shipped defaults; its timing is the shared motion roles' ([OnePickerTiming]). The
- * presets and registration are Tuning Panel, n/a (Android's tuning is `:devtools`).
+ * One Picker's layout metrics and options at their shipped defaults; its timing is
+ * [OnePickerTiming].
  */
 object OnePickerTunables {
     /** "Compact height" (320…640). */
@@ -103,10 +102,9 @@ object OnePickerTunables {
 }
 
 /**
- * iOS `OnePickerTiming`: One Picker's motion, on the shared roles. It grows out of the chip on
- * `Motion.panelOpen` and folds back on `Motion.panelClose`, its bottom edge riding the keyboard
- * on `Motion.keyboard`; a rest changes on `Motion.layout`, and a drag let go settles on
- * `Motion.release`.
+ * One Picker's motion, on the shared roles. It grows out of the chip on `Motion.panelOpen` and
+ * folds back on `Motion.panelClose`, its bottom edge riding the keyboard on `Motion.keyboard`; a
+ * rest changes on `Motion.layout`, and a drag let go settles on `Motion.release`.
  */
 object OnePickerTiming {
     /** Narrow to wide, the width gets there first: `panelOpen` quickened by `widthLead`. */
@@ -115,9 +113,9 @@ object OnePickerTiming {
 }
 
 /**
- * iOS `OnePickerProviderMark`: the provider's real monochrome mark (`provider-<id>` in
- * [BrandAssets]) when there is one, or a filled rounded-square monogram with the bold initial
- * knocked out, for unknown or custom local providers.
+ * The provider's real monochrome mark (`provider-<id>` in [BrandAssets]) when there is one, or a
+ * filled rounded-square monogram with the bold initial knocked out, for unknown or custom local
+ * providers.
  */
 object OnePickerProviderMark {
     private val assetAliases: Map<String, String> = mapOf(
@@ -132,9 +130,8 @@ object OnePickerProviderMark {
     )
 
     /**
-     * A real asset name, or null when the provider is unknown, so callers draw the filled
-     * fallback instead of the stroked `provider-synthetic` sparkles. [exists] is iOS's
-     * `UIImage(named:) != nil`.
+     * A real asset name, or null when the provider is unknown, so callers draw the filled fallback
+     * instead of the stroked `provider-synthetic` sparkles.
      */
     fun resolvedAssetName(providerID: String, canonical: String?, exists: (String) -> Boolean = BrandAssets::exists): String? {
         val stripped = if (providerID.startsWith("console-")) providerID.drop(8) else null
@@ -158,7 +155,7 @@ object OnePickerProviderMark {
     }
 }
 
-/** iOS `OnePickerProviderMark` (view): decorative, [size] square, in [tint] (or the content colour). */
+/** Decorative, [size] square, in [tint] (or the content colour). */
 @Composable
 fun OnePickerProviderMark(
     providerID: String,
@@ -198,9 +195,8 @@ fun OnePickerProviderMark(
 }
 
 /**
- * iOS `AnimatedLevelArc`: the level arc sweeping on `Motion.microIn` as the level
- * changes. Off by default (`CHIP_SHOWS_ARC`, `ROW_SHOWS_ARC`). iOS's UIKit template-image cache
- * is n/a: Compose draws it directly.
+ * The level arc sweeping on `Motion.microIn` as the level changes. Off by default
+ * (`CHIP_SHOWS_ARC`, `ROW_SHOWS_ARC`).
  */
 @Composable
 fun AnimatedLevelArc(

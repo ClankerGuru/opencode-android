@@ -18,18 +18,13 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `Settings/Onboarding/OnboardingPlaygroundFeature.swift`.
+ * Settings → Advanced → Developer → Playgrounds → Onboarding: the onboarding's pages and their
+ * motion in a full-screen sandbox. The camera is real when the app already has access, otherwise
+ * simulated; the server is simulated by a timer. Nothing here reaches a server, the saved servers,
+ * the keychain or a persisted setting.
  *
- * Settings → Advanced → Developer → Playgrounds → Onboarding (OC-351, D-72 Signal Handshake):
- * the onboarding's pages and their motion in a full-screen sandbox. Welcome → story → the
- * camera scanning for the Mac's pairing code (the dot field ripples) → waiting → the server's
- * reply earns one heartbeat → the first session. The camera is real when the app already has
- * access, otherwise simulated; the server is simulated by a timer. Nothing here reaches a
- * server, the saved servers, the keychain or a persisted setting.
- *
- * iOS dismisses itself on Close through `@Dependency(\.dismiss)`; here [Action.CloseTapped]
- * cancels the playground's effects and the view then calls its `onClose`, which sends the
- * parent's `PresentationAction.Dismiss`.
+ * [Action.CloseTapped] cancels the playground's effects; the view then calls its `onClose`, which
+ * sends the parent's `PresentationAction.Dismiss`.
  */
 class OnboardingPlaygroundFeature : Reducer<OnboardingPlaygroundFeature.State, OnboardingPlaygroundFeature.Action> {
     /** D-72's three treatments, in its option order. */
@@ -254,7 +249,6 @@ class OnboardingPlaygroundFeature : Reducer<OnboardingPlaygroundFeature.State, O
     private fun interrupt(state: State): Pair<State, Effect<Action>> =
         state.copy(isReplaying = false) to Effect.merge(Effect.cancel(CancelID.pairing), Effect.cancel(CancelID.replay))
 
-    /** iOS `.merge(interrupt(&state), <next>)`. */
     private inline fun interrupting(state: State, next: (State) -> Reduced<State, Action>): Reduced<State, Action> {
         val (interrupted, cancel) = interrupt(state)
         val reduced = next(interrupted)
@@ -312,8 +306,8 @@ class OnboardingPlaygroundFeature : Reducer<OnboardingPlaygroundFeature.State, O
 }
 
 /**
- * Whether the app may already use the camera. The playground never asks: without access it
- * shows a simulated feed. (iOS `OnboardingCameraClient`.)
+ * Whether the app may already use the camera. The playground never asks: without access it shows a
+ * simulated feed.
  */
 class OnboardingCameraClient(val isAuthorized: () -> Boolean) {
     companion object Key : DependencyKey<OnboardingCameraClient> {

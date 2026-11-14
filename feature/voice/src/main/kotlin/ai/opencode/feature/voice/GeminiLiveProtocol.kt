@@ -12,9 +12,6 @@ import java.util.UUID
 // `BidiGenerateContentConstrained`). Kept free of UI and reducer state so
 // setup, input audio, server content, transcriptions, interruptions, and tool
 // calls can be tested directly from fixtures.
-//
-// Ported from iOS `GeminiLiveClient.swift` lines 1–426; its socket and client, and
-// `GeminiCallCoordinator`, come with the transports (waves 2–3).
 
 data class GeminiLiveContentTurn(val role: String, val text: String) {
     val json: RealtimeJSON
@@ -114,7 +111,6 @@ data class GeminiLiveSessionConfig(
         const val defaultWebSocketURL =
             "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained"
 
-        /** iOS `init(from: RealtimeSessionConfig)`. */
         fun from(config: RealtimeSessionConfig): GeminiLiveSessionConfig {
             val resolvedModel = if (config.model == RealtimeSessionConfig.defaultModel ||
                 config.model == LiveSessionConfig.defaultModel ||
@@ -340,8 +336,7 @@ sealed interface GeminiLiveServerEvent {
  * Downsamples 24 kHz 16-bit mono PCM from `VoiceAudioClient` to 16 kHz 16-bit
  * mono PCM for Gemini Live's `realtimeInput.audio` (an exact 3:2 ratio).
  *
- * A plain object on the audio path (iOS: a `mutating` struct): it keeps the leftover
- * samples between chunks.
+ * A plain object on the audio path: it keeps the leftover samples between chunks.
  */
 class GeminiPCMResampler {
     private var remainder: ShortArray = ShortArray(0)

@@ -59,20 +59,8 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /**
- * A number whose digits roll on independent per-place springs with a vertical motion smear
- * (iOS `RollingNumber`, D-50 option 3). Use for live counts (background-work capsule,
- * badges, context gauge).
- *
- * Falls back to plain text (cross-faded) under Reduce Motion, right-to-left layouts, text
- * without ASCII digits, a stopped/backgrounded screen, or when the width doesn't fit
- * (iOS `ViewThatFits`).
- *
- * Rendering is Android-native: glyphs are drawn on a [Canvas]; the iOS Metal vertical blur
- * is reproduced by additively compositing a 9-tap Gaussian of vertically offset glyph
- * copies in an offscreen layer (no shader).
- *
- * @param style text style; defaults to iOS's `.subheadline` medium with tabular digits.
- * @param monospacedDigits tabular figures (`tnum`), iOS's default.
+ * A number whose digits roll on per-place springs with a vertical smear, drawn on a [Canvas]. Plain
+ * cross-faded text under Reduce Motion, RTL, no ASCII digits, a stopped screen, or no room.
  */
 @Composable
 fun RollingNumber(
@@ -107,7 +95,7 @@ fun RollingNumber(
     model.sync(text, locale, animated = canRoll, style = motion, nowSeconds = System.nanoTime() / 1e9)
 
     if (!canRoll) {
-        // iOS `.fixedSize(horizontal: !dynamicTypeSize.isAccessibilitySize, ...)`: one line, wrapping only at accessibility sizes.
+        // One line, wrapping only at accessibility sizes.
         val maxLines = if (LocalDensity.current.fontScale >= ACCESSIBILITY_FONT_SCALE) Int.MAX_VALUE else 1
         Crossfade(text, modifier.then(semantics), animationSpec = Motion.easeInOut(Motion.fadeStandard), label = "RollingNumber") {
             Text(it, style = resolvedStyle, maxLines = maxLines)
@@ -136,7 +124,7 @@ fun RollingNumber(
         }
         val widthDp = with(density) { max(targetWidth, 1f).toDp() }
         val heightDp = with(density) { metrics.lineHeight.toDp() }
-        // Clipped to its line, as iOS's Canvas and edge-fade mask are: outgoing digits roll out of view, not over neighbours.
+        // Clipped to its line: outgoing digits roll out of view, not over neighbours.
         Canvas(Modifier.size(widthDp, heightDp).clipToBounds().baselineAt(metrics.ascender)) {
             val time = if (frameNanos == 0L) System.nanoTime() / 1e9 else frameNanos / 1e9
             val frame = model.frame(time, metrics, motion, targetWidth, alignment)
@@ -162,7 +150,7 @@ fun RollingNumber(
     RollingNumber(text, modifier, style, color, motion, alignment, accessibilityLabel = accessibilityLabel)
 }
 
-/** Exposes the glyphs' baseline so the canvas aligns with neighbouring text (iOS `alignmentGuide(.firstTextBaseline)`). */
+/** Exposes the glyphs' baseline so the canvas aligns with neighbouring text. */
 private fun Modifier.baselineAt(ascender: Float): Modifier = layout { measurable, constraints ->
     val placeable = measurable.measure(constraints)
     val baseline = ascender.roundToInt()
@@ -172,10 +160,8 @@ private fun Modifier.baselineAt(ascender: Float): Modifier = layout { measurable
 }
 
 /**
- * Glyph metrics shared by every [RollingNumber] with the same style. A row that scrolls in
- * (a "Used 25 tools" header, say) reuses its digits' text layouts instead of measuring each
- * glyph again, which cost about a millisecond per row. Colour isn't part of the key: the
- * glyphs are drawn with the number's colour. Keeps the few most recent styles.
+ * Glyph metrics shared by every [RollingNumber] with the same style, so rows scrolling in don't
+ * measure glyphs again. Keeps the few most recent styles.
  */
 private object SharedRollingMetrics {
     private const val MAX_STYLES = 8
@@ -203,7 +189,7 @@ private object SharedRollingMetrics {
     }
 }
 
-/** Glyph metrics from Compose text layout (iOS `RollingNumberMetrics`). */
+/** Glyph metrics from Compose text layout. */
 private class TextRollingMetrics(private val measurer: TextMeasurer, private val style: TextStyle) : RollingNumberMetrics {
     private val layouts = HashMap<String, TextLayoutResult>()
     private val advances = HashMap<String, Float>()
@@ -236,7 +222,7 @@ private fun DrawScope.drawRollingFrame(frame: RollingNumberFrame, metrics: Rolli
             if (smear <= 0f) {
                 drawText(layout, color = color, topLeft = topLeft, alpha = alpha)
             } else {
-                // Vertical Gaussian (iOS rollingBlur: exp(-2.5 t²), t in -1..1), summed additively offscreen.
+                // Vertical Gaussian, summed additively offscreen.
                 drawIntoCanvas { it.saveLayer(bounds, Paint()) }
                 for (k in -SMEAR_TAPS..SMEAR_TAPS) {
                     val t = k.toFloat() / SMEAR_TAPS
@@ -295,17 +281,14 @@ private fun DrawScope.drawRollingFrame(frame: RollingNumberFrame, metrics: Rolli
     }
 }
 
-/**
- * The blur one slot draws with: iOS's band shader passes reels through below a 0.45 radius
- * (`rollingBlur`), and its per-glyph arrival/exit blur starts above 0.3 (`slot.blur > 0.3`).
- */
+/** The blur one slot draws with. */
 private fun smearRadius(band: Float, arrival: Float): Float =
     max(if (band >= BAND_BLUR_THRESHOLD) band else 0f, if (arrival > ARRIVAL_BLUR_THRESHOLD) arrival else 0f)
 
 private const val BAND_BLUR_THRESHOLD = 0.45f
 private const val ARRIVAL_BLUR_THRESHOLD = 0.3f
 
-/** iOS's first accessibility Dynamic Type size (AX1): body 28 pt over Large's 17 pt. */
+/** Body 28 pt over Large's 17 pt. */
 private const val ACCESSIBILITY_FONT_SCALE = 28f / 17f
 private const val SMEAR_TAPS = 4
 private val SMEAR_WEIGHT_TOTAL: Float = (-SMEAR_TAPS..SMEAR_TAPS).sumOf { k ->

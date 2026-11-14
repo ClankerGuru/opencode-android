@@ -42,19 +42,8 @@ import org.junit.Test
 import java.time.Instant
 
 /**
- * Port of iOS `FirstComputerPairingTests.swift` (t485), the halves that are `AppFeature`'s:
- * every pairing that lands plays `success`, a computer after the first opens the drawer, and a
- * fresh install starts with What’s New read. Both read `InstallHistory`, which removing
- * computers never resets.
- *
- * The first computer's ready session is Home's `firstComputerPaired`. iOS re-derives the draft
- * in its expectation; `makeDraft` draws a new session ID from the store's clients, so
- * `theFirstComputerOpensAReadySessionInItsLatestProject` receives it non-exhaustively and checks
- * the draft's project, starter prompts and closed drawer instead.
- *
- * Elsewhere: `homeFoldersAreNotProjects` (:server's `OpenCodeProject.isHomeFolder`),
- * `aStarterPromptIsTypedInForThePersonToSend` and `typingRetiresTheStarterPromptsForGood`
- * (`:feature:session`'s `FirstComputerPairingTests`).
+ * The `AppFeature` halves. `makeDraft` draws a new session ID, so
+ * `theFirstComputerOpensAReadySessionInItsLatestProject` receives it non-exhaustively.
  */
 class FirstComputerPairingTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -73,7 +62,7 @@ class FirstComputerPairingTests {
 
     private fun project(directory: String, name: String? = null) = OpenCodeProject(id = directory, name = name ?: directory, directory = directory)
 
-    /** Kit's own computer: the home folder holds the newest session. */
+    /** The home folder holds the newest session. */
     private val snapshot: OpenCodeHomeSnapshot
         get() = OpenCodeHomeSnapshot(
             projects = listOf(project("/Users/kit"), project("/Users/kit/code/api", name = "api"), project("/Users/kit/code/web", name = "web")),

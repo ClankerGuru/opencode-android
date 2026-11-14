@@ -21,14 +21,13 @@ import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.friendlyName
 
 /*
- * Port of iOS `App/AppFeature+Pairing.swift`: everything pairing in one place. Validating a
- * pasted or scanned code, an unsolicited link waiting for confirmation, redeeming it, and where a
- * pairing lands once its computer's sessions load (t485). The install's first computer opens a ready session, another new computer opens
- * the drawer on its sessions, and re-pairing a known one stays put. Every pairing that lands
- * plays the handshake: `success` and, for TalkBack, the computer's name.
+ * Everything pairing in one place. Validating a pasted or scanned code, an unsolicited link waiting
+ * for confirmation, redeeming it, and where a pairing lands once its computer's sessions load
+ * (t485). The install's first computer opens a ready session, another new computer opens the drawer
+ * on its sessions, and re-pairing a known one stays put. Every pairing that lands plays the
+ * handshake: `success` and, for TalkBack, the computer's name.
  */
 
-/** iOS `AppFeature.PairingArrival`. */
 enum class PairingArrival {
     /** This install's first computer ever: a new session in its latest project. */
     firstComputer,

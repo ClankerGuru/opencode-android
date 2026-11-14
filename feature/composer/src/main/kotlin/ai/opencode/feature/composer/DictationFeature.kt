@@ -16,11 +16,10 @@ import java.time.Duration
 import java.time.Instant
 
 /**
- * The composer's dictation (iOS `DictationFeature` in `DictationClient.swift`):
- * press tokens, tap vs hold decided at the lift, lock, cancel, and where the
- * words land. The session reducer embeds it and owns the draft: the helpers
- * ([start], [stop], [finish], [ends], [discardPending]) take the draft's text
- * and return the next state with their effect, as iOS's `static` helpers do.
+ * The composer's dictation: press tokens, tap vs hold decided at the lift, lock, cancel, and where
+ * the words land. The session reducer embeds it and owns the draft: the helpers ([start], [stop],
+ * [finish], [ends], [discardPending]) take the draft's text and return the next state with their
+ * effect.
  */
 object DictationFeature : Reducer<DictationFeature.State, DictationFeature.Action> {
     sealed interface Phase {
@@ -40,7 +39,7 @@ object DictationFeature : Reducer<DictationFeature.State, DictationFeature.Actio
 
     data class Sending(
         val recording: Int,
-        /** The draft it sends (iOS `SessionFeature.State.DraftState`); this reducer only rewrites its text. */
+        /** The draft it sends; this reducer only rewrites its text. */
         val draft: DraftState,
         val delivery: OpenCodeDelivery,
         val base: String = "",

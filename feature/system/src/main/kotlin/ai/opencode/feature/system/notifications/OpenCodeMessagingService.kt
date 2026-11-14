@@ -8,12 +8,11 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 
 /**
- * FCM, the push channel behind [PushTokenProvider] (iOS: APNs and its delegate callbacks).
- * Inert without a Firebase configuration: Firebase's init provider makes the default
- * `FirebaseApp` from the `google_app_id`, `gcm_defaultSenderId`, `google_api_key` and
- * `project_id` string resources (what the google-services plugin generates; plain resources
- * in `:app` work too). None ship, so no `FirebaseApp` exists, [FcmPushTokenProvider] fails at
- * once and this service never runs.
+ * FCM, the push channel behind [PushTokenProvider]. Inert without a Firebase configuration:
+ * Firebase's init provider makes the default `FirebaseApp` from the `google_app_id`,
+ * `gcm_defaultSenderId`, `google_api_key` and `project_id` string resources (what the
+ * google-services plugin generates; plain resources in `:app` work too). None ship, so no
+ * `FirebaseApp` exists, [FcmPushTokenProvider] fails at once and this service never runs.
  *
  * The relay is expected to send a data-only, high-priority FCM message whose `data` is the
  * APNs alert's fields (`title`, `body`, `sessionID`, `status`, `ref`), so the app builds the

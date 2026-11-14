@@ -28,7 +28,6 @@ import kotlinx.coroutines.test.runTest
 import java.io.ByteArrayOutputStream
 import java.util.UUID
 
-/** iOS `ComposerPhotoViewerTests`. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)

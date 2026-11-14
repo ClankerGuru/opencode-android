@@ -112,26 +112,24 @@ data class AgentFileDestination(val reference: AgentFileReference, val directory
 typealias AgentFileMarkdown = @Composable (source: String, server: OpenCodeServer, directory: String?, onOpenFile: (AgentFileReference) -> Unit) -> Unit
 
 /**
- * The app's Markdown renderer for file pages that aren't handed one (iOS `AgentFileViewer`
- * renders `MarkdownBlocksView` itself; here the renderer is `:feature:transcript`'s, provided
- * at the app root by `TranscriptMediaProviders`). Null: Markdown files open as source.
+ * The app's Markdown renderer for file pages that aren't handed one. Null: Markdown files open as
+ * source.
  */
 val LocalAgentFileMarkdown = staticCompositionLocalOf<AgentFileMarkdown?> { null }
 
 /**
- * Opens a file the agent mentioned (iOS `AgentFileViewer`): streams media when the server
- * supports ranges, otherwise downloads with progress, then shows the player, a rendered Markdown
- * document, the code viewer, a PDF, or offers another app. Links inside a document push further
- * pages; system back pops them.
+ * Opens a file the agent mentioned: streams media when the server supports ranges, otherwise
+ * downloads with progress, then shows the player, a rendered Markdown document, the code viewer, a
+ * PDF, or offers another app. Links inside a document push further pages; system back pops them.
  *
- * @param onDone closes the viewer (iOS Done: the media viewer's dismissal, else the sheet's).
+ * @param onDone Closes the viewer.
  * @param isInMediaViewer the media viewer hosts it: the root page's dark room is the viewer's own
  *   (clear), which lifts as it's dragged away.
  * @param markdown renders Markdown files; without it [LocalAgentFileMarkdown] does, and without
  *   either they open as source.
- * @param onImageShown the root page decoded its image (iOS `viewer.show(sourceID:image:)`).
- * @param onZoomChange iOS `viewer.isZoomed`.
- * @param onImageFrame where the root page's image sits (iOS `viewer.mediaFrames[zoomSourceID]`).
+ * @param onImageShown The root page decoded its image.
+ * @param onZoomChange
+ * @param onImageFrame Where the root page's image sits.
  */
 @Composable
 fun AgentFileViewer(
@@ -172,7 +170,7 @@ fun AgentFileViewer(
     }
 }
 
-/** One file's page (iOS `AgentFilePage`). Media plays in a dark room, like Photos. */
+/** One file's page. Media plays in a dark room, like Photos. */
 @Composable
 fun AgentFilePage(
     model: AgentFileViewerModel,
@@ -290,8 +288,8 @@ private fun AgentFilePageContent(
             )
         },
     ) { padding ->
-        // An image fills the whole screen under the bar (iOS `.ignoresSafeArea()`), so it zooms
-        // in and out of the same frame the transcript's flight lands on.
+        // An image fills the whole screen under the bar, so it zooms in and out of the same frame
+        // the transcript's flight lands on.
         val fillsScreen = phase is AgentFileViewerModel.Phase.Ready && phase.content is AgentFileViewerModel.Content.Image
         Box(
             Modifier
@@ -498,7 +496,6 @@ private fun ConfirmLargeView(reference: AgentFileReference, size: Long, onDownlo
     }
 }
 
-/** iOS `ContentUnavailableView` with Try Again. */
 @Composable
 private fun FailedView(error: AgentFileError, onRetry: () -> Unit) {
     Column(
@@ -519,7 +516,7 @@ private fun FailedView(error: AgentFileError, onRetry: () -> Unit) {
     }
 }
 
-/** A document Android can't preview here: another app opens it (iOS shows it in Quick Look). */
+/** A document Android can't preview here: another app opens it. */
 @Composable
 private fun ExternalDocumentView(reference: AgentFileReference, noAppOpens: Boolean, onOpen: () -> Unit, modifier: Modifier) {
     Column(
@@ -586,8 +583,8 @@ private fun AgentPdfView(document: AgentPdfDocument, modifier: Modifier) {
 }
 
 /**
- * The player, with a glyph and name above the controls for audio (iOS `AgentFilePlayer`,
- * `AVPlayerViewController`). Video controls hide while playing and come back with a tap.
+ * The player, with a glyph and name above the controls for audio. Video controls hide while playing
+ * and come back with a tap.
  */
 @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
 @Composable

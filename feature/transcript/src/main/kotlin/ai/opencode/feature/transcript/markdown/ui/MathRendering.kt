@@ -40,9 +40,9 @@ import ru.noties.jlatexmath.awt.AndroidGraphics2D
 import ru.noties.jlatexmath.awt.Color as TeXColor
 
 /**
- * iOS `MathRenderer` (SwiftMath → jlatexmath): TeX typeset into template images (alpha masks)
- * that take the colour of the text around them via a tint, so light, dark and a done task's
- * secondary all reuse one image. Null for source jlatexmath can't parse.
+ * TeX typeset into template images (alpha masks) that take the colour of the text around them via a
+ * tint, so light, dark and a done task's secondary all reuse one image. Null for source jlatexmath
+ * can't parse.
  */
 object MathRenderer {
     class Rendered(
@@ -66,7 +66,7 @@ object MathRenderer {
     var rendersForTesting = 0
         private set
 
-    /** [fontSizePx] is the typeset size in pixels (iOS points × the display scale). */
+    /** [fontSizePx] is the typeset size in pixels. */
     fun render(source: String, fontSizePx: Float, display: Boolean): Rendered? {
         val key = "${if (display) "display" else "inline"}|$fontSizePx|$source"
         cache.get(key)?.let { return it.rendered }
@@ -105,18 +105,15 @@ object MathRenderer {
 }
 
 /**
- * iOS `InlineMath`: the size inline math typesets at, and how a run reads. Typesetting into the
- * text is part of the Markdown presentation (`MarkdownPresentation`), as inline content on the
- * baseline at the text's size.
+ * The size inline math typesets at, and how a run reads. Typesetting into the text is part of the
+ * Markdown presentation (`MarkdownPresentation`), as inline content on the baseline at the text's
+ * size.
  */
 object InlineMath {
     /** Latin Modern sits smaller than SF at the same size; this evens it out (`(pointSize * 1.1).rounded()`). */
     fun fontSize(pointSize: Float): Float = Math.round(pointSize * 1.1f).toFloat()
 
-    /**
-     * [fontSize] for a text size, in px for [density]. Rounded at the scaled size, as iOS rounds
-     * the Dynamic Type point size (font scale included, nonlinear scaling too).
-     */
+    /** [fontSize] for a text size, in px for [density]. Rounded at the scaled size. */
     fun fontSizePx(textSize: TextUnit, density: Density): Float {
         val scaledPoints = with(density) { textSize.toPx() } / density.density
         return fontSize(scaledPoints) * density.density
@@ -124,12 +121,11 @@ object InlineMath {
 }
 
 /**
- * iOS `MathDisplayView`: display math on the full-width band code blocks use, scrolling
- * sideways when it's wider than the screen. Source jlatexmath can't typeset shows as code, as
- * written.
+ * Display math on the full-width band code blocks use, scrolling sideways when it's wider than the
+ * screen. Source jlatexmath can't typeset shows as code, as written.
  *
- * @param selection the block's key in a reply: the equation joins the reply's one selection, a
- *   typeset one as one whole piece of its source (iOS's image leaf), source shown as code as text.
+ * @param selection The block's key in a reply: the equation joins the reply's one selection, a
+ *     typeset one as one whole piece of its source, source shown as code as text.
  */
 @Composable
 fun MathDisplayView(math: OpenCodeMarkdownBlock.MathBlock, selection: TranscriptSelectionLeafKey? = null, modifier: Modifier = Modifier) {
@@ -137,8 +133,8 @@ fun MathDisplayView(math: OpenCodeMarkdownBlock.MathBlock, selection: Transcript
     val colors = OpenCodeTheme.colors
     val fontSizePx = InlineMath.fontSizePx(MarkdownStyle.bodyTextSize, density) * 1.15f
     val rendered = remember(math.source, fontSizePx) { MathRenderer.render(math.source, fontSizePx, display = true) }
-    // In a reply a hold selects the equation; a hold on one already selected lifts it to drag
-    // as its TeX (iOS `.transcriptDragSource(.code(source: math.raw, language: "tex"))`).
+    // In a reply a hold selects the equation; a hold on one already selected lifts it to drag as
+    // its TeX.
     val equationDescription = stringResource(R.string.transcript_equation_description)
     var drag: Modifier = Modifier
     if (selection != null) {

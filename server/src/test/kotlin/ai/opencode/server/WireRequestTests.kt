@@ -303,7 +303,6 @@ class WireRequestTests {
         }
     }
 
-    /** iOS `VoiceHandoff.format(instruction:transcriptDelta: [])` (its type lives in `:feature:voice`). */
     private fun voiceHandoff(instruction: String): String =
         "Voice delegation. The user is on a voice call with a voice agent, which hands their requests to you.\n" +
             "{\n  \"instruction\" : \"$instruction\",\n  \"transcript_delta\" : [\n\n  ]\n}"
@@ -471,8 +470,7 @@ class WireRequestTests {
     }
 
     /**
-     * iOS `AppFeatureTests.transportSecurityAllowsPrivateOverlays` (same addresses): plain HTTP
-     * reaches private networks and overlays only; the live guard refuses the rest as the
+     * Plain HTTP reaches private networks and overlays only; the live guard refuses the rest as the
      * platform's cleartext refusal, before anything is sent.
      */
     @Test

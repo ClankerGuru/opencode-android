@@ -44,7 +44,6 @@ import java.time.Instant
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-/** Builds a [VoiceCallClient] the way iOS tests override single closures of `voiceCall`. */
 internal fun speechVoiceCall(
     start: suspend (String, RealtimeSessionConfig) -> Flow<VoiceCallEvent> = { _, _ -> kotlinx.coroutines.flow.emptyFlow() },
     completeFunction: suspend (String, String) -> Unit = { _, _ -> },
@@ -438,8 +437,7 @@ class VoiceSuppressionTests {
     private fun runCafeRequest(finalRoundFails: Boolean, check: (List<Announced>) -> Unit) = runBlocking {
         val shared = SpeechTestShared()
         val released = CompletableDeferred<Unit>()
-        // iOS sleeps 300 ms so the watched reads land while the delegator writes its answer;
-        // here the answer waits until all four reads came back.
+        // The answer waits until all four reads came back.
         val reads = Locked(0)
         val readsLanded = CompletableDeferred<Unit>()
         fun readLanded() { if (reads.withValue { (it + 1) to (it + 1) } == 4) readsLanded.complete(Unit) }
@@ -807,9 +805,8 @@ class VoiceSuppressionTests {
         assertEquals(true, answered.value.firstOrNull()?.first?.contains("Item 40"))
     }
 
-    // MARK: Kit's call (TestFlight 301): the delegator read GAME ENGINE's
-    // design cut at 400 characters ("| The 1…") and told him the reply it
-    // could see was cut off, so it didn't want to invent the rules.
+    // MARK: The delegator read a design cut at 400 characters ("| The 1…") and said the reply it
+    // could see was cut off, so it wouldn't invent the rules.
 
     private val gameEngine = OpenCodeSession(id = "ses_game", serverTitle = "GAME ENGINE", projectID = "p", directory = "/Users/kit/game", updatedAt = distantPast)
 
@@ -1372,7 +1369,7 @@ class VoiceSuppressionTests {
             this[SharedStore] = shared.store
             this[Clock] = clock
             this[DateClient] = epoch
-            // Android: the rejoined call's ongoing-notification ID (iOS's Home owns that Live Activity).
+            // Android: the rejoined call's ongoing-notification ID.
             this[UuidClient] = UuidClient.incrementing()
             this[VoiceDelegatorClient] = VoiceDelegatorClient(isEnabled = true) { _, _, _ ->
                 answerNow.await()

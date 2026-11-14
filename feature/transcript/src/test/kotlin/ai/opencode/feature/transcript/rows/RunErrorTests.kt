@@ -9,11 +9,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Port of iOS `RunErrorTests.swift`: the transcript's item-level [RunErrorState] and
- * `OpenCodeRunError`'s kinds. The `SessionFeature` reducer tests (Edit's undo, Redo, Revert to
- * Here, the undo snapshot) are `:feature:session`'s.
- */
+/** The transcript's item-level [RunErrorState] and `OpenCodeRunError`'s kinds. */
 class RunErrorTests {
     private val filter = OpenCodeRunError(type = "provider.content-filter", message = "Provider blocked the response")
 
@@ -27,7 +23,6 @@ class RunErrorTests {
             OpenCodeTranscriptItem.RunError(id = "msg_idle", error = OpenCodeRunError(type = filter.type, message = filter.message, beforeReply = true)),
         )
 
-    /** iOS `SessionFeature.State` with a session, nothing failed or queued, no staged revert. */
     private fun actionableID(items: List<OpenCodeTranscriptItem>, isAwaitingReply: Boolean = false) =
         RunErrorState.actionableRunErrorID(
             items, hasSession = true, isRunning = isAwaitingReply, hasFailedSends = false, hasQueuedInputs = false, revertMessageID = null,

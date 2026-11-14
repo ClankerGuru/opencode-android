@@ -42,8 +42,8 @@ import kotlin.time.Duration.Companion.seconds
 private const val MAX_IMAGE_BYTES = 25 * 1024 * 1024
 
 /**
- * Decoded Markdown image bytes by cache key (iOS `transcriptImageCache`), bounded by bytes,
- * least recently used out first. Android decodes bitmaps in the UI layer.
+ * Decoded Markdown image bytes by cache key, bounded by bytes, least recently used out first.
+ * Android decodes bitmaps in the UI layer.
  */
 class MarkdownImageCache(private val capacityBytes: Long = 32L * 1024 * 1024) {
     private val entries = LinkedHashMap<String, ByteArray>(16, 0.75f, true)

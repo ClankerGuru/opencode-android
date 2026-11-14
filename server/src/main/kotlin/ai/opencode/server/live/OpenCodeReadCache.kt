@@ -22,9 +22,9 @@ import kotlin.time.Duration.Companion.seconds
 internal data class KnownParent(val parent: String?)
 
 /**
- * Process-wide decoded reads shared by every screen (iOS `OpenCodeReadCache` actor):
- * model catalogs for 30 s, session parents for the app's lifetime, missing sessions for 5 s,
- * in-flight session lookups joined, and a per-server lookup permit pool.
+ * Process-wide decoded reads shared by every screen: model catalogs for 30 s, session parents for
+ * the app's lifetime, missing sessions for 5 s, in-flight session lookups joined, and a per-server
+ * lookup permit pool.
  */
 internal class OpenCodeReadCache {
     private val lock = Any()

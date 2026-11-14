@@ -11,7 +11,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/** iOS `PhotoSheetInteractionTests`: the photo sheet's dismissal seed and drag geometry. */
+/** The photo sheet's dismissal seed and drag geometry. */
 class PhotoSheetInteractionTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -53,7 +53,6 @@ class PhotoSheetInteractionTests {
     }
 
     private companion object {
-        /** iOS's `stretched` floor of 120 pt, in px at density 1. */
         const val MIN_HEIGHT = 120f
 
         fun rect(x: Float, y: Float, width: Float, height: Float) = Rect(Offset(x, y), Size(width, height))

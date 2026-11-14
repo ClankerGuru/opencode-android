@@ -5,12 +5,8 @@ import kotlinx.coroutines.delay
 import kotlin.time.Duration
 
 /**
- * Port of iOS `BackgroundTaskClient`: asks for time to finish work started in the foreground
- * once the app leaves it (Stop's request, tapped right before locking the phone).
- *
- * Android keeps a backgrounded process running until the system freezes or reclaims it
- * (cached-app freezer, typically seconds), so the live value is a scoped marker that logs.
- * Work that must survive (outbox sends) belongs in a WorkManager job owned by its feature.
+ * Android keeps a backgrounded process running until the system freezes it, so the live value is a
+ * scoped marker that logs.
  */
 fun interface BackgroundTaskClient {
     /** Begins an assertion named [name]; the returned function ends it. */
@@ -27,9 +23,8 @@ fun interface BackgroundTaskClient {
 }
 
 /**
- * Port of iOS `BackgroundTimeClient`: keeps the app's event stream alive for a short while
- * after it leaves the screen (`HomeFeature.liveUpdatesAfterLeaving`). Holds until [seconds]
- * pass or the effect is cancelled.
+ * Keeps the app's event stream alive for a short while after it leaves the screen
+ * (`HomeFeature.liveUpdatesAfterLeaving`). Holds until [seconds] pass or the effect is cancelled.
  */
 fun interface BackgroundTimeClient {
     suspend fun hold(name: String, seconds: Duration)

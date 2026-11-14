@@ -35,12 +35,6 @@ import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
 
-/**
- * Port of iOS `DictationLiveActivityTests.swift`'s Home tests and `onlyALiveHandsFreeRecordingOutsideACallShows`
- * (Home's `liveActivityRecording` reads `SessionFeature.State`, which `:feature:system` can't see).
- * `theStopIntentSendsItsCommand` is `:feature:system`'s (`DictationIntents`); `dictationFeatureReducesHoldArmingLockingAndFinishExhaustively` is
- * `:feature:composer`'s.
- */
 class DictationLiveActivityTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -198,8 +192,7 @@ class DictationLiveActivityTests {
 
     /**
      * Only hands-free once the mic is live, outside a call: a held mic shows nothing, and a call
-     * that failed or dropped doesn't count as a call. (Home's `liveActivityRecording` is iOS
-     * `DictationLiveActivity.recording(in:)`.)
+     * that failed or dropped doesn't count as a call.
      */
     @Test fun onlyALiveHandsFreeRecordingOutsideACallShows() = homeTest { h ->
         var detail = requireNotNull(h.state { home() }.sessionDetail)

@@ -22,21 +22,16 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * Port of iOS `WindowSnapshot` (`TraceTriggers.swift`): the app's window as it looks now, as a JPEG
- * within the report's budget. `drawHierarchy` → `PixelCopy` of the resumed activity's window.
- *
- * Never in the background (no resumed activity), never while a credential surface is composed
- * ([CredentialSurface], iOS's Settings), and never from a `FLAG_SECURE` window. iOS also skips
- * while a secure text field is first responder; Compose has no responder chain to ask, and the
- * app's password fields all live inside Settings, which is a credential surface.
+ * The window as a JPEG within the report's budget, via `PixelCopy`. Never in the background, over a
+ * [CredentialSurface], or from a `FLAG_SECURE` window.
  */
 object WindowSnapshot {
     /** Resumed activities, last resumed last (several in multi-window). Main thread only. */
     private val resumed = ArrayList<WeakReference<Activity>>()
 
     /**
-     * The window in use (iOS `keyWindow` through `ActiveScene.window`): with several windows, the
-     * one with window focus, the one last touched; otherwise the last resumed activity.
+     * The window in use: with several windows, the one with window focus, the one last touched;
+     * else the last resumed activity.
      */
     val keyWindow: Activity?
         get() {
@@ -62,7 +57,6 @@ object WindowSnapshot {
         })
     }
 
-    /** iOS `isAllowed(applicationState:credentialSurfaces:firstResponder:)`. */
     fun isAllowed(isActive: Boolean, credentialSurfaces: Int, isSecureWindow: Boolean): Boolean =
         isActive && credentialSurfaces == 0 && !isSecureWindow
 
@@ -87,7 +81,7 @@ object WindowSnapshot {
         val view = window.decorView
         val secure = window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0
         if (view.width <= 0 || view.height <= 0 || !isAllowed(!activity.isFinishing, CredentialSurface.visible, secure)) return null
-        // iOS renders at no more than 2× points.
+        // Renders at no more than 2× points.
         val density = activity.resources.displayMetrics.density
         val scale = min(1f, 2f / density)
         val full = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
@@ -106,8 +100,8 @@ object WindowSnapshot {
 }
 
 /**
- * iOS `ProblemReportCapture`: the app window at the moment of a trace, as a JPEG. A screenshot
- * taken flashes the window and plays the shutter after it (`ScreenCaptureFeedback`).
+ * The app window at the moment of a trace, as a JPEG. A screenshot taken flashes the window and
+ * plays the shutter after it (`ScreenCaptureFeedback`).
  */
 class ProblemReportCapture(val screenshot: suspend () -> ByteArray? = { null }) {
     companion object Key : DependencyKey<ProblemReportCapture> {

@@ -35,10 +35,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * Android-only: [ComposerKeyboardProgress] reads Compose's IME insets. After an animation the app
- * controlled (the drawer's keyboard hold giving the keys back) Compose can keep
- * `imeAnimationSource` at the keys' old height while the keys and the target are down; read as
- * an animation, it kept the row's hidden controls mounted over the field, swallowing its taps.
+ * Android-only: after an app-controlled IME animation, Compose can keep `imeAnimationSource` at the
+ * keys' old height while the keys and the target are down; that must not read as an animation.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -69,8 +67,8 @@ class ComposerKeyboardProgressTests {
     }
 
     /**
-     * iOS `.allowsHitTesting(false)` on the shut row's controls: a tap on them reaches the field
-     * laid out under them in another branch (the composer's input slot), and they still draw.
+     * A tap on them reaches the field laid out under them in another branch (the composer's input
+     * slot), and they still draw.
      */
     @Test fun shutControlsLetTheFieldUnderThemTakeTheTap() {
         for (passes in listOf(true, false)) {

@@ -36,24 +36,15 @@ import kotlinx.coroutines.launch
 import kotlin.math.max
 
 /**
- * The New Plus Menu's photo sheet hosted in the composer's morph, as iOS's
- * `SessionView+PhotoSheet` hosts [PlusPhotoSheetContent] in [ComposerMorphSurface]
- * (`photoSheetSurface`, `openPhotoSheet`, `dragPhotoSheet`, `settlePhotoSheet`,
- * `togglePhotoSheetExpand`, `backFromPhotoSheet`, `closePhotoSheet`, `resetPhotoSheet`): the
- * + menu's surface grows into a sheet over the keyboard's place (compact) that a drag or the
- * grabber raises to [ceiling] (expanded), the camera first, Back and All Photos / Add along its
- * foot. Back folds it onto the menu; Add, a capture, a tap outside, a drag down or system Back
- * slide it down and fade it out while the composer rises back from behind it.
- *
- * Keep it composed for the session's lifetime (it draws nothing closed) and drive it with
- * [isPresented]; it opens from [AttachmentMenuAnchors.menu]. The + menu overlay stays the
- * menu (pass it `handedOff = isPresented`, which dissolves its rows as the sheet grows);
- * this surface doesn't take the menu phase over (`menuRows`), so the two never draw rows twice.
+ * The New Plus Menu's photo sheet in the composer's morph: the
+ * + menu's surface grows into a sheet over the keyboard's place that a drag or the grabber
+ * raises to [ceiling]. Keep it composed for the session's lifetime and drive it with
+ * [isPresented]; pass the + menu overlay `handedOff = isPresented`.
  *
  * @param isPresented Photos was chosen in the menu; false folds the sheet away.
- * @param menuOpen the menu is still up: going away, the sheet folds back onto it (Back);
- *   otherwise it slides down (iOS `photoSheetFoldsToComposer`).
- * @param ceiling the expanded detent's top, root px (iOS `headerHeight + headerGap`).
+ * @param menuOpen The menu is still up: going away, the sheet folds back onto it (Back); otherwise
+ *     it slides down.
+ * @param ceiling The expanded detent's top, root px.
  * @param hadKeyboard the message field had the keyboard when Photos was chosen: the compact
  *   detent takes the keyboard's height, and the sheet's bottom edge rides the keyboard's curve.
  * @param morph hoist it to sink the composer under the sheet with
@@ -87,7 +78,7 @@ fun ComposerMorphPhotoSheet(
     val imeBottom = WindowInsets.ime.getBottom(density)
     val navigationBottom = WindowInsets.navigationBars.getBottom(density)
 
-    // Detent state in root dp; [displayTop] is its top as drawn (iOS animates `photoSheetDetent`).
+    // Detent state in root dp; [displayTop] is its top as drawn.
     var detent by remember { mutableStateOf(PlusPhotoSheetDetent()) }
     val displayTop = remember { Animatable(0f) }
     var source by remember { mutableStateOf(Rect.Zero) }
@@ -99,7 +90,7 @@ fun ComposerMorphPhotoSheet(
     val currentNavigationBottom by rememberUpdatedState(navigationBottom)
     val currentOnDismiss by rememberUpdatedState(onDismiss)
 
-    /** iOS `composerSheetTop(composer:)`: the compact detent's top (root dp). */
+    /** The compact detent's top (root dp). */
     fun compactTop(): Float {
         val composer = anchors.composer
         val keyboard = currentImeBottom / px
@@ -138,7 +129,7 @@ fun ComposerMorphPhotoSheet(
         morph.armThenOpen(animation, edge, ComposerMorphTunables.photoContentDelay, prepare = {}, launch = {}, opened = {})
     }
 
-    /** iOS `backFromPhotoSheet`: folds onto the menu's surface, which (and whose rows) come back as it lands. */
+    /** Folds onto the menu's surface, which (and whose rows) come back as it lands. */
     fun back() {
         if (!morph.isOpening) return
         // The picks are dropped, but their badges stay until the sheet has folded away.
@@ -149,7 +140,7 @@ fun ComposerMorphPhotoSheet(
         morph.fold(Motion.panelClose.animation(reduceMotion = reduceMotion), reduceMotion = reduceMotion)
     }
 
-    /** iOS `closePhotoSheet` / `foldPhotoSheet`: slides down and fades out while the composer rises back. */
+    /** Slides down and fades out while the composer rises back. */
     fun foldDown() {
         if (!morph.isOpening) return
         library.clearPicks()
@@ -187,7 +178,7 @@ fun ComposerMorphPhotoSheet(
                 detent = next
                 val spec = Motion.release.animation<Float>(reduceMotion = reduceMotion)
                 val v0 = Motion.release.initialVelocity(settlement.initialVelocity, reduceMotion)
-                // Each value continues at the finger's speed toward its own end (iOS's normalized initialVelocity).
+                // Each value continues at the finger's speed toward its own end.
                 scope.launch { displayTop.animateTo(next.top, spec, initialVelocity = v0 * (next.top - displayTop.value)) }
                 morph.animateDrag(0f, spec, initialVelocity = v0 * (0f - morph.drag))
             }
@@ -229,7 +220,7 @@ fun ComposerMorphPhotoSheet(
     }
     LaunchedEffect(library) { library.prime() }
     DisposableEffect(library) { onDispose { library.stop() } }
-    // iOS's escape action: system Back dismisses the sheet and the menu.
+    // System Back dismisses the sheet and the menu.
     BackHandler(enabled = morph.isOpening) { onDismiss() }
 
     PhotoLibraryAccessHost()

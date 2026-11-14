@@ -10,9 +10,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Port of iOS `AttachmentCameraActivityTests.swift`. iOS's `handleScenePhase(.inactive/.active)`
- * change nothing; Android's presentation only hears the background (`ON_STOP` →
- * [PlusCameraPresentation.handleBackground]), so those steps assert that nothing moved.
+ * IOS's `handleScenePhase(.inactive/.active)` change nothing; Android's presentation only hears the
+ * background (`ON_STOP` → [PlusCameraPresentation.handleBackground]), so those steps assert that
+ * nothing moved.
  */
 class AttachmentCameraActivityTests {
     @Test fun hiddenAndBackgroundCamerasNeverActivate() {
@@ -80,7 +80,7 @@ class AttachmentCameraActivityTests {
             ).shouldActivate,
         )
 
-        // 2. The system permission dialog pauses the activity (iOS `.inactive`):
+        // 2. The system permission dialog pauses the activity.
         // PlusCameraPresentation stays expanded while AttachmentCameraActivity pauses.
         assertTrue(camera.expanded)
         assertTrue(camera.shouldActivateCamera(sheetIsOpen = true))
@@ -93,7 +93,7 @@ class AttachmentCameraActivityTests {
             ).shouldActivate,
         )
 
-        // 3. User taps Allow and the activity resumes (iOS `.active`):
+        // 3. User taps Allow and the activity resumes.
         // viewfinder is still expanded and AttachmentCameraActivity immediately activates.
         assertTrue(camera.expanded)
         assertTrue(

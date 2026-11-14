@@ -46,12 +46,11 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * A Mermaid diagram drawn once per source and theme: its SVG (vector, standing in for iOS's PDF),
- * at its natural size in dp (padding included). Port of iOS `MermaidDiagram`.
+ * A Mermaid diagram drawn once per source and theme: its SVG, at its natural size in dp (padding
+ * included).
  */
 class MermaidDiagram(val svg: String, val width: Float, val height: Float)
 
-/** Port of iOS `MermaidRenderError`. */
 sealed class MermaidRenderError : Exception() {
     /** Pele rejected the source (a syntax error): the same every time, so it's the only failure that's cached. */
     data object InvalidDiagram : MermaidRenderError()
@@ -68,15 +67,13 @@ sealed class MermaidRenderError : Exception() {
 /**
  * Renders Mermaid with the bundled `assets/mermaid/pele.global.js` (Pele 1.7.0, MIT) in one shared
  * offscreen [WebView], one diagram at a time: Pele lays the source out and writes its SVG
- * (theme-independent, kept by source with its natural size), the page themes it, and it's drawn
- * at whatever size a view asks for (the page scales the SVG; the web view draws into a bitmap).
- * iOS runs Pele in JavaScriptCore to size a card synchronously on its first frame; Android has no
- * in-process JavaScript engine, so Pele runs in the page and a size is synchronous once the source
- * has been prepared ([naturalSize]).
- * The page is offline (a strict Content Security Policy, network loads blocked, no navigation)
- * and has no JavaScript interfaces: nothing in it can reach the app; results are read back by
- * polling the page. The web view goes [idleTimeout] after the last render or drawing, and on
- * memory pressure with the rasters. Main thread only. Port of iOS `MermaidRenderer`.
+ * (theme-independent, kept by source with its natural size), the page themes it, and it's drawn at
+ * whatever size a view asks for (the page scales the SVG; the web view draws into a bitmap).
+ * Android has no in-process JavaScript engine, so Pele runs in the page and a size is synchronous
+ * once the source has been prepared ([naturalSize]). The page is offline (a strict Content Security
+ * Policy, network loads blocked, no navigation) and has no JavaScript interfaces: nothing in it can
+ * reach the app; results are read back by polling the page. The web view goes [idleTimeout] after
+ * the last render or drawing, and on memory pressure with the rasters. Main thread only.
  */
 class MermaidRenderer private constructor() {
     /** Diagrams by source and theme. Small: SVGs of a few kilobytes. In insertion order, at most 64. */
@@ -93,7 +90,7 @@ class MermaidRenderer private constructor() {
 
     private var webView: WebView? = null
     private var pageLoad: CompletableDeferred<Unit>? = null
-    /** The window to render in (iOS inserts its web view into the key window, off screen). */
+    /** The window to render in. */
     private var host: WeakReference<ViewGroup>? = null
 
     /** How long the web view outlives the last render. */
@@ -492,10 +489,7 @@ class MermaidRenderer private constructor() {
         fun caches(result: Result<MermaidDiagram>): Boolean =
             result.isSuccess || result.exceptionOrNull() == MermaidRenderError.InvalidDiagram
 
-        /**
-         * The card's colour, drawn into the image so the image is the card (iOS
-         * `secondarySystemBackground` resolved for the theme).
-         */
+        /** The card's colour, drawn into the image so the image is the card. */
         fun background(theme: MermaidTheme): Color =
             if (theme == MermaidTheme.Dark) Color(0xFF1C1C1E) else Color(0xFFF2F2F7)
 

@@ -1,20 +1,15 @@
 package ai.opencode.feature.composer
 
-/** iOS `AutocompleteOrder`: where the best match sits. */
+/** Where the best match sits. */
 enum class AutocompleteOrder(val rawValue: String) { Top("top"), Bottom("bottom") }
 
-/** iOS `AutocompleteExitMode`: how a leaving row goes. */
+/** How a leaving row goes. */
 enum class AutocompleteExitMode(val rawValue: String) { Fade("fade"), Collapse("collapse") }
 
-/** iOS `AutocompleteCommandAction`: whether choosing a `/` command fills it in or runs it. */
+/** Whether choosing a `/` command fills it in or runs it. */
 enum class AutocompleteCommandAction(val rawValue: String) { Fill("fill"), Run("run") }
 
-/**
- * Port of iOS `ComposerAutocompleteTunables` (D-105 option 3, "Composer Grows"), keys and
- * defaults under `composer.autocomplete.*`. iOS backs these with live `Tunable`s in the
- * Developer Mode Tuning Panel; Android has no tuning store, so these are the baked defaults
- * (lengths in dp, times in seconds). Timing is the motion roles' ([AutocompleteParameters]).
- */
+/** Lengths in dp, times in seconds. */
 object ComposerAutocompleteTunables {
     /** `composer.autocomplete.order` "Best match". */
     val order = AutocompleteOrder.Bottom
@@ -56,6 +51,6 @@ object ComposerAutocompleteTunables {
     /** `composer.autocomplete.edgeFade` "Scroll edge fade (pt)" (0…60). */
     const val edgeFade = 24.0
 
-    /** `ComposerTunables.cornerRadius` (the desktop dock's 12; iOS 28), the surface the highlight sits concentric in. */
+    /** `ComposerTunables.cornerRadius`, the surface the highlight sits concentric in. */
     const val composerCornerRadius = 12.0
 }

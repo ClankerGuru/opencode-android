@@ -6,8 +6,8 @@ import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 
 /**
- * Port of Swift's `@TaskLocal`: a value bound for the duration of a block and
- * inherited by everything (child coroutines included) that block starts.
+ * A value bound for the duration of a block and inherited by everything (child coroutines included)
+ * that block starts.
  *
  * ```kotlin
  * val current = TaskLocal<String?> { null }
@@ -17,7 +17,7 @@ import kotlin.coroutines.CoroutineContext
 class TaskLocal<T>(private val defaultValue: () -> T) {
     private class Key<T> : CoroutineContext.Key<Element<T>>
 
-    /** Also mirrors the value into [local] while its coroutine runs, so plain functions can read it as Swift's can. */
+    /** Also mirrors the value into [local] while its coroutine runs. */
     private class Element<T>(
         val value: T,
         override val key: CoroutineContext.Key<*>,
@@ -34,8 +34,8 @@ class TaskLocal<T>(private val defaultValue: () -> T) {
     suspend fun current(): T = get(currentCoroutineContext())
 
     /**
-     * The bound value from a non-suspending function running inside a coroutine that bound it
-     * (Swift reads `@TaskLocal`s from synchronous code too), else the default.
+     * The bound value from a non-suspending function running inside a coroutine that bound it, else
+     * the default.
      */
     fun currentBlocking(): T = local.get()?.value ?: defaultValue()
 

@@ -8,7 +8,6 @@ val appLanguages = listOf("en")
 android {
     namespace = "ai.opencode.app"
     defaultConfig {
-        // Matches the iOS bundle identifier.
         applicationId = "ai.opencode.mobilecode"
         // CI stamps builds so testers can tell them apart: the workflow run number as the
         // version code (each build installs over the last), the release tag's version

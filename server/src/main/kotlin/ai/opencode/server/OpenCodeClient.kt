@@ -109,11 +109,10 @@ import kotlinx.coroutines.flow.Flow
 import java.io.File
 
 /**
- * The V2 OpenCode server client (iOS `@Dependency(\.openCodeClient)`): a value of suspend
- * functions, read with `dependency(OpenCodeClient)` and overridden in tests with `copy(...)`.
- * Every call throws [OpenCodeClientError] (or `CancellationException`); every request goes
- * through `NetworkRetry` exactly once. Run a loop that owns its retries under
- * `withRetryPolicy(RetryPolicy.once) { … }`.
+ * The V2 OpenCode server client: a value of suspend functions, read with
+ * `dependency(OpenCodeClient)` and overridden in tests with `copy(...)`. Every call throws
+ * [OpenCodeClientError] (or `CancellationException`); every request goes through `NetworkRetry`
+ * exactly once. Run a loop that owns its retries under `withRetryPolicy(RetryPolicy.once) { … }`.
  */
 data class OpenCodeClient(
     val health: suspend (server: OpenCodeServer) -> Unit,
@@ -259,18 +258,17 @@ data class OpenCodeClient(
             markdownImageCacheKey(server, directory, source).removePrefix("markdown:")
 
         /**
-         * iOS `OpenCodeClient.pairNotificationPreview(server:callbackURL:ref:publicKey:)`: sends
-         * this phone's notification public key for `ref` to the saved server's HTTPS address
+         * Sends this phone's notification public key for `ref` to the saved server's HTTPS address
          * and returns the server's. Only public keys cross; throws without an HTTPS address.
          */
         suspend fun pairNotificationPreview(server: OpenCodeServer, callbackURL: String, ref: String, publicKey: String): String =
             ai.opencode.server.live.requestPairNotificationPreview(server, callbackURL, ref, publicKey)
 
-        /** iOS `OpenCodeClient.assistantReply(messagesJSON:afterMessageID:acrossSteers:)`: a prompt's reply in a `/message` page. */
+        /** A prompt's reply in a `/message` page. */
         fun assistantReply(messagesJSON: ByteArray, afterMessageID: String, acrossSteers: Boolean = false): String? =
             ai.opencode.server.live.assistantReply(messagesJSON, afterMessageID, acrossSteers)
 
-        /** iOS `OpenCodeClient.decodeTranscript(_:)`: a `/message` page's transcript items. */
+        /** A `/message` page's transcript items. */
         fun decodeTranscript(data: ByteArray): List<ai.opencode.server.model.OpenCodeTranscriptItem> =
             ai.opencode.server.live.decodeTranscript(data)
 
@@ -347,10 +345,9 @@ data class OpenCodeClient(
         )
 
         /**
-         * Inert: endpoints a test doesn't override throw `AssertionError("Unimplemented: OpenCodeClient.<name>")`.
-         * The ones iOS stubs for every test (context reads, capabilities, autocomplete, background
-         * moves, Markdown images on a per-test cache) are inert defaults, so routine refreshes
-         * don't fail tests that don't care about them.
+         * Inert: endpoints a test doesn't override throw `AssertionError`, except routine reads
+         * (context, capabilities, autocomplete, background moves, Markdown images), which default
+         * to inert values.
          */
         override val testValue: OpenCodeClient
             get() {

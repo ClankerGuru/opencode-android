@@ -45,20 +45,6 @@ import java.time.Instant
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `VoiceLiveActivityTests.swift`'s Home tests (the call's ongoing notification as
- * Home drives it) and its mapping tests (here because Home's `liveActivityCall` builds the
- * `VoiceLiveActivity.Call` from `VoiceFeature.State`, which `:feature:system` can't see). The
- * commands and `LiveVoiceActivity` tests are `:feature:system`'s;
- * `leavingHomeMidCallEndsTheActivity` and `leavingHomeWithoutACallLeavesActivitiesAlone` are
- * `:app`'s.
- *
- * Android: the call's microphone foreground service (`:feature:voice`'s `VoiceCallService`) *is*
- * its ongoing notification, so Home keeps what it would show in `voiceCallActivity` without
- * posting it through `VoiceLiveActivityClient` (drawer.md, `HomeFeature+Composition`). Where iOS
- * asserts the pushes, these tests assert the content Home kept, and that a call's changes post
- * nothing through the client.
- */
 class VoiceLiveActivityTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -75,13 +61,12 @@ class VoiceLiveActivityTests {
     private fun pushRecorder(pushes: LockIsolated<List<VoiceCallActivityAttributes.ContentState?>>) =
         VoiceLiveActivityClient(update = { content, _ -> pushes.append(content) }, endAll = {}, commands = { kotlinx.coroutines.flow.emptyFlow() })
 
-    /** iOS `voiceCall.start` stays open until the test's events (its test value never ends the call). */
     private fun ai.opencode.core.dependencies.DependencyValues.Builder.startableCall(ends: LockIsolated<Int>? = null) {
         voiceCall { copy(start = { _, _ -> flow { awaitCancellation() } }, setMuted = { }, end = { ends?.increment() }) }
         this[RealtimePreflightClient] = RealtimePreflightClient(verify = { _, _ -> })
     }
 
-    /** iOS `await clock.advance(by:)`: lets launched effects reach their sleep first, then reduces what they send. */
+    /** Lets launched effects reach their sleep first, then reduces what they send. */
     private suspend fun advance(store: TestStore<HomeFeature.State, HomeFeature.Action>, clock: TestClock, by: kotlin.time.Duration) {
         settle()
         clock.advance(by)
@@ -274,7 +259,7 @@ class VoiceLiveActivityTests {
         }
     }
 
-    // MARK: Mapping (iOS `VoiceLiveActivity.content(for:previous:now:)` over Home's `liveActivityCall`)
+    // MARK: Mapping
 
     private val t1: Instant = Instant.ofEpochSecond(1_060)
 

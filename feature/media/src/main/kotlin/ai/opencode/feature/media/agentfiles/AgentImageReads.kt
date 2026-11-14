@@ -19,14 +19,12 @@ import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
-/** An image's display size in pixels (iOS `CGSize` in `AgentImagePreviews`). */
+/** An image's display size in pixels. */
 data class AgentImageSize(val width: Double, val height: Double)
 
 /**
  * A read of an image file: the authenticated `GET /api/fs/read` request (built by
- * `OpenCodeServer.fileReadRequest`) and whether it may use a constrained network (iOS
- * `URLRequest.allowsConstrainedNetworkAccess`: false for automatic prefetches, true once the
- * person tapped to load).
+ * `OpenCodeServer.fileReadRequest`) and whether it may use a constrained network.
  */
 data class AgentImageRequest(val request: Request, val allowsConstrainedNetworkAccess: Boolean = false)
 
@@ -47,12 +45,12 @@ internal class AgentImageBytes(initial: Int = 64 * 1024) {
 }
 
 /**
- * The pixel size an image will show at, read from its first bytes (iOS `AgentImageHeader`):
- * PNG, JPEG, HEIC, GIF and WebP headers through the platform decoder's bounds pass, with EXIF
- * orientation applied, so a preview can hold its final shape before its pixels arrive.
+ * The pixel size an image will show at, read from its first bytes: PNG, JPEG, HEIC, GIF and WebP
+ * headers through the platform decoder's bounds pass, with EXIF orientation applied, so a preview
+ * can hold its final shape before its pixels arrive.
  */
 object AgentImageHeader {
-    /** `final` says the bytes are the whole file (iOS's incremental source); the bounds pass reads either the same way. */
+    /** `final` says the bytes are the whole file; the bounds pass reads either the same way. */
     @Suppress("UNUSED_PARAMETER")
     fun size(data: ByteArray, count: Int = data.size, final: Boolean = false): AgentImageSize? {
         if (count <= 0) return null
@@ -116,7 +114,7 @@ object AgentImageHeader {
     }
 }
 
-/** What a read answered: the file, or that the copy already shown is current (iOS `AgentImageResponse`). */
+/** What a read answered: the file, or that the copy already shown is current. */
 sealed interface AgentImageResponse {
     class File(val data: ByteArray, val validators: AgentImageValidators) : AgentImageResponse
     data object NotModified : AgentImageResponse
@@ -133,8 +131,8 @@ data class AgentImageValidators(val entityTag: String? = null, val lastModified:
 }
 
 /**
- * One request with its body streamed to [block], cancelled with the calling coroutine (iOS's
- * `CancellableTaskGate` over a data task). Cancellation surfaces as [CancellationException].
+ * One request with its body streamed to [block], cancelled with the calling coroutine. Cancellation
+ * surfaces as [CancellationException].
  */
 internal suspend fun <T> OkHttpClient.agentImageStreaming(request: Request, block: (Response) -> T): T = withContext(Dispatchers.IO) {
     val call = newCall(request)
@@ -150,10 +148,10 @@ internal suspend fun <T> OkHttpClient.agentImageStreaming(request: Request, bloc
 }
 
 /**
- * One image's read: its size as soon as the header arrives, then the bytes (iOS
- * `AgentImageDownload`). One request, so the shape is known about as early as the first byte.
- * It goes through its own connections with no HTTP cache (OkHttp keeps none unless asked), so
- * nothing is kept on disk and a render overwritten in place is never served stale.
+ * One image's read: its size as soon as the header arrives, then the bytes. One request, so the
+ * shape is known about as early as the first byte. It goes through its own connections with no HTTP
+ * cache (OkHttp keeps none unless asked), so nothing is kept on disk and a render overwritten in
+ * place is never served stale.
  */
 object AgentImageDownload {
     enum class Failure {
@@ -161,8 +159,8 @@ object AgentImageDownload {
         TooLarge,
         NotImage,
         /**
-         * The constrained network (Android Data Saver, iOS Low Data Mode) refused an automatic
-         * prefetch; not retried automatically, and shown as Tap to load until the person asks for it.
+         * The constrained network refused an automatic prefetch; not retried automatically, and
+         * shown as Tap to load until the person asks for it.
          */
         Constrained,
         /** The network, or the server, failed this time: worth another try. */
@@ -177,7 +175,9 @@ object AgentImageDownload {
      */
     const val HEADER_INSPECTION_BYTES = 256 * 1024
 
-    /** iOS's ephemeral session: the transport's pools' configuration, its own connections, URLSession's 60 s idle timeout. */
+    /**
+     * The transport's pools' configuration, its own connections, URLSession's 60 s idle timeout.
+     */
     val client: OkHttpClient by lazy {
         dependency(OpenCodeTransport).request.newBuilder()
             .connectionPool(ConnectionPool())
@@ -189,10 +189,7 @@ object AgentImageDownload {
 
     private val noRedirects: OkHttpClient by lazy { client.newBuilder().followRedirects(false).followSslRedirects(false).build() }
 
-    /**
-     * Whether the request would be refused by the constrained path (iOS refuses a request with
-     * `allowsConstrainedNetworkAccess = false` on a Low Data Mode path).
-     */
+    /** Whether the request would be refused by the constrained path. */
     internal fun isConstrainedRefusal(request: AgentImageRequest): Boolean =
         !request.allowsConstrainedNetworkAccess && NetworkPathMonitor.shared?.isConstrained == true
 
@@ -265,7 +262,7 @@ object AgentImageDownload {
     }
 }
 
-/** What a header probe found (iOS `AgentImageProbeResult`). */
+/** What a header probe found. */
 sealed interface AgentImageProbeResult {
     data class Size(val size: AgentImageSize, val entityTag: String?) : AgentImageProbeResult
     /** The shape remembered for this ETag still holds. */
@@ -274,7 +271,7 @@ sealed interface AgentImageProbeResult {
     /** The first bytes didn't say (an unusual header, a server error, the network). */
     data object Unknown : AgentImageProbeResult
 
-    /** The trace name (iOS's case name). */
+    /** The trace name. */
     val traceName: String
         get() = when (this) {
             is Size -> "size"
@@ -285,10 +282,9 @@ sealed interface AgentImageProbeResult {
 }
 
 /**
- * A header-only read (iOS `AgentImageProbe`): the first bytes of an image (`Range`, which V2's
- * `/api/fs/read` honours; a server that ignores it sends the whole file and the probe stops once
- * it has the header), through its own connections so it never waits behind pixel reads. It ends
- * as soon as the shape is known.
+ * A header-only read: the first bytes of an image (`Range`, which V2's `/api/fs/read` honours; a
+ * server that ignores it sends the whole file and the probe stops once it has the header), through
+ * its own connections so it never waits behind pixel reads. It ends as soon as the shape is known.
  */
 object AgentImageProbe {
     /** Enough for PNG, GIF and WebP headers and a JPEG's EXIF before its frame. */

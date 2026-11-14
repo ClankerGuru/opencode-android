@@ -53,7 +53,6 @@ import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 
-/** Port of iOS `VoiceScreenRequestTests.swift` (and its `VoiceFeatureTests` extension). */
 class VoiceScreenRequestTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -314,7 +313,7 @@ class VoiceScreenRequestTests {
         scope.cancel()
     }
 
-    /** The call's place in the session (iOS `ScreenRequestHost`): presented, so dismissing it cancels its effects. */
+    /** The call's place in the session: presented, so dismissing it cancels its effects. */
     data class HostState(val request: State?)
 
     sealed interface HostAction {
@@ -340,7 +339,7 @@ class VoiceScreenRequestTests {
         tool = ClientTool.voiceRequestScreen, sessionID = "ses_voice",
     )
 
-    /** iOS `startExhaustiveCall`: a live call (Android asserts what each step changes by hand). */
+    /** A live call (Android asserts what each step changes by hand). */
     private suspend fun startLiveCall(
         configure: DependencyValues.Builder.() -> Unit,
     ): TestStore<VoiceFeature.State, VoiceFeature.Action> {

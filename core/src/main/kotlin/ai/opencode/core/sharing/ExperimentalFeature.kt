@@ -7,14 +7,11 @@ import ai.opencode.core.strings.localized
 import androidx.annotation.StringRes
 
 /**
- * Port of iOS `ExperimentalFeature` (`OpenCode/Settings/Experimental/ExperimentalFeature.swift`)
- * and `ExperimentalFeatures` (`OpenCode/Settings/ExperimentalFeatures.swift`): features still
- * being tried out on phones, listed in Settings › Experimental, off by default, kept on this
- * phone. Lives in `:core` because Composer, Transcript, Voice,
- * Drawer and Settings all read it; Settings owns the list UI.
+ * Features still being tried out on phones, listed in Settings › Experimental, off by default, kept
+ * on this phone. Lives in `:core` because Composer, Transcript, Voice, Drawer and Settings all read
+ * it; Settings owns the list UI.
  *
- * The entries are the whole list, in Settings order, as iOS's enum cases are; each one carries
- * its title, group and symbol (iOS `row`; Android drops iOS's summary: the rows are titles only). [allCases] is iOS `allCases`.
+ * The entries are the whole list, in Settings order; each one carries its title, group and symbol.
  *
  * Code reads it with `dependency(ExperimentalFeatures)(feature)` (reducers) or
  * `shared(experimental(feature))` (views).
@@ -29,17 +26,16 @@ enum class ExperimentalFeature(
      * Settings page (Welcome Preview, in Developer › Playgrounds).
      */
     val group: ExperimentalGroup?,
-    /** SF Symbol name (iOS `systemImage`), drawn through `OpenCodeIcons`. */
+    /** SF Symbol name, drawn through `OpenCodeIcons`. */
     val symbol: String,
     /**
-     * Removed on iOS but still read by modules whose port of the removal hasn't landed. Not in
-     * [allCases], never listed, never on.
+     * Removed, but still read by modules that haven't dropped it yet. Not in [allCases], never
+     * listed, never on.
      */
     val isRetired: Boolean = false,
     /**
-     * All Experiments switches it (iOS `joinsAll`). False for experiments that ask for a
-     * permission or share data, which stay a choice of their own, and for switches outside the
-     * pane.
+     * All Experiments switches it. False for experiments that ask for a permission or share data,
+     * which stay a choice of their own, and for switches outside the pane.
      */
     joinsAll: Boolean = true,
 ) {
@@ -73,17 +69,17 @@ enum class ExperimentalFeature(
     // Settings › Developer › Playgrounds, beside Show Welcome
     welcomePreview("welcome-preview", R.string.core_experiment_welcome_preview_title, null, "hand.wave"),
 
-    // Removed on iOS; kept only until the modules that still read them port the removal.
+    // Removed; kept only until the modules that still read them port the removal.
 
-    /** iOS cd6be7c6 removed the Since You Left experiment. Never on. */
+    /** Never on. */
     @Deprecated("Removed on iOS (cd6be7c6)")
     sinceYouLeft("since-you-left", R.string.core_experiment_since_you_left_title, ExperimentalGroup.transcript, "clock.arrow.circlepath", isRetired = true),
 
-    /** iOS c75d4a1e removed the Session Switcher experiment. Never on; its switch is cleared at launch. */
+    /** Never on; its switch is cleared at launch. */
     @Deprecated("Removed on iOS (c75d4a1e)")
     sessionSwitcher("session-switcher", R.string.core_experiment_session_switcher_title, ExperimentalGroup.drawer, "square.stack", isRetired = true),
 
-    /** iOS c75d4a1e removed Title Is the Switch. Never on; its switch is cleared at launch. */
+    /** Never on; its switch is cleared at launch. */
     @Deprecated("Removed on iOS (c75d4a1e)")
     serverTitleSwitch("server-title-switch", R.string.core_experiment_server_title_switch_title, ExperimentalGroup.drawer, "server.rack", isRetired = true),
     ;
@@ -92,7 +88,7 @@ enum class ExperimentalFeature(
 
     val title: String get() = localized(titleRes)
 
-    /** All Experiments switches it: it didn't opt out and sits in the pane (iOS `joinsAll`). */
+    /** All Experiments switches it: it didn't opt out and sits in the pane. */
     val joinsAll: Boolean = joinsAll && group != null && !isRetired
 
     /** Retired: always off. */
@@ -107,7 +103,7 @@ enum class ExperimentalFeature(
             entries.filter { !it.isRetired }
         }
 
-        /** The registered experiment with this key, or null (iOS `init?(rawValue:)`). */
+        /** The registered experiment with this key, or null. */
         fun fromRawValue(rawValue: String): ExperimentalFeature? = allCases.firstOrNull { it.rawValue == rawValue }
 
         /**
@@ -150,7 +146,7 @@ enum class ExperimentalFeature(
     }
 }
 
-/** One experimental feature's switch (iOS `.experimental(feature)`): `experimental-<rawValue>`, off by default. */
+/** One experimental feature's switch: `experimental-<rawValue>`, off by default. */
 fun experimental(feature: ExperimentalFeature): SharedKey<Boolean> =
     SharedKey.appStorage("experimental-${feature.rawValue}", false)
 

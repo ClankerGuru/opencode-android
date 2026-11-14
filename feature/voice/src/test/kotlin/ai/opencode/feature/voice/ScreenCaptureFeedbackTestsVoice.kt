@@ -7,11 +7,6 @@ import org.junit.Rule
 import org.junit.Test
 import kotlin.math.abs
 
-/**
- * The voice half of iOS `ScreenCaptureFeedbackTests` (the rest is `:core`'s
- * `ScreenCaptureFeedbackTests`): `ShutterSystemSound` scales voice's `VoiceShutterSound`, so its
- * WAV test lives with it.
- */
 class ScreenCaptureFeedbackTestsVoice {
     @get:Rule val isolation = TestIsolationRule()
 

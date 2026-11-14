@@ -5,10 +5,7 @@ import ai.opencode.core.strings.localized
 import ai.opencode.feature.settings.whatsnew.WhatsNewEntry
 import ai.opencode.feature.settings.whatsnew.WhatsNewShipped
 
-// iOS generates this list at build time (`scripts/registries.py` → `WhatsNewList.generated.swift`).
-// Android keeps it by hand: each entry is its own file in this folder, named
-// `<day>-<NN>-<id>.kt` like iOS's (`NN` counts up within a day), declaring
-// `internal val WhatsNewShipped.<name>`. Add its line here in file-name order, newest first.
+// Android keeps it by hand. Add its line here in file-name order, newest first.
 
 /**
  * Every shipped entry, newest first: by day, then by `NN` (higher is newer). The list is built

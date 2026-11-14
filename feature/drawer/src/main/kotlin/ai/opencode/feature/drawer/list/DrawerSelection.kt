@@ -61,9 +61,8 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 
 /**
- * The drawer's selection (Android, as in Gmail and Files; iOS holds a row for its menu instead).
- * Holding a row chooses it; while any row is chosen, a tap adds or removes one, and the header
- * shows [DrawerSelectionBar] with the chosen sessions' actions.
+ * The drawer's selection. Holding a row chooses it; while any row is chosen, a tap adds or removes
+ * one, and the header shows [DrawerSelectionBar] with the chosen sessions' actions.
  */
 @Stable
 class DrawerSelection {

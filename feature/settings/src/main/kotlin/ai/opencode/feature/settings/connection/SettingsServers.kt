@@ -54,9 +54,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 /**
- * Port of iOS `switchableServers` (`Drawer/ServerSwitcher.swift`; `:feature:drawer` sits above
- * Settings, so this module keeps its own copy): saved servers, most recent first, with the one in
- * use even if it was never saved, and its live copy (a rename shows at once).
+ * Saved servers, most recent first, with the one in use even if it was never saved, and its live
+ * copy (a rename shows at once).
  */
 internal fun switchableServers(current: OpenCodeServer, saved: List<OpenCodeServer>): List<OpenCodeServer> {
     if (saved.any { it.persistenceID == current.persistenceID }) {
@@ -66,11 +65,10 @@ internal fun switchableServers(current: OpenCodeServer, saved: List<OpenCodeServ
 }
 
 /**
- * Port of iOS `SettingsServersSection` (`Settings/SettingsServers.swift`): Settings' saved servers,
- * the one in use checked, a tap switches, and each has Rename, Edit (address, password, headers)
- * and Remove; Add Server pairs or takes an address. It lives on the server page, which the
- * connection card and the drawer's Manage Servers… open. The scanner and the forms present over
- * Settings (Home's), so Cancel returns here.
+ * Settings' saved servers, the one in use checked, a tap switches, and each has Rename, Edit
+ * (address, password, headers) and Remove; Add Server pairs or takes an address. It lives on the
+ * server page, which the connection card and the drawer's Manage Servers… open. The scanner and the
+ * forms present over Settings (Home's), so Cancel returns here.
  *
  * @param status Home's connection: the server in use couldn't connect (a rejected password, an
  *   address that answers nothing), so its edit is offered outright.

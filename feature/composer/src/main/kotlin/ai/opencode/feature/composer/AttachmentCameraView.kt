@@ -139,8 +139,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * A still camera presented full screen; the preview fills the display while the controls
- * stay inside the safe area. iOS `AttachmentCameraView` (AVFoundation → CameraX).
+ * A still camera presented full screen; the preview fills the display while the controls stay
+ * inside the safe area.
  *
  * @param onCapture the JPEG (with its EXIF orientation; front photos unmirrored).
  * @param onBack Close: the full-screen camera closes itself first.
@@ -245,7 +245,6 @@ fun AttachmentCameraView(
             }
             if (!showsControls && !camera.canCapture) {
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
-                    // iOS `.font(.title2)`.
                     OpenCodeIcon(SFSymbol.Camera, contentDescription = null, size = 22.dp, tint = MaterialTheme.colorScheme.onSurface)
                 }
             }
@@ -253,7 +252,7 @@ fun AttachmentCameraView(
     }
 }
 
-/** The tile never prompts for permission and no hidden or background camera runs. iOS `AttachmentCameraActivity`. */
+/** The tile never prompts for permission and no hidden or background camera runs. */
 data class AttachmentCameraActivity(
     val visible: Boolean,
     val sceneActive: Boolean,
@@ -263,7 +262,7 @@ data class AttachmentCameraActivity(
     val shouldActivate: Boolean get() = visible && sceneActive && (authorized || requestsAccess)
 }
 
-/** iOS `AttachmentCameraPreview`: the viewfinder with pinch, tap to focus and long-press AE/AF Lock. */
+/** The viewfinder with pinch, tap to focus and long-press AE/AF Lock. */
 @Composable
 private fun AttachmentCameraPreview(camera: AttachmentCameraState, isInteractive: Boolean) {
     val transformer = remember { MutableCoordinateTransformer() }
@@ -359,7 +358,6 @@ private fun AttachmentCameraPreview(camera: AttachmentCameraState, isInteractive
     }
 }
 
-/** iOS `AttachmentCameraPreview.Pinch`. */
 sealed interface Pinch {
     data object Began : Pinch
     data class Changed(val scale: Double) : Pinch
@@ -367,8 +365,7 @@ sealed interface Pinch {
 }
 
 /**
- * The camera's controls, independent of the capture session so they can render over a
- * placeholder. iOS `AttachmentCameraControls`.
+ * The camera's controls, independent of the capture session so they can render over a placeholder.
  *
  * @param flash null hides the flash button (front camera, or no flash).
  */
@@ -455,9 +452,9 @@ fun AttachmentCameraControls(
             ) {
                 CameraCircleButton(symbol = SFSymbol.Xmark, label = stringResource(R.string.composer_camera_close_description), onClick = onClose)
                 Spacer(Modifier.weight(1f))
-                // Android camera apps' shutter size (iOS: 58 pt). The face is sized after the tap
-                // target, which measures what follows it with no minimum: an empty Box sized before
-                // it drew only its 5 dp padding.
+                // Android camera apps' shutter size. The face is sized after the tap target, which
+                // measures what follows it with no minimum: an empty Box sized before it drew only
+                // its 5 dp padding.
                 Box(
                     Modifier
                         .alpha(inert)
@@ -508,8 +505,8 @@ private fun CameraMessageButton(label: String, onClick: () -> Unit) {
 }
 
 /**
- * iOS `openCodeGlassCircle(tint: .black.opacity(0.3))` over the preview: a translucent circle with a
- * hairline. Camera controls stay round, as on every phone camera, rather than the desktop's squares.
+ * A translucent circle with a hairline. Camera controls stay round, as on every phone camera,
+ * rather than the desktop's squares.
  */
 @Composable
 private fun CameraCircleButton(
@@ -538,7 +535,6 @@ private fun CameraCircleButton(
             },
         contentAlignment = Alignment.Center,
     ) {
-        // iOS `.font(.system(size: 20))`.
         OpenCodeIcon(symbol, contentDescription = null, size = 20.dp, tint = tint)
     }
 }
@@ -606,10 +602,10 @@ private fun AttachmentLensPicker(
     }
 }
 
-/** iOS `AttachmentFocusMark`: [point] in the preview's pixels. */
+/** [point] in the preview's pixels. */
 data class AttachmentFocusMark(val id: UUID = UUID.randomUUID(), val point: Offset, val locked: Boolean)
 
-/** Camera's brief yellow square where a tap focused; it pulses once on a lock. iOS `AttachmentFocusIndicator`. */
+/** Camera's brief yellow square where a tap focused; it pulses once on a lock. */
 @Composable
 fun AttachmentFocusIndicator(mark: AttachmentFocusMark?) {
     val reduceMotion = rememberReduceMotion()
@@ -649,8 +645,8 @@ fun AttachmentFocusIndicator(mark: AttachmentFocusMark?) {
 }
 
 /**
- * Camera-local presentation state (iOS `AttachmentCameraState`, an `@Observable` view
- * object): only the camera's own state lives here; the parent owns attachments.
+ * Camera-local presentation state: only the camera's own state lives here; the parent owns
+ * attachments.
  */
 private class AttachmentCameraState(private val context: Context, private val scope: CoroutineScope) {
     var message: String? by mutableStateOf(localized(R.string.composer_camera_opening))
@@ -854,9 +850,9 @@ private class AttachmentCameraState(private val context: Context, private val sc
 }
 
 /**
- * The CameraX session (iOS `AttachmentCaptureSession`): binding, zoom (with lens ramps),
- * focus and exposure, capture, and camera-state reports, all on the main thread as CameraX
- * requires. Events carry the generation they belong to; stale ones are dropped by the state.
+ * The CameraX session: binding, zoom (with lens ramps), focus and exposure, capture, and
+ * camera-state reports, all on the main thread as CameraX requires. Events carry the generation
+ * they belong to; stale ones are dropped by the state.
  */
 private class AttachmentCaptureSession(
     private val context: Context,
@@ -1099,9 +1095,9 @@ private class AttachmentCaptureSession(
     }
 
     /**
-     * Maps CameraX's zoom space (1.0 = the main wide lens; a logical camera reaches its
-     * ultra wide below 1) into iOS's (1.0 = the widest lens), with each physical lens's
-     * intrinsic zoom as its switch-over point.
+     * Maps CameraX's zoom space (1.0 = the main wide lens; a logical camera reaches its ultra wide
+     * below 1) into one where 1.0 is the widest lens, with each physical lens's intrinsic zoom as
+     * its switch-over point.
      */
     @OptIn(ExperimentalCamera2Interop::class)
     private fun describe(bound: Camera): CameraDeviceDescription {

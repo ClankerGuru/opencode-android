@@ -27,9 +27,9 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * ActivityKit's part, on Android's notifications: one notification ID per kind of Live
- * Update, a fresh activity ID per start, and the stale date as the notification's timeout.
- * The state is tracked here rather than read back from the shade, whose list lags a post.
+ * One notification ID per kind of Live Update, a fresh activity ID per start, and the stale date as
+ * the notification's timeout. The state is tracked here rather than read back from the shade, whose
+ * list lags a post.
  */
 internal class LiveUpdateTracker(
     private val context: Context,
@@ -147,7 +147,7 @@ internal object LiveUpdateSystem {
     fun sessionRun(context: Context): LiveUpdateTracker =
         LiveUpdateTracker(context.applicationContext, SessionRunLiveActivity.NOTIFICATION_ID, SystemNotificationChannels.SESSION_RUN)
 
-    /** The app's or a channel's notifications switched in Settings (iOS `activityEnablementUpdates`). */
+    /** The app's or a channel's notifications switched in Settings. */
     private fun enablementUpdates(context: Context, tracker: LiveUpdateTracker): Flow<Boolean> = callbackFlow {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
@@ -162,7 +162,7 @@ internal object LiveUpdateSystem {
         awaitClose { context.unregisterReceiver(receiver) }
     }
 
-    /** The app coming to the foreground (iOS `didBecomeActiveNotification`). */
+    /** The app coming to the foreground. */
     private fun foregroundEntries(): Flow<Unit> = callbackFlow {
         val lifecycle = ProcessLifecycleOwner.get().lifecycle
         val observer = object : DefaultLifecycleObserver {

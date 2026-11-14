@@ -16,13 +16,11 @@ import java.io.IOException
 import java.util.UUID
 
 /**
- * The network half of iOS `MediaReferenceLoader` (`Media/MediaReferenceClient.swift`): one
- * `GET /api/experimental/media/<hash>` on the transport's uncached `media` pool, through
- * `NetworkRetry`. It lives here because it shares `perform`'s correlation, capabilities and
- * error mapping; `:feature:media`'s `MediaReferenceLoader` owns the caches and coalescing.
+ * One `GET /api/experimental/media/<hash>` on the transport's uncached `media` pool, through
+ * `NetworkRetry`. It lives here because it shares `perform`'s correlation, capabilities and error
+ * mapping; `:feature:media`'s `MediaReferenceLoader` owns the caches and coalescing.
  */
 object MediaReferenceFetch {
-    /** iOS `MediaReferenceLoader.FetchResponse`. */
     data class Response(val statusCode: Int, val data: ByteArray) {
         override fun equals(other: Any?): Boolean =
             other is Response && statusCode == other.statusCode && data.contentEquals(other.data)
@@ -30,10 +28,10 @@ object MediaReferenceFetch {
         override fun hashCode(): Int = 31 * statusCode + data.contentHashCode()
     }
 
-    /** iOS `MediaReferenceLoader.shortHash`: enough of a hash to tell logs apart. */
+    /** Enough of a hash to tell logs apart. */
     fun shortHash(hash: String): String = hash.take(12)
 
-    /** iOS `MediaReferenceLoader.liveFetch(server:hash:)`. Throws [OpenCodeClientError]. */
+    /** Throws [OpenCodeClientError]. */
     suspend fun live(server: OpenCodeServer, hash: String): Response {
         val path = "/api/experimental/media/$hash"
         val url = dependency(ServerLinkClient).resolve(server).endpoint(path) ?: throw OpenCodeClientError(localized(R.string.server_error_invalid_url))
@@ -45,8 +43,7 @@ object MediaReferenceFetch {
             label = "GET /api/experimental/media/${shortHash(hash)}",
             reachable = { ServerContact.shared.next(contact) },
         ) {
-            // iOS `.reloadIgnoringLocalCacheData` and `httpShouldHandleCookies = false`: the
-            // `media` pool has no cache and OkHttp keeps no cookies, so no header is needed.
+            // The `media` pool has no cache and OkHttp keeps no cookies, so no header is needed.
             val builder = Request.Builder().url(url).get().header("Accept", "*/*")
             server.authorize(builder)
             applyCapabilities(builder)

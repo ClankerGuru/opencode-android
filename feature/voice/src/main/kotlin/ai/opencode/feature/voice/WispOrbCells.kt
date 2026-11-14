@@ -17,11 +17,10 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * Wisp's per-cell light (iOS `WispOrb.metal` `wispOrbCells`, Wisp's `evaluate_duplex_cells`):
- * one LED cell per lattice point, read by [WispOrbShaders]' raster fragment. iOS runs this as a
- * Metal compute kernel; AGSL has no compute stage, so Android evaluates the cells on the CPU
- * each frame (40 × 40 at the default tuning) and uploads them as a float texture, as the old
- * Living Orb field did. Constants, curves and the uniform layout are the shader's.
+ * Wisp's per-cell light: one LED cell per lattice point, read by [WispOrbShaders]' raster fragment.
+ * AGSL has no compute stage, so Android evaluates the cells on the CPU each frame (40 × 40 at the
+ * default tuning) and uploads them as a float texture, as the old Living Orb field did. Constants,
+ * curves and the uniform layout are the shader's.
  */
 object WispOrbCells {
     /** One cell: (dot radius, halo radius, dot alpha, halo alpha), colour (rgb, 1). */
@@ -655,7 +654,6 @@ object WispOrbCells {
         val wy = gc.n.y
         val cc = couplingCell(u, gc.n)
 
-        // Kit's ribbon enters from the left.
         val delayU = ((nx + 1f) * 0.5f) * 0.24f
         val uTrace = tracePast(traces, delayU)
         val uAmp = uTrace[0]

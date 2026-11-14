@@ -15,11 +15,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `NetworkRetryTests.swift`'s `actionsALoopThatOwnsItsRetriesSendsStartEffectsOutsideIt`
- * (`Effect.runOwningRetries`, here `runOwningRetries` in `VoiceFeatureDelegation.kt`). The rest of
- * that file is `:server`'s `NetworkRetryTests`.
- */
 class NetworkRetryTests {
     private sealed interface RetryScopeProbe {
         data object Start : RetryScopeProbe

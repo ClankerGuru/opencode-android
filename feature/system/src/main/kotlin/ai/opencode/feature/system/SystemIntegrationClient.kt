@@ -25,8 +25,8 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Port of iOS `SystemIntegrationClient`: the app's side of the system integrations: where
- * shortcuts, tiles, widgets and links arrive, and where Home publishes the sessions they offer.
+ * The app's side of the system integrations: where shortcuts, tiles, widgets and links arrive, and
+ * where Home publishes the sessions they offer.
  */
 class SystemIntegrationClient(
     /** Every action from a shortcut, tile, widget or link, starting with any that arrived before the app listened. */
@@ -59,10 +59,10 @@ class SystemIntegrationClient(
 }
 
 /**
- * The inputs to [systemDirectoryEntry], for change detection (iOS `SystemPublication`).
- * `HomeFeature` (in `:feature:drawer`) builds one from its state after every action and
- * publishes when it changes. The server and the last-viewed table go in whole: deriving the
- * server's ID costs more than comparing them while they're unchanged.
+ * The inputs to [systemDirectoryEntry], for change detection. `HomeFeature` (in `:feature:drawer`)
+ * builds one from its state after every action and publishes when it changes. The server and the
+ * last-viewed table go in whole: deriving the server's ID costs more than comparing them while
+ * they're unchanged.
  */
 class SystemPublication(
     val server: OpenCodeServer,
@@ -98,7 +98,7 @@ class SystemPublication(
 
     /**
      * This server's entry in the [SessionDirectory]: titles and project names, pins and the
-     * last-viewed session; never message text (iOS `HomeFeature.State.systemDirectoryEntry`).
+     * last-viewed session; never message text.
      */
     val systemDirectoryEntry: SessionDirectory.Server
         get() {
@@ -131,7 +131,7 @@ class SystemPublication(
         }
 
     companion object {
-        /** iOS `SessionListContext.globalProjectID`: sessions outside any project. */
+        /** Sessions outside any project. */
         const val GLOBAL_PROJECT_ID = "global"
     }
 }
@@ -147,9 +147,9 @@ fun List<OpenCodeSession>.hasSameDirectoryMetadata(other: List<OpenCodeSession>)
 }
 
 /**
- * Port of iOS `SystemIntegrationPublisher`: serializes publishes and removals, debounced per
- * server: each server's latest publish runs half a second after its last change, and removing
- * a server cancels its pending publish, so a deleted server is never published again.
+ * Serializes publishes and removals, debounced per server: each server's latest publish runs half a
+ * second after its last change, and removing a server cancels its pending publish, so a deleted
+ * server is never published again.
  */
 class SystemIntegrationPublisher(
     private val delay: Duration = 500.milliseconds,
@@ -199,8 +199,8 @@ class SystemIntegrationPublisher(
 }
 
 /**
- * Writes the directory and the controls' copy, then brings system search (iOS Spotlight:
- * [SystemSearchIndex]), the widgets, tiles and quick actions in line with it.
+ * Writes the directory and the controls' copy, then brings system search, the widgets, tiles and
+ * quick actions in line with it.
  */
 internal object SystemIntegrationEffects {
     suspend fun perform(context: Context, job: SystemIntegrationPublisher.Job) {

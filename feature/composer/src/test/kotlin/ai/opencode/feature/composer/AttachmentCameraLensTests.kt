@@ -9,7 +9,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.UUID
 
-/** Port of iOS `AttachmentCameraLensTests.swift`. */
 class AttachmentCameraLensTests {
     /** iPhone 15 Pro–style triple camera: ultra wide at 1.0, wide at 2.0, 3× telephoto at 6.0. */
     private val triple = CameraDeviceDescription(

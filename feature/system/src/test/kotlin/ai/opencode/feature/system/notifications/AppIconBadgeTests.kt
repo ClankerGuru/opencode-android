@@ -23,12 +23,11 @@ import org.junit.Test
 import java.util.UUID
 
 /**
- * Port of the `:feature:system` suites of iOS `AppIconBadgeTests.swift`: pushes against the
- * ledger, its storage and the servers' refs. Home's publishing is `:feature:drawer`'s, the
- * AppFeature identity-forgetting tests `:app`'s. Dropped: `withoutAnAppGroupTheLedgerIsNeitherReadNorWritten`
- * (the ledger lives in the app's own preferences; there is no App Group), `badgesAreAddedOnlyToAFullGrantWithoutThem`,
- * `aPermissionGrantedLaterInTheSameRunStillGetsBadges`, `callsWhileOneRunsShareIt` (`BadgeAuthorization`:
- * Android has no separate badge authorization; the notification permission covers the badge).
+ * Dropped: `withoutAnAppGroupTheLedgerIsNeitherReadNorWritten` (the ledger lives in the app's own
+ * preferences; there is no App Group), `badgesAreAddedOnlyToAFullGrantWithoutThem`,
+ * `aPermissionGrantedLaterInTheSameRunStillGetsBadges`, `callsWhileOneRunsShareIt`
+ * (`BadgeAuthorization`: Android has no separate badge authorization; the notification permission
+ * covers the badge).
  */
 class AppIconBadgeTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -59,7 +58,7 @@ class AppIconBadgeTests {
         assertEquals(listOf("a"), ledger.sessionIDs)
     }
 
-    /** An in-memory `SharedPreferences` (iOS's per-test `UserDefaults(suiteName:)`). */
+    /** An in-memory `SharedPreferences`. */
     private class MemoryPreferences : SharedPreferences {
         val values = HashMap<String, Any?>()
         override fun getAll(): MutableMap<String, *> = HashMap(values)
@@ -149,7 +148,7 @@ class AppIconBadgeTests {
 
     private val payloadJson = Json { encodeDefaults = true }
 
-    /** iOS `AES.GCM.seal(…).combined`: nonce, ciphertext and tag. */
+    /** Nonce, ciphertext and tag. */
     private fun seal(payload: NotificationCrypto.Payload, key: ByteArray, ref: String): ByteArray {
         val nonce = ByteArray(12).also { SecureRandom().nextBytes(it) }
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
@@ -171,8 +170,8 @@ class AppIconBadgeTests {
     }
 
     /**
-     * iOS runs this against the signed host's shared keychain. The JVM has no `AndroidKeyStore`,
-     * so the store runs over [NotificationKeyStore.Storage.inMemory] with the live cache.
+     * The JVM has no `AndroidKeyStore`, so the store runs over
+     * [NotificationKeyStore.Storage.inMemory] with the live cache.
      */
     @Test
     fun deviceBoundNotificationKeySurvivesRepeatingEnrollmentAndIsForgotten() {
@@ -295,7 +294,6 @@ class AppIconBadgeTests {
         assertFalse(fresh.contentEquals(first))
     }
 
-    /** iOS `DeliveredNotifications` is [SessionPushNotifications]' removal here (Android posts its own notifications). */
     @Test
     fun clearingReadsTheVerifiedThreadWithoutTheKeychain() {
         fun envelopeOf(ref: String = encryptedRef) = NotificationContent.Envelope(ref, encryptedBox)

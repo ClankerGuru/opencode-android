@@ -16,10 +16,7 @@ import org.junit.Test
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
-/**
- * iOS `NetworkRetryFormTests.swift` (an extension of `NetworkRetryWireTests` there): p229, form
- * replies and dismissals read the form back before failing.
- */
+/** Form replies and dismissals read the form back before failing. */
 class NetworkRetryFormTests {
     @get:Rule val isolation = TestIsolationRule()
 

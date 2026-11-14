@@ -3,23 +3,23 @@ package ai.opencode.devtools
 import ai.opencode.core.diagnostics.DiagnosticsEvent
 import java.util.Locale
 
-/** The pure parts of iOS `DiagnosticsView`'s Troubleshooting page: summary, epochs and row text. */
+/** Summary, epochs and row text. */
 object Troubleshooting {
     data class Group(val key: Int, val title: String, val events: List<DiagnosticsEvent>)
 
-    /** iOS `groupedEpochs`: newest navigation first; epoch 0 is "App". */
+    /** Newest navigation first; epoch 0 is "App". */
     fun groupedEpochs(events: List<DiagnosticsEvent>): List<Group> =
         events.groupBy { it.navigationEpoch ?: 0 }.toSortedMap(compareByDescending { it }).map { (epoch, values) ->
             val session = values.firstNotNullOfOrNull { it.sessionID }
             Group(epoch, if (epoch == 0) "App" else "Navigation $epoch · ${session ?: "session"}", values)
         }
 
-    /** iOS `metricsByRequest`: each request's network metrics. */
+    /** Each request's network metrics. */
     fun metricsByRequest(events: List<DiagnosticsEvent>): Map<String, DiagnosticsEvent> =
         events.filter { it.kind == DiagnosticsEvent.Kind.NetworkMetrics && it.requestID != null }.associateBy { it.requestID!! }
 
-    /** iOS `summary`: last session open, tap → first frame / fresh content, SSE, last 60 seconds. */
-    /** [motionJumps]: the Motion Watch count, shown while it's on or has jumps (iOS), else null. */
+    /** Last session open, tap → first frame / fresh content, SSE, last 60 seconds. */
+    /** [motionJumps]: the Motion Watch count, shown while it's on or has jumps, else null. */
     fun summary(events: List<DiagnosticsEvent>, motionJumps: Int? = null): List<Pair<String, String>> {
         val open = events.lastOrNull { it.name == "session_tap" || it.name == "session_navigation_started" }
         val frame = after(events, open, setOf("session_first_frame"))
@@ -37,7 +37,7 @@ object Troubleshooting {
             listOf("Last 60 seconds" to lastMinute(events))
     }
 
-    /** iOS `watchdogSummary`: stalled streams the watchdog ended, by which deadline passed. */
+    /** Stalled streams the watchdog ended, by which deadline passed. */
     fun watchdogSummary(events: List<DiagnosticsEvent>): String {
         var fired = 0
         var silent = 0
@@ -75,7 +75,7 @@ object Troubleshooting {
 
     fun ms(value: Double?): String = value?.let { String.format(Locale.ROOT, "%.0f ms", it) } ?: "—"
 
-    /** iOS `ByteCountFormatter` (`.file`): decimal units, “Zero KB”, “1 byte”, KB whole, MB one decimal. */
+    /** Decimal units, “Zero KB”, “1 byte”, KB whole, MB one decimal. */
     fun bytes(value: Long?): String = when {
         value == null -> "—"
         value == 0L -> "Zero KB"

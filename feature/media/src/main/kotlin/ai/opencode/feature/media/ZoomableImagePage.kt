@@ -62,7 +62,6 @@ import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
-/** UIKit's `UIEdgeInsets`, for [MediaZoomGeometry]. */
 data class MediaInsets(val top: Float, val left: Float, val bottom: Float, val right: Float) {
     companion object {
         val Zero = MediaInsets(0f, 0f, 0f, 0f)
@@ -70,10 +69,9 @@ data class MediaInsets(val top: Float, val left: Float, val bottom: Float, val r
 }
 
 /**
- * Where a zoomable image sits and how far it zooms, in a page's units (iOS
- * `MediaZoomGeometry`, `Media/ZoomableImagePage.swift`). The image lays out fitted at zoom
- * scale 1, so 1 is fit. Android works in pixels, so callers pass `displayScale = 1` with
- * pixel sizes.
+ * Where a zoomable image sits and how far it zooms, in a page's units. The image lays out fitted at
+ * zoom scale 1, so 1 is fit. Android works in pixels, so callers pass `displayScale = 1` with pixel
+ * sizes.
  */
 object MediaZoomGeometry {
     /** However small the image, it zooms at least this far. */
@@ -150,9 +148,9 @@ object MediaZoomGeometry {
 }
 
 /**
- * One page's zoom (iOS `MediaZoomScrollView`): a scroll view's zoom scale and content offset,
- * with the image fitted at scale 1 and centred by insets. A plain object owning per-frame
- * motion; the page composable drives it from gestures.
+ * One page's zoom: a scroll view's zoom scale and content offset, with the image fitted at scale 1
+ * and centred by insets. A plain object owning per-frame motion; the page composable drives it from
+ * gestures.
  */
 @Stable
 class MediaZoomState internal constructor(image: Bitmap) {
@@ -189,7 +187,7 @@ class MediaZoomState internal constructor(image: Bitmap) {
 
     val isZoomed: Boolean get() = zoomScale > minimumZoomScale + 0.01f
 
-    /** Mirrors iOS `isZoomedIn`, which drives accessibility. */
+    /** Which drives accessibility. */
     var zoomedForAccessibility by mutableStateOf(false)
         private set
 
@@ -200,7 +198,7 @@ class MediaZoomState internal constructor(image: Bitmap) {
     /** Where the image is drawn in the page: fitted, or where a zoom has it. */
     val imageFrame: Rect get() = Rect(Offset(-contentOffset.x, -contentOffset.y), contentSize)
 
-    /** iOS `layoutSubviews`: fit when the page size changes. */
+    /** Fit when the page size changes. */
     fun layout(size: Size) {
         if (size != laidOutSize) fit(size)
     }
@@ -423,7 +421,7 @@ class MediaZoomState internal constructor(image: Bitmap) {
             set(scale, offset)
             animation = scope.launch {
                 try {
-                    // The reduced cross-fade (iOS `Motion.reduced`).
+                    // The reduced cross-fade.
                     animate(0f, 1f, animationSpec = MotionRole.Reduced.animation(reduceMotion = true)) { value, _ -> fade = value }
                 } finally {
                     fade = 1f
@@ -446,11 +444,11 @@ class MediaZoomState internal constructor(image: Bitmap) {
 }
 
 /**
- * One image fitted to its page, reporting where so the viewer's flight lands on it (iOS
- * `ZoomableImagePage`). Pinching (about the fingers, past either limit with resistance),
- * panning (with momentum, bouncing back flush with the edges), and double tapping behave like Photos. At
- * fit, drags belong to the pager and the dismissal; zoomed, a drag from a side edge heading
- * out turns the page ([MediaZoomGeometry.handsOffToPager]).
+ * One image fitted to its page, reporting where so the viewer's flight lands on it. Pinching (about
+ * the fingers, past either limit with resistance), panning (with momentum, bouncing back flush with
+ * the edges), and double tapping behave like Photos. At fit, drags belong to the pager and the
+ * dismissal; zoomed, a drag from a side edge heading out turns the page
+ * ([MediaZoomGeometry.handsOffToPager]).
  *
  * @param isHidden the flight above draws it for now.
  * @param onFrame where the image sits in the viewer's coordinates: fitted, or where a zoom

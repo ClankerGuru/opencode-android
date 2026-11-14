@@ -24,11 +24,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 
 /**
- * The real transcript rows behind Settings › Appearance › Themes (iOS `AppearanceTranscriptPreview`
- * in `Settings/AppearanceSettingsView.swift`): a user bubble and an assistant Markdown reply with
- * inline code and a code band, drawn by `TranscriptMessageRow` at real transcript spacing.
- * `:feature:settings` sits beside `:feature:transcript`, so Home provides this through
- * `LocalAppearanceTranscriptPreview`; Settings themes it, caps its type and labels it.
+ * The real transcript rows behind Settings › Appearance › Themes: a user bubble and an assistant
+ * Markdown reply with inline code and a code band, drawn by `TranscriptMessageRow` at real
+ * transcript spacing. `:feature:settings` sits beside `:feature:transcript`, so Home provides this
+ * through `LocalAppearanceTranscriptPreview`; Settings themes it, caps its type and labels it.
  */
 internal val AppearanceTranscriptPreviewRows: @Composable () -> Unit = {
     val disclosure = remember { TranscriptDisclosureState() }
@@ -50,7 +49,7 @@ internal val AppearanceTranscriptPreviewRows: @Composable () -> Unit = {
                     props = RowProps(),
                     run = UserMessageRun.alone,
                     revealArrival = null,
-                    // At the readable width on a wider window (iOS `readableColumn`).
+                    // At the readable width on a wider window.
                     modifier = Modifier
                         .fillMaxWidth()
                         .wrapContentWidth()

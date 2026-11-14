@@ -9,9 +9,9 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Port of iOS `ScreenCaptureFeedbackTests`: every self-capture flashes and plays the shutter after
- * it captures, and only when it captured something. `shutterWavIsMono16BitPCM` pins
- * `ShutterSystemSound`, voice's shutter (it scales `VoiceShutterSound`), so it ports with it.
+ * Every self-capture flashes and plays the shutter after it captures, and only when it captured
+ * something. `shutterWavIsMono16BitPCM` pins `ShutterSystemSound`, voice's shutter (it scales
+ * `VoiceShutterSound`), so it ports with it.
  */
 class ScreenCaptureFeedbackTests {
     @get:Rule val isolation = TestIsolationRule()

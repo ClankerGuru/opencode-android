@@ -38,7 +38,6 @@ import org.junit.Test
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-/** Port of iOS `SessionFeatureTests+Resume.swift`. */
 class SessionFeatureTestsResume {
     private fun user(id: String, text: String) = OpenCodeTranscriptItem.UserText(id = id, text = text)
     private fun assistant(id: String, text: String) = OpenCodeTranscriptItem.AssistantMarkdown(id = id, text = text)
@@ -240,7 +239,7 @@ class SessionFeatureTestsResume {
         store.exhaustive = false
         store.send(Action.ShowEarlierTapped)
         store.send(Action.FamilyPicked(child.id))
-        // iOS `await history.finish()`: the page read ends once the switch cancels it.
+        // The page read ends once the switch cancels it.
         for (i in 0 until 100) {
             if (cancelled.value) break
             yield()

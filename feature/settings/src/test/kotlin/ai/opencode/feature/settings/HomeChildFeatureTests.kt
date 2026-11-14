@@ -14,11 +14,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `HomeChildFeatureTests.swift`, the `:feature:settings` part: the
- * `HomeSettingsFeature` test (Android keeps that reducer here). The `HomeNotificationsFeature`
- * and other Home children are `:feature:drawer`'s port.
- */
 class HomeChildFeatureTests {
     @get:Rule val isolation = TestIsolationRule()
 

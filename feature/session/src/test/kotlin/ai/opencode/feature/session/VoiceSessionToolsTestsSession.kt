@@ -14,10 +14,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/**
- * Port of the `SessionFeature` test of iOS `VoiceSessionToolsTests.swift`
- * (`theScreenFollowsOnlyItsOwnSessionsSwitch`), deferred from `:feature:voice`.
- */
 class VoiceSessionToolsTestsSession {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
 

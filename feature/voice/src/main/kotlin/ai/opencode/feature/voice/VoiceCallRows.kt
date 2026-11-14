@@ -39,12 +39,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 /*
- * Port of iOS `VoiceCallRows.swift`, `VoiceScreenRequestCard.swift`, `VoiceOpenLinkCard.swift`
- * and `VoiceCallAudioRow.swift`.
- *
- * Android divergence: iOS draws these rows inside the composer's glass, which grows over them
- * (`VoiceCallRowsPanel`). Android shows them in a Material card standing on the composer, which
- * expands and shrinks with the rows (`AnimatedVisibility`), so the glass room maths isn't ported.
+ * Android shows them in a Material card standing on the composer, which expands and shrinks with
+ * the rows (`AnimatedVisibility`), so the glass room maths isn't ported.
  */
 
 /** What the call has up above the composer right now. */
@@ -146,7 +142,7 @@ private class ShownRows {
     var rows = VoiceCallRows()
 }
 
-/** iOS `VoiceScreenRequestCard`: “Share Screen?”, its reason, ✕ and Share. */
+/** “Share Screen?”, its reason, ✕ and Share. */
 @Composable
 private fun ScreenRequestRow(request: ClientToolCall, send: (VoiceFeature.Action) -> Unit) {
     val reason = request.reason
@@ -175,7 +171,7 @@ private fun ScreenRequestRow(request: ClientToolCall, send: (VoiceFeature.Action
     }
 }
 
-/** iOS `VoiceOpenLinkCard`: “Open Uber?”, its host, ✕ and Open. */
+/** “Open Uber?”, its host, ✕ and Open. */
 @Composable
 private fun OpenLinkRow(request: ClientToolCall, send: (VoiceFeature.Action) -> Unit) {
     val title = VoiceOpenLinkFeature.cardTitle(request.title)
@@ -205,7 +201,7 @@ private fun OpenLinkRow(request: ClientToolCall, send: (VoiceFeature.Action) -> 
     }
 }
 
-/** iOS `VoiceCallAudioRow`: the track's title, then Pause (or Play) and Stop. */
+/** The track's title, then Pause (or Play) and Stop. */
 @Composable
 private fun CallAudioRow(track: CallAudioTrack, isPaused: Boolean, send: (VoiceFeature.Action) -> Unit) {
     CallRow(
@@ -234,7 +230,7 @@ private fun CallAudioRow(track: CallAudioTrack, isPaused: Boolean, send: (VoiceF
     }
 }
 
-/** iOS `VoiceCallRowContent`: an icon, a title over its detail, then the row's buttons. */
+/** An icon, a title over its detail, then the row's buttons. */
 @Composable
 private fun CallRow(
     symbol: SFSymbol,

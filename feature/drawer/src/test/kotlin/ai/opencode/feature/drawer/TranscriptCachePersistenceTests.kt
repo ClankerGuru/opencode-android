@@ -40,16 +40,6 @@ import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
 
-/**
- * Port of iOS `TranscriptCachePersistenceTests.swift`'s Home tests: the transcript cache as Home
- * restores, ranks, touches and prunes it. The envelope and writer tests are `:server`'s
- * (`server/src/test/.../TranscriptCachePersistenceTests.kt`).
- *
- * In `deletingSessionOrForgettingServerRemovesPersistedEntriesAndExcludesBackup`, the
- * `AppFeature.serverDeleted` half is `:app`'s, and the backup-exclusion half is iOS-only
- * (`isExcludedFromBackup`; Android keeps the cache under `filesDir` and the app's backup rules
- * decide, not a per-file flag).
- */
 class TranscriptCachePersistenceTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -69,8 +59,8 @@ class TranscriptCachePersistenceTests {
     )
 
     /**
-     * One test's dependency world (iOS's process-wide storage and `withDependencies`): the shared
-     * store and transcript persistence states are built in, and the stores' dependencies.
+     * One test's dependency world: the shared store and transcript persistence states are built in,
+     * and the stores' dependencies.
      */
     private class World(
         private val extra: DependencyValues.Builder.() -> Unit = {},

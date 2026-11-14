@@ -4,8 +4,7 @@ import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.transcript.TranscriptEntry
 import ai.opencode.server.model.OpenCodeTranscriptItem
 
-// Port of iOS `SessionFeature+StateTranscript.swift` (split out of `SessionFeature+State.swift`
-// in 67a3fb61): the transcript window, what caches keep, and the loading and empty states.
+// The transcript window, what caches keep, and the loading and empty states.
 
 /** The transcript as the server confirmed it, for caches: no message still in flight or failed. */
 val State.cacheableItems: List<OpenCodeTranscriptItem> get() = items(optimisticPromptIDs + failedSends.ids)
@@ -31,7 +30,7 @@ val State.firstVisibleItemID: String?
         return items.getOrNull(start)?.id
     }
 
-/** Once drawn, keeps the window starting at the row it started at before an update (OC-375/386). */
+/** Once drawn, keeps the window starting at the row it started at before an update. */
 fun State.retainRenderedWindowStart(previousFirstID: String?): State {
     if (!hasRenderedFirstContentFrame || previousFirstID == null) return this
     val index = if (items.firstOrNull()?.id == previousFirstID) {

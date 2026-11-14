@@ -16,11 +16,6 @@ import ai.opencode.server.model.OpenCodeSession
 import kotlinx.coroutines.CoroutineScope
 import java.time.Instant
 
-/**
- * Shared fixtures of the ports of `VoiceSessionDelegatorTests.swift`,
- * `VoiceSessionDelegatorEdgeTests.swift` and `VoiceSessionDelegatorServerVoiceTests.swift`
- * (iOS keeps them as members of the `VoiceSessionDelegatorTests` suite).
- */
 internal object VoiceSessionDelegatorTestSupport {
     val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
     val otherServer = OpenCodeServer(url = "http://other.example.ts.net:4096", username = "", password = "")
@@ -32,15 +27,15 @@ internal object VoiceSessionDelegatorTestSupport {
         updatedAt = Instant.ofEpochSecond(100),
     )
 
-    /** iOS `mockServerID(session:message:)`: ascending IDs are messages, descending ones sessions. */
+    /** Ascending IDs are messages, descending ones sessions. */
     fun mockServerID(session: () -> String, message: () -> String) = ServerIDClient(
         ascending = { message() },
         descending = { session() },
     )
 
     /**
-     * iOS `preserveSettings()`: each test's in-memory shared store starts from these values,
-     * so nothing needs restoring afterwards.
+     * Each test's in-memory shared store starts from these values, so nothing needs restoring
+     * afterwards.
      */
     fun preserveSettings(): VoiceTestShared {
         val shared = VoiceTestShared()
@@ -63,16 +58,11 @@ internal object VoiceSessionDelegatorTestSupport {
         return shared
     }
 
-    /** iOS `var state = VoiceFeature.State(server:session:); state.phase = .live; state.usesSessionDelegator = true`. */
     fun liveDelegatorState(shared: VoiceTestShared, server: OpenCodeServer = this.server, session: OpenCodeSession = this.session): VoiceFeature.State =
         shared.read { VoiceFeature.State(server, session) }
             .withPhase(VoiceFeature.State.Phase.Live)
             .copy(usesSessionDelegator = true)
 
-    /**
-     * iOS `TestStore(initialState:) { VoiceFeature() } withDependencies: { $0.continuousClock =
-     * ImmediateClock(); $0.date.now = … }` over the test's shared values.
-     */
     fun store(
         shared: VoiceTestShared,
         state: VoiceFeature.State,
@@ -86,10 +76,6 @@ internal object VoiceSessionDelegatorTestSupport {
         dependencies()
     }
 
-    /**
-     * iOS `$0.replyWatch.noteUserActed(); let capture = $0.tail.capture(); …turns.append(.init(…));
-     * $0.delegatorWork.append(callID); _ = $0.replyWatch.step(.delegatorStarted(requestID:))`.
-     */
     fun VoiceFeature.State.startingTurn(
         callID: String,
         sessionID: String?,
@@ -118,13 +104,12 @@ internal object VoiceSessionDelegatorTestSupport {
         ).stepping(ReplyWatch.Event.DelegatorStarted(requestID = callID))
     }
 
-    /** iOS `$0.replyWatch.noteUserActed(); _ = $0.tail.record(.user, text, id:); $0.captions = [user caption]`. */
     fun VoiceFeature.State.hearing(itemID: String, text: String): VoiceFeature.State =
         copy(replyWatch = replyWatch.noteUserActed())
             .recording(VoiceTranscriptTail.Role.user, text, itemID)
             .copy(captions = listOf(VoiceFeature.State.Caption("user-$itemID", VoiceTranscriptTail.Role.user, text)))
 
-    /** The first turn's admission as the reducer applies it (iOS `sessionDelegatorAdmitted` expectation). */
+    /** The first turn's admission as the reducer applies it. */
     fun VoiceFeature.State.admittingFirstTurn(
         sessionID: String,
         title: String,
@@ -151,7 +136,6 @@ internal object VoiceSessionDelegatorTestSupport {
             .stepping(ReplyWatch.Event.Sent(listOf(ReplyWatch.Prompt(promptID = promptID, sessionID = sessionID, title = title, saidTurn = saidTurn))))
     }
 
-    /** iOS's `.replyWatch(.waitSucceeded)` expectation that settles and removes the first turn. */
     fun VoiceFeature.State.settlingFirstTurn(sessionID: String, promptID: String, reply: String): VoiceFeature.State {
         val callID = sessionDelegator.turns[0].callID
         val remaining = sessionDelegator.turns.drop(1)
@@ -168,8 +152,8 @@ internal object VoiceSessionDelegatorTestSupport {
     }
 
     /**
-     * iOS `endTapped` expectation: `.callPhaseChanged(.ended)`, no delegator work, unadmitted captures
-     * released into the tail, transcript persisted (a shared write here) and `.ended`.
+     * `.callPhaseChanged(.ended)`, no delegator work, unadmitted captures released into the tail,
+     * transcript persisted (a shared write here) and `.ended`.
      */
     fun VoiceFeature.State.hungUp(): VoiceFeature.State {
         val ended = stepping(ReplyWatch.Event.CallPhaseChanged(ReplyWatch.CallPhase.ended))

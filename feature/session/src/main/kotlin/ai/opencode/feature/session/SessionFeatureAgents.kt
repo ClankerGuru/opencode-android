@@ -20,12 +20,11 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlin.time.Duration.Companion.seconds
 
-// Port of iOS `SessionFeature+Agents.swift`. Agent Selection (experimental `agentSelection`,
-// OC-511): the composer's agent menu. A pick is remembered per session (`sessionAgents`) and,
-// like a model pick, applied (`POST …/agent`) just before the next send; a draft starts with its
-// pick, else the Settings default (`defaultAgentID`).
+// Agent Selection (experimental `agentSelection`, OC-511): the composer's agent menu. A pick is
+// remembered per session (`sessionAgents`) and, like a model pick, applied (`POST …/agent`) just
+// before the next send; a draft starts with its pick, else the Settings default (`defaultAgentID`).
 
-/** iOS `SessionFeature.AgentSelectionState`: Agent Selection's part of the session's state. */
+/** Agent Selection's part of the session's state. */
 data class AgentSelectionState(
     /** The server's primary agents, as last listed. */
     val primaryAgents: List<OpenCodeAutocompleteAgent> = emptyList(),
@@ -44,13 +43,13 @@ data class AgentSelectionState(
     val knownPrimaryAgents: Shared<List<OpenCodeAutocompleteAgent>> = shared(AgentPickerSharedKeys.knownPrimaryAgents),
 )
 
-/** iOS `SessionFeature.ListedDirectory`: the folder an agents list came from (null: the server's own). */
+/** The folder an agents list came from (null: the server's own). */
 data class ListedDirectory(val directory: String?)
 
-/** iOS `SessionFeature.agentsAttempts`: tries for the agents list, the first, then retries after 1 s and 2 s. */
+/** Tries for the agents list, the first, then retries after 1 s and 2 s. */
 internal const val agentsAttempts = 3
 
-/** iOS `reduceAgents(_:_:)`: the agent menu's list, picks and applications. */
+/** The agent menu's list, picks and applications. */
 internal fun SessionFeature.reduceAgents(state: State, action: Action): Reduced<State, Action> = when (action) {
     Action.AgentsRequested -> {
         if (!experimentalFeatures(ExperimentalFeature.agentSelection)) {
@@ -135,11 +134,11 @@ internal fun SessionFeature.reduceAgents(state: State, action: Action): Reduced<
     else -> Reduced(state)
 }
 
-/** iOS `waitingAgent(_:)`: the pick a send would apply now, while Agent Selection is on. */
+/** The pick a send would apply now, while Agent Selection is on. */
 internal fun SessionFeature.waitingAgent(state: State): String? =
     if (experimentalFeatures(ExperimentalFeature.agentSelection)) state.sendAgent else null
 
-/** iOS `applyDueAgentPick(_:)`: a queued send's message started with its agent still waiting. */
+/** A queued send's message started with its agent still waiting. */
 internal fun SessionFeature.applyDueAgentPick(state: State): Reduced<State, Action> {
     val agent = state.queuedAgentPickDue ?: return Reduced(state)
     val next = state.withQueuedAgentPickDue(null)
@@ -148,9 +147,8 @@ internal fun SessionFeature.applyDueAgentPick(state: State): Reduced<State, Acti
 }
 
 /**
- * iOS `applyQueuedAgentPick(_:sessionID:server:)`: applies a queued send's agent once its message
- * starts or becomes a steer. A refusal leaves the pick waiting, so the next send applies it (and
- * fails, saying why, if it's still refused).
+ * Applies a queued send's agent once its message starts or becomes a steer. A refusal leaves the
+ * pick waiting, so the next send applies it (and fails, saying why, if it's still refused).
  */
 internal fun SessionFeature.applyQueuedAgentPick(agent: String, sessionID: String, server: OpenCodeServer): Effect<Action> {
     val client = openCodeClient
@@ -164,7 +162,7 @@ internal fun SessionFeature.applyQueuedAgentPick(agent: String, sessionID: Strin
     }
 }
 
-/** iOS `adoptDraftAgent(_:in:)`: a draft's pick (or the default it started with) becomes its session's. */
+/** A draft's pick (or the default it started with) becomes its session's. */
 internal fun SessionFeature.adoptDraftAgent(sessionID: String, state: State): State {
     val picked = state.draftAgent
     val next = state.withDraftAgent(null)
@@ -176,7 +174,7 @@ internal fun SessionFeature.adoptDraftAgent(sessionID: String, state: State): St
     return next
 }
 
-// region `SessionFeature.State` members (iOS `extension SessionFeature.State`)
+// region `SessionFeature.State` members
 
 val State.primaryAgents: List<OpenCodeAutocompleteAgent> get() = agentSelection.primaryAgents
 fun State.withPrimaryAgents(value: List<OpenCodeAutocompleteAgent>): State = copy(agentSelection = agentSelection.copy(primaryAgents = value))
@@ -187,10 +185,8 @@ fun State.withDraftAgent(value: String?): State = copy(agentSelection = agentSel
 val State.queuedAgentPicks: Map<String, String> get() = agentSelection.queuedPicks
 fun State.withQueuedAgentPicks(value: Map<String, String>): State = copy(agentSelection = agentSelection.copy(queuedPicks = value))
 
-/** iOS `State.queuedAgentPickDue` (get). */
 val State.queuedAgentPickDue: String? get() = agentSelection.queuedPickDue
 
-/** iOS `State.queuedAgentPickDue` (set). */
 fun State.withQueuedAgentPickDue(value: String?): State = copy(agentSelection = agentSelection.copy(queuedPickDue = value))
 
 val State.sessionAgents: Map<String, String> get() = agentSelection.sessionAgents.value

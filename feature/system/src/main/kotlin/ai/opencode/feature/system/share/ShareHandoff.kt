@@ -20,12 +20,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
 
-// Port of iOS ShareHandoff.swift. The share target sends what was shared itself
-// (`ShareSender`); what it can't send, or what you take on in the app (Continue in
-// OpenCode), it re-encodes and files in `filesDir/Shares`, and the app picks it up on its
-// next activation. Like iOS, the encoder, file staging and item loader live in their own files:
-// SharedImageEncoder.kt, `:core` `files/ComposerFileStaging.kt` (the composer needs it too) and
-// SharedItemLoader.kt; this file keeps the handoff models and their store.
+// The share target sends what was shared itself (`ShareSender`); what it can't send, or what you
+// take on in the app (Continue in OpenCode), it re-encodes and files in `filesDir/Shares`, and the
+// app picks it up on its next activation.
 
 /**
  * Sessions the share sheet can offer, published by the app for its current server whenever it
@@ -85,7 +82,7 @@ data class ShareTargets(
         const val MAXIMUM_RECENTS = 20
         const val MAXIMUM_PROJECTS = 12
 
-        /** `filesDir/share-targets.json` (iOS: the App Group container's `share-targets.json`). */
+        /** `filesDir/share-targets.json`. */
         val fileURL: File get() = File(dependency(AppContext).filesDir, "share-targets.json")
 
         fun load(file: File = fileURL): ShareTargets? {
@@ -136,7 +133,7 @@ data class ShareHandoff(
         val mime: String,
     )
 
-    /** A non-image file (PDF, document, video, audio) the app uploads (iOS `ShareHandoff.File`). */
+    /** A non-image file (PDF, document, video, audio) the app uploads. */
     @Serializable
     data class FileEntry(
         @Serializable(with = UUIDSerializer::class) val id: UUID,
@@ -283,7 +280,7 @@ class ShareHandoffStore(val root: File) {
         private const val STAGING_PREFIX = ".staging-"
         private const val CLAIMED_PREFIX = ".claimed-"
 
-        /** `filesDir/Shares` (iOS: the App Group container's `Shares`). */
+        /** `filesDir/Shares`. */
         val live: ShareHandoffStore?
             get() = runCatching { ShareHandoffStore(File(dependency(AppContext).filesDir, "Shares")) }.getOrNull()
 
@@ -291,14 +288,14 @@ class ShareHandoffStore(val root: File) {
     }
 }
 
-/** iOS `JSONEncoder`/`JSONDecoder` for the share files: unknown keys ignored, nils omitted. */
+/** Unknown keys ignored, nils omitted. */
 internal val ShareJson = Json {
     ignoreUnknownKeys = true
     encodeDefaults = true
     explicitNulls = false
 }
 
-/** `UUID` as its string form (iOS `UUID` Codable). */
+/** `UUID` as its string form. */
 internal object UUIDSerializer : KSerializer<UUID> {
     override val descriptor = PrimitiveSerialDescriptor("ai.opencode.UUID", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: UUID) = encoder.encodeString(value.toString().uppercase())

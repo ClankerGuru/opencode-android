@@ -146,10 +146,7 @@ import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 
-/**
- * The phone's client tools (iOS `AppView.clientTools`): links and audio always, the screen while
- * its experiment is on.
- */
+/** The phone's client tools: links and audio always, the screen while its experiment is on. */
 private fun clientTools(shareScreen: Boolean): Set<ClientTool> {
     val tools = mutableSetOf(ClientTool.voiceOpenURL, ClientTool.voicePlayAudio, ClientTool.voiceAudioControl)
     if (ExperimentalFeature.shareScreenWithAgents.isActive(shareScreen)) tools.add(ClientTool.voiceRequestScreen)
@@ -157,9 +154,9 @@ private fun clientTools(shareScreen: Boolean): Set<ClientTool> {
 }
 
 /**
- * Port of iOS `AppView` (`OpenCode/App/AppView.swift`): Home when a server is connected, else
- * the connection screen; over either the New Server / Edit Server sheet, the pairing scanner,
- * the pairing confirmation, the error alerts and the server switch toast.
+ * Home when a server is connected, else the connection screen; over either the New Server / Edit
+ * Server sheet, the pairing scanner, the pairing confirmation, the error alerts and the server
+ * switch toast.
  */
 @Composable
 fun AppView(store: StoreOf<AppFeature.State, AppFeature.Action>) {
@@ -188,8 +185,8 @@ fun AppView(store: StoreOf<AppFeature.State, AppFeature.Action>) {
                     state = { it.home ?: HomeFeature.State.placeholder(OpenCodeServer(url = "", username = "", password = "")) },
                     action = AppFeature.Action::Home,
                 )
-                // The app's one media root (iOS `MediaPresenter` presents over the window): the
-                // transcript image viewer and file/diagram/pasted-text viewers cover the whole Home.
+                // The app's one media root: the transcript image viewer and
+                // file/diagram/pasted-text viewers cover the whole Home.
                 val media = remember { Store(MediaFeature.State(), MediaFeature()) }
                 MediaView(media) { HomeView(home, welcomeMark = painterResource(R.drawable.opencode_app_mark)) }
             } else if (showsWelcome) {
@@ -244,15 +241,15 @@ private fun ErrorAlert(title: String, message: String, onDismiss: () -> Unit) {
     )
 }
 
-/** iOS `dynamicTypeSize.isAccessibilitySize`: the largest font scales (1.8× and 2×). */
+/** The largest font scales (1.8× and 2×). */
 @Composable
 private fun isAccessibilitySize(): Boolean = LocalDensity.current.fontScale > 1.5f
 
-/** iOS `.orange` (systemOrange) for the error card title and paste errors. */
+/** System orange for the error card title and paste errors. */
 @Composable
 private fun systemOrange(): Color = if (OpenCodeTheme.colors.isDark) Color(0xFFFF9F0A) else Color(0xFFFF9500)
 
-/** iOS `connectionView`: the saved servers, pairing and the manual form. */
+/** The saved servers, pairing and the manual form. */
 @Composable
 private fun ConnectionView(store: StoreOf<AppFeature.State, AppFeature.Action>) {
     val savedServers by store.observe { it.savedServers.value }
@@ -320,7 +317,7 @@ private fun ConnectionView(store: StoreOf<AppFeature.State, AppFeature.Action>) 
 
 private val COLUMN_WIDTH = 520.dp
 
-/** Peer pairing actions share one shape; prominence is carried by the fill alone (iOS `pairingActionLabel`). */
+/** Peer pairing actions share one shape; prominence is carried by the fill alone. */
 @Composable
 private fun PairingActionsButtons(store: StoreOf<AppFeature.State, AppFeature.Action>) {
     val progress by store.observe { it.connectionProgressLabel }
@@ -464,7 +461,7 @@ private fun PasteRow(store: StoreOf<AppFeature.State, AppFeature.Action>) {
     }
 }
 
-/** A terminal command shown in the setup steps; tapping copies it (iOS `CopyCommandButton`). */
+/** A terminal command shown in the setup steps; tapping copies it. */
 @Composable
 private fun CopyCommand(command: String, onCopy: (String) -> Unit) {
     var copied by remember { mutableStateOf(false) }
@@ -488,8 +485,7 @@ private fun CopyCommand(command: String, onCopy: (String) -> Unit) {
         // Explicit: the fill matches `surfaceVariant`, whose content colour is the secondary text.
         contentColor = OpenCodeTheme.colors.text,
         border = OpenCodeSurfaces.border,
-        // The label stands in for the visible command (cleared below), read once as a button
-        // (iOS `.accessibilityLabel("Copy \(command)")` on a `Button`).
+        // The label stands in for the visible command (cleared below), read once as a button.
         modifier = Modifier.heightIn(min = 48.dp).semantics {
             contentDescription = copyDescription
             stateDescription = if (copied) copiedState else ""
@@ -643,7 +639,6 @@ private fun formatted(message: String): AnnotatedString = buildAnnotatedString {
     }
 }
 
-/** iOS `errorTitle`. */
 private fun errorTitle(phase: AppFeature.FailureContext.Phase?, context: AppFeature.FailureContext?): String = when (phase) {
     AppFeature.FailureContext.Phase.Pair -> localized(R.string.app_error_title_pair)
     AppFeature.FailureContext.Phase.LoadSessions -> localized(R.string.app_error_title_load_sessions)
@@ -709,7 +704,6 @@ private fun ConnectionErrorCard(store: StoreOf<AppFeature.State, AppFeature.Acti
     }
 }
 
-/** iOS `credentialForm` in its "New Server" / "Edit Server" sheet. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>) {
@@ -725,9 +719,9 @@ private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>)
     val attempt = state.errorContext?.attempt
     val reduceMotion = rememberReduceMotion()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    // TalkBack starts on the title, not the scrim or the drag handle, as VoiceOver starts in
-    // iOS's navigation bar: one move once the sheet has opened, after TalkBack's own first focus
-    // in the new window, which would otherwise land after it.
+    // TalkBack starts on the title, not the scrim or the drag handle: one move once the sheet has
+    // opened, after TalkBack's own first focus in the new window, which would otherwise land after
+    // it.
     var hasOpened by remember { mutableStateOf(false) }
     LaunchedEffect(sheetState.currentValue) { if (sheetState.currentValue == SheetValue.Expanded) hasOpened = true }
     val titleFocus = rememberAccessibilityFocusRequest(Unit.takeIf { hasOpened })
@@ -739,9 +733,8 @@ private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>)
     ) {
         // Its password and headers, out of problem reports and voice screenshots.
         HidesFromScreenshots()
-        // iOS resigns the first responder on Connect, Go and each failed attempt. Here only the
-        // keyboard goes (the sheet window's controller): a cleared focus would fall to the drag
-        // handle, and TalkBack's focus with it.
+        // Here only the keyboard goes (the sheet window's controller): a cleared focus would fall
+        // to the drag handle, and TalkBack's focus with it.
         val keyboard = LocalSoftwareKeyboardController.current
         val dismissKeyboard = { keyboard?.hide() }
         // TalkBack takes the scroll up to the error for the user's and leaves Connect for whatever
@@ -821,11 +814,11 @@ private fun ServerFormSheet(store: StoreOf<AppFeature.State, AppFeature.Action>)
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Next),
                 modifier = Modifier.fillMaxWidth(),
             )
-            // A new field each time the password is shown or hidden, as iOS swaps its SecureField
-            // for a TextField: Compose keeps a field's first password flag (foundation 1.12's
-            // `CoreTextFieldSemanticsModifierNode` never stores a new one), so TalkBack would
-            // read a shown password as hidden. Input focus carries over to the new field; the
-            // eye sits over it, outside the swap, so TalkBack's focus stays on it.
+            // A new field each time the password is shown or hidden: Compose keeps a field's first
+            // password flag (foundation 1.12's `CoreTextFieldSemanticsModifierNode` never stores a
+            // new one), so TalkBack would read a shown password as hidden. Input focus carries over
+            // to the new field; the eye sits over it, outside the swap, so TalkBack's focus stays
+            // on it.
             Box {
                 androidx.compose.runtime.key(revealsPassword) {
                     OpenCodeTextField(
@@ -914,7 +907,7 @@ private fun editHint(editing: OpenCodeServer?): String {
     }
 }
 
-/** iOS's Connect button: label-coloured when ready, a quiet fill while disabled, an arrow at the end. */
+/** Label-coloured when ready, a quiet fill while disabled, an arrow at the end. */
 @Composable
 private fun ConnectButton(label: String, inProgress: Boolean, enabled: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val colors = OpenCodeTheme.colors

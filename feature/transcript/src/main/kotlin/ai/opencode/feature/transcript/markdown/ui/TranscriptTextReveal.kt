@@ -26,8 +26,8 @@ import androidx.compose.ui.node.currentValueOf
 import androidx.compose.ui.platform.LocalGraphicsContext
 
 /**
- * How streamed assistant text reveals as chunks arrive (iOS `StreamTextRevealStyle`, D-53),
- * picked live in the Tuning Panel (`transcript.textReveal.style`; [TextRevealTunables]).
+ * How streamed assistant text reveals as chunks arrive, picked live in the Tuning Panel
+ * (`transcript.textReveal.style`; [TextRevealTunables]).
  */
 enum class StreamTextRevealStyle(override val rawValue: String) : TunableChoice {
     /** Today's look: each chunk fades its opacity over 0.2 s on its own clock. */
@@ -47,10 +47,10 @@ enum class StreamTextRevealStyle(override val rawValue: String) : TunableChoice 
         val current: StreamTextRevealStyle get() = TextRevealTunables.style.value
 
         /**
-         * iOS `StreamSweepRenderer.alpha`: a feathered frontier crossing the chunk (positions
-         * 0…1) as `progress` runs 0…1, reaching full opacity everywhere by the end, so handing
-         * the chunk to the base text never changes a pixel. The head moves evenly and the
-         * feather spans most of a chunk, so each glyph fades over about half the reveal.
+         * A feathered frontier crossing the chunk (positions 0…1) as `progress` runs 0…1, reaching
+         * full opacity everywhere by the end, so handing the chunk to the base text never changes a
+         * pixel. The head moves evenly and the feather spans most of a chunk, so each glyph fades
+         * over about half the reveal.
          */
         fun sweepAlpha(progress: Double, position: Double, feather: Double): Double {
             if (progress >= 1) return 1.0
@@ -68,8 +68,8 @@ enum class StreamTextRevealStyle(override val rawValue: String) : TunableChoice 
 }
 
 /**
- * D-53 (Developer Mode → Tuning → Transcript → Text Reveal; iOS `TextRevealTunables`). Each
- * chunk reads them as it arrives, so a change shows on the next chunk without a relaunch.
+ * Tunables. Each chunk reads them as it arrives, so a change shows on the next chunk without a
+ * relaunch.
  */
 object TextRevealTunables {
     /** The Tuning Panel sections it registers (the key segment after the group), in order. */
@@ -81,7 +81,7 @@ object TextRevealTunables {
     val phosphorLift = Tunable("transcript.textReveal.phosphorLift", "Phosphor lift", default = 0.09, range = 0.0..0.4, step = 0.01)
     val stagger = Tunable("transcript.textReveal.stagger", "Per-chunk stagger (s)", default = 0.0, range = 0.0..0.2, step = 0.005)
 
-    /** 1 Today · 2 Soft Frontier Sweep · 3 Focus Frontier, as recorded for D-53. */
+    /** 1 Today · 2 Soft Frontier Sweep · 3 Focus Frontier. */
     val options: TuningPresets by lazy {
         TuningPresets(
             "transcript.textReveal", "Text Reveal",
@@ -101,11 +101,10 @@ object TextRevealTunables {
 }
 
 /**
- * When a streamed reply's text arrived, so what just landed fades in while earlier text stays
- * put (iOS `TranscriptTextReveal`). The list owns it, like disclosure, so a row LazyColumn
- * recomposes or brings back never fades its text again; a block it sees first (opening a
- * session, scrolling back) is history and appears at once. A plain object, read during
- * composition as iOS reads it in `body`: rendering the same blocks again records nothing.
+ * When a streamed reply's text arrived, so what just landed fades in while earlier text stays put.
+ * The list owns it, like disclosure, so a row LazyColumn recomposes or brings back never fades its
+ * text again; a block it sees first (opening a session, scrolling back) is history and appears at
+ * once. A plain object, read during composition: rendering the same blocks again records nothing.
  */
 class TranscriptTextReveal {
     /** Seconds on the frame clock's timebase (`System.nanoTime`), injectable for deterministic checks. */
@@ -240,7 +239,7 @@ class TranscriptTextReveal {
             is OpenCodeMarkdownBlock.Kind.Mermaid -> 11 to 1
         }
 
-        /** iOS `ArrivalFade`'s curve: ease-out from where the arrival's clock stands. */
+        /** Ease-out from where the arrival's clock stands. */
         fun opacity(arrival: Arrival, now: Double): Float {
             val u = ((now - arrival.time) / maxOf(0.01, arrival.duration)).coerceIn(0.0, 1.0)
             return (1 - (1 - u) * (1 - u)).toFloat()
@@ -249,15 +248,14 @@ class TranscriptTextReveal {
 }
 
 /**
- * iOS `EnvironmentValues.transcriptTextReveal`. The list provides one; without it,
- * `MarkdownBlocksView` keeps one per row (a row LazyColumn brings back starts as history).
+ * The list provides one; without it, `MarkdownBlocksView` keeps one per row (a row LazyColumn
+ * brings back starts as history).
  */
 val LocalTranscriptTextReveal = staticCompositionLocalOf<TranscriptTextReveal?> { null }
 
 /**
- * A frame clock that ticks only until [ends] (seconds on [TranscriptTextReveal.now]'s clock):
- * read the returned state in a draw lambda so each frame redraws without recomposing or
- * relaying out (iOS: the fades run on the render server).
+ * A frame clock that ticks only until [ends] (seconds on [TranscriptTextReveal.now]'s clock): read
+ * the returned state in a draw lambda so each frame redraws without recomposing or relaying out.
  */
 @Composable
 internal fun rememberRevealFrame(ends: Double?, now: () -> Double): androidx.compose.runtime.MutableLongState {
@@ -273,9 +271,9 @@ internal fun rememberRevealFrame(ends: Double?, now: () -> Double): androidx.com
 }
 
 /**
- * iOS `ArrivalFade` for a whole block: fades it in from where its arrival's clock stands.
- * Only opacity changes per frame (a graphics layer property); the block is laid out once.
- * Whole blocks are always wrapped, arriving or not, so a fade never changes their identity.
+ * Fades it in from where its arrival's clock stands. Only opacity changes per frame (a graphics
+ * layer property); the block is laid out once. Whole blocks are always wrapped, arriving or not, so
+ * a fade never changes their identity.
  */
 @Composable
 internal fun Modifier.arrivalFade(arrival: TranscriptTextReveal.Arrival?, reveal: TranscriptTextReveal): Modifier {

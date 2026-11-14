@@ -26,10 +26,10 @@ import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
- * Steers GPT-Live client delegations directly into a real OpenCode session on the connected
- * server (`voiceSessionDelegator` experiment), tracking watermarked `[Voice delta]` turns, live
- * tool captions, and `ios_voice_*` phone-side tool effects (iOS `VoiceSessionDelegator.swift`).
- * The `ios_voice_*` names are the server plugin's, so they stay as iOS names them.
+ * Steers GPT-Live client delegations directly into a real OpenCode session on the connected server
+ * (`voiceSessionDelegator` experiment), tracking watermarked `[Voice delta]` turns, live tool
+ * captions, and `ios_voice_*` phone-side tool effects. The `ios_voice_*` names are the server
+ * plugin's, so they stay.
  */
 object VoiceSessionDelegator {
     const val voiceSessionTitle = "Voice"
@@ -220,7 +220,7 @@ object VoiceSessionDelegator {
     /** Cleans an assistant reply for spoken commentary: collapses fenced code blocks and strips Markdown syntax. */
     fun spokenReply(raw: String): String = stripMarkdown(LiveContentChunker.collapseCodeBlocks(raw))
 
-    /** iOS `CharacterSet.whitespaces`: tab and the space separators, not newlines. */
+    /** Tab and the space separators, not newlines. */
     private fun isBlank(c: Char): Boolean = c == '\t' || Character.getType(c) == Character.SPACE_SEPARATOR.toInt()
 
     /**
@@ -423,7 +423,6 @@ object VoiceSessionDelegator {
         return out.toString()
     }
 
-    /** iOS `Character.isLetter || isNumber`. */
     private fun isWord(c: Char): Boolean {
         if (c.isLetter() || c.isDigit()) return true
         val type = Character.getType(c)
@@ -500,7 +499,7 @@ object VoiceSessionDelegator {
         companion object Key : DependencyKey<Client> {
             override val liveValue: Client by lazy { live() }
 
-            /** As iOS: the live submit, which reaches only test dependencies under tests. */
+            /** The live submit, which reaches only test dependencies under tests. */
             override val testValue: Client get() = live()
 
             fun live(): Client {
@@ -749,10 +748,9 @@ object VoiceSessionDelegator {
 }
 
 /**
- * One Automatic `"Voice"` session lookup per server at a time (iOS `VoiceSessionCreationGate`):
- * concurrent turns join the in-flight find-or-create, and the lookup is cancelled only once
- * every waiter has left. Remembers the resolved session and its unfinished setup (rename,
- * model) so a later turn finishes it.
+ * One Automatic `"Voice"` session lookup per server at a time: concurrent turns join the in-flight
+ * find-or-create, and the lookup is cancelled only once every waiter has left. Remembers the
+ * resolved session and its unfinished setup (rename, model) so a later turn finishes it.
  */
 private class VoiceSessionCreationGate {
     data class PendingSetup(val session: OpenCodeSession, val renamed: Boolean, val modelConfigured: Boolean)
@@ -845,7 +843,7 @@ private class VoiceSessionCreationGate {
             }
         }
         if (starts) {
-            // Like iOS's unstructured Task: it keeps the caller's dependencies and retry policy.
+            // An unstructured job: it keeps the caller's dependencies and retry policy.
             val job = scope.launch(context, start = CoroutineStart.LAZY) {
                 val outcome = try {
                     Result.success(operation())

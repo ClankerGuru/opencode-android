@@ -44,10 +44,9 @@ import okhttp3.Request
 import java.io.File
 
 /**
- * One open file's loading, playback and Share (iOS `AgentFileViewerModel`, an `@Observable`
- * model the page owns). A plain object, like iOS: its state is Compose snapshot state the page
- * reads; the page calls [open] when it appears and [stop] when it goes, and the viewer calls
- * [release] when the page is gone for good.
+ * One open file's loading, playback and Share. Its state is snapshot state the page reads; the page
+ * calls [open] when it appears and [stop] when it goes, and the viewer calls [release] when the
+ * page is gone for good.
  */
 class AgentFileViewerModel(
     val reference: AgentFileReference,
@@ -64,8 +63,8 @@ class AgentFileViewerModel(
         class Image(val image: Bitmap) : Content
 
         /**
-         * iOS Quick Look. Android has none: a PDF renders its pages ([pdf]); any other document
-         * offers another app (`ACTION_VIEW` through the FileProvider).
+         * Android has none: a PDF renders its pages ([pdf]); any other document offers another app
+         * (`ACTION_VIEW` through the FileProvider).
          */
         class QuickLook(val file: File, val pdf: AgentPdfDocument?) : Content
 
@@ -99,10 +98,7 @@ class AgentFileViewerModel(
 
     var shareError: AgentFileError? by mutableStateOf(null)
 
-    /**
-     * No app on this device opened the document (Android only: iOS previews every document in
-     * Quick Look). Cleared by the next try.
-     */
+    /** No app on this device opened the document. Cleared by the next try. */
     var noAppOpens: Boolean by mutableStateOf(false)
         private set
 
@@ -474,9 +470,8 @@ class AgentPdfDocument private constructor(
 }
 
 /**
- * Hands a downloaded file to the system: the share sheet (iOS `ShareLink` /
- * `ActivitySharePresenter`), or another app for a document Android can't preview (iOS shows
- * those in Quick Look). Files go out through the FileProvider declared in this module's manifest.
+ * Hands a downloaded file to the share sheet, or to another app for a document Android can't
+ * preview, through this module's FileProvider.
  */
 class AgentFileShareClient(
     val share: (file: File, mime: String) -> Boolean,

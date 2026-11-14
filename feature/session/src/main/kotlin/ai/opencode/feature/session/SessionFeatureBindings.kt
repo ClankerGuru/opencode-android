@@ -24,17 +24,14 @@ import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.model.OpenCodeProject
 import kotlin.time.Duration.Companion.seconds
 
-// Port of iOS `SessionFeature+Bindings.swift`: the call, Raise to Talk, bindings, and the Project
-// sheet's folders.
+// The call, Raise to Talk, bindings, and the Project sheet's folders.
 
 /**
- * iOS `BindableAction`: the view's two-way bindings, as explicit setter actions. The view sends
- * `Action.Binding(BindingAction.Draft(text))` (iOS `$store.draft`); [bindingReducer] writes the
- * field first (TCA's `BindingReducer`), then the core chain reacts (`reduceCallAndBindings`
- * handles `.binding(\.draft)`). Only the fields iOS binds are bindable.
+ * The view's two-way bindings, as explicit setter actions. [bindingReducer] writes the field first,
+ * then the core chain reacts.
  */
 sealed interface BindingAction {
-    /** `$store.draft`: the composer's text. Written through [withDraft] (iOS `didSet`). */
+    /** `$store.draft`: the composer's text. Written through [withDraft]. */
     data class Draft(val value: String) : BindingAction
     /** `$store.activePicker`: a sheet presented or dismissed. */
     data class ActivePicker(val value: State.ActivePicker?) : BindingAction
@@ -44,7 +41,7 @@ sealed interface BindingAction {
     data class ProjectFilter(val value: String) : BindingAction
 }
 
-/** iOS `BindingReducer()`: applies a binding's value before the rest of the body sees the action. */
+/** Applies a binding's value before the rest of the body sees the action. */
 internal val bindingReducer: Reducer<State, Action> = Reducer { state, action ->
     val binding = (action as? Action.Binding)?.action ?: return@Reducer Reduced(state)
     Reduced(
@@ -357,7 +354,7 @@ private fun SessionFeature.startCall(state: State): Reduced<State, Action> {
     return Reduced(next, Effect.merge(yielded.effect, create))
 }
 
-// region Composer autocomplete (iOS `ComposerAutocompleteReducer`'s `in: &state` arguments)
+// region Composer autocomplete
 
 /** The slice of the session's state the autocomplete reducer reads. */
 internal val State.autocompleteHost: ComposerAutocompleteHost
@@ -370,7 +367,7 @@ internal val State.autocompleteHost: ComposerAutocompleteHost
         projects = projects,
     )
 
-/** The clients, cancel IDs and session actions iOS passes to every `ComposerAutocompleteReducer` call. */
+/** The clients, cancel IDs and session actions every autocomplete reducer call takes. */
 internal fun SessionFeature.autocompleteEnvironment(): ComposerAutocompleteEnvironment<Action> = ComposerAutocompleteEnvironment(
     client = openCodeClient,
     clock = clock,
@@ -389,9 +386,8 @@ internal fun SessionFeature.autocompleteEnvironment(): ComposerAutocompleteEnvir
 )
 
 /**
- * Applies one autocomplete reduce to the session: its state, the draft it edited (a chosen row or
- * a deleted chip, written as iOS's `state.draft = …`), and the session-field half of
- * `commandFinished`.
+ * Applies one autocomplete reduce to the session: its state, the draft it edited, and the
+ * session-field half of `commandFinished`.
  */
 internal fun applyAutocomplete(state: State, outcome: ComposerAutocompleteOutcome<Action>): Reduced<State, Action> {
     var next = state.copy(autocomplete = outcome.autocomplete)
@@ -411,9 +407,9 @@ internal fun applyAutocomplete(state: State, outcome: ComposerAutocompleteOutcom
 // endregion
 
 /**
- * iOS `draftEdited(_:)`: the draft changed in the field. A keyboard edit mid-dictation wins: stop
- * transcribing rather than letting the next volatile result clobber what the user typed. Return's
- * newline alone is a send, not a new answer.
+ * The draft changed in the field. A keyboard edit mid-dictation wins: stop transcribing rather than
+ * letting the next volatile result clobber what the user typed. Return's newline alone is a send,
+ * not a new answer.
  */
 private fun SessionFeature.draftEdited(state: State): Reduced<State, Action> {
     var next = state
@@ -427,6 +423,5 @@ private fun SessionFeature.draftEdited(state: State): Reduced<State, Action> {
     return Reduced(autocomplete.state, Effect.merge(stop.effect, autocomplete.effect))
 }
 
-/** iOS `reduceAutocomplete(_:_:)`. */
 private fun SessionFeature.reduceAutocomplete(action: ComposerAutocompleteAction, state: State): Reduced<State, Action> =
     applyAutocomplete(state, ComposerAutocompleteReducer.reduce(action, state.autocomplete, state.autocompleteHost, autocompleteEnvironment()))

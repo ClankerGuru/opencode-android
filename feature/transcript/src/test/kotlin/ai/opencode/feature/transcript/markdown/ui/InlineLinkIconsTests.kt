@@ -16,22 +16,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /*
- * Port of iOS `OpenCodeTests/InlineLinkIconsTests.swift` (Link Icons, OC-348 / D-68). iOS
- * `InlineLinkText.decorate` is part of [MarkdownPresentation.present] on Android: a link's icon
- * slot is a word joiner carrying inline content (iOS: a `InlineLinkSlotKey` attribute on the
- * link's first character), so it is one more character in the presented text and an insertion
- * in [PresentedText.edits]. iOS `AttributedString(markdown:)` → [InlineMarkdownParser.parse].
- *
- * Not ported:
- * - `cleanAddressIsTheDefault`: Android bakes D-68's Clean Address (`LocalInlineLinkStyle`
- *   defaults to [InlineLinkStyle.Address]) and has no `InlineLinkTunables` presets to compare.
- * - Dropped (UIKit/SwiftUI): `holdingTheIconFindsItsLink`,
- *   `headingWithLinkCoversBothIconAndLinkTextInHitLayout`,
- *   `linkLayoutMeasuresTunedBodySizeInlineCodeAndScaledLeading` (`LinkHitLayout`/`LinkMenuView`
- *   TextKit hit testing; Android hit-tests the Compose text layout in media's `LinkMenu`),
- *   `iconsStayWithinTheAscentAndCentreOnCapHeight`,
- *   `centredIconsKeepLineHeightAndAlignOpticallyAcrossStylesAndDynamicType` (`UIFont`
- *   metrics, `ImageRenderer` pixel probes; Android centres a `Placeholder` on the text).
+ * A link's icon slot is a word joiner carrying inline content, so it is one more character in the
+ * presented text and an insertion in [PresentedText.edits].
  */
 // Robolectric: the Chip fold and the icon slot's host parse with `android.net.Uri`.
 @RunWith(RobolectricTestRunner::class)
@@ -55,7 +41,7 @@ class InlineLinkIconsTests {
 
     private fun shown(presented: PresentedText) = presented.text.text.replace("\u2060", "")
 
-    /** The character after each icon slot (iOS: the link character the slot sits on). */
+    /** The character after each icon slot. */
     private fun slots(presented: PresentedText): List<Char> {
         val text = presented.text
         return text.getStringAnnotations(0, text.length)
@@ -117,7 +103,7 @@ class InlineLinkIconsTests {
         assertEquals("example.com", MarkdownPresentation.displayed("https://www.example.com/", InlineLinkStyle.Address))
     }
 
-    /** Offsets past the slot are one further than iOS's: the slot is a character here. */
+    /** The slot is a character here. */
     @Test fun streamedArrivalsMapPastAFoldedURL() {
         val decorated = decorate("Open $device and check.", InlineLinkStyle.Address, isGrowing = false)
         val slot = 1

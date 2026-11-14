@@ -21,15 +21,8 @@ import org.junit.Test
 import java.time.Instant
 
 /**
- * Port of iOS `DrawerPerfGateTests`: the drawer's work, counted so it can't creep back. No list
- * builds while the drawer is hidden, one prewarm build, and the one-pass session and project
- * lookups.
- *
- * Not ported: `headerRevealAttachesAHandfulOfFilters` (UIKit `VariableBlurView` filters; Android's
- * header fade is a gradient drawn per frame), `homePersistenceWritesOffTheMainThread` (Android's
- * `LiveSharedBytes` needs an Android `Context`; writes already ran on its own thread and now encode
- * there too), `rowPressWaitsToSeeTheFingerIsntScrolling` (the UIKit row coordinator; Android's
- * press delay lives in a Compose pointer gesture).
+ * The drawer's work, counted so it can't creep back. No list builds while the drawer is hidden, one
+ * prewarm build, and the one-pass session and project lookups.
  */
 class DrawerPerfGateTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -149,10 +142,6 @@ class DrawerPerfGateTests {
         }
     }
 
-    /**
-     * iOS also draws the field at 0.75x pixel density; Android's AGSL brush has no cheaper
-     * lower-resolution target, so only the frame rate is ported.
-     */
     @Test fun driftFieldDrawsAtThreeQuartersDensityAndThirtyFPS() {
         assertEquals(30, CatchUpDriftRenderer.FRAMES_PER_SECOND)
     }

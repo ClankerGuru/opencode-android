@@ -18,21 +18,10 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
- * Port of iOS `RollingNumberTests` (`OpenCodeTests/RollingNumberTests.swift`).
- *
  * Android lays the reels out with a Compose `TextMeasurer`; these JVM tests use [FakeMetrics]
- * (fractional advances, in px) in its place, standing in for iOS's `UIFont` metrics. Pixel grid:
- * Android works in px, so iOS's `1 / scale` tolerances are 1 px.
+ * (fractional advances, in px) in its place. Pixel grid: Android works in px.
  *
- * Deleted (UIKit/SwiftUI-only):
- * - `rollingTitleSurvivesPixelSnapping`: hosts `RollingNumber` in a `UIWindow` under Dynamic Type
- *   sizes and SwiftUI pixel snapping.
- * - From `reduceMotionAndInactiveSceneSettleImmediatelyAndVoiceOverReadsFinalValue`: the Dynamic
- *   Type `uiFont(dynamicTypeSize:)` comparison and reading `text`/`accessibilityOverride` off the
- *   SwiftUI view struct (a composable has no inspectable value).
- * - From `rollingTitleMeasuresWhatItDraws`: the comparison with SwiftUI `Text`'s fitting width
- *   (Android measures with the same `TextMeasurer` it draws with); its Dynamic Type × Bold Text
- *   arguments are font sizes × weights of [FakeMetrics] here.
+ * Deleted.
  */
 class RollingNumberTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -235,13 +224,12 @@ class RollingNumberTests {
         assertTrue(abs((lastSlot.x + lastSlot.width) - targetW) < 0.01f)
     }
 
-    // Measured width (OC-355)
+    // Measured width
 
     private val titles = listOf("1 queued", "2 queued", "10 queued", "1 subagent · 2 shells", "64% of 400K")
 
     /**
      * The width a rolling title lays out at is on the pixel grid and holds every glyph it draws.
-     * iOS's Dynamic Type sizes (large, xxxLarge, accessibility3) are font sizes here.
      */
     @Test
     fun rollingTitleMeasuresWhatItDraws() {
@@ -267,7 +255,7 @@ class RollingNumberTests {
     @Test
     fun countRollNeverClipsOrJumps() {
         val style = RollingNumberStyle()
-        // A 15 pt subheadline at 3× is 45 px; iOS's 3 pt jump bound is 9 px.
+        // A 15 pt subheadline at 3× is 45 px.
         val metrics = FakeMetrics(45f)
         val jump = 9f
         val model = RollingNumberModel()

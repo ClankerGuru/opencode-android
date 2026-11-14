@@ -9,16 +9,8 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * One axis of an analytical spring, stepped in closed form for any frame interval `dt`
- * without numerical drift (iOS `SpringSolver`, `OpenCode/Core/Motion/SpringSolver.swift`).
- *
- * Parameterized in SwiftUI's `(duration, bounce)` ([MotionSpring]) or directly in
- * `(omega, zeta)`. [retarget] keeps position and velocity continuous across mid-flight
- * reversals. Use it for custom gesture-driven drivers (drawer, back swipe, flights) stepped
- * from [motionFrameLoop]; for ordinary property animation use `Animatable` with
- * [MotionSpring.spec], which is the same curve.
- *
- * Mutable like the Swift value type it ports; [copy] gives an independent value.
+ * One axis of an analytical spring, stepped in closed form for any `dt`. [retarget] keeps position
+ * and velocity continuous. Mutable; [copy] gives an independent value.
  */
 class SpringSolver(
     var value: Double = 0.0,
@@ -36,7 +28,6 @@ class SpringSolver(
 
     data class Parameters(val omega: Double, val zeta: Double)
 
-    /** iOS `init(_ spring: TunableSpring, ...)`. */
     constructor(
         spring: MotionSpring,
         value: Double = 0.0,
@@ -105,7 +96,6 @@ class SpringSolver(
     override fun toString(): String = "SpringSolver(value=$value, velocity=$velocity, target=$target, ω=$omega, ζ=$zeta)"
 
     companion object {
-        /** iOS `init(value:velocity:target:duration:bounce:...)`. */
         fun of(
             duration: Double,
             bounce: Double = 0.0,
@@ -116,10 +106,7 @@ class SpringSolver(
             velocityEpsilon: Double = 4.0,
         ): SpringSolver = SpringSolver(MotionSpring(duration, bounce), value, velocity, target, positionEpsilon, velocityEpsilon)
 
-        /**
-         * SwiftUI's `Spring(duration:bounce:)` mapping: ω = 2π / duration, ζ = 1 − bounce
-         * (or 1 / (1 + bounce) for negative bounce).
-         */
+        /** ω = 2π / duration, ζ = 1 − bounce (or 1 / (1 + bounce) for negative bounce). */
         fun parameters(duration: Double, bounce: Double): Parameters {
             val omega = 2 * PI / max(duration, 0.01)
             val zeta = if (bounce >= 0) 1 - bounce else 1 / (1 + bounce)

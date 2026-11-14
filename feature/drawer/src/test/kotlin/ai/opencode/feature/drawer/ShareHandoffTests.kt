@@ -37,15 +37,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `ShareHandoffTests`' `ShareInboxFeatureTests`: shares arriving in Home open their
- * session (or a New Session draft) with the items in its composer, and the targets Home
- * publishes to the share sheet.
- *
- * Other modules' tests of this file: `ShareHandoffStoreTests`, `SharedImageEncoderTests` and
- * `SharedItemLoaderAndActivationTests` are `:feature:system`'s;
- * `appConsumesSharesOnActivationAndRoutesThemToTheOpenServer` is `:app`'s (`AppFeature`).
- */
 class ShareInboxFeatureTests {
     @get:Rule val isolation = TestIsolationRule()
 

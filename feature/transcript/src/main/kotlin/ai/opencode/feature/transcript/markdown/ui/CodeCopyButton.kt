@@ -35,10 +35,9 @@ import kotlinx.coroutines.delay
 
 /**
  * Android: a code block's Copy button, as the desktop app draws it (`markdown-copy-button` in
- * `packages/session-ui`: a 24 px ghost icon button in the block's top-right corner, always shown
- * on touch screens, a check for 2 s after copying). iOS code blocks have none. The 48 dp target
- * fills the block's corner; the square is filled with the block's colour so long lines pass
- * under it cleanly.
+ * `packages/session-ui`: a 24 px ghost icon button in the block's top-right corner, always shown on
+ * touch screens, a check for 2 s after copying). The 48 dp target fills the block's corner; the
+ * square is filled with the block's colour so long lines pass under it cleanly.
  */
 @Composable
 fun CodeCopyButton(code: String, onCopy: (String) -> Unit) {

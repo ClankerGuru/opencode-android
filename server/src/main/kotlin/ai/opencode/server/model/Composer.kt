@@ -390,11 +390,7 @@ data class OpenCodeAutocompleteMentions(
     val isEmpty: Boolean get() = files.isEmpty() && agents.isEmpty() && skills.isEmpty()
 }
 
-/**
- * Per-send context the prompt body folds in without changing every client signature
- * (iOS task locals `PromptPageContext.current`, `PromptNotification.callbackURL`,
- * `PromptAutocompleteMentions.current`, `PromptMessageID.current`, `FormLocationDirectory.current`).
- */
+/** Per-send context the prompt body folds in without changing every client signature. */
 object PromptContext {
     val page = TaskLocal<OpenCodePageContext?> { null }
     /** The notify plugin's callback: POSTs here when this run ends. */
@@ -432,9 +428,8 @@ internal object OpenCodeAutocompleteAgentSerializer : ElementSerializer<OpenCode
 )
 
 /**
- * What a send asks of the in-app browser's open page (iOS `PageShareRequest`,
- * `Browser/BrowserFeature.swift`). Here because the composer's `PendingPrompt` carries it
- * and `:feature:composer` sits beside, not above, the browser's module.
+ * What a send asks of the in-app browser's open page. Here because the composer's `PendingPrompt`
+ * carries it and `:feature:composer` sits beside, not above, the browser's module.
  */
 data class PageShareRequest(
     val pageID: java.util.UUID,

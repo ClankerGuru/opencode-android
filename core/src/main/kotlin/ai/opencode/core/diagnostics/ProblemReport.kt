@@ -9,11 +9,8 @@ import java.util.UUID
 import kotlin.math.max
 
 /**
- * Port of iOS `ProblemReport.swift` (`Diagnostics/Traces/`): a report of where the app was and
- * what it recorded, bounded under 2 MB. No credentials or server addresses: the server goes by
- * a short hash of its persistence ID ([ProblemReportBuilder.safeServerID]), the session by ID.
- * Lives in `:core` so Report a Problem (session), the developer tools' diagnostics bundle and
- * Developer Mode uploads share one builder.
+ * Where the app was and what it recorded, under 2 MB. No credentials or server addresses: the
+ * server goes by a short hash.
  */
 @Serializable
 data class ProblemReportContext(
@@ -29,7 +26,7 @@ data class ProblemReportContext(
 data class ProblemReportDevice(
     val appVersion: String,
     val build: String,
-    /** "Debug", "Internal" (iOS TestFlight) or "Play Store" (iOS App Store). */
+    /** "Debug", "Internal" or "Play Store". */
     val distribution: String,
     val system: String,
     val model: String,
@@ -235,7 +232,7 @@ object ProblemReportBuilder {
     /** A persistence ID ("user|https://host") becomes its short hash, so no address or username leaves the phone. */
     fun safeServerID(serverID: String): String = if ("|" in serverID || "://" in serverID) serverKey(serverID) else serverID
 
-    /** iOS `ShareConversation.serverKey(for:)`: the first 6 bytes of SHA-256, hex. */
+    /** The first 6 bytes of SHA-256, hex. */
     fun serverKey(persistenceID: String): String =
         MessageDigest.getInstance("SHA-256").digest(persistenceID.toByteArray()).take(6).joinToString("") { "%02x".format(it) }
 

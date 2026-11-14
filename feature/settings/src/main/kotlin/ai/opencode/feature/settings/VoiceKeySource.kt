@@ -3,9 +3,8 @@ package ai.opencode.feature.settings
 import ai.opencode.core.strings.localized
 
 /**
- * Port of iOS `Settings/VoiceKeySource.swift`'s `VoiceKeyStatus`: the status shown at a glance on
- * the provider key row in Settings › Voice. `VoiceKeySource` itself lives in `:feature:voice`
- * (`VoiceRoute.keySource` returns it).
+ * The status shown at a glance on the provider key row in Settings › Voice. `VoiceKeySource` itself
+ * lives in `:feature:voice` (`VoiceRoute.keySource` returns it).
  */
 sealed interface VoiceKeyStatus {
     data object Missing : VoiceKeyStatus

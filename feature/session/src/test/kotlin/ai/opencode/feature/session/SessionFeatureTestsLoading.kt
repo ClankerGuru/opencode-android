@@ -47,9 +47,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.yield
 import org.junit.Test
 
-/** Port of iOS `SessionFeatureTests+Loading.swift`. */
 class SessionFeatureTestsLoading {
-    /** iOS `holdPendingWork(_:on:)`: pending requests and inbox reads wait on [hold]. */
+    /** Pending requests and inbox reads wait on [hold]. */
     private fun DependencyValues.Builder.holdPendingWork(hold: Gate) {
         this[OpenCodeClient] = this[OpenCodeClient].copy(
             familyPendingRequests = { _, _, _ ->
@@ -163,7 +162,7 @@ class SessionFeatureTestsLoading {
         store.exhaustive = false
 
         store.send(Action.FamilyResponse(Result.success(OpenCodeSessionFamily(sessions = listOf(session), activeSessionIDs = emptySet()))))
-        // iOS's store reduces effect actions as they arrive; this TestStore does on request.
+        // This TestStore reduces effect actions when asked.
         for (i in 0 until 20) {
             if (inboxReads.value != 0) break
             store.skipReceivedActions()
@@ -440,7 +439,7 @@ class SessionFeatureTestsLoading {
         store.receive(Action.FirstContentFrameRendered) {
             it.copy(hasRenderedFirstContentFrame = true).withRequestLoadAttempt(RequestDockFeature.State.LoadAttempt.Initial)
         }
-        // Android's merged effects answer in launch order (family, shells, models); iOS's land as its threads run them.
+        // Merged effects answer in launch order (family, shells, models).
         store.receive(
             Action.FamilyResponse(Result.success(OpenCodeSessionFamily(sessions = listOf(session), activeSessionIDs = emptySet()))),
         ) {
@@ -854,7 +853,7 @@ class SessionFeatureTestsLoading {
             it.copy(hasRenderedFirstContentFrame = true, isLoadingModels = true)
                 .withRequestLoadAttempt(RequestDockFeature.State.LoadAttempt.Initial)
         }
-        // Android's merged effects answer in launch order (family, shells, models); iOS's land as its threads run them.
+        // Merged effects answer in launch order (family, shells, models).
         store.receive(
             Action.FamilyResponse(Result.success(OpenCodeSessionFamily(sessions = listOf(session), activeSessionIDs = setOf(session.id)))),
         ) {
@@ -938,7 +937,7 @@ class SessionFeatureTestsLoading {
         store.receive(Action.FirstContentFrameRendered) {
             it.copy(hasRenderedFirstContentFrame = true).withRequestLoadAttempt(RequestDockFeature.State.LoadAttempt.Initial)
         }
-        // Android's merged effects answer in launch order (family, shells, models); iOS's land as its threads run them.
+        // Merged effects answer in launch order (family, shells, models).
         store.receive(
             Action.FamilyResponse(Result.success(OpenCodeSessionFamily(sessions = listOf(session), activeSessionIDs = emptySet()))),
         ) {
@@ -1027,7 +1026,6 @@ class SessionFeatureTestsLoading {
 
     private val page = SessionFeature.AuthoritativeRefresh.Scope.Page
 
-    /** The optimistic send iOS asserts inline after `.sendTapped` on an idle session. */
     private fun optimisticSend(state: State, sessionID: String, text: String): State {
         val id = "msg_00000000000100000000000000"
         return state.withDraftState(DraftState()).copy(

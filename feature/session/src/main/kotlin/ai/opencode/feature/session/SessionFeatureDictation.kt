@@ -12,8 +12,8 @@ import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.feature.composer.DictationHoldRelease
 import ai.opencode.server.model.OpenCodeDelivery
 
-// Port of iOS `SessionFeature+Dictation.swift`: the mic and dictation. `:feature:composer`'s
-// `DictationFeature` owns the recording's state; this file is the session's glue.
+// The mic and dictation. `:feature:composer`'s `DictationFeature` owns the recording's state; this
+// file is the session's glue.
 
 /** The mic and dictation. Null: the action passes on. */
 internal fun SessionFeature.reduceDictation(state: State, action: Action): Reduced<State, Action>? {
@@ -220,10 +220,10 @@ private fun SessionFeature.startDictation(state: State): Reduced<State, Action> 
 }
 
 /**
- * iOS `stopDictation(_:)`: discards dictation. Tears down the mic at once, drops audio not yet
- * transcribed, and cancels the transcript stream so nothing else lands in the draft. For cancels,
- * sends and manual edits, where a late result would clobber what the user committed to. Safe to
- * call unconditionally: a no-op unless dictation is active.
+ * Discards dictation. Tears down the mic at once, drops audio not yet transcribed, and cancels the
+ * transcript stream so nothing else lands in the draft. For cancels, sends and manual edits, where
+ * a late result would clobber what the user committed to. Safe to call unconditionally: a no-op
+ * unless dictation is active.
  */
 internal fun SessionFeature.stopDictation(state: State): Reduced<State, Action> {
     val endedAt = if (state.dictationPhase != DictationFeature.Phase.Idle && state.isVoiceAvailable) date.now() else null
@@ -232,9 +232,9 @@ internal fun SessionFeature.stopDictation(state: State): Reduced<State, Action> 
 }
 
 /**
- * iOS `yieldDictation(_:)`: something else takes the mic (a call). Stops at once, keeping the words
- * heard so far in the draft, as an interruption does. Finishes once the recording is discarded and
- * dictation has let go of the audio session.
+ * Something else takes the mic (a call). Stops at once, keeping the words heard so far in the
+ * draft, as an interruption does. Finishes once the recording is discarded and dictation has let go
+ * of the audio session.
  */
 internal fun SessionFeature.yieldDictation(state: State): Reduced<State, Action> {
     val hold = state.dictationHold
@@ -244,8 +244,8 @@ internal fun SessionFeature.yieldDictation(state: State): Reduced<State, Action>
 }
 
 /**
- * iOS `releaseDictationHold(_:)`: ends a dictation audio session still held ready after a recording,
- * if [reason] applies to it; a recording still running or finalizing isn't held after it.
+ * Ends a dictation audio session still held ready after a recording, if [reason] applies to it; a
+ * recording still running or finalizing isn't held after it.
  */
 internal fun SessionFeature.releaseDictationHold(reason: DictationHoldRelease): Effect<Action> {
     val dictation = dictation
@@ -253,9 +253,9 @@ internal fun SessionFeature.releaseDictationHold(reason: DictationHoldRelease): 
 }
 
 /**
- * iOS `finishDictation(_:send:)`: finishes dictation intentionally (mic tap). Stops capture but keeps
- * the transcript stream alive so the engine's finalized text — often the only accurate result —
- * still lands in the draft before the stream ends.
+ * Finishes dictation intentionally (mic tap). Stops capture but keeps the transcript stream alive
+ * so the engine's finalized text — often the only accurate result — still lands in the draft before
+ * the stream ends.
  */
 private fun SessionFeature.finishDictation(state: State, send: OpenCodeDelivery?): Reduced<State, Action> {
     val finished = DictationFeature.finish(state.dictation, send = send, dictation = dictation)

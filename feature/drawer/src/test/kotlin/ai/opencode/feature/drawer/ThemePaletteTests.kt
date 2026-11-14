@@ -19,11 +19,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `ThemePaletteTests`' Home test (`appearanceSettingsActionsPersistViaSharedAndPlaySelectionHaptic`).
- * The palette tests are `:core`'s; the transcript layout half of that test (`TranscriptTunables`,
- * `MarkdownStyle`) is `:feature:transcript`'s.
- */
 class ThemePaletteTests {
     @get:Rule val isolation = TestIsolationRule()
 

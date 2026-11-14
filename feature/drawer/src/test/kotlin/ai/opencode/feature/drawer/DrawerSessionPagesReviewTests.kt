@@ -30,7 +30,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/** Port of iOS `DrawerSessionPagesReviewTests`: the drawer's older pages and server search at their edges (p244 review). */
+/** The drawer's older pages and server search at their edges (p244 review). */
 class DrawerSessionPagesReviewTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -242,7 +242,6 @@ class DrawerSessionPagesReviewTests {
         h.skipInFlightEffects()
     }
 
-    /** iOS `store.receive(\.sessionPages.case)`. */
     private suspend fun <T : SessionPagesAction> TestStore<HomeFeature.State, Action>.receivePages(case: KClass<T>) =
         receiveBounded({ case.isInstance((it as? Action.SessionPages)?.action) }, "sessionPages.${case.simpleName}")
 

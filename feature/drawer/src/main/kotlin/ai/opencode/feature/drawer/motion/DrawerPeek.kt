@@ -32,11 +32,10 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * A session's last activity as the drawer's time reveal shows it (iOS `DrawerTimestamp`): the
- * time today, then Yesterday, the weekday within the week, and a short numeric date. Formats
- * are java.time's localized short styles (iOS `Date.FormatStyle` `.shortened` / `.numeric`).
- * Pass [hour24] (`DateFormat.is24HourFormat`) so the time follows the device's 24-hour setting,
- * as iOS's `.shortened` follows the user's.
+ * A session's last activity as the drawer's time reveal shows it: the time today, then Yesterday,
+ * the weekday within the week, and a short numeric date. Formats are java.time's localized short
+ * styles. Pass [hour24] (`DateFormat.is24HourFormat`) so the time follows the device's 24-hour
+ * setting.
  */
 object DrawerTimestamp {
     private val cache = ConcurrentHashMap<String, String>()
@@ -63,7 +62,7 @@ object DrawerTimestamp {
         fun text(date: Instant): String {
             val zoned = date.atZone(zone)
             val days = ChronoUnit.DAYS.between(zoned.toLocalDate(), todayDate).toInt()
-            // iOS `MinuteTimestampCache`: one entry per minute, day bucket, locale and zone.
+            // One entry per minute, day bucket, locale and zone.
             val key = "${date.epochSecond / 60}|$days|$tag|${zone.id}|$hour24"
             cache[key]?.let { return it }
             val formatted = uncachedText(zoned, today, days, locale, hour24)
@@ -79,7 +78,7 @@ object DrawerTimestamp {
         } else {
             DateTimeFormatter.ofPattern(android.text.format.DateFormat.getBestDateTimePattern(locale, if (hour24) "Hm" else "hm"), locale)
         }
-        // iOS `.numeric` writes the full year ("9/30/2026"); java.time's short style has two digits.
+        // Java.time's short style has two digits.
         val numericPattern = DateTimeFormatterBuilder.getLocalizedDateTimePattern(FormatStyle.SHORT, null, IsoChronology.INSTANCE, locale)
         val numeric = DateTimeFormatter.ofPattern(numericPattern.replace(Regex("y+"), "y"), locale)
         if (days == 0 && !date.isBefore(today)) return date.format(time)
@@ -90,7 +89,7 @@ object DrawerTimestamp {
     }
 }
 
-/** A drag on the open drawer that slides the rows to show their times (iOS `DrawerRevealPhase`). */
+/** A drag on the open drawer that slides the rows to show their times. */
 sealed interface DrawerRevealPhase {
     data object Began : DrawerRevealPhase
     /** Translation in dp since the pan was recognized. */
@@ -99,10 +98,10 @@ sealed interface DrawerRevealPhase {
 }
 
 /**
- * How far a sideways drag on the open drawer has slid the session rows, uncovering their times
- * (iOS `DrawerTimeReveal`). Only the rows read it, in their layer blocks, so a drag never
- * recomposes the drawer around them. The rows spring back from where they are on [DrawerRevealPhase.Ended]
- * (the list owns that spring).
+ * How far a sideways drag on the open drawer has slid the session rows, uncovering their times.
+ * Only the rows read it, in their layer blocks, so a drag never recomposes the drawer around them.
+ * The rows spring back from where they are on [DrawerRevealPhase.Ended] (the list owns that
+ * spring).
  */
 @Stable
 class DrawerTimeReveal {
@@ -145,13 +144,13 @@ class DrawerTimeReveal {
     }
 
     companion object {
-        /** iOS `-lab-reveal-trace`; no launch arguments on Android. */
+        /** No launch arguments on Android. */
         const val IS_TRACED = false
         /** Between a time and the row it belongs to (dp). */
         const val SPACING = 8f
         /** How far the card-edge fade's mask reaches before a row's leading edge, so the revealed time isn't masked off (dp). */
         const val FADE_GUTTER = 160f
-        /** iOS `@ScaledMetric(relativeTo: .footnote) timeRevealReach = 76`: scale by the font scale. */
+        /** Scale by the font scale. */
         const val REACH = 76f
 
         /** The rows follow the finger until the times are uncovered ([reach]), then rubber-band toward a little further. */
@@ -166,7 +165,7 @@ class DrawerTimeReveal {
     }
 }
 
-/** `-lab-reveal-trace`: the furthest the last reveal reached and where the rows rest now (iOS `DrawerRevealTrace`). */
+/** `-lab-reveal-trace`: the furthest the last reveal reached and where the rows rest now. */
 @Composable
 fun DrawerRevealTrace(reveal: DrawerTimeReveal) {
     Box(
@@ -180,9 +179,9 @@ fun DrawerRevealTrace(reveal: DrawerTimeReveal) {
 }
 
 /**
- * Whether a keyboard overlaps the screen (iOS `DrawerKeyboardMonitor`), so the drawer can put
- * its footer backdrop at its bottom while any keyboard is on screen. iOS keeps one shared
- * instance; here the drawer container owns one and [rememberDrawerKeyboardHold] feeds it.
+ * Whether a keyboard overlaps the screen, so the drawer can put its footer backdrop at its bottom
+ * while any keyboard is on screen. The drawer container owns one and [rememberDrawerKeyboardHold]
+ * feeds it.
  */
 @Stable
 class DrawerKeyboardMonitor {
@@ -194,9 +193,9 @@ class DrawerKeyboardMonitor {
 }
 
 /**
- * `-lab-drawer-controls-trace`: where the drawer's New Session and Settings have stood (iOS
- * `DrawerControlsTrace`). [top] is the controls' resting top edge, [highest] the highest it has
- * been laid out, so a test can tell they never rose with the keyboard.
+ * `-lab-drawer-controls-trace`: where the drawer's New Session and Settings have stood. [top] is
+ * the controls' resting top edge, [highest] the highest it has been laid out, so a test can tell
+ * they never rose with the keyboard.
  */
 @Stable
 class DrawerControlsTrace {
@@ -214,18 +213,18 @@ class DrawerControlsTrace {
     }
 
     companion object {
-        /** iOS reads a launch argument; no launch arguments on Android. */
+        /** No launch arguments on Android. */
         const val IS_TRACED = false
     }
 }
 
-/** Records the controls' frame in the root, in px (iOS `DrawerControlsTraceProbe`). */
+/** Records the controls' frame in the root, in px. */
 fun Modifier.drawerControlsTraceProbe(trace: DrawerControlsTrace): Modifier = onGloballyPositioned {
     val y = it.positionInRoot().y
     trace.record(y, y + it.size.height)
 }
 
-/** Publishes [DrawerControlsTrace] as the `drawer-controls-trace` element (iOS `DrawerControlsTraceView`). */
+/** Publishes [DrawerControlsTrace] as the `drawer-controls-trace` element. */
 @Composable
 fun DrawerControlsTraceView(trace: DrawerControlsTrace, monitor: DrawerKeyboardMonitor) {
     Box(

@@ -15,14 +15,11 @@ import android.net.Uri
 import android.os.Bundle
 
 /**
- * The one door every system entry point opens: launcher quick actions and app shortcuts,
- * Quick Settings tiles, widgets, App Actions (through [AppActionActivity]), and tapped
- * notifications. Private to the app: other apps can't start calls through it. It reads the
- * [SystemAction] the intent carries, posts it to [SystemActionInbox] (as iOS intents'
- * `perform` does), then brings the app forward and finishes without drawing.
- *
- * iOS splits this between `NotificationAppDelegate` (cold quick actions, notification taps),
- * `SystemSceneDelegate` (warm quick actions), `onOpenURL` and each intent's `perform`.
+ * The one door every system entry point opens: launcher quick actions and app shortcuts, Quick
+ * Settings tiles, widgets, App Actions (through [AppActionActivity]), and tapped notifications.
+ * Private to the app: other apps can't start calls through it. It reads the [SystemAction] the
+ * intent carries, posts it to [SystemActionInbox], then brings the app forward and finishes without
+ * drawing.
  */
 class SystemActionActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,8 +38,8 @@ class SystemActionActivity : Activity() {
     private fun handle(intent: Intent): Boolean {
         intent.getStringExtra(EXTRA_APP_FEATURE)?.let { spoken ->
             val directory = SessionDirectory.loadOrEmpty(SessionDirectory.file(filesDir))
-            // Calls only for a verified assistant (AppActionActivity), as iOS's run only from
-            // Siri and Shortcuts; any other app's call opens the session, where the user starts it.
+            // Calls only for a verified assistant (AppActionActivity); any other app's call opens
+            // the session, where the user starts it.
             val fromAssistant = intent.getBooleanExtra(EXTRA_FROM_ASSISTANT, false)
             when (val feature = OpenCodeShortcuts.feature(spoken, directory)) {
                 OpenCodeShortcuts.Feature.BackgroundCall, OpenCodeShortcuts.Feature.StartVoiceCall -> when {

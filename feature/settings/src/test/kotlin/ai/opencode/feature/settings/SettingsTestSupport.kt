@@ -7,15 +7,13 @@ import ai.opencode.core.sharing.SharedStore
 import ai.opencode.core.sharing.shared
 
 /**
- * Shared test support for `:feature:settings`' ports of the iOS unit tests.
- *
- * iOS's `@Shared` values are process-wide and each suite resets them; here every test gets a
- * fresh in-memory [SharedStore] ([SettingsTestShared]) that its `TestStore` and its reads share.
+ * Every test gets a fresh in-memory [SharedStore] ([SettingsTestShared]) that its `TestStore` and
+ * its reads share.
  */
 class SettingsTestShared(val store: SharedStore = SharedStore.inMemory()) {
     private val values: DependencyValues = DependencyValues.testing().update { this[SharedStore] = store }
 
-    /** Runs [block] reading and writing this store (iOS `@Shared` outside a store). */
+    /** Runs [block] reading and writing this store. */
     fun <R> read(block: () -> R): R = DependencyValues.withValues(values, block)
 
     fun <T> set(key: SharedKey<T>, value: T) = read { shared(key).set(value) }
@@ -23,7 +21,6 @@ class SettingsTestShared(val store: SharedStore = SharedStore.inMemory()) {
     fun <T> get(key: SharedKey<T>): T = read { shared(key).value }
 }
 
-/** iOS `LockIsolated`. */
 class Locked<T>(initial: T) {
     @Volatile private var current: T = initial
     val value: T get() = synchronized(this) { current }
@@ -31,7 +28,7 @@ class Locked<T>(initial: T) {
     fun update(block: (T) -> T) = synchronized(this) { current = block(current) }
 }
 
-/** iOS `HapticsClient.recording(_:)`: the name of every haptic played, in order. */
+/** The name of every haptic played, in order. */
 class HapticsRecorder {
     private val played = Locked(listOf<String>())
     val value: List<String> get() = played.value

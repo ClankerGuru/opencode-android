@@ -15,10 +15,7 @@ import org.junit.Rule
 import org.junit.Test
 import kotlin.math.abs
 
-/**
- * Port of iOS `MediaZoomGeometryTests.swift`. Android passes pixel sizes with
- * `displayScale = 1`; the geometry is unit-free, so the iOS point values carry over.
- */
+/** Android passes pixel sizes with `displayScale = 1`; the geometry is unit-free. */
 class MediaZoomGeometryTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -127,7 +124,6 @@ class MediaZoomGeometryTests {
     }
 }
 
-/** Port of iOS `TranscriptImageViewerFeatureTests` (`MediaZoomGeometryTests.swift`). */
 class TranscriptImageViewerFeatureTests {
     @get:Rule val isolation = TestIsolationRule()
 

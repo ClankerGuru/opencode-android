@@ -21,7 +21,7 @@ import kotlinx.coroutines.withContext
  * so a composable takes `StoreOf<Feature.State, Feature.Action>` regardless of depth.
  */
 interface StoreOf<S, A> {
-    /** The state right now (synchronous, like reading `store.state` in SwiftUI). */
+    /** The state right now. */
     val state: S
     /** Every distinct state, starting with the current one. */
     val states: Flow<S>
@@ -29,11 +29,8 @@ interface StoreOf<S, A> {
 }
 
 /**
- * Port of TCA's `Store`: runs [reducer] on the main thread and its effects in [scope].
- *
- * `send` must be called on the main thread (views and effects' sends are routed there).
- * Actions produced synchronously by [Effect.send] are processed in order right after the
- * action that produced them, before `send` returns.
+ * Port of TCA's `Store`: runs [reducer] on the main thread. Call `send` on the main thread;
+ * synchronous [Effect.send] actions are processed before it returns.
  */
 class Store<S, A>(
     initialState: S,

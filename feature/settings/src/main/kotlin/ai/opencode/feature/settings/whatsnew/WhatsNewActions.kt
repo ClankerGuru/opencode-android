@@ -9,10 +9,6 @@ import ai.opencode.feature.voice.VoiceRoutePreferences
 import ai.opencode.server.OpenCodeServer
 
 /**
- * Port of iOS `Settings/WhatsNew/WhatsNewActions.swift`.
- *
- * iOS's `whatsNewSettingsPage(_:over:)` / `WhatsNewSettingsPage` (a Settings page pushed over the
- * entry's page on What's New's own stack) fold into Settings' stack on Android:
  * [SettingsFeature] pushes `settingsPage()` for an `open` action, and Voice's page for a call
  * before Voice is set up.
  */
@@ -61,10 +57,6 @@ fun SettingsFeature.State.canTryWhatsNew(destination: WhatsNewEntry.Destination)
 fun SettingsFeature.State.offersWhatsNew(destination: WhatsNewEntry.Destination): Boolean =
     destination != WhatsNewEntry.Destination.notifications || notificationPermission != null
 
-/**
- * Whether a call can start now (iOS `VoiceRoutePreferences.isAvailable(server:)`: Voice Mode on
- * and `VoiceRoute.resolve` not unavailable, the broker resolved from the Voice Server choice).
- * False until Home hands Settings its server.
- */
+/** Whether a call can start now. False until Home hands Settings its server. */
 fun whatsNewVoiceAvailable(server: OpenCodeServer?): Boolean =
     server != null && VoiceRoutePreferences().isAvailable(server)

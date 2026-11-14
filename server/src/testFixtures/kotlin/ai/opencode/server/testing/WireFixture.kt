@@ -29,10 +29,10 @@ import javax.net.ssl.SSLException
 import javax.net.ssl.SSLHandshakeException
 
 /**
- * Port of iOS `OpenCodeTests/WireFixture.swift`: serves scripted replies for one test's unique
- * host (`wire-<uuid>.invalid`). Requests to any other host are never intercepted. Requests go
- * through the real client code and OkHttp (`OpenCodeTransport.testValue`'s
- * [TestNetworkBlock] routes this host here), so tests see exactly what the app sends.
+ * Serves scripted replies for one test's unique host (`wire-<uuid>.invalid`). Requests to any other
+ * host are never intercepted. Requests go through the real client code and OkHttp
+ * (`OpenCodeTransport.testValue`'s [TestNetworkBlock] routes this host here), so tests see exactly
+ * what the app sends.
  *
  * ```kotlin
  * val fixture = WireFixture { Reply.Json(200, """{"ok":true}""") }
@@ -49,7 +49,7 @@ class WireFixture(
     sealed interface Reply {
         data class Json(val status: Int, val body: String, val headers: Map<String, String> = emptyMap()) : Reply
 
-        /** No HTTP response: the connection failed this way (an iOS `URLError.Code`, [UrlErrorCode]). */
+        /** No HTTP response: the connection failed this way. */
         data class Failure(val code: Int) : Reply
 
         /** Sends [status] and [body], then holds the connection open without another byte: a stream stranded on a route that went away. */
@@ -71,7 +71,7 @@ class WireFixture(
         val query: String?,
         val headers: Map<String, String>,
         val body: ByteArray,
-        /** The client's read timeout, in seconds (iOS `URLRequest.timeoutInterval`). */
+        /** The client's read timeout, in seconds. */
         val timeoutInterval: Double = 0.0,
         val url: HttpUrl,
     ) {

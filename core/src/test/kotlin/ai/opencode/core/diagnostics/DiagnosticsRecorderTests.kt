@@ -13,14 +13,8 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * Port of iOS `DiagnosticsRecorderTests`.
- *
- * Android takes a socket address as bytes (OkHttp hands over an `InetAddress`), so the address
- * test parses literals the way iOS's `inet_pton` does ([addressBytes]) before classifying.
- * `voiceSocketEventsAreStreamEventsWithTheirCodes` keeps the recorder half; building the
- * `RealtimeTransportDiagnostic` belongs to `:feature:voice`.
- * `headerResolutionNotifiesObserversWhenChanged` isn't ported: `SessionHeaderStyle` and the
- * recorder's header resolution live in iOS's session header only (`:feature:session`).
+ * Android takes a socket address as bytes (OkHttp hands over an `InetAddress`), so the address test
+ * parses literals ([addressBytes]) before classifying.
  */
 class DiagnosticsRecorderTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -173,7 +167,7 @@ class DiagnosticsRecorderTests {
         assertEquals(listOf("after_retention"), recorder.snapshot().map { it.name })
     }
 
-    /** Android reads a socket error's errno from its message, as iOS reads `NSPOSIXErrorDomain` codes. */
+    /** Android reads a socket error's errno from its message. */
     @Test
     fun socketErrnosClassifyAsOfflineOrTimeout() {
         fun posix(name: String) = DiagnosticsErrorCategory.of(SocketException("sendto failed: $name"))
@@ -184,7 +178,6 @@ class DiagnosticsRecorderTests {
         assertEquals(DiagnosticsErrorCategory.Transport, posix("EACCES"))
         assertEquals(DiagnosticsErrorCategory.Offline, DiagnosticsErrorCategory.of("NSURLErrorDomain", -1005))
         assertEquals(DiagnosticsErrorCategory.Transport, DiagnosticsErrorCategory.of("NSCocoaErrorDomain", 57))
-        // The persisted iOS domain/code form classifies the same way.
         for (code in listOf(57, 54, 53, 32, 50, 51, 64, 65)) {
             assertEquals(DiagnosticsErrorCategory.Offline, DiagnosticsErrorCategory.of("NSPOSIXErrorDomain", code))
         }
@@ -279,7 +272,6 @@ class DiagnosticsRecorderTests {
     }
 }
 
-/** Port of iOS `PrivacyManifestTests`' diagnostics half (the manifest half is iOS-only: `PrivacyInfo.xcprivacy`). */
 class PrivacyManifestTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -298,7 +290,7 @@ class PrivacyManifestTests {
     }
 }
 
-/** iOS `inet_pton` for the literals the address test uses: IPv4 dotted quads and IPv6 (zone stripped). */
+/** IPv4 dotted quads and IPv6 (zone stripped). */
 private fun addressBytes(address: String?): ByteArray? {
     val host = address?.substringBefore('%') ?: return null
     parseV4(host)?.let { return it }

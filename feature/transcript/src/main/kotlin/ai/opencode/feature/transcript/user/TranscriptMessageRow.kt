@@ -21,9 +21,9 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.dp
 
 /**
- * A transcript entry or a pending inbox row (iOS `TranscriptMessageRow`): the one root view for
- * message rows, so a plain user message from either source takes the same branch and promotion
- * animates in place. User messages draw here; every other entry goes to [TranscriptEntryView].
+ * A transcript entry or a pending inbox row: the one root view for message rows, so a plain user
+ * message from either source takes the same branch and promotion animates in place. User messages
+ * draw here; every other entry goes to [TranscriptEntryView].
  */
 @Composable
 fun TranscriptMessageRow(
@@ -57,7 +57,7 @@ fun TranscriptMessageRow(
     if (run.joinsBelow) bottom = UserMessageRun.spacing - half
 
     TopAnchoredRow(modifier) {
-        // A negative bottom half (a run's join) overlaps the next row, as iOS's cell edge does.
+        // A negative bottom half (a run's join) overlaps the next row.
         Box(Modifier.fillMaxWidth().padding(top = top).negativeBottom(bottom)) {
             when {
                 userMessage != null -> {

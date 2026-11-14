@@ -25,40 +25,28 @@ import android.content.Intent
 import java.net.URL
 
 /**
- * The developer tools' process-wide entry points (iOS `TuningOverlay.shared` + the launch-time
- * parts of `DiagnosticsRecorder`, `AnimationTimeScale` and `LabMarks`). `:app` calls:
- *
- * 1. [install] in `Application.onCreate`, after `DependencyValues.installRoot`.
- * 2. [handleLaunchIntent] in `MainActivity.onCreate` (debug lab extras).
- * 3. `DevToolsOverlay { … }` around the app's root content (summon gesture, Tuning Panel,
- *    perf HUD, layout bounds).
- * 4. `DevToolsView(store)` with a `DevToolsFeature` store as Settings › Developer.
- *
- * Who gets them: [TuningAccess] (debug builds always; other builds while Developer Mode is on).
+ * The developer tools' process-wide entry points. `:app` calls [install], [handleLaunchIntent],
+ * wraps its root in `DevToolsOverlay` and shows `DevToolsView` as Settings › Developer.
  */
 object DevTools {
-    /** The Tuning Panel's store, shared by the overlay and Settings (iOS `TuningOverlay.shared.store`). Main thread. */
+    /** The Tuning Panel's store, shared by the overlay and Settings. Main thread. */
     val tuningStore: Store<TuningFeature.State, TuningFeature.Action> by lazy { Store(TuningFeature.State(), TuningFeature()) }
 
     /** The Developer screen's store when the overlay opens it (Settings may keep its own). Main thread. */
     val developerStore: Store<DevToolsFeature.State, DevToolsFeature.Action> by lazy { Store(DevToolsFeature.State(), DevToolsFeature()) }
 
-    /** At launch: applies the saved Tuning switch where tuning is available (iOS `TuningOverlay.start`). */
+    /** At launch: applies the saved Tuning switch where tuning is available. */
     fun install() {
-        // iOS makes `DiagnosticsRecorder.shared` at launch: its journal sets the previous run aside
-        // and starts following the foreground marker before anything records.
+        // Made at launch: its journal sets the previous run aside before anything records.
         DiagnosticsRecorder.shared
         runCatching { dependency(AppContext).applicationContext as Application }.getOrNull()?.let(WindowSnapshot::install)
         applyTuning(shared(TuningSharedKeys.tuningEnabled).value && TuningAccess.isAvailable)
     }
 
     /**
-     * Debug lab extras (iOS launch arguments): `tuning-enabled`, `tuning-as-release`,
-     * `lab-time-scale`, `lab-marks-url`, `diagnostics-enabled`, `lab-tuning-perf`, `tuning-panel`,
-     * `perf-signposts` (iOS `OPENCODE_PERF_SIGNPOSTS=1`: `PerfTimeline` sections without a lab),
-     * `perf-frames` (iOS `OPENCODE_PERF_FRAMES=1`: frame windows and latencies on a lab run) and
-     * `lab-crash-report` (iOS `-lab-crash-report`: debug builds report an unclean exit only when asked) and
-     * `lab-motion-watch` (iOS `-lab-motion-watch`: Motion Watch on for the run).
+     * Debug lab extras: `tuning-enabled`, `tuning-as-release`, `lab-time-scale`, `lab-marks-url`,
+     * `diagnostics-enabled`, `lab-tuning-perf`, `tuning-panel`, `perf-signposts`, `perf-frames`,
+     * `lab-crash-report` and `lab-motion-watch`.
      */
     fun handleLaunchIntent(intent: Intent?) {
         intent ?: return
@@ -101,13 +89,13 @@ object DevTools {
         if (!tuningStore.state.isPanelShown) tuningStore.send(TuningFeature.Action.Summoned)
     }
 
-    /** Settings' Tuning switch (iOS `TuningOverlay.setEnabled`). Call from a reducer: it writes the shared key. */
+    /** Settings' Tuning switch. Call from a reducer: it writes the shared key. */
     fun setTuningEnabled(isOn: Boolean) {
         shared(TuningSharedKeys.tuningEnabled).set(isOn)
         applyTuning(isOn)
     }
 
-    /** Developer Mode changed: outside debug builds, tuning and slow motion leave with it (iOS `TuningOverlay.accessChanged`). */
+    /** Developer Mode changed: outside debug builds, tuning and slow motion leave with it. */
     fun accessChanged() {
         MotionWatch.shared.accessChanged()
         if (!TuningAccess.isAvailable) {
@@ -126,7 +114,7 @@ object DevTools {
     }
 }
 
-/** Android developer tools' own switches (no iOS keys: these tools are Android-native). */
+/** Android developer tools' own switches. */
 object DevToolsKeys {
     /** The perf HUD: frame rate, janky frames, worst frame and recompositions per second. */
     val perfHud: SharedKey<Boolean> = SharedKey.appStorage("devtools-perf-hud", false)

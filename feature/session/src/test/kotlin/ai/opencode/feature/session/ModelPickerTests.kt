@@ -30,25 +30,6 @@ import kotlinx.coroutines.awaitCancellation
 import org.junit.Test
 import java.time.Instant
 
-/**
- * Port of the `SessionFeature` half of iOS `ModelPickerTests.swift` (its Reducer section, and
- * the store parts of the search tests), keeping iOS names.
- *
- * Not ported here (`:feature:composer`, the picker's own types): favoritesThenOneSectionPerProviderInTheServersOrder,
- * aModelSeveralProvidersOfferIsListedUnderEach, searchDropsFavoritesAndMatchesNamesAndProviders,
- * aProvidersNameListsItsModels, wordsMatchInAnyOrderAcrossNameAndProvider, betterMatchesComeFirstThenFavorites,
- * emptyAndPunctuationQueriesKeepTheList, levelsRunFromTheDefaultUpThroughTheSortedVariants,
- * scrubbingStepsOneLevelPerThirtyPointsFromWhereTheHoldBegan, aDragKeepsTheOwnerItStartedWith,
- * theListRestsLikeASheetsDetents, aDragCatchesTheGlassWhereItIsAndACancelledOneSettles,
- * aCancelledDragSettlesFromWhereTheFingerLeftIt, theGrabberAdjustsTheRest, aFocusRestoreRunsOnceUnlessCancelled,
- * theArcFillsToTheLevelAtAnyCount, theBackdropIsStrongestOverTheComposerAndGoneAtBothEnds,
- * shortNamesStripRedundantVendorWordsAndDisambiguateSharedShortNames,
- * theSheetsRecentSitsAfterFavoritesWithoutThemUpToItsLimit.
- * Not ported (iOS-only): searchableSheetsAvoidForcedNavigationBarDrawerOnMac (SwiftUI's
- * `SearchFieldPlacement` on Mac and a source scan of the Swift views).
- * `searchParsesTrailingLevelAndReturnPicksBestMatchAtThatLevel` keeps both halves here: the
- * `ModelSearch.parseLevelQuery` checks (`:server`) lead into the store's pick.
- */
 class ModelPickerTests {
     private val cirrusZen = OpenCodeModel(modelID = "cirrus-4", providerID = "opencode", name = "Cirrus 4", variants = listOf("low", "high"))
     private val mini = OpenCodeModel(modelID = "cirrus-4-mini", providerID = "opencode", name = "Cirrus 4 Mini")
@@ -56,7 +37,7 @@ class ModelPickerTests {
         OpenCodeModel(modelID = "vendor/cirrus-4", providerID = "openrouter", name = "Cirrus 4", variants = listOf("low", "medium", "high", "max"))
     private val basalt = OpenCodeModel(modelID = "basalt-pro", providerID = "halcyon", name = "Basalt Pro")
 
-    // MARK: Search (OC-331)
+    // MARK: Search
 
     private val sonnet45 = OpenCodeModel(modelID = "claude-sonnet-4-5-20250929", providerID = "anthropic", name = "Claude Sonnet 4.5")
     private val sonnet4 = OpenCodeModel(modelID = "claude-sonnet-4-20250514", providerID = "anthropic", name = "Claude Sonnet 4")
@@ -257,7 +238,7 @@ class ModelPickerTests {
         store.state.assertRemembersModelNames(listOf(cirrusZen))
     }
 
-    // MARK: - Fused + Stack Model Picker (OC-397)
+    // MARK: - Fused + Stack Model Picker
 
     private val opus55 = OpenCodeModel(modelID = "claude-opus-5-5", providerID = "anthropic", name = "Claude Opus 5.5", variants = listOf("low", "medium", "high", "max"))
     private val sonnet55Anthropic =

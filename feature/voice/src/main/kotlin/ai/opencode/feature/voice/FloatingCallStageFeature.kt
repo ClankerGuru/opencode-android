@@ -8,9 +8,8 @@ import ai.opencode.core.store.Reducer
 import androidx.compose.ui.geometry.Rect
 
 /**
- * How far the floating call has grown (iOS `FloatingCallStage`, One Shape): the orb, a card
- * above the composer, or a sheet the height of the screen. One shape grows through all
- * three on one vertical drag.
+ * How far the floating call has grown: the orb, a card above the composer, or a sheet the height of
+ * the screen. One shape grows through all three on one vertical drag.
  */
 enum class FloatingCallStage {
     orb, card, full;
@@ -35,9 +34,8 @@ enum class FloatingCallStage {
 }
 
 /**
- * Port of iOS `FloatingCallStageFeature`: which stage the floating call settles on, and the
- * haptics for getting there. The per-frame motion between stages is the view's; this only
- * hears where a tap, a drag or its release lands.
+ * Which stage the floating call settles on, and the haptics for getting there. The per-frame motion
+ * between stages is the view's; this only hears where a tap, a drag or its release lands.
  */
 class FloatingCallStageFeature : Reducer<FloatingCallStageFeature.State, FloatingCallStageFeature.Action> {
     data class State(

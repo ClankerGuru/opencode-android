@@ -14,13 +14,12 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 
 /**
- * Debug-only trace of the full-screen image in flight (iOS `MediaTransitionTrace`,
- * `-lab-media-trace`): frame by frame, its on-screen frame and corner radius, the backdrop,
- * and whether the thumbnail is out of the transcript, so the open, the drag, the spring back
- * and the flight home can be checked. One `AppLog.perf` line per phase:
- * `media-trace name|source x,y,w,h,r|rest x,y,w,h|page x,y,w,h|` then `x,y,w,h,r,backdrop,sourceAlpha,t`
- * samples separated by spaces, in dp (iOS points), window coordinates (`t`: seconds since the
- * phase began, so steps compare per 120 Hz frame).
+ * Debug-only trace of the full-screen image in flight: frame by frame, its on-screen frame and
+ * corner radius, the backdrop, and whether the thumbnail is out of the transcript, so the open, the
+ * drag, the spring back and the flight home can be checked. One `AppLog.perf` line per phase:
+ * `media-trace name|source x,y,w,h,r|rest x,y,w,h|page x,y,w,h|` then
+ * `x,y,w,h,r,backdrop,sourceAlpha,t` samples separated by spaces, in dp, window coordinates (`t`:
+ * seconds since the phase began, so steps compare per 120 Hz frame).
  *
  * Enabled only in debuggable builds, when [isEnabled] is set (developer tools) or the app was
  * launched with `--ez lab-media-trace true` (read by [MediaView]). Geometry only, no content.
@@ -117,7 +116,7 @@ class MediaTransitionTrace {
 
         private val enabled: Boolean get() = isEnabled && debuggable
 
-        /** Every phase traced in this process, oldest first (iOS's `media-trace` element value). */
+        /** Every phase traced in this process, oldest first. */
         val lines: List<String> get() = synchronized(recorded) { recorded.toList() }
         private val recorded = ArrayList<String>()
     }

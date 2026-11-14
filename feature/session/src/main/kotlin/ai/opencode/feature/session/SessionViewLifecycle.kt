@@ -20,12 +20,10 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
 
-// Port of iOS `Session/SessionView+Lifecycle.swift` (split out of `SessionView.swift` in
-// 9972785b): the screen's task, visibility and scene phase, and the settings it watches.
+// The screen's task, visibility and scene phase, and the settings it watches.
 
 /**
- * iOS `.task(id: taskIdentity)`, `onAppear`/`onDisappear` and `onChange(of: scenePhase)`: the
- * screen's visit starts its task, visibility and the scene's phase reach the reducer, and the
+ * The screen's visit starts its task, visibility and the scene's phase reach the reducer, and the
  * New Messages Divider and Since You Left settings tell an open session when they change.
  *
  * Android's lifecycle maps to scene phases: RESUMED is active, STARTED inactive, CREATED
@@ -50,7 +48,7 @@ internal fun SessionLifecycle(store: StoreOf<State, Action>) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val currentStore by rememberUpdatedState(store)
     // A configuration change (dark mode, font size, rotation) recreates the activity; the reader
-    // never left, as an iOS appearance change never leaves the scene, so it isn't a leave.
+    // never left, so it isn't a leave.
     val activity = androidx.activity.compose.LocalActivity.current
     val changingConfigurations = { activity?.isChangingConfigurations == true }
     DisposableEffect(lifecycleOwner, store) {
@@ -80,8 +78,8 @@ internal fun SessionLifecycle(store: StoreOf<State, Action>) {
         }
     }
 
-    // iOS `markVisibleSession`: notifications learn which session is on screen, so its own don't
-    // show. Told again as the scene, the cover or the session changes; told it left on disappear.
+    // Notifications learn which session is on screen, so its own don't show. Told again as the
+    // scene, the cover or the session changes; told it left on disappear.
     val notifications = remember { dependency(SessionNotificationsClient) }
     val lifecycleState by lifecycleOwner.lifecycle.currentStateAsState()
     val sceneActive = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)

@@ -11,10 +11,9 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `VoiceAnswerHoldTests`. How a delegation's answer and the
- * results around it wait for speech, on a test clock: a loaded machine
- * stretching a pause can't change what the call does (the real clock failed
- * these in train smoke runs on Oct 25).
+ * How a delegation's answer and the results around it wait for speech, on a test clock: a loaded
+ * machine stretching a pause can't change what the call does (the real clock failed these in train
+ * smoke runs on Oct 25).
  */
 class VoiceAnswerHoldTests {
     private val answer = LiveCallCoordinatorTests.rulesAnswer
@@ -316,11 +315,8 @@ class VoiceAnswerHoldTests {
     }
 
     /**
-     * Kit's call (TestFlight 301, 170–203 s): he asked for the rules, then
-     * "Wait, don't you have them?" while the delegator read them. Its answer
-     * was ready 1.4 s after he stopped, held for the voice agent's reply; the
-     * voice agent answered from an older result ("I don't have them, what I
-     * got back was cut off"), and the rules went out 23 s later.
+     * The user asks for the rules, then "Wait, don't you have them?" while the delegator reads
+     * them: its answer is ready 1.4 s after they stop, held for the voice agent's reply.
      */
     private suspend fun kotlinx.coroutines.test.TestScope.pressedCall(pressedHold: Duration): VoiceClockedCall = clockedCall(
         VoiceCallTiming(

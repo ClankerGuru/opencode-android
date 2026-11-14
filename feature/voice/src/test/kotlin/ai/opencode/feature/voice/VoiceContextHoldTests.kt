@@ -10,9 +10,8 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * From Kit's Oct 24 call: after four quick switches the voice agent didn't
- * answer him (“And now you're not responding to me”). The switches' context
- * went out together 1.5 s after he stopped talking, and any append cuts
+ * After four quick switches the voice agent didn't answer him (“And now you're not responding to
+ * me”). The switches' context went out together 1.5 s after he stopped talking, and any append cuts
  * GPT-Live's reply off. Now they become one append, sent after the reply.
  */
 class VoiceContextHoldTests {

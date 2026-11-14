@@ -54,14 +54,6 @@ import java.util.UUID
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `AppFeatureTests.swift` (the `AppFeature` reducer half). Pairing-link decoding,
- * live redemption, reachability and the Home cache's wire format are `:server`'s
- * `AppFeatureTests`; `appVersionPrefersOpenCodeVersion` is `:feature:settings`'s.
- * `credentialFieldFocusOrder…`: the focus order is Compose's `ImeAction.Next` chain in
- * `AppView` (no `CredentialField` type), so only the name prompt is ported.
- * `transportSecurityAllowsPrivateOverlays` (opt-in ATS probe) is iOS-only.
- */
 class AppFeatureTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -98,7 +90,7 @@ class AppFeatureTests {
 
     private fun gated(gate: GatedHome) = gate.client()
 
-    /** iOS `suspendedConnectionStore()`: probes and reads hold open until cancelled. */
+    /** Probes and reads hold open until cancelled. */
     private fun TestScope.suspendedConnectionStore(): TestStore<AppFeature.State, AppFeature.Action> {
         val clock = TestClock()
         val state = shared.appState()
@@ -1241,8 +1233,7 @@ class AppFeatureTests {
         store.finish()
     }
 
-    // Connecting picks the address, keeps the saved order: iOS `ServerLinkConnectionTests`, here for
-    // this file's harness (the rest of that suite is `:feature:drawer`'s `ServerLinkConnectionTests`).
+    // Connecting picks the address, keeps the saved order.
 
     @Test
     fun connectFallsBackToAnAlternateAddressAndAdoptsIt() = runTest {

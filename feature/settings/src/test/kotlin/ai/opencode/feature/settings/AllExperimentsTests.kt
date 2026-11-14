@@ -23,11 +23,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `AllExperimentsTests.swift`: Settings › Experimental › All Experiments (p217). Its
- * Home test (`allSwitchingTheLiveActivityOffEndsIt`) is in `:feature:drawer`'s
- * `SessionLiveActivityTests`, where Home's reducer lives.
- */
+/** Settings › Experimental › All Experiments. */
 class AllExperimentsTests {
     @get:Rule val isolation = TestIsolationRule()
 

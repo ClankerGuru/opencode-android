@@ -24,11 +24,8 @@ import kotlin.time.Duration
 import ai.opencode.feature.transcript.list.NewMessagesFold
 import ai.opencode.feature.transcript.list.TranscriptScan
 
-// Port of iOS `SessionFeature+Stream.swift`.
-
 /**
- * iOS `SessionFeature.mergeTranscript(fetched:into:…)`: splices a freshly fetched window of newest
- * messages into what we show.
+ * Splices a freshly fetched window of newest messages into what we show.
  *
  * Every fetch returns the *newest N messages*, so a poll's window is often shorter than a
  * transcript already expanded by the full-history fetch — and its item count can even shrink as
@@ -181,7 +178,7 @@ fun SessionFeature.Companion.preservingInProgressText(
     return mergeTranscript(fetched, anchorsAndText, preserveInProgressText = true)
 }
 
-/** iOS `SessionFeature.messageID(for:)`: the server message an item belongs to. */
+/** The server message an item belongs to. */
 internal fun SessionFeature.Companion.messageID(item: OpenCodeTranscriptItem): String {
     TranscriptEntry.promptID(item)?.let { return it }
     return when (item) {
@@ -196,7 +193,10 @@ internal fun SessionFeature.Companion.messageID(item: OpenCodeTranscriptItem): S
     }
 }
 
-/** iOS `SessionFeature.ids(_:in:)`: which of [ids] are rows in [items], looking from the end (live parts are recent) and stopping once all are found. */
+/**
+ * Which of [ids] are rows in [items], looking from the end (live parts are recent) and stopping
+ * once all are found.
+ */
 internal fun SessionFeature.Companion.ids(ids: Set<String>, items: List<OpenCodeTranscriptItem>): Set<String> {
     if (ids.isEmpty()) return emptySet()
     val found = HashSet<String>()
@@ -209,7 +209,6 @@ internal fun SessionFeature.Companion.ids(ids: Set<String>, items: List<OpenCode
     return found
 }
 
-/** iOS `SessionFeature.promptIDs(in:)`. */
 internal fun SessionFeature.Companion.promptIDs(items: List<OpenCodeTranscriptItem>): Set<String> =
     items.mapNotNullTo(HashSet()) { TranscriptEntry.promptID(it) }
 
@@ -758,7 +757,7 @@ private fun SessionFeature.firstContentFrameRendered(state: SessionFeature.State
     )
 }
 
-/** iOS `Result.failure(OpenCodeClientError)`: a failure that isn't one reads as a generic client error. */
+/** A failure that isn't one reads as a generic client error. */
 internal fun Throwable.asClientError(): ai.opencode.server.OpenCodeClientError =
     this as? ai.opencode.server.OpenCodeClientError ?: ai.opencode.server.OpenCodeClientError(message ?: localized(R.string.session_something_went_wrong))
 
@@ -890,10 +889,9 @@ private fun LiveProjection.upsertText(change: LiveUpsert, id: String): String? {
 internal enum class LiveUpsert { Unchanged, Replaced, Inserted }
 
 /**
- * iOS `upsertLiveText(id:text:streaming:in:)`. [streaming] text is still arriving: a last line
- * holding only a block's marker waits for its first word (`holdingPendingMarker`). iOS projects
- * Markdown blocks here (`markdownStream.blocks`); the Android item carries its text and the
- * transcript parses it. True when [items] changed.
+ * [streaming] text is still arriving: a last line holding only a block's marker waits for its first
+ * word (`holdingPendingMarker`). The Android item carries its text and the transcript parses it.
+ * True when [items] changed.
  */
 internal fun SessionFeature.upsertLiveText(
     id: String,
@@ -902,7 +900,7 @@ internal fun SessionFeature.upsertLiveText(
     items: MutableList<OpenCodeTranscriptItem>,
 ): Boolean = upsertLiveTextChange(id, text, streaming, items) != LiveUpsert.Unchanged
 
-/** [upsertLiveText], saying whether it inserted the row (iOS returns the inserted ID). */
+/** [upsertLiveText], saying whether it inserted the row. */
 internal fun SessionFeature.upsertLiveTextChange(
     id: String,
     text: String,

@@ -59,10 +59,9 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 
 /**
- * Server Flow's tunables (iOS `ServerFlowTunables`, `OpenCode/Drawer/ServerFlow.swift`), moved
- * down from the drawer because the session's [ServerConnectionPill] reads the pill's palette;
- * the drawer reads the springs and travels, the app the switch-back timeout. Constants here:
- * Android has no Tuning Panel.
+ * Server Flow's tunables, moved down from the drawer because the session's [ServerConnectionPill]
+ * reads the pill's palette; the drawer reads the springs and travels, the app the switch-back
+ * timeout. Constants here: Android has no Tuning Panel.
  */
 object ServerFlowTunables {
     /** Switch back after (s). */
@@ -85,10 +84,8 @@ object ServerFlowTunables {
 }
 
 /**
- * What a session's pill says while its server isn't connected (iOS `ServerConnectionNotice`,
- * `OpenCode/Drawer/ServerFlow.swift`; here in `:feature:session` because [SessionListContext]
- * carries it). The drawer builds it from Home's connection (`ServerConnectionNotice(status:…)`
- * in `:feature:drawer`'s `ServerFlow.kt`).
+ * What a session's pill says while its server isn't connected. The drawer builds it from Home's
+ * connection (`ServerConnectionNotice(status:…)` in `:feature:drawer`'s `ServerFlow.kt`).
  */
 data class ServerConnectionNotice(
     val kind: Kind,
@@ -135,10 +132,9 @@ data class ServerConnectionNotice(
 
     companion object {
         /**
-         * iOS `init?(status:credentialsRejected:errorMessage:server:isSwitching:)` without Home's
-         * status type: null while connected and while the drawer switches servers (the switch is
-         * the drawer's to show). Pass Home's displayed status, which reads connected while a
-         * reconnect is still in its grace.
+         * Null while connected and while the drawer switches servers (the switch is the drawer's to
+         * show). Pass Home's displayed status, which reads connected while a reconnect is still in
+         * its grace.
          */
         fun of(
             isConnected: Boolean,
@@ -162,10 +158,9 @@ data class ServerConnectionNotice(
 }
 
 /**
- * Server Flow: a pill right above the composer while the session's server isn't connected
- * (iOS `ServerConnectionPill`). It says what's happening, and its tap retries (or pairs again,
- * for a sign-in the server refused); a long press offers Edit Server… then. iOS's glass capsule
- * is an M3 tonal surface here.
+ * Server Flow: a pill right above the composer while the session's server isn't connected. It says
+ * what's happening, and its tap retries (or pairs again, for a sign-in the server refused); a long
+ * press offers Edit Server… then.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -249,10 +244,9 @@ fun ServerConnectionPill(
 }
 
 /**
- * iOS `.motionMicroTransition()` on the pill, with its room in the composer's column
- * (`composerColumnAnimation`): the room opens on `layout` and closes on `collapse`, so the
- * composer's top, and the transcript riding it, move with the pill instead of jumping its height
- * in one frame. Under Reduce Motion it cross-fades.
+ * The pill's room in the composer's column opens on `layout` and closes on `collapse`, so the
+ * composer's top, and the transcript riding it, move with the pill instead of jumping its height in
+ * one frame. Under Reduce Motion it cross-fades.
  */
 object ServerConnectionPillTransition {
     fun enter(reducedMotion: Boolean): EnterTransition {

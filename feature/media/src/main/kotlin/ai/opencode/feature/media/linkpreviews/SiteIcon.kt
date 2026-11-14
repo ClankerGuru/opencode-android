@@ -25,7 +25,7 @@ import kotlin.math.min
 /**
  * The only part of a link a site icon request ever carries: its registrable domain (eTLD+1), so
  * `docs.exe.dev/regions` asks for `exe.dev` and `secret.evil.com` for `evil.com`. Path, query,
- * port, and subdomains never leave the phone (iOS `SiteIconDomain`).
+ * port, and subdomains never leave the phone.
  */
 object SiteIconDomain {
     /**
@@ -105,9 +105,9 @@ object SiteIconDomain {
 }
 
 /**
- * DuckDuckGo's icon service (iOS `SiteIconService`): it fetches the icon, so the site never sees
- * the phone, and it is told only the registrable domain. It serves the site's own favicon at
- * the site's sizes; there is no size to ask for.
+ * DuckDuckGo's icon service: it fetches the icon, so the site never sees the phone, and it is told
+ * only the registrable domain. It serves the site's own favicon at the site's sizes; there is no
+ * size to ask for.
  */
 object SiteIconService {
     const val host = "icons.duckduckgo.com"
@@ -125,7 +125,7 @@ object SiteIconService {
 
 /**
  * A site's icon, ready to draw: square, at most [maximumPixels] a side, and never smaller than
- * [minimumPixels], blank, or a single flat colour (iOS `SiteIcon`).
+ * [minimumPixels], blank, or a single flat colour.
  */
 class SiteIcon private constructor(
     val image: Bitmap,
@@ -199,7 +199,7 @@ class SiteIcon private constructor(
         private fun inspect(sample: Bitmap): Inspection {
             val count = sample.width * sample.height
             val colors = IntArray(count)
-            // Unpremultiplied ARGB; the flat test compares premultiplied values, as iOS's buffer holds.
+            // Unpremultiplied ARGB; the flat test compares premultiplied values.
             sample.getPixels(colors, 0, sample.width, 0, 0, sample.width, sample.height)
             val alpha = IntArray(count) { colors[it] ushr 24 }
             val red = IntArray(count) { (colors[it] shr 16) and 0xFF }
@@ -234,8 +234,8 @@ sealed interface SiteIconResult {
 }
 
 /**
- * Memory and disk caches keyed by registrable domain, with one request in flight per domain
- * however many cards ask. Missing icons are remembered too (iOS `SiteIconLoader`).
+ * Memory and disk caches keyed by registrable domain, with one request in flight per domain however
+ * many cards ask. Missing icons are remembered too.
  */
 class SiteIconLoader(
     private val fetch: LinkPreviewFetch,

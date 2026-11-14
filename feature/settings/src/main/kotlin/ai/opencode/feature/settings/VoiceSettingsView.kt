@@ -123,7 +123,6 @@ internal fun rememberVoiceState(voice: VoiceStore): VoiceSettingsFeature.State {
 }
 
 /**
- * Port of iOS `VoiceSettingsView` / `AdvancedSettingsView` (`Settings/SettingsView.swift`):
  * Settings › Voice. 1. Enable Voice; 2. the Voice Provider row and Model; for Grok, Model (provider
  * plus model) and its xAI Key row. Then Voice; 3. Raise to Talk and Call History.
  */
@@ -203,7 +202,7 @@ fun VoiceSettingsView(store: SettingsStore) {
                 if (!state.showsProviderRow) {
                     if (divider()) SettingsDivider()
                     KeyRow(state, reduceMotion) { voice.send(VoiceSettingsFeature.Action.KeyRowTapped) }
-                    // iOS inserts the editor on the layout role; under Reduce Motion it fades in place.
+                    // Under Reduce Motion it fades in place.
                     AnimatedVisibility(
                         visible = state.isEditingKey && keySource.isPhoneKey,
                         enter = keyEditorEnter(reduceMotion),
@@ -235,7 +234,7 @@ fun VoiceSettingsView(store: SettingsStore) {
                         voice.send(VoiceSettingsFeature.Action.RaiseToTalkChanged(it))
                         settings(HomeSettingsFeature.Action.RaiseToTalkChanged(it))
                     },
-                    // iOS `accessibilityHint`: TalkBack's click label (“Double tap to …”).
+                    // TalkBack's click label (“Double tap to …”).
                     modifier = Modifier.semantics {
                         onClick(label = raiseToTalkHint) {
                             val on = !state.raiseToTalk
@@ -285,7 +284,7 @@ private fun KeyRow(state: VoiceSettingsFeature.State, reduceMotion: Boolean, onT
     ) {
         val title = @Composable { Text(state.keyRowTitle, style = SettingsText.title, color = OpenCodeTheme.colors.text) }
         if (stacked) {
-            // iOS at accessibility sizes: the status goes under the title.
+            // The status goes under the title.
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 title()
                 KeyStatusAccessory(state, rotation)
@@ -328,7 +327,7 @@ private fun KeyStatusAccessory(state: VoiceSettingsFeature.State, rotation: Floa
     }
 }
 
-/** The key editor opens on the layout role (iOS `keyRow`); under Reduce Motion, the reduced fade. */
+/** The key editor opens on the layout role; under Reduce Motion, the reduced fade. */
 private fun keyEditorEnter(reduceMotion: Boolean): EnterTransition {
     if (reduceMotion) return fadeIn(MotionRole.Layout.animation(reduceMotion = true))
     return expandVertically(MotionRole.Layout.animation()) + fadeIn(MotionRole.Layout.animation())

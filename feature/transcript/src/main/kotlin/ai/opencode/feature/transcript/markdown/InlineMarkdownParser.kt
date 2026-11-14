@@ -1,10 +1,10 @@
 package ai.opencode.feature.transcript.markdown
 
 /**
- * Inline Markdown as Foundation's `AttributedString(markdown:options:
- * .inlineOnlyPreservingWhitespace)` reads it, which iOS parses every block's text with. Android
- * has no counterpart, so this is a CommonMark inline parser (cmark-gfm's algorithm, which
- * Foundation wraps) limited to what that option interprets:
+ * Inline Markdown as Foundation's
+ * `AttributedString(markdown:options:.inlineOnlyPreservingWhitespace)` reads it. Android has no
+ * counterpart, so this is a CommonMark inline parser (cmark-gfm's algorithm, which Foundation
+ * wraps) limited to what that option interprets.
  *
  * - backslash escapes, entity and numeric character references;
  * - code spans (line endings become spaces, one padding space stripped);
@@ -728,8 +728,7 @@ object InlineMarkdownParser {
 
     /**
      * The destination as `URL(string:)` keeps it, then `absoluteString`: characters a URL can't
-     * hold are percent-encoded (iOS 17's `URL(string:)` encodes rather than fails). Null when
-     * empty (no URL, so no link).
+     * hold are percent-encoded. Null when empty (no URL, so no link).
      */
     private fun urlString(destination: String): String? {
         if (destination.isEmpty()) return null

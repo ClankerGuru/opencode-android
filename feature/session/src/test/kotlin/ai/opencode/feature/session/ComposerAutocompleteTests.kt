@@ -48,22 +48,11 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of the `SessionFeature` tests of iOS `ComposerAutocompleteTests.swift` (those built on its
- * `makeStore`, a `SessionFeature` store).
- *
- * Not ported here (:feature:composer, `AutocompleteTrigger` / `ComposerAutocompleteDraftResolution` /
- * `ComposerAutocompleteTextBridge` / `AutocompleteSimulation` alone): `triggerDetectionMatchesWordStartForAtAndMessageStartForSlash`,
- * `choosingChipsMapsSkillFileAndAgentMentionsIntoPromptResolution`, `choosingCommandChipResolvesSlashCommandPayload`,
- * `keyboardBridgeOnlyInterceptsReturnWhenSelectableAndSingleBackspaceInChip`,
- * `simulationGrowsGlassSmoothlyCollapsesSlotsWithoutOverlapAndRespectsEdgeFades`,
- * `growAndCollapseAnimationSnapsBothEdgesKeepingAnchoredEdgesPixelStable`.
- * Not ported here (:server, `OpenCodeClient.promptBody` alone, internal to :server): `experimentalFlagOffProducesByteIdenticalPromptBodyToMain`,
- * and the `promptBody` tail of `sendingComposerWithChipsForwardsMentionsWithoutDuplicateFileAttachment`.
- * UIKit-only: the `ImagePasteTextView` / `ComposerTextInput` caret checks of `midDraftChipInsertAndChipDeletePreserveCaretOffset`
- * (its store half is here).
- * Android divergence: `ComposerAutocompleteTunables.commandAction` is a constant (`fill`; iOS's tuning panel isn't
- * ported), so `caretAwareTriggerDetectionAndAutoRunCancellationWorkCleanly` can't switch it to `run`; its auto-run
- * step still checks that nothing sends.
+ * The `ImagePasteTextView` / `ComposerTextInput` caret checks of
+ * `midDraftChipInsertAndChipDeletePreserveCaretOffset` (its store half is here).
+ * `ComposerAutocompleteTunables.commandAction` is a constant, so
+ * `caretAwareTriggerDetectionAndAutoRunCancellationWorkCleanly` can't switch it to `run`; its
+ * auto-run step still checks that nothing sends.
  */
 class ComposerAutocompleteTests {
     private fun autocomplete(action: ComposerAutocompleteAction): Action = Action.Autocomplete(action)

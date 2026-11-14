@@ -28,12 +28,12 @@ import ai.opencode.server.model.OpenCodeSession
 import java.time.Instant
 
 /*
- * Port of iOS `HomeFeature+Notifications.swift`: what Home does as notifications change (before
- * `HomeNotificationsFeature` settles the same action), the notify plugin's set-up draft, the app
- * icon's badge, and In-App Notices' rules: Home's live state in, the drawer button's label out.
+ * What Home does as notifications change (before `HomeNotificationsFeature` settles the same
+ * action), the notify plugin's set-up draft, the app icon's badge, and In-App Notices' rules:
+ * Home's live state in, the drawer button's label out.
  *
- * Home's composition watches [noticeInput] (iOS `.onChange(of: noticeInput)`) and calls
- * [inAppNoticeSignalChanged] with the old and new inputs.
+ * Home's composition watches [noticeInput] and calls [inAppNoticeSignalChanged] with the old and
+ * new inputs.
  */
 
 internal fun HomeFeature.reduceNotifications(state: State, action: Action): HomeReduced = when (action) {
@@ -61,14 +61,14 @@ internal fun HomeFeature.publishAppBadge(state: State, ledger: AppBadgeLedger? =
 }
 
 /**
- * What the icon's badge counts: the sessions Catch Up holds (unread or needing input, never
- * muted), matching its row in the drawer. Null until the list and its attention read have landed
- * on a live connection, so a reconnect, an outage, or the app leaving keeps the last count rather
- * than clearing it (iOS `HomeFeature.State.appBadgeLedger`, `AppIconBadge.swift`).
+ * What the icon's badge counts: the sessions Catch Up holds (unread or needing input, never muted),
+ * matching its row in the drawer. Null until the list and its attention read have landed on a live
+ * connection, so a reconnect, an outage, or the app leaving keeps the last count rather than
+ * clearing it.
  */
 internal val State.appBadgeLedger: AppBadgeLedger? get() = appBadgePublication.ledger
 
-/** Change-detection key for [appBadgeLedger] (iOS `appBadgePublication`). */
+/** Change-detection key for [appBadgeLedger]. */
 internal val State.appBadgePublication: AppBadgePublication
     get() {
         val isReady = isConnected && snapshotLoaded && noticeReadiness == State.NoticeReadiness.settled
@@ -87,7 +87,7 @@ internal val State.appBadgePublication: AppBadgePublication
         )
     }
 
-/** iOS `AppBadgePublication` (`AppIconBadge.swift`): Home's half of the badge, which `:feature:system` can't see. */
+/** Home's half of the badge, which `:feature:system` can't see. */
 internal data class AppBadgePublication(
     val isReady: Boolean,
     val server: OpenCodeServer?,
@@ -136,8 +136,8 @@ internal data class AppBadgePublication(
 }
 
 /**
- * In-App Notices' input from Home's state (iOS `InAppNoticeInput`): compared on every action, so
- * an off mode or a Home that isn't live reduces to small constant values.
+ * In-App Notices' input from Home's state: compared on every action, so an off mode or a Home that
+ * isn't live reduces to small constant values.
  */
 data class InAppNoticeInput(
     val mode: InAppNoticeMode,
@@ -269,8 +269,7 @@ internal fun HomeFeature.inAppNoticeSignalChanged(oldInput: InAppNoticeInput, ne
     val urgent = added.any { it.kind == InAppNotice.Kind.needsInput }
     // A call has its own sounds.
     val inCall = s.sessionDetail?.voice?.let { !it.phase.isTerminal } ?: false
-    // iOS speaks up only from the window in use (Multiple Windows, `sceneWindow.isFront`); the
-    // Android app has one task, so the window is always the one in use.
+    // The Android app has one task, so the window is always the one in use.
     if (urgent && !inCall) dependency(HapticsClient).play(Haptic.attention)
     if (!inCall && dependency(ExperimentalFeatures)(ExperimentalFeature.soundEffects)) {
         dependency(SoundEffectsClient).play(if (urgent) SoundEffect.needsInput else SoundEffect.replyDone)

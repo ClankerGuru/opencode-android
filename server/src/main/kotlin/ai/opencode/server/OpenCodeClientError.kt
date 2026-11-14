@@ -14,8 +14,8 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
- * Port of iOS `OpenCodeClientError`: the one error every client call throws.
- * A value type (`copy` to change it); the message is user-facing copy.
+ * The one error every client call throws. A value type (`copy` to change it); the message is
+ * user-facing copy.
  */
 data class OpenCodeClientError(
     override val message: String,
@@ -33,7 +33,7 @@ data class OpenCodeClientError(
     /** A prompt whose sending ended in doubt and that the server didn't show when read back. */
     val unconfirmedPromptID: String? = null,
     val connectionFailures: List<ConnectionFailureDetail> = emptyList(),
-    /** The iOS `URLError` code equivalent of the transport exception (see [UrlErrorCode]). */
+    /** The `URLError` code equivalent of the transport exception (see [UrlErrorCode]). */
     val urlErrorCode: Int? = null,
     /** The request this answered was already settled, or is gone, on the server: trying again can't help. */
     val requestSettled: Boolean = false,

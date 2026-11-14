@@ -116,7 +116,6 @@ sealed class VoicePreviewError : Exception("Couldn’t play preview") {
 
     data object Failed : VoicePreviewError()
 
-    /** iOS `errorDescription`. */
     val errorDescription: String get() = localized(R.string.voice_preview_error)
 
     override fun fillInStackTrace(): Throwable = this
@@ -132,7 +131,7 @@ object VoicePreviewRequest {
     const val xaiTTSURL = "https://api.x.ai/v1/tts"
     const val openAITTSModel = "gpt-4o-mini-tts"
 
-    /** iOS `request.timeoutInterval`, applied by the client that sends it. */
+    /** Applied by the client that sends it. */
     const val timeoutSeconds = 15L
 
     @Serializable
@@ -192,7 +191,7 @@ class VoicePreviewCache(val directory: File = defaultDirectory()) {
         val url = fileURL(voice, provider)
         try {
             directory.mkdirs()
-            // Atomic, as iOS writes it: a temporary file renamed over the clip.
+            // Atomic: a temporary file renamed over the clip.
             val temporary = File(directory, url.name + ".tmp")
             temporary.writeBytes(data)
             if (!temporary.renameTo(url)) temporary.delete()
@@ -326,7 +325,7 @@ class VoicePreviewCoordinator(
             if (!isActive(id)) throw CancellationException()
             synchronized(lock) { activeID = null }
         } catch (error: CancellationException) {
-            // iOS `onCancel`: a cancelled preview stops its own audio, never a newer one.
+            // A cancelled preview stops its own audio, never a newer one.
             if (!currentCoroutineContext().isActive) withContext(NonCancellable) { cancel(id) }
             throw error
         }
@@ -346,12 +345,12 @@ class VoicePreviewCoordinator(
         if (wasActive) stopAudio()
     }
 
-    // iOS also serves VoiceLabDemo's scripted preview key here (`#if DEBUG`); VoiceLabDemo is not ported.
+    // VoiceLabDemo is not ported.
     private suspend fun fetchClip(voice: CallVoice, provider: VoiceProvider, apiKey: String): ByteArray =
         VoicePreviewClient.synthesize(voice, provider, apiKey, send)
 }
 
-/** iOS `VoicePreviewAudioPlayer` (`AVAudioPlayer`) → `MediaPlayer` over the clip's bytes. One process-wide player. */
+/** One process-wide player. */
 private object VoicePreviewAudioPlayer {
     private var player: MediaPlayer? = null
     private var continuation: kotlinx.coroutines.CancellableContinuation<Unit>? = null
@@ -432,7 +431,7 @@ private object VoicePreviewAudioPlayer {
         override fun close() {}
     }
 
-    /** Generates a short syllable-shaped PCM16 WAV clip for lab demos (iOS `#if DEBUG`; used by VoiceLabDemo). */
+    /** Generates a short syllable-shaped PCM16 WAV clip for lab demos. */
     @Suppress("unused")
     fun makeDemoWAV(duration: Double, frequency: Double): ByteArray {
         val sampleRate = PCM.sampleRate
@@ -447,5 +446,5 @@ private object VoicePreviewAudioPlayer {
         return VoiceCallSoundBank.wavData(samples)
     }
 }
-/** iOS CallVoice.swift's DEBUG-only VoiceLabDemo extension. Only read in lab mode. */
+/** Only read in lab mode. */
 val VoiceLabDemo.previewDemoKey: String get() = "lab-voice-preview-key"

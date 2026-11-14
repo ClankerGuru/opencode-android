@@ -40,13 +40,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Port of iOS `SessionFeatureTests+FailedSends.swift`. Parameterized tests loop over their
- * arguments.
- *
- * Not ported here (`:feature:transcript`): `aFailedMessageRetriedMidRunKeepsItsRowIdentity`
- * (its subject is `TranscriptRowIdentityPlan` alone; ported there).
- */
+/** Parameterized tests loop over their arguments. */
 class SessionFeatureTestsFailedSends {
     /**
      * A send store whose POSTs follow `attempt` (by its 1-based number) and

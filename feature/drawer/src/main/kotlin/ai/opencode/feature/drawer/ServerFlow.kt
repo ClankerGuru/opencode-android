@@ -11,11 +11,10 @@ import ai.opencode.server.friendlyName
 import androidx.annotation.StringRes
 
 /*
- * Server Flow (OC-582, iOS `OpenCode/Drawer/ServerFlow.swift`, d8a311bd, graduated in p217):
- * what the drawer and a session show of the servers' connections. Picking a server swaps the
- * drawer to it at once with Title Leads' motion: its name rolls in, ghost rows follow it like a
- * chain, and an underline shimmers under the name until the server answers. One that fails, or
- * doesn't answer in `ServerFlowTunables.timeout`, is switched back from on its own with a note
+ * Server Flow: what the drawer and a session show of the servers' connections. Picking a server
+ * swaps the drawer to it at once with Title Leads' motion: its name rolls in, ghost rows follow it
+ * like a chain, and an underline shimmers under the name until the server answers. One that fails,
+ * or doesn't answer in `ServerFlowTunables.timeout`, is switched back from on its own with a note
  * (the switch and switch-back are AppFeature's). A session whose server drops shows a pill above
  * the composer that retries.
  *
@@ -111,8 +110,7 @@ enum class ServerMenuStatus(@StringRes private val titleRes: Int, val systemImag
 }
 
 /**
- * iOS `ServerConnectionNotice.init?(status:credentialsRejected:errorMessage:server:isSwitching:)`:
- * null while connected and while the drawer switches servers (the switch is the drawer's to show).
+ * Null while connected and while the drawer switches servers (the switch is the drawer's to show).
  * Pass [HomeConnectionFeature.State.displayedStatus], which reads connected while a reconnect is
  * still in its grace.
  */
@@ -131,7 +129,7 @@ operator fun ServerConnectionNotice.Companion.invoke(
     isSwitching = isSwitching,
 )
 
-/** The server the drawer shows, as the swap's motion needs it (iOS `ServerSwapTarget`). */
+/** The server the drawer shows, as the swap's motion needs it. */
 data class ServerSwapTarget(
     /** Its persistence ID. */
     val id: String,

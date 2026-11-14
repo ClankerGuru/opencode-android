@@ -171,7 +171,6 @@ object SessionSheetFormat {
         return if (rest.isEmpty()) "~" else "~/$rest"
     }
 
-    /** iOS `cost.formatted(.currency(code: "USD"))`. */
     fun cost(value: Double, locale: Locale = appFormattingLocale()): String =
         NumberFormat.getCurrencyInstance(locale).apply { currency = Currency.getInstance("USD") }.format(value)
 }
@@ -184,8 +183,8 @@ enum class SessionSheetStatus(@StringRes val textRes: Int) {
 }
 
 /**
- * What the Session sheet reads from `SessionFeature.State` (iOS reads `store.*` directly).
- * The SessionView group builds this from the session store:
+ * What the Session sheet reads from `SessionFeature.State`. The SessionView group builds this from
+ * the session store.
  *
  * - [session]: `state.session`.
  * - [hasPendingRequests]: `permissionRequests` or `formRequests` is non-empty.
@@ -217,18 +216,17 @@ data class SessionSheetDetails(
 }
 
 /**
- * Port of iOS `SessionSheetView`: session details and actions, opened from the header's title
- * or the … menu, in a Material bottom sheet just tall enough for its content (drag up for more).
- * Includes [SessionActionPresentations]; when the sheet is closed the SessionView shows those
- * on its own (actions started from the header menu).
+ * Session details and actions, opened from the header's title or the … menu, in a Material bottom
+ * sheet just tall enough for its content (drag up for more). Includes [SessionActionPresentations];
+ * when the sheet is closed the SessionView shows those on its own (actions started from the header
+ * menu).
  *
  * @param sheet the session's `sessionSheet` child store.
  * @param details what the sheet reads from the session ([SessionSheetDetails]).
  * @param onModelTapped `SessionFeature.Action.modelButtonTapped`.
  * @param onDismissRequest the sheet was swiped or tapped away.
- * @param statusOrb draws the status orb (iOS `AgentActivityGlyph(.subagent(…))` scoped
- *   `"<server persistenceID>|<session id or draft>|sheet"`); the default is a plain dot.
- * @param providerIcon draws the model's provider mark (iOS `ProviderIcon`), sized by the caller.
+ * @param statusOrb Draws the status orb; the default is a plain dot.
+ * @param providerIcon Draws the model's provider mark, sized by the caller.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -392,7 +390,7 @@ private fun Hero(
     val reduceMotion = rememberReduceMotion()
     val density = LocalDensity.current
     val orbSize = with(density) { (22 * fontScale).dp }
-    // From the orb's centre down to the title's first baseline: half a cap height (iOS `orbToBaseline`).
+    // From the orb's centre down to the title's first baseline: half a cap height.
     val orbToBaseline = with(density) { (8 * fontScale).dp.roundToPx() }
     val isAutoRenaming = state.operation == SessionSheetFeature.Operation.AutoRenaming
     val renameFailed = stringResource(R.string.session_sheet_rename_failed)
@@ -406,7 +404,7 @@ private fun Hero(
         else -> sessionTitle ?: ""
     }
     // The title's own height: its target grows only downward from it, over the location line, so
-    // nothing moves (iOS `minimumHitTarget(side: 50, topReach: 0)`).
+    // nothing moves.
     var titleHeight by remember { mutableStateOf(0) }
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
         Box(
@@ -447,7 +445,7 @@ private fun Hero(
                             AnimatedContent(
                                 targetState = title,
                                 transitionSpec = {
-                                    // iOS `.titleRoll` timed by `Motion.swap`; without animation it swaps in place.
+                                    // Without animation it swaps in place.
                                     if (!animates) fadeIn(snap()) togetherWith fadeOut(snap())
                                     else MotionTransition.roll(MotionRollDirection.Up, reduceMotion, density, Motion.swap).content
                                 },
@@ -544,8 +542,7 @@ private fun Tiles(
         }
         add { ExportTile(state.operation is SessionSheetFeature.Operation.Exporting, isBusy) { send(SessionSheetFeature.Action.ExportTapped(it, title ?: untitledSession)) } }
     }
-    // Six across; at accessibility sizes they wrap into rows of three, then two (iOS
-    // `.accessibility3` and up; Android's largest font scale, 2.0, stands in for it).
+    // Six across; at accessibility sizes they wrap into rows of three, then two.
     val fontScale = LocalDensity.current.fontScale
     val across = minOf(tiles.size, if (fontScale >= 2f) 2 else if (isAccessibilityFontScale(fontScale)) 3 else tiles.size)
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -657,7 +654,7 @@ private fun SessionSheetTile(title: String, symbol: SFSymbol, isOn: Boolean = fa
                 }
             }
         }
-        // iOS `.lineLimit(1).minimumScaleFactor(0.75)`: a long caption shrinks to 75 % before it truncates.
+        // A long caption shrinks to 75 % before it truncates.
         val style = OpenCodeTextStyles.caption1.copy(fontWeight = if (isOn) FontWeight.SemiBold else FontWeight.Normal)
         BasicText(
             title,
@@ -671,9 +668,9 @@ private fun SessionSheetTile(title: String, symbol: SFSymbol, isOn: Boolean = fa
 }
 
 /**
- * iOS `.minimumScaleFactor`: the caption at full size when it fits, which takes one layout (a
- * step-based search lays each caption out five or six times); only a caption that doesn't fit
- * searches down, in 0.25 sp steps, for the largest size that does.
+ * The caption at full size when it fits, which takes one layout (a step-based search lays each
+ * caption out five or six times); only a caption that doesn't fit searches down, in 0.25 sp steps,
+ * for the largest size that does.
  */
 private data class CaptionAutoSize(val min: TextUnit, val max: TextUnit) : TextAutoSize {
     override fun TextAutoSizeLayoutScope.getFontSize(constraints: Constraints, text: AnnotatedString): TextUnit {
@@ -697,7 +694,6 @@ private data class CaptionAutoSize(val min: TextUnit, val max: TextUnit) : TextA
 private fun cardFill(): Color {
     val colors = OpenCodeTheme.colors
     return when {
-        // iOS `.fill.tertiary` / `.fill.quaternary` in dark: (118, 118, 128) at 24 % / 18 %.
         colors.isDark && colors.highContrast -> colors.text.copy(alpha = 0.11f)
         colors.isDark -> colors.text.copy(alpha = 0.08f)
         colors.highContrast -> colors.text.copy(alpha = 0.1f)
@@ -827,7 +823,6 @@ private fun CostRow(details: SessionSheetDetails) {
 
 @Composable
 private fun AlwaysNotifyCard(isOn: Boolean, isPending: Boolean, onToggle: (Boolean) -> Unit) {
-    // iOS `ThisDevice.name` (“iPhone”, “iPad”).
     val message = if (LocalConfiguration.current.smallestScreenWidthDp >= 600) {
         stringResource(R.string.session_always_notify_message_tablet)
     } else {
@@ -915,9 +910,9 @@ object ModelLevelBars {
 }
 
 /**
- * Port of iOS `SessionActionPresentations`: rename, failure, delete confirmation, and export
- * sharing for the Session sheet's actions, wherever they were started (the sheet or the header
- * menu). Shown inside [SessionSheetView]; the SessionView shows it itself while the sheet is closed.
+ * Rename, failure, delete confirmation, and export sharing for the Session sheet's actions,
+ * wherever they were started (the sheet or the header menu). Shown inside [SessionSheetView]; the
+ * SessionView shows it itself while the sheet is closed.
  *
  * @param title the session's title, for the delete confirmation.
  */
@@ -925,7 +920,7 @@ object ModelLevelBars {
 fun SessionActionPresentations(sheet: StoreOf<SessionSheetFeature.State, SessionSheetFeature.Action>, title: String?) {
     val state by sheet.collectState()
     if (state.isRenaming) {
-        // The alert's field takes the keyboard as it opens, as iOS's alert text field does.
+        // The alert's field takes the keyboard as it opens.
         val focus = remember { FocusRequester() }
         LaunchedEffect(Unit) { focus.requestFocus() }
         OpenCodeAlertDialog(
@@ -945,7 +940,7 @@ fun SessionActionPresentations(sheet: StoreOf<SessionSheetFeature.State, Session
                     modifier = Modifier.fillMaxWidth().focusRequester(focus),
                 )
             },
-            // Three actions stack, Cancel last, as an iOS alert with more than two buttons does.
+            // Three actions stack, Cancel last.
             confirmButton = {
                 Column(horizontalAlignment = Alignment.End) {
                     TextButton(onClick = { sheet.send(SessionSheetFeature.Action.AutoRenameTapped) }) { Text(stringResource(R.string.session_auto_rename)) }
@@ -983,8 +978,7 @@ fun SessionActionPresentations(sheet: StoreOf<SessionSheetFeature.State, Session
 
 /**
  * The share sheet itself is started by [SessionExportClient.share]; this only notices it closing:
- * after the app pauses for it and resumes, the export is dismissed (and its file removed), as
- * iOS's `completionWithItemsHandler` does.
+ * after the app pauses for it and resumes, the export is dismissed (and its file removed).
  */
 @Composable
 private fun ExportShareDismissal(isSharing: Boolean, onDismiss: () -> Unit) {

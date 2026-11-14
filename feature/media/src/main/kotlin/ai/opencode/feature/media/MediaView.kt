@@ -20,9 +20,9 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 
 /**
  * The media area's root composable: draws [content] (the session) and, above it, whichever
- * full-screen viewer is up: the transcript image viewer from [MediaFeature], or a viewer
- * presented through [LocalMediaPresenter] (files, diagrams, pasted text). While one is up the
- * content below is hidden from TalkBack and takes no touches (iOS `accessibilityViewIsModal`).
+ * full-screen viewer is up: the transcript image viewer from [MediaFeature], or a viewer presented
+ * through [LocalMediaPresenter] (files, diagrams, pasted text). While one is up the content below
+ * is hidden from TalkBack and takes no touches.
  *
  * The overlay covers this composable's bounds: place it over the whole window so flights
  * start on the thumbnails' exact window frames.
@@ -36,7 +36,7 @@ fun MediaView(
     val context = LocalContext.current
     LaunchedEffect(store) {
         store.send(MediaFeature.Action.Task)
-        // `adb shell am start --ez lab-media-trace true …` (iOS `-lab-media-trace`).
+        // `adb shell am start --ez lab-media-trace true …`.
         if (context.findActivity()?.intent?.getBooleanExtra("lab-media-trace", false) == true) {
             MediaTransitionTrace.isEnabled = true
         }

@@ -21,7 +21,7 @@ import java.time.temporal.ChronoUnit
  * the next capture notes what it dropped. Delivered context is bounded by
  * `maxLines` and `maxCharacters`, as is `lines`, the continuity tail.
  *
- * Immutable (a Swift value type): the iOS `mutating` methods return the updated tail.
+ * Immutable: the mutating methods return the updated tail.
  */
 data class VoiceTranscriptTail private constructor(
     private val entries: List<Entry>,
@@ -246,7 +246,7 @@ data class VoiceTranscriptTail private constructor(
         const val maxUndeliveredCharacters = 20_000
         const val omittedNote = "[earlier conversation omitted]"
 
-        /** iOS `init(lines:)`: a tail seeded with already-delivered lines. */
+        /** A tail seeded with already-delivered lines. */
         operator fun invoke(lines: List<String> = emptyList()): VoiceTranscriptTail {
             val entries = lines.mapIndexed { key, line ->
                 if (line.startsWith("assistant: ")) {
@@ -308,7 +308,6 @@ object VoiceHandoff {
     ): String {
         val trimmedContext = context?.trim()
         val trimmedFraming = framing?.trim()
-        // Swift `JSONEncoder` with `[.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]`.
         val fields = sortedMapOf<String, Any>()
         if (appLogAttached) fields["app_log_attached"] = true
         appState?.let { fields["app_state"] = it.jsonObject }
@@ -473,7 +472,7 @@ object VoiceHandoff {
     }
 }
 
-/** Splits on characters matching [isSeparator], dropping empty pieces (Swift `split(whereSeparator:)`). */
+/** Splits on characters matching [isSeparator], dropping empty pieces. */
 internal inline fun String.splitWhere(isSeparator: (Char) -> Boolean): List<String> {
     val result = mutableListOf<String>()
     val current = StringBuilder()
@@ -490,9 +489,8 @@ internal inline fun String.splitWhere(isSeparator: (Char) -> Boolean): List<Stri
 }
 
 /**
- * Writes JSON as Swift's `JSONEncoder` does with `.prettyPrinted` and
- * `.withoutEscapingSlashes`: two-space indent, `"key" : value`, and an empty
- * array as `[\n\n<indent>]`. Values: String, Boolean, List<String>, maps.
+ * Writes JSON: two-space indent, `"key": value`, and an empty array as `[\n\n<indent>]`. Values:
+ * String, Boolean, List<String>, maps.
  */
 internal object PrettyJSON {
     fun obj(fields: Map<String, Any>): String = StringBuilder().also { write(it, fields, 0) }.toString()
@@ -566,7 +564,7 @@ data class VoiceTranscriptRecord(
     /** Everything said on this phone about this session, newest last, bounded. */
     val log: List<String>,
 ) {
-    /** iOS `mutating append(tail:log:endedAt:)`: the updated record. */
+    /** The updated record. */
     fun appending(tail: List<String>, log: List<String>, endedAt: Instant): VoiceTranscriptRecord {
         val combined = this.log + log
         return VoiceTranscriptRecord(endedAt, continuityLines(tail), combined.takeLast(maxLogLines))
@@ -585,7 +583,6 @@ data class VoiceTranscriptRecord(
     }
 }
 
-/** iOS `url.host(percentEncoded: false)` for the shared `ai.opencode.server.model.VoiceViewingPage`. */
 val VoiceViewingPage.host: String?
     get() = try {
         java.net.URI(url).host?.let { java.net.URLDecoder.decode(it, "UTF-8") }
@@ -728,8 +725,7 @@ object VoiceInstructions {
             if (context.recentMessages.isNotEmpty()) {
                 sections += "Recent messages from this session:\n" + context.recentMessages.takeLast(6).joinToString("\n")
             }
-            // iOS keeps the "Previous voice call tail:" marker for voice-lab's spec;
-            // switching sessions mid-call never replays raw lines from a previous call.
+            // Switching sessions mid-call never replays raw lines from a previous call.
             sections.joinToString("\n\n")
         }
     }
@@ -860,12 +856,8 @@ $personalMessagesSection
     }
 
     /**
-     * Kit's call (Oct 19): words said over a result became "an unrelated note
-     * here about picking a gym", a child's "Bye, Keanu" got commentary and an
-     * offer to say bye, and the recap after his correction repeated it all.
-     * Kit's call (Oct 25): "Hi, baby" got "Hey! Still going?" and "Hi, you,
-     * boy" a laugh and "Hey.": "a word at most" and the greeting rules let it
-     * answer, so speech that isn't for it now gets nothing.
+     * Speech that isn't for the voice agent (a greeting to a child, an aside, background talk) gets
+     * no reply at all.
      */
     const val whatYouHearSection = """# What You Hear
 
@@ -898,7 +890,7 @@ $personalMessagesSection
         }
 
         if (context.previousTail.isNotEmpty()) {
-            // Swift `Date.ISO8601Format()`: whole seconds, UTC.
+            // Whole seconds, UTC.
             val ended = context.previousEndedAt?.truncatedTo(ChronoUnit.SECONDS)?.toString() ?: "earlier"
             sections += "# Previous Voice Call\n\n" +
                 "Voice memory resets between calls. User turns from the previous call about this session (ended $ended) follow as silent memory so earlier references resolve; never new requests, never completed outcomes or facts, and never repeat or recap them unless asked.\n\n" +

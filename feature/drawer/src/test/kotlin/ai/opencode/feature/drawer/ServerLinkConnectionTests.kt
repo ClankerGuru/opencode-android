@@ -49,12 +49,8 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `ServerLinkConnectionTests.swift`: how Home's connection rides out a lost server, the
- * address race, the quiet grace before Reconnecting, Offline, and what becoming active or leaving
- * the app does to the event stream.
- *
- * The `AppFeature` cases (connecting picks the address, keeps the saved order) live in `:app`'s
- * `ServerLinkConnectionTests`. Parameterized iOS tests run each argument in turn inside one method.
+ * How Home's connection rides out a lost server, the address race, the quiet grace before
+ * Reconnecting, Offline, and what becoming active or leaving the app does to the event stream.
  */
 class ServerLinkConnectionTests {
     @get:Rule val isolation = TestIsolationRule()

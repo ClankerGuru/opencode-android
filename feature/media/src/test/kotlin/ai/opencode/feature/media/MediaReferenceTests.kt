@@ -28,12 +28,7 @@ import java.nio.file.Files
 import java.util.Collections
 import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * The media half of iOS `MediaReferenceTests` (the loader's tiers, the retry state and the
- * viewer's page loads). The wire and decoding tests are `:server`'s `MediaReferenceTests`; the
- * mosaic's are the transcript's. Robolectric's native graphics decode the sample PNG as iOS's
- * `UIImage(data:)` does.
- */
+/** Robolectric's native graphics decode the sample PNG. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)

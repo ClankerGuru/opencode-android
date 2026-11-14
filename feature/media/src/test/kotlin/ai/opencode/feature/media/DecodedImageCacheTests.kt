@@ -18,12 +18,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * Port of iOS `DecodedImageCacheTests.swift`: costs are real `rowBytes × height`, so it runs
- * under Robolectric's native graphics. `attachmentAndMarkdownUseTheSameBudgetAndPreserveOriginalDimensions`
- * decodes through `CachedImage` (`:feature:session`) and `:server`'s Markdown image read, so it
- * belongs to those modules.
- */
+/** Costs are real `rowBytes × height`, so it runs under Robolectric's native graphics. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -69,9 +64,8 @@ class DecodedImageCacheTests {
     }
 
     /**
-     * iOS posts `didReceiveMemoryWarningNotification`, which every cache observes; Android's live
-     * cache registers `ComponentCallbacks2` on the app, so this drives the live value with the
-     * Robolectric application's `onTrimMemory`.
+     * Android's live cache registers `ComponentCallbacks2` on the app, so this drives the live
+     * value with the Robolectric application's `onTrimMemory`.
      */
     @Test
     fun memoryWarningPurgesEntriesAndPixelCost() {

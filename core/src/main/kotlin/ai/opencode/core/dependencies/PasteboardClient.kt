@@ -11,9 +11,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Port of iOS `PasteboardClient` (`OpenCode/Browser/LinkMenu.swift`), moved down to `:core`
- * because the app, the browser, the transcript and the composer all copy and paste.
- * The system clipboard, for reducers (through effects) and views; never touch
+ * Moved down to `:core` because the app, the browser, the transcript and the composer all copy and
+ * paste. The system clipboard, for reducers (through effects) and views; never touch
  * `ClipboardManager` elsewhere.
  */
 class PasteboardClient(
@@ -22,7 +21,7 @@ class PasteboardClient(
     /** The clipboard's text if it isn't blank, else its URL. Main thread. */
     val string: () -> String? = { null },
     val hasImages: () -> Boolean = { false },
-    /** The clipboard's images (content URIs), for the composer's + menu Paste (iOS `PasteButton`'s item providers). Main thread. */
+    /** The clipboard's images (content URIs), for the composer's + menu Paste. Main thread. */
     val imageURIs: () -> List<Uri> = { emptyList() },
 ) {
     companion object Key : DependencyKey<PasteboardClient> {

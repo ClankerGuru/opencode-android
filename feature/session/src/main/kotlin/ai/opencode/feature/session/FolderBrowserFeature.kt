@@ -12,10 +12,9 @@ import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeDirectoryListing
 
 /**
- * Port of iOS `FolderBrowserFeature`: browsing the connected server's folders for a new
- * session, from the Project sheet. Each folder is read only when it's opened, one
- * `GET /api/fs/list` through the server's default location, so browsing never boots another
- * location and never reads ahead.
+ * Browsing the connected server's folders for a new session, from the Project sheet. Each folder is
+ * read only when it's opened, one `GET /api/fs/list` through the server's default location, so
+ * browsing never boots another location and never reads ahead.
  */
 class FolderBrowserFeature : Reducer<FolderBrowserFeature.State, FolderBrowserFeature.Action> {
     /** A folder pushed in the Project sheet; null is where browsing starts, the server's default folder. */

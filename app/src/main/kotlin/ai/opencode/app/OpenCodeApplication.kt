@@ -27,10 +27,8 @@ import kotlinx.coroutines.launch
 import android.util.Log
 
 /**
- * Process entry (iOS `OpenCodeApp` + `AppDelegate` launch work). Installs the application
- * [android.content.Context] as the one process-wide dependency override; everything else is
- * resolved lazily through `DependencyKey.liveValue`. No synchronous disk reads here beyond
- * what the first frame needs (iOS cold-start rule).
+ * Process entry. Installs the application context as the one process-wide override; no synchronous
+ * disk reads beyond what the first frame needs.
  */
 class OpenCodeApplication : Application() {
     private val launchScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -38,10 +36,8 @@ class OpenCodeApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         DependencyValues.installRoot { this[AppContext] = applicationContext }
-        // The batcher projects streaming text through the transcript's Markdown stream, so a
-        // row's blocks for the same text are a lookup (iOS `EventBatcher.prepareMarkdown`).
-        // It also records every event into the agent activity ledger the session glyphs read
-        // (iOS `AgentActivityLedger.record` in `OpenCodeClient+Events.swift`).
+        // The batcher prepares streaming Markdown and records every event into the agent activity
+        // ledger.
         DependencyValues.installRoot {
             val markdown = this[EventBatcherHooks].withMarkdownStream()
             this[EventBatcherHooks] = EventBatcherHooks(
@@ -63,28 +59,25 @@ class OpenCodeApplication : Application() {
         AppDependencies.install(this)
         // Open in New Window (tablet multi-instance windows).
         SceneWindows.install()
-        // The haptics diagnostics trace's `dictating=`/`call=` (iOS reads the audio session owner).
+        // The haptics diagnostics trace's `dictating=`/`call=`.
         AudioSessionHaptics.isCallActive = { SceneWindows.all.any { it.isResolved && it.store.state.hasLiveCall } }
         AudioSessionHaptics.isDictating = { SceneWindows.all.any { it.isResolved && it.store.state.home?.dictationActivity != null } }
-        // iOS `OpenCodeApp.init`'s launch line: version, distribution, model, system.
+        // Version, distribution, model, system.
         val device = dependency(DevToolsClient).device()
         AppLog.app.notice { "Launch: ${AppVersion.current.label}, ${device.distribution}, ${device.model}, ${device.system}" }
         // A call, a recording or a followed run never outlives its process: end any ongoing
-        // notification a killed process left behind (iOS ends stale Live Activities at launch).
+        // notification a killed process left behind.
         val voiceActivity = dependency(VoiceLiveActivityClient)
         val dictationActivity = dependency(DictationLiveActivityClient)
         val sessionActivity = dependency(SessionLiveActivityClient)
         launchScope.launch { voiceActivity.endAll() }
         launchScope.launch { dictationActivity.endAll() }
         launchScope.launch { sessionActivity.endAll() }
-        // A call log a previous process left in progress (killed, updated) is saved as
-        // interrupted, off the main thread (iOS `OpenCodeApp.init`), and an open call's log is
-        // written as the app leaves the foreground (iOS `scenePhase == .background`). Resolved
-        // after AppDependencies so the recorder gets the installed uploader.
+        // A call log a previous process left in progress is saved as interrupted, off the main
+        // thread. Resolved after AppDependencies so the recorder gets the installed uploader.
         val voiceCallLog = dependency(VoiceCallLogClient)
         launchScope.launch(Dispatchers.IO) { voiceCallLog.recoverInterrupted() }
-        // Remembered image shapes are read off the main thread now, so the first preview that
-        // asks finds them in memory (iOS `AgentImageSizeCache.live.warm()`).
+        // Remembered image shapes are read off the main thread.
         AgentImageSizeCache.live.warm()
         launchScope.launch {
             AppPhases.phases().collect { phase ->

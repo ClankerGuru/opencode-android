@@ -83,9 +83,8 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 
 /**
- * iOS `.traceUploads(store)` (`TraceTriggers.swift`, `TraceUploadsModifier`): Home's host for the
- * Report a Problem sheet and its “Sent to session” toast, and the launch-time crash-marker check
- * (`.task`). Compose it once over Home, after Home's content.
+ * Home's host for the Report a Problem sheet, its toast and the launch-time crash-marker check.
+ * Compose it once over Home, after Home's content.
  */
 @Composable
 fun TraceUploadsHost(store: StoreOf<State, Action>) {
@@ -100,7 +99,7 @@ fun TraceUploadsHost(store: StoreOf<State, Action>) {
     if (sheetShown) ProblemReportSheet(store, toast)
 }
 
-/** iOS `ProblemReportSheet`: a note, Include Screenshot, what's sent, and Send / Sending… / Sent / Try Again. */
+/** A note, Include Screenshot, what's sent, and Send / Sending… / Sent / Try Again. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ProblemReportSheet(store: StoreOf<State, Action>, toast: State.Toast?) {
@@ -110,7 +109,7 @@ private fun ProblemReportSheet(store: StoreOf<State, Action>, toast: State.Toast
         onDismissRequest = { store.send(Action.Dismissed) },
         sheetState = sheetState,
         containerColor = OpenCodeTheme.colors.groupedCanvas,
-        // The canvas isn't a scheme colour, so contentColorFor would fall back to a dimmed default.
+        // The canvas isn't a scheme colour, so contentColorFor would give a dimmed default.
         contentColor = MaterialTheme.colorScheme.onSurface,
         modifier = Modifier.testTag("problem-report-sheet"),
     ) {
@@ -291,7 +290,7 @@ private fun ToastAboveSheet(toast: State.Toast?) {
     }
 }
 
-/** iOS `ProblemReportToastView`: “Sent to session”, for a moment; announced, never hit-tested. */
+/** “Sent to session”, for a moment; announced, never hit-tested. */
 @Composable
 fun ProblemReportToastView(toast: State.Toast?) {
     val reduceMotion = rememberReduceMotion()
@@ -329,7 +328,7 @@ fun ProblemReportToastView(toast: State.Toast?) {
     }
 }
 
-/** SwiftUI `.snappy`: a 0.5 s spring with a little bounce. */
+/** A 0.5 s spring with a little bounce. */
 private val SNAPPY = MotionSpring(0.5, 0.15)
 
 @Composable

@@ -23,9 +23,8 @@ import org.junit.Test
 import java.util.Base64
 
 /**
- * The server half of iOS `MediaReferenceTests`: the capabilities header, decoding inline and
- * `media:<hash>` shapes and unavailable placeholders, and the live fetch. The loader and its
- * caches are tested in `:feature:media`; the tool mosaic in `:feature:transcript`.
+ * The capabilities header, decoding inline and `media:<hash>` shapes and unavailable placeholders,
+ * and the live fetch.
  */
 class MediaReferenceTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -297,9 +296,8 @@ class MediaReferenceTests {
     }
 
     /**
-     * iOS also asserts the session's `urlCache == nil` and each request's
-     * `.reloadIgnoringLocalCacheData`: OkHttp has no per-request cache policy, so the `media`
-     * pool having no cache is the whole of it (`WireFixture` records no `cachePolicy`).
+     * OkHttp has no per-request cache policy, so the `media` pool having no cache is the whole
+     * check.
      */
     @Test
     fun liveFetchUsesUncachedMediaSessionAndReloadIgnoringLocalCacheData() = runTest {

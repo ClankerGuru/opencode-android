@@ -12,11 +12,12 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 
-// Minimal value ports of iOS types this package draws from other areas (hand-offs: `:feature:voice`
-// owns `VoiceHandoff`, `:feature:composer` owns `SharedLocation`; file chip labels are `:core`'s `AttachmentFileType`).
-// Kept internal so the owning areas can replace them without touching callers outside `user/`.
+// Minimal values this package draws from other areas (hand-offs: `:feature:voice` owns
+// `VoiceHandoff`, `:feature:composer` owns `SharedLocation`; file chip labels are `:core`'s
+// `AttachmentFileType`). Kept internal so the owning areas can replace them without touching
+// callers outside `user/`.
 
-/** iOS `Voice/VoiceTranscript.swift` `VoiceHandoff`: only the parse the transcript needs. */
+/** Only the parse the transcript needs. */
 object VoiceHandoff {
     @Immutable
     data class Delegation(
@@ -77,9 +78,8 @@ object VoiceHandoff {
 }
 
 /**
- * A location shared from the composer's + menu: one fix and its nearest address (iOS
- * `Composer/SharedLocation.swift`, the value and its parse only). It travels as a tagged block
- * at the top of the prompt's text, and the transcript draws it as a card.
+ * A location shared from the composer's + menu: one fix and its nearest address. It travels as a
+ * tagged block at the top of the prompt's text, and the transcript draws it as a card.
  */
 @Immutable
 data class SharedLocation(

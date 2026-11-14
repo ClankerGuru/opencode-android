@@ -26,9 +26,8 @@ import java.util.concurrent.Executors
 import kotlin.coroutines.resume
 
 /**
- * Port of iOS's Spotlight indexing (`SystemIntegrationEffects.index`, `SessionEntity.attributeSet`
- * and `SystemAction(spotlightIdentifier:)`): every published session, by title and project name
- * only, in the platform's on-device search index (AppSearch platform storage).
+ * Every published session, by title and project name only, in the platform's on-device search index
+ * (AppSearch platform storage).
  *
  * Documents use the shape of AndroidX's `builtin:Thing` (`name`, `alternateNames`,
  * `description`, `url`, `potentialActions`) and are displayed by the system, so system search
@@ -36,10 +35,9 @@ import kotlin.coroutines.resume
  * can find them; a result's `url` is the session's `opencode://session/<id>?server=<key>` link,
  * which the app routes like any link. Launchers without AppSearch search the quick actions.
  *
- * As iOS: an item's ID is its session's scoped ID (`<serverKey>:<sessionID>`), its namespace
- * (Spotlight's domain) the server key; only what changed is indexed, sessions that left the
- * list are removed, and a forgotten server's whole namespace goes. Failures are logged and
- * otherwise ignored (`try?` on iOS).
+ * An item's ID is its session's scoped ID (`<serverKey>:<sessionID>`), its namespace (Spotlight's
+ * domain) the server key; only what changed is indexed, sessions that left the list are removed,
+ * and a forgotten server's whole namespace goes. Failures are logged and otherwise ignored.
  */
 internal object SystemSearchIndex {
     private const val DATABASE = "opencode-sessions"
@@ -72,7 +70,7 @@ internal object SystemSearchIndex {
         AppLog.app.debug { "System search indexed changed=${changed.size} removed=${removed.size}" }
     }
 
-    /** Removes a forgotten server's sessions (iOS `deleteSearchableItems(withDomainIdentifiers:)`). */
+    /** Removes a forgotten server's sessions. */
     suspend fun remove(context: Context, serverKey: String) = lock.withLock {
         val session = session(context) ?: return@withLock
         val spec = SearchSpec.Builder().addFilterNamespaces(serverKey).build()
@@ -82,14 +80,14 @@ internal object SystemSearchIndex {
         if (!result.isSuccess) AppLog.app.debug { "System search removal failed code=${result.resultCode}" }
     }
 
-    /** The session's scoped ID, as iOS's Spotlight items. */
+    /** The session's scoped ID. */
     fun identifier(serverKey: String, sessionID: String): String = "$serverKey:$sessionID"
 
     /** The link a search result opens (`SystemAction.fromUrl`'s `opencode://session/<id>?server=<key>`). */
     fun url(serverKey: String, sessionID: String): String =
         "${SystemAction.URL_SCHEME}://session/${encode(sessionID)}?server=${encode(serverKey)}"
 
-    /** Titles and project names only (iOS `SessionEntity.attributeSet`). */
+    /** Titles and project names only. */
     internal fun document(session: SessionDirectory.Session, serverKey: String): GenericDocument {
         val url = url(serverKey, session.id)
         val open = GenericDocument.Builder<GenericDocument.Builder<*>>(serverKey, "${identifier(serverKey, session.id)}#open", POTENTIAL_ACTION)

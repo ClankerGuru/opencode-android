@@ -45,13 +45,6 @@ import org.robolectric.annotation.Config
 import java.io.File
 import java.time.Instant
 
-/*
- * Ports of iOS `SystemIntegrationTests.swift`. Suites (and tests) whose store is `HomeFeature` or
- * `AppFeature` belong to `:feature:drawer` / `:app`: `SystemRoutingTests`, `SystemColdLaunchTests`,
- * `SystemVoiceAvailabilityTests`, `SystemCallTests`, and Home's `systemDirectoryEntry` tests in
- * `SessionDirectoryTests`.
- */
-
 private val server = OpenCodeServer(url = "https://saved.example", username = "kit", password = "test")
 private val otherServer = OpenCodeServer(url = "https://other.example", username = "kit", password = "test")
 private val serverKey = SessionDirectory.serverKey(server.persistenceID)
@@ -71,7 +64,6 @@ private fun directoryServer(lastViewed: String? = "ses_older", pinned: List<Stri
 
 private fun directory(entry: SessionDirectory.Server = directoryServer()): SessionDirectory = SessionDirectory().publish(entry)
 
-/** `homeBuildsItsEntryFromTheListPinsAndLastViewed` and `entryNeverCarriesMessageText` are Home's (`:feature:drawer`). */
 class SessionDirectoryTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -179,8 +171,8 @@ class SystemEntityQueryTests {
 }
 
 /**
- * [SystemEntityQueryTests]' index check: Android's Spotlight item is an AppSearch `GenericDocument`
- * (iOS `CSSearchableItemAttributeSet`), built by [SystemSearchIndex.document] (Robolectric).
+ * [SystemEntityQueryTests]' index check: Android's Spotlight item is an AppSearch
+ * `GenericDocument`, built by [SystemSearchIndex.document] (Robolectric).
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -197,7 +189,7 @@ class SystemEntityQueryFrameworkTests {
     }
 }
 
-/** Android only: App Actions and Ask OpenCode can be started by any app (iOS intents can't). */
+/** Android only: App Actions and Ask OpenCode can be started by any app. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class SystemCallerTests {
@@ -250,7 +242,7 @@ class SessionControlTests {
         assertEquals(listOf("ses_loose"), server.pinned.map { it.id })
         assertEquals("ses_older", server.lastViewed?.id)
         assertEquals(listOf("ses_0", "ses_1", "ses_2"), server.sessions.take(3).map { it.id })
-        // iOS `.distantPast`; Android's copy uses the epoch.
+        // Android's copy uses the epoch.
         assertTrue(server.sessions.all { it.updatedAt == Instant.EPOCH })
         assertEquals(listOf("app", "docs"), server.projects.map { it.name })
         assertTrue(server.projects.all { it.directory.isEmpty() })
@@ -289,7 +281,7 @@ class SessionControlTests {
         assertTrue(new.isNewSession)
     }
 
-    /** iOS's intents post to the shared inbox; Android's `perform` returns the action `SystemActionActivity` posts. */
+    /** Android's `perform` returns the action `SystemActionActivity` posts. */
     @Test
     fun controlIntentsPostTheirChoice() {
         assertEquals(
@@ -322,7 +314,6 @@ class SystemActionTests {
         assertNull(SystemAction.fromUrl("opencode://session"))
     }
 
-    /** iOS Spotlight identifiers → a session shortcut's scoped ID. */
     @Test
     fun spotlightIdentifiersAreScopedSessions() {
         assertEquals(SystemAction(serverKey, SystemAction.Destination.Session("ses_newer")), SystemAction.fromScopedIdentifier("$serverKey:ses_newer"))
@@ -462,7 +453,7 @@ class SystemPromptSenderTests {
     }
 }
 
-/** iOS waits real time for its debounce; the publisher's scope runs on the test's virtual clock here. */
+/** The publisher's scope runs on the test's virtual clock here. */
 class SystemPublisherTests {
     @get:Rule val isolation = TestIsolationRule()
 

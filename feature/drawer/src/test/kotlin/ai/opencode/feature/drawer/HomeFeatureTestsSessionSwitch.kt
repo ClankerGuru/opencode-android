@@ -68,7 +68,6 @@ import org.junit.Rule
 import org.junit.Test
 import ai.opencode.core.testing.TestIsolationRule
 
-/** Port of iOS `SessionSwitchTests` (`OpenCodeTests/HomeFeatureTests.swift`). */
 class SessionSwitchTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -546,7 +545,7 @@ class SessionSwitchTests {
             )
             next.markingReadLocally(session("other")).copy(activeSessionIDs = emptySet())
         }
-        // iOS `CatchUpPreviewStores().store(for:in:)`: the preview card's state, built as `HomeView` builds it.
+        // The preview card's state, built as `HomeView` builds it.
         val preview = h.state {
             val root = session("root")
             home.seedingSessionSnapshot(

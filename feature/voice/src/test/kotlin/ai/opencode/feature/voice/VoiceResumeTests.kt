@@ -51,19 +51,11 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `VoiceResumeTests.swift` (`struct VoiceResumeTests` and its microphone-path
- * extension): a call that outlives its Realtime session: rotation before the time limit,
- * reconnects after a drop, and results for tool calls that belonged to a retired session.
- *
- * The coordinator runs on real time here, as on iOS (its rotation deadlines are wall-clock
- * dates and its pauses real sleeps), with the same short timings and bounded waits.
- */
+/** The coordinator runs on real time here, with the same short timings and bounded waits. */
 class VoiceResumeTests {
-    /** iOS `URLError(.networkConnectionLost)`: OkHttp's reset socket. */
+    /** OkHttp's reset socket. */
     private fun connectionLost() = SocketException("Connection reset")
 
-    /** iOS `URLError(.notConnectedToInternet)`. */
     private fun notConnected() = ConnectException("Network is unreachable")
 
     /** One fake Realtime socket per `connect`. */
@@ -110,7 +102,7 @@ class VoiceResumeTests {
         )
     }
 
-    /** The call's events as iOS's `AsyncThrowingStream` iterator: `next()` waits, a failure throws. */
+    /** The call's events: `next()` waits, a failure throws. */
     internal class EventIterator(flow: Flow<VoiceCallEvent>, scope: CoroutineScope) {
         private val channel = Channel<Result<VoiceCallEvent?>>(Channel.UNLIMITED)
 
@@ -198,7 +190,7 @@ class VoiceResumeTests {
     }
 
     private companion object {
-        /** The coordinator's world: real time, as iOS's `ContinuousClock` and `Date()`. */
+        /** The coordinator's world: real time. */
         fun coordinatorDependencies(): DependencyValues = DependencyValues.testing().update {
             this[Clock] = Clock.liveValue
             this[DateClient] = DateClient.liveValue
@@ -232,13 +224,11 @@ class VoiceResumeTests {
             realtimeTranscriptWait: Duration = 1.seconds,
         ) = VoiceCallTiming(rotateAfter = rotateAfter, forceRotateAfter = forceRotateAfter, retryDelays = retryDelays, realtimeTranscriptWait = realtimeTranscriptWait)
 
-        /** iOS `eventually(timeout:step:)`. */
         suspend fun eventually(timeout: Duration = 2.seconds, step: Duration = 5.milliseconds, condition: () -> Boolean) {
             val deadline = System.nanoTime() + timeout.inWholeNanoseconds
             while (!condition() && System.nanoTime() < deadline) delay(step)
         }
 
-        /** iOS `@Test(.timeLimit(.minutes(1)))`. */
         fun timed(block: suspend CoroutineScope.() -> Unit) = runBlocking {
             withTimeout(1.minutes) { block() }
         }
@@ -332,8 +322,7 @@ class VoiceResumeTests {
         first.yield(RealtimeServerEvent.ResponseDone(id = "r1"))
         eventually { first.closed.value }
         assertTrue(first.closed.value)
-        // The swap closes the old socket, then attaches the new one (iOS's order too). iOS's actor
-        // finishes that attach in the same turn; here it lands a moment after the close, so wait for it.
+        // The swap closes the old socket, then attaches the new one.
         eventually { second.systemMessages.size > 1 }
         // What was said after seeding reaches the replacement before anything else happens.
         assertEquals(true, second.systemMessages.lastOrNull()?.contains("You: It races the progress callback."))
@@ -376,7 +365,6 @@ class VoiceResumeTests {
         assertEquals(listOf("voice_socket_dropped", "voice_socket_reconnected"), harness.voiceEvents)
         val dropped = harness.socketEvents.value.firstOrNull { it.name == "voice_socket_dropped" }
         assertNotNull(dropped)
-        // iOS also checks the recorder's `.stream` kind: Android records socket events on their own sink.
         assertEquals(DiagnosticsErrorCategory.Offline.description, dropped!!.errorCategory)
         assertEquals("domain=NSURLErrorDomain code=-1005 closeCode=0", "domain=${dropped.domain} code=${dropped.code} closeCode=${dropped.closeCode}")
 
@@ -722,7 +710,6 @@ class VoiceResumeTests {
     }
 }
 
-/** Port of iOS `VoiceResumeFeatureTests` (in `VoiceResumeTests.swift`). */
 class VoiceResumeFeatureTests {
     @Test fun reconnectingShowsOnlyWhenTheSwapIsSlow() = voiceTest { h ->
         val clock = TestClock()

@@ -29,11 +29,10 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `VoiceReconnectReplyTests.swift`. From Kit's Oct 21 call: a request steered
- * into OPENCODE IOS while it was still answering the one before, then two network switches.
- * The steer arrives after the earlier reply's text (V2 adds it at the next step), and the
- * delegator's round fails once the voice connection is replaced, after its message was
- * already sent.
+ * A request steered into OPENCODE IOS while it was still answering the one before, then two network
+ * switches. The steer arrives after the earlier reply's text (V2 adds it at the next step), and the
+ * delegator's round fails once the voice connection is replaced, after its message was already
+ * sent.
  */
 class VoiceReconnectReplyTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
@@ -226,7 +225,7 @@ class VoiceReconnectReplyTests {
         val requests = mutableListOf<Pair<String?, List<VoiceDelegator.InputItem>>>()
         val replaced = replaced
         val completed = mutableListOf<String>()
-        // iOS `skipInFlightEffects`: the store's effects run in a scope the test cancels.
+        // The store's effects run in a scope the test cancels.
         val effects = CoroutineScope(coroutineContext + SupervisorJob(coroutineContext[Job]))
         val store = voiceTestStore(shared, { voice }, effects) {
             this[Clock] = TestClock()
@@ -331,8 +330,8 @@ class VoiceReconnectReplyTests {
         call.userSays("Hold on", from = 1_000, to = 1_100)
         call.advance(30)
         call.socket.finish(NetworkConnectionLost())
-        // The reconnect backoff runs on the test clock here (iOS sleeps it in real time), so its
-        // 10ms come off the first wait below: the drain still opens 150ms after the user's words.
+        // The reconnect backoff runs on the test clock here, so its 10ms come off the first wait
+        // below: the drain still opens 150ms after the user's words.
         call.retryDelayPasses()
         call.waitFor { call.harness.sockets.size == 2 }
         val second = call.harness.sockets[1]

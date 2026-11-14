@@ -40,9 +40,8 @@ import org.robolectric.annotation.GraphicsMode
 /**
  * Server Flow's leaving pictures ([ServerSwapPictures]) against a real `LazyColumn`: a layer a
  * switch takes is the leaving server's alone, so a row the next server shows under the same key
- * (the Recents header, or the same session on both servers) records itself again instead of
- * drawing the picture as it fades out and is released (the header that stayed blank after a Pin).
- * Not an iOS port: iOS's snapshot views are copies, so it has nothing to pin here.
+ * (the Recents header, or the same session on both servers) records itself again instead of drawing
+ * the picture as it fades out and is released (the header that stayed blank after a Pin).
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -144,8 +143,7 @@ class ServerSwapPicturesTests {
         val name = harness.motion.names.first { it.id == "server-a" }.position
         val rows = harness.motion.rows("server-a", harness.keys.size)
         assertTrue("the name is on its way out ($name)", name < -0.01f)
-        // iOS adds the snapshots at rest and the chain follows the name from there: the first row
-        // lags the name and each row the one above it.
+        // The first row lags the name and each row the one above it.
         assertTrue("the first row follows the name (${rows[0].position} vs $name)", rows[0].position > name)
         for (i in 1 until rows.size) assertTrue("row $i lags the row above", rows[i].position >= rows[i - 1].position)
         assertTrue("still showing", rows[0].opacity > 0.5f)

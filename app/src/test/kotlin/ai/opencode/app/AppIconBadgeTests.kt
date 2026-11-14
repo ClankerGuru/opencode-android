@@ -19,11 +19,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of the `AppFeature` part of iOS `AppIconBadgeTests.swift` (forgetting an identity).
- * The Home badge-publishing tests are `HomeFeature`'s (`:feature:drawer`); the ledger, refs and
- * badge permission tests are `:feature:system`'s.
- */
 class AppIconBadgeTests {
     @get:Rule val isolation = TestIsolationRule()
 

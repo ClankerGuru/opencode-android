@@ -42,20 +42,7 @@ import org.junit.Test
 import java.time.Instant
 import kotlin.math.max
 
-/**
- * Port of iOS `SessionRefreshReviewTests.swift`: `SessionRefreshReviewTests` and the
- * SessionFeature half of `SharedLocationTests`. Parameterized iOS tests loop over their
- * arguments, each in its own store.
- *
- * Not ported here (their subject is another module): `theBlockReadsPlainlyAndParsesBack`,
- * `locationSnapshotIsInertInTestsAndInjectable`, `locationTappedPrefetchesCompactSnapshotBeforeDeliveringLocationResponse`,
- * `locationEntranceTraceHasOneContinuousEntranceWithNoHeightJumpAbove1_5pt`,
- * `locationTappedDeliversLocationAfterPrefetchTimeoutAndLoadsMapAsyncWithoutHeightChange`
- * (SharedLocation / ComposerAttachmentsFeature, :feature:composer). Ported here:
- * `composerFoldLayoutMatchesMainWhenNoLocationIsMountedIncludingPreparingDictationRow`
- * (`ComposerFoldFrames` lives in this module's `ComposerViews.kt`);
- * `theTranscriptShowsTheCardAndOnlyTheTypedText` (TranscriptUserMessage, :feature:transcript, ported there).
- */
+/** `SessionRefreshReviewTests` and the SessionFeature half of `SharedLocationTests`. */
 class SessionRefreshReviewTests {
     private val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
     private val session = OpenCodeSession(id = "ses_review", serverTitle = "Review", projectID = "p", directory = "/project", updatedAt = distantPast)
@@ -71,7 +58,6 @@ class SessionRefreshReviewTests {
     private fun response(requestID: Int, items: List<OpenCodeTranscriptItem>, scope: AuthoritativeRefresh.Scope, pageCursor: AuthoritativeRefresh.PageCursor? = null, session: OpenCodeSession = this.session) =
         Action.RefreshResponse(session.id, requestID, Result.success(AuthoritativeRefresh(observed = session, items = items, scope = scope, pageCursor = pageCursor)))
 
-    /** iOS `AsyncStream<Void>` used as a gate: `for await _ in stream { break }`. */
     private class Gate {
         private val channel = Channel<Unit>(Channel.UNLIMITED)
         suspend fun await() { channel.receiveCatching() }
@@ -566,7 +552,6 @@ class SessionRefreshReviewTests {
         }
         assertTrue(store.state.canSendPrompt)
         store.send(Action.SendTapped)
-        // iOS starts the send's effect eagerly before `skipInFlightEffects`; here it runs on the scope.
         repeat(200) { if (sent.value.isEmpty()) kotlinx.coroutines.delay(5) }
         h.skipInFlightEffects()
         assertNull(store.state.pendingLocation)
@@ -749,11 +734,7 @@ class SessionRefreshReviewTests {
         assertEquals(1, store.state.earlierHistoryGeneration)
     }
 
-    /**
-     * iOS checks `ComposerFoldLayout`'s static frames, then measures it in a `UIHostingController`
-     * (that last step is dropped: Android's `ComposerFoldLayout` measures through the same
-     * [ComposerFoldFrames]). Frames are the children's tops; widths are the column's.
-     */
+    /** Frames are the children's tops; widths are the column's. */
     @Test fun composerFoldLayoutMatchesMainWhenNoLocationIsMountedIncludingPreparingDictationRow() {
         // 1. An absent attachment row starts at zero so its first reservation can animate into
         // the layout. Existing attachments keep the row revealed.

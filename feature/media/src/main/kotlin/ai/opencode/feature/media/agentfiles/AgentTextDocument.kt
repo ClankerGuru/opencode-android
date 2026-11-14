@@ -7,22 +7,20 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 
 /**
- * Highlighted lines for the code viewer, built off the main thread (iOS `AgentTextDocument`).
+ * Highlighted lines for the code viewer, built off the main thread.
  *
- * Small files ([maxNumberedBytes], [maxNumberedLines], lines up to [maxNumberedLineBytes])
- * render as numbered rows ([usesLazyTextView] false). Larger or long-line files format minified
- * JSON, fold paragraphs over [maxParagraphBytes], highlight only a
- * [maxHighlightedCharacters] prefix, and render as a plain lazy list of lines (iOS: a TextKit 2
- * `UITextView`), so a multi-megabyte file lays out only what's on screen.
+ * Small files ([maxNumberedBytes], [maxNumberedLines], lines up to [maxNumberedLineBytes]) render
+ * as numbered rows ([usesLazyTextView] false). Larger or long-line files format minified JSON, fold
+ * paragraphs over [maxParagraphBytes], highlight only a [maxHighlightedCharacters] prefix, and
+ * render as a plain lazy list of lines, so a multi-megabyte file lays out only what's on screen.
  *
- * Colours are applied when a line is drawn ([line]), so a theme change recolours it.
- * Equality is identity, like iOS's per-document UUID.
+ * Colours are applied when a line is drawn ([line]), so a theme change recolours it. Equality is
+ * identity.
  */
 @Stable
 class AgentTextDocument private constructor(
     /** The formatted text the viewer shows. */
     val text: String,
-    /** iOS `PastedTextSummary.scan` line count of [text]. */
     val lineCount: Int,
     /** The line a `path:42` reference pointed at, when it exists. */
     val focusLine: Int?,
@@ -102,7 +100,6 @@ class AgentTextDocument private constructor(
         val proseExtensions: Set<String> = setOf("md", "markdown", "mdx", "txt", "log", "csv", "tsv", "rtf")
         val markdownExtensions: Set<String> = setOf("md", "markdown", "mdx")
 
-        /** iOS `init(source:fileName:focusLine:)`. */
         fun of(source: String, fileName: String, focusLine: Int?): AgentTextDocument {
             val language = AttachmentFileType.fileExtension(fileName)
             val formattedBytes = formatSourceBytes(source.encodeToByteArray(), language)
@@ -121,10 +118,7 @@ class AgentTextDocument private constructor(
             }
         }
 
-        /**
-         * Plain lines, never highlighted: numbered rows when small, the lazy view when large
-         * (iOS `init(plainText:)`, used by large pastes too).
-         */
+        /** Plain lines, never highlighted: numbered rows when small, the lazy view when large. */
         fun plainText(source: String): AgentTextDocument {
             val bytes = source.encodeToByteArray()
             val folded = foldLongLinesBytes(bytes, maxParagraphBytes)
@@ -147,7 +141,7 @@ class AgentTextDocument private constructor(
             return tokens.copyOf(count)
         }
 
-        /** Line starts for display; a trailing newline adds no empty last line (iOS `lines(of:)`). */
+        /** Line starts for display; a trailing newline adds no empty last line. */
         private fun lineStarts(text: String): IntArray {
             var starts = IntArray(64)
             var count = 0
@@ -165,7 +159,7 @@ class AgentTextDocument private constructor(
             return starts.copyOf(count)
         }
 
-        /** iOS `PastedTextSummary.scan`: newlines (a trailing one adds no line) and the longest line in bytes. */
+        /** Newlines (a trailing one adds no line) and the longest line in bytes. */
         data class Scan(val lineCount: Int, val longestLineBytes: Int)
 
         fun scan(bytes: ByteArray): Scan {

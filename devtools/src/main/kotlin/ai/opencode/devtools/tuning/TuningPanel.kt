@@ -118,18 +118,17 @@ import kotlin.math.PI
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
-/** The orange iOS uses for a changed value. */
 private val ChangedColor = Color(0xFFFF9500)
 
-/** iOS `TuningOverlayView.Form`: what the panel shows as. */
+/** What the panel shows as. */
 private enum class TuningForm { Panel, Pill, Tab }
 
-/** iOS `settle`: `.spring(duration: 0.38, bounce: 0.12)`. */
+/** `.spring(duration: 0.38, bounce: 0.12)`. */
 private val SettleSpring = MotionSpring(duration = 0.38, bounce = 0.12)
 
 /**
- * iOS's throw spring, `.interpolatingSpring(stiffness: 240, damping: 26)`, in duration/bounce
- * terms: ω = √240 (duration 2π/ω), ζ = 26 / (2√240) (bounce 1 − ζ).
+ * The throw spring, `.interpolatingSpring(stiffness: 240, damping: 26)`, in duration/bounce terms:
+ * ω = √240 (duration 2π/ω), ζ = 26 / (2√240) (bounce 1 − ζ).
  */
 private val ThrowSpring = MotionSpring(duration = 2 * PI / sqrt(240.0), bounce = 1 - 26 / (2 * sqrt(240.0)))
 
@@ -154,15 +153,8 @@ private class ThrowHandler(
 )
 
 /**
- * The floating Tuning Panel (iOS `TuningOverlayView` + `TuningPanel`): a small M3 surface over
- * the app that takes touches only inside itself and floats like picture-in-picture. Drag it by
- * its header and throw it: it settles against the side the throw carries it to (into a corner
- * near the top or bottom), at [TuningPlacementLayout]'s landing, with a spring that starts at the
- * release speed. Thrown past an edge, it tucks into a tab there; tap or pull the tab to bring it
- * back. Collapse folds it into a pill naming the screen and how many values are changed. Where
- * it sits ([TuningPlacement], `tuning-placement`) and whether it's folded are kept across launches.
- * Rows: label, slider/switch/menu, and value (orange once changed; tap it to reset). Presets show
- * as numbered chips at the top of their group.
+ * The floating Tuning Panel. Drag and throw it to a side, past an edge to tuck it into a tab, or
+ * collapse it into a pill. Tap a changed (orange) value to reset it.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -176,7 +168,7 @@ fun TuningPanel(store: StoreOf<TuningFeature.State, TuningFeature.Action>, modif
     BoxWithConstraints(modifier.fillMaxSize()) {
         val density = LocalDensity.current
         val direction = LocalLayoutDirection.current
-        // The safe area as iOS has it (the keyboard apart), and the keyboard's final top.
+        // The safe area, and the keyboard's final top.
         val safe = WindowInsets.systemBars.union(WindowInsets.displayCutout)
         val imeTarget = WindowInsets.imeAnimationTarget.getBottom(density) / density.density
         val screenWidth = maxWidth.value
@@ -227,8 +219,8 @@ fun TuningPanel(store: StoreOf<TuningFeature.State, TuningFeature.Action>, modif
             if (snap) position.snapTo(target) else position.animateTo(target, spec, velocity)
         }
 
-        // iOS `throwGesture`: follows the finger, then throws to the layout's landing; a spring
-        // carries it there from the release speed along its path.
+        // Follows the finger, then throws to the layout's landing; a spring carries it there from
+        // the release speed along its path.
         fun throwHandler(size: Size, tap: (() -> Unit)?) = ThrowHandler(
             onStart = { dragging = true },
             onDrag = { drag = it },
@@ -244,7 +236,7 @@ fun TuningPanel(store: StoreOf<TuningFeature.State, TuningFeature.Action>, modif
                     val distance = path.getDistance()
                     val along = if (distance > 1f) (velocity.x * path.x + velocity.y * path.y) / distance else 0f
                     val initial = if (distance > 1f) (along / distance).coerceIn(0f, 12f) else 0f
-                    // SwiftUI's unit initial velocity is a share of each axis' distance a second.
+                    // A unit initial velocity is a share of each axis' distance a second.
                     pending.spec = if (reduceMotion) Motion.easeOut(0.2) else ThrowSpring.spec(OffsetThreshold)
                     pending.velocity = path * initial
                     dragging = false
@@ -257,8 +249,8 @@ fun TuningPanel(store: StoreOf<TuningFeature.State, TuningFeature.Action>, modif
             dragging = false
             store.send(TuningFeature.Action.PlacementChanged(placement.copy(isTucked = false)))
         }
-        // iOS `tabGesture`: the tab slides with the finger along its edge's normal; a tap, pull or
-        // flick inward brings the panel back, anything else settles it back.
+        // The tab slides with the finger along its edge's normal; a tap, pull or flick inward
+        // brings the panel back, anything else settles it back.
         val tabHandler = ThrowHandler(
             onStart = { dragging = true },
             onDrag = { translation ->
@@ -299,8 +291,8 @@ fun TuningPanel(store: StoreOf<TuningFeature.State, TuningFeature.Action>, modif
                     )
                 fun measured(update: (Size) -> Unit, current: Size): Modifier = Modifier.onSizeChanged {
                     val next = Size(it.width / density.density, it.height / density.density)
-                    // Only the panel's very first size (as it appears) lands in place; a form measured later
-                    // (the pill on Collapse) moves on the settle spring, or it would jump in one frame.
+                    // Only the panel's first size lands in place; a form measured later moves on
+                    // the settle spring, or it would jump in one frame.
                     val first = pending.measured.isEmpty()
                     pending.measured.add(shown)
                     if (next != current) {
@@ -316,7 +308,8 @@ fun TuningPanel(store: StoreOf<TuningFeature.State, TuningFeature.Action>, modif
                         TuningForm.Panel -> PanelForm(
                             store = store,
                             state = state,
-                            // iOS: `min(272, width − 2 × margin)` wide, `min(0.4 × height, 340)` tall in the safe area.
+                            // `min(272, width − 2 × margin)` wide, `min(0.4 × height, 340)` tall in
+                            // the safe area.
                             width = minOf(272f, safeArea.width - 2 * TuningPlacementLayout.MARGIN).dp,
                             maxHeight = minOf(safeArea.height * 0.4f, 340f).dp,
                             drag = Modifier.throwGesture(4.dp, panelHandler),
@@ -340,9 +333,7 @@ fun TuningPanel(store: StoreOf<TuningFeature.State, TuningFeature.Action>, modif
 }
 
 /**
- * A SwiftUI `DragGesture` in the global space: starts once the finger has moved
- * [minimumDistance] (at once for zero), reports the translation since touch-down, and the
- * release velocity from a [VelocityTracker]. Both in dp (px ÷ density).
+ * Starts after [minimumDistance], reports translation since touch-down and release velocity, in dp.
  */
 private fun Modifier.throwGesture(minimumDistance: Dp, handler: State<ThrowHandler>): Modifier =
     this.then(
@@ -468,7 +459,7 @@ private fun PanelForm(
     }
 }
 
-/** iOS `slowMotionControl`: the speed for the whole app, its caption orange while slowed. */
+/** The speed for the whole app, its caption orange while slowed. */
 @Composable
 private fun SlowMotionControl(slowMotion: SlowMotion, select: (Double) -> Unit) {
     Column(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -491,7 +482,10 @@ private fun SlowMotionControl(slowMotion: SlowMotion, select: (Double) -> Unit) 
     }
 }
 
-/** iOS `TuningPill`: the panel folded, naming what it tunes and how many values are changed. A still finger unfolds it. */
+/**
+ * The panel folded, naming what it tunes and how many values are changed. A still finger unfolds
+ * it.
+ */
 @Composable
 private fun TuningPill(state: TuningFeature.State, expand: () -> Unit, modifier: Modifier = Modifier) {
     val tuning = TuningStore.shared
@@ -504,7 +498,7 @@ private fun TuningPill(state: TuningFeature.State, expand: () -> Unit, modifier:
     )
     val changed = tuning.observedOverrides.keys.count { key -> key.substringBefore('.') in groups }
     val title = if (state.showsAll) "All" else tuning.context.displayTitle
-    // iOS: a 34 tall capsule (caption semibold, 12 padding, 6 spacing) inside a 48 dp touch target.
+    // A 34 tall capsule (caption semibold, 12 padding, 6 spacing) inside a 48 dp touch target.
     Box(
         modifier
             .heightIn(min = 48.dp)
@@ -539,9 +533,7 @@ private fun TuningPill(state: TuningFeature.State, expand: () -> Unit, modifier:
 }
 
 /**
- * iOS `TuningTab`: the panel tucked against an edge, a slim tab to pull it back out. The whole
- * 44×72 dp is on screen (Compose extends its touch area to 48 dp), with the slim
- * [TuningPlacementLayout.TAB_GLASS_WIDTH] face against the same edge and a chevron pointing inward.
+ * The panel tucked against an edge, a slim tab with a chevron pointing inward to pull it back out.
  */
 @Composable
 private fun TuningTab(side: TuningPlacement.Side, pullOut: () -> Unit, modifier: Modifier = Modifier) {
@@ -552,7 +544,7 @@ private fun TuningTab(side: TuningPlacement.Side, pullOut: () -> Unit, modifier:
             .semantics(mergeDescendants = true) {
                 contentDescription = "Tuning Panel"
                 role = Role.Button
-                // iOS `accessibilityHint`: TalkBack's click label (“Double tap to …”).
+                // TalkBack's click label (“Double tap to …”).
                 onClick(label = "Bring the panel back") { pullOut(); true }
             },
         contentAlignment = if (leading) Alignment.CenterStart else Alignment.CenterEnd,
@@ -587,7 +579,8 @@ private fun PanelHeader(
 ) {
     var menu by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth().padding(end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        // iOS: the handle is the title (slider glyph + footnote semibold); the changed count lives on groups.
+        // The handle is the title (slider glyph + footnote semibold); the changed count lives on
+        // groups.
         Row(
             drag.weight(1f).heightIn(min = 48.dp).padding(start = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -596,7 +589,7 @@ private fun PanelHeader(
             OpenCodeIcon(SFSymbol.SliderHorizontal3, null, size = OpenCodeIconSize.small, tint = OpenCodeTheme.colors.secondaryText)
             Text(title, style = OpenCodeTextStyles.footnote.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        // iOS's "All": caption semibold in a 24 tall capsule, filled while on.
+        // Caption semibold in a 24 tall capsule, filled while on.
         Box(
             Modifier
                 .clickable(role = Role.Button) { store.send(TuningFeature.Action.ShowsAllToggled) }
@@ -708,7 +701,7 @@ private fun TunableRow(descriptor: TunableDescriptor, override: TuneValue?, set:
     val current = override ?: descriptor.defaultValue
     val isChanged = override != null
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp).heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-        // iOS: caption2 on one line, 0.36 of the panel's width.
+        // Caption2 on one line, 0.36 of the panel's width.
         val labelStyle = MaterialTheme.typography.labelSmall
         val labelSize = if (labelStyle.fontSize.isSp) labelStyle.fontSize else 11.sp
         BasicText(
@@ -718,7 +711,6 @@ private fun TunableRow(descriptor: TunableDescriptor, override: TuneValue?, set:
             maxLines = 1,
             softWrap = false,
             overflow = TextOverflow.Ellipsis,
-            // iOS `.minimumScaleFactor(0.75)`.
             autoSize = TextAutoSize.StepBased(minFontSize = labelSize * 0.75f, maxFontSize = labelSize),
         )
         when (descriptor.kind) {
@@ -727,7 +719,7 @@ private fun TunableRow(descriptor: TunableDescriptor, override: TuneValue?, set:
                 val range = descriptor.effectiveRange
                 // Continuous track (no stop marks for 100+ positions), snapped to the step grid.
                 val step = descriptor.step ?: if (descriptor.valueType == "Int") 1.0 else null
-                // iOS `.controlSize(.mini)`, tinted orange once changed.
+                // Tinted orange once changed.
                 val sliderColors = if (isChanged) {
                     SliderDefaults.colors(thumbColor = ChangedColor, activeTrackColor = ChangedColor)
                 } else {
@@ -789,7 +781,7 @@ private fun ValueText(text: String, isChanged: Boolean, reset: () -> Unit) {
     }
 }
 
-/** iOS `TuningPanel.sections`: rows grouped by the key's second segment ("drawer.edge.…" is Edge). */
+/** Rows grouped by the key's second segment ("drawer.edge.…" is Edge). */
 internal fun sections(rows: List<TunableDescriptor>): List<Pair<String, List<TunableDescriptor>>> {
     val result = LinkedHashMap<String, MutableList<TunableDescriptor>>()
     for (row in rows) {

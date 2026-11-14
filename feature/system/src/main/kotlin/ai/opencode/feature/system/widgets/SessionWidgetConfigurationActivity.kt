@@ -59,9 +59,8 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 
 /**
- * Choose Session (iOS `SessionControlConfiguration`): which session a Start Call or Open
- * Session widget is for. Lists what iOS's `SessionQuery` offers: Last Viewed Session and New
- * Session, then the current server's pinned and recent sessions, searchable. Reads the
+ * Choose Session: which session a Start Call or Open Session widget is for. Last Viewed Session and
+ * New Session, then the current server's pinned and recent sessions, searchable. Reads the
  * controls' copy of the directory, never the network.
  */
 class SessionWidgetConfigurationActivity : ComponentActivity() {

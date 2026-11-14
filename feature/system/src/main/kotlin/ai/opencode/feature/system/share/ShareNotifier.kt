@@ -12,9 +12,9 @@ import androidx.core.app.NotificationManagerCompat
 import java.util.UUID
 
 /**
- * Port of iOS `ShareNotifier`: the share sheet's local notifications. Tapping "sent" opens the
- * session it went to; "continue" opens the app, which finds the share waiting. They show only
- * when the person has allowed OpenCode's notifications. Blocking; call off the main thread.
+ * The share sheet's local notifications. Tapping "sent" opens the session it went to; "continue"
+ * opens the app, which finds the share waiting. They show only when the person has allowed
+ * OpenCode's notifications. Blocking; call off the main thread.
  */
 object ShareNotifier {
     fun isAllowed(context: Context): Boolean = NotificationManagerCompat.from(context).areNotificationsEnabled()

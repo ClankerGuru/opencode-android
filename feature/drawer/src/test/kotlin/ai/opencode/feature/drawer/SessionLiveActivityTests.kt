@@ -46,12 +46,6 @@ import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of the Home half of iOS `SessionLiveActivityTests.swift` (f657969b): Home follows the run of
- * the session it sent in (`HomeFeature+SessionActivity`) and pushes its content to the
- * Session Live Activity. The mapping tests live in `:feature:system`
- * (`liveactivity/SessionLiveActivityTests.kt`); `leavingHomeEndsAFollowedRunsActivity` is `:app`'s.
- */
 class SessionLiveActivityTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -159,7 +153,7 @@ class SessionLiveActivityTests {
     fun aSendStartsTheActivityOnlyWithTheExperimentOn() = homeTest { h ->
         val pushes = LockIsolated<List<SessionActivityAttributes.ContentState?>>(emptyList())
         val store = h.sendStore(enabled = true, pushes = pushes)
-        // iOS seeds `sessionDetail.draft`; here the draft is typed in.
+        // The draft is typed in.
         store.send(detail(SessionFeature.Action.Binding(BindingAction.Draft("Fix the upload test"))))
         store.send(detail(SessionFeature.Action.SendTapped))
         eventually { pushes.value.isNotEmpty() }
@@ -376,7 +370,6 @@ class SessionLiveActivityTests {
             transcriptCache = mapOf(
                 open.id to listOf(
                     OpenCodeTranscriptItem.UserText(id = "msg_u1", text = "Go"),
-                    // iOS `OpenCodeClient.stoppedRunText` (`STOPPED_RUN_TEXT`, internal to `:server`).
                     OpenCodeTranscriptItem.Info(id = "msg_a1-error", text = "Interrupted"),
                 ),
             ),
@@ -399,8 +392,8 @@ class SessionLiveActivityTests {
     // endregion
 
     /**
-     * Port of iOS `AllExperimentsTests.allSwitchingTheLiveActivityOffEndsIt`: All Experiments
-     * switching Session Live Activity off ends the activity, as the switch itself does.
+     * All Experiments switching Session Live Activity off ends the activity, as the switch itself
+     * does.
      */
     @Test
     fun allSwitchingTheLiveActivityOffEndsIt() = homeTest { h ->

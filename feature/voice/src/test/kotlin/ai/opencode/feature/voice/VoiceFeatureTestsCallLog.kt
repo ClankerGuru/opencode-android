@@ -44,15 +44,6 @@ import java.nio.file.Files
 import java.time.Instant
 import java.util.UUID
 
-/**
- * Port of iOS `VoiceFeatureTests+CallLog.swift` (an extension of `VoiceFeatureTests`): the
- * tests whose store is `VoiceFeature`.
- *
- * Not ported here (HomeFeature, :feature:drawer):
- * `delegatorSendsToOffScreenSessionAndSSEExecutionEndedAnnouncesReplyWhileViewingAnotherSession`,
- * `reconnectSnapshotCatchesUpWatchedSessionThatFinishedWhileOffline`,
- * `switchingSessionsInHomeKeepsAnActiveCallAndRetargetsIt`, `newSessionKeepsTheCallAndMovesItToTheDraft`.
- */
 class VoiceFeatureTestsCallLog {
     private lateinit var h: Harness
 
@@ -187,7 +178,7 @@ class VoiceFeatureTestsCallLog {
         }
     }
 
-    /** iOS `@Test(arguments: OutcomeCase.all)`: one run per case. */
+    /** One run per case. */
     @Test fun everyWatchedReplyOutcomeAnnouncesAndLogsWithoutSilentDrops() = voiceTest { harness ->
         h = harness
         for (outcomeCase in OutcomeCase.all) {

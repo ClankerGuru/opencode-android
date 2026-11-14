@@ -7,7 +7,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/** The `:devtools` test in iOS `SessionHeaderStyleTests` (moved there from `GlassShapeTests` in 18771799). */
 class SessionHeaderStyleTests {
     @get:Rule val isolation = TestIsolationRule()
 

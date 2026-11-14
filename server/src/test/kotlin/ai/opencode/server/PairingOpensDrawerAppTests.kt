@@ -4,7 +4,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The `OpenCodeServer.isNewComputer` test of iOS `PairingOpensDrawerAppTests.swift` (the rest is `:app`'s). */
 class PairingOpensDrawerAppTests {
     @Test
     fun aComputerSharingAnAddressWithASavedOneIsNotNew() {

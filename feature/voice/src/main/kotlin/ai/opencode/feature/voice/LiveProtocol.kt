@@ -83,7 +83,7 @@ enum class VoiceEngine(val rawValue: String) {
         grok -> if (gptLive.hasVerifiedAPIKey(openAI = openAI, xAI = null, verifiedFingerprint = verifiedFingerprint)) gptLive else grok
     }
 
-    /** Provider and model shown on the Settings › Voice Model row (iOS `CallVoice.swift` extension). */
+    /** Provider and model shown on the Settings › Voice Model row. */
     val providerModelTitle: String get() = "${provider.displayName} · $title"
 
     companion object {
@@ -98,14 +98,13 @@ enum class VoiceProvider(val rawValue: String) {
     @SerialName("openAI") openAI("openAI"),
     @SerialName("xAI") xAI("xAI");
 
-    /** iOS `VoiceProvider.name` ("OpenAI", "xAI"); Kotlin enums reserve `name`, so it is `displayName` here. */
+    /** Kotlin enums reserve `name`, so it is `displayName` here. */
     val displayName: String
         get() = when (this) {
             openAI -> "OpenAI"
             xAI -> "xAI"
         }
 
-    // iOS `CallVoice.swift` extension.
     val id: VoiceProvider get() = this
     val keyRowTitle: String get() = localized(R.string.voice_provider_key_row_title, displayName)
     val keyPlaceholder: String get() = localized(R.string.voice_provider_key_placeholder, displayName)
@@ -117,9 +116,8 @@ enum class VoiceProvider(val rawValue: String) {
 }
 
 /**
- * The SHA-256 fingerprint of a voice key and the model its preflight accepted it for
- * (iOS `VoiceKeyFingerprint`, `Settings/SettingsView.swift`), moved down to Voice because
- * [VoiceEngine.hasVerifiedAPIKey] needs it and Settings sits above Voice.
+ * The SHA-256 fingerprint of a voice key and the model its preflight accepted it for, moved down to
+ * Voice because [VoiceEngine.hasVerifiedAPIKey] needs it and Settings sits above Voice.
  */
 object VoiceKeyFingerprint {
     fun make(key: String, model: String): String =
@@ -168,7 +166,6 @@ sealed interface LiveDelegation {
         }
 
     companion object {
-        /** iOS `.client`. */
         val client: LiveDelegation get() = Client
         fun responses(backend: LiveResponsesDelegation): LiveDelegation = Responses(backend)
     }
@@ -441,7 +438,6 @@ sealed interface LiveCloseReason {
         }
 
     companion object {
-        /** iOS `init(rawValue:)`. */
         fun of(rawValue: String?): LiveCloseReason = when (rawValue) {
             "close_requested" -> CloseRequested
             "expired" -> Expired
@@ -517,7 +513,7 @@ sealed interface LiveServerEvent {
     }
 
     companion object {
-        /** Throws when the frame isn't JSON or has no `type` (iOS `decode` throws). */
+        /** Throws when the frame isn't JSON or has no `type`. */
         fun decode(data: ByteArray): LiveServerEvent = decode(data.decodeToString())
 
         fun decode(text: String): LiveServerEvent {
@@ -591,7 +587,7 @@ sealed interface LiveResponseEvent {
     data object Ignored : LiveResponseEvent
 
     companion object {
-        /** Never throws: anything unreadable is [Ignored] (iOS `init(from:)`). */
+        /** Never throws: anything unreadable is [Ignored]. */
         fun decode(json: JsonElement): LiveResponseEvent {
             val payload = json as? JsonObject ?: return Ignored
             val type = payload.str("type") ?: return Ignored

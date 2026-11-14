@@ -5,9 +5,9 @@ import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 
 /**
- * Marks each turn of a call on the diagnostics timeline (iOS `VoiceTimeline`): timing only,
- * plus short excerpts while Include Transcripts is on. Composed ahead of [VoiceFeature]'s own
- * reducer, so it sees the state an action arrives to. It never changes state or starts effects.
+ * Marks each turn of a call on the diagnostics timeline: timing only, plus short excerpts while
+ * Include Transcripts is on. Composed ahead of [VoiceFeature]'s own reducer, so it sees the state
+ * an action arrives to. It never changes state or starts effects.
  */
 class VoiceTimeline : Reducer<VoiceFeature.State, VoiceFeature.Action> {
     override fun reduce(state: VoiceFeature.State, action: VoiceFeature.Action): Reduced<VoiceFeature.State, VoiceFeature.Action> {

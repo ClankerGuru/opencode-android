@@ -32,13 +32,12 @@ import androidx.lifecycle.compose.currentStateAsState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
-// Port of the view half of iOS `Session/AgentActivity/ShellGlyph.swift`. The meter, its client
-// and the probe type are in `ShellOutputMeter.kt`; the engine in `agentactivity/ShellPromptGlyph.kt`.
+// The meter, its client and the probe type are in `ShellOutputMeter.kt`; the engine in
+// `agentactivity/ShellPromptGlyph.kt`.
 
 /**
- * iOS `ShellOutputFeature.endOfCapture` is 2⁵³ − 1; `OpenCodeClient.shellOutput` takes an `Int`
- * cursor, so the probe reads from `Int.MAX_VALUE`, which is equally past any capture: the page
- * is empty and carries the capture's size.
+ * `OpenCodeClient.shellOutput` takes an `Int` cursor, so the probe reads from `Int.MAX_VALUE`,
+ * which is equally past any capture: the page is empty and carries the capture's size.
  */
 private const val END_OF_CAPTURE_CURSOR = Int.MAX_VALUE
 

@@ -24,17 +24,16 @@ data class RealtimeFunctionTool(
 )
 
 /**
- * Minimal JSON value for tool schemas and function arguments (iOS `RealtimeJSON`):
- * kotlinx's [JsonElement]. Build values with [RealtimeJSON.string] / [RealtimeJSON.number] /
- * [RealtimeJSON.obj] … so numbers encode as Swift's `JSONEncoder` writes them (24000, not 24000.0).
+ * Minimal JSON value for tool schemas and function arguments: kotlinx's [JsonElement]. Build values
+ * with [RealtimeJSON.string] / [RealtimeJSON.number] / [RealtimeJSON.obj] … so numbers encode.
  */
 typealias RealtimeJSON = JsonElement
 
-/** Builders mirroring the iOS `RealtimeJSON` cases. */
+/** Builders. */
 object RealtimeJSONs {
     fun string(value: String): RealtimeJSON = JsonPrimitive(value)
 
-    /** A number written as Swift writes a `Double`: integral values without a fraction. */
+    /** A number written: integral values without a fraction. */
     fun number(value: Double): RealtimeJSON =
         if (value.isFinite() && value == Math.rint(value) && kotlin.math.abs(value) < 1e15) JsonPrimitive(value.toLong()) else JsonPrimitive(value)
 
@@ -46,10 +45,10 @@ object RealtimeJSONs {
     fun obj(values: Map<String, RealtimeJSON>): RealtimeJSON = JsonObject(values)
 }
 
-/** iOS `RealtimeJSON.subscript(key:)`: the member of an object, else null. */
+/** The member of an object, else null. */
 operator fun RealtimeJSON.get(key: String): RealtimeJSON? = (this as? JsonObject)?.get(key)
 
-/** iOS `RealtimeJSON.stringValue`: the value of a string, else null. */
+/** The value of a string, else null. */
 val RealtimeJSON.stringValue: String?
     get() = (this as? JsonPrimitive)?.takeIf { it.isString }?.content
 
@@ -59,10 +58,10 @@ internal val VoiceWireJson = Json {
     explicitNulls = false
 }
 
-/** Encodes a [RealtimeJSON] as UTF-8 bytes (iOS `JSONEncoder().encode(json)`). */
+/** Encodes a [RealtimeJSON] as UTF-8 bytes. */
 internal fun RealtimeJSON.encodedBytes(): ByteArray = VoiceWireJson.encodeToString(JsonElement.serializer(), this).toByteArray()
 
-/** Decodes standard base64, or null when it isn't (iOS `Data(base64Encoded:)`). */
+/** Decodes standard base64, or null when it isn't. */
 internal fun decodeBase64OrNull(encoded: String): ByteArray? = try {
     Base64.getDecoder().decode(encoded)
 } catch (_: IllegalArgumentException) {
@@ -71,7 +70,7 @@ internal fun decodeBase64OrNull(encoded: String): ByteArray? = try {
 
 internal fun ByteArray.base64Encoded(): String = Base64.getEncoder().encodeToString(this)
 
-/** Seconds since 1970 as an [Instant] (iOS `Date(timeIntervalSince1970:)`). */
+/** Seconds since 1970 as an [Instant]. */
 internal fun instantOfEpochSeconds(seconds: Double): Instant = Instant.ofEpochMilli(Math.round(seconds * 1000))
 
 data class RealtimeSessionConfig(
@@ -313,7 +312,7 @@ sealed interface RealtimeServerEvent {
     }
 
     companion object {
-        /** Throws when the frame isn't JSON or has no `type` (iOS `decode` throws). */
+        /** Throws when the frame isn't JSON or has no `type`. */
         fun decode(data: ByteArray): RealtimeServerEvent = decode(data.decodeToString())
 
         fun decode(text: String): RealtimeServerEvent {

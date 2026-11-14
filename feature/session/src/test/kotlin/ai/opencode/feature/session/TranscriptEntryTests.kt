@@ -12,11 +12,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The `SessionFeature.State` window tests of iOS `OpenCodeTests/TranscriptEntryTests.swift`
- * (`windowStart`, `visibleItems`, `retainRenderedWindowStart`); the rest of the file is
- * `:feature:transcript`'s (`TranscriptEntryTests.kt`) and `:server`'s.
- */
 class TranscriptEntryTests {
     private fun tool(id: String): OpenCodeTranscriptItem = OpenCodeTranscriptItem.Tool(
         id,
@@ -67,8 +62,8 @@ class TranscriptEntryTests {
     }
 
     /**
-     * OC-375/386: once drawn, rows arriving at the end keep the window's first
-     * row, and that row is a whole group's first.
+     * Once drawn, rows arriving at the end keep the window's first row, and that row is a whole
+     * group's first.
      */
     @Test fun retainingTheRenderedStartKeepsTheGroupWhole() {
         val tools = (0 until 10).map { tool("t$it") }

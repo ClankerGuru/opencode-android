@@ -9,9 +9,8 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Port of iOS `PerfFreshTrackerTests`: a snapshot counts as on screen only once a transcript on
- * screen reports a configuration of that revision rendered, at the next frame, however many
- * frames that takes.
+ * A snapshot counts as on screen only once a transcript on screen reports a configuration of that
+ * revision rendered, at the next frame, however many frames that takes.
  */
 class PerfFreshTrackerTests {
     @get:Rule val isolation = TestIsolationRule()

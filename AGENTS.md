@@ -128,6 +128,7 @@ already wired by its parent; keep those names.
 - Comment only what the current code can't say itself, in one short line, such as a
   non-obvious platform constraint. Don't restate the code.
 - Don't match the surrounding comment density; existing comments aren't a template.
+- Don't add comments pointing to the iOS counterpart; `docs/parity` tracks that mapping.
 
 ## Dependencies
 

@@ -33,16 +33,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `ShareComposerTests`' `ShareComposerAppTests`: the app taking over what the share
- * sheet's composer handed it (Send Later, Continue in OpenCode), the credentials Home shares on
- * leaving, and the suggestions it donates.
- *
- * Other modules' tests of this file: `ShareCredentialsTests`, `ShareHandoffDeliveryTests`,
- * `ShareSenderTests`, `ShareSendMotionTests` and `ShareCompositionTests` are `:feature:system`'s,
- * except `ShareCompositionTests.sharesJoiningOneComposerSendOnlyWhenAllAskTo`
- * (`SharedComposerDraft.append`), which is `:feature:composer`'s.
- */
 class ShareComposerAppTests {
     @get:Rule val isolation = TestIsolationRule()
 

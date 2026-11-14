@@ -5,10 +5,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Asks for `RECORD_AUDIO` when a call starts without it (iOS
- * `AVAudioApplication.requestRecordPermission()` in `VoiceAudioEngine.start`). The visible
- * activity registers how (an `ActivityResultLauncher` it owns) while it's resumed; with nothing
- * registered the answer is no and the call fails with `microphoneDenied`, as a denial does.
+ * Asks for `RECORD_AUDIO` when a call starts without it. The visible activity registers how (an
+ * `ActivityResultLauncher` it owns) while it's resumed; with nothing registered the answer is no
+ * and the call fails with `microphoneDenied`, as a denial does.
  */
 class VoiceMicrophonePermission {
     private val lock = Any()

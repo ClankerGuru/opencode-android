@@ -12,7 +12,6 @@ import kotlin.random.Random
 // (packages/schema/src/identifier.ts), so desktop's text order puts an
 // Android message where it was sent.
 
-/** Port of iOS `OpenCodeTests/ServerIDTests.swift`. */
 class ServerIDTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -62,10 +61,6 @@ class ServerIDTests {
         assertTrue("A newer session sorts first", newer < sessions.last())
     }
 
-    /**
-     * The iOS test's last check (the time part reads back as now through
-     * `TranscriptTimeStamps.date(ofID:)`) belongs to `:feature:transcript`.
-     */
     @Test
     fun liveIDsHaveTheServersShapeAndSortAfterOlderServerIDs() {
         val client = ServerIDClient.liveValue

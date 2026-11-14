@@ -24,10 +24,9 @@ import org.junit.Test
 import java.io.File
 
 /**
- * Port of iOS `AgentFileLoadingTests` (`AgentFileTests.swift`): probing, streaming ranges,
- * errors, text documents, JSON formatting and folding, highlight budgets, cache keys and the
- * loader's credentials. Requests are answered by an OkHttp interceptor (iOS passes the transport
- * as a closure), so nothing reaches the network.
+ * Probing, streaming ranges, errors, text documents, JSON formatting and folding, highlight
+ * budgets, cache keys and the loader's credentials. Requests are answered by an OkHttp interceptor,
+ * so nothing reaches the network.
  */
 class AgentFileLoadingTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -181,9 +180,8 @@ class AgentFileLoadingTests {
     }
 
     /**
-     * The build half of iOS's test (format, fold and highlight off the main thread within
-     * budget). Its paint, wrap-toggle and memory-footprint probes drive `UIHostingController`
-     * and `drawHierarchy` (UIKit-only).
+     * Its paint, wrap-toggle and memory-footprint probes drive `UIHostingController` and
+     * `drawHierarchy`.
      */
     @Test
     fun largeFilesFormatAndHighlightOffMainActorAndRenderWithinBudget() = runTest {
@@ -300,7 +298,7 @@ class AgentFileLoadingTests {
         assertNotEquals(AgentFileLoader.cacheURL(a, absolutePath = "/var/x.mp4", name = "x.mp4", cacheDirectory = cache), first)
     }
 
-    /** iOS also asserts `NetworkRetry.policy == .once`; the loader's client sends once by construction ([AgentFileLoader.client]). */
+    /** The loader's client sends once by construction ([AgentFileLoader.client]). */
     @Test
     fun probeAndDownloadAttachCustomServerHeadersAndRecordContact() = runTest {
         val server = OpenCodeServer(
@@ -362,10 +360,7 @@ class AgentFileLoadingTests {
         }
     }
 
-    /**
-     * iOS also covers IPv6 zone-scoped origins (`http://[fe80::1%25en0]:4096`); OkHttp's `HttpUrl`
-     * rejects zone IDs, so such a request can't be built on Android.
-     */
+    /** OkHttp's `HttpUrl` rejects zone IDs, so such a request can't be built on Android. */
     @Test
     fun foreignOriginRequestsExcludeServerAuthAndCustomHeaders() = runTest {
         val server = OpenCodeServer(

@@ -23,9 +23,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * What a subagent's (or a failed run's) status glyph shows: iOS `SubagentActivity` handed to
- * `AgentActivityGlyph`. The orb lives in `Session/AgentActivity` on iOS; `:feature:session`
- * fills [TranscriptRowSlots.agentGlyph] with its port, and rows fall back to a plain glyph.
+ * What a subagent's (or a failed run's) status glyph shows. The orb lives in
+ * `Session/AgentActivity`; `:feature:session` fills [TranscriptRowSlots.agentGlyph] with its port,
+ * and rows fall back to a plain glyph.
  */
 @Immutable
 data class AgentGlyphState(
@@ -37,16 +37,12 @@ data class AgentGlyphState(
     enum class Phase { Spawning, Running, Done, Failed }
 }
 
-/**
- * Upward views the rows host (iOS rows reference `Session/` types directly; here
- * `:feature:session` sits above, so it provides them). Each slot is optional: a null slot draws
- * the row's own fallback.
- */
+/** Upward views the rows host. Each slot is optional: a null slot draws the row's own fallback. */
 @Immutable
 data class TranscriptRowSlots(
-    /** iOS `AgentActivityGlyph(source: .subagent(...))`, scoped to the transcript. */
+    /** Scoped to the transcript. */
     val agentGlyph: (@Composable (state: AgentGlyphState, modifier: Modifier) -> Unit)? = null,
-    /** iOS `ProviderIcon(providerID:)`; without one, model switches show filled sparkles. */
+    /** Without one, model switches show filled sparkles. */
     val providerMark: (@Composable (providerID: String, modifier: Modifier) -> Unit)? = null,
 )
 

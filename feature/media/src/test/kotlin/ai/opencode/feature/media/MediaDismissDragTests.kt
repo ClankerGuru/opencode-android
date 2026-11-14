@@ -10,7 +10,6 @@ import org.junit.Rule
 import org.junit.Test
 import kotlin.math.abs
 
-/** Port of iOS `MediaDismissDragTests.swift`. */
 class MediaDismissDragTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -59,10 +58,7 @@ class MediaDismissDragTests {
         assertFalse("Flicked back up, it stays", MediaDismissDrag.dismisses(distance = 200f, velocity = -600f))
     }
 
-    /**
-     * iOS also builds two `MediaViewerController`s and reads their `overrideUserInterfaceStyle`
-     * (UIKit-only); the rule they apply is [MediaPresenter.isDarkRoom].
-     */
+    /** The rule they apply is [MediaPresenter.isDarkRoom]. */
     @Test
     fun nonMediaViewerInheritsWindowAppearanceWhileMediaForcesDark() {
         assertTrue(MediaPresenter.isDarkRoom(isMedia = true))

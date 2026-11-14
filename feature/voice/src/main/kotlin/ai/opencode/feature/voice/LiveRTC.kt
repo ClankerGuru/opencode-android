@@ -77,7 +77,7 @@ object LiveRTC {
                 .post(requestBody(config, sdp).toRequestBody(voiceJsonMediaType)).build() },
             answer = { data ->
                 val root = VoiceWireJson.parseToJsonElement(data.decodeToString()).jsonObject
-                // Swift's Answer requires both session.id and transport.sdp.
+                // An answer requires both session.id and transport.sdp.
                 require(root["session"]?.jsonObject?.get("id")?.stringValue != null)
                 root["transport"]?.jsonObject?.get("sdp")?.stringValue ?: throw ServerVoiceError.InvalidResponse
             },
@@ -623,12 +623,11 @@ class VoiceRTCAudioContext {
 }
 
 /**
- * iOS replaces WebRTC's audio unit; Android's JavaAudioDeviceModule is the ONE
- * hardware owner instead. VoiceAudioEngine(externalOwner=true) still owns focus,
- * routing, mute, cues, meters and tracking. SamplesReadyCallback feeds telemetry,
- * never another AudioRecord; the remote AudioTrack sink reports decoded playout.
- * Native jitter-buffer PCM is converted to 24-kHz mono and emitted in 40-ms chunks.
- * ADM mute sends zero frames without stopping the RTP timeline, matching iOS.
+ * JavaAudioDeviceModule is the one hardware owner; VoiceAudioEngine(externalOwner=true) still owns
+ * focus, routing, mute, cues, meters and tracking. SamplesReadyCallback feeds telemetry, never
+ * another AudioRecord; the remote AudioTrack sink reports decoded playout. Native jitter-buffer PCM
+ * is converted to 24-kHz mono and emitted in 40-ms chunks. ADM mute sends zero frames without
+ * stopping the RTP timeline.
  */
 class LiveRTCAudioDevice(
     context: Context,

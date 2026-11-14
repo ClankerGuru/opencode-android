@@ -20,7 +20,7 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.random.Random
 
-/** What changed in a [TuningStore] (iOS `TuningEvent`, minus the Mac-only playground/capture events). */
+/** What changed in a [TuningStore]. */
 sealed interface TuningEvent {
     /** A key's value; null is back to its default. */
     data class Changed(val key: String, val value: TuneValue?) : TuningEvent
@@ -38,7 +38,9 @@ sealed interface TuningEvent {
     data class Presets(val presets: TuningPresets) : TuningEvent
 }
 
-/** Where overrides and hidden groups persist (iOS `UserDefaults`). Null in a [TuningStore] keeps everything in memory. */
+/**
+ * Where overrides and hidden groups persist. Null in a [TuningStore] keeps everything in memory.
+ */
 interface TuningPersistence {
     fun loadOverrides(): String?
     fun saveOverrides(json: String?)
@@ -47,14 +49,8 @@ interface TuningPersistence {
 }
 
 /**
- * Port of iOS `TuningStore`: the one place tuned values live. Tunables register themselves the
- * first time they're read while tuning is on, so the panel lists exactly what this build uses.
- * Overrides persist across launches (keys `tuning-overrides`, `tuning-hidden-groups`, as iOS).
- * Readable from any thread; a composable that reads a value recomposes when values change
- * ([revision] is Compose snapshot state, iOS's Observation registrar).
- *
- * Reducers read through the dependency: `dependency(TuningStore).value(SomeTunables.thing)`.
- * Tests get a fresh in-memory store at defaults.
+ * The one place tuned values live. Overrides persist across launches. Readable from any thread;
+ * [revision] is snapshot state, so reading composables recompose.
  */
 class TuningStore(
     private val persistence: TuningPersistence?,
@@ -185,7 +181,6 @@ class TuningStore(
     /** Overrides only: keys at their default are absent. */
     val overrides: Map<String, TuneValue> get() = synchronized(lock) { state.overrides.toMap() }
 
-    /** The overrides, observed like [value]. */
     val observedOverrides: Map<String, TuneValue>
         get() {
             revisionState.intValue
@@ -390,8 +385,8 @@ class TuningStore(
     // Copy as Kotlin / Copy Values
 
     /**
-     * The changed values as Kotlin (iOS "Copy as Swift"): each tunable's declaration with its
-     * tuned default (a spring's as one `TunableSpring`), and what it was.
+     * The changed values as Kotlin: each tunable's declaration with its tuned default (a spring's
+     * as one `TunableSpring`), and what it was.
      */
     fun kotlinSnippet(group: String? = null): String {
         val (descriptors, overrides) = synchronized(lock) { state.order.mapNotNull { state.descriptors[it] } to state.overrides.toMap() }
@@ -472,7 +467,10 @@ class TuningStore(
         return sanitized
     }
 
-    /** Registration happens during composition; tell the panel afterwards (a write mid-composition would be a backwards write). */
+    /**
+     * Registration happens during composition; tell the panel afterwards to avoid a backwards
+     * write.
+     */
     private fun notifyCatalogLocked() {
         if (state.catalogNotificationPending) return
         state.catalogNotificationPending = true
@@ -539,7 +537,7 @@ class SharedPreferencesTuningPersistence(context: Context) : TuningPersistence {
     }
 }
 
-/** Content-free timing for the opt-in preset benchmark (iOS `TuningPerf`; `-lab-tuning-perf` → [enabled]). */
+/** Content-free timing for the opt-in preset benchmark. */
 object TuningPerf {
     @Volatile var enabled: Boolean = false
 

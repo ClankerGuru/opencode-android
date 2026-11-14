@@ -12,9 +12,8 @@ import ai.opencode.server.model.nonEmpty
 import androidx.compose.runtime.Immutable
 
 /**
- * What a Used N group shows (iOS `InlineToolRow`): one row per tool in a band, with consecutive
- * reads merged into one row and notices kept where they arrived. Pure, so the merging and labels
- * stay apart from the views.
+ * What a Used N group shows: one row per tool in a band, with consecutive reads merged into one row
+ * and notices kept where they arrived. Pure, so the merging and labels stay apart from the views.
  */
 @Immutable
 data class InlineToolRow(
@@ -130,8 +129,8 @@ data class InlineToolRow(
 }
 
 /**
- * The collapsed Used N header (iOS `InlineToolGroupHeader`): “Used 12 tools”, or “Used 12 tools ·
- * 1 failed” in red when a call failed.
+ * The collapsed Used N header: “Used 12 tools”, or “Used 12 tools · 1 failed” in red when a call
+ * failed.
  */
 @Immutable
 data class InlineToolGroupHeader(
@@ -160,7 +159,6 @@ data class InlineToolGroupHeader(
     }
 }
 
-/** iOS `TranscriptEntryView.toolGroupLabel` / `toolGroupFailedNotices`. */
 object ToolGroupLabel {
     /**
      * The collapsed row's label and quiet cue. With tools, “Used 12 tools”; a lone notice says
@@ -199,10 +197,9 @@ object ToolGroupLabel {
 }
 
 /**
- * An answered question in the band (iOS `InlineQuestion`): the draft or question as a muted quote,
- * then every option in the order offered (yours primary with a ✓, the rest tertiary) and anything
- * typed. A quoted draft at the end of a question becomes the quote, and a stray “?” after its
- * closing quote is dropped.
+ * An answered question in the band: the draft or question as a muted quote, then every option in
+ * the order offered (yours primary with a ✓, the rest tertiary) and anything typed. A quoted draft
+ * at the end of a question becomes the quote, and a stray “?” after its closing quote is dropped.
  */
 object InlineQuestion {
     @Immutable
@@ -271,7 +268,7 @@ object InlineQuestion {
     }
 }
 
-/** The settled question row's words: the header, then the answer (iOS `QuestionRowSummary`). */
+/** The settled question row's words: the header, then the answer. */
 @Immutable
 data class QuestionRowSummary(
     val questions: List<OpenCodeQuestion>,

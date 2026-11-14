@@ -31,11 +31,6 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of the `SharedEventStreams`/`SharedReads` half of iOS `MultipleWindowsTests.swift`
- * (`batcherOverflowFinishesAndCancelsFurtherEmission` is `EventBatcherTests`). The window
- * roster, app-wide work and call ownership are `:app`'s `MultipleWindowsTests`.
- */
 class MultipleWindowsTests {
     @get:Rule val isolation = TestIsolationRule()
 

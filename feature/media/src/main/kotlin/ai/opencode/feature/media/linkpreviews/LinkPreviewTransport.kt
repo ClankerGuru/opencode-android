@@ -24,8 +24,8 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 /**
- * A preview request's own idle timeout (iOS `URLRequest.timeoutInterval`), attached as an
- * OkHttp request tag; without one the transport's 6 s applies.
+ * A preview request's own idle timeout, attached as an OkHttp request tag; without one the
+ * transport's 6 s applies.
  */
 data class LinkPreviewTimeout(val amount: Long, val unit: TimeUnit)
 
@@ -33,18 +33,18 @@ data class LinkPreviewTimeout(val amount: Long, val unit: TimeUnit)
 class LinkPreviewResponse(val data: ByteArray, val statusCode: Int, val mimeType: String? = null)
 
 /**
- * Data Saver restricts this app (iOS `allowsConstrainedNetworkAccess = false` refusing a request
- * on Low Data Mode). Android has no per-request flag, so the transport refuses before sending.
+ * Data Saver restricts this app. Android has no per-request flag, so the transport refuses before
+ * sending.
  */
 class ConstrainedNetworkException : IOException("constrained network")
 
-/** The answer is larger than the transport's cap (iOS `URLError.dataLengthExceedsMaximum`). */
+/** The answer is larger than the transport's cap. */
 class LinkPreviewTooLargeException : IOException("data length exceeds maximum")
 
 /**
- * Preview services cannot redirect a request to a page an agent supplied (iOS
- * `LinkPreviewTransport`). No cookie jar or app/server credentials are attached, and byte limits
- * apply while receiving (not after an unbounded download has finished).
+ * Preview services cannot redirect a request to a page an agent supplied. No cookie jar or
+ * app/server credentials are attached, and byte limits apply while receiving (not after an
+ * unbounded download has finished).
  */
 object LinkPreviewTransport {
     /** The JSON cap (1 MB); `Accept: image/…` requests get [IMAGE_LIMIT]. */
@@ -71,7 +71,6 @@ object LinkPreviewTransport {
             .build()
     }
 
-    /** iOS `allowsConstrainedNetworkAccess = false` on the session and every request. */
     private object ConstrainedRefusal : Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
             if (NetworkPathMonitor.shared?.isConstrained == true) throw ConstrainedNetworkException()

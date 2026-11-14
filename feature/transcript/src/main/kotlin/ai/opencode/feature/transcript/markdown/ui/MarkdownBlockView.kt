@@ -59,17 +59,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * One rendered Markdown block (iOS `MarkdownBlockView`), shared by assistant replies,
- * compaction summaries, and Markdown files in the viewer. Rows read the server, directory and
- * `send` from `LocalTranscriptRowContext`: links and file links send `LinkTapped` /
- * `OpenFile`, images `PreviewImage`.
+ * One rendered Markdown block, shared by assistant replies, compaction summaries, and Markdown
+ * files in the viewer. Rows read the server, directory and `send` from `LocalTranscriptRowContext`:
+ * links and file links send `LinkTapped` / `OpenFile`, images `PreviewImage`.
  *
  * @param arrivals streamed text that just arrived, which fades in (`offset == 0`: the whole
  *   block arrived and fades in whole).
  * @param isGrowingTail the reply's last block while it can still grow: a link still streaming
  *   in at its end keeps the globe.
- * @param selectionItemID the reply row this block is in (iOS `selectionItemID`): its text joins
- *   the list's one selection across the reply instead of being selectable on its own.
+ * @param selectionItemID The reply row this block is in: its text joins the list's one selection
+ *     across the reply instead of being selectable on its own.
  */
 @Composable
 fun MarkdownBlockView(
@@ -126,8 +125,8 @@ private fun BlockContent(kind: Kind, grown: List<TranscriptTextReveal.Arrival>, 
         )
         is Kind.Code -> {
             val text = remember(kind.code, colors) { PresentedText.plain(MarkdownPresentation.code(kind.code, colors)) }
-            // In a reply a hold selects the code; a hold on code already selected lifts the
-            // block to drag (iOS `.transcriptDragSource(.code(...))`; the selection owns the hold).
+            // In a reply a hold selects the code; a hold on code already selected lifts the block
+            // to drag.
             var drag: Modifier = Modifier
             if (selection != null) {
                 drag = Modifier.transcriptDragSource(
@@ -148,7 +147,7 @@ private fun BlockContent(kind: Kind, grown: List<TranscriptTextReveal.Arrival>, 
         }
         is Kind.Table -> MarkdownTable(kind.header, kind.rows, selection)
         is Kind.Math -> MathDisplayView(kind.math, selection)
-        // The diagram drags out as `diagram.png` (iOS `.transcriptDragSource(.image(...))`).
+        // The diagram drags out as `diagram.png`.
         is Kind.Mermaid -> androidx.compose.runtime.CompositionLocalProvider(
             ai.opencode.feature.media.LocalTranscriptImageDragSource provides MermaidImageDragSource,
         ) {
@@ -181,8 +180,7 @@ private fun BlockText(
     val density = LocalDensity.current
     val sessionLinks = LocalSessionLinks.current
     val linkStyle = LocalInlineLinkStyle.current
-    // iOS `linkPreviewStore` / `linkPreviewRevision` / `linkPreviewRow`: the list's store, read
-    // for Link Icons; the revision redraws the row when an icon arrives.
+    // The list's store, read for Link Icons; the revision redraws the row when an icon arrives.
     val linkStore = LocalLinkPreviewStore.current
     val linkRevision = LocalLinkPreviewRevision.current
     val linkRow = LocalLinkPreviewRow.current
@@ -264,7 +262,7 @@ private val MermaidImageDragSource = { image: android.graphics.Bitmap, name: Str
     )
 }
 
-/** iOS's pull request link card: purple branch glyph, the title, and an outward arrow. */
+/** Purple branch glyph, the title, and an outward arrow. */
 @Composable
 private fun PullRequestCard(title: String, url: String, onOpen: () -> Unit) {
     val colors = currentMarkdownStyle().colors
@@ -297,16 +295,16 @@ private fun PullRequestCard(title: String, url: String, onOpen: () -> Unit) {
 }
 
 /**
- * A `.files` block (iOS `MarkdownBlockView.fileCards`): image previews in the transcript, file
- * cards on other Markdown surfaces (and without a server to read the images from).
+ * A `.files` block: image previews in the transcript, file cards on other Markdown surfaces (and
+ * without a server to read the images from).
  */
 @Composable
 private fun FileCards(files: List<AgentFileReference>) {
     val context = LocalTranscriptRowContext.current
     val server = context.server
     val onOpenFile = { file: AgentFileReference -> context.send(TranscriptAction.OpenFile(file)) }
-    // iOS `\.transcriptDragContext`: media's gallery tiles and file cards drag their files
-    // (`.agentFile`) and read the server and folder from here.
+    // Media's gallery tiles and file cards drag their files (`.agentFile`) and read the server and
+    // folder from here.
     val directory = context.directory
     androidx.compose.runtime.CompositionLocalProvider(ai.opencode.feature.media.LocalMediaDragContext provides ai.opencode.feature.media.MediaDragContext(server, directory)) {
         FileCardsContent(files, server, context.imagePreviews, directory, onOpenFile)

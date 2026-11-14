@@ -8,12 +8,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/**
- * The `:feature:session` tests of iOS `OpenCodeTests/DictationHoldTrackerTests.swift`
- * ([DictationHoldRetention], [DictationBarPose], `DictationViews.kt`); the tracker and mic press
- * tests are `:feature:composer`'s. iOS mutates the retention in place; Android's is a value,
- * reassigned; so are [DictationHoldVisuals]' `begin()`/`end()`.
- */
+/** Android's is a value, reassigned; so are [DictationHoldVisuals]' `begin()`/`end()`. */
 class DictationHoldTrackerTests {
     /**
      * What one recording's hold showed never carries into the next: the second starts at the

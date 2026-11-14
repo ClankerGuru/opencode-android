@@ -20,10 +20,6 @@ import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
 
-/**
- * Port of iOS `VoiceSessionToolsTests.swift`'s Home test (Home's board). The delegator's tools
- * are `:feature:voice`'s (`VoiceSessionToolsTests.kt` there).
- */
 class VoiceSessionToolsTests {
     @get:Rule val isolation = TestIsolationRule()
 

@@ -42,9 +42,9 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * Port of iOS `HomeFeatureTests+MovedSessions.swift`: a session whose folder is gone moves to its
- * project's folder (Move to, or the server's `session.moved`): every screen knows the project to
- * offer, and every copy Home holds follows the move.
+ * A session whose folder is gone moves to its project's folder (Move to, or the server's
+ * `session.moved`): every screen knows the project to offer, and every copy Home holds follows the
+ * move.
  */
 class HomeFeatureTestsMovedSessions {
     @get:Rule val isolation = TestIsolationRule()

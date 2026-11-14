@@ -19,9 +19,8 @@ import ai.opencode.core.tuning.TuningStore
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * The phone's slow-motion choice (iOS `SlowMotion`): the speed now, and the slow speed the quick
- * toggle (`summonGesture`'s two-finger triple tap) returns to. Lives only in memory, so every
- * launch starts at `1×`.
+ * The slow-motion choice: the speed now, and the slow speed the quick toggle returns to. In memory
+ * only.
  */
 data class SlowMotion(val scale: Double = 1.0, val lastSlowScale: Double = DEFAULT_SLOW_SCALE) {
     val isSlowed: Boolean get() = scale != 1.0
@@ -44,11 +43,7 @@ data class SlowMotion(val scale: Double = 1.0, val lastSlowScale: Double = DEFAU
     }
 }
 
-/**
- * Android counterpart of iOS `TuningFeature` (`OpenCode/Tuning/TuningFeature.swift`): the floating
- * Tuning Panel's state and actions. The panel edits [TuningStore] live; the Mac tune page link
- * (`TuningRemote`) and the playground controls are not ported (see docs/parity/devtools.md).
- */
+/** The floating Tuning Panel's state and actions. The panel edits [TuningStore] live. */
 class TuningFeature : Reducer<TuningFeature.State, TuningFeature.Action> {
     data class State(
         /** On screen at all: the panel or its pill. */
@@ -59,7 +54,7 @@ class TuningFeature : Reducer<TuningFeature.State, TuningFeature.Action> {
         val isCollapsed: Boolean = false,
         val didCopy: Boolean = false,
         val lastCopied: String? = null,
-        /** Where the panel floats (iOS `@AppStorage("tuning-placement")`). Kept across launches. */
+        /** Where the panel floats. Kept across launches. */
         val placement: TuningPlacement = TuningPlacement(),
         /** Groups folded to their header. Kept across launches. */
         val foldedGroups: Set<String> = emptySet(),
@@ -194,7 +189,7 @@ class TuningFeature : Reducer<TuningFeature.State, TuningFeature.Action> {
         )
     }
 
-    /** Slows the app's clock (iOS `applySlowMotion`; there's no Mac page or playground to tell). */
+    /** Slows the app's clock. */
     private fun applySlowMotion(next: SlowMotion, state: State): Reduced<State, Action> {
         dependency(HapticsClient).play(Haptic.selection)
         AnimationTimeScale.shared.setScale(next.scale)
@@ -202,20 +197,20 @@ class TuningFeature : Reducer<TuningFeature.State, TuningFeature.Action> {
     }
 }
 
-/** iOS tuning panel keys (`tuning-panel-collapsed`, folded groups and `tuning-placement`). */
+/** Tuning panel keys (`tuning-panel-collapsed`, folded groups and `tuning-placement`). */
 object TuningPanelKeys {
     val collapsed: SharedKey<Boolean> = SharedKey.appStorage("tuning-panel-collapsed", false)
     val foldedGroups: SharedKey<String> = SharedKey.appStorage("tuning-folded-groups", "")
-    /** iOS `@AppStorage("tuning-placement")`: [TuningPlacement.text], JSON; anything unreadable is the default. */
+    /** [TuningPlacement.text], JSON; anything unreadable is the default. */
     val placement: SharedKey<String> = SharedKey.appStorage("tuning-placement", "")
 }
 
 /**
- * iOS `TuningPanelGroups.shown`: this screen's groups (then the global ones) that have tunables
- * and aren't settled; with All, every unsettled group, this screen's first.
+ * This screen's groups (then the global ones) that have tunables and aren't settled; with All,
+ * every unsettled group, this screen's first.
  */
 object TuningPanelGroups {
-    /** iOS `globalGroups`: [TuningContext.globalGroups]. */
+    /** [TuningContext.globalGroups]. */
     val globalGroups: List<String> get() = TuningContext.globalGroups
 
     fun shown(registered: List<String>, context: TuningContext, showsAll: Boolean, hidden: Set<String>): List<String> {

@@ -36,17 +36,14 @@ import kotlin.coroutines.resume
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-/** How much of the photo library the app may read (iOS `PhotoLibraryAccess`). */
+/** How much of the photo library the app may read. */
 enum class PhotoLibraryAccess {
     NotDetermined,
 
     /** Every photo. */
     Full,
 
-    /**
-     * Only the photos the person picked: iOS's limited library, Android 14+'s “Selected
-     * photos” (`READ_MEDIA_VISUAL_USER_SELECTED` without `READ_MEDIA_IMAGES`).
-     */
+    /** Only the photos the person picked. */
     Limited,
     Denied,
 
@@ -60,7 +57,7 @@ enum class PhotoLibraryAccess {
     val canRead: Boolean get() = this == Full || this == Limited
 }
 
-/** One photo or video in the library, by its MediaStore content URI (iOS `LibraryPhoto`). */
+/** One photo or video in the library, by its MediaStore content URI. */
 data class LibraryPhoto(
     val id: String,
     val created: Instant?,
@@ -94,9 +91,8 @@ fun interface PhotoPermissionRequester {
 }
 
 /**
- * The photo library for the New Plus Menu's grid and recent strip (OC-354): access, the
- * newest photos, thumbnails, and the full image to attach. The grid and strip read it;
- * nothing else touches MediaStore. iOS `PhotoLibraryClient`.
+ * The photo library for the New Plus Menu's grid and recent strip: access, the newest photos,
+ * thumbnails, and the full image to attach. Nothing else touches MediaStore.
  */
 class PhotoLibraryClient(
     val access: () -> PhotoLibraryAccess,
@@ -105,9 +101,8 @@ class PhotoLibraryClient(
     /** The newest photos, newest first. */
     val recent: suspend (limit: Int) -> List<LibraryPhoto>,
     /**
-     * A thumbnail at least `side` dp square at `scale` px/dp, or null. `onDegraded` receives
-     * any low-resolution preview before the full thumbnail lands (MediaStore has none, so the
-     * live client never calls it; the seam stays for parity).
+     * A thumbnail at least `side` dp square at `scale` px/dp, or null. `onDegraded` receives any
+     * low-resolution preview first (MediaStore has none).
      */
     val thumbnail: suspend (id: String, side: Float, scale: Float, onDegraded: ((ImageBitmap) -> Unit)?) -> ImageBitmap?,
     /** Stops any thumbnail preheating and drops cached assets. */
@@ -120,14 +115,14 @@ class PhotoLibraryClient(
     val manageLimitedSelection: () -> Unit,
     /** Installs (or, with null, removes) the activity seam permission requests go through. */
     val installRequester: (PhotoPermissionRequester?) -> Unit = {},
-    /** iOS `UIApplication.openSettingsURLString`: this app's system settings page. */
+    /** This app's system settings page. */
     val openSettings: () -> Unit = {},
 ) {
     companion object Key : DependencyKey<PhotoLibraryClient> {
         /**
-         * The live library: none. Google Play allows `READ_MEDIA_IMAGES`/`READ_MEDIA_VIDEO` only
-         * to apps whose core purpose is photos, so the app declares no photo permission and the
-         * + menu's Photos opens the system photo picker instead (Android-only exception to iOS).
+         * The live library: none. Google Play allows `READ_MEDIA_IMAGES`/`READ_MEDIA_VIDEO` only to
+         * apps whose core purpose is photos, so the + menu's Photos opens the system photo picker
+         * instead.
          */
         override val liveValue: PhotoLibraryClient = PhotoLibraryClient(
             access = { PhotoLibraryAccess.Unavailable },
@@ -151,7 +146,6 @@ class PhotoLibraryClient(
             manageLimitedSelection = {},
         )
 
-        /** iOS `labVideoDuration(forIndex:)`. */
         fun labVideoDuration(index: Int): Double? = when (index) {
             1 -> 14.0
             4 -> 8.0
@@ -160,8 +154,8 @@ class PhotoLibraryClient(
         }
 
         /**
-         * iOS `-lab-photo-fixture`: a library of drawn swatches, so previews and lab runs never
-         * wait on the device's photos or its access dialog. [limited] makes it a limited library.
+         * A library of drawn swatches, so previews and lab runs never wait on the device's photos
+         * or its access dialog. [limited] makes it a limited library.
          */
         fun labFixture(limited: Boolean): PhotoLibraryClient {
             val count = if (limited) 7 else 48
@@ -214,7 +208,7 @@ class PhotoLibraryClient(
 
 /**
  * Serializes the asset cache, preheat start/stop, and lifecycle generation under one lock so
- * [stopCaching] can't race a fetch. iOS `PhotoCacheGate`.
+ * [stopCaching] can't race a fetch.
  */
 class PhotoCacheGate<Asset>(
     private val stopAll: () -> Unit,
@@ -257,11 +251,9 @@ internal fun Context.findActivity(): Activity? {
 }
 
 /**
- * Requests [permissions] from [activity] and returns once the system answered: the
- * permission screen pauses the activity and resumes it when it closes; an answer the system
- * gives without a screen (asked too often) resumes after [IMMEDIATE_ANSWER_MS].
- * `androidx.activity`'s result registry isn't on this module's classpath, so this uses the
- * framework call and the activity's lifecycle.
+ * Requests [permissions] from [activity] and returns once the system answered (on resume, or after
+ * [IMMEDIATE_ANSWER_MS] when it answers without a screen). Uses the framework call because
+ * `androidx.activity`'s result registry isn't on this module's classpath.
  */
 internal suspend fun requestPermissionsAndAwait(activity: Activity, lifecycle: Lifecycle, permissions: Array<String>) {
     withContext(Dispatchers.Main) {

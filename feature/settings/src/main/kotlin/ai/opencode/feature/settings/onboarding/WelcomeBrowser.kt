@@ -47,9 +47,9 @@ private fun mono(size: Float, weight: FontWeight = FontWeight.Normal) =
 
 /**
  * The OpenCode website (`opencode.ai`) in dark mode, as the laptop's browser shows it on
- * `localhost:3000` (iOS `WelcomeSitePage`): warm dark canvas, architectural grid rails, the pixel
- * wordmark, monospace hero, install command, and the platform CTA that [grow] expands from a
- * modest desktop chip (0) into a full-width “Download for Android” button (1).
+ * `localhost:3000`: warm dark canvas, architectural grid rails, the pixel wordmark, monospace hero,
+ * install command, and the platform CTA that [grow] expands from a modest desktop chip (0) into a
+ * full-width “Download for Android” button (1).
  */
 @Composable
 internal fun WelcomeSitePage(modifier: Modifier = Modifier, grow: Double = 1.0, sheen: Double = 0.0) {
@@ -205,7 +205,7 @@ internal object WelcomeSitePage {
 
 /**
  * The `opencode` ornate pixel wordmark (`39 × 7` unit grid from `logo-ornate-dark.svg`): `open` in
- * warm silver, `code` in ivory, with dark inner blocks (iOS `WelcomeWordmark`).
+ * warm silver, `code` in ivory, with dark inner blocks.
  */
 @Composable
 internal fun WelcomeWordmark(modifier: Modifier = Modifier) {
@@ -239,7 +239,7 @@ private val WORDMARK_CODE = cells(
 
 /**
  * The browser OpenCode drives on the laptop: a dark window over the app with the `opencode.ai` dev
- * page, the edit's reload bar, and the capture flash (iOS `WelcomeBrowserWindow`).
+ * page, the edit's reload bar, and the capture flash.
  */
 @Composable
 internal fun WelcomeBrowserWindow(frame: WelcomeFrame, targets: WelcomeTargets?, modifier: Modifier = Modifier) {
@@ -307,10 +307,9 @@ internal object WelcomeBrowserWindow {
 }
 
 /**
- * The browser's screenshot as the agent's tool sends it back: the edited dark-mode OpenCode page
- * (iOS `WelcomeScreenshot`). iOS renders [WelcomeSitePage] once into a 3× PNG; Compose draws the
- * page itself wherever the screenshot shows (the carrier, the phone's tile), so nothing is
- * rasterised, and this keeps the attachment's name and pixel size.
+ * The browser's screenshot as the agent's tool sends it back: the edited dark-mode OpenCode page.
+ * Compose draws the page itself wherever the screenshot shows (the carrier, the phone's tile), so
+ * nothing is rasterised, and this keeps the attachment's name and pixel size.
  */
 internal object WelcomeScreenshot {
     const val NAME = "opencode.png"

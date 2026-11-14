@@ -84,7 +84,7 @@ class VoiceSessionLifecycle<E, C, A> {
 abstract class VoiceSessionCoordinator<E, C, A>(
     val timing: VoiceCallTiming = VoiceCallTiming.live,
     val diagnostics: VoiceCallDiagnostics = dependency(VoiceCallDiagnostics),
-    /** The actor's single lane. Tests pass their virtual-time dispatcher (iOS runs the actor on real time). */
+    /** The actor's single lane. Tests pass their virtual-time dispatcher. */
     internal val dispatcher: CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1),
 ) : VoiceCallTestingCoordinator {
     private val rtcAudio = VoiceRTCAudioContext()
@@ -110,7 +110,7 @@ abstract class VoiceSessionCoordinator<E, C, A>(
     private var audioUsesRTC = false
     private var captureTask: Job? = null
     private var audioEventTask: Job? = null
-    /** The audio session last told the call connected: each hears it once (iOS notes it on connect only). */
+    /** The audio session last told the call connected: each hears it once. */
     private var connectedAudio: VoiceAudioSession? = null
     abstract val defaultSessionLimit: Double
     abstract val defaultDiagnosticDomain: String
@@ -169,7 +169,7 @@ abstract class VoiceSessionCoordinator<E, C, A>(
             val socket = requireNotNull(active)
             activateAudio(socket)
             if (!running()) throw CancellationException()
-            // Only an ear change made while the audio started (iOS `if atEar != initialAtEar`).
+            // Only an ear change made while the audio started.
             if (lifecycle.atEar != atEar) audio?.setAtEar?.invoke(lifecycle.atEar)
             startSocketEvents(socket)
             return makeEventStream(requireNotNull(audio))

@@ -130,9 +130,9 @@ private data class NotificationPreviewPairReply(val output: Output) {
 }
 
 /**
- * iOS `OpenCodeClient.pairNotificationPreview` (1ddd36b2): exchanges public keys on the saved
- * server, never on the push relay. A plain LAN connection can't authenticate this exchange, so
- * only a paired HTTPS address is used; without one it fails before sending anything.
+ * Exchanges public keys on the saved server, never on the push relay. A plain LAN connection can't
+ * authenticate this exchange, so only a paired HTTPS address is used; without one it fails before
+ * sending anything.
  */
 internal suspend fun requestPairNotificationPreview(
     server: OpenCodeServer,

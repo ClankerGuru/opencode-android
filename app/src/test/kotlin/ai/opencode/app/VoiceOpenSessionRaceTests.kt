@@ -41,11 +41,7 @@ import java.time.Instant
 import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `VoiceOpenSessionRaceTests.swift`. These app-level races assert navigation and
- * transport outcomes, not the unrelated Home/voice bookkeeping (non-exhaustive, as iOS); the
- * coordinator has exhaustive tests in `:feature:voice`.
- */
+/** Non-exhaustive: these assert navigation and transport outcomes only. */
 class VoiceOpenSessionRaceTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -134,7 +130,6 @@ class VoiceOpenSessionRaceTests {
         throw AssertionError("Timed out waiting for an effect")
     }
 
-    /** iOS `VoiceOpenSessionAcknowledgementTests.navigationToolNeedsNoExperimentAndPinsBothReplySockets` (app-level, so here). */
     @Test fun navigationToolNeedsNoExperimentAndPinsBothReplySockets() {
         val current = session("ses_current", directory = "/current")
         var app = shared.run {

@@ -15,8 +15,7 @@ import ai.opencode.server.model.OpenCodeNotifyPluginStatus
 import kotlinx.coroutines.CancellationException
 
 /**
- * Port of iOS `HomeNotificationsFeature` (`OpenCode/Drawer/HomeNotificationsFeature.swift`): this
- * phone's notification permission and the server's notify plugin, as Settings › Notifications
+ * This phone's notification permission and the server's notify plugin, as Settings › Notifications
  * reads them. Home supplies the current server and keeps [Status] as `notificationState`.
  */
 class HomeNotificationsFeature : Reducer<HomeNotificationsFeature.State, HomeNotificationsFeature.Action> {

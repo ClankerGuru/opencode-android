@@ -19,13 +19,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 
 /**
- * iOS `HomeView`'s stored properties (`@State`) and the helpers `HomeView+Drawer.swift` shares
- * with it, as one plain holder: the drawer panel (`HomeDrawer`) and the session container read
- * and drive the same values iOS's `extension HomeView` does. View-local only: durable state stays
- * in [HomeFeature.State].
- *
- * Create it with [rememberHomeViewState]; [HomeView] fills in [keyboardHold] and [shortcutMotion]
- * (they need a composition) before anything reads them.
+ * Home's view-local state, as one plain holder that the drawer panel (`HomeDrawer`) and the session
+ * container read and drive. Durable state stays in [HomeFeature.State]. Create it with
+ * [rememberHomeViewState]; [HomeView] fills in [keyboardHold] and [shortcutMotion] (they need a
+ * composition) before anything reads them.
  */
 @Stable
 class HomeViewState internal constructor(
@@ -33,68 +30,67 @@ class HomeViewState internal constructor(
     initiallyOpenDrawer: Boolean,
 ) {
     /**
-     * The phone's drawer is open, or opening (iOS `isSessionDrawerPresented`). Setting it is iOS
-     * `setSessionDrawerPresented(_:)`: the container animates the change (Reduce Motion lands at once).
+     * The phone's drawer is open, or opening. The container animates the change (Reduce Motion
+     * lands at once).
      */
     var isSessionDrawerPresented: Boolean by mutableStateOf(initiallyOpenDrawer)
 
-    /** The session last chosen in the drawer, until it's the one shown (iOS `chosenSessionID`). */
+    /** The session last chosen in the drawer, until it's the one shown. */
     var chosenSessionID: String? by mutableStateOf(null)
 
     /** The window is wide enough for the sidebar (`SidebarMetrics.minimumWindowWidth`). */
     var usesSidebar: Boolean by mutableStateOf(false)
         internal set
 
-    /** The app is in the foreground (iOS `scenePhase == .active`). */
+    /** The app is in the foreground. */
     var isSceneActive: Boolean by mutableStateOf(true)
         internal set
 
-    /** The header shows the search field in place of the title (iOS `search`). */
+    /** The header shows the search field in place of the title. */
     val search = DrawerSearchState()
 
-    /** The rows chosen by holding one (Android selection mode; iOS holds a row for its menu). */
+    /** The rows chosen by holding one. */
     val selection = DrawerSelection()
 
-    /** The drawer shows its Archived page over the list (Android; iOS has no Archived page). */
+    /** The drawer shows its Archived page over the list. */
     var showsArchived: Boolean by mutableStateOf(false)
 
-    /** How far the drawer's list has scrolled beneath its title (iOS `headerScroll`). */
+    /** How far the drawer's list has scrolled beneath its title. */
     val headerScroll = DrawerHeaderScrollState()
 
-    /** The rows' slide uncovering their times (iOS `timeReveal`). */
+    /** The rows' slide uncovering their times. */
     val timeReveal = DrawerTimeReveal()
 
-    /** Whether a keyboard is on screen or held (iOS `DrawerKeyboardMonitor.shared`). */
+    /** Whether a keyboard is on screen or held. */
     val keyboardMonitor = DrawerKeyboardMonitor()
 
     /** The touch regions the drawer's pan tests (the list registers itself with `drawerPanList`). */
     val panRegions = DrawerPanRegions()
 
-    /** Counts the times leaving Catch Up hands TalkBack back to its row (iOS `catchUpFocusRequests`). */
+    /** Counts the times leaving Catch Up hands TalkBack back to its row. */
     var catchUpFocusRequests: Int by mutableIntStateOf(0)
 
-    /** The drawer's keyboard hold (iOS `DrawerKeyboardHold`'s statics live on this instance). */
+    /** The drawer's keyboard hold. */
     var keyboardHold: DrawerKeyboardHold? = null
         internal set
 
-    /** Catch Up's and What’s New's shortcut rows (iOS `shortcutMotion`). */
+    /** Catch Up's and What’s New's shortcut rows. */
     var shortcutMotion: DrawerShortcutMotion? = null
         internal set
 
     /**
-     * Cancels a drawer row's pin drag (iOS `pinDrag.cancelDrag()`); the drawer panel sets it while
-     * it owns a `DrawerPinDrag`.
+     * Cancels a drawer row's pin drag; the drawer panel sets it while it owns a `DrawerPinDrag`.
      */
     var cancelPinDrag: () -> Unit = {}
 
     private val state: HomeFeature.State get() = store.state
 
-    /** The session on screen (iOS `selectedSessionID`). */
+    /** The session on screen. */
     val selectedSessionID: String? get() = state.sessionDetail?.session?.id
 
     /**
      * The drawer can be seen: in the foreground, not catching up, and open (or, beside a sidebar,
-     * the sidebar showing). iOS `isDrawerVisible`.
+     * the sidebar showing).
      */
     fun isDrawerVisible(state: HomeFeature.State = this.state): Boolean =
         isSceneActive &&
@@ -103,18 +99,17 @@ class HomeViewState internal constructor(
 
     /**
      * The row the drawer highlights. Catch Up shows its cards in the session's place, but the
-     * drawer behind it still belongs to the session it was opened from (iOS `drawerSelectedSessionID`).
+     * drawer behind it still belongs to the session it was opened from.
      */
     fun drawerSelectedSessionID(state: HomeFeature.State = this.state): String? =
         state.catchUp?.returnSessionID ?: state.sessionDetail?.session?.id
 
-    /** iOS `closeSessionDrawer()`. */
     fun closeSessionDrawer() {
         cancelPinDrag()
         isSessionDrawerPresented = false
     }
 
-    /** Settings pushes over the open drawer, which waits beneath it (iOS `openSettings()`). */
+    /** Settings pushes over the open drawer, which waits beneath it. */
     fun openSettings() {
         store.send(HomeFeature.Action.SettingsTapped)
     }
@@ -126,7 +121,7 @@ class HomeViewState internal constructor(
 
     /**
      * The drawer animates search itself (`DrawerSearchPill`). Cancel and Escape clear the search
-     * and bring the title back (iOS `endSearch()`).
+     * and bring the title back.
      */
     fun endSearch() {
         keyboardHold?.setDrawerSearching(false)
@@ -135,7 +130,7 @@ class HomeViewState internal constructor(
         if (search.isSearching) search.isSearching = false
     }
 
-    /** A drawer row was tapped (iOS `selectSession(_:)`). */
+    /** A drawer row was tapped. */
     fun selectSession(sessionID: String) {
         // Another session opens with the keyboard down from its first frame.
         if (sessionID != selectedSessionID) keyboardHold?.cardWillChange()
@@ -147,29 +142,27 @@ class HomeViewState internal constructor(
         closeSessionDrawer()
     }
 
-    /** New Session in the drawer (iOS `startNewSessionFromDrawer()`). */
+    /** New Session in the drawer. */
     fun startNewSessionFromDrawer() {
         keyboardHold?.cardWillChange()
         closeSessionDrawer()
         store.send(HomeFeature.Action.NewSessionTapped)
     }
 
-    /** The drawer's Catch Up row (iOS `DrawerListActions.openCatchUp`). */
+    /** The drawer's Catch Up row. */
     fun openCatchUp() {
         keyboardHold?.cardWillChange()
         closeSessionDrawer()
         store.send(HomeFeature.Action.catchUpTapped)
     }
 
-    /** The drawer's What’s New row (iOS `DrawerListActions.openWhatsNew`). */
+    /** The drawer's What’s New row. */
     fun openWhatsNew() {
         keyboardHold?.cardWillChange()
         store.send(HomeFeature.Action.WhatsNew(WhatsNewFeature.Action.ButtonTapped))
     }
 
-    /**
-     * The screen a screen recording names while nothing covers Home (iOS `scrawlScreenName`).
-     */
+    /** The screen a screen recording names while nothing covers Home. */
     fun screenName(state: HomeFeature.State = this.state): String {
         if (state.catchUp != null) return "Catch Up"
         if (isSessionDrawerPresented || state.isDrawerOpen) return "Sessions"
@@ -181,7 +174,7 @@ class HomeViewState internal constructor(
 }
 
 /**
- * A [HomeViewState] for [store], kept across recompositions (iOS `HomeView`'s `@State`).
+ * A [HomeViewState] for [store], kept across recompositions.
  *
  * A configuration change (light/dark, rotation) recreates the activity and this view with it,
  * while Home's state lives on in the retained store: a drawer that last arrived open

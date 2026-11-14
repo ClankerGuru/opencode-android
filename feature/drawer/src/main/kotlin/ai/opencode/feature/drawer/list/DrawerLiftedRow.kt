@@ -10,16 +10,15 @@ import androidx.compose.ui.graphics.toArgb
 import kotlin.math.max
 
 /**
- * Port of iOS `DrawerLiftedRowView` (`DrawerLiftedRow.swift`): the lifted row's grow and shadow.
- * iOS draws the lifted row as a window-level bitmap over the drawer; here the row itself rides the
- * finger in the list ([DrawerPinDrag]), and its raised surface casts this shadow
- * ([drawLiftedRowSurface]) instead of a Material elevation, so the drag reads as on iOS.
+ * The lifted row's grow and shadow. The row itself rides the finger in the list ([DrawerPinDrag]),
+ * and its raised surface casts this shadow ([drawLiftedRowSurface]) instead of a Material
+ * elevation.
  */
 object DrawerLiftedRowView {
     /** How a row lifted [lift] (0 at rest in the list, 1 fully lifted) looks; dp for lengths. */
     data class Look(val scale: Float, val shadowOpacity: Float, val shadowOffsetY: Float, val shadowRadius: Float)
 
-    /** iOS `apply(lift:)`: grows by `pinLiftScale`, the shadow's opacity follows the lift. */
+    /** Grows by `pinLiftScale`, the shadow's opacity follows the lift. */
     fun apply(lift: Float): Look = Look(
         scale = 1f + (DrawerTunables.pinLiftScale - 1f) * lift,
         shadowOpacity = (max(lift, 0f) * DrawerTunables.pinLiftShadow.value).toFloat(),
@@ -30,7 +29,7 @@ object DrawerLiftedRowView {
 
 /**
  * The lifted row's raised surface in [surface], rounded by [cornerRadius] px, casting [look]'s
- * black shadow (iOS `layer.shadow*` over a rounded `shadowPath`).
+ * black shadow.
  */
 internal fun DrawScope.drawLiftedRowSurface(surface: Color, cornerRadius: Float, look: DrawerLiftedRowView.Look) {
     if (look.shadowOpacity <= 0f || look.shadowRadius <= 0f && look.shadowOffsetY == 0f) {

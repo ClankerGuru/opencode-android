@@ -3,9 +3,8 @@ package ai.opencode.feature.composer
 import kotlin.math.hypot
 
 /**
- * Tells a tap on an autocomplete row from a drag that scrolls the list (OC-474), iOS
- * `AutocompleteTouchTracker`. A touch is a tap until it moves past [TAP_SLOP]; from then on
- * it only scrolls, and lifting it picks nothing. Points are list-local dp.
+ * Tells a tap on an autocomplete row from a drag that scrolls the list. A touch is a tap until it
+ * moves past [TAP_SLOP]. Points are list-local dp.
  */
 class AutocompleteTouchTracker {
     var start: AutocompletePoint? = null
@@ -46,7 +45,7 @@ class AutocompleteTouchTracker {
     }
 
     companion object {
-        /** UIKit's tap allowance (`UITapGestureRecognizer`'s allowable movement), in dp. */
+        /** The tap allowance: how far a finger can move and still tap, in dp. */
         const val TAP_SLOP: Double = 10.0
 
         /** The selectable, settled row under [point] (list-local coordinates). */

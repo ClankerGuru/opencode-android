@@ -72,31 +72,29 @@ fun rememberCatchUpStackController(): CatchUpStackController {
 }
 
 /**
- * The Catch Up card stack (iOS `CatchUpStackController` hosted in `SessionDrawerContainer`): the
- * live session card inset between the chrome's header and footer, the next session's preview
- * beneath it, and the snapshots that fly away. Drag the card right to Mark as Read, left to Keep
- * Unread; the chrome's buttons play the same flight through [proxy].
+ * The Catch Up card stack: the live session card inset between the chrome's header and footer, the
+ * next session's preview beneath it, and the snapshots that fly away. Drag the card right to Mark
+ * as Read, left to Keep Unread; the chrome's buttons play the same flight through [proxy].
  *
  * Draw it edge to edge over [CatchUpChrome]; it insets the card itself (system bars + header,
  * system bars + footer, `sideInset` at the sides). The live card and the preview consume those
  * insets and provide them as [LocalContainerInsets], so the hosted session lays out against the
- * card's edges as in iOS's locked safe area (`CatchUpCardSurfaceView`), and the keyboard reaches
- * into the card only as far as it overlaps it (iOS `safeAreaRegions = .keyboard`).
+ * card's edges, and the keyboard reaches into the card only as far as it overlaps it.
  *
  * Swiping never recomposes [card] or [preview]: motion is snapshot state read in `graphicsLayer`.
  *
  * @param stage the queue and its actions. Changes are diffed: a new queue animates (rise, crossfade,
  *   fade) unless a flight or drag is running, which settles against the latest stage when it lands.
- * @param revealsPreviewOnBegin reveal the card behind as soon as the stack begins. A host that
- *   morphs into Catch Up (the session container) passes `false` and calls
- *   [CatchUpStackController.revealPreview] when its morph lands, as iOS does.
+ * @param revealsPreviewOnBegin Reveal the card behind as soon as the stack begins. A host that
+ *     morphs into Catch Up (the session container) passes `false` and calls
+ *     [CatchUpStackController.revealPreview] when its morph lands.
  * @param handlesPan the stack runs its own two-axis pan. Pass `false` when the drawer container's
  *   pan routes Catch Up swipes to [CatchUpStackController.handlePan].
- * @param panRegions the drawer's pan regions: a horizontal scroller in the card that can still move
- *   the way the finger goes keeps the drag (iOS `cardSwipeDecision`).
+ * @param panRegions The drawer's pan regions: a horizontal scroller in the card that can still move
+ *     the way the finger goes keeps the drag.
  * @param card the live card's body for the open session (`null` once the stack is empty).
- * @param preview an inert preview of the next session, with the host's preview revision so it can
- *   skip re-rendering for unrelated changes (iOS `CatchUpPreviewCard`'s equality).
+ * @param preview An inert preview of the next session, with the host's preview revision so it can
+ *     skip re-rendering for unrelated changes.
  */
 @Composable
 fun CatchUpStack(
@@ -109,7 +107,7 @@ fun CatchUpStack(
     handlesPan: Boolean = true,
     isExiting: Boolean = false,
     panRegions: DrawerPanRegions? = null,
-    /** What [proxy]'s buttons do (the drawer container lands its morph first, iOS `dismissCard`/`undoCard`). */
+    /** What [proxy]'s buttons do. */
     dismissCard: (CatchUpDisposition) -> Unit = controller::fling,
     undoCard: () -> Unit = controller::undo,
     leavingCard: (@Composable () -> Unit)? = null,
@@ -126,8 +124,8 @@ fun CatchUpStack(
     val insets = WindowInsets.systemBars.union(WindowInsets.displayCutout)
     val insetPadding = insets.asPaddingValues()
     // The window's edges outside the card: the system bars plus the header, footer and sides. The
-    // hosted session lays out against the card's edges, as in iOS's locked safe area, and the
-    // keyboard reaches into the card only as far as it overlaps it (UIKit's keyboard safe area).
+    // hosted session lays out against the card's edges, and the keyboard reaches into the card only
+    // as far as it overlaps it.
     val cardInsets = remember(insets) {
         insets.add(
             WindowInsets(
@@ -278,7 +276,7 @@ fun CatchUpStack(
                         },
                 )
                 if (!controller.isContentEnabled) {
-                    // iOS `content.isUserInteractionEnabled = false`: touches stop here; the stack's pan still sees them.
+                    // Touches stop here; the stack's pan still sees them.
                     Box(Modifier.matchParentSize().pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } })
                 }
             }
@@ -290,7 +288,7 @@ fun CatchUpStack(
     }
 }
 
-/** A snapshot in flight: inert, hidden from TalkBack, with a shadow like iOS's (0.16, 24 pt, y 10). */
+/** A snapshot in flight: inert, hidden from TalkBack, with a shadow. */
 @Composable
 private fun CatchUpFlyingCardView(
     flying: CatchUpFlyingCard,
@@ -328,10 +326,10 @@ private fun CatchUpFlyingCardView(
 }
 
 /**
- * The stack's pan (iOS `DirectionalPanGestureRecognizer` with `isCardSwipe`): waits 8 dp before
- * choosing an axis, yields at once to a vertical move (the transcript scrolls), and once horizontal
- * wins it consumes the touch so a pending button in the card never fires. While the card is inert
- * (a flight or settle running) it reads touches before the card's content does.
+ * The stack's pan: waits 8 dp before choosing an axis, yields at once to a vertical move (the
+ * transcript scrolls), and once horizontal wins it consumes the touch so a pending button in the
+ * card never fires. While the card is inert (a flight or settle running) it reads touches before
+ * the card's content does.
  */
 private fun Modifier.catchUpPan(controller: CatchUpStackController, regions: DrawerPanRegions?): Modifier = composed {
     val coordinates = remember { arrayOfNulls<LayoutCoordinates>(1) }
@@ -410,12 +408,9 @@ private suspend fun PointerInputScope.catchUpPanGestures(
 private val FlyingShadowColor = Color.Black.copy(alpha = 0.16f)
 
 /**
- * Draws a Catch Up card surface through a [GraphicsContext] [GraphicsLayer] in the draw phase
- * rather than `Modifier.graphicsLayer`. `BlockGraphicsLayerModifier` implements
- * `SemanticsModifierNode` and dispatches `Owner.onLayoutChange` plus descendant
- * `onGloballyPositioned` callbacks on every positional frame (`translationX/Y`, `scaleX/Y`,
- * `rotationZ`), which re-laid out off-screen retained sheets inside hosted `SessionView`s and
- * flooded TalkBack with subtree change events on every card swipe or reveal.
+ * Draws a Catch Up card surface through a [GraphicsLayer] in the draw phase:
+ * `Modifier.graphicsLayer` dispatches layout-change and `onGloballyPositioned` callbacks on every
+ * positional frame, which re-lays out hosted `SessionView`s and floods TalkBack with change events.
  */
 private fun Modifier.catchUpCardSurface(
     layerState: CatchUpCardLayer,

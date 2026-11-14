@@ -10,12 +10,8 @@ import kotlin.math.abs
 import kotlin.math.max
 
 /**
- * iOS `TuningPlacement` (`OpenCode/Tuning/TuningPlacement.swift`): where the tuning panel floats,
- * picture-in-picture style: against one side, at a height, or tucked into a tab at that side.
- * Kept across launches. The height is a share of the free band (the safe area above the
- * keyboard), so it survives rotation and the keyboard coming up.
- *
- * Sides are physical, as iOS resolves them in screen coordinates: leading is the left edge.
+ * Where the tuning panel floats. The height is a share of the free band above the keyboard, so it
+ * survives rotation; sides are physical.
  */
 data class TuningPlacement(
     val side: Side = Side.Trailing,
@@ -25,14 +21,14 @@ data class TuningPlacement(
 ) {
     enum class Side { Leading, Trailing }
 
-    /** Stored as JSON in app storage (iOS `@AppStorage("tuning-placement")`). */
+    /** Stored as JSON in app storage. */
     val text: String
         get() = runCatching {
             json.encodeToString(Stored.serializer(), Stored(if (side == Side.Leading) Stored.Side.Leading else Stored.Side.Trailing, y, isTucked))
         }.getOrDefault("")
 
     companion object {
-        /** iOS `init(text:)`: anything unreadable (including a missing field) is the default. */
+        /** Anything unreadable (including a missing field) is the default. */
         fun fromText(text: String): TuningPlacement = runCatching {
             val stored = json.decodeFromString(Stored.serializer(), text)
             TuningPlacement(if (stored.side == Stored.Side.Leading) Side.Leading else Side.Trailing, stored.y, stored.isTucked)
@@ -41,7 +37,7 @@ data class TuningPlacement(
         private val json = Json { ignoreUnknownKeys = true }
     }
 
-    /** The wire form, field for field as Swift's synthesized `Codable` (every field required). */
+    /** The wire form, field for field. */
     @Serializable
     private class Stored(val side: Side, val y: Double, val isTucked: Boolean) {
         @Serializable
@@ -52,10 +48,7 @@ data class TuningPlacement(
     }
 }
 
-/**
- * iOS `TuningPlacementLayout`: the geometry a placement resolves in. All values are dp (points
- * on iOS); velocities are dp a second.
- */
+/** The geometry a placement resolves in. All values are dp; velocities are dp a second. */
 data class TuningPlacementLayout(
     /** Where the panel may sit: the safe area above the keyboard, inset. */
     val bounds: Rect,
@@ -75,9 +68,8 @@ data class TuningPlacementLayout(
     }
 
     /**
-     * Where something [size] lands when let go at [center] moving at [velocity] (dp a second):
-     * the side its throw carries it toward, at the height it carries it to (into a corner near
-     * the top or bottom), tucked if the throw carries a good share of it past the edge.
+     * Where something [size] lands when let go at [releasedAt] moving at [velocity] (dp/s): the
+     * side and height its throw carries it to, tucked if it carries far past the edge.
      */
     fun placement(releasedAt: Offset, velocity: Offset, size: Size): TuningPlacement {
         val projected = Offset(releasedAt.x + velocity.x * PROJECTION, releasedAt.y + velocity.y * PROJECTION)
@@ -114,7 +106,7 @@ data class TuningPlacementLayout(
         /** How much of the panel past the edge tucks it. */
         const val TUCK_SHARE = 0.35f
 
-        /** iOS `init(safeArea:screen:keyboardTop:)`: the safe area inset by [MARGIN], cut above the keyboard. */
+        /** The safe area inset by [MARGIN], cut above the keyboard. */
         fun of(safeArea: Rect, screen: Rect, keyboardTop: Float? = null): TuningPlacementLayout {
             var bounds = safeArea.deflate(MARGIN)
             if (keyboardTop != null && keyboardTop - MARGIN < bounds.bottom) {

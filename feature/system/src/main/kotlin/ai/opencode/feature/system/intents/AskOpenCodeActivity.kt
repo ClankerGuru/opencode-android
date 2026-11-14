@@ -76,17 +76,16 @@ import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Ask OpenCode's door (iOS `AskOpenCodeIntent`, run by Siri or Shortcuts): a small dialog over
- * whatever is on screen that sends without opening the app. When a verified assistant
- * ([AppActionActivity.isVerifiedAssistant]) hands the message in `EXTRA_TEXT` it sends at
- * once, as Siri does; any other app's text only fills the field, and Send needs a tap;
- * without text it asks “What should OpenCode do?”. Activities never show over the lock
- * screen, so it needs an unlocked phone, as iOS's `.requiresAuthentication`.
+ * Ask OpenCode's door: a small dialog over whatever is on screen that sends without opening the
+ * app. When a verified assistant ([AppActionActivity.isVerifiedAssistant]) hands the message in
+ * `EXTRA_TEXT` it sends at once; any other app's text only fills the field, and Send needs a tap;
+ * without text it asks “What should OpenCode do?”. Activities never show over the lock screen, so
+ * it needs an unlocked phone.
  *
- * iOS's intents can't be started by other apps; this activity can, so its Send can't be
- * covered: other apps' overlays are hidden and obscured touches dropped while it shows, and it
- * closes when anything else comes on top before the message is sent, so a caller can't put
- * its own screen over the dialog and lift it as the user taps.
+ * Other apps can start this activity, so its Send can't be covered: other apps' overlays are
+ * hidden and obscured touches dropped while it shows, and it closes when anything else comes on
+ * top before the message is sent, so a caller can't put its own screen over the dialog and lift it
+ * as the user taps.
  */
 class AskOpenCodeActivity : ComponentActivity() {
     private val model: AskOpenCodeModel by viewModels()

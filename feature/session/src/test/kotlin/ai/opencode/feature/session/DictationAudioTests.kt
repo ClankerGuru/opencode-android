@@ -23,12 +23,6 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 import java.time.Instant
 
-/**
- * Port of the `SessionFeature` tests of iOS `DictationAudioTests.swift` (in its `DictationHoldReportingTests` suite).
- *
- * Not ported here (:feature:composer, `DictationAudio` / `DictationFeature` alone): all of the `DictationAudioTests`
- * suite, and `DictationHoldReportingTests.eachWayOfFinishingSaysHowItEnded`.
- */
 class DictationHoldReportingTests {
     private val server = OpenCodeServer(url = "http://127.0.0.1:9", username = "opencode", password = "pw")
     private val session = OpenCodeSession(id = "ses_1", serverTitle = "Chat", projectID = "proj_1", directory = "/tmp/demo", updatedAt = Instant.EPOCH)

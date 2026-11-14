@@ -7,8 +7,6 @@ import ai.opencode.server.model.OpenCodeModelRef
 import kotlinx.serialization.Serializable
 
 /**
- * Port of iOS `ModelDisplayNames` (`Composer/ModelPicker/ModelDisplayNames.swift`).
- *
  * Labels only: remembered names never make an unavailable model selectable or supply stale
  * capabilities. Provider/catalog identity remains authoritative.
  */
@@ -17,7 +15,7 @@ data class ModelDisplayNames(val entries: List<Entry> = emptyList()) {
     @Serializable
     data class Entry(val providerID: String, val key: String, val modelID: String, val name: String)
 
-    /** iOS `remember(_:)` (a `mutating func`): this value with [models]' usable names first. */
+    /** This value with [models]' usable names first. */
     fun remember(models: List<OpenCodeModel>): ModelDisplayNames {
         val incoming = models.mapNotNull { model ->
             if (!usable(model.name, model.key, model.modelID)) null
@@ -48,7 +46,6 @@ data class ModelDisplayNames(val entries: List<Entry> = emptyList()) {
     companion object {
         private const val LIMIT = 1024
 
-        /** iOS `init(models:)`. */
         operator fun invoke(models: List<OpenCodeModel>): ModelDisplayNames = ModelDisplayNames().remember(models)
 
         fun usable(name: String, key: String, modelID: String): Boolean =
@@ -74,7 +71,6 @@ data class ModelDisplayNames(val entries: List<Entry> = emptyList()) {
             }
         }
 
-        /** iOS `SharedReaderKey.modelDisplayNamesByServer` (server persistence ID → names). */
         val modelDisplayNamesByServer = SharedKey.fileStorage<Map<String, ModelDisplayNames>>(
             FileDirectory.Documents,
             "model-display-names.json",

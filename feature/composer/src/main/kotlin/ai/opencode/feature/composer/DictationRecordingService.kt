@@ -15,19 +15,16 @@ import android.content.pm.ServiceInfo
 import android.os.IBinder
 
 /**
- * Keeps a recording's microphone alive while the app is away: iOS's `audio` background mode,
- * which lets [DictationAudio]'s session keep recording after `didEnterBackground`. Android
- * silences a background app's microphone unless a microphone foreground service runs, so
- * [LiveCapture] starts this one with every recording (the app is on screen then: a press
- * started it) and stops it with the recorder.
+ * Keeps a recording's microphone alive while the app is away. Android silences a background app's
+ * microphone unless a microphone foreground service runs, so [LiveCapture] starts this one with
+ * every recording (the app is on screen then: a press started it) and stops it with the recorder.
  *
  * Its notification is the recording's Live Update slot: it posts under the id and channel the
  * system area's `LiveUpdateNotifications.dictation` uses (`DICTATION_ID` 4102, channel
- * `dictation`), so when a hands-free recording raises its Live Update the service's
- * notification becomes it, and there is never a second one. Until then (a press held on
- * screen) Android defers a new foreground service's notification by ten seconds, so a short
- * dictation shows nothing, as on iOS. The ids are repeated here because `:feature:system` sits
- * beside this module, not under it.
+ * `dictation`), so when a hands-free recording raises its Live Update the service's notification
+ * becomes it, and there is never a second one. Until then (a press held on screen) Android defers a
+ * new foreground service's notification by ten seconds, so a short dictation shows nothing. The ids
+ * are repeated here because `:feature:system` sits beside this module, not under it.
  */
 class DictationRecordingService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null

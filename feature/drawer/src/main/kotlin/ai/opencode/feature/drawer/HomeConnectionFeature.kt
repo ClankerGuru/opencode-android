@@ -37,8 +37,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `HomeConnectionFeature` (`OpenCode/Drawer/HomeConnectionFeature.swift`): the
- * event-stream lifecycle, retry timers, and last-known activity deadline. Home reconciles REST
+ * The event-stream lifecycle, retry timers, and last-known activity deadline. Home reconciles REST
  * snapshots into its session list and coordinates requests on open screens; those operations can
  * settle this child's connection state (`HomeFeatureConnection.kt`).
  *
@@ -61,14 +60,14 @@ class HomeConnectionFeature : Reducer<HomeConnectionFeature.State, HomeConnectio
         /** The view's task owns the event stream, so foregrounding can restart it. */
         val isStreaming: Boolean = false,
         val isEventStreamLive: Boolean = false,
-        /** iOS `@ObservationStateIgnored`: bookkeeping, not shown. */
+        /** Bookkeeping, not shown. */
         val snapshotFailures: Int = 0,
         val lastKnownActivityDeadline: Instant? = null,
         /** A reconnect has outlasted `ServerFlowTunables.grace`, or the person asked for it: screens may say so. */
         val showsRecovery: Boolean = false,
         /**
          * Between losing the server (or launching without it) and hearing from it again, timed by
-         * [HomeFeature.CancelID.ConnectionGrace]. iOS `@ObservationStateIgnored`, as are the next three.
+         * [HomeFeature.CancelID.ConnectionGrace].
          */
         val isRecovering: Boolean = false,
         /** Attempts that failed since the reconnect began. */
@@ -532,8 +531,8 @@ class HomeConnectionFeature : Reducer<HomeConnectionFeature.State, HomeConnectio
         val foregroundSilence: Duration = 20.seconds
 
         /**
-         * iOS `OpenCodeClient.logDescription`: an exception's type and its cause's, never its
-         * message (which can carry the URL). Same rule as `:server`'s internal helper.
+         * An exception's type and its cause's, never its message (which can carry the URL). Same
+         * rule as `:server`'s internal helper.
          */
         private fun logDescription(error: Throwable): String {
             var description = error::class.java.simpleName

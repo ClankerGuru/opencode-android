@@ -6,9 +6,9 @@ import ai.opencode.core.sharing.shared
 import ai.opencode.server.OpenCodeServer
 
 /**
- * Shared settings read by Home's call entry points, without loading a session
- * (iOS `VoiceRoutePreferences`). Holds the `@Shared` references; views that must follow a
- * change collect their `flow`s. Equality is by reference identity (`Shared`), like iOS.
+ * Shared settings read by Home's call entry points, without loading a session. Holds the `@Shared`
+ * references; views that must follow a change collect their `flow`s. Equality is by reference
+ * identity (`Shared`).
  */
 data class VoiceRoutePreferences(
     val enabled: Shared<Boolean> = shared(SharedKeys.voiceModeEnabled),

@@ -34,8 +34,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 
 /**
- * iOS `VoiceKeyEditor`: the selected model's provider key, its reveal button and Verify, under
- * Grok's xAI Key row, and on Your OpenAI Account. Kept out of every screenshot (iOS `.hidesFromScreenshots()`).
+ * The selected model's provider key, its reveal button and Verify, under Grok's xAI Key row, and on
+ * Your OpenAI Account. Kept out of every screenshot.
  */
 @Composable
 internal fun VoiceKeyEditor(state: VoiceSettingsFeature.State, voice: VoiceStore, settings: (HomeSettingsFeature.Action) -> Unit) {
@@ -43,7 +43,7 @@ internal fun VoiceKeyEditor(state: VoiceSettingsFeature.State, voice: VoiceStore
     val provider = state.activeProvider
     val stacked = isAccessibilitySize()
     val revealDescription = if (state.revealsKey) stringResource(R.string.settings_voice_key_hide_description) else stringResource(R.string.settings_voice_key_show_description)
-    // iOS `.hidesFromScreenshots()` on the editor: the key is a credential.
+    // The key is a credential.
     HidesFromScreenshots()
     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         val keyInput = @Composable { fieldModifier: Modifier ->
@@ -84,7 +84,7 @@ internal fun VoiceKeyEditor(state: VoiceSettingsFeature.State, voice: VoiceStore
             ) { Text(stringResource(R.string.settings_voice_key_verify)) }
         }
         if (stacked) {
-            // iOS at accessibility sizes: Verify goes under the field.
+            // Verify goes under the field.
             keyInput(Modifier.fillMaxWidth())
             verifyButton()
         } else {
@@ -96,7 +96,6 @@ internal fun VoiceKeyEditor(state: VoiceSettingsFeature.State, voice: VoiceStore
         state.keyVerificationError?.let { error ->
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 OpenCodeIcon(SFSymbol.ExclamationmarkCircleFill, contentDescription = null, size = 16.dp, tint = OpenCodeTheme.colors.destructive)
-                // iOS `.textSelection(.enabled)`.
                 SelectionContainer {
                     Text(error, style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.destructive)
                 }

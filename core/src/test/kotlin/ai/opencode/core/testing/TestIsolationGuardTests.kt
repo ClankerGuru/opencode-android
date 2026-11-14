@@ -13,16 +13,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `TestIsolationGuardTests`.
- *
- * Not ported (UIKit-only state with no Android counterpart in a JVM unit test):
- * `catchesAndResetsLeakedDockedKeyboardFrame`, `catchesAndResetsLeakedWindowAndFirstResponder`,
- * the `UIView.areAnimationsEnabled` half of `catchesAndResetsDisabledAnimationsAndTimeScale`, and
- * `seededOrderPermutesSuitesAndTestsDeterministically` (a Swift Testing ordering hook; JUnit 4
- * runs methods in its fixed `MethodSorters` order). `blocksUnmockedNetworkRequests…` lives in
- * `:server` (`ServerTestIsolationTests`), next to the network block it checks.
- */
 class TestIsolationGuardTests {
     @get:Rule val isolation = TestIsolationRule()
 

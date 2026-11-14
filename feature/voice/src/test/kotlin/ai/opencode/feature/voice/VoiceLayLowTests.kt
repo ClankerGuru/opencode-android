@@ -5,10 +5,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Kit's call (Oct 25): "Hi, baby" to his son got "Hey! Still going?", and
- * "Hi, you, boy" a laugh and "Hey.". GPT-Live takes its turns itself (no
- * `create_response` or turn-detection setting exists), so its instructions
- * are the only lever: speech that isn't for the voice agent gets nothing.
+ * "Hi, baby" to his son got "Hey. Still going?", and "Hi, you, boy" a laugh and "Hey.". GPT-Live
+ * takes its turns itself (no `create_response` or turn-detection setting exists), so its
+ * instructions are the only lever: speech that isn't for the voice agent gets nothing.
  */
 class VoiceLayLowTests {
     private val context = VoiceInstructions.Context(
@@ -71,8 +70,7 @@ class VoiceLayLowTests {
         assertTrue(delegation >= 0)
         assertTrue(attention < delegation)
         assertTrue(live.contains("Backchannel policy: No backchannels. While the user is talking, stay silent"))
-        // Kit's Oct 30 call: "Okay." and a chuckle over his words, and an update
-        // spoken over his dictation.
+        // "Okay." and a chuckle over his words, and an update spoken over his dictation.
         assertTrue(live.contains("Turn-taking policy: The user often dictates long requests and messages, pausing to think."))
         assertTrue(live.contains("if the user starts talking while you give one, stop at once"))
         assertTrue(live.contains("- The speech isn't meant for you or makes no sense: say nothing (What You Hear)."))

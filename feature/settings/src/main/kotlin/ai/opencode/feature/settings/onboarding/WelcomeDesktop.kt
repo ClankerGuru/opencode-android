@@ -49,9 +49,9 @@ private val deskDim = WelcomeInk.hex(0x8F8F8F)
 
 /**
  * The laptop's screen: the OpenCode desktop app in its dark theme, drawn from its captures at a
- * logical 720 × 450 and scaled into the lid (iOS `WelcomeDesktop`). The session works through the
- * story, with the browser it drives in a window over it; pairing cross-fades to Settings › Pairing
- * with its code. [pairing] is the cross-fade's progress (0 the session, 1 pairing).
+ * logical 720 × 450 and scaled into the lid. The session works through the story, with the browser
+ * it drives in a window over it; pairing cross-fades to Settings › Pairing with its code. [pairing]
+ * is the cross-fade's progress (0 the session, 1 pairing).
  */
 @Composable
 internal fun WelcomeDesktop(frame: WelcomeFrame, wall: Double, pairing: Float, reduced: Boolean, targets: WelcomeTargets?) {

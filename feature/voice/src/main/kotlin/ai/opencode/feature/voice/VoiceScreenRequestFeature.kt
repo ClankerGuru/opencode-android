@@ -21,11 +21,10 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
 /**
- * Port of iOS `VoiceScreenRequestFeature`: an agent asking, during a call, to see the app's
- * screen (`android_voice_request_screen`, Share Screen with Agents). The person answers on a
- * card above the composer: Share captures the app's own window and returns it as the tool's
- * image; Not Now, a minute's silence or the call ending returns a refusal. Nothing is captured
- * without a tap.
+ * An agent asking, during a call, to see the app's screen (`android_voice_request_screen`, Share
+ * Screen with Agents). The person answers on a card above the composer: Share captures the app's
+ * own window and returns it as the tool's image; Not Now, a minute's silence or the call ending
+ * returns a refusal. Nothing is captured without a tap.
  */
 class VoiceScreenRequestFeature : Reducer<VoiceScreenRequestFeature.State, VoiceScreenRequestFeature.Action> {
     data class State(

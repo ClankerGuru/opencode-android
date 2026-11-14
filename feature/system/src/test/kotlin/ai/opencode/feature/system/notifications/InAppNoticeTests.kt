@@ -7,17 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `InAppNoticeTests.swift`'s notification tests (the rest is `:feature:drawer`'s):
- * how a session notification shows in the foreground (iOS `DeliveredNotifications.presentation`,
- * Android [SessionNotifications.presentation]) and which delivered ones an answer clears (iOS
- * `DeliveredNotifications.isNeedsInput`/`sessionID(of:)`, Android [SessionPushNotifications.isNeedsInput]/
- * [SessionPushNotifications.sessionID], which [SessionPushNotifications.remove] reads from each posted one).
- *
- * iOS `[.banner, .sound, .list]` is [NotificationPresentation.Banner], `[.list]`
- * [NotificationPresentation.ListOnly], `[]` [NotificationPresentation.None]. In-App Notices' mode
- * reaches Android as `inAppNoticesOn` (the drawer's reader: mode ≠ Off).
- */
+/** In-App Notices' mode reaches Android as `inAppNoticesOn` (the drawer's reader: mode ≠ Off). */
 class InAppNoticeTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -30,7 +20,6 @@ class InAppNoticeTests {
         }
         assertEquals(NotificationPresentation.None, presentation("ses_a", "ses_a", noticesOn = true))
         assertEquals(NotificationPresentation.Banner, presentation("ses_b", "ses_a", noticesOn = false))
-        // iOS `.needsInput` and `.all` both read as on.
         assertEquals(NotificationPresentation.ListOnly, presentation("ses_b", "ses_a", noticesOn = true))
         assertEquals(NotificationPresentation.ListOnly, presentation("ses_b", null, noticesOn = true))
         assertEquals(NotificationPresentation.Banner, presentation(null, "ses_a", noticesOn = true))

@@ -15,15 +15,13 @@ import java.time.Instant
 import kotlin.time.Duration
 
 /**
- * Port of `OpenCodeWidgets/SessionRunLiveActivity.swift`: a run a send from this phone started,
- * while the app is away: the session, what the agent is on and for how long, then Done with the
- * reply's opening line or Needs your input. Tapping it opens the session, where a pending
- * request docks. No message text while it works.
+ * A run a send from this phone started, while the app is away: the session, what the agent is on
+ * and for how long, then Done with the reply's opening line or Needs your input. Tapping it opens
+ * the session, where a pending request docks. No message text while it works.
  *
- * iOS draws it on the Lock Screen and in the Dynamic Island; Android draws a promoted ongoing
- * notification (a Live Update) in the status bar chip, the shade and on the lock screen. The
- * preview is `.privacySensitive()` on iOS: here the lock screen shows a public version with the
- * title and status only.
+ * Drawn as a promoted ongoing notification (a Live Update) in the status bar chip, the shade and on
+ * the lock screen. The preview is `.privacySensitive()`: here the lock screen shows a public
+ * version with the title and status only.
  */
 object SessionRunLiveActivity {
     const val NOTIFICATION_ID = 4103
@@ -70,7 +68,7 @@ object SessionRunLiveActivity {
             .build()
     }
 
-    /** iOS `widgetURL(context.attributes.url)`: the session's `opencode://session` link, routed like a tapped notification. */
+    /** The session's `opencode://session` link, routed like a tapped notification. */
     private fun open(context: Context, attributes: SessionActivityAttributes): PendingIntent? {
         val url = attributes.url ?: return null
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
@@ -81,9 +79,9 @@ object SessionRunLiveActivity {
 }
 
 /**
- * Port of iOS `SessionRunDisplay`: what the row shows. An activity the app stopped refreshing
- * while it worked reads as its last known state, without a timer that would claim it's still
- * going (Android removes it at its timeout, so [isStale] is for parity and tests).
+ * What the row shows. An activity the app stopped refreshing while it worked reads as its last
+ * known state, without a timer that would claim it's still going (Android removes it at its
+ * timeout, so [isStale] is for parity and tests).
  */
 data class SessionRunDisplay(
     val title: String,
@@ -131,7 +129,10 @@ data class SessionRunDisplay(
             Phase.failed -> SFSymbol.XmarkCircleFill
         }
 
-    /** iOS system colours (blue, orange, green, red; secondary when stale), as notification accent colours. */
+    /**
+     * System colours (blue, orange, green, red; secondary when stale), as notification accent
+     * colours.
+     */
     val tint: Int
         get() = when (phase) {
             Phase.working -> if (isStale) SECONDARY else BLUE

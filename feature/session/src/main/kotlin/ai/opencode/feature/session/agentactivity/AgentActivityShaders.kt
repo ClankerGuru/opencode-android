@@ -4,8 +4,6 @@ import android.graphics.Paint
 import android.graphics.RuntimeShader
 
 /**
- * Port of iOS `Session/AgentActivity/AgentActivityShaders.metal` (`activityOrbField`) to AGSL.
- *
  * Single-pass analytical fragment shader for [AgentActivityOrb] (the activity glyph and the shell
  * glyph): the central Gaussian glow, pixel-snapped 7×7 grid, analytical exponential per-dot halo
  * (`0.22 · P² · exp(−d / (0.12 · pitch))`), and anti-aliased disc SDF in one draw call.
@@ -23,9 +21,6 @@ import android.graphics.RuntimeShader
  * - `header1`: glowAmount, glowPeak, dark (0/1), unlitAlpha
  * - `glowRGB`, `neutral`, `neutralCore`, `accent`, `accentCore`
  * - `cells[49]`: (light, fresh, accent, dotSize); dotSize 0 marks a cell outside the disc mask.
- *
- * iOS's second shader in that file, `agentMessageRevealGlow`, draws `AgentMessageRevealLight`
- * (Transcript) and belongs with that view in `:feature:transcript`.
  */
 object AgentActivityShaders {
     const val ACTIVITY_ORB_FIELD = """
@@ -129,9 +124,9 @@ half4 main(float2 position) {
 """
 
     /**
-     * The one shared orb shader and paint (iOS's `DotScopeMetalShared` rule: compile once, share).
-     * Main thread only: a glyph sets its uniforms and draws at once; a recorded draw keeps the
-     * native shader it was recorded with, since every uniform change makes a new native instance.
+     * The one shared orb shader and paint. Main thread only: a glyph sets its uniforms and draws at
+     * once; a recorded draw keeps the native shader it was recorded with, since every uniform
+     * change makes a new native instance.
      */
     val orbShader: RuntimeShader by lazy { RuntimeShader(ACTIVITY_ORB_FIELD) }
     val orbPaint: Paint by lazy { Paint().apply { shader = orbShader } }

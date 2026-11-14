@@ -26,17 +26,15 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlin.math.max
 
 /**
- * The band behind the session header, as resolved for this phone (iOS `SessionHeaderBackdrop`).
- * Place it at the top of the session screen, under the header controls and over the transcript,
- * drawing up through the status bar.
+ * The band behind the session header, as resolved for this phone. Place it at the top of the
+ * session screen, under the header controls and over the transcript, drawing up through the status
+ * bar.
  *
  * Android mapping (no blur imitation, AGENTS.md):
- * - iOS's progressive blur ([SessionHeaderStyle.Resolved.AppBlur], and the iOS 27 system edge,
- *   which Android resolves to the same app path) is the M3 top app bar's scrolled state: once
- *   content scrolls under the header, the bar from the top of the screen to the bottom of the
- *   header row fills with the canvas over a hairline (the desktop title bar), with no soft tail (a fading
- *   tail left text showing through it). The fill fades in and out on the theme's effects spring,
- *   as `TopAppBar`'s container colour does.
+ * - Once content scrolls under the header, the bar from the top of the screen to the bottom of the
+ *   header row fills with the canvas over a hairline (the desktop title bar), with no soft tail (a
+ *   fading tail left text showing through it). The fill fades in and out on the theme's effects
+ *   spring, as `TopAppBar`'s container colour does.
  * - The wash ([SessionHeaderStyle.Appearance]) is the canvas colour at its opacity through the same
  *   stops; its optional material is a tonal surface (ultraThin → `surfaceContainerLow`, thin →
  *   `surfaceContainer`, regular → `surfaceContainerHigh`), revealed over its own `fadeIn`.
@@ -49,9 +47,9 @@ import kotlin.math.max
  * @param header the header row's height below [safeTop] (dp; `Resolved.header`).
  * @param safeTop the screen's top inset (status bar) above the header; 0 in an inset card.
  * @param scrolledUnderHeader how far content has scrolled under the header (dp), read per frame.
- * @param transcriptPlaced whether the transcript has reported where it sits. Until it has, and for
- *   that first report, the bar follows the content without fading, so a cold launch's first frame
- *   already has it behind the rows (iOS reveals by geometry and never fades it in at launch).
+ * @param transcriptPlaced Whether the transcript has reported where it sits. Until it has, and for
+ *     that first report, the bar follows the content without fading, so a cold launch's first frame
+ *     already has it behind the rows.
  */
 @Composable
 fun SessionHeaderBackdrop(

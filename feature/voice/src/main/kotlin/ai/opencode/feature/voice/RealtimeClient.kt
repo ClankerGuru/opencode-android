@@ -12,7 +12,7 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.milliseconds
 
-/** iOS RealtimeClient.swift; the preflight lives in RealtimePreflight.kt. */
+/** The preflight lives in RealtimePreflight.kt. */
 class RealtimeConnection(
     override val events: Flow<RealtimeServerEvent>,
     override val send: suspend (RealtimeCommand) -> Unit,
@@ -33,7 +33,7 @@ class RealtimeClient(val connect: suspend (String, RealtimeSessionConfig) -> Rea
     }
 }
 
-/** Why a Realtime connection ended (iOS `RealtimeClientError`); [message] is iOS's `errorDescription`. */
+/** Why a Realtime connection ended. */
 sealed class RealtimeClientError(override val message: String) : Exception(message), CarriesRealtimeTransportDiagnostic {
     data object InvalidURL : RealtimeClientError("The voice service address is invalid.")
     data class Closed(val reason: String) : RealtimeClientError(reason)

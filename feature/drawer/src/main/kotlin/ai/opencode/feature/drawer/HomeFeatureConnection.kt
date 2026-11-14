@@ -39,10 +39,9 @@ import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.core.tuning.DeveloperMode
 
 /*
- * Port of iOS `HomeFeature+Connection.swift`: what Home does as the connection comes and goes
- * (before `HomeConnectionFeature` settles the same action), the authoritative snapshot's
- * reconciliation into the list and the open screens, the active-ancestry merge, and the attention
- * read.
+ * What Home does as the connection comes and goes (before `HomeConnectionFeature` settles the same
+ * action), the authoritative snapshot's reconciliation into the list and the open screens, the
+ * active-ancestry merge, and the attention read.
  */
 
 internal fun HomeFeature.reduceConnection(state: State, action: Action): HomeReduced = when (action) {
@@ -77,7 +76,7 @@ internal fun HomeFeature.reduceConnection(state: State, action: Action): HomeRed
         val sharedStore = dependency(SharedStore)
         val flush = Effect.run<Action> {
             persistence.flush()
-            // Home's snapshots and read dates still waiting for the writer land too (iOS 24057173).
+            // Home's snapshots and read dates still waiting for the writer land too.
             withContext(Dispatchers.IO) { sharedStore.flush() }
         }
         Reduced(state, Effect.merge(flush, flushPersistedComposer(state)))
@@ -429,15 +428,13 @@ internal fun HomeFeature.refreshSnapshot(state: State): HomeReduced {
     )
 }
 
-/** Upper bound on directories one attention refresh may query (iOS `HomeFeature.attentionDirectoryLimit`). */
+/** Upper bound on directories one attention refresh may query. */
 internal const val attentionDirectoryLimit = 8
 
 /**
- * Directories that can actually hold a pending request. Every location-scoped read makes the
- * server boot that directory's full service graph (MCP servers, watchers, plugins) and keep it for
- * an hour, so asking about all historical directories on each Home refresh once booted 152 graphs
- * and ~900 child processes. A request can only pend inside a booted graph, and a session blocked
- * on one is still running, so running roots, roots already flagged, and the open session cover it.
+ * Directories that can actually hold a pending request. Every location-scoped read makes the server
+ * boot that directory's full service graph (MCP servers, watchers, plugins) for an hour, so only
+ * running roots, roots already flagged and the open session are asked.
  */
 internal fun HomeFeature.Companion.attentionDirectories(state: State): List<String> {
     val busy = state.busySessionIDs
@@ -475,10 +472,7 @@ internal fun HomeFeature.refreshAttention(state: State): Effect<Action> {
     }.cancellable(HomeFeature.CancelID.Attention, cancelInFlight = true)
 }
 
-/**
- * iOS `HomeFeature.flushPersistedComposer(_:)` (`ComposerPersistence.swift`): leaving the app
- * saves every composer on screen that keeps its draft, then writes at once.
- */
+/** Leaving the app saves every composer on screen that keeps its draft, then writes at once. */
 internal fun HomeFeature.flushPersistedComposer(state: State): Effect<Action> {
     val persistence = dependency(ComposerPersistence)
     val serverID = state.server.persistenceID
@@ -494,8 +488,8 @@ internal fun HomeFeature.flushPersistedComposer(state: State): Effect<Action> {
 }
 
 /**
- * The board the call's delegator reads while a call is up; null otherwise, so Home pays nothing
- * for it between calls (iOS `HomeFeature.State.voiceSessionBoard`, `VoiceSessionBoard.swift`).
+ * The board the call's delegator reads while a call is up; null otherwise, so Home pays nothing for
+ * it between calls.
  */
 internal val State.voiceSessionBoard: VoiceSessionBoard?
     get() {
@@ -515,7 +509,7 @@ internal val State.voiceSessionBoard: VoiceSessionBoard?
         )
     }
 
-/** The drawer and the top session's composer, for a call's screenshots (iOS `voiceAppStateHome`). */
+/** The drawer and the top session's composer, for a call's screenshots. */
 internal val State.voiceAppStateHome: VoiceAppState.Home
     get() = VoiceAppState.Home(
         drawerOpen = isDrawerOpen,

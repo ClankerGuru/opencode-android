@@ -16,10 +16,9 @@ import ai.opencode.server.model.OpenCodeSession
 import kotlinx.coroutines.CancellationException
 
 /*
- * Port of iOS `HomeFeature+SessionLinks.swift`: session IDs linked in transcripts (`SessionLink`).
- * Titles come from sessions already loaded (the list, the open families), then one fetch per
- * unknown ID, a few at a time and the rest queued. A tap opens the session on this server; a
- * subagent pushes over the screen on top.
+ * Session IDs linked in transcripts (`SessionLink`). Titles come from sessions already loaded (the
+ * list, the open families), then one fetch per unknown ID, a few at a time and the rest queued. A
+ * tap opens the session on this server; a subagent pushes over the screen on top.
  */
 
 
@@ -144,15 +143,15 @@ fun State.linkedSession(id: String): OpenCodeSession? {
     return null
 }
 
-/** Hands each open screen the answers for IDs it asked about (iOS `applySessionLinks`). */
+/** Hands each open screen the answers for IDs it asked about. */
 fun State.applyingSessionLinks(targets: Map<String, SessionLinkTarget>): State {
     if (targets.isEmpty()) return this
     return updatingDetail { it.applySessionLinks(targets) }.updatingSubagents { it.applySessionLinks(targets) }
 }
 
-/** A lookup that failed: screens still waiting on it may ask again (iOS `forgetSessionLinks`). */
+/** A lookup that failed: screens still waiting on it may ask again. */
 fun State.forgettingSessionLinks(ids: List<String>): State =
     updatingDetail { it.forgetSessionLinks(ids) }.updatingSubagents { it.forgetSessionLinks(ids) }
 
-/** iOS `SessionLinkTarget(_ session:)`: a linked session's title, and whether it's a subagent. */
+/** A linked session's title, and whether it's a subagent. */
 internal fun sessionLinkTarget(session: OpenCodeSession): SessionLinkTarget = SessionLinkTarget.Session(session.title, session.parentID)

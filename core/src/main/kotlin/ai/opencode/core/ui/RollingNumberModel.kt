@@ -15,11 +15,7 @@ import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sqrt
 
-/**
- * Motion parameters for [RollingNumber] (iOS `RollingNumberStyle`): a roll runs on
- * `Motion.layout`, its places `Motion.staggerStep` apart; the reel's look defaults to iOS's
- * `RollingNumberTunables` (D-50 option 3 "Metal Reel + Vertical Smear").
- */
+/** Motion parameters for [RollingNumber]. */
 data class RollingNumberStyle(
     /** Perceptual roll duration in seconds (`stiffness = (2π / d)²`). */
     val duration: Double = MotionTunables.layoutSpring.duration.defaultValue,
@@ -42,7 +38,7 @@ data class RollingNumberStyle(
     }
 }
 
-/** Glyph metrics a [RollingNumberModel] lays out with (iOS `RollingNumberMetrics`), in px. */
+/** Glyph metrics a [RollingNumberModel] lays out with, in px. */
 interface RollingNumberMetrics {
     val lineHeight: Float
     val ascender: Float
@@ -60,11 +56,11 @@ interface RollingNumberMetrics {
     }
 }
 
-/** One drawn frame (iOS `RollingNumberFrame`). */
+/** One drawn frame. */
 class RollingNumberFrame(
     val slots: List<Slot>,
     val width: Float,
-    /** `(x0, x1, radius)` triples: horizontal bands smeared vertically (iOS shader input). */
+    /** `(x0, x1, radius)` triples: horizontal bands smeared vertically. */
     val blurBands: FloatArray,
     val isSettled: Boolean,
 ) {
@@ -91,12 +87,7 @@ class RollingNumberFrame(
     )
 }
 
-/**
- * The per-place spring model behind [RollingNumber], ported line for line from iOS
- * `RollingNumberModel` (`RollingNumber.swift`): each digit place rolls on its own spring,
- * new places stagger in right to left, separators cross-fade, and a number's direction of
- * change picks the roll direction.
- */
+/** The per-place spring model behind [RollingNumber]. */
 class RollingNumberModel {
     /** Stable identity per token across one or more numeric runs in the string. */
     sealed class Key : Comparable<Key> {
@@ -129,7 +120,7 @@ class RollingNumberModel {
         }
     }
 
-    /** Semi-implicit Euler spring stepped at 240 Hz (iOS `RollingNumberModel.Spring`). */
+    /** Semi-implicit Euler spring stepped at 240 Hz. */
     class Spring(var value: Double, var target: Double, var velocity: Double = 0.0) {
         val isSettled: Boolean get() = abs(value - target) < 0.0005 && abs(velocity) < 0.005
 
@@ -161,9 +152,8 @@ class RollingNumberModel {
         private set
 
     /**
-     * Brings the model to [text]. Animated changes roll from the current pose; otherwise
-     * it snaps. [nowSeconds] is on the same clock as the frame times passed to [frame]
-     * (`System.nanoTime() / 1e9`, Compose's frame clock).
+     * Brings the model to [text], rolling when [animated], else snapping. [nowSeconds] is on the
+     * frame clock passed to [frame].
      */
     fun sync(text: String, locale: Locale, animated: Boolean, style: RollingNumberStyle, nowSeconds: Double) {
         if (text == shownText && !(!animated && isMoving)) return
@@ -380,7 +370,7 @@ class RollingNumberModel {
     class Parsed(val tokens: List<Pair<Key, String>>, val magnitudes: List<Double>)
 
     companion object {
-        /** Width of [text] at rest, rounded up to the pixel grid (avoids truncation, OC-355). */
+        /** Width of [text] at rest, rounded up to the pixel grid to avoid truncation. */
         fun targetWidth(text: String, metrics: RollingNumberMetrics, locale: Locale): Float {
             val width = parse(text, locale).tokens.sumOf { metrics.advance(it.second).toDouble() }
             return ceil(width - 0.001).toFloat()
@@ -399,7 +389,7 @@ class RollingNumberModel {
                 // Non-ASCII decimal digits (e.g. Eastern Arabic) stay static localized text.
                 if (Character.isDigit(cp) && cp !in 0x30..0x39) return false
             }
-            // Swift `Character`s: a digit carrying a combining mark (`1⃣`) is not a digit.
+            // A digit carrying a combining mark (`1⃣`) is not a digit.
             return text.characterGlyphs().any { it.isAsciiDigit }
         }
 
@@ -520,7 +510,7 @@ class RollingNumberModel {
 /** Horizontal placement of a [RollingNumber] inside its resting width. */
 enum class RollingNumberAlignment { Start, Center, End }
 
-/** The string's Swift `Character`s: extended grapheme clusters (`\r\n`, a digit with a combining mark, an emoji sequence). */
+/** Extended grapheme clusters (`\r\n`, a digit with a combining mark, an emoji sequence). */
 private fun String.characterGlyphs(): List<String> {
     val out = ArrayList<String>(length)
     val breaks = BreakIterator.getCharacterInstance(Locale.ROOT)

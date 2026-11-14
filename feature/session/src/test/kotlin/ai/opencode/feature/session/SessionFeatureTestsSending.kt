@@ -45,12 +45,6 @@ import java.time.Instant
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `SessionFeatureTests+Sending.swift`.
- *
- * Not ported here (`:feature:drawer`, `HomeFeature`): `twoSessionsInARowEachGetStartingUpAndAFinale`
- * (it builds details through `HomeFeature.makeDetail`, a module above this one).
- */
 class SessionFeatureTestsSending {
     private fun user(id: String, text: String) = OpenCodeTranscriptItem.UserText(id = id, text = text)
     private fun assistant(id: String, text: String) = OpenCodeTranscriptItem.AssistantMarkdown(id = id, text = text)
@@ -346,9 +340,8 @@ class SessionFeatureTestsSending {
     }
 
     /**
-     * The view's `onChange` ran after `body`, so the first frame after a run's
-     * end dropped Working and showed the reply's end, then swapped back for
-     * the finale. The reducer records both in the action that flips the run.
+     * The first frame after a run's end keeps Working until the finale: the reducer records both in
+     * the action that flips the run.
      */
     @Test
     fun aRunsStartAndEndReachTheWorkingLineInTheSameAction() {

@@ -39,11 +39,7 @@ import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `ClientToolsTests.swift`, its app tests (MARK: App, and the delegator tests under
- * MARK: Transport). The protocol and transport tests are in `:server`, the reducer's in
- * `:feature:system`.
- */
+/** Its app tests (MARK: App, and the delegator tests under MARK: Transport). */
 class ClientToolsTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -58,7 +54,6 @@ class ClientToolsTests {
         updatedAt = Instant.ofEpochSecond(1_700_000_000),
     )
 
-    /** iOS `AppFeature.State()` with Home on [server] showing [session]. */
     private fun appWithSession(): AppFeature.State = shared.run {
         val home = HomeFeature.State(server, OpenCodeHomeSnapshot(projects = emptyList(), sessions = listOf(session), activeSessionIDs = emptySet()))
         AppFeature.State.initial().copy(home = home.copy(sessionDetail = SessionFeature.State.session(server, session)))
@@ -349,8 +344,8 @@ class ClientToolsTests {
             assertNull(state.withVoice(viewed).voiceDelegatorSessionID)
             assertNull(state.withVoice(voice.withPhase(VoiceFeature.State.Phase.Ended)).voiceDelegatorSessionID)
             assertNull(state.withVoice(voice.copy(usesSessionDelegator = false)).voiceDelegatorSessionID)
-            // iOS still expects nil with no experiment on, but its own `offeredClientTools` keeps
-            // `voiceOpenSession` (and so this socket) for a live delegator call; navigation needs it.
+            // A live delegator call keeps `voiceOpenSession`, and so this socket, with no
+            // experiment on: navigation needs it.
             assertEquals("ses_voice", state.withClientTools { it.copy(tools = emptySet()) }.voiceDelegatorSessionID)
             shared(VoiceSharedKeys.voiceDelegatorChoice).set(VoiceDelegatorChoice.ViewedSession)
             assertNull(state.voiceDelegatorSessionID)

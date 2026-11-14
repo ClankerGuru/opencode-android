@@ -65,9 +65,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * The stage around the Catch Up card (iOS `CatchUpChrome`): progress and Undo above it, the two
- * dispositions below it, and the Drift field dot-matrix backdrop behind it. Once the last card goes
- * the chrome fades as Catch Up closes itself (`CatchUpFinish.kt`).
+ * The stage around the Catch Up card: progress and Undo above it, the two dispositions below it,
+ * and the Drift field dot-matrix backdrop behind it. Once the last card goes the chrome fades as
+ * Catch Up closes itself (`CatchUpFinish.kt`).
  *
  * Draw it edge to edge under [CatchUpStack]; it pads itself by the system bars and cutout, not the
  * keyboard (the card owns keyboard avoidance; the stage stays put beneath the keys).
@@ -89,7 +89,7 @@ fun CatchUpChrome(
     SideEffect { if (remaining > 0) displayedRemaining = remaining }
     val shownRemaining = if (remaining > 0) remaining else displayedRemaining
     val finished = remaining == 0
-    // The chrome leaves on `microOut` (iOS 03adf07a), a fade under Reduce Motion.
+    // The chrome leaves on `microOut`, a fade under Reduce Motion.
     val spec = MotionRole.MicroIn.animation<Float>(if (finished) MotionPhase.Exit else MotionPhase.Enter, reducedMotion)
     val finishedProgress by animateFloatAsState(if (finished) 1f else 0f, spec, label = "CatchUpChromeFinish")
     // One move per stage the chrome is composed for.
@@ -173,7 +173,7 @@ fun CatchUpChrome(
     }
 }
 
-/** iOS's Undo capsule: subheadline semibold, tertiary while there's nothing to undo. */
+/** Subheadline semibold, tertiary while there's nothing to undo. */
 @Composable
 private fun CatchUpUndoButton(canUndo: Boolean, onClick: () -> Unit) {
     FilledTonalButton(
@@ -195,7 +195,7 @@ private fun CatchUpUndoButton(canUndo: Boolean, onClick: () -> Unit) {
     }
 }
 
-/** One line, shrinking to 75 % before it would wrap (iOS `.lineLimit(1).minimumScaleFactor(0.75)`). */
+/** One line, shrinking to 75 % before it would wrap. */
 @Composable
 private fun FittingLabel(text: String) {
     val style = MaterialTheme.typography.labelLarge

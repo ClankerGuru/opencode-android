@@ -16,20 +16,18 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 
-// Port of iOS `Session/AgentActivity/AgentActivitySource.swift`.
-//
-// Times are seconds on the wall clock (a `TimeInterval`): iOS reads
-// `Date.timeIntervalSinceReferenceDate`; here [AgentActivityClock.now] is epoch seconds. Only
-// differences are ever compared, so the epoch doesn't matter as long as one clock is used.
+// Times are seconds on the wall clock (a `TimeInterval`); here [AgentActivityClock.now] is epoch
+// seconds. Only differences are ever compared, so the epoch doesn't matter as long as one clock is
+// used.
 
-/** The clock activity glyphs and the ledger time events on (iOS `Date.timeIntervalSinceReferenceDate`). */
+/** The clock activity glyphs and the ledger time events on. */
 object AgentActivityClock {
     fun now(): Double = System.currentTimeMillis() / 1000.0
 
     fun of(instant: Instant): Double = instant.toEpochMilli() / 1000.0
 }
 
-/** What a glyph shows. The labels are the prototype's. (iOS declares it in `ActivityGyro.swift`.) */
+/** What a glyph shows. The labels are the prototype's. */
 enum class AgentActivity(val rawValue: String) {
     idle("idle"),
     startup("startup"),
@@ -221,7 +219,6 @@ data class WorkingHandoffPose(
     companion object {
         const val BLUR: Double = 6.0
 
-        /** iOS `init(progress:handsOffToCopy:reduceMotion:)`. */
         fun of(progress: Double, handsOffToCopy: Boolean, reduceMotion: Boolean): WorkingHandoffPose {
             fun clamp(x: Double) = min(1.0, max(0.0, x))
             fun ease(x: Double): Double { val c = clamp(x); return c * c * (3 - 2 * c) }
@@ -249,7 +246,7 @@ data class WorkingHandoffPose(
  * times each event from when it first draws it and reports it played out, and lets it go on its
  * own if that never comes.
  *
- * Immutable: the mutating Swift methods return the next value.
+ * Immutable: the mutating methods return the next value.
  */
 data class WorkingRun(
     /** Numbers starts and finales; it carries over when a screen swaps details in place, so with the detail's navigation ID it names each one. */
@@ -380,16 +377,15 @@ data class WorkingRun(
     )
 
     companion object {
-        /** How long the Done or Failed flash holds the line (D-25 A; iOS `TranscriptTunables.workingFinale` default). */
+        /** How long the Done or Failed flash holds the line. */
         const val finale: Double = 0.55
 
-        /** Then the line hands off to the reply's copy button in the same row (iOS `TranscriptTunables.workingHandoff` default). */
+        /** Then the line hands off to the reply's copy button in the same row. */
         const val handoff: Double = 0.34
 
         /** How long a run that ended with nothing new waits for its settlement read: a provider error before any text only arrives with it. */
         const val SETTLE: Double = 1.5
 
-        /** iOS `OpenCodeClient.stoppedRunText` (`:server`'s `STOPPED_RUN_TEXT`, internal there). */
         private const val STOPPED_RUN_TEXT = "Interrupted"
 
         fun token(navigationID: Int, id: Int): String = "$navigationID|$id"
@@ -505,9 +501,9 @@ sealed interface AgentActivitySource {
  * and when it last streamed text, called a tool, or began spawning a subagent. The event stream
  * records into it as events arrive; glyphs read it while they draw.
  *
- * Process-wide like iOS's: it is a visual projection (as `ShellOutputMeter`), never read by a
- * reducer. iOS records from `OpenCodeClient+Events.swift`; `:server` sits below this module, so
- * the session's event consumer must call [record] for every [OpenCodeServerEvent] it receives.
+ * Process-wide: it is a visual projection (as `ShellOutputMeter`), never read by a reducer.
+ * `:server` sits below this module, so the session's event consumer must call [record] for every
+ * [OpenCodeServerEvent] it receives.
  */
 class AgentActivityLedger {
     data class Record(
@@ -669,10 +665,9 @@ object AgentActivityShowcase {
 }
 
 /**
- * Debug builds let the session lab hold subagent glyphs in one state, play the showcase, or show
- * a 120 dp preview over the session. iOS drives this through Darwin notifications
- * (`ai.opencode.lab.activity.<state>`); Android has no bridge yet, so [handle] is the entry point
- * a debug-only receiver can call with the same command names. Observable for Compose.
+ * Debug builds let the session lab hold subagent glyphs in one state, play the showcase, or show a
+ * 120 dp preview over the session. Android has no bridge yet, so [handle] is the entry point a
+ * debug-only receiver can call with the same command names. Observable for Compose.
  */
 object AgentActivityLab {
     var override: AgentActivityOverride? by mutableStateOf<AgentActivityOverride?>(null)

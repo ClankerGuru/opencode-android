@@ -8,8 +8,8 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Port of iOS `Composer/ModelPicker/ModelVisibility.swift` (moved down to `:server` because both
- * `:feature:composer` (the pickers) and `:feature:settings` (Settings › Models) read it).
+ * In `:server` because both `:feature:composer` (the pickers) and `:feature:settings` (Settings ›
+ * Models) read it.
  *
  * Which models one server's pickers list (Hide Unused Models, OC-510). Kept on this phone, per
  * server. Hidden providers hide all their models; otherwise **Hide** lists every model but

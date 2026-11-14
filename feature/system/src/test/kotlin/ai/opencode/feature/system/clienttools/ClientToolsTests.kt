@@ -27,10 +27,7 @@ import java.util.UUID
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `ClientToolsTests.swift`, its reducer tests (MARK: Reducer). The protocol and
- * transport tests are in `:server`, the app's in `:app`.
- */
+/** Its reducer tests (MARK: Reducer). */
 class ClientToolsTests {
     @get:Rule val isolation = TestIsolationRule()
 

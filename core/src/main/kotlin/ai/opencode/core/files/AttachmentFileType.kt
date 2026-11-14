@@ -11,11 +11,10 @@ import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
 
 /**
- * Port of iOS `AttachmentFileType` (`OpenCode/Composer/AttachmentFileType.swift`), moved to
- * `:core` because the composer and the share target both use it. Mirrors the desktop app's
+ * Moved to `:core` because the composer and the share target both use it. Mirrors the desktop app's
  * attachment typing (packages/app/src/composer/attachments/attachments.ts `attachmentMime`,
- * packages/session-ui/src/components/message-file.ts `typeLabel`). `MimeTypeMap` stands in
- * for `UTType`.
+ * packages/session-ui/src/components/message-file.ts `typeLabel`). `MimeTypeMap` stands in for
+ * `UTType`.
  */
 object AttachmentFileType {
     val imageMimes: Set<String> = setOf("image/png", "image/jpeg", "image/gif", "image/webp")

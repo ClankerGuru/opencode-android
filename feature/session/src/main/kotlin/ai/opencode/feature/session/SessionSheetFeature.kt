@@ -28,9 +28,9 @@ import kotlinx.coroutines.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Port of iOS `SessionSheetFeature`: the Session sheet's own work (rename, compact, fork,
- * export, and the confirmations around them). What the sheet shows (title, model, context,
- * cost) is read from the session; list-level actions are delegated to Home.
+ * The Session sheet's own work (rename, compact, fork, export, and the confirmations around them).
+ * What the sheet shows (title, model, context, cost) is read from the session; list-level actions
+ * are delegated to Home.
  */
 class SessionSheetFeature : Reducer<SessionSheetFeature.State, SessionSheetFeature.Action> {
     data class State(
@@ -61,7 +61,7 @@ class SessionSheetFeature : Reducer<SessionSheetFeature.State, SessionSheetFeatu
         data class Exporting(val format: OpenCodeExportFormat) : Operation
     }
 
-    /** A written export, by absolute path (iOS: a temporary file URL). */
+    /** A written export, by absolute path. */
     data class ExportedFile(val path: String) {
         val id: String get() = path
     }
@@ -69,7 +69,7 @@ class SessionSheetFeature : Reducer<SessionSheetFeature.State, SessionSheetFeatu
     data class Failure(val title: String, val message: String)
 
     sealed interface Action {
-        // Bindings (iOS `BindableAction`).
+        // Bindings.
         data class RenameDraftChanged(val draft: String) : Action
         /** The rename prompt was dismissed (Cancel, back, outside tap). */
         data class IsRenamingChanged(val isRenaming: Boolean) : Action

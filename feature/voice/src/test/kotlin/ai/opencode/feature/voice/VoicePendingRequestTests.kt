@@ -24,8 +24,6 @@ import org.junit.Test
 import java.time.Instant
 
 /**
- * Port of iOS `VoicePendingRequestTests.swift`.
- *
  * From a call log: a session sat on a question form while the delegator
  * steered two more messages into it, each stuck behind the form.
  */

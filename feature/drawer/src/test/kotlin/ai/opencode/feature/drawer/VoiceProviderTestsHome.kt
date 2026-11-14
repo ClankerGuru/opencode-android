@@ -29,11 +29,7 @@ import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Home's half of iOS `VoiceProviderTests`: `aReconnectForgetsTheServersModelsAndAnyAnswerStillComing`,
- * which drives [HomeFeature]. The rest are `:feature:voice`'s `VoiceProviderTests.kt` and
- * `:feature:settings`' `VoiceProviderTestsSettings.kt`.
- */
+/** `aReconnectForgetsTheServersModelsAndAnyAnswerStillComing`, which drives [HomeFeature]. */
 class VoiceProviderTestsHome {
     @get:Rule val isolation = TestIsolationRule()
 

@@ -14,8 +14,6 @@ import ai.opencode.server.model.nonEmpty
 import ai.opencode.server.model.trimmedWhitespace
 import kotlinx.serialization.json.JsonElement
 
-// Port of iOS `OpenCodeClient+RunMessages.swift`.
-
 internal suspend fun requestRunMessages(server: OpenCodeServer, sessionID: String, cursor: String?): OpenCodeRunMessagesPage {
     val response = perform(
         "/api/session/$sessionID/message",

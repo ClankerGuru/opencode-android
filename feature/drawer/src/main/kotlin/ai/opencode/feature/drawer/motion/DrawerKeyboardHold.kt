@@ -36,38 +36,17 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 /**
- * Port of `OpenCode/Drawer/DrawerKeyboardHold.swift`: the composer keeps its focus while the
- * drawer moves (OC-244).
+ * The composer keeps its focus while the drawer moves. Apps can't move the IME's window sideways,
+ * so [follow] drives its insets animation (`WindowInsetsController.controlWindowInsetsAnimation`),
+ * sliding the keys down as the card opens and back up as it closes ([ImeFollower]). Resting open
+ * they are down ([sendKeysAway]); where the insets can't be driven (TalkBack touch exploration, or
+ * the request refused) the keys stay put and step down at rest. Closing onto the same session gives
+ * the field back ([giveBack]); anything else lets it go ([letGo]). A card the keyboard is leaving,
+ * or drawer search, sets [excludesKeyboard].
  *
- * iOS slides the system keyboard's own window sideways with the card through a private UIKit
- * lookup (`follow`), so the card and its keys read as one card. The Android IME is another
- * process's window that apps can't move sideways, but an app can drive its insets animation
- * (`WindowInsetsController.controlWindowInsetsAnimation`): while the card moves, [follow] keeps
- * the keys with it by sliding them down out of the drawer's way as the card opens and back up
- * as it closes, frame for frame with the finger and the spring ([ImeFollower]); the card's
- * composer rides on them. Resting open they are down ([sendKeysAway]; the field keeps its
- * focus), and moving the card again brings them back with it. Where the insets can't be driven
- * (TalkBack touch exploration, as iOS keeps the keys still under VoiceOver; the request
- * refused), it's iOS's fallback: the keys stay put while the card moves and step down at rest.
- * Closing onto the same session gives the field back ([giveBack]); anything else (another
- * session, a new one, another field taking the keyboard) lets it go ([letGo]).
- *
- * A card the keyboard is leaving (another session or New Session chosen in the drawer,
- * [cardWillChange]) lays out without it from that moment ([excludesKeyboard]): the incoming
- * session's composer rests at the bottom from its first frame while the IME goes down.
- *
- * Drawer search's keyboard belongs to the drawer, never the peeking card: while search is open
- * or its keyboard is still leaving, [excludesKeyboard] is true too.
- *
- * Wiring (the drawer container): create with [rememberDrawerKeyboardHold], provide it as
- * [LocalDrawerKeyboardSignals] around the card (the composer marks its field with
- * `Modifier.drawerKeyboardField(key)`), report drawer fields through [drawerFieldFocusChanged],
- * and set [DrawerMotionState.keyboardHold] so the drag and settle drive it at iOS's points.
- *
- * Android mapping: the keys follow the card vertically, not sideways (no API moves the IME's
- * window across the screen), so iOS's `veil` (the scrim over keys beside the drawer) has
- * nothing to cover. Not ported: `DrawerKeyboardTrace` (iOS lab trace), `PrivateAPI` (no private
- * API lookups on Android).
+ * Wiring: create with [rememberDrawerKeyboardHold], provide it as [LocalDrawerKeyboardSignals]
+ * around the card, mark fields with `Modifier.drawerKeyboardField(key)`, report drawer fields
+ * through [drawerFieldFocusChanged], and set [DrawerMotionState.keyboardHold].
  */
 @Stable
 class DrawerKeyboardHold(
@@ -111,7 +90,7 @@ class DrawerKeyboardHold(
         fun cancel()
     }
 
-    /** Drives the IME's insets with the card ([follow]); `null` keeps the keys still (iOS's fallback). */
+    /** Drives the IME's insets with the card ([follow]); `null` keeps the keys still. */
     var follower: Follower? = null
         set(value) {
             field?.cancel()
@@ -119,7 +98,7 @@ class DrawerKeyboardHold(
             value?.onRefused = ::followRefused
         }
 
-    /** TalkBack's touch exploration finds the keys where the system put them, so they stay put (iOS VoiceOver rule). */
+    /** TalkBack's touch exploration finds the keys where the system put them, so they stay put. */
     var followsCard: Boolean = true
 
     /** Keys brought back while the card moves: the follower raises them with it, or [giveBack] shows them. */
@@ -133,7 +112,7 @@ class DrawerKeyboardHold(
 
     private class Field(val key: Any, val inDrawer: Boolean, val clearFocus: () -> Unit)
 
-    /** The focused field (iOS `UIResponder.current`). */
+    /** The focused field. */
     private var focused: Field? = null
 
     /** The field that keeps its focus while the card is away. */
@@ -199,7 +178,7 @@ class DrawerKeyboardHold(
         if (changed.inDrawer && !isDrawerSearching) releaseDrawerKeyboardWhenHidden()
     }
 
-    /** The IME started showing (`true`, iOS `keyboardWillShow`) or finished hiding (`false`, `keyboardDidHide`). */
+    /** The IME started showing or finished hiding (`false`, `keyboardDidHide`). */
     fun imeVisibilityChanged(visible: Boolean) {
         if (visible) {
             isKeyboardVisible = true
@@ -221,8 +200,8 @@ class DrawerKeyboardHold(
     }
 
     /**
-     * Drawer search opened or closed (iOS `setDrawerSearching`): while it's open or its keyboard
-     * is still leaving, the card and transcript ignore the keyboard.
+     * Drawer search opened or closed: while it's open or its keyboard is still leaving, the card
+     * and transcript ignore the keyboard.
      */
     fun setDrawerSearching(searching: Boolean) {
         isDrawerSearching = searching
@@ -259,8 +238,8 @@ class DrawerKeyboardHold(
     private val canFollow: Boolean get() = followsCard && follower != null
 
     /**
-     * The card is where it is: [progress] is how far the drawer is open (iOS `follow(card:dim:color:)`,
-     * every frame the card moves). The keys slide down as it opens and up as it closes.
+     * The card is where it is: [progress] is how far the drawer is open. The keys slide down as it
+     * opens and up as it closes.
      */
     fun follow(progress: Float) {
         val held = heldField ?: return
@@ -288,7 +267,7 @@ class DrawerKeyboardHold(
         if (!keysAway) return
         keysAway = false
         if (focused?.key != held.key) return
-        // Following, they come up with the card's next frames; else at once, as on iOS.
+        // Following, they come up with the card's next frames; else at once.
         if (canFollow) keysComingBack = true else ime?.show()
     }
 
@@ -304,12 +283,11 @@ class DrawerKeyboardHold(
     }
 
     /**
-     * Back from the background (iOS `didBecomeActiveNotification`): the system has the keys
-     * again and may bring the held field's up over the open drawer, so keys the hold sent down
-     * go down again (and [imeVisibilityChanged] catches the system restoring them after this).
-     * Only a hold whose keys rest under the card acts: mid-move the card's next frame follows
-     * it anyway, and nothing held leaves the keys to the system. iOS re-frames the keys' window
-     * here (5308241f); the Android IME has no window of ours to re-frame, only its shown state.
+     * Back from the background: the system has the keys again and may bring the held field's up
+     * over the open drawer, so keys the hold sent down go down again (and [imeVisibilityChanged]
+     * catches the system restoring them after this). Only a hold whose keys rest under the card
+     * acts: mid-move the card's next frame follows it anyway, and nothing held leaves the keys to
+     * the system. The Android IME has no window of ours to re-frame, only its shown state.
      */
     fun didBecomeActive() {
         val held = heldField ?: return
@@ -458,18 +436,15 @@ class DrawerKeyboardHold(
     }
 
     private companion object {
-        /** iOS `asyncAfter(.now() + 0.6)` for drawer search's keyboard. */
         const val SEARCH_RESTORE_MILLIS = 600L
-        /** iOS `asyncAfter(.now() + 1.5)` for a card the keyboard leaves. */
         const val LEAVE_RESTORE_MILLIS = 1_500L
     }
 }
 
 /**
- * Drives the IME's insets for [DrawerKeyboardHold.follow] (the Android counterpart of iOS moving
- * the keyboard's window): one controlled insets animation at a time, its shown fraction set each
- * frame, finished shown or hidden when the card rests. Asking for control while the keys are
- * down brings them up from hidden, so they rise with a closing card.
+ * Drives the IME's insets for [DrawerKeyboardHold.follow]: one controlled insets animation at a
+ * time, its shown fraction set each frame, finished shown or hidden when the card rests. Asking for
+ * control while the keys are down brings them up from hidden, so they rise with a closing card.
  */
 class ImeFollower(private val view: View) : DrawerKeyboardHold.Follower {
     private var controller: WindowInsetsAnimationController? = null
@@ -591,13 +566,9 @@ class ImeFollower(private val view: View) : DrawerKeyboardHold.Follower {
 
     /**
      * Compose moves `WindowInsets.imeAnimationSource` to the resting insets only when an animation
-     * with a duration ends, or on an insets dispatch outside any animation. A controlled animation
-     * has no duration (-1), and its last dispatch lands while it still runs, so after a hold the
-     * source kept the keys' height while the keys and the target were down: the composer's
-     * keyboard morph (`source != target`) saw the keyboard animating for good, kept its hidden
-     * model chips mounted over the field, and their touch gate swallowed every tap on it, until
-     * the IME's own next animation. A dispatch asked for now runs in the next frame's traversal,
-     * after the end is delivered; a second, a frame later, covers an end delivered late.
+     * with a duration ends, or on a dispatch outside any animation. A controlled animation has no
+     * duration, so after a hold this asks for a dispatch next frame, and a second a frame later for
+     * a late end.
      */
     private fun resyncInsets() {
         view.requestApplyInsets()
@@ -606,9 +577,9 @@ class ImeFollower(private val view: View) : DrawerKeyboardHold.Follower {
 }
 
 /**
- * A [DrawerKeyboardHold] wired to this window's IME: the soft keyboard controller shows and
- * hides the keys, and `WindowInsets.ime` reports when they start showing or finish hiding.
- * Releases the hold when it leaves composition (iOS `viewDidDisappear` → `release()`).
+ * A [DrawerKeyboardHold] wired to this window's IME: the soft keyboard controller shows and hides
+ * the keys, and `WindowInsets.ime` reports when they start showing or finish hiding. Releases the
+ * hold when it leaves composition.
  */
 @Composable
 fun rememberDrawerKeyboardHold(monitor: DrawerKeyboardMonitor? = null): DrawerKeyboardHold {
@@ -644,8 +615,7 @@ fun rememberDrawerKeyboardHold(monitor: DrawerKeyboardMonitor? = null): DrawerKe
                 monitor?.isImeVisible = visible
             }
     }
-    // Back from the background the keys go back where the hold had them (iOS observes
-    // `didBecomeActiveNotification`).
+    // Back from the background the keys go back where the hold had them.
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(hold, lifecycle) {
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) hold.didBecomeActive() }

@@ -28,8 +28,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 /**
- * iOS `ModelListEmptyState`: the search's empty state, else **Couldn’t Load Models** with the
- * error and **Try Again** (when [includesLoadError]), else **No Models**.
+ * The search's empty state, else **Couldn’t Load Models** with the error and **Try Again** (when
+ * [includesLoadError]), else **No Models**.
  */
 @Composable
 fun ModelListEmptyState(
@@ -58,7 +58,7 @@ fun ModelListEmptyState(
     }
 }
 
-/** iOS `ContentUnavailableView`: a large glyph, a title and a description, centred. */
+/** A large glyph, a title and a description, centred. */
 @Composable
 internal fun ContentUnavailable(
     symbol: SFSymbol,

@@ -22,32 +22,31 @@ import ai.opencode.server.ServerSharedKeys
 import ai.opencode.server.friendlyName
 
 /**
- * Home's connection, as Settings shows it (iOS `HomeFeature.State.ConnectionStatus`).
- * Home owns the stream and passes the status in ([SettingsFeature.Action.HomeChanged]).
+ * Home's connection, as Settings shows it. Home owns the stream and passes the status in
+ * ([SettingsFeature.Action.HomeChanged]).
  */
 enum class ConnectionStatus { reconnecting, connected, disconnected }
 
 /**
- * One page on Settings' own stack (iOS `NavigationLink` destinations in `SettingsView` and the
- * pages they push). [SettingsFeature.State.path] is the stack above the root page.
+ * One page on Settings' own stack. [SettingsFeature.State.path] is the stack above the root page.
  */
 sealed interface SettingsPage {
     /** Connection card › the server page (status, address, version, Servers, Rename Server…). */
     data object Server : SettingsPage
     data object Appearance : SettingsPage
     data object Themes : SettingsPage
-    /** Settings › Sessions (iOS `SessionsSettingsView`): the transcript and composer preferences. */
+    /** Settings › Sessions: the transcript and composer preferences. */
     data object Sessions : SettingsPage
     /** Settings › Models (experimental `hideModels`). */
     data object Models : SettingsPage
     /** Settings › Models › one provider (`ModelVisibilityProviderView`). */
     data class ModelProvider(val providerID: String) : SettingsPage
     data object Voice : SettingsPage
-    /** Settings › Voice › Voice Provider (iOS `VoiceProviderDetailPage`, Server Voice); [opensAccount] pushes Your Account over it. */
+    /** Settings › Voice › Voice Provider; [opensAccount] pushes Your Account over it. */
     data class VoiceProvider(val opensAccount: Boolean = false) : SettingsPage
-    /** Settings › Voice › Voice Provider › API Key (iOS `VoiceProviderAccountPage`). */
+    /** Settings › Voice › Voice Provider › API Key. */
     data object VoiceAccount : SettingsPage
-    /** Settings › Voice › Delegator (iOS `VoiceDelegatorSettingsPage`, OpenCode Session Delegator). */
+    /** Settings › Voice › Delegator. */
     data object VoiceDelegator : SettingsPage
     /** Settings › Voice › Voice (`CallVoicePicker`). */
     data object CallVoicePicker : SettingsPage
@@ -59,23 +58,22 @@ sealed interface SettingsPage {
     data object WhatsNew : SettingsPage
     /** One entry's page in What's New. */
     data class WhatsNewDetail(val entryID: String) : SettingsPage
-    /** What's New › Smaller Changes (iOS `WhatsNewSmallerList`). */
+    /** What's New › Smaller Changes. */
     data object WhatsNewSmallerChanges : SettingsPage
     /** Settings › Developer › Server Details. */
     data object ServerDetails : SettingsPage
     /** Settings › Experimental; [focus] scrolls to and tints that experiment's row (What's New). */
     data class Experimental(val focus: String? = null) : SettingsPage
-    /** Settings › Developer (iOS `DiagnosticsView`; Android's `:devtools` page). */
+    /** Settings › Developer. */
     data object Developer : SettingsPage
     data object Playgrounds : SettingsPage
-    /** Settings › Playgrounds › Motion (iOS `MotionPlaygroundView`; the page lives in `:devtools`). */
+    /** Settings › Playgrounds › Motion. */
     data object MotionPlayground : SettingsPage
 }
 
 /**
- * Port of iOS Settings (`SessionSettingsView` in `SettingsView.swift`, `SettingsPresentation`'s
- * state and the Settings half of `HomeFeature`). Home presents it (`HomeFeature.State.settings`)
- * over the drawer and session: an overlay with its own stack, never a push over Home.
+ * Home presents it (`HomeFeature.State.settings`) over the drawer and session: an overlay with its
+ * own stack, never a push over Home.
  *
  * Home keeps owning the connection and server management: it passes the server and its health
  * in through [Action.HomeChanged] and handles every [Action.Delegate] (switch, rename, edit,
@@ -96,7 +94,7 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
         val notificationPermission: NotificationPermission? = null,
         val isRequestingNotifications: Boolean = false,
         val notificationSetupError: String? = null,
-        /** The server half of notifications (iOS `HomeFeature.State.notifyPlugin`), read when Notifications opens. */
+        /** The server half of notifications, read when Notifications opens. */
         val notifyPlugin: NotifyPluginCheck? = null,
         /** What the push shows, fixed as it opens: Settings, or What's New from the drawer's row. */
         val root: Root = Root.settings,
@@ -146,13 +144,13 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
             val notifyPlugin: NotifyPluginCheck? = null,
         ) : Action
 
-        /** Push a page (iOS `NavigationLink`). */
+        /** Push a page. */
         data class PagePushed(val page: SettingsPage) : Action
         /** Back from the top page; at the root it closes Settings (`SettingsNavigator.escape`). */
         data object BackTapped : Action
         /**
-         * iOS `showSettings()`: Settings asked for while What's New is the page up cross-fades to
-         * Settings' root, keeping what was read.
+         * Settings asked for while What's New is the page up cross-fades to Settings' root, keeping
+         * what was read.
          */
         data object ShowSettingsRoot : Action
 
@@ -166,7 +164,7 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
         data class Delegate(val action: SettingsDelegate) : Action
     }
 
-    /** What Settings asks of Home (iOS sends these as `HomeFeature.Action`s from Settings' views). */
+    /** What Settings asks of Home. */
     sealed interface SettingsDelegate {
         /** Back at the root, or the swipe that closes Settings. */
         data object Close : SettingsDelegate
@@ -179,9 +177,9 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
         data class RemoveServer(val server: OpenCodeServer) : SettingsDelegate
         data object EnableNotificationsTapped : SettingsDelegate
         data object NotificationSettingsRequested : SettingsDelegate
-        /** Check Again, and opening Notifications (iOS `notifyPluginCheckRequested`). */
+        /** Check Again, and opening Notifications. */
         data object NotifyPluginCheckRequested : SettingsDelegate
-        /** Set Up with OpenCode (iOS `notifyPluginSetUpTapped`, 7969c85c). */
+        /** Set Up with OpenCode. */
         data object NotifyPluginSetUpTapped : SettingsDelegate
         /** What's New's action that leaves Settings for a session (`HomeFeature.tryWhatsNew`). */
         data class TryWhatsNew(val destination: WhatsNewEntry.Destination, val entryID: String) : SettingsDelegate
@@ -309,9 +307,8 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
         markWhatsNewRead(state, Effect.send(Action.Delegate(SettingsDelegate.Close)))
 
     /**
-     * Settings closing marks what was read in What's New as seen (iOS `whatsNew(.closed)` on
-     * `isSettingsShown` turning off). Reduced inline, before the close delegate, because Home drops
-     * this state when it handles the delegate.
+     * Settings closing marks what was read in What's New as seen. Reduced inline, before the close
+     * delegate, because Home drops this state when it handles the delegate.
      */
     private fun markWhatsNewRead(state: State, then: Effect<Action>): Reduced<State, Action> {
         val closed = WhatsNewFeature().reduce(state.whatsNew, WhatsNewFeature.Action.Closed)
@@ -335,7 +332,7 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
         return Reduced(next)
     }
 
-    /** Leaving a page drops what only it owned, which cancels its reads (iOS: the view's `.task` ends). */
+    /** Leaving a page drops what only it owned, which cancels its reads. */
     private fun setPath(state: State, path: List<SettingsPage>): Reduced<State, Action> {
         var next = state.copy(path = path)
         if (SettingsPage.ServerDetails !in path) next = next.copy(serverDetails = null)
@@ -349,8 +346,8 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
     }
 
     /**
-     * `ifLet` cancels the removed child's reads and polling. Cancel its server-side sign-in
-     * from the parent so that cleanup survives the child's removal (iOS `disappeared`).
+     * `ifLet` cancels the removed child's reads and polling. Cancel its server-side sign-in from
+     * the parent so that cleanup survives the child's removal.
      */
     private fun leaveServerDetails(old: ServerDetailsFeature.State?): Effect<Action> {
         old ?: return Effect.none()
@@ -361,15 +358,14 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
         is WhatsNewFeature.Action.TryTapped -> when (val destination = action.destination) {
             // A Settings page pushes over the entry's page; the rest leave through Home.
             is WhatsNewEntry.Destination.Open -> push(state, destination.page.settingsPage())
-            // A call before Voice is set up keeps the page and pushes Voice's settings over it
-            // (iOS `HomeFeature.tryWhatsNew`).
+            // A call before Voice is set up keeps the page and pushes Voice's settings over it.
             WhatsNewEntry.Destination.Call ->
                 if (whatsNewVoiceAvailable(state.server)) {
                     Reduced(state, Effect.send(Action.Delegate(SettingsDelegate.TryWhatsNew(destination, action.entryID))))
                 } else {
                     push(state, SettingsPage.Voice)
                 }
-            // A new session needs the server: offline the page stays (iOS `canTryWhatsNew`).
+            // A new session needs the server: offline the page stays.
             else -> if (!state.canTryWhatsNew(destination)) {
                 Reduced(state)
             } else {
@@ -380,7 +376,7 @@ class SettingsFeature : Reducer<SettingsFeature.State, SettingsFeature.Action> {
     }
 }
 
-/** The Settings page a What's New action opens (iOS `WhatsNewSettingsPage`). */
+/** The Settings page a What's New action opens. */
 fun WhatsNewEntry.SettingsDestination.settingsPage(): SettingsPage = when (this) {
     WhatsNewEntry.SettingsDestination.Themes -> SettingsPage.Themes
     WhatsNewEntry.SettingsDestination.Sessions -> SettingsPage.Sessions

@@ -4,10 +4,8 @@ import ai.opencode.server.OpenCodeServerEvent
 import ai.opencode.server.model.OpenCodeRunMessagesPage
 
 /**
- * `:server`'s internal wire decoders for other modules' tests: iOS tests call them as
- * `OpenCodeClient.decodeRunMessages(_:)` and `OpenCodeClient.decodeStreamFrame(_:decoder:)`
- * (e.g. `VoiceBackgroundResultTests`, `VoiceSessionDelegatorTests`). The decoders stay
- * `internal` to `:server`; only tests reach them, through here.
+ * `:server`'s internal wire decoders for other modules' tests. The decoders stay `internal` to
+ * `:server`; only tests reach them, through here.
  */
 object WireDecoders {
     /** One `/run/messages` page body, oldest message first. */

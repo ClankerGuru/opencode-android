@@ -12,8 +12,8 @@ import okhttp3.Request
 import java.util.concurrent.TimeUnit
 
 /**
- * A normalised public link (iOS `LinkPreviewTarget`). First-party metadata sources are selected
- * by strict URL shapes in [RichLinkSource]; arbitrary web pages aren't fetched.
+ * A normalised public link. First-party metadata sources are selected by strict URL shapes in
+ * [RichLinkSource]; arbitrary web pages aren't fetched.
  */
 sealed interface LinkPreviewTarget {
     data class XPost(val handle: String, val id: String) : LinkPreviewTarget
@@ -54,7 +54,7 @@ sealed interface LinkPreviewTarget {
     }
 }
 
-/** Which links may ever be previewed, and the one form each is keyed by (iOS `LinkPreviewPolicy`). */
+/** Which links may ever be previewed, and the one form each is keyed by. */
 object LinkPreviewPolicy {
     /**
      * Public web pages only: never loopback, private or tailnet hosts, IP literals, custom
@@ -79,7 +79,7 @@ object LinkPreviewPolicy {
         if (allowsTailnetImages && scheme == "https" && host.endsWith(".ts.net") && host.split(".").size == 4) {
             return queryNames(components).none(::isCredential)
         }
-        // `HttpUrl.port` is the scheme's default when none is named, which iOS allows too.
+        // `HttpUrl.port` is the scheme's default when none is named.
         if (!allowsCustomPort && components.port != 443 && components.port != 80) return false
         if (isIPLiteral(host)) return false
         // A single label (`intranet`, `nas`) is a local name.
@@ -143,16 +143,15 @@ object LinkPreviewPolicy {
 }
 
 /**
- * One attribute run of a Markdown block as link extraction reads it: its characters, its link,
- * and whether it is inline code. `OpenCodeMarkdownBlock` lives in `:feature:transcript`, above
- * media, so the transcript maps its `InlineRun`s into these.
+ * One attribute run of a Markdown block as link extraction reads it. `:feature:transcript` maps its
+ * `InlineRun`s into these.
  */
 data class LinkTextRun(val text: String, val link: String? = null, val isCode: Boolean = false)
 
 /**
- * The link-bearing text of one Markdown block (iOS reads `OpenCodeMarkdownBlock.Kind`):
- * [prose] for a paragraph, numbered or list item, blockquote or heading; [cells] (header then
- * rows) for a table; neither for code, images, pull requests, dividers, files, math and Mermaid.
+ * The link-bearing text of one Markdown block: [prose] for a paragraph, numbered or list item,
+ * blockquote or heading; [cells] (header then rows) for a table; neither for code, images, pull
+ * requests, dividers, files, math and Mermaid.
  */
 data class LinkTextBlock(
     val id: Int,
@@ -160,7 +159,7 @@ data class LinkTextBlock(
     val cells: List<List<LinkTextRun>> = emptyList(),
 )
 
-/** iOS `NSDataDetector(types: .link)` over plain text: each web URL with its character range. */
+/** Each web URL with its character range. */
 internal object LinkDetector {
     private val trailing = ".,;:!?'\"".toSet()
 
@@ -184,7 +183,7 @@ internal object LinkDetector {
     }
 }
 
-/** The links a reply names, in order, once each (iOS `LinkPreviewExtractor`). */
+/** The links a reply names, in order, once each. */
 object LinkPreviewExtractor {
     fun targets(blocks: List<LinkTextBlock>, limit: Int = 6): List<LinkPreviewTarget> {
         val seen = HashSet<String>()
@@ -220,8 +219,8 @@ object LinkPreviewExtractor {
 }
 
 /**
- * What is known about a link beyond its URL (iOS `LinkPreviewMetadata`). Posts come from X's
- * oEmbed; pages are the seam for metadata the server supplies with a reply.
+ * What is known about a link beyond its URL. Posts come from X's oEmbed; pages are the seam for
+ * metadata the server supplies with a reply.
  */
 @Serializable
 class LinkPreviewMetadata(

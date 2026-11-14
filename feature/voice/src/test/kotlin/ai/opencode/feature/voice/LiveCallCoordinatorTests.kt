@@ -19,10 +19,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Port of iOS `LiveCallCoordinatorTests`. The harness runs the coordinator on virtual time
- * (`VoiceLiveTestSupport.kt`), so iOS's wall-clock sleeps and limits are exact here.
- */
+/** The harness runs the coordinator on virtual time (`VoiceLiveTestSupport.kt`). */
 class LiveCallCoordinatorTests {
     private fun obj(vararg pairs: Pair<String, RealtimeJSON>) = RealtimeJSONs.obj(*pairs)
     private fun text(value: String) = obj("text" to RealtimeJSONs.string(value))
@@ -372,10 +369,6 @@ class LiveCallCoordinatorTests {
         }
     }
 
-    /**
-     * "Open code iOS" answered the voice agent's own question; it said
-     * "Opening." and never delegated.
-     */
     @Test fun theVoiceIsToldAClaimNeedsADelegationAndAnAnswerIsNoFragment() {
         val live = VoiceInstructions.buildLive(
             VoiceInstructions.Context(sessionTitle = "HOME", directoryName = "home", recentMessages = emptyList(), previousTail = emptyList(), previousEndedAt = null, managesSessions = true),
@@ -495,11 +488,10 @@ class LiveCallCoordinatorTests {
     }
 
     /**
-     * Replays Kit's call (Oct 19): after a network switch, "Um... Could pick a
-     * gymnasium Thanks", said over the HOME result, came back from the voice
-     * agent as "an unrelated note here about picking a gym". His words reach
-     * the model only as his own: live audio, `user` turns in a seed, or a
-     * catch-up transcript that says so; never inside a result or a note.
+     * After a network switch, "Um.. Could pick a gymnasium Thanks", said over the HOME result, came
+     * back from the voice agent as "an unrelated note here about picking a gym". His words reach
+     * the model only as his own: live audio, `user` turns in a seed, or a catch-up transcript that
+     * says so; never inside a result or a note.
      */
     @Test fun replayedGymCallKeepsTheUsersWordsTheirOwnAcrossReconnects() = runTest {
         val harness = LiveHarness(this)
@@ -568,13 +560,11 @@ class LiveCallCoordinatorTests {
     }
 
     /**
-     * Replays Kit's call (Oct 19) after the gym note: a switch cut "…it'll
-     * lock" off mid-sentence and the next session, seeded with it as its own
-     * turn, finished it and riffed on his son's "Bye, Keanu" ("kids say stuff…
-     * I can say bye to him"). After "I was talking to somebody else… Catch me
-     * up" and another switch, it repeated those lines word for word: its own
-     * replies were all it knew of the call. A cut-off reply is seeded as cut
-     * off, never as a turn to finish, and the seed lists the real results.
+     * A switch cut "…it'll lock" off mid-sentence and the next session, seeded with it as its own
+     * turn, finished it and riffed on his son's "Bye, Keanu" ("kids say stuff… I can say bye to
+     * him"). After "I was talking to somebody else… Catch me up" and another switch, it repeated
+     * those lines word for word: its own replies were all it knew of the call. A cut-off reply is
+     * seeded as cut off, never as a turn to finish, and the seed lists the real results.
      */
     @Test fun replayedKeanuCallSeedsRealResultsAndNeverAReplyToFinish() = runTest {
         val timing = VoiceCallTiming(
@@ -815,11 +805,7 @@ class LiveCallCoordinatorTests {
         liveAcknowledgementWait = liveAcknowledgementWait,
     )
 
-    /**
-     * iOS's `Harness(timing:clock: VoiceTestClock().clock)` and its iterator:
-     * the test's virtual time is the clock, and reading the events never
-     * moves it.
-     */
+    /** The test's virtual time is the clock, and reading the events never moves it. */
     private suspend fun TestScope.connectedOnTheClock(harness: LiveHarness): Pair<ClockedEvents, FakeLiveSocket> {
         val events = ClockedEvents(harness.start(), backgroundScope)
         val socket = harness.nextOpened()
@@ -828,13 +814,11 @@ class LiveCallCoordinatorTests {
         return events to socket
     }
 
-    /** iOS `time.advance(by:)`. */
     private fun TestScope.advance(milliseconds: Int) {
         testScheduler.advanceTimeBy(milliseconds.toLong())
         testScheduler.runCurrent()
     }
 
-    /** iOS `while await harness.coordinator.acknowledgements[id] == nil { await Task.yield() }`. */
     private suspend fun awaitAcknowledgement(harness: LiveHarness, id: String) {
         val mark = TimeSource.Monotonic.markNow()
         while (harness.coordinator.serialized { harness.coordinator.acknowledgements[id] } == null) {

@@ -24,10 +24,8 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * iOS `MediaReferenceTests.swift`, the session's part: re-sending a `media:<hash>` image restores
- * it without its bytes, sends the reference as is, and a revert loads the bytes (iOS 7f5ac4c5).
- * The wire and decoding tests are `:server`'s, the loader's `:feature:media`'s, and the load key
- * `:feature:transcript`'s.
+ * The session's part: re-sending a `media:<hash>` image restores it without its bytes, sends the
+ * reference as is, and a revert loads the bytes.
  */
 class MediaReferenceTests {
     private val hashA = "a1".repeat(32)

@@ -13,9 +13,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.res.stringResource
 
 /**
- * Port of iOS `Settings/SessionsSettingsView.swift` (and `DefaultAgentSection` from
- * `Composer/AgentPicker.swift`): Settings › Sessions, Composer (Return Key Sends and the default
- * agent). Replaces Settings › Composer (iOS 302b95e7).
+ * Settings › Sessions, Composer (Return Key Sends and the default agent). Replaces Settings ›
+ * Composer.
  */
 @Composable
 fun SessionsSettingsView(store: SettingsStore) {

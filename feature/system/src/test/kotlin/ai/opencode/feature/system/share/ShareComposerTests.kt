@@ -43,9 +43,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-// Ports of iOS `ShareComposerTests.swift`: the share sheet's composer (OC-218): the credentials
-// the app shares with it, its sends, what it hands the app. `ShareComposerAppTests` (the app
-// taking a share over) is `HomeFeature`'s, in `:feature:drawer`.
+// The share sheet's composer: the credentials the app shares with it, its sends, what it hands the
+// app.
 
 private val server = OpenCodeServer(
     url = "http://studio.tail1234.ts.net:4096", username = "opencode", password = "secret",
@@ -57,10 +56,6 @@ private val server = OpenCodeServer(
 /**
  * `removingAServerForgetsItsCredentialsOnly` (`ShareInboxClient.live` needs an Android `Context`
  * for its files and sharing shortcuts) runs under Robolectric in [ShareCredentialsFrameworkTests].
- * Not ported: `keychainItemRoundTripsUpdatesAndRemoves` (the item is an `AndroidKeyStore`-encrypted
- * `SharedKey.keychain`; Robolectric has no `AndroidKeyStore` provider),
- * `extensionTransportSecurityMatchesTheApp` (iOS ATS / `NSExtension` plist: Android's share target
- * runs in the app's process under its network security config).
  */
 class ShareCredentialsTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -160,9 +155,8 @@ class ShareCredentialsFrameworkTests {
 // MARK: Handoff format
 
 /**
- * Android writes and reads its own handoff files (the share target runs in the app's process),
- * so “from before” means this port's JSON without the fields added later, not iOS's
- * `JSONEncoder` dates and enum keys.
+ * Android writes and reads its own handoff files (the share target runs in the app's process), so
+ * “from before” means this port's JSON without the fields added later.
  */
 class ShareHandoffDeliveryTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -230,8 +224,6 @@ private fun json(data: ByteArray?): JsonObject = Json.parseToJsonElement(String(
 private val encoder = Json { encodeDefaults = true; explicitNulls = false }
 
 /**
- * `promptBodyMatchesTheApps` compares with the app's body as `:server`'s (internal)
- * `promptBody` writes it for the same message (see `LivePrompts.kt`).
  * The two file tests stage through `ComposerFileStaging`, whose type sniffing reads Android's
  * `MimeTypeMap`: they're in [ShareSenderFrameworkTests].
  */
@@ -330,10 +322,7 @@ class ShareSenderTests {
     }
 }
 
-/**
- * [ShareSenderTests]' file sends, staged as iOS does through `ComposerFileStaging.stage` (its
- * type sniffing reads Android's `MimeTypeMap`; Robolectric's real one on API 35).
- */
+/** [ShareSenderTests]' file sends, staged. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class ShareSenderFrameworkTests {
@@ -397,9 +386,8 @@ class ShareSenderFrameworkTests {
 // MARK: The sheet's decisions
 
 /**
- * `sharesJoiningOneComposerSendOnlyWhenAllAskTo` is `SharedComposerDraft`'s (`:feature:composer`).
  * `suggestionsAreOutgoingMessagesToTheSession`: Android's suggestion is a sharing shortcut, not an
- * `INSendMessageIntent`; its ID carries the same conversation (title and message type are iOS's).
+ * `INSendMessageIntent`; its ID carries the same conversation.
  */
 class ShareCompositionTests {
     @get:Rule val isolation = TestIsolationRule()

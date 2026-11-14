@@ -10,14 +10,10 @@ import org.robolectric.annotation.Config
 import org.junit.Test
 
 /**
- * Port of iOS `OpenCodeTests/TranscriptDragTests.swift` ("Transcript Drag Sources"): the
- * [TranscriptDragPayload] model, its file names and MIME types (iOS `UTType`s).
- *
  * The drag's data itself is a `ClipData` and `content://` URIs, and names from MIME types use
- * `MimeTypeMap`; both are stubs in plain JVM tests, so the class runs under Robolectric. Those
- * halves are the `…Framework` tests beside the iOS names. iOS's off-main-thread
- * loading has no Android counterpart: the `ClipData` is built when the drag starts and media's
- * `AgentFileDragProvider` serves bytes on the reader's thread.
+ * `MimeTypeMap`; both are stubs in plain JVM tests, so the class runs under Robolectric. The
+ * `ClipData` is built when the drag starts and media's `AgentFileDragProvider` serves bytes on the
+ * reader's thread.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -64,7 +60,10 @@ class TranscriptDragTests {
         assertTrue(untagged.mimeTypes.contains(PLAIN))
     }
 
-    /** iOS: `ts` and `tsx` conform to `.sourceCode`; Android has no source-code supertype, so a text type. */
+    /**
+     * `ts` and `tsx` conform to `.sourceCode`; Android has no source-code supertype, so a text
+     * type.
+     */
     @Test
     fun codeLanguageMappingCoversCommonFenceTagsFramework() {
         for (tag in listOf("ts", "tsx")) {

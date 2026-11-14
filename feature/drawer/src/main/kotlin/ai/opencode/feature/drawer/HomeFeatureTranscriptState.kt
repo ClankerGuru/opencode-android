@@ -15,13 +15,9 @@ import ai.opencode.server.model.OpenCodeTranscriptItem
 import ai.opencode.server.model.SessionActivity
 import java.time.Instant
 
-/*
- * Port of iOS `HomeFeature+TranscriptState.swift`: Home's cached snapshot, the inbox baseline, and
- * the in-memory and on-disk transcript caches. (iOS's lab switch `LabTranscriptDiskCache` is a
- * DEBUG/PERF environment toggle with no Android equivalent; the disk cache is always on.)
- */
+// Home's cached snapshot, the inbox baseline, and the in-memory and on-disk transcript caches.
 
-/** The cached Home snapshot for this server (iOS `cachedHomeSnapshot`). */
+/** The cached Home snapshot for this server. */
 val HomeFeature.State.cachedHomeSnapshot: CachedHomeSnapshot?
     get() = shared(ServerSharedKeys.cachedHomeSnapshots).value[server.persistenceID]
 

@@ -14,11 +14,10 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 
-// iOS `VoiceTestClock` is not ported: `runTest`'s virtual time already is a
-// clock that moves only when the test advances it. The coordinator runs on a
-// `StandardTestDispatcher` of the test's scheduler and reads time from the
-// `Clock` dependency bound to it (`virtualClock()`), so `advanceTimeBy` +
-// `runCurrent` wakes every timer due by the new time, as iOS's `advance(by:)`.
+// `runTest`'s virtual time is the clock: it moves only when the test advances it. The coordinator
+// runs on a `StandardTestDispatcher` of the test's scheduler and reads time from the `Clock`
+// dependency bound to it (`virtualClock()`), so `advanceTimeBy` + `runCurrent` wakes every timer
+// due by the new time.
 
 /**
  * A live call on the test's virtual time, with steps that return once the
@@ -42,10 +41,8 @@ class VoiceClockedCall private constructor(
     }
 
     /**
-     * The reconnect after a lost session first sleeps its retry delay. iOS
-     * sleeps it on the wall clock, which runs on while `waitUntil` polls and
-     * the call's clock stands still; the Kotlin coordinator sleeps every timer
-     * on the one `Clock`, so the test steps virtual time over the delay.
+     * The reconnect after a lost session first sleeps its retry delay. The Kotlin coordinator
+     * sleeps every timer on the one `Clock`, so the test steps virtual time over the delay.
      */
     fun retryDelayPasses() = advance((timing.retryDelays.first() * 1_000).roundToInt())
 
@@ -104,10 +101,7 @@ class VoiceClockedCall private constructor(
         while (!condition() && mark.elapsedNow() < 5.seconds) yield()
     }
 
-    /**
-     * iOS's real-time `Task.sleep` in a clocked test: the call does all the
-     * work it can while the clock stands still.
-     */
+    /** The call does all the work it can while the clock stands still. */
     suspend fun settle() {
         repeat(50) {
             test.testScheduler.runCurrent()
@@ -115,7 +109,7 @@ class VoiceClockedCall private constructor(
         }
     }
 
-    /** iOS `await task.value`: waits for [job] without moving the clock. */
+    /** Waits for [job] without moving the clock. */
     suspend fun join(job: Job) = until { job.isCompleted }
 
     /**
@@ -180,10 +174,8 @@ class VoiceClockedCall private constructor(
     }
 }
 
-/** iOS `VoiceClockedCall.start(_:)` from a test body. */
 suspend fun TestScope.clockedCall(timing: VoiceCallTiming): VoiceClockedCall = VoiceClockedCall.start(this, timing)
 
-/** iOS `VoiceClockedCall.idle(resultMaxHold:answerSpeakingHold:)` from a test body. */
 suspend fun TestScope.idleCall(
     resultMaxHold: Duration = 1.seconds,
     answerSpeakingHold: Duration = 4.seconds,
@@ -192,10 +184,8 @@ suspend fun TestScope.idleCall(
 ): VoiceClockedCall = VoiceClockedCall.idle(this, resultMaxHold, answerSpeakingHold, progress, delegation)
 
 /**
- * A clocked call's events, like iOS's iterator over `call.events`, read
- * without moving time: a test body suspended on a channel would let
- * `runTest` skip ahead to the next timer, where iOS's iterator waits in real
- * time while the test clock stands still.
+ * A clocked call's events, read without moving time: a test body suspended on a channel would
+ * let `runTest` skip ahead to the next timer while the test clock should stand still.
  */
 class ClockedEvents(flow: Flow<VoiceCallEvent>, scope: CoroutineScope) {
     private val received = mutableListOf<VoiceCallEvent>()

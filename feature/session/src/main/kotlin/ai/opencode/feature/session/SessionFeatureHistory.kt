@@ -19,8 +19,6 @@ import kotlinx.coroutines.isActive
 import kotlin.math.roundToLong
 import kotlin.time.Duration.Companion.milliseconds
 
-// Port of iOS `SessionFeature+History.swift`.
-
 /** The New divider, earlier history, and transcript reads. Null: the action passes on. */
 internal fun SessionFeature.reduceHistory(
     state: SessionFeature.State,
@@ -201,11 +199,10 @@ private fun SessionFeature.transcriptResponse(
 }
 
 /**
- * iOS `SessionFeature.mergeOlderPage(_:into:before:reachedLoadedItems:id:)`: O(loaded + page)
- * reconciliation. Index IDs once, splice through integer links, then materialize once. Older
- * values never replace newer ones, and unknown rows after the last known anchor remain ignored.
- * Indexing newly inserted nodes also preserves the reverse-scan rule for repeated page IDs.
- * `null` means a disjoint page must keep seeking overlap.
+ * O(loaded + page) reconciliation. Index IDs once, splice through integer links, then materialize
+ * once. Older values never replace newer ones, and unknown rows after the last known anchor remain
+ * ignored. Indexing newly inserted nodes also preserves the reverse-scan rule for repeated page
+ * IDs. `null` means a disjoint page must keep seeking overlap.
  */
 internal fun <Item, ID> SessionFeature.Companion.mergeOlderPage(
     page: List<Item>,
@@ -299,13 +296,13 @@ internal fun SessionFeature.abandonRefresh(state: SessionFeature.State): Reduced
     Effect.cancel(listOf(CancelID.Freshness, CancelID.ResyncDelay, CancelID.ResyncMinimum)),
 )
 
-/** iOS `SessionFeature.pruneAnswerDrafts(_:to:)`: bar drafts are keyed by request or "request/field" (`answerTarget`). */
+/** Bar drafts are keyed by request or "request/field" (`answerTarget`). */
 internal fun SessionFeature.Companion.pruneAnswerDrafts(drafts: Map<String, String>, live: Set<String>): Map<String, String> {
     fun isLive(key: String): Boolean = key in live || key.indexOf('/').let { it >= 0 && key.substring(0, it) in live }
     return if (drafts.keys.any { !isLive(it) }) drafts.filterKeys(::isLive) else drafts
 }
 
-/** iOS `SessionFeature.prune(_:to:)`: drops entries whose keys are no longer in [live]. */
+/** Drops entries whose keys are no longer in [live]. */
 internal fun <V> SessionFeature.Companion.prune(values: Map<String, V>, live: Set<String>): Map<String, V> =
     if (values.keys.any { it !in live }) values.filterKeys { it in live } else values
 
@@ -313,7 +310,6 @@ internal fun <V> SessionFeature.Companion.prune(values: Map<String, V>, live: Se
 internal val SessionFeature.Companion.resyncCueDelay get() = 350.milliseconds
 internal val SessionFeature.Companion.resyncCueMinimum get() = 900.milliseconds
 
-/** iOS `beginResync(_:refreshID:)`. */
 internal fun SessionFeature.beginResync(state: SessionFeature.State, refreshID: Int): Reduced<SessionFeature.State, Action> {
     if (state.session == null) return Reduced(state)
     // A read starting while the title breathes keeps it breathing: it now waits on this read, and
@@ -332,7 +328,6 @@ internal fun SessionFeature.beginResync(state: SessionFeature.State, refreshID: 
     )
 }
 
-/** iOS `settleResync(_:refreshID:)`. */
 internal fun SessionFeature.settleResync(state: SessionFeature.State, refreshID: Int): Reduced<SessionFeature.State, Action> {
     val resync = state.resync
     if (resync == null || resync.refreshID != refreshID) return Reduced(state)
@@ -343,7 +338,7 @@ internal fun SessionFeature.settleResync(state: SessionFeature.State, refreshID:
     }
 }
 
-/** iOS `cacheTailIDs(_:)`: the newest rows Home caches, past the prompts it leaves out. */
+/** The newest rows Home caches, past the prompts it leaves out. */
 internal fun SessionFeature.Companion.cacheTailIDs(state: SessionFeature.State): List<String> {
     val excluded = state.optimisticPromptIDs.size + state.failedSends.size
     val count = SessionFeature.initialFetchLimit + 3 * excluded
@@ -356,9 +351,8 @@ internal fun SessionFeature.Companion.cacheTailIDs(state: SessionFeature.State):
 /**
  * The window keeps the rows a returning reader glides past; once they've been at the end a moment
  * it lets go of the history paged in above (`RenderedWindowSettled`), so every later update works
- * on a screen or two of rows rather than everything they paged through. The wait runs on the
- * clock the glide runs on: slowed with animation slow motion (iOS also scales it by the lab's
- * jump slow motion, which Android doesn't have).
+ * on a screen or two of rows rather than everything they paged through. The wait runs on the clock
+ * the glide runs on: slowed with animation slow motion.
  */
 internal fun SessionFeature.scheduleWindowReset(state: SessionFeature.State): Effect<Action> {
     if (!sessionTimers.windowReset || state.visibleLimit <= SessionFeature.baseVisibleLimit) return Effect.none()

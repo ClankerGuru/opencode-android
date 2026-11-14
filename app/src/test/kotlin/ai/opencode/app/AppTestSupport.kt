@@ -17,9 +17,8 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * The process-wide `@Shared` storage iOS tests write through `state.$savedServers.withLock`: one
- * in-memory [SharedStore] per test, installed both where a test builds `AppFeature.State()` and in
- * the store, so the state's `Shared` references and the reducer's `shared(...)` reads agree.
+ * One in-memory [SharedStore] per test, installed both where a test builds `AppFeature.State()` and
+ * in the store, so their `Shared` references agree.
  */
 class AppTestShared {
     val store: SharedStore = SharedStore.inMemory()
@@ -28,11 +27,10 @@ class AppTestShared {
 
     fun <R> run(block: () -> R): R = DependencyValues.withValues(values, block)
 
-    /** iOS `AppFeature.State()`: the saved server and its cached Home restored. */
+    /** The saved server and its cached Home restored. */
     fun appState(): AppFeature.State = run { AppFeature.State.initial() }
 }
 
-/** iOS `TestStore(initialState:) { AppFeature() } withDependencies:`. */
 fun AppTestShared.appStore(
     state: AppFeature.State,
     scope: CoroutineScope,
@@ -44,14 +42,13 @@ fun AppTestShared.appStore(
     }
 
 /**
- * Effects launch here instead of the test's own scope, so a test that ends with work still in
- * flight cancels it (TCA's `skipInFlightEffects`) rather than the runner waiting on it.
+ * Effects launch here instead of the test's own scope, so work still in flight when a test ends is
+ * cancelled (TCA's `skipInFlightEffects`).
  */
 fun detachedScope(context: CoroutineContext): CoroutineScope = CoroutineScope(context + Job())
 
 fun CoroutineScope.skipInFlightEffects() = cancel()
 
-/** iOS `LockIsolated`. */
 class Locked<T>(initial: T) {
     @Volatile private var current: T = initial
     val value: T get() = synchronized(this) { current }
@@ -59,19 +56,19 @@ class Locked<T>(initial: T) {
     fun update(block: (T) -> T) = synchronized(this) { current = block(current) }
 }
 
-/** iOS `eventually`: polls until [condition] holds. */
+/** Polls until [condition] holds. */
 suspend fun eventually(timeout: Duration = 5.seconds, condition: () -> Boolean) {
     withTimeout(timeout) { while (!condition()) delay(10) }
 }
 
-/** iOS `store.receive(\.case)`: the next action of type [T]. */
+/** The next action of type [T]. */
 suspend inline fun <reified T : AppFeature.Action> TestStore<AppFeature.State, AppFeature.Action>.receiveCase(
     noinline update: ((AppFeature.State) -> AppFeature.State)? = null,
 ) = receive({ it is T }, T::class.simpleName ?: "action", update = update)
 
 /**
- * iOS `gatedHomeStore`: health passes, and Home's snapshot waits for [GatedHome.snapshots].
- * Closing the channel without a value fails the read as cancelled.
+ * Health passes, and Home's snapshot waits for [GatedHome.snapshots]. Closing the channel without a
+ * value fails the read as cancelled.
  */
 class GatedHome {
     val snapshots = Channel<OpenCodeHomeSnapshot>(Channel.UNLIMITED)

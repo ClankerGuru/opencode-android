@@ -7,17 +7,6 @@ import org.junit.Test
 import java.time.Instant
 import java.util.UUID
 
-/**
- * Port of iOS `FileAttachmentTests.swift`, the part whose subject lives in `:feature:composer`
- * (`FileAttachmentFeatureTests.composerAttachmentsFeatureReducesLocationAndAttachmentRemovalExhaustively`).
- *
- * `AttachmentFileTypeTests` → `:core` (`core/src/test/.../files/AttachmentFileTypeTests.kt`).
- * Skipped → `:feature:session`: the other `FileAttachmentFeatureTests` (they drive
- * `SessionFeature`'s staging, uploads, deferred send and model inputs). Skipped → `:server`:
- * `PromptPresentationTests` (`OpenCodePromptPresentation`, transcript decoding; its
- * `TranscriptEntry` assertion → `:feature:transcript`) and `FileAttachmentWireTests` (live
- * client wire format). Skipped → `:feature:system`: `ShareHandoffFileTests`.
- */
 class FileAttachmentFeatureTests {
     @Test fun composerAttachmentsFeatureReducesLocationAndAttachmentRemovalExhaustively() = runTest {
         val place = SharedLocation(latitude = 37.77, longitude = -122.41, capturedAt = Instant.ofEpochSecond(1_000))

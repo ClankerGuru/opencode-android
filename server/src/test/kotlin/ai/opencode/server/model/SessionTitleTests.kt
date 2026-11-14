@@ -13,7 +13,7 @@ import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
 
-/** The session title rule (iOS `SessionTitleTests`): a real title wins, else the first prompt, else the placeholder. */
+/** The session title rule: a real title wins, else the first prompt, else the placeholder. */
 class SessionTitleTests {
     @get:Rule val isolation = TestIsolationRule()
 

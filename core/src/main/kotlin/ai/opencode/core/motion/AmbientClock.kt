@@ -15,12 +15,8 @@ import kotlin.math.cos
 import kotlin.math.max
 
 /**
- * One clock for every ambient loop (iOS `AmbientClock`, `Core/Motion/AmbientClock.swift`):
- * breathing dots and sweeping shimmers derive their phase from the same (slow-motion aware)
- * time, so two loops on screen stay in step, and a loop that remounts resumes in phase.
- *
- * iOS `breathTimingFunction` and `RenderServerLoop` (Core Animation loops) are n/a: Compose
- * loops run on the frame clock through [AmbientTimeline].
+ * One clock for every ambient loop, so loops on screen stay in step and a remounted loop resumes in
+ * phase.
  */
 object AmbientClock {
     val breathPeriod: Double get() = max(0.2, MotionTunables.breathPeriod.value)
@@ -57,7 +53,7 @@ object AmbientClock {
     }
 }
 
-/** How often an ambient loop redraws (iOS `AmbientRate`): full rate in front, half behind. */
+/** How often an ambient loop redraws: full rate in front, half behind. */
 enum class AmbientRate {
     Foreground, Background;
 
@@ -69,9 +65,8 @@ enum class AmbientRate {
 }
 
 /**
- * iOS `AmbientTimelineView`: draws [content] with the clock's sample on each frame (at most
- * [rate]), and holds [AmbientClock.Sample.settled] while paused: under Reduce Motion, when not
- * [isActive], or while the screen isn't resumed.
+ * Draws [content] each frame (at most [rate]); settled under Reduce Motion, when not [isActive], or
+ * while not resumed.
  */
 @Composable
 fun AmbientTimeline(

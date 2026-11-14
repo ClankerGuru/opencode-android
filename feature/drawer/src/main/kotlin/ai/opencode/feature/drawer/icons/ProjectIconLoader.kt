@@ -43,16 +43,15 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-/** An entry that expires (iOS `ExpiringCacheEntry`); kept on disk until [retentionDate]. */
+/** An entry that expires; kept on disk until [retentionDate]. */
 interface ExpiringCacheEntry {
     val expires: Instant
     val retentionDate: Instant get() = expires
 }
 
 /**
- * Memory and SHA-256-named JSON disk cache (iOS `CoalescedDiskCache`, shared there by the
- * link-preview, site-icon and project-icon loaders). Thread-safe; disk I/O runs on the
- * caller's thread, so call it off the main thread.
+ * Memory and SHA-256-named JSON disk cache. Thread-safe; disk I/O runs on the caller's thread, so
+ * call it off the main thread.
  */
 class CoalescedDiskCache<M : ExpiringCacheEntry, D : ExpiringCacheEntry>(
     val directory: File?,
@@ -125,9 +124,8 @@ class CoalescedDiskCache<M : ExpiringCacheEntry, D : ExpiringCacheEntry>(
 }
 
 /**
- * Memory and SHA-256 disk cache for project icons, coalescing in-flight fetches per icon key
- * and decoding off the main thread (iOS `ProjectIconLoader`). Reached only through
- * [ProjectIconClient].
+ * Memory and SHA-256 disk cache for project icons, coalescing in-flight fetches per icon key and
+ * decoding off the main thread. Reached only through [ProjectIconClient].
  */
 class ProjectIconLoader(
     private val fetch: Fetch,
@@ -190,8 +188,8 @@ class ProjectIconLoader(
     }
 
     /**
-     * The icon, from memory, disk or the network. Fetches coalesce per key, and a waiter
-     * cancelling never cancels the shared fetch (iOS's unstructured coalesced task).
+     * The icon, from memory, disk or the network. Fetches coalesce per key, and a waiter cancelling
+     * never cancels the shared fetch.
      */
     suspend fun load(request: ProjectIconRequest): ProjectIconResult {
         val key = request.cacheKey
@@ -313,7 +311,7 @@ class ProjectIconLoader(
         val missingLifetime: Duration = Duration.ofSeconds(12L * 3600)
         private const val MEMORY_LIMIT = 128
 
-        /** iOS's 2 MB streaming cap for an image response (`LinkPreviewTransport`). */
+        /** A 2 MB streaming cap for an image response. */
         const val maxResponseBytes = 2 shl 20
 
         private val RecordJson = Json { ignoreUnknownKeys = true }
@@ -458,7 +456,7 @@ private suspend fun Call.awaitCapped(limit: Int): ProjectIconLoader.FetchRespons
     })
 }
 
-/** Loads and caches project icons (iOS `ProjectIconClient`). */
+/** Loads and caches project icons. */
 class ProjectIconClient(
     /** A fresh in-memory result, without I/O: safe on the main thread. */
     val cached: (ProjectIconRequest) -> ProjectIconResult? = { null },

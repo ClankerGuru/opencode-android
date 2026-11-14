@@ -29,14 +29,7 @@ import org.junit.Rule
 import org.junit.Test
 
 /*
- * The parsing and presentation half of iOS `OpenCodeTests/SessionLinkTests.swift` (session IDs in
- * replies link like desktop's `session-mention.ts`). iOS `AttributedString` runs → [InlineText]
- * runs; `AttributedString(markdown:)` → [InlineMarkdownParser.parse]; iOS
- * `InlineLinkText.decorate` and `PresentedMarkdownText.make` → [MarkdownPresentation.present].
- *
- * Elsewhere: `linkURLRoundTripsItsIDAndTitle` (`:server`); the `SessionFeature` tests
- * (`:feature:session`); the `HomeFeature` tests (`:feature:drawer`); `testSessionLinkCPU`
- * (env-gated benchmark, not ported).
+ * `AttributedString(markdown:)` → [InlineMarkdownParser.parse].
  *
  * Dropped: `reinjectingAnEqualContextDoesNotRedrawItsReaders` (a `UIHostingController` redraw
  * count; Android's [SessionLinkContext] carries no closure, only targets and the row, so an equal
@@ -60,7 +53,7 @@ class SessionLinkTests {
         return (kind as? Kind.Paragraph)?.text ?: run { fail("Not a paragraph"); throw AssertionError() }
     }
 
-    /** iOS `runs[SessionChipKey.self].compactMap(\.0)`: each run of one chip, once. */
+    /** Each run of one chip, once. */
     private fun chips(text: InlineText): List<SessionChip> {
         val out = mutableListOf<SessionChip>()
         var previous: SessionChip? = null
@@ -136,7 +129,7 @@ class SessionLinkTests {
         assertEquals(ID, SessionLink.id(link))
         assertEquals("HOME", SessionLink.title(link))
         assertFalse("A title reads as text", titled.text.runs.first { it.link != null }.code)
-        // iOS: no run is link blue or filled. Android styles at presentation.
+        // No run is link blue or filled. Android styles at presentation.
         val shown = present(text, mapOf(ID to SessionLinkTarget.Session("HOME", null)))
         assertTrue(
             "Not blue, no square fill",
@@ -173,7 +166,7 @@ class SessionLinkTests {
 
     // endregion
 
-    // region Hot paths (OC-486)
+    // region Hot paths
 
     @Test fun aStreamedDeltaLeavesTheRowsLinkContextEqual() {
         val targets = mapOf<String, SessionLinkTarget>(ID to SessionLinkTarget.Session("HOME", null))
@@ -238,7 +231,6 @@ class SessionLinkTests {
     // endregion
 }
 
-/** Swift `try #require(…)`. */
 private fun <T : Any> required(value: T?): T {
     assertNotNull(value)
     return value!!

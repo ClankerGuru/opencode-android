@@ -26,13 +26,8 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 
-/**
- * Shared setup for the ports of iOS `HomeFeatureTests.swift` (`SessionSwitchTests`,
- * `HomeFeatureTests`, `FirstSendSurvivesNavigationTests`). Everything lives in this object so
- * it never clashes with other test files' helpers.
- */
+/** Everything lives in this object so it never clashes with other test files' helpers. */
 internal object HomeFeatureTestSupport {
-    /** Swift's `Date.distantPast` / `Date.distantFuture`. */
     val distantPast: Instant = Instant.parse("0001-01-01T00:00:00Z")
     val distantFuture: Instant = Instant.parse("4001-01-01T00:00:00Z")
 
@@ -68,7 +63,6 @@ internal object HomeFeatureTestSupport {
         parents: Map<String, String>? = null,
     ) = OpenCodeHomeSnapshot(projects = projects, sessions = sessions, activeSessionIDs = active, activeSessionParents = parents)
 
-    /** iOS `LockIsolated`. */
     class LockIsolated<T>(initial: T) {
         @Volatile private var current: T = initial
         val value: T get() = synchronized(this) { current }
@@ -79,7 +73,7 @@ internal object HomeFeatureTestSupport {
     fun <T> LockIsolated<List<T>>.append(value: T) = update { it + value }
     fun LockIsolated<Int>.increment() = update { it + 1 }
 
-    /** iOS `AsyncStream<Void>` used as a gate: `for await _ in stream { break }` returns at the first yield or the finish. */
+    /** `for await _ in stream { break }` returns at the first yield or the finish. */
     class Gate {
         private val channel = Channel<Unit>(Channel.UNLIMITED)
         suspend fun await() {
@@ -93,17 +87,17 @@ internal object HomeFeatureTestSupport {
         }
     }
 
-    /** Lets launched effects run (iOS effects start eagerly on the main actor). */
+    /** Lets launched effects run. */
     suspend fun settle(times: Int = 50) = repeat(times) { yield() }
 
-    /** A copy of the inert test client (iOS `$0.openCodeClient.x = …` on the test value). */
+    /** A copy of the inert test client. */
     fun client(block: OpenCodeClient.() -> OpenCodeClient = { this }): OpenCodeClient = OpenCodeClient.testValue.block()
 
     /**
      * One test's dependency world: the shared store, composer persistence, outbox and transcript
-     * persistence that states built before the store (as iOS builds them) and the store share,
-     * and the scope effects run in. The store's scope is not a child of the test, so effects a
-     * test leaves running are cancelled by [skipInFlightEffects] (iOS `store.skipInFlightEffects()`).
+     * persistence that states built before the store and the store share, and the scope effects run
+     * in. The store's scope is not a child of the test, so effects a test leaves running are
+     * cancelled by [skipInFlightEffects].
      */
     class Harness(scope: CoroutineScope) {
         val sharedStore: SharedStore = SharedStore.inMemory()
@@ -126,7 +120,7 @@ internal object HomeFeatureTestSupport {
         /** Builds or reads a value that touches shared keys (`HomeFeature.State`) in this world. */
         fun <R> state(block: () -> R): R = DependencyValues.withValues(values, block)
 
-        /** A shared key's current value in this world (iOS `@Shared(.key) var x`). */
+        /** A shared key's current value in this world. */
         fun <T> shared(key: SharedKey<T>): T = state { ai.opencode.core.sharing.shared(key).value }
 
         fun <T> setShared(key: SharedKey<T>, value: T) = state { ai.opencode.core.sharing.shared(key).set(value) }
@@ -149,8 +143,8 @@ internal object HomeFeatureTestSupport {
                 world()
                 dependencies()
             }
-            // Built under the test's dependencies, as `:feature:session`'s stores are: the reducer
-            // resolves its watchdog clock (`SessionTimers`) when it's made.
+            // Built under the test's dependencies: the reducer resolves its watchdog clock
+            // (`SessionTimers`) when it's made.
             val reducer = DependencyValues.withValues(DependencyValues.testing().update(deps)) { SessionFeature() }
             return TestStore(state, reducer, scope, deps).also(stores::add)
         }
@@ -158,10 +152,8 @@ internal object HomeFeatureTestSupport {
         fun skipInFlightEffects() = job.cancel()
 
         /**
-         * iOS's `TestStore` reports an effect that failed (an unimplemented dependency included)
-         * even when the test never touches the store again: surfaces any such failure, and for an
-         * exhaustive store any action left unreceived. Effects still running are let go, as
-         * `skipInFlightEffects()` does.
+         * Surfaces any such failure, and for an exhaustive store any action left unreceived.
+         * Effects still running are let go, as `skipInFlightEffects()` does.
          */
         suspend fun verifyStores() {
             for (store in stores) {
@@ -212,14 +204,12 @@ internal object HomeFeatureTestSupport {
         )
     }
 
-    /** iOS `store.receive(\.case)`. */
     suspend fun <S, A : Any, T : A> TestStore<S, A>.receive(
         case: KClass<T>,
         timeout: Duration = 5.seconds,
         update: ((S) -> S)? = null,
     ) = receiveBounded({ case.isInstance(it) }, case.simpleName ?: "action", timeout, update = update)
 
-    /** iOS `store.receive(\.sessionDetail.presented.case)`. */
     suspend fun <T : SessionFeature.Action> TestStore<HomeFeature.State, HomeFeature.Action>.receiveDetail(
         case: KClass<T>,
         timeout: Duration = 5.seconds,

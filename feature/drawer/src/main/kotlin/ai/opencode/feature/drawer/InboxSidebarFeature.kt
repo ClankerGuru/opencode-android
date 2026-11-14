@@ -32,9 +32,9 @@ import kotlin.time.Duration.Companion.seconds
 
 /**
  * Inbox Sidebar (experimental): the drawer as an inbox, one item per session, sorted Needs your
- * input, then unread, then newest. Rows come from Home's state ([HomeFeature.State.inboxSidebarRows]);
- * this reducer owns Archive and Unarchive, the actions Home doesn't already have.
- * Android: archived sessions can be restored, as on desktop (iOS can't).
+ * input, then unread, then newest. Rows come from Home's state
+ * ([HomeFeature.State.inboxSidebarRows]); this reducer owns Archive and Unarchive, the actions Home
+ * doesn't already have. Android: archived sessions can be restored, as on desktop.
  */
 class InboxSidebarFeature : Reducer<InboxSidebarFeature.State, InboxSidebarFeature.Action> {
     data class Status(
@@ -224,7 +224,7 @@ class InboxSidebarFeature : Reducer<InboxSidebarFeature.State, InboxSidebarFeatu
     }
 
     companion object {
-        /** The Inbox Sidebar switch (iOS `ExperimentalFeature.inboxSidebar`, off by default). */
+        /** The Inbox Sidebar switch. */
         val experiment: ExperimentalFeature get() = ExperimentalFeature.inboxSidebar
 
         /** As many archived sessions as desktop's Archived list shows. */

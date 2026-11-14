@@ -36,29 +36,14 @@ import kotlin.math.max
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Port of iOS `ComposerAutocompleteTests.swift` (and its `ComposerSessionMentionTests.swift`
- * extension in `ComposerSessionMentionTests.kt`).
- *
- * iOS drives `SessionFeature`; the autocomplete half of it is the pure
- * [ComposerAutocompleteReducer] the session store hosts, so these tests drive it through
- * [ComposerAutocompleteTestHost] (a draft binding plus `.autocomplete` actions, as
- * `SessionFeatureBindings.kt` wires them) with the same inputs and expected state.
- *
- * Skipped → `:feature:session` (they assert sending, session creation, persistence and
- * retries on `SessionFeature`): `sendingComposerWithChipsForwardsMentionsWithoutDuplicateFileAttachment`,
- * `sendingSlashCommandChipCallsSendCommandEndpoint`, `mentionSpansMatchTrimmedLocationPrefixedSentText`,
- * `commandFailureRestoresDraftChipsAndAttachmentsAndUsesClientSessionID`,
- * `sessionSwitchRoundTripsChipsAndFailedSendRetryKeepsMentions`.
- * Skipped → `:server`: `experimentalFlagOffProducesByteIdenticalPromptBodyToMain`
- * (`promptBody` is internal to the live client).
+ * The autocomplete half of it is the pure [ComposerAutocompleteReducer] the session store hosts, so
+ * these tests drive it through [ComposerAutocompleteTestHost] (a draft binding plus `.autocomplete`
+ * actions, as `SessionFeatureBindings.kt` wires them) with the same inputs and expected state.
  *
  * Partly dropped:
  * - `caretAwareTriggerDetectionAndAutoRunCancellationWorkCleanly`: step 2 (auto-run) sets the
  *   `composer.autocomplete.commandAction` tunable to Run through the Tuning Panel; Android bakes
- *   the tunables (Fill), so a chosen command never runs by itself. Step 1 is ported.
- * - `midDraftChipInsertAndChipDeletePreserveCaretOffset`: the `UITextView` probes
- *   (`selectedRange`, `pinsToEnd`, `syncMeasuredState`) are UIKit; the reducer half (caret
- *   after inserting and deleting a mid-draft chip) is ported.
+ *   the tunables (Fill), so a chosen command never runs by itself.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -417,7 +402,6 @@ class ComposerAutocompleteTests {
         store.finish()
     }
 
-    /** Step 1 of iOS's test (see the class note for step 2). */
     @Test fun caretAwareTriggerDetectionAndAutoRunCancellationWorkCleanly() = runTest {
         val store = makeStore(
             initial = state { autocomplete { copy(loadedCatalogDirectoryKey = directory, skills = sampleSkills, loadedCommandsDirectoryKey = directory, commands = sampleCommands) } },
@@ -457,7 +441,7 @@ class ComposerAutocompleteTests {
     }
 
     /** The `shouldChangeText` half (see the class note). */
-    /** Hardware keys the bridge takes (iOS's `keyCommands`): ↑, ↓, Escape, Tab, Return pressed down. */
+    /** Hardware keys the bridge takes: ↑, ↓, Escape, Tab, Return pressed down. */
     private fun interceptedKeys(bridge: ComposerAutocompleteTextBridge): Int =
         listOf(
             android.view.KeyEvent.KEYCODE_DPAD_UP,
@@ -484,14 +468,14 @@ class ComposerAutocompleteTests {
         assertTrue(bridge.shouldChangeText("", start = 0, length = 0, replacement = "\n"))
         assertTrue(bridge.shouldChangeText("", start = 0, length = 0, replacement = "\t"))
         assertEquals(0, confirmCount)
-        // iOS `keyCommands.count == 3`: hardware ↑, ↓ and Escape only.
+        // Hardware ↑, ↓ and Escape only.
         assertEquals(3, interceptedKeys(bridge))
 
         // With a selectable row (`hasSelectableRow == true`): Return and Tab confirm selection.
         bridge.hasSelectableRow = true
         assertFalse(bridge.shouldChangeText("", start = 0, length = 0, replacement = "\n"))
         assertEquals(1, confirmCount)
-        // iOS `keyCommands.count == 5`: plus Tab and Return.
+        // Plus Tab and Return.
         confirmCount = 0
         assertEquals(5, interceptedKeys(bridge))
         assertEquals(2, confirmCount)

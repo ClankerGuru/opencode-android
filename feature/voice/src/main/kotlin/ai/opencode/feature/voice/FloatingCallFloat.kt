@@ -16,24 +16,26 @@ import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 
-// Floaty (D-147 option 3; iOS `FloatingCallFloat.swift`): the resting orb's place, what a touch on
-// it was, the space it may rest in, and its drift after a throw. Lengths in dp (iOS points),
-// speeds in dp a second, times in seconds. Plain values and objects: no Compose but observed
-// state, so the physics runs in JVM tests.
+// Floaty: the resting orb's place, what a touch on it was, the space it may rest in, and its drift
+// after a throw. Lengths in dp, speeds in dp a second, times in seconds. Plain values and objects,
+// so the physics runs in JVM tests.
 
 /** Where the orb's centre rests: null [x] is the trailing side, null [y] just above the composer, following it as the keyboard raises it. */
 data class FloatingCallPlace(val x: Float? = null, val y: Float? = null)
 
-/** The floating call's screen, safe area and resting size, for working out where its orb rests from outside its overlay (iOS `FloatingCallOrbLayout`). */
+/**
+ * The floating call's screen, safe area and resting size, for working out where its orb rests from
+ * outside its overlay.
+ */
 data class FloatingCallOrbLayout(val screen: Size, val safeArea: FloatingCallEdgeInsets, val size: Size)
 
-/** The screen's safe area in dp, by side (SwiftUI `EdgeInsets`). */
+/** The screen's safe area in dp, by side. */
 data class FloatingCallEdgeInsets(val top: Float = 0f, val leading: Float = 0f, val bottom: Float = 0f, val trailing: Float = 0f)
 
 /**
- * Where the orb may be on one screen (iOS `FloatingCallRestArea`): where its centre may rest
- * (inside the side keep-outs and safe areas, below the header, above the composer and what stands
- * on it), and how far past that a throw may carry it with the whole orb still on screen.
+ * Where the orb may be on one screen: where its centre may rest (inside the side keep-outs and safe
+ * areas, below the header, above the composer and what stands on it), and how far past that a throw
+ * may carry it with the whole orb still on screen.
  */
 data class FloatingCallRestArea(
     val screen: Size,
@@ -104,9 +106,9 @@ internal fun Rect.union(other: Rect): Rect =
     Rect(min(left, other.left), min(top, other.top), max(right, other.right), max(bottom, other.bottom))
 
 /**
- * The floating call's screen and safe area as last laid out (iOS `FloatingCallLayout`). A drift or
- * a lift outlives the layout pass that started it, so it reads its bounds here every frame: a
- * rotation or resize mid-flight moves them along.
+ * The floating call's screen and safe area as last laid out. A drift or a lift outlives the layout
+ * pass that started it, so it reads its bounds here every frame: a rotation or resize mid-flight
+ * moves them along.
  */
 class FloatingCallLayout(var screen: Size = Size.Zero, var safeArea: FloatingCallEdgeInsets = FloatingCallEdgeInsets()) {
     /** The window's keyboard top, while one is up ([FloatingCallRestArea.keyboardTop]). */
@@ -114,9 +116,9 @@ class FloatingCallLayout(var screen: Size = Size.Zero, var safeArea: FloatingCal
 }
 
 /**
- * What a touch on the resting orb was, judged when the finger lifts (iOS `FloatingCallTouch`): the
- * orb is under the finger from touch-down, so a drag always moves it, and only a tap expands it. A
- * tap on an orb still drifting only catches it.
+ * What a touch on the resting orb was, judged when the finger lifts: the orb is under the finger
+ * from touch-down, so a drag always moves it, and only a tap expands it. A tap on an orb still
+ * drifting only catches it.
  */
 @Suppress("EnumEntryName")
 enum class FloatingCallTouch {
@@ -137,11 +139,11 @@ enum class FloatingCallTouch {
 }
 
 /**
- * Floaty (D-147 option 3; iOS `FloatingCallDrift`): the orb glides on with a throw's speed and
- * slows with friction; outside `bounds` (where its centre may rest) a soft spring eases it back
- * in, carrying the speed it has rather than stopping hard. It rests where it slows. A hard throw
- * runs on past the keep-out no further than `reach` (the screen's edge): heading out, it's held
- * to the speed the soft spring can stop within what's left. Doubles inside, as iOS's `CGFloat`.
+ * Floaty: the orb glides on with a throw's speed and slows with friction; outside `bounds` (where
+ * its centre may rest) a soft spring eases it back in, carrying the speed it has rather than
+ * stopping hard. It rests where it slows. A hard throw runs on past the keep-out no further than
+ * `reach` (the screen's edge): heading out, it's held to the speed the soft spring can stop within
+ * what's left.
  */
 class FloatingCallDrift(
     position: Offset,
@@ -212,9 +214,8 @@ class FloatingCallDrift(
 }
 
 /**
- * The orb off its rest (iOS `FloatingCallFloatMotion`): held under a finger, or drifting after a
- * throw. A plain object stepping at the display's rate ([link]); it tells the surface where the
- * orb came to rest and lets go.
+ * The orb off its rest: held under a finger, or drifting after a throw. A plain object stepping at
+ * the display's rate ([link]); it tells the surface where the orb came to rest and lets go.
  */
 class FloatingCallFloatMotion {
     /** Where it may rest and how far a throw may carry it. */

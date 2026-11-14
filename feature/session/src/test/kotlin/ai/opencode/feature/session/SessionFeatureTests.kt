@@ -46,16 +46,9 @@ import org.junit.Test
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `SessionFeatureTests.swift`. Parameterized iOS tests loop over their arguments.
- *
- * Not ported here (`:feature:composer`): `imageImportDecodesImagesAndRejectsOversizedSources`
- * (its subject is `ImageAttachmentImporter`, and its source is a UIKit `UIImage(systemName:)`).
- */
 class SessionFeatureTests {
     private fun markdown(id: String, text: String) = OpenCodeTranscriptItem.AssistantMarkdown(id = id, text = text)
 
-    /** iOS `OpenCodeToolCall.test(name:)` (`SessionRefreshReviewTests.swift`). */
     private fun toolCall(name: String, status: OpenCodeToolCall.Status = OpenCodeToolCall.Status.Completed) =
         OpenCodeToolCall(callID = name, name = name, status = status, input = OpenCodeJSONValue.Null, output = emptyList(), error = null, metadata = emptyMap())
 
@@ -851,7 +844,7 @@ class SessionFeatureTests {
         assertTrue(calls.value.toString(), calls.value.isEmpty())
 
         store.send(Action.FirstContentFrameRendered)
-        // iOS's store reduces effect actions as they arrive; this one reduces them when drained.
+        // This TestStore reduces effect actions when asked.
         repeat(10) {
             if (calls.value.size < 5) {
                 store.skipReceivedActions()

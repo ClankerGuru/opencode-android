@@ -11,12 +11,10 @@ import org.junit.Rule
 import org.junit.Test
 
 /*
- * Port of iOS `OpenCodeTests/MarkdownStreamTests.swift`: the streaming Markdown guards
- * (docs/transcript.md, "Streaming Markdown"): completed blocks parse once, per-delta work is
- * bounded by the live tail, and the result always equals a full parse of the same text.
- * iOS measures cost in UTF-8 bytes; Android's [MarkdownStream.Cost] counts UTF-16 chars (the
- * generated replies are ASCII, so the numbers are the same). Unicode-scalar prefixes → code
- * point prefixes.
+ * The streaming Markdown guards (docs/transcript.md, "Streaming Markdown"): completed blocks parse
+ * once, per-delta work is bounded by the live tail, and the result always equals a full parse of
+ * the same text. Android's [MarkdownStream.Cost] counts UTF-16 chars (the generated replies are
+ * ASCII, so the numbers are the same). Unicode-scalar prefixes → code point prefixes.
  */
 class MarkdownStreamTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -328,7 +326,7 @@ class MarkdownStreamTests {
     }
 }
 
-/** iOS `SplitMix`: a deterministic 64-bit generator. */
+/** A deterministic 64-bit generator. */
 class SplitMix(private var state: ULong) {
     fun next(): ULong {
         state += 0x9E3779B97F4A7C15uL
@@ -340,9 +338,9 @@ class SplitMix(private var state: ULong) {
 }
 
 /**
- * The nightly streaming parse-cost metric (iOS `scripts/perf-run.sh --parse`): a 4,000-word
- * reply streamed in small deltas through [MarkdownStream], with the chars each delta parses,
- * beside the whole-text re-parse it replaced. Runs only with `MARKDOWN_STREAM_COST=1`.
+ * The nightly streaming parse-cost metric: a 4,000-word reply streamed in small deltas through
+ * [MarkdownStream], with the chars each delta parses, beside the whole-text re-parse it replaced.
+ * Runs only with `MARKDOWN_STREAM_COST=1`.
  */
 class MarkdownStreamCostTests {
     @Test fun testStreamingParseCost() {

@@ -23,8 +23,7 @@ import ai.opencode.server.model.OpenCodeTranscriptItem
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 
-// Port of iOS `SessionFeature+Models.swift`: models, projects, the family, shells, and the Session
-// sheet.
+// Models, projects, the family, shells, and the Session sheet.
 
 /** Models, projects, the family, shells, and the Session sheet. Null: the action passes on. */
 internal fun SessionFeature.reduceModelsAndFamily(state: State, action: Action): Reduced<State, Action>? = when (action) {
@@ -201,7 +200,7 @@ internal fun SessionFeature.reduceModelsAndFamily(state: State, action: Action):
     else -> null
 }
 
-/** Picks [model] at [explicitLevel] (iOS `.modelPickedWithLevel`); remembers the level and the model as recent. */
+/** Picks [model] at [explicitLevel]; remembers the level and the model as recent. */
 private fun SessionFeature.pickWithLevel(model: OpenCodeModel, explicitLevel: String?, ticked: Boolean, state: State): State {
     val scale = ModelLevelScale(model.variants)
     val normalized = explicitLevel?.takeIf { it != "default" && it in scale.levels }
@@ -219,7 +218,7 @@ private fun SessionFeature.pickWithLevel(model: OpenCodeModel, explicitLevel: St
     return next
 }
 
-/** iOS `.modelRowLevelChanged`: scrubs or adjusts a model's remembered reasoning level in place. */
+/** Scrubs or adjusts a model's remembered reasoning level in place. */
 private fun SessionFeature.modelRowLevelChanged(model: OpenCodeModel, level: String?, state: State): State {
     val scale = ModelLevelScale(model.variants)
     if (!scale.isAdjustable) return state
@@ -279,8 +278,8 @@ private fun SessionFeature.sessionSheetDelegate(delegate: SessionSheetFeature.De
 }
 
 /**
- * iOS `.familyPicked`: swaps the family member on screen in place. Sends still on their way carry
- * on in the outbox, and come back with their session.
+ * Swaps the family member on screen in place. Sends still on their way carry on in the outbox, and
+ * come back with their session.
  */
 private fun SessionFeature.familyPicked(id: String, state: State): Reduced<State, Action> {
     val current = state.session
@@ -415,9 +414,8 @@ private fun SessionFeature.familyPicked(id: String, state: State): Reduced<State
 }
 
 /**
- * iOS `pickProject(_:byHand:_:)`: moves the draft to [project]. A choice made by hand that changes it
- * plays `.selection`; the project already chosen plays nothing. Moving to another folder asks for
- * that folder's agents.
+ * Moves the draft to [project]. A choice made by hand that changes it plays `.selection`; the
+ * project already chosen plays nothing. Moving to another folder asks for that folder's agents.
  */
 private fun SessionFeature.pickProject(project: OpenCodeProject, byHand: Boolean, state: State): Reduced<State, Action> {
     // Once the first send has left, it goes where it was sent.
@@ -436,9 +434,9 @@ private fun SessionFeature.pickProject(project: OpenCodeProject, byHand: Boolean
 }
 
 /**
- * iOS `cacheFamilyTranscript(_:sessionID:in:)`. Family switching retains only a small working set.
- * Eight sessions covers the largest lab family with room for the root while bounding duplicated
- * transcript rows; the selected session itself remains fully expanded.
+ * Family switching retains only a small working set. Eight sessions covers the largest lab family
+ * with room for the root while bounding duplicated transcript rows; the selected session itself
+ * remains fully expanded.
  */
 private fun cacheFamilyTranscript(items: List<OpenCodeTranscriptItem>, sessionID: String, state: State): State {
     val cache = LinkedHashMap(state.familyTranscriptCache)
@@ -452,8 +450,8 @@ private fun cacheFamilyTranscript(items: List<OpenCodeTranscriptItem>, sessionID
 }
 
 /**
- * iOS `loadModelsIfNeeded(_:)`: loads the model catalog once per session view — needed up front so
- * the composer can show the model's display name instead of its raw ID.
+ * Loads the model catalog once per session view — needed up front so the composer can show the
+ * model's display name instead of its raw ID.
  */
 internal fun SessionFeature.loadModelsIfNeeded(state: State): Reduced<State, Action> {
     if (state.models.isNotEmpty() || state.isLoadingModels) return Reduced(state)
@@ -461,8 +459,8 @@ internal fun SessionFeature.loadModelsIfNeeded(state: State): Reduced<State, Act
 }
 
 /**
- * iOS `reloadModels(_:)`: starts or restarts a model catalog read for the picker, cancelling any
- * earlier in-flight read so a retry while loading is never dropped.
+ * Starts or restarts a model catalog read for the picker, cancelling any earlier in-flight read so
+ * a retry while loading is never dropped.
  */
 internal fun SessionFeature.reloadModels(state: State): Reduced<State, Action> {
     var next = state
@@ -487,10 +485,7 @@ private fun SessionFeature.fetchModels(state: State): Effect<Action> {
     }.cancellable(CancelID.Models, cancelInFlight = true)
 }
 
-/**
- * The model picker's inputs as `:feature:composer`'s pickers read them (iOS's
- * `ModelPickerSections.swift` extends `SessionFeature.State` with these derived values).
- */
+/** The model picker's inputs as `:feature:composer`'s pickers read them. */
 val State.modelPicker: ModelPickerState
     get() = ModelPickerState(
         models = models,
@@ -506,31 +501,31 @@ val State.modelPicker: ModelPickerState
         modelDisplayNames = modelDisplayNamesByServer.value[server.persistenceID] ?: ModelDisplayNames(),
     )
 
-/** iOS `currentModelName`: resolve a label without borrowing another provider's capabilities. */
+/** Resolve a label without borrowing another provider's capabilities. */
 val State.currentModelName: String get() = modelPicker.currentModelName
 
-/** iOS `currentModelInfo`: only the live catalogue can supply availability and capabilities. */
+/** Only the live catalogue can supply availability and capabilities. */
 val State.currentModelInfo: OpenCodeModel? get() = currentModel?.let { models.model(it) }
 
-/** iOS `currentModelLabel`: "Claude Haiku 5.5 · High", the model and its reasoning variant, if any. */
+/** "Claude Haiku 5.5 · High", the model and its reasoning variant, if any. */
 val State.currentModelLabel: String get() = modelPicker.currentModelLabel
 
-/** iOS `currentModelShortName`: compact name for the composer chip (`"Opus 5.5"` for `"Claude Opus 5.5"`). */
+/** Compact name for the composer chip (`"Opus 5.5"` for `"Claude Opus 5.5"`). */
 val State.currentModelShortName: String get() = modelPicker.currentModelShortName
 
-/** iOS `currentLevelScale`: the current model's levels, when it has any to choose between. */
+/** The current model's levels, when it has any to choose between. */
 val State.currentLevelScale: ModelLevelScale? get() = modelPicker.currentLevelScale
 
-/** iOS `currentLevel`: the current level; null is the model's default. */
+/** The current level; null is the model's default. */
 val State.currentLevel: String? get() = modelPicker.currentLevel
 
 /**
- * iOS `rememberedLevel(for:)`: the level shown for [model] on its row in the list (and picked when
- * tapping its name): a level parsed from the search query when searching, else the active level
- * for the current model, else the remembered variant in `modelVariants`, else null (`"Default"`).
+ * The level shown for [model] on its row in the list (and picked when tapping its name): a level
+ * parsed from the search query when searching, else the active level for the current model, else
+ * the remembered variant in `modelVariants`, else null (`"Default"`).
  */
 fun State.rememberedLevel(model: OpenCodeModel): String? = modelPicker.rememberedLevel(model)
 
-/** iOS `SessionFeature.catalog(_:offers:)`: whether the catalogue still lists `ref`'s model. */
+/** Whether the catalogue still lists `ref`'s model. */
 internal fun SessionFeature.Companion.catalog(models: List<OpenCodeModel>, offers: OpenCodeModelRef): Boolean =
     models.any { it.ref.sameModel(offers) }

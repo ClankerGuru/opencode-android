@@ -17,9 +17,8 @@ import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.longOrNull
 
 /**
- * The wire codec. Matches Swift's `JSONDecoder`/`JSONEncoder` defaults as the
- * server payloads use them: unknown keys ignored, absent optionals decode as
- * null, nil optionals are omitted on encode.
+ * The wire codec. Unknown keys ignored, absent optionals decode as null, nil optionals are omitted
+ * on encode.
  */
 internal val WireJson = Json {
     ignoreUnknownKeys = true
@@ -27,7 +26,7 @@ internal val WireJson = Json {
     encodeDefaults = true
 }
 
-/** A payload that doesn't have the shape Swift's `Decodable` would require. */
+/** A payload that doesn't have the required shape. */
 internal class WireDecodingException(message: String) : RuntimeException(message)
 
 internal fun JsonElement.obj(): JsonObject = this as? JsonObject ?: throw WireDecodingException("expected an object")

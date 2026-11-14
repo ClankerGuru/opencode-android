@@ -5,11 +5,8 @@ import androidx.compose.runtime.DisposableEffect
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Port of iOS `CredentialSurface` (`Diagnostics/Traces/TraceTriggers.swift`): counts what's on
- * screen that screenshots must skip. `sheets` show credentials (the server and pairing sheets, the
- * pairing camera) and skip every screenshot; `screens` (Settings, What's New) show server
- * addresses and account details and skip only problem reports, which leave the phone (9436b567).
- * In `:core` so Settings and the app can mark themselves without depending on the developer tools.
+ * What's on screen that screenshots must skip. `sheets` skip every screenshot; `screens` skip only
+ * problem reports.
  */
 object CredentialSurface {
     data class Marks(val sheets: Int = 0, val screens: Int = 0)
@@ -39,9 +36,8 @@ object CredentialSurface {
 }
 
 /**
- * iOS `ScreenshotPolicy`: who a screenshot is for. Problem reports leave the phone, so they skip
- * every marked surface; the Developer Mode voice tool sends to the person's own session, so it
- * skips only the credential sheets.
+ * Problem reports leave the phone, so they skip every marked surface; the voice tool skips only
+ * credential sheets.
  */
 enum class ScreenshotPolicy {
     problemReport,
@@ -53,15 +49,15 @@ enum class ScreenshotPolicy {
     }
 }
 
-/** iOS `.hidesFromProblemReports()`: keeps the screen composing this out of problem report screenshots while it's composed. */
+/** Keeps the screen composing this out of problem report screenshots while it's composed. */
 @Composable
 fun HidesFromProblemReports() = CredentialMark(CredentialSurface.Kind.screens)
 
-/** iOS `.hidesFromScreenshots()`: keeps this credential view out of every screenshot, voice ones included. */
+/** Keeps this credential view out of every screenshot, voice ones included. */
 @Composable
 fun HidesFromScreenshots() = CredentialMark(CredentialSurface.Kind.sheets)
 
-/** iOS `.hidesFromScreenshots(while:)`: keeps every screenshot out while [shown] (an alert with no lifecycle of its own). */
+/** Keeps every screenshot out while [shown] (an alert with no lifecycle of its own). */
 @Composable
 fun HidesFromScreenshots(shown: Boolean) {
     if (shown) HidesFromScreenshots()

@@ -4,11 +4,10 @@ import ai.opencode.core.dependencies.DependencyKey
 import java.util.UUID
 
 /**
- * Port of iOS `EventStreamFocusClient` (`EventStreamFocus.swift`): the sessions on screen, which
- * the event stream must never shed deltas for ([EventBatcher]). Each window's Home publishes its
- * own set under its own id, so with several windows a session counts while any window shows it.
- * A window that closes without clearing its set only keeps those sessions whole, never the other
- * way round.
+ * The sessions on screen, which the event stream must never shed deltas for ([EventBatcher]). Each
+ * window's Home publishes its own set under its own id, so with several windows a session counts
+ * while any window shows it. A window that closes without clearing its set only keeps those
+ * sessions whole, never the other way round.
  */
 class EventStreamFocusClient(
     val publish: (owner: UUID, sessionIDs: Set<String>) -> Unit,

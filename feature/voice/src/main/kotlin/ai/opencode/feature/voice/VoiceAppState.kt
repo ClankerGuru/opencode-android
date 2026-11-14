@@ -30,10 +30,9 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 
 /**
- * Port of iOS `VoiceAppState`: what the app showed when the voice delegator took a screenshot
- * (`capture_app_screenshot`, Developer Mode only), sent with it so the session can tell what
- * the user meant. Names, flags and counts only: never a server address, credentials, pairing
- * codes, or message or draft text.
+ * What the app showed when the voice delegator took a screenshot (`capture_app_screenshot`,
+ * Developer Mode only), sent with it so the session can tell what the user meant. Names, flags and
+ * counts only: never a server address, credentials, pairing codes, or message or draft text.
  */
 data class VoiceAppState(
     /** The screen's name, at the capture ([VisibleScreen]). */
@@ -111,14 +110,13 @@ data class VoiceAppState(
     data class Appearance(
         /** "dark" or "light". */
         val style: String,
-        /** The font scale (iOS's Dynamic Type size, "L", "AccessibilityXL"): "1.0", "1.3". */
+        /** The font scale: "1.0", "1.3". */
         val dynamicType: String,
     ) {
         val jsonObject: Map<String, Any>
             get() = sortedMapOf("dynamicType" to dynamicType, "style" to style)
 
         companion object {
-            /** iOS `init(_ traits:)`. */
             fun of(configuration: Configuration) = Appearance(
                 style = if (configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES) "dark" else "light",
                 dynamicType = configuration.fontScale.toString(),
@@ -131,7 +129,7 @@ data class VoiceAppState(
             get() = sortedMapOf("model" to model, "system" to system)
     }
 
-    /** iOS's Codable output as a sorted map for [PrettyJSON]; nil fields are left out. */
+    /** Nil fields are left out. */
     val jsonObject: Map<String, Any>
         get() = sortedMapOf<String, Any>(
             "appVersion" to appVersion,
@@ -153,9 +151,8 @@ data class VoiceAppState(
 
     companion object {
         /**
-         * iOS `init(_ call:experiments:developerMode:device:)`: what the call knows when the
-         * delegator starts a request. The screen, appearance and Home's part are filled in at
-         * the capture.
+         * What the call knows when the delegator starts a request. The screen, appearance and
+         * Home's part are filled in at the capture.
          */
         operator fun invoke(
             call: VoiceFeature.State,
@@ -191,9 +188,8 @@ data class VoiceAppState(
         }
 
         /**
-         * iOS `ProblemReportDevice.current`: the app's version and the device, as
-         * `DevToolsClient` builds them for problem reports. "?" where it can't be read
-         * (JVM tests have no package manager).
+         * The app's version and the device, as `DevToolsClient` builds them for problem reports.
+         * "?" where it can't be read (JVM tests have no package manager).
          */
         fun currentDevice(): ProblemReportDevice {
             val info = runCatching {
@@ -212,9 +208,8 @@ data class VoiceAppState(
 }
 
 /**
- * Port of iOS `VisibleScreen` (`Diagnostics/ScrawlTags.swift`): the screen named on top now,
- * for the voice delegator's screenshots: the most recently shown one still visible. Screens
- * report themselves with [set] as they appear, rename and disappear.
+ * The screen named on top now, for the voice delegator's screenshots: the most recently shown one
+ * still visible. Screens report themselves with [set] as they appear, rename and disappear.
  */
 object VisibleScreen {
     private val screens = mutableListOf<Pair<UUID, String>>()
@@ -237,16 +232,15 @@ object VisibleScreen {
 }
 
 /**
- * Port of iOS `VoiceAppLog`: recent `AppLog` lines for a screenshot's message, the newest,
- * bounded, with anything address- or credential-shaped masked as a second line of defence
- * behind the logging rules.
+ * Recent `AppLog` lines for a screenshot's message, the newest, bounded, with anything address- or
+ * credential-shaped masked as a second line of defence behind the logging rules.
  */
 object VoiceAppLog {
     const val maxLines = 300
     const val maxBytes = 60_000
     const val fileName = "app-log.txt"
 
-    /** iOS `diagnostics.appLog`: the app's recent lines over the diagnostics retention window, oldest first. */
+    /** The app's recent lines over the diagnostics retention window, oldest first. */
     fun recentLines(): List<String> =
         AppLog.recentLines(Instant.now().minusSeconds(DiagnosticsRecorder.DEFAULT_RETENTION_SECONDS.toLong()))
 
@@ -276,9 +270,8 @@ object VoiceAppLog {
 }
 
 /**
- * Port of iOS `VoiceScreenshotClient`: the app's own window as a JPEG, for the voice
- * delegator's `capture_app_screenshot`: the call's activity window, never the device screen,
- * another app, or another of the app's windows.
+ * The app's own window as a JPEG, for the voice delegator's `capture_app_screenshot`: the call's
+ * activity window, never the device screen, another app, or another of the app's windows.
  */
 class VoiceScreenshotClient(
     /**
@@ -313,7 +306,6 @@ class VoiceScreenshotClient(
             }
     }
 
-    /** Swift's `Result<Capture, Failure>`. */
     sealed interface Result {
         data class Taken(val capture: Capture) : Result
         data class Failed(val failure: Failure) : Result
@@ -322,8 +314,8 @@ class VoiceScreenshotClient(
     companion object Key : DependencyKey<VoiceScreenshotClient> {
         override val liveValue by lazy {
             val registry = dependency(VoiceScreenActivityRegistry)
-            // iOS `ScreenCaptureFeedback.capture(in: VoiceScreenshot.scene())`: a taken picture
-            // flashes the activity it drew and plays the shutter; a refused one shows nothing.
+            // A taken picture flashes the activity it drew and plays the shutter; a refused one
+            // shows nothing.
             suspend fun capture(policy: ScreenshotPolicy): Result {
                 val scene = VoiceScreenshot.scene(registry)
                 var failed: Result? = null
@@ -341,9 +333,9 @@ class VoiceScreenshotClient(
 }
 
 /**
- * Port of iOS `VoiceScreenshot`. `drawHierarchy` → `PixelCopy` of a resumed activity's
- * window (the floating call draws inside it on Android, so it's in the picture). Refused while
- * a credential surface is composed ([CredentialSurface]) or from a `FLAG_SECURE` window.
+ * `drawHierarchy` → `PixelCopy` of a resumed activity's window (the floating call draws inside it
+ * on Android, so it's in the picture). Refused while a credential surface is composed
+ * ([CredentialSurface]) or from a `FLAG_SECURE` window.
  */
 object VoiceScreenshot {
     const val maxBytes = 900_000
@@ -380,7 +372,7 @@ object VoiceScreenshot {
 
     private suspend fun pickedScene(registry: VoiceScreenActivityRegistry): Pair<Activity?, VoiceScreenshotClient.Failure?> {
         val activities = withContext(Dispatchers.Main) { registry.resumedActivities }
-        // Drawing in the background touches the GPU (iOS gets killed for it); no resumed activity is the background.
+        // Drawing in the background touches the GPU; no resumed activity is the background.
         if (activities.isEmpty()) return null to VoiceScreenshotClient.Failure.background
         val (index, failure) = pickScene(
             activities.map { activity ->

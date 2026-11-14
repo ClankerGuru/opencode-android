@@ -21,13 +21,12 @@ import java.io.FileNotFoundException
 import java.util.UUID
 
 /**
- * Serves agent files dragged out of the app (iOS `TranscriptDragPayload.agentFile`'s
- * `registerFileRepresentation`): [register] hands out a `content://` URI at drag start, and the
- * file is downloaded through [AgentFileLoader] into its usual cache (`AgentFileLoader.cacheURL`,
- * shared with the viewer, revalidated with its validators) only when the drop target opens or
- * queries it, as iOS's item provider loads lazily. A failed read falls back to the decoded image
- * the tile already shows, as a PNG, when there is one. Pixels known only in memory (and those
- * fallbacks) are written under `AgentFiles/Drag/` and swept after an hour.
+ * Serves agent files dragged out of the app: [register] hands out a `content://` URI at drag start,
+ * and the file is downloaded through [AgentFileLoader] into its usual cache
+ * (`AgentFileLoader.cacheURL`, shared with the viewer, revalidated with its validators) only when
+ * the drop target opens or queries it. A failed read falls back to the decoded image the tile
+ * already shows, as a PNG, when there is one. Pixels known only in memory (and those fallbacks) are
+ * written under `AgentFiles/Drag/` and swept after an hour.
  */
 class AgentFileDragProvider : FileProvider(R.xml.agent_file_drag_paths) {
     /** Where a dragged file's bytes come from. */
@@ -66,10 +65,7 @@ class AgentFileDragProvider : FileProvider(R.xml.agent_file_drag_paths) {
         return ParcelFileDescriptor.open(resolve(entry), ParcelFileDescriptor.MODE_READ_ONLY)
     }
 
-    /**
-     * The file's bytes for [entry]: downloaded (binder threads block here; the drop target
-     * waits for the file as iOS's progress does), or the cached image as a PNG.
-     */
+    /** The file's bytes for [entry]: downloaded, or the cached image as a PNG. */
     private fun resolve(entry: Pending): File = runBlocking(Dispatchers.IO) {
         entry.lock.withLock {
             entry.ready?.takeIf { it.exists() }?.let { return@withLock it }

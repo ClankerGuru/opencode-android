@@ -17,9 +17,8 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * The curated starter themes in Settings → Appearance (iOS `AppTheme`, `Theme.swift`).
- * [System] is the default and is a faithful port of iOS's default (UIKit system colour)
- * palette, not Material You. Serialized by iOS's raw values so the stored choice reads the same.
+ * The curated starter themes in Settings → Appearance. [System] is the default palette, not
+ * Material You. Stored by raw value, so don't rename the values.
  */
 @Serializable
 enum class AppTheme(val rawValue: String, private val brandTitle: String?) {
@@ -42,7 +41,7 @@ enum class AppTheme(val rawValue: String, private val brandTitle: String?) {
     }
 }
 
-/** System / Light / Dark appearance override in Settings → Appearance (iOS `AppearanceColorScheme`). */
+/** System / Light / Dark appearance override in Settings → Appearance. */
 @Serializable
 enum class AppearanceColorScheme(val rawValue: String, @StringRes private val titleRes: Int) {
     @SerialName("system") System("system", R.string.core_appearance_color_scheme_system_title),
@@ -52,7 +51,7 @@ enum class AppearanceColorScheme(val rawValue: String, @StringRes private val ti
 
     val title: String get() = localized(titleRes)
 
-    /** `null` follows the system (iOS `colorScheme == nil`). */
+    /** `null` follows the system. */
     val isDark: Boolean? get() = when (this) {
         System -> null
         Light -> false
@@ -64,9 +63,8 @@ enum class AppearanceColorScheme(val rawValue: String, @StringRes private val ti
 }
 
 /**
- * Pre-resolved sRGB colour components (`0..1`), port of iOS `ThemeRGBA` including its
- * WCAG contrast, OKLab/OKLCH and gamut-mapping maths (used for derived tones such as
- * [ThemePalette.bodyText] and [highContrastForeground]).
+ * Pre-resolved sRGB colour components (`0..1`), with WCAG contrast, OKLab/OKLCH and gamut-mapping
+ * maths (used for derived tones such as [ThemePalette.bodyText] and [highContrastForeground]).
  */
 data class ThemeRGBA(val r: Double, val g: Double, val b: Double, val a: Double = 1.0) {
     val color: Color get() = Color(r.toFloat(), g.toFloat(), b.toFloat(), a.toFloat())
@@ -149,8 +147,8 @@ data class ThemeRGBA(val r: Double, val g: Double, val b: Double, val a: Double 
         }
 
         /**
-         * OKLCH → sRGB with CSS Color 4 binary-search chroma gamut mapping, holding
-         * lightness and hue constant (iOS `ThemeRGBA.fromOklch`).
+         * OKLCH → sRGB with CSS Color 4 binary-search chroma gamut mapping, holding lightness and
+         * hue constant.
          */
         fun fromOklch(l: Double, c: Double, h: Double, a: Double = 1.0): ThemeRGBA {
             val clampedL = l.coerceIn(0.0, 1.0)
@@ -203,8 +201,8 @@ data class ThemeRGBA(val r: Double, val g: Double, val b: Double, val a: Double 
 }
 
 /**
- * One resolved light or dark palette for a theme (iOS `ThemeVariant`). Derived surfaces,
- * prose mixes and swatch tokens were computed in OKLab/OKLCH by iOS's generator.
+ * One resolved light or dark palette for a theme. Derived surfaces, prose mixes and swatch tokens
+ * are precomputed in OKLab/OKLCH.
  */
 data class ThemeVariant(
     val canvas: ThemeRGBA,
@@ -237,7 +235,7 @@ data class ThemeVariant(
     val swatchAccent: ThemeRGBA,
 )
 
-/** Light and dark variants for one [AppTheme] (iOS `ThemeDefinition`). */
+/** Light and dark variants for one [AppTheme]. */
 data class ThemeDefinition(
     val id: AppTheme,
     val title: String,
@@ -248,15 +246,12 @@ data class ThemeDefinition(
 }
 
 /**
- * Every theme's palette (iOS `ThemePalette`). Resolve semantic colours for the UI through
- * [OpenCodeColors] (`OpenCodeTheme.colors`), not these raw variants; raw variants are for
- * swatches and contrast checks.
+ * Every theme's palette. Resolve semantic colours for the UI through [OpenCodeColors]
+ * (`OpenCodeTheme.colors`), not these raw variants; raw variants are for swatches and contrast
+ * checks.
  */
 object ThemePalette {
-    /**
-     * Reference palette for [AppTheme.System]: iOS's UIKit system colours (systemBackground,
-     * secondarySystemBackground, label, separator, systemBlue, …) as concrete values.
-     */
+    /** Reference palette for [AppTheme.System]. */
     val system = ThemeDefinition(
         id = AppTheme.System,
         title = "System",
@@ -339,9 +334,9 @@ object ThemePalette {
         AppTheme.GitHub -> github
     }
 
-    /** iOS crossfades windows for this long when the theme or appearance changes (`applyToWindows`). */
+    /** Windows crossfade for this long when the theme or appearance changes. */
     const val THEME_CHANGE_CROSSFADE_SECONDS = 0.22
 
-    /** Retired iOS key (`appearance-transcript-rhythm`); never read on Android. Kept for the key list. */
+    /** Never read on Android. Kept for the key list. */
     const val LEGACY_TRANSCRIPT_RHYTHM_STORAGE_KEY = "appearance-transcript-rhythm"
 }

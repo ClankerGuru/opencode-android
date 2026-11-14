@@ -30,9 +30,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-// Port of iOS `SessionFeature+Refresh.swift`.
-
-/** iOS `SessionFeature.RefreshReason`: why an authoritative read runs. */
+/** Why an authoritative read runs. */
 sealed interface RefreshReason {
     data object Open : RefreshReason
     data object Resume : RefreshReason
@@ -65,10 +63,9 @@ sealed interface RefreshReason {
 }
 
 /**
- * iOS `SessionFeature.WatchdogSchedule`. Reconciliation is only a watchdog when projection is
- * healthy. Without a proven content event, active sessions retain the short fallback cadence.
- * [deadline] is a reading of the watchdog's monotonic [ai.opencode.core.dependencies.Clock]
- * (`Clock.now()`), as iOS keeps an `AnyClock` instant.
+ * Reconciliation is only a watchdog when projection is healthy. Without a proven content event,
+ * active sessions retain the short fallback cadence. [deadline] is a reading of the watchdog's
+ * monotonic [ai.opencode.core.dependencies.Clock] (`Clock.now()`).
  */
 data class WatchdogSchedule(
     val sessionID: String,
@@ -76,7 +73,7 @@ data class WatchdogSchedule(
     val deadline: Duration,
 )
 
-/** iOS `watchdog(_:)`: (re)arms the reconciliation watchdog for the session's cadence. */
+/** (re)arms the reconciliation watchdog for the session's cadence. */
 internal fun SessionFeature.watchdog(
     state: SessionFeature.State,
 ): Reduced<SessionFeature.State, Action> {
@@ -107,7 +104,6 @@ internal fun SessionFeature.watchdog(
     return Reduced(scheduled.copy(watchdogGeneration = generation), sleepWatchdog(schedule, generation))
 }
 
-/** iOS `watchdogElapsed(_:generation:)`. */
 internal fun SessionFeature.watchdogElapsed(
     state: SessionFeature.State,
     generation: Int,
@@ -142,8 +138,8 @@ private fun stopWatchdog(state: SessionFeature.State): Reduced<SessionFeature.St
 }
 
 /**
- * iOS `quietServerPolling(_:)`: stops every timed read of the server: the pending-work polls and
- * the watchdog. Requests that answer the person (replies, sends) carry on.
+ * Stops every timed read of the server: the pending-work polls and the watchdog. Requests that
+ * answer the person (replies, sends) carry on.
  */
 internal fun quietServerPolling(state: SessionFeature.State): Reduced<SessionFeature.State, Action> {
     val stopped = stopWatchdog(state.copy(pendingWorkPollSeconds = null))
@@ -161,8 +157,8 @@ internal fun quietServerPolling(state: SessionFeature.State): Reduced<SessionFea
 }
 
 /**
- * iOS `resumeServerPolling(_:)`: back in front with the server reachable, polls and the watchdog
- * start again at once, and a request read that was owed its retry gets it.
+ * Back in front with the server reachable, polls and the watchdog start again at once, and a
+ * request read that was owed its retry gets it.
  */
 internal fun SessionFeature.resumeServerPolling(state: SessionFeature.State): Reduced<SessionFeature.State, Action> {
     if (!state.pollsServer || state.session == null) return Reduced(state)
@@ -223,7 +219,6 @@ internal fun SessionFeature.pollPendingWork(
     return Reduced(state.copy(pendingWorkPollSeconds = pollSeconds), Effect.merge(requests, inbox))
 }
 
-/** iOS `fetchQueuedInputs(server:sessionID:)`. */
 internal fun SessionFeature.fetchQueuedInputs(server: OpenCodeServer, sessionID: String): Effect<Action> =
     Effect.run<Action> { send -> readQueuedInputs(server, sessionID, send) }
         .cancellable(CancelID.InboxFetch, cancelInFlight = true)
@@ -238,7 +233,6 @@ private suspend fun SessionFeature.readQueuedInputs(server: OpenCodeServer, sess
     send(Action.PendingInputsResponse(sessionID = sessionID, inputs = inputs))
 }
 
-/** iOS `startPendingWork(_:attempt:)`. */
 internal fun SessionFeature.startPendingWork(
     state: SessionFeature.State,
     attempt: RequestDockFeature.State.LoadAttempt,
@@ -256,10 +250,8 @@ internal fun SessionFeature.retunePendingWork(
     return pollPendingWork(state)
 }
 
-/** iOS `SessionFeature.pendingWorkPollSeconds(streamIsHealthy:)`. */
 internal fun SessionFeature.Companion.pendingWorkPollSeconds(streamIsHealthy: Boolean): Int = if (streamIsHealthy) 12 else 2
 
-/** iOS `refreshRequests(_:)`. */
 internal fun SessionFeature.refreshRequests(state: SessionFeature.State): Effect<Action> {
     val session = state.session ?: return Effect.none()
     val server = state.server
@@ -303,7 +295,6 @@ internal fun SessionFeature.acknowledgeViewed(observed: OpenCodeSession, state: 
     }.cancellable(CancelID.ViewReceipt, cancelInFlight = true)
 }
 
-/** iOS `authoritativeRefresh(server:session:requestID:reason:messageIsInWindow:readsContext:)`. */
 internal fun SessionFeature.authoritativeRefresh(
     server: OpenCodeServer,
     session: OpenCodeSession,
@@ -363,7 +354,6 @@ internal fun SessionFeature.authoritativeRefresh(
     }.cancellable(CancelID.Freshness)
 }
 
-/** iOS `applyAuthoritative(_:pageCursor:to:preserveProjection:)`. */
 internal fun SessionFeature.applyAuthoritative(
     items: List<OpenCodeTranscriptItem>,
     pageCursor: AuthoritativeRefresh.PageCursor? = null,
@@ -382,7 +372,7 @@ internal fun SessionFeature.applyAuthoritative(
     return s
 }
 
-/** iOS `acceptWindow(_:pageCursor:into:preserveProjection:)`: adopts a newest-messages window and settles the prompts it echoes. */
+/** Adopts a newest-messages window and settles the prompts it echoes. */
 internal fun SessionFeature.acceptWindow(
     items: List<OpenCodeTranscriptItem>,
     pageCursor: AuthoritativeRefresh.PageCursor? = null,
@@ -505,7 +495,6 @@ internal fun SessionFeature.settleFailedSends(messageIDs: Set<String>, state: Se
     return s
 }
 
-/** iOS `applyAuthoritativeMessage(_:messageID:to:preserveProjection:)`. */
 internal fun SessionFeature.applyAuthoritativeMessage(
     fetched: List<OpenCodeTranscriptItem>,
     messageID: String,

@@ -12,9 +12,8 @@ import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 /**
- * Port of iOS `ComposerAutocompleteMotionTests.swift` (OC-474): search results swap
- * near-instantly and retarget instead of queueing; a drag through the list scrolls and never
- * picks a row. Lengths in dp (iOS points).
+ * Search results swap near-instantly and retarget instead of queueing; a drag through the list
+ * scrolls and never picks a row. Lengths in dp.
  */
 class ComposerAutocompleteMotionTests {
     private val width = 360.0
@@ -158,7 +157,7 @@ class ComposerAutocompleteMotionTests {
         assertEquals(18.0, tracker.move(start, AutocompletePoint(100.0, 130.0)))
         assertEquals(-29.0, tracker.move(start, AutocompletePoint(100.0, 101.0)))
         assertNull("Lifting after a scroll picks nothing, even back near the start", tracker.end(start, AutocompletePoint(100.0, 101.0)))
-        // iOS `tracker == AutocompleteTouchTracker()`: back to a fresh tracker.
+        // Back to a fresh tracker.
         assertNull(tracker.start)
         assertFalse(tracker.isScrolling)
     }

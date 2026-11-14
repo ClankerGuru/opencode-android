@@ -26,13 +26,13 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
- * How full the model's context window is (iOS `SessionContextRing`): neutral, then orange from
- * 80 % and red from 95 %, matching where a compaction becomes worth it. Hidden from TalkBack: the
- * control hosting it carries [SessionContextText.accessibilityValue].
+ * How full the model's context window is: neutral, then orange from 80 % and red from 95 %,
+ * matching where a compaction becomes worth it. Hidden from TalkBack: the control hosting it
+ * carries [SessionContextText.accessibilityValue].
  *
  * @param fraction tokens used over the context limit (clamped to 0…1 for drawing).
  * @param modifier size it here (the ring fills its bounds, inset by half the line width).
- * @param lineWidth stroke width (iOS 3.5 pt).
+ * @param lineWidth Stroke width.
  * @param trackOpacity the unfilled track's opacity; doubled under high contrast.
  */
 @Composable
@@ -47,7 +47,7 @@ fun SessionContextRing(
     val clamped = fraction.coerceIn(0.0, 1.0).toFloat()
     val animated by animateFloatAsState(
         targetValue = clamped,
-        // iOS `Motion.layout`; the reduced fade under Reduce Motion.
+        // The reduced fade under Reduce Motion.
         animationSpec = Motion.layout.animation(reduceMotion = reduceMotion),
         label = "contextRing",
     )
@@ -71,10 +71,9 @@ fun SessionContextRing(
 
 
 /**
- * The context gauge around the header's More button. Android divergence: iOS draws a bare arc
- * round its glass circle; on the bar a bare arc around a plain ⋮ read as part of the header, so
- * here it is M3's determinate circular progress indicator: the same fill and tint as
- * [SessionContextRing], over a full `outlineVariant` track, so it always reads as a ring.
+ * The context gauge around the header's More button. On the bar a bare arc around a plain ⋮ read as
+ * part of the header, so here it is M3's determinate circular progress indicator: the same fill and
+ * tint as [SessionContextRing], over a full `outlineVariant` track, so it always reads as a ring.
  */
 @Composable
 fun SessionContextGauge(fraction: Double, modifier: Modifier = Modifier) {
@@ -95,14 +94,10 @@ fun SessionContextGauge(fraction: Double, modifier: Modifier = Modifier) {
     )
 }
 
-/** iOS `SessionContextRing` statics. */
 object SessionContextRing {
     fun percent(fraction: Double): Int = (fraction * 100).roundToInt()
 
-    /**
-     * Red from 95 %, orange from 80 %, else [primary] (iOS `.red` / `.orange` / `.primary`;
-     * [red] is the theme's `systemRed`).
-     */
+    /** Red from 95 %, orange from 80 %, else [primary]. */
     fun tint(fraction: Double, isDark: Boolean, primary: Color, red: Color): Color = when {
         fraction >= 0.95 -> red
         fraction >= 0.8 -> if (isDark) Color(1f, 0.6235f, 0.0392f) else Color(1f, 0.5843f, 0f)
@@ -110,7 +105,7 @@ object SessionContextRing {
     }
 }
 
-/** "64% of 400K", or the token count when the window is unknown (iOS `SessionContextText`). */
+/** "64% of 400K", or the token count when the window is unknown. */
 object SessionContextText {
     fun summary(tokens: Int, limit: Int?, locale: Locale = appFormattingLocale()): String {
         if (limit == null || limit <= 0) return localized(R.string.session_sheet_context_tokens, NumberFormat.getIntegerInstance(locale).format(tokens))

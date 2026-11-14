@@ -13,16 +13,13 @@ import org.junit.Test
 import kotlin.math.abs
 
 /**
- * Port of iOS `TitleBreathTests.swift` (`TitleBreathTests`; its `TitleHoldTests` are below).
- *
- * The title's loading breath (D-48): it eases in from full, breathes down to
- * 45% and back, and eases back to full from wherever it is, never jumping.
+ * The title's loading breath eases in from full, breathes down to 45% and back, and eases back to
+ * full from wherever it is, never jumping.
  */
 class TitleBreathTests {
     /**
-     * Without tuning (everyone outside Developer Mode) the title loads with
-     * the breathing that shipped before D-54, at its shipped period and depth.
-     * (Android bakes the tunables: `usesShippedLook` and the presets list have no counterpart.)
+     * Without tuning (everyone outside Developer Mode) the title loads with the shipped breathing,
+     * at its shipped period and depth.
      */
     @Test fun todaysLookUsesTheShippedBreathing() {
         assertEquals(TitleLoadingStyle.Breathing, TitleLoadingTunables.STYLE)
@@ -180,8 +177,8 @@ class TitleBreathTests {
 }
 
 /**
- * Port of iOS `TitleHoldTests` (in `TitleBreathTests.swift`): which title shows while titles
- * change under a breath. Android's `TitleHold` is a value: each `update`/`settle` returns the next.
+ * Which title shows while titles change under a breath. Android's `TitleHold` is a value: each
+ * `update`/`settle` returns the next.
  */
 class TitleHoldTests {
     private val settle = TitleBreath.SETTLE_SECONDS

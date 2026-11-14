@@ -5,11 +5,10 @@ import ai.opencode.core.strings.localized
 import ai.opencode.server.internal.UrlParts
 
 /**
- * Port of iOS `OpenCodeServer.friendlyName` (`OpenCode/Drawer/ServerSwitcher.swift`), moved down
- * to `:server` because App and Drawer both name servers with it. A name to show, never an
- * address: the user's name, else the machine's from a tailnet or Bonjour address, else the address
- * in use when it's a name ("my-mac" → "My Mac"). An IP the server hasn't named reads as "Server"
- * and its last part, as a last resort.
+ * Moved down to `:server` because App and Drawer both name servers with it. A name to show, never
+ * an address: the user's name, else the machine's from a tailnet or Bonjour address, else the
+ * address in use when it's a name ("my-mac" → "My Mac"). An IP the server hasn't named reads as
+ * "Server" and its last part, as a last resort.
  */
 val OpenCodeServer.friendlyName: String
     get() = friendlyName(among = shared(ServerSharedKeys.savedServers).value)
@@ -17,7 +16,7 @@ val OpenCodeServer.friendlyName: String
 /**
  * [friendlyName] among [among] (the saved servers): an unnamed server whose name another saved
  * server also reads, on another port, gets its port (“Server 2 · 4197”), so two servers on one
- * machine can be told apart. Android divergence (QA D-02): iOS names both alike.
+ * machine can be told apart.
  */
 fun OpenCodeServer.friendlyName(among: List<OpenCodeServer>): String {
     val base = baseFriendlyName
@@ -66,7 +65,7 @@ fun friendlyServerName(address: String): String {
     var host = (parsed ?: trimmed).trim('[', ']')
     host.indexOf('%').takeIf { it >= 0 }?.let { host = host.substring(0, it) }
     if (host.contains(":")) {
-        // Swift's `split` drops empty pieces: `fe80::` ends in "fe80".
+        // `fe80::` ends in "fe80".
         val last = host.split(":").lastOrNull { it.isNotEmpty() }.orEmpty()
         return if (last.isEmpty()) localized(R.string.server_friendly_name_fallback) else localized(R.string.server_friendly_name_numbered, last)
     }

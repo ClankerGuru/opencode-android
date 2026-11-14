@@ -33,7 +33,7 @@ import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 
-/** The session card as the top of a Catch Up stack (iOS `CatchUpStage`). */
+/** The session card as the top of a Catch Up stack. */
 data class CatchUpStage(
     /** Sessions still to show; the first is the open card. */
     val queue: List<String>,
@@ -49,7 +49,7 @@ data class CatchUpStage(
     val nextCardID: String? get() = queue.getOrNull(1)
 }
 
-/** Lets the chrome's buttons play the same choreography as a swipe (iOS `CatchUpStageProxy`). */
+/** Lets the chrome's buttons play the same choreography as a swipe. */
 class CatchUpStageProxy {
     var dismiss: (CatchUpDisposition) -> Unit = {}
     var undo: () -> Unit = {}
@@ -58,7 +58,7 @@ class CatchUpStageProxy {
     fun undoCard() = undo()
 }
 
-/** A card transform in iOS terms: translation (dp), rotation (radians) and uniform scale about the centre. */
+/** Translation (dp), rotation (radians) and uniform scale about the centre. */
 data class CatchUpPose(val tx: Float = 0f, val ty: Float = 0f, val rotation: Float = 0f, val scale: Float = 1f) {
     fun lerp(to: CatchUpPose, t: Float) = CatchUpPose(
         tx + (to.tx - tx) * t,
@@ -91,7 +91,7 @@ class CatchUpCardLayer {
 
 /**
  * A snapshot riding above or below the live card: a dismissed card's flight, Undo's card shrinking
- * back, or a crossfade (iOS's `snapshotView`s). [badge] is the flying card's own swipe overlay.
+ * back, or a crossfade. [badge] is the flying card's own swipe overlay.
  */
 @Stable
 class CatchUpFlyingCard internal constructor(
@@ -112,20 +112,18 @@ class CatchUpFlyingCard internal constructor(
 }
 
 /**
- * Owns the stack's choreography (iOS `CatchUpStackController`): the drag, the fling that hands the
- * next card forward, Undo's return flight, and the preview card beneath. A plain object: per-frame
- * motion lives in snapshot state read by `graphicsLayer`, never in a reducer or a recomposition.
+ * Owns the stack's choreography: the drag, the fling that hands the next card forward, Undo's
+ * return flight, and the preview card beneath. A plain object: per-frame motion lives in snapshot
+ * state read by `graphicsLayer`, never in a reducer or a recomposition.
  *
  * The live session card is the only interactive card. The card behind it is a preview of the next
  * session; a dismissal flies a snapshot ([GraphicsLayer.toImageBitmap]) of the live card away while
  * the preview rises into place, and the live card (already showing that same session) replaces the
  * preview once it has landed.
  *
- * Android differences: the live card itself is the drag surface (iOS drags a snapshot over a hidden
- * live card to keep UIKit layout out of the gesture; Compose's `graphicsLayer` transform already
- * never re-lays out or recomposes). Until a flight's snapshot is ready (a frame or two) the flight
- * carries the live card itself, then hands over to the snapshot and tells the store, as iOS tells it
- * a frame after the flight starts.
+ * Android differences: the live card itself is the drag surface. Until a flight's snapshot is ready
+ * (a frame or two) the flight carries the live card itself, then hands over to the snapshot and
+ * tells the store.
  */
 @Stable
 class CatchUpStackController internal constructor() {
@@ -144,7 +142,7 @@ class CatchUpStackController internal constructor() {
     // Render state.
     val live = CatchUpCardLayer()
     val preview = CatchUpCardLayer().also { it.alpha = 1f }
-    /** The session the preview card shows (iOS `showPreview`), `null` for none. */
+    /** The session the preview card shows, `null` for none. */
     var shownPreviewID by mutableStateOf<String?>(null)
         private set
     var isPreviewHidden by mutableStateOf(true)
@@ -161,7 +159,6 @@ class CatchUpStackController internal constructor() {
     val readBadge = CatchUpBadgeState(CatchUpDisposition.markRead)
     val keepBadge = CatchUpBadgeState(CatchUpDisposition.keepUnread)
     val flyingCards = mutableStateListOf<CatchUpFlyingCard>()
-    /** iOS `content.isUserInteractionEnabled`. */
     var isContentEnabled by mutableStateOf(false)
         private set
 
@@ -312,7 +309,7 @@ class CatchUpStackController internal constructor() {
         setPreviewDepth(0f)
     }
 
-    /** Re-applies stack geometry (iOS `refreshTuning`, used when tunables or the card size change). */
+    /** Re-applies stack geometry. */
     fun refreshTuning() {
         if (isDragging || settleJob != null) {
             applyDrag(dragOffset, isSettling = settleJob != null)
@@ -427,7 +424,7 @@ class CatchUpStackController internal constructor() {
         }
     }
 
-    // Drag (iOS `handlePan`, split by gesture phase; translations in dp, velocities in dp/s)
+    // Drag
 
     internal val canBeginDrag: Boolean get() = stage?.cardID != null || (settleJob != null && dragActive)
 
@@ -481,9 +478,9 @@ class CatchUpStackController internal constructor() {
     }
 
     /**
-     * iOS `handlePan(_:)` for a host that routes the drawer container's pan here
-     * (`Modifier.drawerPan(onCardSwipe = controller::handlePan)`). That pan is horizontal only, so
-     * the card gets no vertical rubber band; [CatchUpStack]'s own pan (its default) carries both axes.
+     * For a host that routes the drawer container's pan here (`Modifier.drawerPan(onCardSwipe =
+     * controller::handlePan)`). That pan is horizontal only, so the card gets no vertical rubber
+     * band; [CatchUpStack]'s own pan (its default) carries both axes.
      */
     fun handlePan(event: DrawerPanEvent) {
         when (event) {
@@ -554,8 +551,8 @@ class CatchUpStackController internal constructor() {
     fun cancelPendingAnimations() = finishTransition(syncingPreview = false)
 
     /**
-     * Catch Up ended under the finger (iOS `end`'s mid-drag part): the rest of the drag, or the
-     * snap-back it started, moves nothing and can't dismiss a card.
+     * Catch Up ended under the finger: the rest of the drag, or the snap-back it started, moves
+     * nothing and can't dismiss a card.
      */
     internal fun dropDrag() {
         if (!isDragging && settleJob == null) return
@@ -865,7 +862,7 @@ class CatchUpStackController internal constructor() {
 
     // Helpers
 
-    /** iOS `snapshotView`: the live card's content (without its swipe overlay) as a bitmap. */
+    /** The live card's content (without its swipe overlay) as a bitmap. */
     private suspend fun captureLive(): ImageBitmap? {
         val layer = liveLayer ?: return null
         return try {
@@ -877,7 +874,7 @@ class CatchUpStackController internal constructor() {
         }
     }
 
-    /** A running piece of choreography that can be jumped to its end (UIKit's `finishAnimation(at: .end)`). */
+    /** A running piece of choreography that can be jumped to its end. */
     private class Running {
         var job: Job? = null
         var finishNow: () -> Unit = {}
@@ -934,7 +931,7 @@ class CatchUpStackController internal constructor() {
         companion object {
             const val MAX_SECONDS = 2.0
 
-            /** iOS `MotionRole.propertyAnimator(_:reduceMotion:initialVelocity:)`: the role's curve as a [Curve]. */
+            /** The role's curve as a [Curve]. */
             fun role(role: MotionRole, phase: MotionPhase = MotionPhase.Enter, reduceMotion: Boolean, initialVelocity: Float = 0f): Curve {
                 val curve = role.curve(phase, reduceMotion)
                 return when (curve) {
@@ -1012,7 +1009,7 @@ class CatchUpStackController internal constructor() {
     }
 }
 
-/** One piece of work on the next display frame, or sooner with [flush] (iOS `CatchUpNextFrame`). */
+/** One piece of work on the next display frame, or sooner with [flush]. */
 internal class CatchUpNextFrame(private val scope: () -> CoroutineScope) {
     private var body: (() -> Unit)? = null
     private var job: Job? = null

@@ -8,11 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.abs
 
-/**
- * Port of iOS `VoiceCaptionAndQualityTests.swift` (`CaptionRevealTests`, `VoiceAudioQualityTests`).
- * `appendingWordsNeverMovesEarlierWords` and `wordsFadeInWhereTheyLie` render SwiftUI views with
- * `ImageRenderer` and compare pixels: a rendering probe with no JVM unit-test equivalent (dropped).
- */
+/** A rendering probe with no JVM unit-test equivalent (dropped). */
 class CaptionRevealTests {
     @Test fun queuedWordsAppearAtLeastSpacingApart() {
         var reveal = CaptionReveal()

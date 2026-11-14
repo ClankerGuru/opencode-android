@@ -35,8 +35,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
 /*
- * Port of iOS `HomeFeature+Drawer.swift`: the drawer's own actions — opening sessions and drafts,
- * pins, mutes, read state, deletion, and the transcript reads around a tap.
+ * The drawer's own actions — opening sessions and drafts, pins, mutes, read state, deletion, and
+ * the transcript reads around a tap.
  */
 
 
@@ -390,10 +390,9 @@ private fun HomeFeature.sessionTapped(state: State, sessionID: String): HomeRedu
 }
 
 /**
- * Catch Up's card becomes the open session as it is (iOS `promoteCatchUpDetail`,
- * `ComposerPersistence.swift`): it reads on view again, keeping any subagent the reader opened.
- * What was typed on the card joins what waited for the session (a share, or its persisted draft),
- * and the family members' card drafts join theirs.
+ * Catch Up's card becomes the open session as it is: it reads on view again, keeping any subagent
+ * the reader opened. What was typed on the card joins what waited for the session (a share, or its
+ * persisted draft), and the family members' card drafts join theirs.
  */
 internal fun State.promotingCatchUpDetail(): State {
     var detail = sessionDetail ?: return this
@@ -553,10 +552,10 @@ internal fun dropPin(state: State, id: String, pinnedIndex: Int?): State {
 }
 
 /**
- * The drawer offers a call (iOS `drawerOffersCall`): with Voice set up, and with something to call: the
- * session or project draft behind the drawer, or the session Start Voice Call's Last Viewed path
- * would open. A draft with no project and no session to fall back on offers none, rather than
- * opening a project picker behind the drawer.
+ * The drawer offers a call: with Voice set up, and with something to call: the session or project
+ * draft behind the drawer, or the session Start Voice Call's Last Viewed path would open. A draft
+ * with no project and no session to fall back on offers none, rather than opening a project picker
+ * behind the drawer.
  */
 val HomeFeature.State.drawerOffersCall: Boolean
     get() {

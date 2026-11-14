@@ -7,11 +7,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * The `:server` half of iOS `ConnectionHealthTests.swift` (“Names and routes”):
- * [ConnectionRoute.of] (iOS `ConnectionRoute(url:)`) and [OpenCodeServer.reachabilityRank].
- * The health state machine, trace and card names are `:feature:settings`'s.
- */
 class ConnectionHealthTests {
     @get:Rule val isolation = TestIsolationRule()
 

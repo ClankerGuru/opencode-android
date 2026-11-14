@@ -8,13 +8,8 @@ import org.junit.Test
 import kotlin.math.abs
 
 /**
- * Port of iOS `PerfFrameWindowTests`: `PerfFrameClock` and `PerfFrameWindow` count only
- * callbacks that came past their deadline, whatever rate the display ran.
- *
- * Not ported: `infoPlistEnablesProMotion120HzOnPhone` (Info.plist key),
- * `proMotion120HzFrameRateRangeAndClockIntervals` (a live `CADisplayLink`; its `DrawerSpring`
- * half belongs to `:feature:drawer`), `transcriptFollowerDisplayLinkDoesNotRequestAbove60Hz`
- * (`CADisplayLink` frame-rate range).
+ * `PerfFrameClock` and `PerfFrameWindow` count only callbacks that came past their deadline,
+ * whatever rate the display ran.
  */
 class PerfFrameWindowTests {
     @get:Rule val isolation = TestIsolationRule()

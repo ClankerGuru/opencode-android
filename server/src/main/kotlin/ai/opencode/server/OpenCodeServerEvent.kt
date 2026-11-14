@@ -11,7 +11,7 @@ class EventStreamOverflow : Exception("The event stream overflowed.") {
     override fun hashCode(): Int = 0
 }
 
-/** One semantic event from `/api/event` (iOS `OpenCodeServerEvent`). */
+/** One semantic event from `/api/event`. */
 sealed interface OpenCodeServerEvent {
     data object Connected : OpenCodeServerEvent
     data class ExecutionStarted(val sessionID: String) : OpenCodeServerEvent

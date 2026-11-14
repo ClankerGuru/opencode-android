@@ -44,7 +44,6 @@ private fun str(value: String): JsonElement = JsonPrimitive(value)
 private fun arr(vararg values: JsonElement): JsonElement = JsonArray(values.toList())
 private fun parsed(bytes: ByteArray): JsonElement = Json.parseToJsonElement(bytes.decodeToString())
 
-/** Port of iOS `ServerVoiceTests.swift` ("Server Voice and Gemini Live"). */
 class ServerVoiceTests {
     private val server = OpenCodeServer(url = "http://127.0.0.1:4096", username = "opencode", password = "secret")
     private val session = OpenCodeSession(
@@ -58,10 +57,7 @@ class ServerVoiceTests {
     /** The first ID the incrementing UUID client hands out: Android's call-presence ID. */
     private val presenceID = UUID(0, 0)
 
-    /**
-     * iOS resets the process-wide shared values before each test; here every test gets a fresh
-     * in-memory store, which starts at those same defaults.
-     */
+    /** Every test gets a fresh in-memory store, which starts at those same defaults. */
     private fun resetSharedVoiceState(): SpeechTestShared = SpeechTestShared()
 
     private fun startedTarget() = VoiceWorkTarget(server = server, sessionID = session.id, directory = session.directory)
@@ -193,7 +189,7 @@ class ServerVoiceTests {
         )
     }
 
-    /** iOS's `withDependencies` for the Server Voice starts; Android adds the presence ID. */
+    /** Android adds the presence ID. */
     private fun serverVoiceDependencies(
         shared: SpeechTestShared,
         at: Long,
@@ -375,10 +371,6 @@ class ServerVoiceTests {
         assertNull(capturedStarts.value[0].second)
     }
 
-    /**
-     * iOS's second half drives `HomeFeature` (`settings(.checkServerVoiceSupport)`, the
-     * event stream's `.connected` clearing the cache): that store belongs to the Home port.
-     */
     @Test fun serverVoiceReprobesOnceWhenUnsupportedAndClearsCacheOnReconnect() = runBlocking {
         val shared = resetSharedVoiceState()
         val probeCount = Locked(0)

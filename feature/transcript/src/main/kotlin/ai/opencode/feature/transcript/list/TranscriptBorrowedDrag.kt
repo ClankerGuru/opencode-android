@@ -16,15 +16,12 @@ import androidx.compose.ui.platform.InspectorInfo
 import kotlin.math.abs
 
 /**
- * A drag borrowed from a control floating over the transcript (iOS `TranscriptBorrowedDrag` and
- * `SessionScrollEdgeBridge.onBorrowedDrag`): a vertical drag that starts on Jump to latest, the
- * queued pill or the background-work capsule scrolls the list as one starting beside it does, so
- * the controls aren't dead spots in the band above the composer. A tap stays the control's.
+ * A drag borrowed from a control floating over the transcript: a vertical drag that starts on Jump
+ * to latest, the queued pill or the background-work capsule scrolls the list as one starting beside
+ * it does. A tap stays the control's.
  *
- * Android divergence: iOS re-implements UIScrollView's drag, rubber band and deceleration on a
- * display link. Here the list scrolls through its own `LazyListState` and the release flings with
- * the list's own fling, so it moves as any Android list does (its ends stop the drag, as they stop
- * a drag on the list). Every pointer gesture ends with an up or a cancel, so there's no watchdog.
+ * The list scrolls through its own `LazyListState` and the release flings with the list's own
+ * fling. Every pointer gesture ends with an up or a cancel, so there's no watchdog.
  */
 class TranscriptBorrowedDrag {
     sealed interface Event {
@@ -56,9 +53,9 @@ class TranscriptBorrowedDrag {
 }
 
 /**
- * Whether a drag on a control is the transcript's (iOS `BorrowedDragVerdict`): decided as it first
- * reports, so a sideways drag stays the control's. Keyed on where the drag began, so a drag that
- * never ended can't decide the next one.
+ * Whether a drag on a control is the transcript's: decided as it first reports, so a sideways drag
+ * stays the control's. Keyed on where the drag began, so a drag that never ended can't decide the
+ * next one.
  */
 class BorrowedDragVerdict {
     private var start: Offset? = null
@@ -79,9 +76,9 @@ class BorrowedDragVerdict {
 }
 
 /**
- * iOS `passesDragsToTranscript(_:isEnabled:)`: a vertical drag starting on this control scrolls
- * the transcript through [drag]. [isEnabled] is read as a drag starts, so a control that hides
- * under the finger (Jump to latest reaching the end) keeps its drag to release.
+ * A vertical drag starting on this control scrolls the transcript through [drag]. [isEnabled] is
+ * read as a drag starts, so a control that hides under the finger (Jump to latest reaching the end)
+ * keeps its drag to release.
  */
 fun Modifier.passesDragsToTranscript(drag: TranscriptBorrowedDrag?, isEnabled: Boolean = true): Modifier {
     if (drag == null) return this

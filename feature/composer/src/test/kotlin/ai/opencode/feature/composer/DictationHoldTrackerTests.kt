@@ -11,16 +11,9 @@ import kotlin.math.abs
 private typealias Arm = DictationFeature.Hold.Arm
 
 /**
- * Port of iOS `DictationHoldTrackerTests.swift`.
- *
- * Holding the mic: progress toward lock (up) and cancel (left) follows the
- * finger wherever it goes; the leading target arms at its line, with
- * hysteresis on the way back and no axis latch. Distances are dp (iOS points).
- *
- * Skipped → `:feature:session` (`DictationViews.kt` owns `DictationHoldVisuals`,
- * `DictationBarPose` and `DictationHoldRetention`):
- * `aSecondDictationStartsWithNoCircleOrGuides`,
- * `dictationHoldRetentionDropsLeavingHoldAcrossSessionAndDraftSwitches` (both ported there).
+ * Holding the mic: progress toward lock (up) and cancel (left) follows the finger wherever it goes;
+ * the leading target arms at its line, with hysteresis on the way back and no axis latch. Distances
+ * are dp.
  */
 class DictationHoldTrackerTests {
     private fun track(points: List<Pair<Float, Float>>): DictationHoldTracker {
@@ -129,10 +122,7 @@ class DictationHoldTrackerTests {
 }
 
 /**
- * Port of iOS `MicPressTests` (in `DictationHoldTrackerTests.swift`).
- *
- * The mic's press reports each ending once, including when the mic's view goes
- * away mid-press. iOS tears the press down by dropping it (`deinit`); here the
+ * The mic's press reports each ending once, including when the mic's view goes away mid-press. The
  * composable's `DisposableEffect` calls [MicPress.dispose].
  */
 class MicPressTests {

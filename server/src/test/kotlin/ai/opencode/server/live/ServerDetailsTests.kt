@@ -8,13 +8,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * The `:server` half of iOS `ServerDetailsTests.swift` (Settings › Server Details): decoding
- * `/api/mcp` and `/api/integration` as `requestServerCapabilities` does, and MCP connect's retry
- * rule. The reducer tests and `OpenCodeAccount.subtitle` (`ServerDetailsTrays`) are
- * `:feature:settings`'s, so `decodesCredentialAndEnvironmentAccounts` checks the decoded
- * provider, method and label here.
- */
 class ServerDetailsTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -62,7 +55,6 @@ class ServerDetailsTests {
             listOf(OpenCodeAccount.Method.OAuth, OpenCodeAccount.Method.OAuth, OpenCodeAccount.Method.Environment),
             accounts.map { it.method },
         )
-        // iOS `subtitle` (["Anomaly", nil, "Key from OPENAI_API_KEY"]) reads these labels.
         assertEquals(listOf("Anomaly", "default", "OPENAI_API_KEY"), accounts.map { it.label })
     }
 

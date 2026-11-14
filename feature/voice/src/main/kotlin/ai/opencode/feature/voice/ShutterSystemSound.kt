@@ -13,10 +13,9 @@ import java.io.File
 import java.io.IOException
 
 /**
- * The shutter outside a call (iOS `ShutterSystemSound`): the call's shutter clicks
- * ([VoiceShutterSound]) louder, written to a WAV once and played as a UI sound
- * (`USAGE_ASSISTANCE_SONIFICATION`), quiet while the ringer is silenced or vibrating, as iOS's
- * registered UI sound follows the Ring/Silent switch.
+ * The shutter outside a call: the call's shutter clicks ([VoiceShutterSound]) louder, written to a
+ * WAV once and played as a UI sound (`USAGE_ASSISTANCE_SONIFICATION`), quiet while the ringer is
+ * silenced or vibrating.
  */
 class ShutterSystemSound(private val context: Context) {
     private val lock = Any()
@@ -78,10 +77,9 @@ class ShutterSystemSound(private val context: Context) {
         const val peak: Float = 0.4f
 
         /**
-         * iOS `LiveScreenCaptureFeedback.playShutterSound`, installed at the root as `:core`'s
-         * [ScreenCaptureShutterSound]: during a call the call's own engine plays it
-         * ([VoiceCallCueClient.shutter]); while dictation or media holds the audio session it
-         * stays quiet; else the app's own shutter.
+         * Installed at the root as `:core`'s [ScreenCaptureShutterSound]: during a call the call's
+         * own engine plays it ([VoiceCallCueClient.shutter]); while dictation or media holds the
+         * audio session it stays quiet; else the app's own shutter.
          */
         fun live(): ScreenCaptureShutterSound {
             val sound by lazy { ShutterSystemSound(dependency(AppContext)) }

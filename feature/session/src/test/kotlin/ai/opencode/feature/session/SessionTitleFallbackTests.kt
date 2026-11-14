@@ -12,7 +12,7 @@ import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
 
-/** The session screen names an unnamed session after its first prompt (iOS `SessionTitleFallbackTests`). */
+/** The session screen names an unnamed session after its first prompt. */
 class SessionTitleFallbackTests {
     @get:Rule val isolation = TestIsolationRule()
 

@@ -28,14 +28,6 @@ import org.junit.Rule
 import org.junit.Test
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `VoiceServerPickerTests.swift` ("Voice Provider"), the `:feature:settings` part:
- * the four `VoiceSettingsFeature` tests, `homeSavesTheChoiceAndAsksTheServerItNames`
- * ([HomeSettingsFeature] lives here on Android), and the Settings checks of
- * `everyEntryPointRoutesByTheChosenServersSupport` and `thisIPhoneUsesThePhonesOwnKey` (their
- * `VoiceRoutePreferences` checks and the call are `:feature:voice`'s port, their
- * `SessionFeature.State` checks `:feature:session`'s).
- */
 class VoiceServerPickerTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -280,9 +272,8 @@ class VoiceServerPickerTests {
     }
 
     /**
-     * Settings' half of iOS `everyEntryPointRoutesByTheChosenServersSupport`: never the connected
-     * server's support. A picked server without the voice routes fails rather than move to the
-     * phone's key.
+     * Never the connected server's support. A picked server without the voice routes fails rather
+     * than move to the phone's key.
      */
     @Test fun everyEntryPointRoutesByTheChosenServersSupport() {
         val shared = SettingsTestShared()
@@ -304,7 +295,6 @@ class VoiceServerPickerTests {
         }
     }
 
-    /** Settings' half of iOS `thisIPhoneUsesThePhonesOwnKey`: This Phone uses the phone's own key, and without one offers no call. */
     @Test fun thisIPhoneUsesThePhonesOwnKey() {
         val shared = SettingsTestShared()
         shared.save(listOf(server, studio), choice = VoiceServerChoice.Phone)

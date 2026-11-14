@@ -25,19 +25,17 @@ import java.io.File
 import java.time.Instant
 import java.util.UUID
 
-// Port of `Composer/AutocompleteModels.swift`. The wire types (skill, agent, command, file,
-// mentions, `PromptAutocompleteMentions` → `PromptContext.mentions`) live in `:server`
-// (`model/Composer.kt`). Kotlin `String` indices are UTF-16 code units, as `NSString`'s are,
-// so the offsets below match iOS exactly.
+// The wire types (skill, agent, command, file, mentions, `PromptAutocompleteMentions` →
+// `PromptContext.mentions`) live in `:server` (`model/Composer.kt`). Kotlin `String` indices are
+// UTF-16 code units.
 
-/** `UUID` as its string, as Swift's `Codable` writes it. */
+/** `UUID` as its string. */
 object UUIDSerializer : KSerializer<UUID> {
     override val descriptor = PrimitiveSerialDescriptor("UUID", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: UUID) = encoder.encodeString(value.toString())
     override fun deserialize(decoder: Decoder): UUID = UUID.fromString(decoder.decodeString())
 }
 
-/** Swift's `trimmingCharacters(in: .whitespacesAndNewlines)`. */
 internal fun String.trimmedWhitespaceAndNewlines(): String = trim { it.isWhitespace() || Character.isSpaceChar(it) }
 
 private fun isWhitespaceUTF16(unit: Char): Boolean = unit.isWhitespace() || Character.isSpaceChar(unit)
@@ -59,7 +57,7 @@ data class OpenCodeAutocompleteSession(
     val sentToken: String get() = "@session:$id"
 
     companion object {
-        /** iOS's designated init: an empty title reads “New Session”. */
+        /** An empty title reads “New Session”. */
         fun of(id: String, title: String, project: String, updatedAt: Instant): OpenCodeAutocompleteSession {
             val trimmed = title.trimmedWhitespaceAndNewlines()
             return OpenCodeAutocompleteSession(id, trimmed.ifEmpty { localized(R.string.composer_autocomplete_new_session) }, project, updatedAt)

@@ -84,8 +84,7 @@ class AudioSessionOwner(
         /**
          * Ends admission without touching the OS session: later activations and engine starts
          * throw, and [release] still deactivates. For a hang-up that lands while another thread
-         * configures the engine (on iOS, deactivating alongside the engine's setup deadlocked
-         * audiomxd).
+         * configures the engine.
          */
         fun withdraw() = synchronized(lock) { live.remove(id); ready.remove(id); Unit }
         /** Whether this was the last holder and the session deactivated. A refused deactivation returns false and retries in the background. */

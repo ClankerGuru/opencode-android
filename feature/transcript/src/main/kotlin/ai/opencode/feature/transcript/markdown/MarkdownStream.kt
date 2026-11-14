@@ -3,18 +3,16 @@ package ai.opencode.feature.transcript.markdown
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock.InlineCache
 
 /**
- * Streaming Markdown that parses each completed block once (iOS `MarkdownStream`, the desktop
- * app's `markdown-stream` design, ported to [OpenCodeMarkdownBlock]'s grammar). The text splits
- * into units at points where the parser's state is clean: a closed code fence, or a blank line
- * followed by a line that resets every open list. A unit is committed only once the chars after
- * it prove its boundary, then parsed once and kept; an update reuses every committed unit whose
- * proof the new text still shares and re-parses only the live tail, healing its last block
- * ([MarkdownTailHeal]) while it streams. Display math and code fences never span a boundary, so
- * they're never cut.
+ * Streaming Markdown that parses each completed block once. The text splits into units at points
+ * where the parser's state is clean: a closed code fence, or a blank line followed by a line that
+ * resets every open list. A unit is committed only once the chars after it prove its boundary, then
+ * parsed once and kept; an update reuses every committed unit whose proof the new text still shares
+ * and re-parses only the live tail, healing its last block ([MarkdownTailHeal]) while it streams.
+ * Display math and code fences never span a boundary, so they're never cut.
  *
- * The result always equals [OpenCodeMarkdownBlock.blocks] of the same text when it isn't
- * streaming. Offsets are UTF-16 chars (iOS: UTF-8 bytes). Mutable and not thread-safe: the
- * store copies a stream ([copy]) before updating it, as Swift's value semantics do.
+ * The result always equals [OpenCodeMarkdownBlock.blocks] of the same text when it isn't streaming.
+ * Offsets are UTF-16 chars. Mutable and not thread-safe: the store copies a stream ([copy]) before
+ * updating it.
  */
 class MarkdownStream(
     private val inlineCache: InlineCache? = InlineCache.shared,
@@ -50,7 +48,7 @@ class MarkdownStream(
     var cost: Cost = Cost()
         private set
 
-    /** An independent copy (Swift struct semantics). */
+    /** An independent copy. */
     fun copy(): MarkdownStream {
         val copy = MarkdownStream(inlineCache, parseUnit)
         copy.source = source

@@ -19,10 +19,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `BrowserTests.swift` › `PagePromptBodyTests`: the prompt admission body when a
- * message is sent from a page in the in-app browser. URLs are strings on Android.
- */
+/** URLs are strings on Android. */
 class PagePromptBodyTests {
     @get:Rule val isolation = TestIsolationRule()
 

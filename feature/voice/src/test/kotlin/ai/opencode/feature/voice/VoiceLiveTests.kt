@@ -23,7 +23,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Port of iOS `VoiceLiveTests.swift`: `LiveProtocolTests`. */
+/** `LiveProtocolTests`. */
 class LiveProtocolTests {
     private fun s(value: String) = RealtimeJSONs.string(value)
 
@@ -219,8 +219,7 @@ class LiveProtocolTests {
         assertEquals(1_500.milliseconds, userGate.delay(t0 + 6_500.milliseconds))
         assertNull(userGate.delay(t0 + 8_000.milliseconds))
 
-        // 3. Kit's Oct 30 dictation: transcript fragments 1.2 s apart for 20 s
-        // never release a held update (a 5 s cap used to, 1.5 s into a pause).
+        // 3. A dictation's transcript fragments 1.2 s apart for 20 s never release a held update.
         var dictation = VoiceCallTiming.live.quietGate
         dictation = dictation.noteUserSpoke(t0)
         dictation = dictation.noteHeld(t0)
@@ -238,7 +237,6 @@ class LiveProtocolTests {
     }
 }
 
-/** Port of iOS `LiveRTCTests`. */
 class LiveRTCTests {
     @Test fun sessionRequestLeavesTheAudioFormatToSDPAndPreNegotiatesTheEventChannel() {
         val config = LiveSessionConfig(instructions = "Be concise.", input = listOf(LiveInputMessage(LiveInputMessage.Role.user, "Hi")))
@@ -462,7 +460,6 @@ private class LiveRTCLinkWatchTester {
         )
 }
 
-/** Port of iOS `RealtimeRTCTests`. */
 class RealtimeRTCTests {
     private val config = RealtimeSessionConfig(instructions = "Be brief.", tools = emptyList())
 
@@ -515,7 +512,6 @@ class RealtimeRTCTests {
     }
 }
 
-/** Port of iOS `VoiceDelegatorRoundTests`. */
 class VoiceDelegatorRoundTests {
     /**
      * Runs a request whose model asks for a wait every round until
@@ -564,10 +560,6 @@ class VoiceDelegatorRoundTests {
     }
 }
 
-/**
- * Port of iOS `VoiceEnginePersistenceTests`. Its migration tests drive `AppFeature`
- * (owned by `:app`) and aren't ported here; the per-call engine test is the voice module's.
- */
 class VoiceEnginePersistenceTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
     private val session = OpenCodeSession(id = "ses_voice", serverTitle = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = Instant.EPOCH)
@@ -626,8 +618,7 @@ class VoiceEnginePersistenceTests {
         store.send(VoiceFeature.Action.Start)
         assertEquals(VoiceFeature.State.Phase.Failed("Add your xAI API key in Settings to use Voice."), store.state.phase)
         assertEquals(2, startedKeys.size)
-        // iOS also checks a session's `isVoiceAvailable` with Voice on (owned by :feature:session);
-        // the voice module's part is that Grok has no key from the OpenAI one.
+        // The voice module's part is that Grok has no key from the OpenAI one.
         assertNull(voiceEngine.apiKey(openAI = "sk-test", xAI = null))
 
         shared.set(SharedKeys.xaiAPIKey, "xai-test")

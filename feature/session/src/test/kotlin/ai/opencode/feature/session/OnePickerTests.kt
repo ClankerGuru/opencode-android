@@ -21,11 +21,6 @@ import ai.opencode.server.model.OpenCodeSession
 import org.junit.Test
 import java.time.Instant
 
-/**
- * The `SessionFeature` half of iOS `OnePickerTests.swift`: its exhaustive reducer test, keeping
- * the iOS name. The catalog, provider-mark and motion-audit tests are in `:feature:composer`'s
- * `OnePickerTests`, beside the types they test.
- */
 class OnePickerTests {
     private val opusZen = OpenCodeModel("claude-opus-5-5", "opencode", "Claude Opus 5.5", variants = listOf("low", "medium", "high", "max"))
     private val sonnetAnthropic = OpenCodeModel("claude-sonnet-5-5", "anthropic", "Claude Sonnet 5.5", variants = listOf("low", "medium", "high"))

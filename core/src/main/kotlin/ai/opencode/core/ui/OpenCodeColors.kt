@@ -9,16 +9,8 @@ import androidx.compose.ui.graphics.Color
 import kotlin.math.abs
 
 /**
- * The app's semantic colours for one (theme, light/dark, contrast) state: a port of iOS
- * `ThemePalette`'s dynamic colour providers (`canvas`, `groupedCard`, `text`, `codeBand`, …)
- * including their Increase Contrast and System-theme rules.
- *
- * Read with `OpenCodeTheme.colors` inside [OpenCodeTheme]. Colours with a Material role are
- * also in `MaterialTheme.colorScheme` (see [toColorScheme] for the mapping); the transcript,
- * syntax, diff and Send-button colours exist only here.
- *
- * Android's Increase Contrast equivalent is the system contrast level (Settings →
- * Accessibility → Colour and motion → Contrast, `UiModeManager.getContrast() >= 0.5`).
+ * The app's semantic colours for one theme, mode and contrast state. Read with
+ * `OpenCodeTheme.colors`; roles Material has are also in `MaterialTheme.colorScheme`.
  */
 @Immutable
 class OpenCodeColors(
@@ -26,37 +18,37 @@ class OpenCodeColors(
     val isDark: Boolean,
     val highContrast: Boolean,
     /**
-     * Hairlines draw in the strong border colour: Increase Contrast or Android's high-contrast
-     * text setting (desktop hairlines are under 3:1 against the canvas).
+     * Hairlines draw in the strong border colour: desktop hairlines are under 3:1 against the
+     * canvas.
      */
     val strongBorders: Boolean,
     /** The raw palette, for swatches (`swatchCanvas`, `swatchRing`, `swatchAccent`) and contrast checks. */
     val variant: ThemeVariant,
-    /** Plain backgrounds (iOS `systemBackground`). */
+    /** Plain backgrounds. */
     val canvas: Color,
-    /** Grouped lists' background, Settings (iOS `systemGroupedBackground`). */
+    /** Grouped lists' background, Settings. */
     val groupedCanvas: Color,
-    /** A card or row group on [groupedCanvas] (iOS `secondarySystemGroupedBackground`). */
+    /** A card or row group on [groupedCanvas]. */
     val groupedCard: Color,
     /** Code block band behind code. */
     val codeBand: Color,
-    /** The user's message bubble (iOS `secondarySystemBackground`). */
+    /** The user's message bubble. */
     val userBubble: Color,
-    /** Inline `code` fill (iOS `tertiarySystemFill`). */
+    /** Inline `code` fill. */
     val inlineCodeFill: Color,
-    /** Primary text (iOS `label`). */
+    /** Primary text. */
     val text: Color,
     /** Strongest text: titles, emphasis. */
     val strongText: Color,
-    /** Secondary text (iOS `secondaryLabel`). */
+    /** Secondary text. */
     val secondaryText: Color,
-    /** Tertiary text (iOS `tertiaryLabel`). */
+    /** Tertiary text. */
     val tertiaryText: Color,
     /** Default transcript prose ([bodyText] at tone 0.92). */
     val defaultBodyText: Color,
-    /** Separators and hairlines (iOS `separator`). */
+    /** Separators and hairlines. */
     val border: Color,
-    /** Tint for controls and selection (iOS `tintColor`). */
+    /** Tint for controls and selection. */
     val accent: Color,
     val sendButtonBackground: Color,
     val sendButtonForeground: Color,
@@ -67,9 +59,8 @@ class OpenCodeColors(
      */
     val signal: Color,
     /**
-     * Fill for on and selected controls: switch tracks, selected segments, radio and checkmark
-     * marks, slider tracks. The desktop's `--v2-background-bg-accent` (blue-600) in the OpenCode
-     * theme, the theme's own accent elsewhere. Never for primary buttons or text.
+     * Fill for on and selected controls (switch tracks, segments, checkmarks). Never for primary
+     * buttons or text.
      */
     val selection: Color,
     /** Content drawn on [selection]: a switch thumb, a check inside a filled radio. */
@@ -90,7 +81,7 @@ class OpenCodeColors(
     val diffRemovedFill: Color,
     val diffAddedText: Color,
     val diffRemovedText: Color,
-    /** Destructive roles only (iOS `systemRed`: delete, end call). */
+    /** Destructive roles only. */
     val destructive: Color,
     /**
      * Failure text and glyphs (a failed tool, a run error): the desktop's `--v2-state-fg-danger`,
@@ -99,11 +90,7 @@ class OpenCodeColors(
     val danger: Color,
     private val bodyTextResolver: (Double) -> Color,
 ) {
-    /**
-     * Prose at [tone] (`0..1`) between canvas and text, mixed in OKLab (System theme: the
-     * label colour at alpha [tone]). `tone >= 0.999` is [strongText]; Increase Contrast
-     * returns full text (iOS `ThemePalette.bodyText(tone:)`).
-     */
+    /** Prose at [tone] (`0..1`) between canvas and text, mixed in OKLab. */
     fun bodyText(tone: Double): Color = when {
         tone >= 0.999 -> strongText
         abs(tone - 0.92) < 0.0005 -> defaultBodyText
@@ -111,12 +98,7 @@ class OpenCodeColors(
     }
 
     companion object {
-        /**
-         * Resolves every semantic colour exactly as iOS's dynamic providers do for [theme],
-         * [isDark] and [highContrast]. For [AppTheme.System], iOS returns UIKit system colours;
-         * this uses their concrete values (the [ThemePalette.system] reference palette plus the
-         * UIKit-only fills below).
-         */
+        /** Resolves every semantic colour for [theme], [isDark] and [highContrast]. */
         fun resolve(theme: AppTheme, isDark: Boolean, highContrast: Boolean = false, strongBorders: Boolean = highContrast): OpenCodeColors {
             val v = ThemePalette.definition(theme).variant(isDark)
             val system = theme == AppTheme.System
@@ -203,7 +185,7 @@ internal object DesktopAccent {
     val borderBaseDark = Color(0x1AFFFFFF)
 }
 
-/** UIKit system colours the iOS System theme reads that have no field in [ThemeVariant]. */
+/** System colours the System theme reads that have no field in [ThemeVariant]. */
 internal object SystemColors {
     fun red(isDark: Boolean) = if (isDark) ThemeRGBA(1.0, 0.2706, 0.2275) else ThemeRGBA(1.0, 0.2314, 0.1882)
     fun green(isDark: Boolean) = if (isDark) ThemeRGBA(0.1882, 0.8196, 0.3451) else ThemeRGBA(0.2039, 0.7804, 0.349)
@@ -213,25 +195,8 @@ internal object SystemColors {
 }
 
 /**
- * Maps the iOS semantic colours onto Material 3 roles. Translucent iOS colours (secondary
- * text, separators) are composited over the canvas, because Material derives its own
- * alpha states (disabled, pressed) from these roles.
- *
- * | M3 role | iOS colour |
- * | --- | --- |
- * | primary / onPrimary | accent / white (System: UIKit tint) or the accent's high-contrast foreground (themes) |
- * | primaryContainer / onPrimaryContainer | canvas → accent 22 % (OKLab) / strong text |
- * | secondary / onSecondary | secondary text / canvas |
- * | secondaryContainer / onSecondaryContainer | surfaceStrong (secondary buttons) / text |
- * | tertiary / onTertiary | link / white (System) or the link's high-contrast foreground (themes) |
- * | background, surface, surfaceContainerLowest | canvas |
- * | surfaceContainerLow, surfaceContainer | System: canvasWeak / canvasWeak ↔ userBubble midpoint; curated themes: the desktop's floating surface ([floating]: canvas in light, a raised step above the canvas in dark), so sheets, menus and tooltips are flat floating panels |
- * | surfaceContainerHigh, surfaceVariant | userBubble |
- * | surfaceContainerHighest | surfaceStrong |
- * | onSurface / onSurfaceVariant | text / secondary text |
- * | outline / outlineVariant | borderStrong / border |
- * | error / onError | destructive red (System) or diffRemovedText (themes) / white (System) or its high-contrast foreground |
- * | errorContainer / onErrorContainer | removed-diff fill over canvas / text |
+ * Maps the semantic colours onto Material 3 roles. Translucent colours are composited over the
+ * canvas, because Material derives its own alpha states from these roles.
  */
 fun OpenCodeColors.toColorScheme(): ColorScheme {
     val v = variant
@@ -251,10 +216,8 @@ fun OpenCodeColors.toColorScheme(): ColorScheme {
     val errorContainer = (if (system) SystemColors.red(isDark).withAlpha(0.14) else v.glassDiffRemovedFill).composited(canvas)
     val surfaceBright = if (isDark) v.surfaceStrong else canvas
     val surfaceDim = if (isDark) canvas else v.canvasWeak
-    // UIKit's system tints (systemBlue, systemRed) are designed for white labels: iOS draws its
-    // tint-filled and destructive controls with white text in light and dark. The luminance pick
-    // ([highContrastForeground]) chooses near-black over systemBlue/systemRed, so it only
-    // applies to theme palettes (iOS `sendButtonForeground` over a theme accent).
+    // System tints are designed for white labels, so the luminance pick applies only to theme
+    // palettes.
     val white = ThemeRGBA(1.0, 1.0, 1.0)
     val base = if (isDark) darkColorScheme() else lightColorScheme()
     return base.copy(
@@ -301,6 +264,6 @@ fun OpenCodeColors.toColorScheme(): ColorScheme {
 /** The current [OpenCodeColors]; provided by [OpenCodeTheme]. Read via `OpenCodeTheme.colors`. */
 val LocalOpenCodeColors = staticCompositionLocalOf { OpenCodeColors.resolve(AppTheme.System, isDark = false) }
 
-/** Crisp dark or white foreground over this colour (iOS `ThemeRGBA.highContrastForeground`). */
+/** Crisp dark or white foreground over this colour. */
 fun Color.highContrastForeground(): Color =
     ThemeRGBA(red.toDouble(), green.toDouble(), blue.toDouble()).highContrastForeground.color

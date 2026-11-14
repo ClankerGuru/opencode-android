@@ -18,8 +18,6 @@ import ai.opencode.server.model.OpenCodeTranscriptFile
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import ai.opencode.server.model.PastedText
 
-// Port of the `SessionFeature.State` members iOS declares in `Transcript/RunErrorState.swift`
-// (and `noteOwnSend()` from `Transcript/NewMessagesMark.swift`), which the send reducer uses.
 // They extend `SessionFeature.State`, so they land in this module; the pure parts are
 // `:feature:transcript`'s `RunErrorState`.
 
@@ -62,7 +60,6 @@ val State.actionableRunErrorActions: List<OpenCodeRunError.Action>
 fun State.runErrorActions(error: OpenCodeRunError): List<OpenCodeRunError.Action> =
     error.actions.filter { it != OpenCodeRunError.Action.Edit || editableLastMessage != null }
 
-/** iOS `editableLastMessage`'s `(id, text)`. */
 data class EditableMessage(val id: String, val text: String)
 
 /**
@@ -113,7 +110,7 @@ fun State.restoredPrompt(messageID: String, uuid: UuidClient = dependency(UuidCl
     }
     if (!matched || source != null || VoiceHandoff.parse(text) != null) return null
     // A `media:<hash>` image or file restores from the memory cache, or empty with its hash for
-    // `stageRevert` to load (iOS 7f5ac4c5); one the server no longer has can't come back.
+    // `stageRevert` to load; one the server no longer has can't come back.
     val mediaReferences = dependency(MediaReferenceClient)
     val attachments = ArrayList<OpenCodeOutgoingAttachment>()
     for (image in images) {
@@ -176,7 +173,7 @@ fun State.dropUndone(): State {
 
 /**
  * The reader sent a message: everything above it is read, so the divider goes and nothing waiting
- * to be settled counts as new (iOS `Transcript/NewMessagesMark.swift` `noteOwnSend()`).
+ * to be settled counts as new.
  */
 fun State.noteOwnSend(): State = copy(
     newMessages = null,

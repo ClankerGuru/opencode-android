@@ -111,9 +111,9 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
- * A location shared from the composer's + menu: one fix and its nearest address. It
- * travels as a tagged block at the top of the prompt's text, readable by the agent as-is,
- * and the transcript draws it as a card (iOS `SharedLocation`, `Composer/SharedLocation.swift`).
+ * A location shared from the composer's + menu: one fix and its nearest address. It travels as a
+ * tagged block at the top of the prompt's text, readable by the agent as-is, and the transcript
+ * draws it as a card.
  */
 data class SharedLocation(
     val latitude: Double,
@@ -162,7 +162,6 @@ data class SharedLocation(
 
         private val ISO: DateTimeFormatter = DateTimeFormatter.ISO_INSTANT
 
-        /** Swift's `Date.distantPast`. */
         private val DISTANT_PAST: Instant = Instant.parse("0001-01-01T00:00:00Z")
 
         /** A prompt that starts with a location block: the location, and the user's own text after it. */
@@ -209,31 +208,27 @@ data class SharedLocation(
 
 // region LocationClient
 
-/** Why Location couldn't be shared (iOS `LocationClientError`); [message] is the user-facing copy. */
+/** Why Location couldn't be shared; [message] is the user-facing copy. */
 sealed class LocationClientError(@StringRes private val messageRes: Int) : Exception() {
     data object Denied : LocationClientError(R.string.composer_location_denied)
     data object Unavailable : LocationClientError(R.string.composer_location_unavailable)
 
     override val message: String get() = localized(messageRes)
 
-    /** iOS `localizedDescription`. */
     val localizedDescription: String get() = message
 }
 
 /**
- * One fix of where the phone is, with its nearest address (iOS `LocationClient`,
- * `@Dependency(\.location)`).
+ * One fix of where the phone is, with its nearest address.
  *
- * Android differences:
  * - The fix comes from `LocationManager` (fused, GPS and network providers) and the address from
  *   `Geocoder`; Play Services' fused client isn't in the catalog.
  * - Android asks for permission from an Activity, so the live client awaits the prompt the
- *   screen installs with [LocationPermissionPrompt.install] (iOS asks inside `CLServiceSession`
- *   the first time).
- * - There is no MapKit: live [snapshot] composes OpenStreetMap tiles into the same 600 m region
- *   MapKit's snapshotter draws ([SharedLocationSnapshots]), cached in memory per place, size
- *   and appearance (tiles on disk), and [cachedSnapshot] reads that cache.
- * - [openSettings] opens the app's system settings page (iOS `openURL(openSettingsURLString)`).
+ *   screen installs with [LocationPermissionPrompt.install].
+ * - Live [snapshot] composes OpenStreetMap tiles into a 600 m region ([SharedLocationSnapshots]),
+ *   cached in memory per place, size and appearance (tiles on disk), and [cachedSnapshot] reads
+ *   that cache.
+ * - [openSettings] opens the app's system settings page.
  */
 class LocationClient(
     val current: suspend () -> SharedLocation,
@@ -241,16 +236,15 @@ class LocationClient(
     val snapshot: suspend (location: SharedLocation, size: IntSize, dark: Boolean) -> ImageBitmap? = { _, _, _ -> null },
     val cachedSnapshot: (location: SharedLocation, size: IntSize, dark: Boolean) -> ImageBitmap? = { _, _, _ -> null },
     val prefetchTimeout: Duration = DEFAULT_PREFETCH_TIMEOUT,
-    /** The composer's compact map in pixels, and whether the app is dark (iOS reads the key window's traits). */
+    /** The composer's compact map in pixels, and whether the app is dark. */
     val compactSnapshotTraits: () -> Pair<IntSize, Boolean> = { IntSize.Zero to true },
     val openSettings: suspend () -> Unit = {},
 ) {
     /**
-     * Pre-renders the composer's compact map snapshot before the location response lands so
-     * the card reveals with its map already in cache, bounded by [timeout] (1.2 s default) so
-     * slow tiles never hold the card on “Finding Location…”. As under iOS's `OneShotRequestGate`, the
-     * snapshot runs in its own job, so the wait ends at [timeout] even when the snapshot ignores
-     * cancellation; it is cancelled then.
+     * Pre-renders the composer's compact map snapshot before the location response lands so the
+     * card reveals with its map already in cache, bounded by [timeout] (1.2 s default) so slow
+     * tiles never hold the card on “Finding Location…”. The snapshot runs in its own job, so the
+     * wait ends at [timeout] even when the snapshot ignores cancellation; it is cancelled then.
      */
     suspend fun prefetchCompactSnapshot(location: SharedLocation, timeout: Duration? = null) {
         val limit = timeout ?: prefetchTimeout
@@ -282,7 +276,7 @@ class LocationClient(
                         (SharedLocationCard.compactWidth.value * metrics.density).roundToInt(),
                         (SharedLocationCard.compactMapHeight.value * metrics.density).roundToInt(),
                     )
-                    // iOS reads the key window's style, which follows the app's Appearance override.
+                    // Reads the key window's style, which follows the app's Appearance override.
                     val night = context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
                     val appearance = shared(ThemeSharedKeys.appearanceColorScheme).value
                     size to appearance.resolveIsDark(night == Configuration.UI_MODE_NIGHT_YES)
@@ -312,7 +306,7 @@ class LocationClient(
  * [LocationClientError.Denied].
  */
 object LocationPermissionPrompt {
-    /** When In Use on iOS: precise or approximate. */
+    /** When In Use: precise or approximate. */
     val permissions: Array<String> = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
 
     @Volatile private var prompt: (suspend () -> Boolean)? = null
@@ -333,7 +327,7 @@ object LocationPermissionPrompt {
     }
 }
 
-/** iOS `LiveLocation`: the best fix within a few seconds, then its nearest address. */
+/** The best fix within a few seconds, then its nearest address. */
 private object LiveLocation {
     /** Good enough to name a street; the first fix is often coarse. */
     const val WANTED_ACCURACY = 65f
@@ -351,7 +345,7 @@ private object LiveLocation {
             }
         }
         val manager = context.getSystemService(LocationManager::class.java) ?: throw LocationClientError.Unavailable
-        // Location turned off for the whole phone: iOS `authorizationDeniedGlobally`.
+        // Location turned off for the whole phone.
         if (!manager.isLocationEnabled) throw LocationClientError.Denied
         val fix = bestFix(context, manager)
         var location = SharedLocation(
@@ -470,7 +464,7 @@ object SharedLocationCard {
     /** `TranscriptMetrics.cardCornerRadius`. */
     val cornerRadius: Dp = FileAttachmentMetrics.cardCornerRadius
 
-    /** iOS `@ScaledMetric(relativeTo: .subheadline)`: the footer grows with the font size. */
+    /** The footer grows with the font size. */
     @Composable
     fun compactFooterHeight(): Dp = defaultCompactFooterHeight * LocalDensity.current.fontScale
 }
@@ -549,7 +543,6 @@ fun SharedLocationCard(
     }
 }
 
-/** iOS `.blue` for the location glyph and `.red` for the pin. */
 private val SystemBlue = Color(0xFF0A84FF)
 private val SystemRed = Color(0xFFFF3B30)
 
@@ -613,9 +606,8 @@ private fun MapPin() {
  * `Motion.layout`'s enter in, its exit out) and revealing the map and address in
  * place with [motionBlurReveal] when ready, without a second pop or height snap.
  *
- * [gateProgress] is the gate's target (0 or 1); this animates toward it and reports
- * [onGateSettled] when it lands, so the session can complete its gate generation (iOS
- * `withAnimation(completionCriteria: .removed)`).
+ * [gateProgress] is the gate's target (0 or 1); this animates toward it and reports [onGateSettled]
+ * when it lands, so the session can complete its gate generation.
  */
 @Composable
 fun ComposerLocationAttachment(
@@ -774,10 +766,7 @@ internal fun ComposerRemoveBadge(label: String, testTag: String, onClick: () -> 
     }
 }
 
-/**
- * The card's single continuous scale + blur + opacity entrance (iOS
- * `ComposerLocationEntranceModifier`); the per-frame lab trace is n/a.
- */
+/** The card's single continuous scale + blur + opacity entrance; the per-frame lab trace is n/a. */
 object ComposerLocationEntrance {
     /** Subtle scale origin for the entrance (0.965 → 1), keeping each frame's height step small. */
     const val ENTRANCE_SCALE = 0.965f

@@ -11,10 +11,6 @@ import org.junit.Rule
 import org.junit.Test
 import kotlin.math.abs
 
-/**
- * iOS `WelcomeFeatureTests`' story tests. Its feature tests drive `AppFeature`, so they're in
- * `:app`'s `WelcomeFeatureTests`; these read the story Settings owns.
- */
 class WelcomeFeatureTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -77,10 +73,6 @@ class WelcomeFeatureTests {
         assertTrue(cooling > 0.1 && cooling < 0.9)
     }
 
-    /**
-     * Android: the live dictation meter lives in `:feature:composer`, which Settings can't reach, so
-     * the story can't touch it by construction; this pins that each voice plays into its own meter.
-     */
     @Test
     fun storyVoiceNeverTouchesTheLiveDictationMeter() {
         val voice = WelcomeVoice()

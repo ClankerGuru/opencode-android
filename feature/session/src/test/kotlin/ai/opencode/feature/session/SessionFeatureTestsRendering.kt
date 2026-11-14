@@ -40,13 +40,11 @@ import ai.opencode.server.model.OpenCodeTranscriptItem
 import kotlinx.coroutines.awaitCancellation
 import org.junit.Test
 
-/** Port of iOS `SessionFeatureTests+Rendering.swift`. */
 class SessionFeatureTestsRendering {
     private fun user(id: String, text: String) = OpenCodeTranscriptItem.UserText(id = id, text = text)
     private fun assistant(id: String, text: String) = OpenCodeTranscriptItem.AssistantMarkdown(id = id, text = text)
     private fun info(id: String, text: String) = OpenCodeTranscriptItem.Info(id = id, text = text)
 
-    /** iOS `OpenCodeToolCall.test(name:)`. */
     private fun toolCall(name: String) = OpenCodeToolCall(
         callID = name, name = name, status = OpenCodeToolCall.Status.Completed, input = OpenCodeJSONValue.Null, output = emptyList(), metadata = emptyMap(),
     )
@@ -234,7 +232,7 @@ class SessionFeatureTestsRendering {
     private fun familyRead(sessions: List<OpenCodeSession>, active: Set<String> = emptySet()) =
         Action.FamilyResponse(Result.success(OpenCodeSessionFamily(sessions = sessions, activeSessionIDs = active)))
 
-    /** iOS: a stub that waits until cancelled, recording that it was. */
+    /** A stub that waits until cancelled, recording that it was. */
     private suspend fun hangUntilCancelled(started: Gate, cancelled: LockIsolated<Boolean>): Nothing {
         started.open()
         try {
@@ -297,7 +295,7 @@ class SessionFeatureTestsRendering {
                 next
             }
             if (reason == RefreshReason.Resume) {
-                // iOS's page read happened to finish first there; here the reads answer in launch order.
+                // The reads answer in launch order.
                 store.receive(familyRead(listOf(root, child))) { it.copy(familyReadAt = now, activeFamilySessionIDs = emptySet()) }
                 store.receive(Action.ShellsResponse(sessionID = root.id, result = Result.success(emptyList()))) {
                     it.copy(shells = emptyList(), restoredShellIDs = emptySet())

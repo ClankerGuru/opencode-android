@@ -17,12 +17,9 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * The `:feature:media` half of iOS `LowDataModeTests.swift` (`LinkPreviewClient`'s loaders and
- * store). `NetworkPathMonitor` and `TransportFailure` are `:server`'s. Android has no
- * per-request `allowsConstrainedNetworkAccess`: the preview transport refuses every request on a
- * constrained path (`LinkPreviewTransport.ConstrainedRefusal`), so those request asserts have
- * no counterpart; the loaders' deferral is checked as on iOS. `AgentImagePreviews` (media) is
- * ported in full.
+ * Android has no per-request `allowsConstrainedNetworkAccess`: the preview transport refuses every
+ * request on a constrained path (`LinkPreviewTransport.ConstrainedRefusal`), so those request
+ * asserts have no counterpart; the loaders' deferral is checked.
  */
 class LowDataModeTests {
     @get:Rule val isolation = TestIsolationRule()

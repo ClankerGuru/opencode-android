@@ -17,12 +17,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-// Port of iOS `Composer/ModelPicker/ModelPickerShared.swift`: the pieces of the deleted Sheet and
-// Grow from Composer pickers (iOS 0fbb99f8) that One Picker, the photo sheet and the composer still
-// use. Plus [predictedEndTranslation], Android's stand-in for SwiftUI's drag projection, which
-// lived beside the deleted `ModelPickerAnchors`.
+// The pieces of the deleted Sheet and Grow from Composer pickers that One Picker, the photo sheet
+// and the composer still use. Plus [predictedEndTranslation], a drag's projected end.
 
-/** iOS `ComposerFocusRestore`: one pending "give the message field its keyboard back". */
+/** One pending "give the message field its keyboard back". */
 class ComposerFocusRestore(private val scope: CoroutineScope) {
     private var task: Job? = null
 
@@ -42,9 +40,9 @@ class ComposerFocusRestore(private val scope: CoroutineScope) {
 }
 
 /**
- * iOS `ProgressiveBlur.Profile`: full strength at one edge fading out, or a band peaking in the
- * middle. Only its strengths are ported here; Android draws no backdrop blur (Material scrims
- * instead), so the strengths only shape dims.
+ * Full strength at one edge fading out, or a band peaking in the middle. Only its strengths are
+ * ported here; Android draws no backdrop blur (Material scrims instead), so the strengths only
+ * shape dims.
  */
 sealed interface ProgressiveBlurProfile {
     /** Strongest at the top ([top]) or the bottom edge. */
@@ -54,7 +52,7 @@ sealed interface ProgressiveBlurProfile {
     data class Band(val lower: Double, val upper: Double) : ProgressiveBlurProfile
 }
 
-/** iOS `ProgressiveBlur.strengths(_:samples:)`: the blur's strength top to bottom, smoothstepped. */
+/** The blur's strength top to bottom, smoothstepped. */
 fun progressiveBlurStrengths(profile: ProgressiveBlurProfile, samples: Int = 32): List<Double> {
     fun smooth(x: Double): Double {
         val t = x.coerceIn(0.0, 1.0)
@@ -76,7 +74,7 @@ fun progressiveBlurStrengths(profile: ProgressiveBlurProfile, samples: Int = 32)
     return strengths
 }
 
-/** Port of iOS `LevelArc` (`Shape`): the level glyph's arc geometry. */
+/** The level glyph's arc geometry. */
 object LevelArc {
     const val TRACK_OPACITY = 0.28
 
@@ -95,7 +93,7 @@ object LevelArc {
 
     fun radius(size: Size): Float = min(size.width, size.height) * 0.37f
 
-    /** Degrees from 3 o'clock, clockwise (y down), as iOS's `start(span:)` in a flipped space. */
+    /** Degrees from 3 o'clock, clockwise (y down). */
     fun start(span: Double): Double = 90 + (360 - span) / 2
 
     fun draw(scope: DrawScope, fill: Double, span: Double, color: Color, stroke: Float) {
@@ -115,7 +113,7 @@ object LevelArc {
     }
 }
 
-/** iOS `ModelListDetent`: One Picker's two rests. */
+/** One Picker's two rests. */
 enum class ModelListDetent {
     Medium, Large;
 
@@ -130,7 +128,7 @@ enum class ModelListDetent {
 
     val accessibilityValue: String get() = if (this == Large) localized(R.string.composer_model_list_full_description) else localized(R.string.composer_model_list_half_description)
 
-    /** iOS `adjusted(_:)`: TalkBack's increment/decrement (+1 / −1, 0 keeps it). */
+    /** TalkBack's increment/decrement (+1 / −1, 0 keeps it). */
     fun adjusted(direction: Int): ModelListDetent = when {
         direction > 0 -> Large
         direction < 0 -> Medium
@@ -159,9 +157,8 @@ enum class ModelListDetent {
 }
 
 /**
- * iOS `LevelScrubberTunables` (`composer.level.*`): the level arc's stroke and span, at their
- * shipped defaults (Android has no tuning store, so `sectionTitles`, `register` and `unregister`
- * are n/a).
+ * The level arc's stroke and span, at their shipped defaults (Android has no tuning store, so
+ * `sectionTitles`, `register` and `unregister` are n/a).
  */
 object LevelScrubberTunables {
     /** `arcStroke` "Arc stroke (pt at 20 pt)". */
@@ -175,13 +172,11 @@ object LevelScrubberTunables {
 const val UIKIT_DECELERATION_RATE_NORMAL = 0.998
 
 /**
- * UIKit's throw projection, the one SwiftUI's `DragGesture.Value.predictedEndTranslation` applies
- * (Apple, WWDC18 “Designing Fluid Interfaces” `project(initialVelocity:decelerationRate:)`):
- * how far a throw at [velocity] (per second) coasts while decelerating at [decelerationRate]
- * per millisecond, `(v / 1000) · r / (1 − r)`.
+ * How far a throw at [velocity] (per second) coasts while decelerating at [decelerationRate] per
+ * millisecond, `(v / 1000) · r / (1 − r)`.
  */
 fun projectedTravel(velocity: Double, decelerationRate: Double = UIKIT_DECELERATION_RATE_NORMAL): Double =
     velocity / 1000.0 * decelerationRate / (1.0 - decelerationRate)
 
-/** SwiftUI `predictedEndTranslation`: where a drag at [translation] released at [velocity] would come to rest. */
+/** Where a drag at [translation] released at [velocity] would come to rest. */
 fun predictedEndTranslation(translation: Double, velocity: Double): Double = translation + projectedTravel(velocity)

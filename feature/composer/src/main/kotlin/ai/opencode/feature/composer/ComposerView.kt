@@ -59,13 +59,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
 /**
- * The composer: a 28 dp capsule with the message field, its attachments, and the control row
- * (+, model chip, Send), with a pending request's panel growing out of it (D-31 B), the
- * attachment menu over it, and the model sheet. Built from the ports of iOS `OpenCode/Composer/`.
+ * The composer: a 28 dp capsule with the message field, its attachments, and the control row (+,
+ * model chip, Send), with a pending request's panel growing out of it (D-31 B), the attachment menu
+ * over it, and the model sheet.
  *
- * Fill the session's screen with it (it draws its overlays over everything and sits the
- * capsule at the bottom, above the keyboard). The session area owns the iOS
- * `SessionView+Composer` capsule and may compose these pieces itself instead.
+ * Fill the session's screen with it (it draws its overlays over everything and sits the capsule at
+ * the bottom, above the keyboard). The session area owns the composer capsule and may compose these
+ * pieces itself instead.
  */
 @Composable
 fun ComposerView(
@@ -216,7 +216,7 @@ fun ComposerView(
     }
 }
 
-/** iOS's bar: Send (null, the arrow), or the request bar's verb while answering (Next, Deny, Dismiss). */
+/** Send (null, the arrow), or the request bar's verb while answering (Next, Deny, Dismiss). */
 private fun sendVerb(state: ComposerFeature.State): String? = when (val bar = state.requestDock.requestBar(state.draft)) {
     null -> null
     is RequestBar.Decline -> bar.verb.title
@@ -237,7 +237,7 @@ private fun SendButton(enabled: Boolean, verb: String?, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         if (verb != null) {
-            // The request bar's verb (Deny, Dismiss, Next) reads as a word, as iOS's bar does.
+            // The request bar's verb (Deny, Dismiss, Next) reads as a word.
             Box(
                 Modifier
                     .heightIn(min = 34.dp)
@@ -343,7 +343,7 @@ private fun AttachmentThumbnail(attachment: ai.opencode.server.model.OpenCodeOut
     }
 }
 
-/** Images go inline (re-encoded); everything else stages for upload (iOS `ComposerFileRouting`). */
+/** Images go inline (re-encoded); everything else stages for upload. */
 private fun importURIs(
     uris: List<android.net.Uri>,
     images: ComposerImageImporter,

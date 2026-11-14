@@ -14,7 +14,6 @@ import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 
-/** The `EventBatcher` test of iOS `MultipleWindowsTests.swift` (the rest belongs to `SharedEventStreams`' suite). */
 class EventBatcherTests {
     @get:Rule val isolation = TestIsolationRule()
 

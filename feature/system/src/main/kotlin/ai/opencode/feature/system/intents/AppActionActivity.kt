@@ -9,13 +9,12 @@ import android.os.Process
 
 /**
  * The App Actions door (`actions.intent.OPEN_APP_FEATURE` in `shortcuts.xml`): the only
- * system-action entry other apps can start, since Assistant launches App Actions as itself.
- * It reads nothing but the spoken feature and hands it to [SystemActionActivity], which is
- * private to the app (shortcuts, tiles, widgets and notifications reach it through the app's
- * own identity). iOS runs its intents only from Siri and Shortcuts; here any app could send
- * this intent, so a call (in the background or with the app open) starts only for a verified
- * assistant ([isVerifiedAssistant]); from anything else the app opens on the session and the
- * user starts the call.
+ * system-action entry other apps can start, since Assistant launches App Actions as itself. It
+ * reads nothing but the spoken feature and hands it to [SystemActionActivity], which is private to
+ * the app (shortcuts, tiles, widgets and notifications reach it through the app's own identity).
+ * Any app could send this intent, so a call (in the background or with the app open) starts only
+ * for a verified assistant ([isVerifiedAssistant]); from anything else the app opens on the session
+ * and the user starts the call.
  */
 class AppActionActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {

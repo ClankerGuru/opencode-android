@@ -118,8 +118,10 @@ class VoiceCallLogRecorder(
     private val networkWatches = mutableMapOf<UUID, Job>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val saving = mutableMapOf<UUID, VoiceCallLog>()
-    /** Serial (iOS `liveQueue`): live writes, the save and delete after a hang-up, and launch
-     * recovery's claim never overtake each other. */
+    /**
+     * Serial: live writes, the save and delete after a hang-up, and launch recovery's claim never
+     * overtake each other.
+     */
     private val liveQueue: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { runnable ->
         Thread(runnable, "voice-call-log-live").apply { isDaemon = true }
     }
@@ -206,9 +208,8 @@ class VoiceCallLogRecorder(
         return raw?.trimmed(at, window)?.redacted()
     }
     /**
-     * Closes everything still open and saves the call. The reducer calls this on the main
-     * thread, so the save runs on [liveQueue] (iOS saves before returning, then deletes the
-     * in-progress copy on its queue); [list] shows the log meanwhile.
+     * Closes everything still open and saves the call. The reducer calls this on the main thread,
+     * so the save runs on [liveQueue]; [list] shows the log meanwhile.
      */
     fun finish(id: UUID, at: Instant = date.now()) {
         stopWatchingNetwork(id)
@@ -397,7 +398,7 @@ class VoiceCallLogRecorder(
         true
     }
     /** Disk I/O: callers must invoke off the main thread (the reducer uses an effect). */
-    /** Saved logs, including one whose save is still writing (iOS saves before `finish` returns). */
+    /** Saved logs, including one whose save is still writing. */
     fun list(): List<VoiceCallLog> {
         if (directory == null) return emptyList()
         val pending = synchronized(lock) { saving.values.toList() }
@@ -427,8 +428,10 @@ class VoiceCallLogRecorder(
         const val liveWriteInterval = 10.0
         const val interruptedNote = "⚠︎ Call interrupted: the app quit before hang-up"
 
-        /** The default write: a sibling temp file renamed over the target. Android's
-         * credential-encrypted storage plays iOS's `completeFileProtectionUntilFirstUserAuthentication`. */
+        /**
+         * The default write: a sibling temp file renamed over the target. Credential-encrypted
+         * storage: readable after the first unlock.
+         */
         fun writeAtomically(data: ByteArray, file: File) {
             val temp = File(file.parentFile, "${file.name}.pending")
             temp.writeBytes(data)
@@ -443,8 +446,7 @@ class VoiceCallLogRecorder(
             if (!file.delete()) AppLog.voice.error("Couldn’t delete a call log file")
         }
 
-        /** A read refused because the storage is locked (iOS: data protection while the phone
-         * is locked; Android: credential-encrypted storage before the first unlock, EACCES/EPERM). */
+        /** A read refused because the storage is locked. */
         fun isProtectedData(error: Throwable): Boolean = generateSequence(error) { it.cause }.take(4).any { candidate ->
             candidate is AccessDeniedException ||
                 (candidate is IOException && candidate.message?.let { message ->

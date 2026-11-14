@@ -24,12 +24,8 @@ import org.junit.Test
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `SessionLinkTests`' Home section: titles for linked session IDs come from Home's
- * list, then one lookup per unknown ID (six at a time); a tap opens or pushes the session.
- * Parsing and presentation are `:feature:transcript`'s, the screen's sends `:feature:session`'s,
- * the URL round trip `:server`'s. `aRowWhoseLookupFailedAsksAgainWhenItNextAppears` drives the
- * screen with `sessionLinksAppeared` as the transcript's rows send it (iOS drives a
- * `TranscriptListViewController`, UIKit).
+ * `aRowWhoseLookupFailedAsksAgainWhenItNextAppears` drives the screen with `sessionLinksAppeared`
+ * as the transcript's rows send it.
  */
 class SessionLinkTests {
     @get:Rule val isolation = TestIsolationRule()

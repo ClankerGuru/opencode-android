@@ -36,10 +36,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
-/*
- * Port of iOS `Settings/VoiceDelegatorSettings.swift` (OpenCode Session Delegator experiment):
- * Settings › Voice's Delegator row and page.
- */
+/* Settings › Voice's Delegator row and page. */
 
 val VoiceSettingsFeature.State.showsDelegatorRow: Boolean
     get() = ExperimentalFeature.voiceSessionDelegator.isActive(voiceSessionDelegatorExperiment)
@@ -272,7 +269,6 @@ private fun ModeRow(
     }
 }
 
-/** iOS `URL(fileURLWithPath:).lastPathComponent`. */
 private fun lastPathComponent(path: String): String {
     val trimmed = path.trimEnd('/')
     if (trimmed.isEmpty()) return if (path.isEmpty()) "" else "/"

@@ -9,9 +9,8 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Corner radii, on this branch the OpenCode desktop's (`--radius-sm` 4, `-md` 6, `-lg` 8,
- * `-xl` 10, the 12 px dock), keeping the iOS role names so call sites are unchanged. Sheets
- * keep a larger 16 dp top radius so they still read as Android sheets.
+ * Corner radii from the OpenCode desktop (`--radius-sm` 4 … `-xl` 10). Sheets keep a 16 dp top
+ * radius.
  */
 object OpenCodeRadius {
     /** Tiny marks: inline code, checkbox insets (desktop 4). */
@@ -32,11 +31,7 @@ object OpenCodeRadius {
     val sheet: Dp = 16.dp
 }
 
-/**
- * Shapes for the iOS forms. [capsule] and [circle] stay true capsules and circles (grabbers,
- * dots, avatars); controls that iOS draws as glass capsules use [control], the desktop's small
- * rounded rectangle.
- */
+/** [capsule] and [circle] stay true. */
 object OpenCodeShape {
     val capsule = RoundedCornerShape(percent = 50)
 
@@ -54,8 +49,7 @@ object OpenCodeShape {
 
 /**
  * Material shape scale from the desktop radii: extraSmall 6, small 6, medium 8, large 10,
- * extraLarge 16. Material components read these (text fields and menus extraSmall, dialogs and
- * sheets extraLarge).
+ * extraLarge 16.
  */
 val OpenCodeShapes = Shapes(
     // Text fields and menus: the desktop's 6 px input and context-menu radius.
@@ -67,20 +61,14 @@ val OpenCodeShapes = Shapes(
 )
 
 /**
- * Port of `GlassGeometry` (`Glass.swift`): a rounded rectangle's radius must be at most half its
- * height. Material shapes clamp on their own, but animated shapes computed by hand (morphs,
- * growing panels) should clamp with this so every intermediate frame stays a valid
- * capsule-or-less (docs/native-ui-guidance.md). iOS removed the unused `GlassShape.clamped`
- * wrapper in 18771799.
+ * Port of `GlassGeometry`: a rounded rectangle's radius is at most half its height. Clamp
+ * hand-computed animated shapes with this.
  */
 object OpenCodeShapeGeometry {
     fun radius(radius: Float, height: Float): Float = min(max(0f, radius), max(0f, height) / 2)
 }
 
-/**
- * Spacing values the iOS app uses (its common `spacing:` and `.padding` values), in dp.
- * Prefer these to literals so layouts stay on the same grid as iOS.
- */
+/** Spacing values, in dp. Prefer these to literals so layouts stay on the same grid. */
 object OpenCodeSpacing {
     val s1: Dp = 1.dp
     val s2: Dp = 2.dp
@@ -96,12 +84,12 @@ object OpenCodeSpacing {
     val s24: Dp = 24.dp
     val s32: Dp = 32.dp
 
-    /** Screen and list-row horizontal inset (iOS `.padding(.horizontal, 16)`). */
+    /** Screen and list-row horizontal inset. */
     val screenHorizontal: Dp = s16
 
-    /** Default stack spacing between related items (iOS `spacing: 8`). */
+    /** Default stack spacing between related items. */
     val stack: Dp = s8
 
-    /** Between groups/sections (iOS `spacing: 12`). */
+    /** Between groups/sections. */
     val group: Dp = s12
 }

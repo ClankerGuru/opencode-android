@@ -26,14 +26,12 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 /**
- * Port of iOS `System/Notifications/NotificationCrypto.swift` (1ddd36b2): the v2 wire format.
- * Neither the relay nor FCM receives these fields in clear.
+ * The v2 wire format. Neither the relay nor FCM receives these fields in clear.
  *
  * P-256 ECDH, HKDF-SHA256 (salt: the ref, info: [CONTEXT], 32 bytes) and AES-256-GCM over
- * `nonce(12) | ciphertext | tag(16)` authenticating `"<context>:<ref>"`, as CryptoKit's
- * `AES.GCM.SealedBox(combined:)` reads it. JCA stands in for CryptoKit; keys keep CryptoKit's
- * shapes (a 32-byte private scalar, a 65-byte X9.63 public key) so both phones speak the same
- * bytes to the server.
+ * `nonce(12) | ciphertext | tag(16)` authenticating `"<context>:<ref>"`. JCA stands in for
+ * CryptoKit; keys keep CryptoKit's shapes (a 32-byte private scalar, a 65-byte X9.63 public key) so
+ * both phones speak the same bytes to the server.
  */
 object NotificationCrypto {
     const val CONTEXT = "OpenCode mobile notifications v2"
@@ -64,7 +62,7 @@ object NotificationCrypto {
             bytes.all { it in 48..57 || it in 65..90 || it in 97..122 || it.toInt() == 95 }
     }
 
-    /** A ref is a lowercase canonical UUID (iOS compares against `uuidString.lowercased()`). */
+    /** A ref is a lowercase canonical UUID. */
     fun validate(ref: String) {
         val canonical = runCatching { UUID.fromString(ref).toString() }.getOrNull()
         if (canonical != ref) throw Failure.InvalidRef
@@ -105,7 +103,7 @@ object NotificationCrypto {
         return payload
     }
 
-    // Key shapes (CryptoKit's `rawRepresentation` and `x963Representation`).
+    // Key shapes.
 
     private val curve: ECParameterSpec by lazy {
         AlgorithmParameters.getInstance("EC").run {
@@ -114,7 +112,7 @@ object NotificationCrypto {
         }
     }
 
-    /** A new P-256 key pair (iOS `P256.KeyAgreement.PrivateKey()`). */
+    /** A new P-256 key pair. */
     fun generateKeyPair(): Pair<ByteArray, ByteArray> {
         val pair = KeyPairGenerator.getInstance("EC").run {
             initialize(ECGenParameterSpec("secp256r1"))
@@ -146,7 +144,7 @@ object NotificationCrypto {
         }
     }
 
-    /** Padded standard base64 that encodes back to itself (iOS `Data(base64Encoded:)` + the round-trip check). */
+    /** Padded standard base64 that encodes back to itself. */
     internal fun strictBase64(text: String): ByteArray? {
         val data = runCatching { Base64.getDecoder().decode(text) }.getOrNull() ?: return null
         return if (Base64.getEncoder().encodeToString(data) == text) data else null

@@ -10,12 +10,10 @@ import java.io.File
 import java.io.IOException
 import java.nio.ByteBuffer
 
-// Port of iOS SharedImageEncoder.swift.
-
 /**
- * The same downscale and re-encode the composer applies to imported images. Rendering a fresh
- * JPEG from decoded pixels drops EXIF, GPS, and other metadata, and keeps prompts small.
- * `ImageDecoder` applies the EXIF orientation (iOS `kCGImageSourceCreateThumbnailWithTransform`).
+ * The same downscale and re-encode the composer applies to imported images. Rendering a fresh JPEG
+ * from decoded pixels drops EXIF, GPS, and other metadata, and keeps prompts small. `ImageDecoder`
+ * applies the EXIF orientation.
  */
 object SharedImageEncoder {
     const val MAX_SOURCE_BYTES = 20_000_000

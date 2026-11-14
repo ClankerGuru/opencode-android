@@ -46,11 +46,8 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * Photos picked in the New Plus Menu (OC-354) fly into the composer: each leaves its tile in
- * the sheet (or the strip a hold on + shows), shrinks and rounds on Kit's spring, and lands
- * exactly on its attachment's thumbnail, which shows in the same frame the flight goes.
- * Purely visual: the attachments are the composer's as ever; a flight only hides one until
- * it lands. iOS `PhotoFlightTunables` (Tunable keys `composer.flight.*`).
+ * Photos picked in the New Plus Menu fly into the composer. Purely visual; a flight only hides its
+ * attachment until it lands.
  */
 object PhotoFlightTunables {
     /** The flight's spring (duration and bounce; bounce 0 never overshoots). `composer.flight`. */
@@ -79,12 +76,10 @@ object PhotoFlightTunables {
 }
 
 /**
- * The flights in the air, on one frame loop. A plain object: it moves the drawn flights
- * directly each frame and changes observable state only when a flight starts or lands (what
- * the composer and the tiles hide). iOS `PhotoFlights`.
- *
- * Geometry is in **screen pixels** (`LayoutCoordinates.boundsOnScreen`), so the sheet (its
- * own window), the composer and the [PhotoFlightCanvas] agree. The canvas sets [density].
+ * The flights in the air, on one frame loop. A plain object: it moves the drawn flights each frame
+ * and changes observable state only when a flight starts or lands. Geometry is in screen pixels, so
+ * the sheet (its own window), the composer and the [PhotoFlightCanvas] agree. The canvas sets
+ * [density].
  */
 class PhotoFlights {
     /** Attachments whose flight hasn't landed: drawn by the flight, not the composer. */
@@ -145,9 +140,9 @@ class PhotoFlights {
     private var rowChangedAt = 0.0
 
     /**
-     * How far the message field is drawn from its laid-out place (iOS reads the anchor view's
-     * presentation layer). Compose coordinates already include layer transforms, so the
-     * default is no offset; the session may supply one for an IME-driven offset.
+     * How far the message field is drawn from its laid-out place. Compose coordinates already
+     * include layer transforms, so the default is none; the session may supply one for an
+     * IME-driven offset.
      */
     var anchorOffset: () -> Offset = { Offset.Zero }
 
@@ -212,9 +207,9 @@ class PhotoFlights {
     }
 
     /**
-     * Opens a held row at the next frame, once the frame that mounted it has drawn (iOS
-     * `revealHeldRow(_:)` on a display link). Call it from the row's effect; the row animates the
-     * opening itself. A later reveal or a release supersedes this one.
+     * Opens a held row at the next frame, once the frame that mounted it has drawn. Call it from
+     * the row's effect; the row animates the opening itself. A later reveal or a release supersedes
+     * this one.
      */
     suspend fun revealHeldRow() {
         if (!holdsReservedRow) return
@@ -395,7 +390,7 @@ class PhotoFlights {
         frame += 1
     }
 
-    /** One frame of the loop; returns whether to keep running. iOS `tick(_:)`. */
+    /** One frame of the loop; returns whether to keep running. */
     internal fun tick(rawDt: Double): Boolean {
         val dt = min(rawDt, 1.0 / 40)
         val params = SpringSolver.parameters(PhotoFlightTunables.spring.duration, PhotoFlightTunables.spring.bounce)
@@ -520,7 +515,7 @@ class PhotoFlights {
         return shift to Offset.Zero
     }
 
-    /** One photo in the air. iOS `PhotoFlights.Flight`. */
+    /** One photo in the air. */
     class Flight(
         val id: UUID,
         val batchId: UUID = UUID.randomUUID(),
@@ -620,16 +615,18 @@ class PhotoFlights {
 
         /** The thumbnails' size, corners and spacing in dp (`SessionView.attachmentThumbnail`). */
         const val SLOT_SIDE = 76f
-        /** iOS `ComposerTunables.attachmentRadius`: the composer's 28 corner, 19 (`attachmentInset`) in. */
+        /** The composer's 28 corner, 19 (`attachmentInset`) in. */
         const val SLOT_RADIUS = 9f
         const val SLOT_SPACING = 8f
 
-        /** iOS `AnimationTimeScale.shared.now()`: geometry time follows Developer Mode slow motion. */
+        /** Geometry time follows Developer Mode slow motion. */
         private fun now(): Double = AnimationTimeScale.shared.now()
     }
 }
 
-/** iOS `PhotoFlightLayout` (dp). `drawnOrigin(of:in:)` has no Compose counterpart: coordinates already include layer transforms. */
+/**
+ * `drawnOrigin(of:in:)` has no Compose counterpart: coordinates already include layer transforms.
+ */
 object PhotoFlightLayout {
     /** The first thumbnail in the composer, before any is laid out: its leading edge from the composer's. */
     const val FIRST_SLOT_X = 6f
@@ -646,10 +643,9 @@ private fun Rect.containsRect(other: Rect): Boolean =
     other.left >= left && other.top >= top && other.right <= right && other.bottom <= bottom
 
 /**
- * The flights on screen, drawn directly each frame above the composer (iOS
- * `PhotoFlightCanvas`, which lived in a window over the keyboard's). Mount it full-screen as
- * the session's topmost overlay; it takes no touches and is hidden from TalkBack. It also
- * runs the flights' frame loop while they're awake.
+ * The flights on screen, drawn directly each frame above the composer. Mount it full-screen as the
+ * session's topmost overlay; it takes no touches, is hidden from TalkBack, and runs the flights'
+ * frame loop while they're awake.
  */
 @Composable
 fun PhotoFlightCanvas(flights: PhotoFlights, modifier: Modifier = Modifier) {

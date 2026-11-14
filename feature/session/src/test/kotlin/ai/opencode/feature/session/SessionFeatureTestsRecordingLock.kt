@@ -32,7 +32,6 @@ import kotlinx.coroutines.yield
 import ai.opencode.server.model.OpenCodeJSONValue
 import org.junit.Test
 
-/** Port of iOS `SessionFeatureTests+RecordingLock.swift`. */
 class SessionFeatureTestsRecordingLock {
     private fun hold(text: String, isLocked: Boolean = false, armed: DictationFeature.Hold.Arm? = null) =
         DictationFeature.Hold(text = text, isLocked = isLocked, armed = armed)
@@ -42,7 +41,7 @@ class SessionFeatureTestsRecordingLock {
 
     private fun finishing(send: OpenCodeDelivery?) = DictationFeature.Phase.Finishing(send = send)
 
-    /** iOS `Issue.record(...)` from a stub: the effect throws, which fails the test at the next store call. */
+    /** The effect throws, which fails the test at the next store call. */
     private fun issue(message: String): Nothing = throw AssertionError(message)
 
     /**
@@ -428,9 +427,9 @@ class SessionFeatureTestsRecordingLock {
     }
 
     /**
-     * UIKit cancels the touch while the scene is merely inactive, before it
-     * reaches the background. If that ever ends as a release, the send still
-     * waits on the engine, and leaving downgrades it to Stop.
+     * The touch is cancelled while the scene is merely inactive, before it reaches the background.
+     * If that ever ends as a release, the send still waits on the engine, and leaving downgrades it
+     * to Stop.
      */
     @Test
     fun backgroundingMidHoldNeverSends() = sessionTest { h ->
@@ -549,7 +548,6 @@ class SessionFeatureTestsRecordingLock {
         )
     }
 
-    /** iOS `OpenCodeToolCall.test(name:)`. */
     private fun toolCall(name: String) = OpenCodeToolCall(
         callID = name, name = name, status = OpenCodeToolCall.Status.Completed, input = OpenCodeJSONValue.Null, output = emptyList(), metadata = emptyMap(),
     )

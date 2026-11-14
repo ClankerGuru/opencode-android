@@ -35,13 +35,13 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/** iOS `.quaternary` on a hairline: the separator colour at its quietest. */
+/** The separator colour at its quietest. */
 @Composable
 internal fun quaternaryLine(): Color = OpenCodeTheme.colors.border
 
 /**
- * A centred label between two hairlines that share what's left of the width: the label takes
- * what it needs (iOS `layoutPriority(1)`), leaving each line at least [minLine].
+ * A centred label between two hairlines that share what's left of the width: the label takes what
+ * it needs, leaving each line at least [minLine].
  */
 @Composable
 internal fun RuleRow(
@@ -75,7 +75,7 @@ internal fun RuleRow(
     }
 }
 
-/** A labelled horizontal rule, like the TUI's compaction marker (iOS `TranscriptRule`). */
+/** A labelled horizontal rule, like the TUI's compaction marker. */
 @Composable
 fun TranscriptRule(
     modifier: Modifier = Modifier,
@@ -91,10 +91,10 @@ fun TranscriptRule(
 }
 
 /**
- * Where the reader left off (iOS `NewMessagesDivider`): a labelled rule like a compaction's,
- * above the first row that arrived while they were away. The first time the reader sees it
- * ([glowStart], on [transcriptNow]'s clock; null with Reduce Motion) its rule and label start
- * brighter and dim to the quiet rule over `dividerGlowDuration`.
+ * Where the reader left off: a labelled rule like a compaction's, above the first row that arrived
+ * while they were away. The first time the reader sees it ([glowStart], on [transcriptNow]'s clock;
+ * null with Reduce Motion) its rule and label start brighter and dim to the quiet rule over
+ * `dividerGlowDuration`.
  */
 @Composable
 fun NewMessagesDivider(modifier: Modifier = Modifier, glowStart: Double? = null) {
@@ -125,7 +125,7 @@ fun NewMessagesDivider(modifier: Modifier = Modifier, glowStart: Double? = null)
 
 /**
  * The divider's glow [now]: from `dividerGlowLift` to nothing on a cubic over
- * `dividerGlowDuration` (iOS's `CubicKeyframe`), none before it's seen.
+ * `dividerGlowDuration`, none before it's seen.
  */
 internal fun newDividerGlow(glowStart: Double?, now: Double): Float {
     if (glowStart == null) return 0f

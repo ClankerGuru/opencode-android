@@ -15,9 +15,8 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Port of iOS `ComposerTextTap` (`OpenCode/Composer/ComposerDoubleTap.swift`): where (in the
- * field's text layout, px) a quick finger tap on the composer's text began, when it began and
- * ended (uptime millis), and the text it landed on.
+ * Where (in the field's text layout, px) a quick finger tap on the composer's text began, when it
+ * began and ended (uptime millis), and the text it landed on.
  */
 data class ComposerTextTap(
     val point: Offset,
@@ -27,47 +26,46 @@ data class ComposerTextTap(
 )
 
 /**
- * iOS `ComposerDoubleTap.swift`'s rules. A finger's second tap lands a little below its first,
- * onto the row gap or the model chip's target under the last line. A tap there (the chip's, or
- * the composer's own) that is that double tap's second half selects the word under the first
- * tap, and the tap does nothing else. It counts only when both taps are fingers, the first was
- * a quick tap on the last visible line, and the second began within 0.4 s of it, about 30 dp
- * across and just below the text. Mouse and
- * stylus clicks and TalkBack activation never count. Distances in px; times in uptime millis.
+ * A finger's second tap lands a little below its first, onto the row gap or the model chip's target
+ * under the last line. A tap there (the chip's, or the composer's own) that is that double tap's
+ * second half selects the word under the first tap, and the tap does nothing else. It counts only
+ * when both taps are fingers, the first was a quick tap on the last visible line, and the second
+ * began within 0.4 s of it, about 30 dp across and just below the text. Mouse and stylus clicks and
+ * TalkBack activation never count. Distances in px; times in uptime millis.
  */
 object ComposerDoubleTap {
-    /** A first tap must end within this of its touch-down (iOS 0.35 s). */
+    /** A first tap must end within this of its touch-down. */
     const val TAP_DURATION_MS = 350L
 
-    /** A first tap that moves further than this (dp) isn't a tap (iOS 10 pt). */
+    /** A first tap that moves further than this (dp) isn't a tap. */
     const val TAP_SLOP_DP = 10f
 
-    /** An inline control's (autocomplete chip's) frame, grown this much (dp), takes the touch (iOS 4 pt). */
+    /** An inline control's (autocomplete chip's) frame, grown this much (dp), takes the touch. */
     const val CONTROL_SLOP_DP = 4f
 
-    /** The second touch-down must come within this of the first tap's end (iOS 0.4 s). */
+    /** The second touch-down must come within this of the first tap's end. */
     const val SECOND_TAP_WINDOW_MS = 400L
 
-    /** The chip's action must run within this of the second touch-down (iOS 0.6 s). */
+    /** The chip's action must run within this of the second touch-down. */
     const val ACTION_WINDOW_MS = 600L
 
-    /** How far across (dp) the second tap may land from the first (iOS 30 pt). */
+    /** How far across (dp) the second tap may land from the first. */
     const val ACROSS_DP = 30f
 
-    /** How far below the field's bottom (dp) the second tap may land (iOS 34 pt). */
+    /** How far below the field's bottom (dp) the second tap may land. */
     const val BELOW_DP = 34f
 
     /**
-     * iOS `isOnLastVisibleLine`: whether a caret rect is on the last line of text in view (the
-     * line a drifting second tap slips off, onto the controls row below).
+     * Whether a caret rect is on the last line of text in view (the line a drifting second tap
+     * slips off, onto the controls row below).
      */
     fun isOnLastVisibleLine(caret: Rect, lastLineCaret: Rect, lineHeight: Float, visibleBottom: Float): Boolean =
         caret.bottom + lineHeight > visibleBottom + 1 || abs(lastLineCaret.center.y - caret.center.y) < lineHeight / 2
 
     /**
-     * iOS `noteSelectionChange`: whether the recorded tap still stands after the selection
-     * changed. It stands only while the selection is the caret that tap placed: within the
-     * tapped word ([tappedOffset], [word]) or across the space beside it.
+     * Whether the recorded tap still stands after the selection changed. It stands only while the
+     * selection is the caret that tap placed: within the tapped word ([tappedOffset], [word]) or
+     * across the space beside it.
      */
     fun keepsTap(tap: ComposerTextTap, text: String, selection: TextRange, tappedOffset: Int, word: TextRange?): Boolean {
         if (tap.text != text || !selection.collapsed) return false
@@ -82,9 +80,9 @@ object ComposerDoubleTap {
     }
 
     /**
-     * iOS `takesDoubleTap`'s test: whether [second] (its point in the field's viewport, px) is
-     * the second half of a double tap begun by [tap] (its point in the same viewport), with the
-     * field [fieldHeight] px tall and the chip's action running at [now].
+     * Whether [second] (its point in the field's viewport, px) is the second half of a double tap
+     * begun by [tap] (its point in the same viewport), with the field [fieldHeight] px tall and the
+     * chip's action running at [now].
      */
     fun isSecondHalf(
         tap: ComposerTextTap,
@@ -104,7 +102,7 @@ object ComposerDoubleTap {
         return secondViewportPoint.y > fieldHeight && secondViewportPoint.y <= fieldHeight + BELOW_DP * density
     }
 
-    /** iOS word selection under the first tap: the word around [offset], or null where there's none. */
+    /** The word around [offset], or null where there's none. */
     fun wordAt(layout: TextLayoutResult, offset: Int): TextRange? {
         val length = layout.layoutInput.text.length
         if (length == 0) return null
@@ -113,14 +111,14 @@ object ComposerDoubleTap {
     }
 }
 
-/** iOS `ComposerWindowTouchObserver.latest`: where (root px) and when a touch began, and whether a finger made it. */
+/** Where (root px) and when a touch began, and whether a finger made it. */
 data class ComposerWindowTouch(val rootPoint: Offset, val time: Long, val isFinger: Boolean)
 
 /**
- * iOS `ComposerWindowTouchObserver`: notes where and when the screen's latest touch began, and
- * what kind it was, so the chip's action can tell a finger's tap from a mouse click or a
- * TalkBack activation ([ComposerSwipeInput.takesDoubleTap]). Fed by [composerWindowTouches] on
- * the screen's root; it never consumes a touch.
+ * Notes where and when the screen's latest touch began, and what kind it was, so the chip's action
+ * can tell a finger's tap from a mouse click or a TalkBack activation
+ * ([ComposerSwipeInput.takesDoubleTap]). Fed by [composerWindowTouches] on the screen's root; it
+ * never consumes a touch.
  */
 class ComposerWindowTouchObserver {
     var latest: ComposerWindowTouch? = null
@@ -134,7 +132,7 @@ class ComposerWindowTouchObserver {
     }
 }
 
-/** Feeds [observer] every touch-down under this node, before anything else sees it (iOS adds the observer to the window). */
+/** Feeds [observer] every touch-down under this node, before anything else sees it. */
 fun Modifier.composerWindowTouches(observer: ComposerWindowTouchObserver): Modifier =
     onPlaced { observer.coordinates = it }
         .pointerInput(observer) {

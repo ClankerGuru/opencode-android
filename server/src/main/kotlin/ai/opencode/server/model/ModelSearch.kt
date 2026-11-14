@@ -3,13 +3,9 @@ package ai.opencode.server.model
 import java.text.Normalizer
 
 /**
- * Port of iOS `ModelSearch`: how both model pickers search (OC-331), like the TUI's. The query's
- * words, in any order, must each match the model's name or ID or its provider's name or ID, so
- * "opencode" lists that provider's models, "son 4.5" finds Claude Sonnet 4.5 and "anthropic
- * opus" Anthropic's Opus models. A word matches a whole word best, then the start of one, then a
- * version part ("5" in 4.5), then anywhere inside one; three letters or more may also skip
- * letters inside a word of the name ("snt" for Sonnet). Numbers match only where a number
- * starts, so "4.5" never matches a date in an ID. Results run best match first, then favorites,
+ * Each query word, in any order, must match the model's or provider's name or ID. Whole words rank
+ * best, then word starts, version parts, then anywhere; three letters or more may skip letters
+ * ("snt" for Sonnet). Numbers match only where a number starts. Best match first, then favorites,
  * then the server's order.
  */
 object ModelSearch {
@@ -164,7 +160,7 @@ object ModelSearch {
      * 4.5" and "claude-sonnet-4-5" both read "claude sonnet 4.5".
      */
     fun normalize(text: String): String {
-        // iOS folds case, diacritics and width; NFKD + dropping combining marks does the same.
+        // NFKD + dropping combining marks does the same.
         val decomposed = Normalizer.normalize(text, Normalizer.Form.NFKD)
         val characters = decomposed.filter { Character.getType(it) != Character.NON_SPACING_MARK.toInt() }.lowercase()
         val out = StringBuilder()
@@ -218,7 +214,7 @@ object ModelSearch {
 
     private fun words(text: String): List<String> = text.split(' ').filter { it.isNotEmpty() }
 
-    /** Swift's `Character.isNumber`: digits and other numeric characters. */
+    /** Digits and other numeric characters. */
     private fun Char.isNumberLike(): Boolean = isDigit() || Character.getType(this).let {
         it == Character.LETTER_NUMBER.toInt() || it == Character.OTHER_NUMBER.toInt()
     }

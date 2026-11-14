@@ -95,7 +95,7 @@ internal suspend fun requestHistoryPage(server: OpenCodeServer, sessionID: Strin
     return page
 }
 
-/** Records the page's context and cursor for an enclosing [TranscriptContextCapture], as iOS does. */
+/** Records the page's context and cursor for an enclosing [TranscriptContextCapture]. */
 fun decodeTranscript(data: ByteArray): List<OpenCodeTranscriptItem> =
     decodeTranscriptPage(data, TranscriptContextCapture.current.currentBlocking()).items
 
@@ -194,7 +194,7 @@ internal class ParsedMessageCache {
 private fun runErrorText(error: ErrorPayload): String {
     // Provider errors embed raw JSON; keep only the human-readable prefix.
     val raw = error.message ?: ""
-    // Swift's `split(separator:)` drops empty pieces: the first non-empty one.
+    // The first non-empty one.
     val human = raw.split("{").firstOrNull { it.isNotEmpty() }?.trim(' ', ':') ?: raw
     val kind = error.type ?: "error"
     return if (human.isEmpty()) "Run failed: $kind" else "Run failed: $kind — $human"
@@ -432,9 +432,8 @@ fun assistantReply(data: ByteArray, afterMessageID: String, acrossSteers: Boolea
 }
 
 /**
- * Whether [text] is a prompt the voice delegator wrote (iOS `VoiceHandoff.parse(text) != nil`):
- * the header line, then a JSON body with a non-empty `instruction`, optionally followed by
- * `Attached file:` lines.
+ * Whether [text] is a prompt the voice delegator wrote: the header line, then a JSON body with a
+ * non-empty `instruction`, optionally followed by `Attached file:` lines.
  */
 internal fun isVoiceDelegation(text: String): Boolean {
     if (!text.startsWith("Voice delegation.") && !text.startsWith("Voice delegation (continued).")) return false

@@ -21,7 +21,6 @@ import java.time.Instant
 import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
-/** Port of iOS `VoiceRouteTests.swift`. */
 class VoiceRouteTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
     private val session = OpenCodeSession(id = "route", serverTitle = "Routing", projectID = "p", directory = "/project", updatedAt = Instant.EPOCH)
@@ -66,7 +65,7 @@ class VoiceRouteTests {
         assertEquals(192, count)
     }
 
-    /** iOS `preserveSettings()`: each test's in-memory shared store starts from these values. */
+    /** Each test's in-memory shared store starts from these values. */
     private fun preserveSettings(): VoiceTestShared {
         val shared = VoiceTestShared()
         shared.set(SharedKeys.voiceModeEnabled, true)

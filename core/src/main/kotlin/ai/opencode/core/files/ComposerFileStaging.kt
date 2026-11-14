@@ -20,8 +20,8 @@ import java.nio.file.attribute.PosixFilePermissions
 import java.util.UUID
 
 /**
- * A file copied into the app's temporary storage (iOS `ComposerStagedFile`, System/Share/ComposerFileStaging.swift).
- * Moved to `:core`: the composer and the share target both stage files.
+ * A file copied into the app's temporary storage. Moved to `:core`: the composer and the share
+ * target both stage files.
  */
 data class ComposerStagedFile(
     val id: UUID,
@@ -30,18 +30,18 @@ data class ComposerStagedFile(
     val size: Long,
     val url: File,
 ) {
-    /** iOS `init(id:name:mime: nil, size:url:)`: sniffs the MIME type from the staged copy. */
+    /** Sniffs the MIME type from the staged copy. */
     constructor(id: UUID, name: String, size: Long, url: File) :
         this(id, name, AttachmentFileType.mime(url, name), size, url)
 }
 
 /**
- * Port of iOS `ComposerFileStaging`: where picked and shared files wait while they upload.
- * Upload streams read from these copies, so the original's grant and lifetime don't matter
- * once staging finishes. Each file gets a fresh `<directory>/<UUID>/<name>` folder.
+ * Where picked and shared files wait while they upload. Upload streams read from these copies, so
+ * the original's grant and lifetime don't matter once staging finishes. Each file gets a fresh
+ * `<directory>/<UUID>/<name>` folder.
  *
- * [directory] is `cacheDir/ComposerFiles` (iOS `temporaryDirectory/ComposerFiles`); every
- * function takes it as a parameter so callers and tests can point elsewhere.
+ * [directory] is `cacheDir/ComposerFiles`; every function takes it as a parameter so callers and
+ * tests can point elsewhere.
  */
 object ComposerFileStaging {
     class FileTooLarge : IOException(localized(R.string.core_file_too_large))
@@ -248,7 +248,7 @@ object ComposerFileStaging {
         if (!folder.mkdirs() && !folder.isDirectory) throw IOException(localized(R.string.core_staging_folder_create_failed))
         val destination = File(folder, fileName)
         try {
-            // Atomic, as iOS's `.atomic` write: a temporary sibling renamed into place.
+            // Atomic: a temporary sibling renamed into place.
             val temporary = File(folder, ".$fileName.tmp")
             temporary.writeBytes(data)
             Files.move(temporary.toPath(), destination.toPath(), StandardCopyOption.ATOMIC_MOVE)

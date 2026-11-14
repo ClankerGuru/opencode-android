@@ -12,9 +12,8 @@ object VoiceProgressTunables {
 
 /**
  * One short spoken line while a delegation's result is still out, so the
- * call never sits silent (Kit's Nov 1 call: "Listening. I've got that.",
- * then about 8 s of tool work with nothing said). It says what's running,
- * never what's done; the result decides that.
+ * call never sits silent. It says what's running, never what's done; the
+ * result decides that.
  */
 object VoiceProgressLine {
     /** One line, then one more only after a much longer wait. */
@@ -92,11 +91,7 @@ object VoiceProgressLine {
         "Using Wisp" to "working on your Mac",
     )
 
-    /**
-     * The built-in delegator's tool as words to say, or null for one that
-     * says nothing useful (iOS `activity(delegatorTool:)`; Kotlin can't
-     * overload [activity] on the argument label).
-     */
+    /** The built-in delegator's tool as words to say, or null for one that says nothing useful. */
     fun activityForDelegatorTool(name: String): String? = when (name) {
         "send_message" -> "messaging a session"
         "read_session" -> "reading a session"
