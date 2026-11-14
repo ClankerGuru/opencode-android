@@ -6,9 +6,12 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.media.AgentImagePlan
 import ai.opencode.feature.media.AgentImageRowAnchor
-import ai.opencode.feature.media.MediaThumbnail
+import ai.opencode.feature.media.AgentImageStatusCard
 import ai.opencode.feature.media.DecodedImageCache
+import ai.opencode.feature.media.MediaThumbnail
+import ai.opencode.feature.media.R as MediaR
 import ai.opencode.feature.media.TranscriptImagePreview
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
@@ -53,7 +56,11 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTag
@@ -67,10 +74,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * A Markdown image. A web image loads through Coil; a `data:` image or a file outside the session's
- * folder loads through the server client's Markdown image reader (`OpenCodeClient.markdownImage`,
- * desktop's `readLocalImage`) once it's on screen. Tapping it opens the zoom viewer; one that
- * didn't load says so, and a tap tries again.
+ * A Markdown image. A web image loads through Coil; a `data:` image loads through the server
+ * client's Markdown image reader (`OpenCodeClient.markdownImage`, desktop's `readLocalImage`) once
+ * it's on screen, and a file outside the session's folder waits for a tap first. Tapping it opens
+ * the zoom viewer; one that didn't load says so, and a tap tries again.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -96,6 +103,10 @@ fun MarkdownImage(
     var attempt by remember { mutableIntStateOf(0) }
     var image by remember(cacheKey) { mutableStateOf<ImageBitmap?>(null) }
     var failed by remember(cacheKey) { mutableStateOf(false) }
+    var allowsOutside by remember(cacheKey) { mutableStateOf(false) }
+    val outside = remember(cacheKey, allowsOutside, fallbackFile) {
+        if (allowsOutside || server == null) null else MarkdownImage.outsideFile(source, fallbackFile, server, directory)
+    }
     // Marks the hosting row revised before an async load, failure, or retry resizes it.
     val row = remember { AgentImageRowAnchor() }
     AgentImageRowAnchor.Placement(row)
@@ -108,7 +119,7 @@ fun MarkdownImage(
         image = nextImage
         failed = nextFailed
     }
-    LaunchedEffect(cacheKey, attempt) {
+    LaunchedEffect(cacheKey, attempt, outside == null) {
         val hadImage = shown != null
         if (shown != null) {
             applyState(shown, nextFailed = false, hadImage = hadImage)
@@ -122,7 +133,7 @@ fun MarkdownImage(
                     (result as? SuccessResult)?.image?.toBitmap()
                 } else {
                     val bytes = client.cachedMarkdownImage(cacheKey)
-                        ?: server?.let { server ->
+                        ?: if (outside != null) null else server?.let { server ->
                             val fallback = fallbackFile?.target(directory)?.let { FileReadTarget(it.location, it.relativePath) }
                             client.markdownImage(server, directory, source, fallback)
                         }
@@ -131,10 +142,12 @@ fun MarkdownImage(
                 bitmap?.also { decodedImages.insert(it, cacheKey) }?.asImageBitmap()
             }.getOrNull()
         }
+        if (loaded == null && outside != null) return@LaunchedEffect
         applyState(loaded, nextFailed = loaded == null, hadImage = hadImage)
     }
     val state = when {
         shown != null -> ImageLoad.Loaded(shown)
+        outside != null -> ImageLoad.Outside(outside)
         failed -> ImageLoad.Failed
         else -> ImageLoad.Loading
     }
@@ -178,6 +191,31 @@ fun MarkdownImage(
             },
             modifier = modifier,
         )
+        is ImageLoad.Outside -> {
+            val loadLabel = stringResource(MediaR.string.media_image_load_label)
+            val value = AgentImagePlan.outsideAccessibilityValue(load.file, directory)
+            val allow = {
+                row.revised()
+                allowsOutside = true
+            }
+            AgentImageStatusCard(
+                load.file,
+                AgentImageStatusCard.Status.Outside,
+                modifier
+                    .clip(shape)
+                    .clickable(onClickLabel = loadLabel, role = Role.Button) { allow() }
+                    .clearAndSetSemantics {
+                        role = Role.Button
+                        contentDescription = load.file.name
+                        stateDescription = value
+                        testTag = "markdown-image-outside"
+                        onClick(label = loadLabel) {
+                            allow()
+                            true
+                        }
+                    },
+            )
+        }
         ImageLoad.Loading -> Box(
             modifier.fillMaxWidth().heightIn(min = 120.dp).background(colors.userBubble, shape),
             contentAlignment = Alignment.Center,
@@ -186,6 +224,15 @@ fun MarkdownImage(
 }
 
 object MarkdownImage {
+    /** A local image outside the session's folder: it waits for a tap, since reading it starts a server instance for that folder. */
+    fun outsideFile(source: String, file: AgentFileReference?, server: OpenCodeServer, directory: String?): AgentFileReference? {
+        file ?: return null
+        val target = file.target(directory) ?: return null
+        if (AgentImagePlan.isInside(target, directory)) return null
+        if (server.imageRequest(source, directory) != null) return null
+        return file
+    }
+
     /** Whether changing between placeholder, loaded image, and failed card alters the row's height. */
     fun revisesRow(hadImage: Boolean, wasFailed: Boolean, nextImage: Boolean, nextFailed: Boolean): Boolean =
         hadImage != nextImage || (!nextImage && wasFailed != nextFailed)
@@ -194,6 +241,7 @@ object MarkdownImage {
 private sealed interface ImageLoad {
     data object Loading : ImageLoad
     data object Failed : ImageLoad
+    class Outside(val file: AgentFileReference) : ImageLoad
     class Loaded(val image: ImageBitmap) : ImageLoad
 }
 
