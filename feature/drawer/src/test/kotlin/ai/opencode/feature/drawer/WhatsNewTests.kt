@@ -54,7 +54,7 @@ private fun whatsNewPage(action: WhatsNewFeature.Action): Action = settingsActio
 private fun tryTapped(destination: WhatsNewEntry.Destination, entryID: String): Action =
     whatsNewPage(WhatsNewFeature.Action.TryTapped(destination, entryID))
 
-/** iOS `HomeFeature.tryWhatsNew` on `.whatsNew(.tryTapped)`: on Android Settings asks Home with `TryWhatsNew`. */
+/** On Android Settings asks Home with `TryWhatsNew`. */
 private suspend fun TestStore<HomeFeature.State, Action>.receiveTryWhatsNew(update: ((HomeFeature.State) -> HomeFeature.State)? = null) =
     receiveBounded(
         { ((((it as? Action.SettingsScreen)?.action as? PresentationAction.Presented)?.action as? SettingsFeature.Action.Delegate)?.action) is SettingsFeature.SettingsDelegate.TryWhatsNew },
@@ -68,21 +68,7 @@ private fun HomeFeature.State.presentingWhatsNew(): HomeFeature.State {
     return presentingSettings(page.copy(whatsNew = page.whatsNew.copy(isPresented = true)))
 }
 
-/**
- * Port of iOS `WhatsNewTests`' Home tests: the drawer's row, its push, and Try It (on Android
- * Settings' `TryWhatsNew` delegate, `HomeFeature.tryWhatsNew`). What's New is Settings' page with
- * `root = whatsNew` here, so iOS's `.whatsNew(.closed)` on `isSettingsShown` turning off is the
- * Settings presentation ending (`settingsClosed`), and `settingsPage`/`settingsPageClosed` are
- * Settings' path. iOS `home(entries:)` sets What's New's entries; Home reads the shipped ones
- * here, so "a" stands for any unseen feature. `onlyUnseenFeaturesShowTheButton`,
- * `whatsNewStaysMarkedWhileReadingAndIsSeenOnClosing`, `closingWithoutReadingMarksNothing`,
- * `hidingTurnsTheButtonOffUntilSettingsBringsItBack`,
- * `anUpdatesNewFeatureBringsTheButtonBackButASmallerChangeDoesNot`,
- * `addedIDsAreUniqueAndEachNamesAnEntry`, `seenIDsCarryOverFromTheEntriesBeforeTheSplit`,
- * `eachDayIsOneSectionHoldingExactlyItsEntries`, `shippedFeaturesAndSmallerChangesGroupIntoUniqueDays`,
- * `developerFeaturesStayOutOfTheMainListAndUnseenBadge`, `shippedEntriesAreWellFormed` and
- * `WhatsNewDotSymbolTests` are `:feature:settings`'.
- */
+/** Home reads the shipped ones here, so "a" stands for any unseen feature. */
 class WhatsNewTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -305,9 +291,8 @@ class WhatsNewTests {
 }
 
 /**
- * Port of iOS `WhatsNewTryItTests`: Try It lands through the paths the drawer, Catch Up and the
- * call button use, and keeps the page for what can't go now. `whatsNewSurvivesAHomeReplacement`
- * (`WhatsNewAcrossHomes` over `AppFeature`) is `:app`'s.
+ * Try It lands through the paths the drawer, Catch Up and the call button use, and keeps the page
+ * for what can't go now.
  */
 class WhatsNewTryItTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -374,9 +359,9 @@ class WhatsNewTryItTests {
         }.presentingWhatsNew()
         val store = h.tryStore(state)
 
-        // Home's Try It itself (Settings' `TryWhatsNew`), as iOS sends `.whatsNew(.tryTapped)` to
-        // Home: any action before it would let Catch Up's reconcile refill this artificial empty
-        // queue (nothing was recorded as handled) with the unread sessions.
+        // Home's Try It itself (Settings' `TryWhatsNew`): any action before it would let Catch Up's
+        // reconcile refill this artificial empty queue (nothing was recorded as handled) with the
+        // unread sessions.
         store.send(settingsAction(SettingsFeature.Action.Delegate(SettingsFeature.SettingsDelegate.TryWhatsNew(WhatsNewEntry.Destination.ModelList, "a"))))
         assertNull(store.state.catchUp)
         assertEquals("Back to the session Catch Up started from", "read", store.state.sessionDetail?.session?.id)

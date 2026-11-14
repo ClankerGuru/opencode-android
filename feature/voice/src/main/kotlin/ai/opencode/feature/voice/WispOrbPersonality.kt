@@ -9,10 +9,10 @@ import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-// Wisp's in-call personality (iOS `WispOrbPersonality.swift`): the ponder gaze (gaze.rs, ponder
-// path only), Attentive Presence (attentive.rs), Thinking Fidgets (fidget.rs) and the Breathing
-// Ember idle (idle.rs). A one-for-one port; Wisp's window-look, cursor and other idle variants
-// have no phone equivalent and are left out.
+// Wisp's in-call personality: the ponder gaze (gaze.rs, ponder path only), Attentive Presence
+// (attentive.rs), Thinking Fidgets (fidget.rs) and the Breathing Ember idle (idle.rs). A
+// one-for-one port; Wisp's window-look, cursor and other idle variants have no phone equivalent and
+// are left out.
 
 internal fun wispHash01(seq: Int): Float {
     var x = (seq * 0x9E3779B9.toInt()) xor 0xC2B2AE35.toInt()
@@ -22,7 +22,7 @@ internal fun wispHash01(seq: Int): Float {
     return (x ushr 8).toFloat() / (1 shl 24).toFloat()
 }
 
-/** A point or direction in the lens, iOS `SIMD2<Float>`. */
+/** A point or direction in the lens. */
 data class WispVec2(val x: Float, val y: Float) {
     operator fun plus(o: WispVec2) = WispVec2(x + o.x, y + o.y)
     operator fun times(s: Float) = WispVec2(x * s, y * s)

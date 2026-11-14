@@ -84,12 +84,10 @@ data class VoiceSessionBoard(
 
     companion object {
         /**
-         * The board while a call is up; null otherwise, so Home pays nothing for
-         * it between calls. Port of iOS `HomeFeature.State.voiceSessionBoard` (Drawer sits
-         * above Voice): Home calls this with its own state — `server.persistenceID`, its
-         * root sessions, its status snapshot's busy, attention and unread-and-not-muted
-         * IDs, its `pinnedSessionKeys` (`<persistenceID>|<sessionID>`), its
-         * `attentionDirectories`, and `status.showsActivity`.
+         * The board while a call is up; null otherwise, so Home pays nothing for it between calls.
+         * Home calls this with its own state — `server.persistenceID`, its root sessions, its
+         * status snapshot's busy, attention and unread-and-not-muted IDs, its `pinnedSessionKeys`
+         * (`<persistenceID>|<sessionID>`), its `attentionDirectories`, and `status.showsActivity`.
          */
         fun make(
             hasVoiceCall: Boolean,
@@ -101,7 +99,7 @@ data class VoiceSessionBoard(
             pinnedSessionKeys: List<String>,
             attentionDirectories: Set<String>,
             isLive: Boolean,
-            /** Home's app state for Developer Mode screenshots (iOS `voiceAppStateHome`), else null. */
+            /** Home's app state for Developer Mode screenshots, else null. */
             home: VoiceAppState.Home? = null,
         ): VoiceSessionBoard? {
             if (!hasVoiceCall) return null

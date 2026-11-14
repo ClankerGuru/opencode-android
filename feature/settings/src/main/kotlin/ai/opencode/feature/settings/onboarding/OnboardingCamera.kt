@@ -19,12 +19,10 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Port of iOS `Settings/Onboarding/OnboardingCamera.swift`. The playground's real camera is the
- * shared [ai.opencode.feature.settings.servers.QRCameraPreview] with `once = false`; without access
- * it shows [SimulatedCameraFeed].
+ * The playground's real camera is the shared [ai.opencode.feature.settings.servers.QRCameraPreview]
+ * with `once = false`; without access it shows [SimulatedCameraFeed].
  */
 
-/** One frame interval of iOS's `TimelineView(.animation(minimumInterval: 1 / 30))`. */
 private const val SimulatedFeedFrameNanos = 1_000_000_000L / 30
 
 /**

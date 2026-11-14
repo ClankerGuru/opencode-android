@@ -12,8 +12,8 @@ import ai.opencode.server.model.model
 import androidx.compose.runtime.Immutable
 
 /**
- * Detects a row removed and restored within five seconds, independently of whether that row
- * is on screen (iOS `TranscriptSnapshotTrace`, DEBUG). IDs only, no content.
+ * Detects a row removed and restored within five seconds, independently of whether that row is on
+ * screen. IDs only, no content.
  */
 class TranscriptSnapshotTrace {
     private var sessionID: String? = null
@@ -37,7 +37,7 @@ class TranscriptSnapshotTrace {
     }
 }
 
-/** A stable, list-sized unit of transcript presentation (iOS `TranscriptEntry`). */
+/** A stable, list-sized unit of transcript presentation. */
 @Immutable
 sealed interface TranscriptEntry {
     data class Single(val item: OpenCodeTranscriptItem) : TranscriptEntry
@@ -45,9 +45,9 @@ sealed interface TranscriptEntry {
     data class ToolGroup(val groupID: String, val tools: List<OpenCodeTranscriptItem>) : TranscriptEntry
 
     /**
-     * After a finished reply: actions on the whole reply, such as Copy. iOS carries the
-     * reply's parsed blocks; Android carries the assistant texts (items keep raw Markdown) and
-     * Copy parses and serializes them on tap (`OpenCodeMarkdownBlock.markdown`).
+     * After a finished reply: actions on the whole reply, such as Copy. Android carries the
+     * assistant texts (items keep raw Markdown) and Copy parses and serializes them on tap
+     * (`OpenCodeMarkdownBlock.markdown`).
      */
     data class ReplyEnd(val endID: String, val texts: List<String>) : TranscriptEntry
 
@@ -110,7 +110,6 @@ sealed interface TranscriptEntry {
             else -> emptyList()
         }
 
-    /** iOS `layoutKind` (layout probe and tracing): no content. */
     val layoutKind: String
         get() = when (this) {
             is UserGroup -> "user"
@@ -128,7 +127,7 @@ sealed interface TranscriptEntry {
             }
         }
 
-    /** Rows meet at the sum of their halves (iOS `rowInsets`), on the live row tunables. */
+    /** Rows meet at the sum of their halves, on the live row tunables. */
     val rowInsets: RowInsets
         get() {
             val flow = TranscriptTunables.flowHalf.dp
@@ -260,7 +259,7 @@ sealed interface TranscriptEntry {
                     is OpenCodeTranscriptItem.AssistantMarkdown -> {
                         flush()
                         entries += Single(item)
-                        // iOS appends the reply's blocks: text that parses to none adds nothing.
+                        // Text that parses to none adds nothing.
                         if (item.text.isNotBlank()) reply += item.text
                         replyID = item.id
                     }
@@ -346,8 +345,8 @@ sealed interface TranscriptEntry {
 
 /**
  * Assigns persistent row IDs while queued input is echoed by the server and then promoted into
- * transcript history (iOS `TranscriptRowIdentityPlan`). The list owns the resulting maps; this
- * pure planner also preserves regrouped member overlap.
+ * transcript history. The list owns the resulting maps; this pure planner also preserves regrouped
+ * member overlap.
  */
 data class TranscriptRowIdentityPlan(
     val entryStableIDs: Map<String, String>,
@@ -532,7 +531,6 @@ data class TranscriptRowIdentityPlan(
     }
 }
 
-/** iOS `OpenCodeQueuedInput.rowInsets`. */
 val OpenCodeQueuedInput.rowInsets: RowInsets
     get() = if (isCompaction) {
         RowInsets(TranscriptTunables.sectionHalf.dp, TranscriptTunables.sectionHalf.dp)

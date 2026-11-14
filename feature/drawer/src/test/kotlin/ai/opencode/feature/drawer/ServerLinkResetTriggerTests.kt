@@ -17,11 +17,7 @@ import org.junit.Rule
 import org.junit.Test
 import java.util.Collections
 
-/**
- * Port of iOS `ServerLinkResetTriggerTests` (in `ServerLinkPoolTests.swift`): which of Home's
- * connection actions start connections over before the stream reconnects. The pool tests
- * themselves are `:server`'s `ServerLinkPoolTests`.
- */
+/** Which of Home's connection actions start connections over before the stream reconnects. */
 class ServerLinkResetTriggerTests {
     @get:Rule val isolation = TestIsolationRule()
 

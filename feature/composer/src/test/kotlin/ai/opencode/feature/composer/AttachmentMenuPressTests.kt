@@ -13,9 +13,8 @@ import org.junit.Test
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `AttachmentMenuPressTests.swift`: the + button's touch (hold to open, slide over
- * rows, release to choose) and the haptics each step plays. Points are root dp at density 1, so
- * the slop is [AttachmentMenuPress.BUTTON_SLOP] itself.
+ * The + button's touch (hold to open, slide over rows, release to choose) and the haptics each step
+ * plays. Points are root dp at density 1, so the slop is [AttachmentMenuPress.BUTTON_SLOP] itself.
  */
 class AttachmentMenuPressTests {
     private val button = rect(20f, 800f, 44f, 44f)

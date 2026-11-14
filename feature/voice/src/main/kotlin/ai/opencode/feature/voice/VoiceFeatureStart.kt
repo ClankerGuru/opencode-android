@@ -22,8 +22,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
-// iOS `VoiceFeature+Start.swift`: starting a call on its route — Server Voice's probe, the
-// phone key's preflight, then the session.
+// Starting a call on its route — Server Voice's probe, the phone key's preflight, then the session.
 
 fun VoiceFeature.State.setActiveRoute(
     route: VoiceRoute,
@@ -146,8 +145,7 @@ internal fun VoiceFeature.startCall(state: VoiceFeature.State): Reduced<VoiceFea
     next = next.copy(
         activeVoice = voice,
         delegatorResponseID = null,
-        // Android: the call's ongoing notification, started with the call (iOS's Home starts
-        // its Live Activity from the same state).
+        // Android: the call's ongoing notification, started with the call.
         callPresenceID = uuid.next(),
     )
     val initialContext = next.instructionsContext
@@ -381,10 +379,9 @@ internal fun VoiceFeature.startCall(state: VoiceFeature.State): Reduced<VoiceFea
 }
 
 /**
- * Whether a failed Server Voice GPT-Live start with `delegation: client` was rejected for
- * client delegation (such as an OpenCode Console proxy that only accepts `responses`
- * delegation) rather than an auth, billing, missing key, or network failure. iOS's
- * `NSURLErrorDomain` check is an [IOException] here.
+ * Whether a failed Server Voice GPT-Live start with `delegation: client` was rejected for client
+ * delegation (such as an OpenCode Console proxy that only accepts `responses` delegation) rather
+ * than an auth, billing, missing key, or network failure.
  */
 fun VoiceFeature.Companion.shouldFallBackFromClientDelegation(error: Throwable, hostedByOpenCode: Boolean): Boolean {
     if (error is CancellationException) return false

@@ -10,14 +10,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `ServerSwitchingTests.swift`, the `:server` part: server names
- * (`friendlyName`, `defaultName`, `displayName`), decoding saved servers from before names and
- * headers, and custom headers on every request. iOS `OpenCodeServer.friendlyName(host:)` is
- * [friendlyServerName]. Home's tests are `:feature:drawer`'s, `ServerTitleFeature`'s
- * `:feature:settings`', and the `AppFeature` tests (switching, editing, renaming, the form's
- * headers) `:app`'s.
- */
 class ServerSwitchingTests {
     @get:Rule val isolation = TestIsolationRule()
 

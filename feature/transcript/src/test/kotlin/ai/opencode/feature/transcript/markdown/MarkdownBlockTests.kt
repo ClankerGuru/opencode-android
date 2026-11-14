@@ -43,41 +43,18 @@ import org.junit.Rule
 import org.junit.Test
 
 /*
- * Port of iOS `OpenCodeTests/MarkdownBlockTests.swift` (all its suites: MarkdownBlockTests,
- * TranscriptTextRevealTests, TranscriptTextRevealWaitTests, LineHoldTests, TextRevealTuningTests,
- * StreamRevealNoFlashTests, StreamLineHoldTests). iOS `AttributedString` runs → [InlineText] runs
- * for parsing and the [AnnotatedString] from [MarkdownPresentation.present] for styling
- * (iOS `MarkdownStyle.styled`). Swift Character iteration → code points (every Character
- * boundary is a code point boundary, so the Kotlin loops cover strictly more prefixes).
- *
- * Skipped (owner):
- * - `markdownImageClientDecodesDataURIAndCachesInIsolatedTestScope` → `:server` (`OpenCodeClient.markdownImage`).
- * - `highlightingPreservesTextAndColorsKeywords`, `highlightingHandlesStringsAndUnknownLanguage`,
- *   `highlightingKeepsUnicodeAndPartialTokenBoundaries` → `:feature:media` (`SyntaxHighlighter`).
- * - `increaseContrastUsesSecondaryOnHeaderProjectLine` → `:feature:session` (`SessionView.headerProjectColor`, ported there).
- * - `TextRevealTuningTests.titleLoadingPresetsPickEachVariantAndDefaultsMatchToday` → `:feature:session` (`TitleLoadingTunables`).
- *
  * Dropped (can't exist on Android):
  * - `multilineCodeMeasuredHeightEqualsSettledHeight`, `LineHoldTests.streamedBlockCollapsesToPlainTextAfterFadesSettle`:
  *   `UIHostingController` measurement; Android's `ArrivingText` lays the text out once and only
  *   erases arriving glyphs in the draw phase, so streaming never changes a block's height.
- * - `TranscriptTextRevealTests.singleOverlaySplitMatchesLegacyBoundaryAcrossShortAndLongBlocks`,
- *   `StreamRevealNoFlashTests.chunksPartitionTheArrivingTextExactly`: SwiftUI's split
- *   `Text` overlays (`ArrivingText.split`/`splitChunks`/`legacyShowing`); Android erases each
- *   chunk's glyph path over one laid-out text instead.
- * - `LineHoldTests.whatIsSelectedCopiedAndReadNeverHoldsTheRun`, `StreamLineHoldTests` (2):
- *   `ArrivingText.lineHold` and SwiftUI `TextRenderer`/`ImageRenderer` line probes; Android lays
- *   transcript text out with greedy `LineBreak.Simple`, which never moves a laid-out word.
+ * - Android erases each chunk's glyph path over one laid-out text instead.
+ * - Android lays transcript text out with greedy `LineBreak.Simple`, which never moves a laid-out
+ *   word.
  * - `TranscriptTextRevealWaitTests` (2): `TranscriptTextReveal.wait(until:)`; Android's
  *   `rememberRevealFrame` ticks frames until the clock passes the fade's end (no early wake).
- * - `standaloneMarkdownImagesBecomeViewableBlocks`'s and `cachedCodeBlocksPersistSourceOnlyAndRehighlight`'s
- *   JSON round trip: Android never persists parsed blocks (rows keep raw text). The rest of
- *   each test is ported (the highlight is derived from source and language).
- * - The UIKit halves of `accessibilityDynamicTypeScalesH3MarkersAndLeading` (`UIFontMetrics`;
- *   sp sizes follow the system font scale), `quotesAndTablesKeepMainColourPolicyAcrossContrastModes`
- *   (`UIColor.secondaryLabel` alpha); `consecutiveHeadings…`'s
- *   `TranscriptTimeStamp.font`/`MarkdownTable.cellFont` (local composable styles) and
- *   `refinedStandardTypography…`'s `TranscriptMetrics` meta fonts (`:feature:media`).
+ * - `standaloneMarkdownImagesBecomeViewableBlocks`'s and
+ *   `cachedCodeBlocksPersistSourceOnlyAndRehighlight`'s JSON round trip: Android never persists
+ *   parsed blocks (rows keep raw text).
  */
 class MarkdownBlockTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -292,7 +269,7 @@ class MarkdownBlockTests {
         assertEquals("artifacts/build-graph.png", image.source)
     }
 
-    /** iOS persists code blocks as source + language and re-highlights on decode; the Android highlight is likewise derived from them. */
+    /** The Android highlight is likewise derived from them. */
     @Test fun cachedCodeBlocksPersistSourceOnlyAndRehighlight() {
         val block = OpenCodeMarkdownBlock(0, Kind.Code(OpenCodeMarkdownBlock.HighlightedCode("let x = 1", "swift")))
         val rebuilt = OpenCodeMarkdownBlock(0, Kind.Code(OpenCodeMarkdownBlock.HighlightedCode("let x = 1", "swift")))
@@ -355,7 +332,7 @@ class MarkdownBlockTests {
         assertEquals(listOf("runc", "weaker isolation"), table.rows[1].map { it.text })
     }
 
-    // Android divergence (G-02): iOS keeps `<br>` literal in cells; Android breaks the line there.
+    // Android breaks the line there.
     @Test fun tableCellBreakTagsBecomeLineBreaks() {
         val blocks = OpenCodeMarkdownBlock.blocks(
             "| Command | Output |\n|---|---|\n" +
@@ -427,8 +404,8 @@ class MarkdownBlockTests {
         assertEquals(listOf(OpenCodeTextStyles.subheadline.fontSize), paragraphCode.map { it.style.fontSize })
         assertTrue(paragraphCode.all { it.style.fontWeight == null })
 
-        // In a heading it takes the heading's size, monospaced and semibold. Android diverges from
-        // iOS on purpose: headings are the desktop's scale (H1 19, H2 17, H3 and deeper 15).
+        // In a heading it takes the heading's size, monospaced and semibold. Headings are the
+        // desktop's scale (H1 19, H2 17, H3 and deeper 15).
         for ((level, size) in listOf(1 to 19f, 2 to 17f, 3 to 15f, 4 to 15f)) {
             assertEquals(size.sp, style.headingStyle(level).fontSize)
             val codeRuns = codeSpans(present(heading.text, style, headingLevel = level))
@@ -488,8 +465,8 @@ class MarkdownBlockTests {
     }
 
     @Test fun refinedStandardTypographyDefaultsAndIncreaseContrast() {
-        // Android diverges from iOS on purpose: transcript type follows the OpenCode desktop
-        // (15 sp body, H1/H2/H3 19/17/15, 14 sp Used N, 13 sp mono code). Tone, leading and gaps are iOS's.
+        // Transcript type follows the OpenCode desktop (15 sp body, H1/H2/H3 19/17/15, 14 sp Used
+        // N, 13 sp mono code).
         with(TranscriptTunables.Knobs) {
             assertEquals(15f, bodySize.defaultValue)
             assertEquals(4.5f, bodyLeading.defaultValue)
@@ -712,7 +689,7 @@ class TranscriptTextRevealTests {
         }
     }
 
-    /** Android measures blocks in UTF-16 chars (Compose text offsets); iOS in Characters. */
+    /** Android measures blocks in UTF-16 chars (Compose text offsets). */
     @Test fun incrementalCodeMeasurementTracksASCIIUnicodeAndCRLFGrowth() {
         val reveal = TranscriptTextReveal()
         assertTrue(reveal.arrivals("code", blocks("```swift\nlet a = 1\n"), now = 0.0).isEmpty())
@@ -728,7 +705,7 @@ class TranscriptTextRevealTests {
     }
 }
 
-/** The growing tail is "streamed" (iOS holds its lines); a reply that stops growing lets go. */
+/** The growing tail is "streamed"; a reply that stops growing lets go. */
 class LineHoldTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -877,7 +854,6 @@ internal fun codePointEnds(text: String): List<Int> {
     return ends
 }
 
-/** iOS `MarkdownStyle.styled(_:secondary:inHeading:tonesBody:)` → [MarkdownPresentation.present]. */
 private fun present(
     inline: InlineText,
     style: MarkdownStyle,

@@ -30,13 +30,9 @@ import java.util.Collections
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `HomeChildFeatureTests.swift`: Home's child features, `HomeNotificationsFeature` and
- * `HomeConnectionFeature`, on their own.
+ * Home's child features, `HomeNotificationsFeature` and `HomeConnectionFeature`, on their own.
  *
- * Not ported here (`HomeSettingsFeature` is `:feature:settings`'): `settingsChecksSupportForItsScopedServer`.
- *
- * `notificationPermissionDecisionIsOwnedByChild` is parameterized in iOS; each permission runs in
- * turn inside the one method.
+ * Each permission runs in turn inside the one method.
  */
 class HomeChildFeatureTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -309,7 +305,7 @@ class HomeChildFeatureTests {
                     if (subscriptions > 1) {
                         second.consumeAsFlow()
                     } else {
-                        // iOS buffers the newest one: the second `.connected` overflows it.
+                        // The second `.connected` overflows it.
                         flow {
                             emit(OpenCodeServerEvent.Connected)
                             throw EventStreamOverflow()

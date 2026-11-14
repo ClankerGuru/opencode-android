@@ -5,9 +5,8 @@ import ai.opencode.core.strings.localizedPlural
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-// Port of the notice model of iOS `OpenCode/Drawer/InAppNotices.swift`. It lives here, below
-// `:feature:drawer`, because `SessionListContext` carries it to the session's header; the rules,
-// the mode and Home's wiring stay in the drawer (`notices/InAppNotices.kt`,
+// It lives here, below `:feature:drawer`, because `SessionListContext` carries it to the session's
+// header; the rules, the mode and Home's wiring stay in the drawer (`notices/InAppNotices.kt`,
 // `HomeFeatureNotifications.kt`).
 
 /**

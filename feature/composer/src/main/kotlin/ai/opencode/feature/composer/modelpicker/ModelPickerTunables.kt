@@ -4,12 +4,11 @@ import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionPhase
 import androidx.compose.animation.core.FiniteAnimationSpec
 
-// Port of iOS `Composer/ModelPicker/ModelPickerTunables.swift`, baked to iOS's names and defaults
-// (lengths in dp, times in seconds).
+// Lengths in dp, times in seconds.
 
 /**
- * iOS `ModelPickerTunables` (`modelPicker.*`): the model list's rests and glass, which One
- * Picker's detents ([ModelListDetent]), the photo sheet and the call's composer expansion still read.
+ * The model list's rests and glass, which One Picker's detents ([ModelListDetent]), the photo sheet
+ * and the call's composer expansion still read.
  */
 object ModelPickerTunables {
     const val settle = 0.6

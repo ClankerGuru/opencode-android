@@ -14,8 +14,7 @@ import java.util.UUID
  * The in-app browser (Experimental → In-App Browser): a web page pushed onto the session's stack
  * like a detail screen. Its bar goes back and forward, shares, opens in the browser, and asks about
  * the page: the question goes to the session with the page attached. Going back from the first page
- * closes it. The web view lives in [BrowserWebViews], keyed by `pageID`. Port of iOS
- * `BrowserFeature`.
+ * closes it. The web view lives in [BrowserWebViews], keyed by `pageID`.
  */
 class BrowserFeature : Reducer<BrowserFeature.State, BrowserFeature.Action> {
     data class State(
@@ -112,19 +111,19 @@ class BrowserFeature : Reducer<BrowserFeature.State, BrowserFeature.Action> {
             }
 
         /**
-         * A new visit for [url] (iOS `open(_:id:)`). The caller discards this state's [pageID],
-         * the web view it replaces.
+         * A new visit for [url]. The caller discards this state's [pageID], the web view it
+         * replaces.
          */
         fun open(url: String, id: UUID): State =
             State(pageID = id, openedURL = url, url = url, isLoading = true)
 
-        /** No visit (iOS `close()`). The caller discards this state's [pageID]. */
+        /** No visit. The caller discards this state's [pageID]. */
         fun close(): State = State()
 
         /**
-         * Ask's draft taken for sending with the open page (iOS `takeAsk(messageID:)`): the
-         * trimmed text, the page and [messageID], with the state after (draft cleared, Ask put
-         * away, the capsule tracking [messageID]'s reply). Null when there's nothing to send.
+         * Ask's draft taken for sending with the open page: the trimmed text, the page and
+         * [messageID], with the state after (draft cleared, Ask put away, the capsule tracking
+         * [messageID]'s reply). Null when there's nothing to send.
          */
         fun takeAsk(messageID: () -> String): TakenAsk? {
             val text = askDraft.trim()
@@ -280,7 +279,7 @@ class BrowserFeature : Reducer<BrowserFeature.State, BrowserFeature.Action> {
     }
 }
 
-/** How the reply to the last question asked from the open page is going (iOS `BrowserReplyStatus`). */
+/** How the reply to the last question asked from the open page is going. */
 enum class BrowserReplyStatus {
     Working,
     NeedsInput,
@@ -291,7 +290,7 @@ enum class BrowserReplyStatus {
 }
 
 /**
- * The page the voice agent hears about (iOS `VoiceViewingPage`). Declared in `:server` so the call
- * (`:feature:voice`) reads the same type the browser produces.
+ * The page the voice agent hears about. Declared in `:server` so the call (`:feature:voice`) reads
+ * the same type the browser produces.
  */
 typealias VoiceViewingPage = ai.opencode.server.model.VoiceViewingPage

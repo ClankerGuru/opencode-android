@@ -5,7 +5,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** iOS `TuningTests`: the composer's tunables (the rest is `:core`'s, `:feature:drawer`'s and transcript's). */
 class TuningTests {
     @Test fun composerKeyboardTunablesRegisterInComposerGroup() {
         val store = TuningStore(null)

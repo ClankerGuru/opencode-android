@@ -14,10 +14,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `AppFeatureTests.encodedHomeCacheDoesNotPersistServerPassword`, the one test there
- * on Home's state alone (`persistSnapshot`, `cachedHomeSnapshot`). The rest is `:app`'s.
- */
+/** The one test there on Home's state alone (`persistSnapshot`, `cachedHomeSnapshot`). */
 class AppFeatureTests {
     @get:Rule val isolation = TestIsolationRule()
 

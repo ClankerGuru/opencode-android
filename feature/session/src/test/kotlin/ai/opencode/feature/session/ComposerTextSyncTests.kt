@@ -24,9 +24,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Port of iOS `OpenCodeTests/ComposerTextSyncTests.swift`. A [TextFieldState] stands in for the
- * field and [ComposerTextInputController.syncText] for `updateUIView`'s sync. [Field.type] is the
- * reader typing: it replaces the selection, then publishes like the field's edit collector.
+ * A [TextFieldState] stands in for the field and [ComposerTextInputController.syncText] for
+ * `updateUIView`'s sync. [Field.type] is the reader typing: it replaces the selection, then
+ * publishes like the field's edit collector.
  */
 class ComposerTextSyncTests {
     private class Field(

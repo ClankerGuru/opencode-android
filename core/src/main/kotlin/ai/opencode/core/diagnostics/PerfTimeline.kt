@@ -9,12 +9,12 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.roundToInt
 
 /**
- * Port of iOS `PerfTimeline`: the performance baseline's end points as trace sections and, in a lab
- * run, `perf_*` marks. On only for a lab run or the `perf-signposts` extra; read per call because
- * lab extras arrive after process start.
+ * The performance baseline's end points as trace sections and, in a lab run, `perf_*` marks. On
+ * only for a lab run or the `perf-signposts` extra; read per call because lab extras arrive after
+ * process start.
  */
 object PerfTimeline {
-    /** The `perf-signposts` launch extra (iOS `OPENCODE_PERF_SIGNPOSTS`); set by `DevTools.handleLaunchIntent`. */
+    /** The `perf-signposts` launch extra; set by `DevTools.handleLaunchIntent`. */
     @Volatile var signpostsRequested: Boolean = false
 
     val isEnabled: Boolean get() = LabMarks.isEnabled || signpostsRequested
@@ -100,7 +100,10 @@ object PerfTimeline {
         synchronized(lock) { state.fresh.rowsHidden(token.id) }
     }
 
-    /** The transcript went on screen (iOS `viewWillAppear`): its rows count from now, and the latest one to appear shows the active session. */
+    /**
+     * The transcript went on screen: its rows count from now, and the latest one to appear shows
+     * the active session.
+     */
     fun transcriptAppeared(token: RowsToken?) {
         token ?: return
         val waiting = synchronized(lock) {
@@ -110,7 +113,7 @@ object PerfTimeline {
         if (waiting) wakeFrames()
     }
 
-    /** The transcript left the screen (iOS `viewDidDisappear`): it no longer completes anything. */
+    /** The transcript left the screen: it no longer completes anything. */
     fun transcriptDisappeared(token: RowsToken?) {
         token ?: return
         synchronized(lock) { state.fresh.disappeared(token.id) }
@@ -311,8 +314,8 @@ object PerfTimeline {
 }
 
 /**
- * The Choreographer frames behind [PerfTimeline]'s rendered frames (iOS's `CADisplayLink`
- * `PerfFrames`), running only while a snapshot waits for an on-screen transcript. Main thread.
+ * The Choreographer frames behind [PerfTimeline]'s rendered frames, running only while a snapshot
+ * waits for an on-screen transcript. Main thread.
  */
 private object PerfFrames : Choreographer.FrameCallback {
     private var running = false
@@ -333,9 +336,8 @@ private object PerfFrames : Choreographer.FrameCallback {
 }
 
 /**
- * Port of iOS `PerfFreshTracker`: a snapshot counts at the first frame after an on-screen
- * transcript reported its revision rendered. Not thread-safe: the timeline holds its lock around
- * every call.
+ * A snapshot counts at the first frame after an on-screen transcript reported its revision
+ * rendered. Not thread-safe: the timeline holds its lock around every call.
  */
 class PerfFreshTracker {
     data class Pending(val revision: Int, val applied: Long)

@@ -8,8 +8,8 @@ import java.time.Instant
  * means the connection is backing up, and the capture stream starts dropping speech. Poor until
  * sends have been quick again for a few seconds, so it doesn't flicker.
  *
- * Immutable (a Swift value type): the iOS `mutating` methods return the updated watch, paired with
- * the change of state when they report one.
+ * Immutable: the mutating methods return the updated watch, paired with the change of state when
+ * they report one.
  */
 data class VoiceUplinkWatch(
     val isPoor: Boolean = false,

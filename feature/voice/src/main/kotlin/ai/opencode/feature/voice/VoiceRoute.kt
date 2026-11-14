@@ -9,14 +9,13 @@ sealed interface VoiceRoute {
     data class PhoneKey(override val engine: VoiceEngine) : VoiceRoute
     data class Unavailable(val reason: Reason) : VoiceRoute
 
-    /** iOS `VoiceRoute.OpenAI`. */
     enum class OpenAI {
         gptLive, realtime;
 
         val engine: VoiceEngine get() = if (this == gptLive) VoiceEngine.gptLive else VoiceEngine.realtime
     }
 
-    /** iOS `VoiceRoute.Server` (named `ServerRoute` here: Kotlin can't nest it beside the `Server` case). */
+    /** Named `ServerRoute`: Kotlin can't nest it beside the `Server` case. */
     sealed interface ServerRoute {
         data class OpenAI(val model: VoiceRoute.OpenAI) : ServerRoute
         data object GeminiLive : ServerRoute
@@ -90,10 +89,8 @@ sealed interface VoiceRoute {
     )
 
     companion object {
-        /** iOS `.server(.openAI(model))`. */
         fun serverOpenAI(model: OpenAI): VoiceRoute = Server(ServerRoute.OpenAI(model))
 
-        /** iOS `.server(.geminiLive)`. */
         val serverGeminiLive: VoiceRoute = Server(ServerRoute.GeminiLive)
 
         fun resolve(
@@ -124,9 +121,8 @@ sealed interface VoiceRoute {
 }
 
 /**
- * Who pays for a call (iOS `VoiceKeySource`, `Settings/VoiceKeySource.swift`), moved down to
- * Voice because [VoiceRoute.keySource] returns it and Settings sits above Voice. Settings'
- * `VoiceKeyStatus` stays in Settings.
+ * Who pays for a call, moved down to Voice because [VoiceRoute.keySource] returns it and Settings
+ * sits above Voice. Settings' `VoiceKeyStatus` stays in Settings.
  */
 sealed interface VoiceKeySource {
     data class Phone(val provider: VoiceProvider) : VoiceKeySource
@@ -195,7 +191,7 @@ class VoiceBroker(
     }
 
     companion object {
-        /** The broker and the readiness it was resolved with (iOS `resolve(…)` returning a tuple). */
+        /** The broker and the readiness it was resolved with. */
         fun resolve(
             choice: VoiceServerChoice,
             provider: ServerVoiceProvider = ServerVoiceProvider.openAI,

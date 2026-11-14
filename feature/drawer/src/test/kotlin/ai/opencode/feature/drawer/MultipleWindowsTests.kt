@@ -12,11 +12,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `MultipleWindowsTests.aFurtherWindowKeepsItsOwnSidebar`: Home owns the sidebar toggle
- * (`reducePreferences`, `State.isWindowLocal`). The rest of that file is `:server`'s, `:app`'s and
- * `:feature:system`'s.
- */
+/** Home owns the sidebar toggle (`reducePreferences`, `State.isWindowLocal`). */
 class MultipleWindowsTests {
     @get:Rule val isolation = TestIsolationRule()
 

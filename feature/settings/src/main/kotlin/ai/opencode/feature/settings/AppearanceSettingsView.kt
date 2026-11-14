@@ -81,8 +81,6 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Port of iOS `Settings/AppearanceSettingsView.swift`.
- *
  * Settings → Appearance: System / Light / Dark mode override and a `Theme` row with a three-dot
  * palette swatch that pushes [ThemesSettingsView] (`Settings › Appearance › Themes`). Choosing a
  * theme or mode re-themes Settings in place: `OpenCodeAppTheme` at the root observes the keys,
@@ -109,7 +107,7 @@ fun AppearanceSettingsView(store: SettingsStore) {
             )
         }
         settingsSection(key = "theme") {
-            // The clickable row merges its texts: "Theme", then the theme (iOS's label and value).
+            // The clickable row merges its texts: "Theme", then the theme.
             SettingsRowFrame(
                 modifier = returnFocus.on(SettingsPage.Themes),
                 onClick = {
@@ -126,7 +124,7 @@ fun AppearanceSettingsView(store: SettingsStore) {
                     )
                 }
                 if (isAccessibilitySize()) {
-                    // iOS stacks the label over the swatch and value at the accessibility sizes.
+                    // The label stacks over the swatch and value at the accessibility sizes.
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(stringResource(R.string.settings_appearance_theme), style = SettingsText.title, color = OpenCodeTheme.colors.text)
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -150,8 +148,8 @@ fun AppearanceSettingsView(store: SettingsStore) {
 
 /**
  * Settings → Appearance → Themes (D-109 Split + D-110 Palette Dots): the top is a session preview
- * edge to edge in the theme's own canvas, pinned, and the curated theme list scrolls
- * independently beneath it, dissolving across a soft edge (iOS `ThemesSoftEdgeBackdrop`).
+ * edge to edge in the theme's own canvas, pinned, and the curated theme list scrolls independently
+ * beneath it, dissolving across a soft edge.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -212,12 +210,11 @@ fun ThemesSettingsView(store: SettingsStore) {
             Box(
                 Modifier
                     .fillMaxWidth()
-                    // iOS pulls the rows 6 pt up under its translucent bar (`.padding(.top, -6)`);
-                    // Android's bar is opaque, so that would cut the bubble's top: no pull.
+                    // No pull-up under the bar: it's opaque, so that would cut the bubble's top.
                     .padding(bottom = SoftEdgeBottomInset)
                     .onSizeChanged { headerHeight = it.height },
             ) {
-                // A theme or light/dark change swaps the preview (iOS `Motion.swap`).
+                // A theme or light/dark change swaps the preview.
                 Crossfade(
                     appTheme to isDark,
                     animationSpec = MotionRole.Swap.animation(reduceMotion = reduceMotion),
@@ -230,22 +227,21 @@ fun ThemesSettingsView(store: SettingsStore) {
     }
 }
 
-/** iOS `AppearanceTunables` (the soft scroll edge under the pinned preview), at their defaults. */
+/** The soft scroll edge under the pinned preview, at its defaults. */
 internal object AppearanceTunables {
     /** Soft edge feather (pt). */
     val softEdgeHeight = 22.dp
-    /** iOS's soft edge blur. Not drawn on Android: the list fades under the gradient alone. */
+    /** Not drawn on Android: the list fades under the gradient alone. */
     val softEdgeBlur = 12.dp
 }
 
 private val SoftEdgeBottomInset = 14.dp
 
 /**
- * Soft scroll-edge backdrop behind the pinned split preview (iOS `ThemesSoftEdgeBackdrop`): full
- * [topBackground] through `fadeOrigin`, then a smoothstep gradient easing to transparent over the
- * feather below the preview, so scrolling theme rows dissolve before they reach it. iOS also
- * blurs the list progressively across that band; Android doesn't blur scrolling content (a plain
- * fading edge, as Android lists use). Under high contrast it is opaque.
+ * Soft scroll-edge backdrop behind the pinned split preview: full [topBackground] through
+ * `fadeOrigin`, then a smoothstep gradient easing to transparent over the feather below the
+ * preview, so scrolling theme rows dissolve before they reach it. Android doesn't blur scrolling
+ * content (a plain fading edge, as Android lists use). Under high contrast it is opaque.
  */
 @Composable
 private fun ThemesSoftEdgeBackdrop(
@@ -298,7 +294,7 @@ private fun ThemeOptionRow(
     isSelected: Boolean,
     onClick: () -> Unit,
 ) {
-    // The clickable row merges its title: the theme's name once (iOS's label), then selected.
+    // The clickable row merges its title: the theme's name once, then selected.
     SettingsRowFrame(
         Modifier.semantics { selected = isSelected },
         onClick = onClick,
@@ -373,16 +369,13 @@ fun ThemeSwatchTile(
 }
 
 /**
- * The real transcript rows for the Themes stage (iOS `TranscriptMessageRow`s), provided by a
- * module that sees `:feature:transcript` (Home provides it where it hosts Settings). Without one,
+ * The real transcript rows for the Themes stage, provided by a module that sees
+ * `:feature:transcript` (Home provides it where it hosts Settings). Without one,
  * [ImitationTranscriptPreview] draws the same slice from the theme's palette.
  */
 val LocalAppearanceTranscriptPreview = staticCompositionLocalOf<(@Composable () -> Unit)?> { null }
 
-/**
- * The Themes stage: an actual slice of the session timeline edge to edge (D-109 Split), in the
- * theme's own colours, its type capped at iOS's xLarge, read as one element and inert.
- */
+/** The Themes stage. */
 @Composable
 private fun AppearanceTranscriptPreview(theme: AppTheme, isDark: Boolean) {
     val rows = LocalAppearanceTranscriptPreview.current
@@ -395,7 +388,7 @@ private fun AppearanceTranscriptPreview(theme: AppTheme, isDark: Boolean) {
                 contentDescription = previewDescription
                 stateDescription = theme.title
             }
-            // iOS `.allowsHitTesting(false)`: the preview takes no touches.
+            // The preview takes no touches.
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
@@ -403,7 +396,6 @@ private fun AppearanceTranscriptPreview(theme: AppTheme, isDark: Boolean) {
             },
     ) {
         OpenCodeTheme(theme = theme, appearance = if (isDark) AppearanceColorScheme.Dark else AppearanceColorScheme.Light) {
-            // iOS `.dynamicTypeSize(...DynamicTypeSize.xLarge)`.
             CompositionLocalProvider(LocalDensity provides Density(density.density, min(density.fontScale, PreviewMaxFontScale))) {
                 if (rows != null) rows() else ImitationTranscriptPreview(theme, isDark)
             }
@@ -411,7 +403,7 @@ private fun AppearanceTranscriptPreview(theme: AppTheme, isDark: Boolean) {
     }
 }
 
-/** iOS xLarge body (19 pt) over Large (17 pt). */
+/** XLarge body (19 sp) over Large (17 sp). */
 private const val PreviewMaxFontScale = 19f / 17f
 
 /** The palette-drawn stand-in for [LocalAppearanceTranscriptPreview] when no host provides rows. */

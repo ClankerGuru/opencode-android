@@ -1,11 +1,10 @@
 package ai.opencode.feature.transcript.selection
 
 /**
- * Port of iOS `TranscriptSelectionAutoscroller`: how fast the transcript scrolls while a
- * selection drag holds near the top or bottom of what the reader can see (below the header,
- * above the composer and keyboard). Values are in dp and dp per second; the frame loop that
- * applies them every frame (so a finger held still keeps the selection growing) is
- * `TranscriptListSelection`'s autoscroll.
+ * How fast the transcript scrolls while a selection drag holds near the top or bottom of what the
+ * reader can see (below the header, above the composer and keyboard). Values are in dp and dp per
+ * second; the frame loop that applies them every frame (so a finger held still keeps the selection
+ * growing) is `TranscriptListSelection`'s autoscroll.
  */
 object TranscriptSelectionAutoscroller {
     /** How deep the edge zones reach into the visible list. */

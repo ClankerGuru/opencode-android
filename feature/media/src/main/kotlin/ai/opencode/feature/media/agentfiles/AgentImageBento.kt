@@ -17,7 +17,7 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
-/** A frame in points (dp), iOS `CGRect` with the accessors the bento uses. */
+/** A frame in points (dp). */
 data class BentoRect(val x: Double, val y: Double, val width: Double, val height: Double) {
     val minX: Double get() = x
     val minY: Double get() = y
@@ -25,7 +25,7 @@ data class BentoRect(val x: Double, val y: Double, val width: Double, val height
     val maxY: Double get() = y + height
 }
 
-/** iOS `CACornerMask` for a tile: the corners that lie on the bento's own corners (layout-relative). */
+/** The corners that lie on the bento's own corners (layout-relative). */
 data class BentoCorners(
     val topStart: Boolean,
     val topEnd: Boolean,
@@ -39,12 +39,11 @@ data class BentoCorners(
 }
 
 /**
- * How a batch of a reply's images is arranged (iOS `AgentImageBento`): one full width up to
- * `loneMaxHeight`; two side by side, or stacked when both are wide; three as a hero beside (or
- * above) the other two; four or more as justified rows. The arrangement that crops least and stands
- * closest to a comfortable height wins, ties to the first. It depends only on the shapes and the
- * width, so a settled batch (`AgentImagePreviews.settleBento`) always lays out the same. Units are
- * dp.
+ * How a batch of a reply's images is arranged: one full width up to `loneMaxHeight`; two side by
+ * side, or stacked when both are wide; three as a hero beside (or above) the other two; four or
+ * more as justified rows. The arrangement that crops least and stands closest to a comfortable
+ * height wins, ties to the first. It depends only on the shapes and the width, so a settled batch
+ * (`AgentImagePreviews.settleBento`) always lays out the same. Units are dp.
  */
 class AgentImageBento(
     aspects: List<Double>,
@@ -301,12 +300,11 @@ class AgentImageBento(
     }
 
     companion object {
-        /** Shapes are laid out within this range (iOS `JustifiedImageRows.aspects`); a stranger one shows whole in its tile. */
+        /** Shapes are laid out within this range; a stranger one shows whole in its tile. */
         const val ASPECT_MIN = 0.2
         const val ASPECT_MAX = 8.0
         /** A tile cropping more than this shows its image whole instead ([fits]). */
         const val MAX_CROP = 0.3
-        /** iOS `JustifiedImageRows.cornerRadius`. */
         val defaultCornerRadius: Dp = TranscriptMetrics.cardCornerRadius
 
         /** The corners of `frame` that lie on the bento's own corners. */
@@ -332,9 +330,8 @@ class AgentImageBento(
 }
 
 /**
- * Lays out a batch's tiles at their [AgentImageBento] frames (iOS `AgentImageBentoLayout`).
- * Children are placed in order; a lone tall image stands narrower than the width, and the
- * layout is then its size.
+ * Lays out a batch's tiles at their [AgentImageBento] frames. Children are placed in order; a lone
+ * tall image stands narrower than the width, and the layout is then its size.
  */
 @Composable
 fun AgentImageBentoLayout(
@@ -380,8 +377,8 @@ private class BentoCache {
 }
 
 /**
- * Image Previews' bento and grow tunables (iOS `AgentImageTunables`): live in the Tuning Panel; the
- * plain properties read the default while tuning is off.
+ * Image Previews' bento and grow tunables: live in the Tuning Panel; the plain properties read the
+ * default while tuning is off.
  */
 object AgentImageTunables {
     /** The Tuning Panel sections it registers (the key segment after the group), in order. */
@@ -399,7 +396,6 @@ object AgentImageTunables {
     /** Corners inside the bento. */
     val innerRadius: Dp get() = innerRadiusTunable.value
 
-    /** iOS `register(in:)` (the transcript's entry view calls it there; here the bento does, once). */
     fun register(store: TuningStore = TuningStore.shared) {
         store.register(gutterTunable, innerRadiusTunable, linkMaxHeightTunable)
     }

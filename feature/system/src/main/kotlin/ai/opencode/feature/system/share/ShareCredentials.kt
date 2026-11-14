@@ -6,10 +6,10 @@ import ai.opencode.server.OpenCodeServer
 import kotlinx.serialization.Serializable
 
 /**
- * Port of iOS `ShareCredentials`: what the share sheet needs to send on its own: the server it
- * offers sessions on (address, password, custom headers) and the relay callback that tells this
- * phone when the run ends. The app writes it to a keychain item whenever it publishes the share
- * sheet's sessions ([ShareTargets]), and removes it with the server.
+ * What the share sheet needs to send on its own: the server it offers sessions on (address,
+ * password, custom headers) and the relay callback that tells this phone when the run ends. The app
+ * writes it to a keychain item whenever it publishes the share sheet's sessions ([ShareTargets]),
+ * and removes it with the server.
  */
 @Serializable
 data class ShareCredentials(
@@ -33,9 +33,9 @@ data class ShareCredentials(
 }
 
 /**
- * The shared keychain item, or an in-memory stand-in for tests (iOS `ShareCredentialStore`).
- * On Android the share target runs in the app's own process, so the item is a
- * [SharedKey.keychain] (Keystore-encrypted, no backup) both read.
+ * The shared keychain item, or an in-memory stand-in for tests. On Android the share target runs in
+ * the app's own process, so the item is a [SharedKey.keychain] (Keystore-encrypted, no backup) both
+ * read.
  */
 class ShareCredentialStore(
     val load: () -> ShareCredentials?,

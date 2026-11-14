@@ -51,7 +51,6 @@ private fun opened(destination: SystemAction.Destination, startsCall: Boolean = 
 
 private fun tapped(id: String) = AppFeature.Action.Home(HomeFeature.Action.SessionTapped(id))
 
-/** Port of iOS `SystemIntegrationTests.swift`' `SystemRoutingTests` AppFeature section. */
 class SystemRoutingTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -66,7 +65,7 @@ class SystemRoutingTests {
         return shared.appStore(state, effects, dependencies)
     }
 
-    /** iOS `home()`: the list, no remembered session, and a draft open. */
+    /** The list, no remembered session, and a draft open. */
     private fun home(): HomeFeature.State = shared.run {
         HomeFeature.State(server, OpenCodeHomeSnapshot(projects = listOf(project, docs), sessions = listOf(older, newer), activeSessionIDs = emptySet()))
             .openingDraft()
@@ -200,7 +199,6 @@ class SystemRoutingTests {
     }
 }
 
-/** Port of iOS `SystemIntegrationTests.swift`' `SystemColdLaunchTests` AppFeature tests. */
 class SystemColdLaunchTests {
     @get:Rule val isolation = TestIsolationRule()
 

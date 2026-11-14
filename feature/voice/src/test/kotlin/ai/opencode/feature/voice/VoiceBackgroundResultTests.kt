@@ -28,17 +28,12 @@ import kotlin.time.Duration.Companion.seconds
 import java.time.Instant
 
 /**
- * Port of iOS `VoiceBackgroundResultTests.swift`.
- *
  * From a call log (Oct 25): asked for eye-tracking research, HOME started
  * a background subagent and replied that it had. The watch resolved on
  * that reply, so when the research landed two minutes and three unrelated
  * delegations later, nothing told the user until he asked twice. Work a
  * watched run starts in the background is watched too, and its result is
  * spoken once, at the next opening.
- *
- * `runMessagesDecodeLaunchesAndCompletions` reaches `:server`'s internal decoder (iOS
- * `OpenCodeClient.decodeRunMessages`) through its test fixture [WireDecoders].
  */
 class VoiceBackgroundResultTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
@@ -52,7 +47,6 @@ class VoiceBackgroundResultTests {
 
     private data class Announcement(val promptIDs: List<String>, val text: String)
 
-    /** iOS `VoiceFeature.State(server:session:)` live, delegating, its watch live. */
     private fun liveVoice(shared: SpeechTestShared): VoiceFeature.State = shared.run {
         VoiceFeature.State(server, homeSession)
             .withPhase(VoiceFeature.State.Phase.Live)
@@ -360,7 +354,6 @@ class VoiceBackgroundResultTests {
         assertFalse("Background work's own result follows nothing", effects.any { it is ReplyWatch.Effect.FindBackgroundWork })
     }
 
-    /** iOS `VoiceFeature.State(server:session:)` live under the session delegator, the user having acted. */
     private fun sessionDelegatorVoice(shared: SpeechTestShared, userActed: Boolean): VoiceFeature.State = shared.run {
         VoiceFeature.State(server, homeSession)
             .withPhase(VoiceFeature.State.Phase.Live)

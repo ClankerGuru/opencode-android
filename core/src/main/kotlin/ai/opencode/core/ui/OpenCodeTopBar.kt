@@ -64,7 +64,7 @@ object OpenCodeTopBarDefaults {
  * theme's effects spring, as the session header's bar does.
  *
  * @param navigation the leading control (Back, or a Cancel/Done text button); 48 dp targets.
- * @param centerTitle centre the title between the controls (iOS inline titles), else start-aligned.
+ * @param centerTitle Centre the title between the controls, else start-aligned.
  * @param hairline false hides the hairline (a bar over a camera preview).
  */
 @OptIn(ExperimentalMaterial3Api::class)

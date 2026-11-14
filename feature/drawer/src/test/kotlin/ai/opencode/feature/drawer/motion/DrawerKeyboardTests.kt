@@ -15,27 +15,17 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Port of iOS `DrawerKeyboardTests.swift`: whether closing the drawer gives the keyboard back
- * (`DrawerKeyboard`), and the hold that keeps the card's field focused while the drawer moves
- * (`DrawerKeyboardHold`), against a real [SessionDrawerController] as iOS drives a real
- * `SessionDrawerViewController`. The composer's field is a fake that reports focus the way
+ * Whether closing the drawer gives the keyboard back (`DrawerKeyboard`), and the hold that keeps
+ * the card's field focused while the drawer moves (`DrawerKeyboardHold`), against a real
+ * [SessionDrawerController]. The composer's field is a fake that reports focus the way
  * `Modifier.drawerKeyboardField` does; the soft keyboard is a recording [DrawerKeyboardHold.Ime].
  *
  * The keys can't follow the card here (no [ImeFollower]: driving the IME's insets needs a real
- * window), which is iOS's "keys that cannot follow" path (`Harness()` without `keys`).
+ * window).
  *
  * Deleted:
  * - `theKeysSlideWithTheCardAndRestBesideTheOpenDrawer` and `anotherFieldTakesTheKeysWhereItIs`
- *   assert the keyboard window's transform as it follows the card. Android drives the IME's
- *   insets through `WindowInsetsAnimationController` ([ImeFollower]), which needs a real window
- *   and IME; nothing else in those tests differs from the ported fallback tests.
- * - `suspendedSessionCardTranscriptIgnoresDrawerKeyboardFrameChanges` probes
- *   `TranscriptListViewController`'s UIKit content inset (`:feature:transcript`).
- *
- * Partially ported: in `keysLeavingWithAnotherSessionSlideOffAndReturnOnceTheyAreGone` the
- * keyboard window's transform; `safeAreaRegions` is
- * [DrawerKeyboardHold.excludesKeyboard] (the container's `consumeWindowInsets(ime)`), and the
- * card's `isUserInteractionEnabled` is [DrawerMotionState.isContentSuspended].
+ *   assert the keyboard window's transform as it follows the card.
  */
 class DrawerKeyboardTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -176,7 +166,7 @@ class DrawerKeyboardHoldTests {
             motion.beginDrag()
         }
 
-        /** The container leaving composition (iOS `viewDidDisappear`). */
+        /** The container leaving composition. */
         fun disappear() = hold.release()
 
         fun sleep(millis: Long) {
@@ -186,10 +176,8 @@ class DrawerKeyboardHoldTests {
     }
 
     /**
-     * iOS: back from the background UIKit set the keyboard window's frame under the slide, so
-     * closing left the keys aside, the keyboard up with none of it on screen. Android: back
-     * from the background the system has the IME again; resting open the keys stay down beside
-     * the drawer, and closing gives them back on screen.
+     * Android: back from the background the system has the IME again; resting open the keys stay
+     * down beside the drawer, and closing gives them back on screen.
      */
     @Test
     fun keysReframedUnderTheSlideComeBackToTheScreen() = runTest {

@@ -22,7 +22,7 @@ dependencies {
     api(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.datastore.preferences)
-    // ProviderIcon/TemplateAssetImage draw the bundled iOS provider and MCP SVG marks (assets/).
+    // ProviderIcon/TemplateAssetImage draw the bundled provider and MCP SVG marks (assets/).
     implementation(libs.coil.compose)
     implementation(libs.coil.svg)
     testFixturesApi(libs.junit)

@@ -56,12 +56,8 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `SendOutboxTests.swift`.
- *
  * Sending never waits for the server: each send shows at once, and the
  * outbox delivers a session's sends one at a time, in order.
- *
- * Not ported here (:server, `OpenCodeClientError.retryAfter` alone): `retryAfterIsReadAsSecondsOrADate`.
  */
 class SendOutboxTests {
     private val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
@@ -90,14 +86,10 @@ class SendOutboxTests {
         fun open() { opened.complete(Unit) }
     }
 
-    /** iOS `Issue.record` from the default PATCH/DELETE stubs: failed at the end of the test. */
+    /** Failed at the end of the test. */
     private val issues = LockIsolated(listOf<String>())
 
-    /**
-     * iOS's outbox works on the main actor, so a test's yields and `TestClock.advance` see each
-     * step its lanes take (a post starting, a sleep re-armed after a wake). Here each test's
-     * outboxes run their lanes on the test's own thread for the same order.
-     */
+    /** Here each test's outboxes run their lanes on the test's own thread for the same order. */
     private lateinit var lanes: CoroutineScope
 
     private fun newOutbox() = PromptOutbox(scope = lanes)
@@ -936,7 +928,6 @@ class SendOutboxTests {
 
     private val offline = OpenCodeClientError.unreachable(TransportFailure.NotSent)
 
-    /** iOS `networkPath.isOffline = { true }` and `available` never returning. */
     private fun DependencyValues.Builder.offlinePath() {
         this[NetworkPathClient] = this[NetworkPathClient].copy(isOffline = { true }, available = { awaitCancellation() })
     }
@@ -1060,10 +1051,7 @@ class SendOutboxTests {
         h.skipInFlightEffects()
     }
 
-    /**
-     * Validation, auth, and other answers sending again can't change still
-     * fail at once. (iOS `@Test(arguments: [400, 401, 404, 409, 422, 500])`.)
-     */
+    /** Validation, auth, and other answers sending again can't change still fail at once. */
     @Test fun aFailureThatCantPassStillFailsAtOnce() {
         for (status in listOf(400, 401, 404, 409, 422, 500)) {
             outboxTest { h ->

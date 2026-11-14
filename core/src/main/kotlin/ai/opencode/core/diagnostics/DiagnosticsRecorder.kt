@@ -29,7 +29,6 @@ import java.util.UUID
 import kotlin.concurrent.schedule
 import kotlin.math.max
 
-/** iOS `DiagnosticsErrorCategory`. */
 @Serializable(with = DiagnosticsErrorCategory.Serializer::class)
 sealed interface DiagnosticsErrorCategory {
     data object Unauthorized : DiagnosticsErrorCategory
@@ -59,8 +58,8 @@ sealed interface DiagnosticsErrorCategory {
         }
 
         /**
-         * iOS `init(_ error:)`: cancellation, timeouts and lost networks by type, else transport. A
-         * socket error's errno is read from its message.
+         * Cancellation, timeouts and lost networks by type, else transport. A socket error's errno
+         * is read from its message.
          */
         fun of(error: Throwable): DiagnosticsErrorCategory = when (error) {
             is kotlinx.coroutines.CancellationException -> Cancelled
@@ -80,7 +79,7 @@ sealed interface DiagnosticsErrorCategory {
             else -> if (error.message.equals("Canceled", ignoreCase = true)) Cancelled else Transport
         }
 
-        /** Persisted iOS diagnostics keep their original NSError domains and codes. */
+        /** Persisted diagnostics keep their original NSError domains and codes. */
         fun of(domain: String, code: Int): DiagnosticsErrorCategory = when (domain) {
             "NSURLErrorDomain" -> when (code) {
                 -1001 -> Timeout
@@ -129,12 +128,11 @@ enum class DiagnosticsAddressFamily { @SerialName("ipv4") Ipv4, @SerialName("ipv
 @Serializable
 enum class DiagnosticsPathScope { @SerialName("loopback") Loopback, @SerialName("tailnet") Tailnet, @SerialName("lan") Lan, @SerialName("wan") Wan }
 
-/** iOS `DiagnosticsStreamName`. */
 enum class DiagnosticsStreamName(val rawValue: String) {
     ConnectStart("sse_connect_start"), Connected("sse_connected"), Disconnected("sse_disconnected"), Resumed("sse_resumed"), Stalled("sse_stalled"),
 }
 
-/** Reduces a socket address to enums immediately; never retains the input (iOS `DiagnosticsNetworkAddress`). */
+/** Reduces a socket address to enums immediately; never retains the input. */
 data class DiagnosticsNetworkAddress(val family: DiagnosticsAddressFamily, val scope: DiagnosticsPathScope) {
     companion object {
         fun of(bytes: ByteArray?): DiagnosticsNetworkAddress? {
@@ -162,8 +160,8 @@ data class DiagnosticsNetworkAddress(val family: DiagnosticsAddressFamily, val s
 }
 
 /**
- * iOS `DiagnosticsNetworkPhases`: a missing phase stays unknown; an unfinished TLS handshake wins
- * over unfinished TCP. Monotonic timestamps.
+ * A missing phase stays unknown; an unfinished TLS handshake wins over unfinished TCP. Monotonic
+ * timestamps.
  */
 data class DiagnosticsNetworkPhases(
     var dnsStart: Long? = null, var dnsEnd: Long? = null,
@@ -184,7 +182,7 @@ data class DiagnosticsNetworkPhases(
         }
 }
 
-/** One request's transport timings (iOS `URLSessionTaskMetrics`, from OkHttp's `EventListener`). */
+/** One request's transport timings. */
 data class DiagnosticsNetworkMetrics(
     val wireBytes: Long? = null,
     val protocolName: String? = null,
@@ -202,7 +200,7 @@ data class DiagnosticsNetworkMetrics(
     val address: DiagnosticsNetworkAddress? = null,
 )
 
-/** Counts only observed line content of the event stream (iOS `DiagnosticsStreamProgress`). */
+/** Counts only observed line content of the event stream. */
 data class DiagnosticsStreamProgress(
     val startedAt: Double,
     var connectedAt: Double? = null,
@@ -226,7 +224,7 @@ object InstantSerializer : KSerializer<Instant> {
     override fun deserialize(decoder: Decoder): Instant = Instant.parse(decoder.decodeString())
 }
 
-/** iOS `DiagnosticsEvent`: timing and routing metadata only (never headers, bodies, addresses or message text). */
+/** Timing and routing metadata only (never headers, bodies, addresses or message text). */
 @Serializable
 data class DiagnosticsEvent(
     @Serializable(with = UuidSerializer::class) val id: UUID = UUID.randomUUID(),
@@ -286,16 +284,15 @@ object UuidSerializer : KSerializer<UUID> {
     override fun deserialize(decoder: Decoder): UUID = UUID.fromString(decoder.decodeString())
 }
 
-/** Where the recorder keeps its two switches (iOS `UserDefaults` keys). */
+/** Where the recorder keeps its two switches. */
 interface DiagnosticsSettings {
     fun bool(key: String): Boolean?
     fun set(key: String, value: Boolean)
 }
 
 /**
- * Port of iOS `DiagnosticsRecorder`: a bounded timeline (5,000 events, 15 minutes) of timing and
- * routing metadata only; paths are redacted. A voice excerpt is kept only while Include Transcripts
- * is on.
+ * A bounded timeline (5,000 events, 15 minutes) of timing and routing metadata only; paths are
+ * redacted. A voice excerpt is kept only while Include Transcripts is on.
  */
 class DiagnosticsRecorder(
     enabled: Boolean? = null,
@@ -303,7 +300,7 @@ class DiagnosticsRecorder(
     private val retentionSeconds: Double = DEFAULT_RETENTION_SECONDS,
     private val settings: DiagnosticsSettings? = null,
     defaultEnabled: Boolean = false,
-    /** Persists every recorded event (iOS `journal`): internal builds keep the run before a crash. */
+    /** Persists every recorded event: internal builds keep the run before a crash. */
     private val journal: DiagnosticsJournal? = null,
     private val monotonicNow: () -> Double = { processElapsedSeconds() },
     private val wallNow: () -> Instant = Instant::now,
@@ -342,7 +339,7 @@ class DiagnosticsRecorder(
 
     private val unexpectedEndTaken = java.util.concurrent.atomic.AtomicBoolean(false)
 
-    /** True once per launch when the previous run ended unexpectedly in the foreground (iOS `DiagnosticsClient.takeUnexpectedEnd`). */
+    /** True once per launch when the previous run ended unexpectedly in the foreground. */
     fun takeUnexpectedEnd(): Boolean = previousRun?.endedUnexpectedly == true && !unexpectedEndTaken.getAndSet(true)
 
     /** The previous run's journaled events, oldest first; empty without a journal. */
@@ -605,7 +602,7 @@ class DiagnosticsRecorder(
         const val TOUCH_PROBE_EVENT_NAME = "touch_probe"
         private val timer by lazy { Timer("diagnostics-notify", true) }
 
-        /** The process-wide recorder (iOS `DiagnosticsRecorder.shared`). Internal builds record by default. */
+        /** The process-wide recorder. Internal builds record by default. */
         val shared: DiagnosticsRecorder by lazy {
             val context = runCatching { dependency(AppContext).applicationContext }.getOrNull()
                 ?: return@lazy DiagnosticsRecorder()
@@ -620,7 +617,7 @@ class DiagnosticsRecorder(
         override val liveValue: DiagnosticsRecorder get() = shared
         override val testValue: DiagnosticsRecorder get() = DiagnosticsRecorder(enabled = false)
 
-        /** Seconds since this process started (iOS `processElapsedSeconds`). */
+        /** Seconds since this process started. */
         fun processElapsedSeconds(): Double = max(0.0, (SystemClock.elapsedRealtime() - android.os.Process.getStartElapsedRealtime()) / 1_000.0)
 
         fun withoutExcerpts(events: Collection<DiagnosticsEvent>): List<DiagnosticsEvent> =
@@ -638,7 +635,7 @@ class DiagnosticsRecorder(
         fun exportJSON(events: List<DiagnosticsEvent>): String =
             runCatching { prettyJson.encodeToString(ListSerializer(DiagnosticsEvent.serializer()), events) }.getOrDefault("[]")
 
-        /** iOS `exportText`: one line per event; [wallClock] adds UTC times for lining up with server logs. */
+        /** One line per event; [wallClock] adds UTC times for lining up with server logs. */
         fun exportText(values: List<DiagnosticsEvent>, wallClock: Boolean = false): String {
             val lines = mutableListOf<String>()
             val first = values.firstOrNull()

@@ -5,10 +5,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Port of the list half of iOS `TranscriptCoverPauseTests.swift`: [TranscriptTimelineGate]. Settings'
- * cover test is in `:feature:settings`. `shownOnlyInAWindowWithNoHiddenOrTransparentAncestor`
- * (`ViewVisibilityObserver`, KVO on ancestor layers) has no Compose counterpart, and the drawer
- * stack tests drive UIKit's `SessionDrawerViewController` page stack in a hosted window.
+ * `shownOnlyInAWindowWithNoHiddenOrTransparentAncestor` (`ViewVisibilityObserver`, KVO on ancestor
+ * layers) has no Compose counterpart.
  */
 class TranscriptCoverPauseTests {
     @Test

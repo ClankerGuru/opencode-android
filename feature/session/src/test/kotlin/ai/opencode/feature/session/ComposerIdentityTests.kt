@@ -39,11 +39,10 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /**
- * iOS `ComposerIdentityTests`: pushing and popping a subagent flips the session screen's
- * `isCovered`, and the composer's text field must survive it (a recreated field drops the
- * keyboard and the draft's selection). iOS hosts `SessionView` in a `TestWindowHost` and compares
- * the `ImagePasteTextView`'s `ObjectIdentifier`; Android hosts it in a Robolectric activity and
- * compares the composer `BasicTextField`'s semantics node id, which lives as long as its layout node.
+ * Pushing and popping a subagent flips the session screen's `isCovered`, and the composer's text
+ * field must survive it (a recreated field drops the keyboard and the draft's selection). Android
+ * hosts it in a Robolectric activity and compares the composer `BasicTextField`'s semantics node
+ * id, which lives as long as its layout node.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -58,8 +57,8 @@ class ComposerIdentityTests {
             queuedInputs = listOf(OpenCodePendingInput(id = "msg_q", text = "Queued", delivery = OpenCodeDelivery.Queue)),
         )
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-        // iOS flips `isCovered` on `.refreshRequestsTapped` (no Android action); here the test
-        // sends the toggled state as `PreviewStateReplaced`, and every other action is ignored.
+        // The test sends the toggled state as `PreviewStateReplaced`, and every other action is
+        // ignored.
         val sessionStore = Store(state, Reducer<SessionFeature.State, SessionFeature.Action> { current, action ->
             if (action is SessionFeature.Action.PreviewStateReplaced) {
                 Reduced(action.state)
@@ -168,14 +167,14 @@ class ComposerIdentityTests {
         }
     }
 
-    /** iOS `TestWindowHost.pump()`: lets a few frames run. */
+    /** Lets a few frames run. */
     private fun pump() {
         repeat(4) {
             shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(20))
         }
     }
 
-    /** iOS `findTextView(in:)`: the composer's editable field, found through the semantics tree. */
+    /** The composer's editable field, found through the semantics tree. */
     private fun findTextField(view: ComposeView): SemanticsNode? {
         val root = findRoot(view) ?: return null
         return findEditable(root.semanticsOwner.unmergedRootSemanticsNode)

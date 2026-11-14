@@ -44,18 +44,16 @@ import kotlin.math.min
 import kotlin.math.sin
 
 /**
- * iOS `EnvironmentValues.dotScopeCovered`: Session sets it while the session is covered (a
- * browser page, Catch Up), so every scope underneath stops drawing while keeping its
- * simulation. Covered scopes run no frame loop at all.
+ * Session sets it while the session is covered (a browser page, Catch Up), so every scope
+ * underneath stops drawing while keeping its simulation. Covered scopes run no frame loop at all.
  */
 val LocalDotScopeCovered = staticCompositionLocalOf { false }
 
-/** iOS `DictationLevels.shared.level`: Composer's dictation meter, read once per frame. */
+/** Composer's dictation meter, read once per frame. */
 fun interface DotScopeLevelSource {
     fun level(): Float
 }
 
-/** iOS `DotScopeView.Mode`. */
 sealed interface DotScopeMode {
     /** Both traces render in your warm pearl and follow [level] (Composer's dictation levels). */
     data class Dictation(val leadingInset: Float, val trailingInset: Float, val level: DotScopeLevelSource) : DotScopeMode
@@ -75,12 +73,11 @@ sealed interface DotScopeMode {
  * background it stops drawing.
  *
  * Android: an AGSL [RuntimeShader] ([DotScopeShaders]) drawn by a Compose [Canvas]; a
- * `withFrameNanos` loop advances the plain-object [DotScopeRenderer] (never reducer actions)
- * only while the scope is visible: not [LocalDotScopeCovered], and the
- * lifecycle resumed (iOS `scenePhase == .active`). A paused scope keeps its last frame and
- * resumes with a reset clock, so it never fast-forwards. Under Reduce Motion it draws one still
- * frame whenever its inputs change. After [DotScopeRenderer.QUIET_AFTER] of silence only the
- * slow carrier moves, so it draws every other frame (iOS halves `preferredFramesPerSecond`).
+ * `withFrameNanos` loop advances the plain-object [DotScopeRenderer] (never reducer actions) only
+ * while the scope is visible: not [LocalDotScopeCovered], and the lifecycle resumed. A paused scope
+ * keeps its last frame and resumes with a reset clock, so it never fast-forwards. Under Reduce
+ * Motion it draws one still frame whenever its inputs change. After [DotScopeRenderer.QUIET_AFTER]
+ * of silence only the slow carrier moves, so it draws every other frame.
  */
 @Composable
 fun DotScopeView(
@@ -136,7 +133,7 @@ fun DotScopeView(
     }
 }
 
-/** The pearl palette shared by the dot scopes, `AgentActivityOrb` and Catch Up's drift field (iOS `DotScopeMetalShared`). */
+/** The pearl palette shared by the dot scopes, `AgentActivityOrb` and Catch Up's drift field. */
 object DotScopePalette {
     /** Dark-mode cool pearl base and core shared by the dot scopes and `AgentActivityOrb`. */
     val coolPearlDarkBase = floatArrayOf(0.70f, 0.75f, 0.84f)
@@ -163,10 +160,10 @@ object DotScopePalette {
 }
 
 /**
- * Steps the scope's simulation at a fixed rate and draws the lit grid (iOS `DotScopeRenderer`).
- * A plain object, one per mounted scope. Configuration and publication are main thread only;
- * simulation and half-float packing run on Default. The mutex covers both, so frames never
- * advance the simulation or reuse its buffer concurrently.
+ * Steps the scope's simulation at a fixed rate and draws the lit grid. A plain object, one per
+ * mounted scope. Configuration and publication are main thread only; simulation and half-float
+ * packing run on Default. The mutex covers both, so frames never advance the simulation or reuse
+ * its buffer concurrently.
  */
 class DotScopeRenderer private constructor() {
     private var simulation = DotScopeSimulation()
@@ -287,7 +284,7 @@ class DotScopeRenderer private constructor() {
             simulation.windowInsets = target
         } else {
             val rawElapsed = (nowSeconds - (lastFrame ?: nowSeconds)).coerceIn(0.0, 0.1)
-            // iOS `AnimationTimeScale` is a lab hook; real time here.
+            // Real time here.
             val elapsed = rawElapsed
             lastFrame = nowSeconds
             val eased = insets?.let {
@@ -364,9 +361,9 @@ class DotScopeRenderer private constructor() {
 
     companion object {
         /**
-         * Builds the shader once off the main thread, so the first scope (a held mic's bar)
-         * appears at once. Android compiles AGSL lazily per program; this warms the
-         * process's shader cache like iOS `DotScopeRenderer.prepare()`, at most once a launch.
+         * Builds the shader once off the main thread, so the first scope (a held mic's bar) appears
+         * at once. Android compiles AGSL lazily per program; this warms the process's shader cache,
+         * at most once a launch.
          */
         fun prepare() {
             if (prepared) return

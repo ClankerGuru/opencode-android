@@ -5,8 +5,8 @@ import kotlinx.coroutines.delay
 import kotlin.time.Duration
 
 /**
- * Port of iOS `BackgroundTaskClient`. Android keeps a backgrounded process running until the system
- * freezes it, so the live value is a scoped marker that logs.
+ * Android keeps a backgrounded process running until the system freezes it, so the live value is a
+ * scoped marker that logs.
  */
 fun interface BackgroundTaskClient {
     /** Begins an assertion named [name]; the returned function ends it. */
@@ -23,9 +23,8 @@ fun interface BackgroundTaskClient {
 }
 
 /**
- * Port of iOS `BackgroundTimeClient`: keeps the app's event stream alive for a short while
- * after it leaves the screen (`HomeFeature.liveUpdatesAfterLeaving`). Holds until [seconds]
- * pass or the effect is cancelled.
+ * Keeps the app's event stream alive for a short while after it leaves the screen
+ * (`HomeFeature.liveUpdatesAfterLeaving`). Holds until [seconds] pass or the effect is cancelled.
  */
 fun interface BackgroundTimeClient {
     suspend fun hold(name: String, seconds: Duration)

@@ -50,10 +50,9 @@ import okhttp3.Call
 import okhttp3.Request
 
 /**
- * Audio in Calls (experimental), port of iOS `VoiceCallAudio.swift`: music or a clip an agent
- * plays on the call (`android_voice_play_audio`). It plays on the call's route as voice
- * communication, so the platform's echo canceller hears it as echo to cancel, and it ducks
- * while either side speaks.
+ * Music or a clip an agent plays on the call (`android_voice_play_audio`). It plays on the call's
+ * route as voice communication, so the platform's echo canceller hears it as echo to cancel, and it
+ * ducks while either side speaks.
  */
 object CallAudioTunables {
     val volume = Tunable("call.audio.volume", "Music Volume", default = 0.8, range = 0.1..1.0, step = 0.05)
@@ -96,7 +95,6 @@ sealed interface CallAudioFailure {
         }
 }
 
-/** iOS `Result<CallAudioTrack, CallAudioFailure>`. */
 sealed interface CallAudioResult {
     data class Started(val track: CallAudioTrack) : CallAudioResult
     data class Failed(val failure: CallAudioFailure) : CallAudioResult

@@ -25,7 +25,7 @@ import org.junit.Test
 import java.time.Instant
 import java.util.UUID
 
-/** Port of iOS `ShareHandoffTests.swift`, the `AppFeature` part. */
+/** The `AppFeature` part. */
 class ShareHandoffTests {
     @get:Rule val isolation = TestIsolationRule()
 

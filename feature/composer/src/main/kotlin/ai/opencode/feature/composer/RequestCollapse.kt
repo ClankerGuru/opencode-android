@@ -37,8 +37,8 @@ object RequestCollapseTunables {
 }
 
 /**
- * A docked question dragged down to its bar (0 open, 1 down to the bar), as pure arithmetic
- * for the dock and its tests (iOS `RequestCollapse`).
+ * A docked question dragged down to its bar (0 open, 1 down to the bar), as pure arithmetic for the
+ * dock and its tests.
  */
 object RequestCollapse {
     /** Where a drag that started at [start] and has moved [translation] (down is positive) holds the fold, over [travel]. */
@@ -79,10 +79,10 @@ object RequestCollapse {
 }
 
 /**
- * What the dock's fold tells the session's surface, kept without being observed: while the
- * finger holds the panel, and while it springs to rest after, the panel's height moves frame
- * by frame and the surface follows it frame by frame (no easing of its own), so the two never
- * ride separate curves (iOS `RequestPanelGesture`).
+ * What the dock's fold tells the session's surface, kept without being observed: while the finger
+ * holds the panel, and while it springs to rest after, the panel's height moves frame by frame and
+ * the surface follows it frame by frame (no easing of its own), so the two never ride separate
+ * curves.
  */
 class RequestPanelGesture {
     /** A finger holds the panel. Cleared by [reset] too, should the drag's end never arrive. */
@@ -134,7 +134,7 @@ class RequestPanelGesture {
     }
 }
 
-/** The open panel and its bar cross-fade over the middle of the fold (iOS `RequestCollapseFade`). */
+/** The open panel and its bar cross-fade over the middle of the fold. */
 object RequestCollapseFade {
     fun opacity(progress: Float, isBar: Boolean, window: ClosedFloatingPointRange<Float> = 0.2f..0.8f): Float {
         val clamped = min(max(progress, 0f), 1f)
@@ -145,12 +145,11 @@ object RequestCollapseFade {
 }
 
 /**
- * Lays the open panel out whole and reports a height between it and its [bar]'s ([progress] 0
- * to 1), both top-aligned so the header stays in place as it folds (iOS `RequestCollapseLayout`).
- * The progress is read in layout, so a drag or settle moves no composition. Clipped to its
- * height, and at the sides only at the glass's edges ([RequestDockMetrics.edge]), where × and
- * the scrolling bands reach (iOS `RequestCollapseClip(overhang:)`). The side the fold rests
- * on ([collapsed]) is placed on top, so only it takes touches.
+ * Lays the open panel out whole and reports a height between it and its [bar]'s ([progress] 0 to
+ * 1), both top-aligned so the header stays in place as it folds. The progress is read in layout, so
+ * a drag or settle moves no composition. Clipped to its height, and at the sides only at the
+ * glass's edges ([RequestDockMetrics.edge]), where × and the scrolling bands reach. The side the
+ * fold rests on ([collapsed]) is placed on top, so only it takes touches.
  */
 @Composable
 internal fun RequestCollapseLayout(
@@ -195,10 +194,10 @@ internal fun RequestCollapseLayout(
 }
 
 /**
- * The docked question's fold as it moves (iOS `RequestDockView`'s `collapse` and
- * `collapseDrag`): a vertical drag on the panel follows the finger, and a downward drag in a
- * list already at its top folds it too (nested scroll, as Material's sheets do); let go, it
- * settles on the spring, carrying the finger's speed, folded or open, and tells the reducer.
+ * The docked question's fold as it moves: a vertical drag on the panel follows the finger, and a
+ * downward drag in a list already at its top folds it too (nested scroll, as Material's sheets do);
+ * let go, it settles on the spring, carrying the finger's speed, folded or open, and tells the
+ * reducer.
  */
 internal class RequestFold(initial: Float) {
     val progress = Animatable(initial)

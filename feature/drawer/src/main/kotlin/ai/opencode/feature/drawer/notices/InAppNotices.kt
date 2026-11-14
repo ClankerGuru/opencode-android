@@ -12,14 +12,13 @@ import android.view.accessibility.AccessibilityManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-// Port of iOS `OpenCode/Drawer/InAppNotices.swift`, the rules half: the mode (the
-// notice itself, [InAppNotice], moved down to `:feature:session`, whose `SessionListContext`
-// carries it), the signal Home derives from its live state, and the clients
-// that clear delivered notifications and speak to TalkBack. The drawer button's label (the view)
-// is `DrawerNoticeLabel` in `motion/DrawerButton.kt`, which reads only [InAppNotice] (its [InAppNotice.title],
-// [InAppNotice.status], [InAppNotice.needsInput], [InAppNotice.target]) and sends Home's
-// `inAppNoticeTapped`; Home's wiring (queueing, the timer, the haptic and the announcement) is in
-// `HomeFeatureNotifications.kt`.
+// The rules half: the mode (the notice itself, [InAppNotice], moved down to `:feature:session`,
+// whose `SessionListContext` carries it), the signal Home derives from its live state, and the
+// clients that clear delivered notifications and speak to TalkBack. The drawer button's label (the
+// view) is `DrawerNoticeLabel` in `motion/DrawerButton.kt`, which reads only [InAppNotice] (its
+// [InAppNotice.title], [InAppNotice.status], [InAppNotice.needsInput], [InAppNotice.target]) and
+// sends Home's `inAppNoticeTapped`; Home's wiring (queueing, the timer, the haptic and the
+// announcement) is in `HomeFeatureNotifications.kt`.
 
 /**
  * Whether the mode shows a notice of this kind ([InAppNoticeMode] itself moved down to `:core`,
@@ -32,9 +31,8 @@ fun InAppNoticeMode.shows(kind: InAppNotice.Kind): Boolean = when (this) {
 }
 
 /**
- * The mode as reducers and the notification handler read it (iOS `@Dependency(\.inAppNoticeSettings)`).
- * iOS lab runs could force one with `OPENCODE_LAB_IN_APP_NOTICES`; Android has no launch
- * environment, so the saved choice decides.
+ * The mode as reducers and the notification handler read it. Android has no launch environment, so
+ * the saved choice decides.
  */
 class InAppNoticeSettings(val mode: () -> InAppNoticeMode) {
     companion object Key : DependencyKey<InAppNoticeSettings> {
@@ -104,8 +102,8 @@ data class InAppNoticeSignal(
 }
 
 /**
- * Removes delivered notifications from the notification shade (iOS `DeliveredNotificationsClient`):
- * `:feature:system`'s [SessionPushNotifications.remove], which knows how it posts them.
+ * Removes delivered notifications from the notification shade: `:feature:system`'s
+ * [SessionPushNotifications.remove], which knows how it posts them.
  */
 class DeliveredNotificationsClient(
     /** Every notification for these sessions (their thread identifiers). */
@@ -125,7 +123,7 @@ class DeliveredNotificationsClient(
     }
 }
 
-/** TalkBack announcements that don't move focus (iOS `AccessibilityAnnouncer`). Main thread. */
+/** TalkBack announcements that don't move focus. Main thread. */
 class AccessibilityAnnouncer(val announce: (text: String, urgent: Boolean) -> Unit) {
     companion object Key : DependencyKey<AccessibilityAnnouncer> {
         override val liveValue: AccessibilityAnnouncer by lazy {

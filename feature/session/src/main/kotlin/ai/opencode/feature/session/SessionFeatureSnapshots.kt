@@ -5,10 +5,9 @@ import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.server.model.keepingFirstPrompt
 import ai.opencode.server.model.keepingFirstPrompts
 
-// Port of iOS `SessionFeature+Snapshots.swift`: switch snapshots. `SwitchSnapshot` and `State.Refresh`
-// stay nested in `SessionFeature.kt` (Kotlin nested types can't live in another file).
+// Switch snapshots. `SwitchSnapshot` and `State.Refresh` stay nested in `SessionFeature.kt` (Kotlin
+// nested types can't live in another file).
 
-/** iOS `SwitchSnapshot.init?(_:)`. */
 fun SessionFeature.SwitchSnapshot.Companion.from(state: State): SessionFeature.SwitchSnapshot? {
     val session = state.session ?: return null
     val queued = state.queuedInputs.filter { state.promptStates[it.id]?.admission != State.PromptState.Admission.sent }
@@ -68,7 +67,7 @@ fun SessionFeature.SwitchSnapshot.Companion.from(state: State): SessionFeature.S
  */
 val SessionFeature.SwitchSnapshot.Companion.seenTailLimit: Int get() = 4 * SessionFeature.initialFetchLimit
 
-/** iOS `SwitchSnapshot.seenTail(_:)`: the IDs of the newest [seenTailLimit] rows. */
+/** The IDs of the newest [seenTailLimit] rows. */
 fun SessionFeature.SwitchSnapshot.Companion.seenTail(items: List<OpenCodeTranscriptItem>): Set<String> {
     val start = maxOf(0, items.size - seenTailLimit)
     val ids = HashSet<String>()
@@ -76,7 +75,6 @@ fun SessionFeature.SwitchSnapshot.Companion.seenTail(items: List<OpenCodeTranscr
     return ids
 }
 
-/** iOS `SwitchSnapshot.restore(into:)`. */
 fun SessionFeature.SwitchSnapshot.restore(state: State): State {
     var next = state
     val selected = next.session
@@ -109,7 +107,6 @@ fun SessionFeature.SwitchSnapshot.restore(state: State): State {
     return next
 }
 
-/** iOS `SwitchSnapshot.pruneRequests(removing:)`. */
 fun SessionFeature.SwitchSnapshot.pruneRequests(
     removing: (PendingRequest) -> Boolean = { false },
 ): SessionFeature.SwitchSnapshot {
@@ -127,7 +124,7 @@ fun SessionFeature.SwitchSnapshot.pruneRequests(
     )
 }
 
-/** iOS `SwitchSnapshot.restoreSessionData(into:)`: family navigation keeps the family's discovery and requests. */
+/** Family navigation keeps the family's discovery and requests. */
 fun SessionFeature.SwitchSnapshot.restoreSessionData(state: State): State {
     val promoted = state.promotedPromptIDs.toSet() + SessionFeature.promptIDs(state.items)
     // The outbox is the source of truth for this phone's own sends: laid over the snapshot.

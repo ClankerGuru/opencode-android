@@ -3,14 +3,11 @@ package ai.opencode.feature.transcript.markdown
 import androidx.compose.runtime.Immutable
 
 /**
- * Inline styled text: the Android counterpart of the `AttributedString` iOS gets from
- * `AttributedString(markdown:options: .inlineOnlyPreservingWhitespace)` plus the attributes
- * `OpenCodeMarkdownBlock.uncachedInlineEntry` adds. Pure data (no Compose styles) so it can be
- * parsed off the main thread, cached and compared; renderers map it to an `AnnotatedString`.
+ * Inline styled text. Pure data (no Compose styles) so it can be parsed off the main thread, cached
+ * and compared; renderers map it to an `AnnotatedString`.
  */
 @Immutable
 data class InlineText(val runs: List<InlineRun>) {
-    /** The characters, as iOS `String(attributed.characters)`. */
     val text: String by lazy(LazyThreadSafetyMode.PUBLICATION) { runs.joinToString("") { it.text } }
 
     val isEmpty: Boolean get() = runs.all { it.text.isEmpty() }
@@ -36,13 +33,10 @@ data class InlineText(val runs: List<InlineRun>) {
 }
 
 /**
- * One attribute run. Flags mirror iOS `InlinePresentationIntent` (`emphasized`,
- * `stronglyEmphasized`, `code`, `strikethrough`); [link] is the run's URL string (web,
- * `opencode-file://`, `opencode-session://`); [languageIdentifier] marks lifted math
- * (`MathSyntax.Delimiter.languageIdentifier`, `x-math-…`); [secondary] is iOS's
- * `foregroundColor = .secondary` (inline code that is not a file link, and math source).
- * [sessionChip] is iOS's `SessionChipKey`, set only by `SessionLinkText.present` on the padding
- * and label of a session link drawn as a chip.
+ * One attribute run. [link] is the run's URL string (web, `opencode-file://`,
+ * `opencode-session://`); [languageIdentifier] marks lifted math
+ * (`MathSyntax.Delimiter.languageIdentifier`, `x-math-…`). [sessionChip] is set only by
+ * `SessionLinkText.present` on the padding and label of a session link drawn as a chip.
  */
 @Immutable
 data class InlineRun(
@@ -65,8 +59,8 @@ data class InlineRun(
 }
 
 /**
- * iOS `SessionChip` (`SessionChipKey`'s value): one session link drawn as a chip. [muted] while
- * nothing named it yet (the short ID in code); [isSubagent] picks the subagent glyph.
+ * One session link drawn as a chip. [muted] while nothing named it yet (the short ID in code);
+ * [isSubagent] picks the subagent glyph.
  */
 @Immutable
 data class SessionChip(val id: String, val muted: Boolean, val isSubagent: Boolean)

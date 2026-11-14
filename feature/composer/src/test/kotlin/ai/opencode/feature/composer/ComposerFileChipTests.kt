@@ -18,9 +18,8 @@ import org.robolectric.annotation.Config
 import java.util.UUID
 
 /**
- * iOS `ComposerFileChipTests`: the file chip keeps 76 dp as its least height and grows with the
- * font scale. Android's largest font scale is 2× (iOS AX5 is about 3×), so it wants half iOS's 20
- * pt of growth.
+ * The file chip keeps 76 dp as its least height and grows with the font scale. Android's largest
+ * font scale is 2×.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])

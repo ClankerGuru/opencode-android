@@ -38,9 +38,8 @@ import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 /**
- * The composer's pending photos in the transcript's full-screen viewer (iOS
- * `ComposerPhotoViewer`): the same flight out of the tile and back, paging and zoom, plus each
- * photo's dimensions and size and a Remove action.
+ * The composer's pending photos in the transcript's full-screen viewer: the same flight out of the
+ * tile and back, paging and zoom, plus each photo's dimensions and size and a Remove action.
  *
  * The viewer's Remove (`TranscriptImageViewerFeature.State.allowsRemove`, `removeTapped`, the
  * `removed` delegate, `isDiscarded`) and the flight's accessories (`MediaFlightAccessory`) are
@@ -64,7 +63,7 @@ object ComposerPhotoViewer {
     private const val REMOVE_GLYPH = 13f
     private const val REMOVE_DISC_OPACITY = 0.65f
 
-    /** The tile's ×, drawn the same on the tile and on the viewer's flight (iOS `RemoveBadge`). */
+    /** The tile's ×, drawn the same on the tile and on the viewer's flight. */
     @Composable
     fun RemoveBadge(modifier: Modifier = Modifier) {
         Box(
@@ -76,10 +75,10 @@ object ComposerPhotoViewer {
     }
 
     /**
-     * The tile's × and a video's duration, carried by the viewer's flight at their own size:
-     * they fade out as the photo flies up and back in as it flies home, while the tile itself
-     * stands aside. iOS renders the SwiftUI badges with `ImageRenderer`; here they're drawn
-     * into bitmaps with the same metrics as [RemoveBadge] and `VideoDurationBadge`.
+     * The tile's × and a video's duration, carried by the viewer's flight at their own size: they
+     * fade out as the photo flies up and back in as it flies home, while the tile itself stands
+     * aside. They're drawn into bitmaps with the same metrics as [RemoveBadge] and
+     * `VideoDurationBadge`.
      */
     fun flightAccessories(mediaID: String, attachments: List<OpenCodeOutgoingAttachment>, context: Context): List<MediaFlightAccessory> {
         val id = attachmentID(mediaID) ?: return emptyList()
@@ -120,7 +119,7 @@ object ComposerPhotoViewer {
         return bitmap
     }
 
-    /** `VideoDurationBadge` with its `VIDEO_BADGE_INSET` margin, as iOS renders the whole view. */
+    /** `VideoDurationBadge` with its `VIDEO_BADGE_INSET` margin. */
     private fun renderVideoDurationBadge(context: Context, duration: String, density: Float, fontScale: Float): Bitmap? {
         val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = android.graphics.Color.WHITE
@@ -199,7 +198,7 @@ object ComposerPhotoViewer {
     /** [detail] for a decoded [image]. */
     fun detail(attachment: OpenCodeOutgoingAttachment, image: Bitmap): String = detail(attachment, image.width, image.height)
 
-    /** The attachment's bytes, decoded (iOS `CachedImage.decoded`: a `media:<hash>` reference decodes the blob already in memory). */
+    /** The attachment's bytes, decoded. */
     private fun decode(attachment: OpenCodeOutgoingAttachment): Bitmap? =
         runCatching { CachedImage.decoded(attachment.id, attachment.data, attachment.mediaHash) }.getOrNull()
 
@@ -214,8 +213,8 @@ object ComposerPhotoViewer {
 }
 
 /**
- * The transcript viewer, whose Remove hands the photo back to the composer ([remove], on the
- * main thread) (iOS `ComposerPhotoViewerFeature`).
+ * The transcript viewer, whose Remove hands the photo back to the composer ([remove], on the main
+ * thread).
  */
 class ComposerPhotoViewerFeature(
     private val remove: (String) -> Unit,

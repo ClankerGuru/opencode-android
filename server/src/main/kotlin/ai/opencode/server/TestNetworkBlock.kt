@@ -7,10 +7,9 @@ import java.io.IOException
 import java.net.ConnectException
 
 /**
- * Port of the network half of iOS's test isolation: under tests every request through
- * [OpenCodeTransport.testValue] passes [interceptor]. It answers registered fixture hosts, lets
- * loopback through (and everything inside [withRealNetworkAllowed]), and fails the rest as
- * unreachable, reporting method, scheme and host to [onBlocked].
+ * Under tests every request through [OpenCodeTransport.testValue] passes [interceptor]. It answers
+ * registered fixture hosts, lets loopback through (and everything inside [withRealNetworkAllowed]),
+ * and fails the rest as unreachable, reporting method, scheme and host to [onBlocked].
  */
 object TestNetworkBlock {
     private val lock = Any()

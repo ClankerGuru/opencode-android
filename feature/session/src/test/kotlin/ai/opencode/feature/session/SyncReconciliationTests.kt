@@ -20,15 +20,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `SyncReconciliationTests.swift`.
- *
- * iOS counts writes to the observed `state.items` with `withObservationTracking` and compares
- * array storage; Android state is immutable, so "no write" is the same list instance (`===`).
- *
- * Not ported: `SyncReconciliationBenchmarkTests.reconciliationCPU` (a benchmark gated on
- * `SYNC_BENCH=1` that prints timings and asserts no behaviour).
- */
+/** Android state is immutable, so "no write" is the same list instance (`===`). */
 class SyncReconciliationTests {
     @Test fun unchangedMessageAndNoticeDoNotWriteTranscript() = sessionTest { h ->
         val first = OpenCodeTranscriptItem.AssistantMarkdown(id = "m-text-0", text = "First")
@@ -72,7 +64,6 @@ class SyncReconciliationTests {
         assertEquals(listOf(fresh, b, other), next.items)
     }
 
-    /** iOS `@Test(arguments: [40, 600, 6_000])`. */
     @Test fun historyMergeHasLinearIDWork() {
         for (count in listOf(40, 600, 6_000)) {
             val existing = (0 until count).toList()
@@ -194,7 +185,7 @@ class SyncReconciliationTests {
         )
     }
 
-    /** Counts sleeps on [base] (iOS `CountingClock`). */
+    /** Counts sleeps on [base]. */
     private class CountingClock(private val base: Clock, private val sleeps: LockIsolated<Int>) : Clock {
         override fun now(): Duration = base.now()
         override suspend fun sleep(duration: Duration) {

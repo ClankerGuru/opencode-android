@@ -78,7 +78,6 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/** Port of iOS `MermaidDiagramCard`'s constants and sizing. */
 object MermaidDiagramMetrics {
     val maxHeight: Dp = 360.dp
     val placeholderHeight: Dp = 180.dp
@@ -90,7 +89,7 @@ object MermaidDiagramMetrics {
         return Size((natural.width * scale).roundToInt().toFloat(), (natural.height * scale).roundToInt().toFloat())
     }
 
-    /** Whether a completed diagram render alters the laid-out height from [laidOutSize] (iOS `MermaidDiagramCard.revisesRow`). */
+    /** Whether a completed diagram render alters the laid-out height from [laidOutSize]. */
     fun revisesRow(laidOutSize: Size?, renderedSize: Size): Boolean {
         if (laidOutSize == null) return true
         return abs(laidOutSize.width - renderedSize.width) >= 0.5f || abs(laidOutSize.height - renderedSize.height) >= 0.5f
@@ -99,11 +98,11 @@ object MermaidDiagramMetrics {
 
 /**
  * A finished Mermaid block as a card showing the diagram at its natural aspect, at most
- * [MermaidDiagramMetrics.maxHeight] tall. It holds a steady height while the diagram renders
- * (its final one once Pele has sized the source), marking its row revised before any change,
- * opens full screen (zoomable, sharp) on a tap, and shows its source from the hold menu. A
- * diagram Pele rejects shows as the code it is; one whose render was interrupted is tried once
- * more, then shows the code until it appears again or is tapped. Port of iOS `MermaidDiagramCard`.
+ * [MermaidDiagramMetrics.maxHeight] tall. It holds a steady height while the diagram renders (its
+ * final one once Pele has sized the source), marking its row revised before any change, opens full
+ * screen (zoomable, sharp) on a tap, and shows its source from the hold menu. A diagram Pele
+ * rejects shows as the code it is; one whose render was interrupted is tried once more, then shows
+ * the code until it appears again or is tapped.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -284,7 +283,7 @@ fun MermaidDiagramCard(
     }
 }
 
-/** The diagram as the code it is: a highlighted, horizontally scrolling band (iOS `MarkdownBand`). */
+/** The diagram as the code it is: a highlighted, horizontally scrolling band. */
 @Composable
 private fun MermaidCode(source: String, modifier: Modifier = Modifier) {
     val palette = SyntaxHighlighter.Palette.current
@@ -301,11 +300,11 @@ private fun MermaidCode(source: String, modifier: Modifier = Modifier) {
     }
 }
 
-/** iOS `TranscriptMetrics.codeFont`: subheadline, monospaced. */
+/** Subheadline, monospaced. */
 @Composable
 private fun codeStyle() = OpenCodeTextStyles.subheadline.copy(fontFamily = OpenCodeFonts.monospace)
 
-/** A diagram's Mermaid source, highlighted and selectable (iOS `MermaidSourceView`). */
+/** A diagram's Mermaid source, highlighted and selectable. */
 @Composable
 private fun MermaidSourceView(source: String, viewer: MediaViewerState) {
     val scope = rememberCoroutineScope()

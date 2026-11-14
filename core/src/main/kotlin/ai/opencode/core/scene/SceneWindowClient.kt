@@ -16,8 +16,8 @@ import kotlinx.coroutines.withContext
 import java.lang.ref.WeakReference
 
 /**
- * Port of iOS `SceneWindow`: the window a store runs in. In use while one of the app's activities
- * is resumed with window focus; in front before any activity is seen. [sceneID] is its task's id.
+ * The window a store runs in. In use while one of the app's activities is resumed with window
+ * focus; in front before any activity is seen. [sceneID] is its task's id.
  */
 class SceneWindowClient(
     private val front: () -> Boolean = { true },
@@ -35,12 +35,12 @@ class SceneWindowClient(
             SceneWindowClient(front = { ActiveScene.isFront })
         }
 
-        /** Inert: always in front and no scene, like iOS's untracked `SceneWindow()`. */
+        /** Inert: always in front and no scene. */
         override val testValue: SceneWindowClient get() = SceneWindowClient()
     }
 }
 
-/** The app's windows (iOS `ActiveScene`). Window focus is read when asked, so it is never stale. */
+/** The app's windows. Window focus is read when asked, so it is never stale. */
 object ActiveScene {
     private val lock = Any()
     private val alive = ArrayList<WeakReference<Activity>>()
@@ -58,7 +58,7 @@ object ActiveScene {
         application.registerActivityLifecycleCallbacks(Tracker)
     }
 
-    /** A window's id: its task's (iOS: the scene session's `persistentIdentifier`). */
+    /** A window's id: its task's. */
     fun sceneID(activity: Activity): String = activity.taskId.toString()
 
     /** The id of the window a view's [context] belongs to; null when it isn't an activity's. */
@@ -80,8 +80,8 @@ object ActiveScene {
         }
 
     /**
-     * The window to open from: the one with [sceneID] while it's still alive, else the one in
-     * use (iOS `connectedScene(id:) ?? current`). Null when no window is known.
+     * The window to open from: the one with [sceneID] while it's still alive, else the one in use.
+     * Null when no window is known.
      */
     fun activity(sceneID: String?): Activity? = synchronized(lock) {
         alive.removeAll { it.get() == null }

@@ -87,13 +87,11 @@ import kotlin.math.max
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.distinctUntilChanged
 
-// Port of iOS `Composer/ModelPicker/OnePickerListView.swift`: One Picker's model list. iOS backs
-// it with a UIKit compositional collection view (for frame rate and native swipe actions); here
-// it's a `LazyColumn` of immutable row snapshots (no store in a row), with the same rows,
+// One Picker's model list. A `LazyColumn` of immutable row snapshots (no store in a row): rows,
 // sections, footer, swipe and long-press favorites, level menu, and the pull-down-from-the-top
 // sheet drag reported to the panel through [OnePickerListActions].
 
-/** iOS `OnePickerRowItem`: one row's immutable snapshot. */
+/** One row's immutable snapshot. */
 data class OnePickerRowItem(
     val sectionID: String,
     val idPrefix: String,
@@ -122,18 +120,17 @@ data class OnePickerRowItem(
         }.joinToString(", ")
 }
 
-/** iOS `OnePickerSectionSnapshot`. */
 data class OnePickerSectionSnapshot(val id: String, val title: String, val rows: List<OnePickerRowItem>)
 
-/** iOS `OnePickerScrollEdges`: whether rows overflow above or below the visible list. */
+/** Whether rows overflow above or below the visible list. */
 data class OnePickerScrollEdges(val topOverflow: Boolean = false, val bottomOverflow: Boolean = false)
 
-/** iOS `OnePickerListView.OnePickerFooterSnapshot`: the Show All Models row. */
+/** The Show All Models row. */
 data class OnePickerFooterSnapshot(val hiddenCount: Int, val showsAll: Boolean)
 
 /**
- * iOS `OnePickerListActions`: the list's callbacks, held stable across redraws and refreshed by
- * the panel, so the list always calls the latest ones.
+ * The list's callbacks, held stable across redraws and refreshed by the panel, so the list always
+ * calls the latest ones.
  */
 @Stable
 class OnePickerListActions {
@@ -148,9 +145,8 @@ class OnePickerListActions {
 }
 
 /**
- * iOS `OnePickerListView`. A new [openGeneration] scrolls back to the top and drops a pull in
- * progress; [scrollDisabled] freezes the list (mid-morph). Structural changes (favoriting)
- * animate, except while searching, as iOS's diffable snapshot does.
+ * A new [openGeneration] scrolls back to the top and drops a pull in progress; [scrollDisabled]
+ * freezes the list (mid-morph). Structural changes (favoriting) animate, except while searching.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -182,11 +178,11 @@ fun OnePickerListView(
         userScrollEnabled = !scrollDisabled,
         modifier = modifier
             .pointerInput(listState) {
-                // Whether this drag began with the list at its top (iOS `startedAtTop`).
+                // Whether this drag began with the list at its top.
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                     pull.startedAtTop = !listState.canScrollBackward
-                    // A gesture torn down before its release (iOS `.cancelled`) settles the pull.
+                    // A gesture torn down before its release settles the pull.
                     try {
                         do {
                             val event = awaitPointerEvent(PointerEventPass.Initial)
@@ -226,9 +222,9 @@ fun OnePickerListView(
 }
 
 /**
- * iOS's `scrollViewWillBeginDragging`/`DidScroll`/`WillEndDragging` sheet pull: a drag that
- * began at the top and pulls down moves the sheet instead of the list, reporting its translation
- * (dp) until released (with its velocity) or pushed back up past its anchor (which cancels).
+ * Sheet pull: a drag that began at the top and pulls down moves the sheet instead of the list,
+ * reporting its translation (dp) until released (with its velocity) or pushed back up past its
+ * anchor (which cancels).
  */
 @Stable
 internal class OnePickerPullDown(
@@ -269,7 +265,7 @@ internal class OnePickerPullDown(
             if (source != NestedScrollSource.UserInput) return Offset.Zero
             if (listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 4f * density()) startedAtTop = false
             if (pulling || !startedAtTop || available.y <= 2f) return Offset.Zero
-            // iOS anchors the pull where the list first overscrolls: the sheet starts from 0.
+            // The sheet starts from 0.
             pulling = true
             pullPx = 0f
             actions.onBeginSheetDrag()
@@ -293,7 +289,7 @@ private fun rememberOnePickerPullDown(listState: LazyListState, actions: OnePick
     return pull
 }
 
-/** iOS's section header: footnote semibold on the 22 pt spine, not pinned. */
+/** Footnote semibold on the 22 pt spine, not pinned. */
 @Composable
 private fun OnePickerSectionHeader(title: String, isFirst: Boolean) {
     Text(
@@ -310,7 +306,7 @@ private fun OnePickerSectionHeader(title: String, isFirst: Boolean) {
     )
 }
 
-/** iOS `OnePickerRowCell`: provider mark, name (and provider), favorite badge, level menu. */
+/** Provider mark, name (and provider), favorite badge, level menu. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun OnePickerRowCell(item: OnePickerRowItem, actions: OnePickerListActions, modifier: Modifier = Modifier) {
@@ -328,7 +324,7 @@ private fun OnePickerRowCell(item: OnePickerRowItem, actions: OnePickerListActio
         bounce.animateTo(1f, Motion.press.animation(MotionPhase.Exit, reduceMotion = false))
     }
     val toggleFavorite = { actions.onToggleFavorite(item.model) }
-    // Android divergence: a ripple in the row's rounded inset answers the press (iOS tints it).
+    // A ripple in the row's rounded inset answers the press.
     val highlight = if (item.isCurrent) colors.text.copy(alpha = if (colors.highContrast) 0.16f else if (colors.isDark) 0.10f else 0.07f) else null
     val panelColor = OnePickerSurfaceDefaults.color
 
@@ -428,12 +424,12 @@ private fun OnePickerRowCell(item: OnePickerRowItem, actions: OnePickerListActio
     }
 }
 
-/** iOS's 0.35 s row hold (Android's long press is a little longer by default). */
+/** A 0.35 s row hold (Android's long press is a little longer by default). */
 private fun rowHoldConfiguration(base: ViewConfiguration): ViewConfiguration = object : ViewConfiguration by base {
     override val longPressTimeoutMillis: Long get() = 350L
 }
 
-/** iOS's level button: the level word (a menu of every level, highest first) at the row's end. */
+/** The level word (a menu of every level, highest first) at the row's end. */
 @Composable
 private fun OnePickerLevelButton(item: OnePickerRowItem, onPickLevel: (String?) -> Unit) {
     val colors = OpenCodeTheme.colors
@@ -492,7 +488,7 @@ private fun OnePickerLevelButton(item: OnePickerRowItem, onPickLevel: (String?) 
     }
 }
 
-/** iOS `OnePickerShowAllCell`: a neutral Show All / Show Fewer row with the hidden count. */
+/** A neutral Show All / Show Fewer row with the hidden count. */
 @Composable
 private fun OnePickerShowAllRow(footer: OnePickerFooterSnapshot, onTap: () -> Unit) {
     val title = if (footer.showsAll) stringResource(R.string.composer_model_show_fewer) else stringResource(R.string.composer_model_show_all)

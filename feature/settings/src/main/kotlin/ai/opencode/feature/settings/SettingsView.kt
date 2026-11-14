@@ -87,10 +87,10 @@ private sealed interface SettingsRoute {
 }
 
 /**
- * Port of iOS `SessionSettingsView` (`Settings/SettingsView.swift`): Settings' own stack, the root
- * page (connection card; Appearance, Sessions, Models, Voice, Notifications; What’s New; Server
- * Details; Experimental, Developer and the version line) and the pages it pushes. Back on a pushed page goes back
- * one level; at the root it closes Settings ([SettingsFeature.SettingsDelegate.Close]).
+ * Settings' own stack, the root page (connection card; Appearance, Sessions, Models, Voice,
+ * Notifications; What’s New; Server Details; Experimental, Developer and the version line) and the
+ * pages it pushes. Back on a pushed page goes back one level; at the root it closes Settings
+ * ([SettingsFeature.SettingsDelegate.Close]).
  */
 @Composable
 fun SettingsView(store: SettingsStore, modifier: Modifier = Modifier) {
@@ -101,8 +101,8 @@ fun SettingsView(store: SettingsStore, modifier: Modifier = Modifier) {
         listOf<SettingsRoute>(SettingsRoute.Root) + path.mapIndexed { index, page -> SettingsRoute.Page(index, page) }
     }
     Box(modifier.fillMaxSize()) {
-        // Android divergence: pages move on Material's shared axis (and the back gesture previews
-        // the pop) instead of Navigation 3's default 0.7 s cross-fade or iOS's push.
+        // Pages move on Material's shared axis (and the back gesture previews the pop) instead of
+        // Navigation 3's default 0.7 s cross-fade.
         val reduceMotion = rememberReduceMotion()
         val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
         val slidePx = with(LocalDensity.current) { PageTransitions.SlideDistance.roundToPx() }
@@ -116,7 +116,7 @@ fun SettingsView(store: SettingsStore, modifier: Modifier = Modifier) {
                 when (route) {
                     SettingsRoute.Root -> NavEntry(route) {
                         // Settings asked for while What’s New is the page up switches Settings'
-                        // root (iOS cross-fades, `SettingsPresentation.fade`; Android fades through).
+                        // root.
                         AnimatedContent(root, transitionSpec = { PageTransitions.fadeThrough(reduceMotion) }, label = "settings-root") { shown ->
                             when (shown) {
                                 SettingsFeature.State.Root.settings -> SettingsRootPage(store)
@@ -160,7 +160,7 @@ private fun SettingsPageContent(store: SettingsStore, page: SettingsPage) {
     }
 }
 
-/** The Onboarding playground, full screen over Settings (iOS `.fullScreenCover`). */
+/** The Onboarding playground, full screen over Settings. */
 @Composable
 private fun OnboardingPlaygroundPresentation(store: SettingsStore) {
     val shown by store.observe { it.onboardingPlayground != null }
@@ -183,14 +183,14 @@ private fun OnboardingPlaygroundPresentation(store: SettingsStore) {
 }
 
 /**
- * One Settings page's chrome (iOS `List` + inline `navigationTitle` + Back): a Back control
- * (“Back” closes Settings at the root, pops otherwise) and a list of grouped rows.
+ * One Settings page's chrome: a Back control (“Back” closes Settings at the root, pops otherwise)
+ * and a list of grouped rows.
  *
- * Android divergence: the bar is the desktop title bar ([OpenCodeLargeTopBar]): a start-aligned
- * large title that scrolls up into the bar as the list scrolls, and the page sets text in
- * Material's own type scale ([SettingsText.typography]) rather than iOS's 17 pt body. A page
- * that draws its own title ([titleVisible] false, as What's New's entry page does) keeps the
- * small bar, its title fading in over 0.15 s once the page's title scrolls under it.
+ * The bar is the desktop title bar ([OpenCodeLargeTopBar]): a start-aligned large title that
+ * scrolls up into the bar as the list scrolls, and the page sets text in Material's own type scale
+ * ([SettingsText.typography]). A page that draws its own title ([titleVisible] false, as What's
+ * New's entry page does) keeps the small bar, its title fading in over 0.15 s once the page's title
+ * scrolls under it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -269,7 +269,7 @@ fun SettingsPageScaffold(
     }
 }
 
-/** Settings' root page (iOS `SessionSettingsView.page`). */
+/** Settings' root page. */
 @Composable
 private fun SettingsRootPage(store: SettingsStore) {
     val voiceModeEnabled by remember { shared(SharedKeys.voiceModeEnabled).flow }.collectAsState()

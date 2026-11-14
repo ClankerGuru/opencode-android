@@ -20,11 +20,6 @@ import java.nio.file.Files
 import java.time.Instant
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * The `:app` step of iOS
- * `ComposerPersistenceTests.sessionDeletionServerDeletionAndStalenessCleanUpPersistedState`:
- * deleting a server forgets its drafts and their files.
- */
 class ComposerPersistenceTests {
     @get:Rule val isolation = TestIsolationRule()
 

@@ -8,11 +8,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `ComposerAutocompleteTests.swift`, the `:server` part:
- * `experimentalFlagOffProducesByteIdenticalPromptBodyToMain` ([promptBody] is internal to the
- * live client). The rest is `:feature:composer`'s and `:feature:session`'s.
- */
 class ComposerAutocompleteTests {
     @get:Rule val isolation = TestIsolationRule()
 

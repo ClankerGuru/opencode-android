@@ -14,8 +14,8 @@ import kotlin.time.Duration.Companion.milliseconds
  * started talking would play straight over them. Tool results therefore wait
  * for the floor, and several waiting results become one reply.
  *
- * Immutable (a Swift value type): each iOS `mutating` method returns the updated state,
- * paired with its result where it has one (`first` is the new state).
+ * Immutable: each mutating method returns the updated state, paired with its result where it has
+ * one (`first` is the new state).
  */
 data class VoiceTurnTaking(
     val userSpeaking: Boolean = false,

@@ -99,19 +99,17 @@ object MoveToBackground {
 }
 
 /**
- * Port of iOS `SessionFeature`: one session screen (or a new session's draft): its transcript,
- * composer, run, requests, call and sheets. This file keeps [State], [Action], dependencies and
- * `reduce`; composition is in `SessionFeatureComposition.kt`, each area's reducer in
- * `SessionFeature<Area>.kt` (`reduceX` returning null passes the action on), and pure state changes
- * in `SessionFeatureState*.kt`. Writes to [State.draft] go through [withDraft], which drops
- * [State.nonSendNewlineDraft] on an edit.
+ * One session screen (or a new session's draft): its transcript, composer, run, requests, call and
+ * sheets. This file keeps [State], [Action], dependencies and `reduce`; composition is in
+ * `SessionFeatureComposition.kt`, each area's reducer in `SessionFeature<Area>.kt` (`reduceX`
+ * returning null passes the action on), and pure state changes in `SessionFeatureState*.kt`. Writes
+ * to [State.draft] go through [withDraft], which drops [State.nonSendNewlineDraft] on an edit.
  */
 class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
 
     /**
-     * iOS `SessionFeature.State`. Every stored property keeps its iOS name and default. Build one
-     * with [State.session] or [State.draft] (iOS's two initializers). `@Shared` properties hold a
-     * [Shared] reference (equal by key identity); read them with `.value`.
+     * Build one with [State.session] or [State.draft]. `@Shared` properties hold a [Shared]
+     * reference (equal by key identity); read them with `.value`.
      */
     data class State(
         val server: OpenCodeServer,
@@ -154,7 +152,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val session: OpenCodeSession? = null,
         val draftProject: OpenCodeProject? = null,
         val projects: List<OpenCodeProject> = emptyList(),
-        /** A new computer's first session offers these until composing retires them (iOS `starterPrompts`). */
+        /** A new computer's first session offers these until composing retires them. */
         val starterPrompts: List<String> = emptyList(),
         val items: List<OpenCodeTranscriptItem> = emptyList(),
         val isLoading: Boolean = false,
@@ -194,7 +192,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         /** The optimistic row most recently appended by an explicit send. */
         val lastSentItemID: String? = null,
         val sendGeneration: Int = 0,
-        /** Write through [withDraft] (iOS `didSet`). */
+        /** Write through [withDraft]. */
         val draft: String = "",
         /** The draft produced by `⇧↩` or a single-newline paste (`nonSendNewlineInserted`). */
         val nonSendNewlineDraft: String? = null,
@@ -350,7 +348,6 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         /** Work a steering send has claimed to move before it's posted, by the send's message ID. */
         val autoBackgroundClaims: Map<String, String> = emptyMap(),
     ) {
-        /** iOS `Identifiable.id`. */
         val id: Int get() = navigationID
 
         /** The authoritative read in flight. Its unique ID rejects the response of any read abandoned before it. */
@@ -365,11 +362,11 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
             val modelChanged: Boolean = false,
             /** A revert was staged, redone, or committed while it was on its way. */
             val revertChanged: Boolean = false,
-            /** The session moved folders while this read was in flight (iOS `directoryChanged`). */
+            /** The session moved folders while this read was in flight. */
             val directoryChanged: Boolean = false,
         )
 
-        // region Nested types of iOS `SessionFeature+State.swift`
+        // region Nested types
 
         /** The title's syncing cue while a page read runs. */
         data class ResyncState(
@@ -430,7 +427,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         // endregion
 
         companion object {
-            /** iOS `init(server:session:cachedItems:…)`: an existing session. */
+            /** An existing session. */
             fun session(
                 server: OpenCodeServer,
                 session: OpenCodeSession,
@@ -462,7 +459,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
                 )
             }
 
-            /** iOS `init(server:draftProject:projects:…)`: a new session's draft. */
+            /** A new session's draft. */
             fun draft(
                 server: OpenCodeServer,
                 draftProject: OpenCodeProject?,
@@ -514,8 +511,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
     }
 
     /**
-     * iOS `SessionFeature.Action`. Bindings: see [BindingAction] (`SessionFeatureBindings.kt`).
-     * Convenience constructors for child actions live in the companion.
+     * Bindings: see [BindingAction] (`SessionFeatureBindings.kt`). Convenience constructors for
+     * child actions live in the companion.
      */
     sealed interface Action {
         data class Binding(val action: BindingAction) : Action
@@ -812,7 +809,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         }
     }
 
-    /** iOS `SessionFeature.Action.Delegate`: list-level changes Home owns. */
+    /** List-level changes Home owns. */
     sealed interface Delegate {
         /** [toolID]: a voice open (`android_voice_open_session`) App authorized; Home navigates only for it. */
         data class OpenSession(val session: OpenCodeSession, val toolID: String? = null) : Delegate
@@ -837,7 +834,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         data object ReportProblem : Delegate
     }
 
-    /** iOS `SessionFeature.AuthoritativeRefresh`: one authoritative read's result. */
+    /** One authoritative read's result. */
     data class AuthoritativeRefresh(
         val observed: OpenCodeSession,
         val items: List<OpenCodeTranscriptItem>,
@@ -858,9 +855,9 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
     }
 
     /**
-     * iOS `SessionFeature.SwitchSnapshot` (`+State`): presentation data only. A new visit gets a new
-     * cancellation identity; known work paints immediately while its authoritative reads run
-     * again. Build with `SwitchSnapshot.from(state)`; apply with `restore(state)`.
+     * Presentation data only. A new visit gets a new cancellation identity; known work paints
+     * immediately while its authoritative reads run again. Build with `SwitchSnapshot.from(state)`;
+     * apply with `restore(state)`.
      */
     data class SwitchSnapshot(
         val session: OpenCodeSession,
@@ -901,7 +898,6 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         data class NewSession(val directory: String) : SendTarget
     }
 
-    /** iOS `CancelID`. */
     sealed interface CancelID {
         data object UniversalLink : CancelID
         data object Models : CancelID
@@ -956,8 +952,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         const val tryAgainPrompt = "Continue"
 
         /**
-         * One function per run of cases, tried in this order (iOS `coreSteps`). A step returns null
-         * when it doesn't take the action, and the next one runs.
+         * One function per run of cases, tried in this order. A step returns null when it doesn't
+         * take the action, and the next one runs.
          */
         internal val coreSteps: List<SessionFeature.(State, Action) -> Reduced<State, Action>?> = listOf(
             SessionFeature::reduceCallAndBindings,
@@ -1006,7 +1002,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
 
     // region Body
 
-    /** iOS `builtBody`: content batches and family run changes skip the full body's hooks (the stream fast path). */
+    /** Content batches and family run changes skip the full body's hooks (the stream fast path). */
     private val builtBody: Reducer<State, Action> by lazy { composedBody() }
 
     override fun reduce(state: State, action: Action): Reduced<State, Action> = builtBody.reduce(state, action)

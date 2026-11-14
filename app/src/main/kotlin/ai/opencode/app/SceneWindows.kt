@@ -25,14 +25,11 @@ import android.os.Bundle
 import androidx.lifecycle.ViewModel
 import java.lang.ref.WeakReference
 
-// Port of iOS `App/SceneWindows.swift` and `App/AppFeature+Windows.swift`: Multiple Windows on a
-// tablet, each a task running `MainActivity` (`singleInstancePerTask`) with its own [RootStore]. A
-// phone has one window: every multi-window path checks [SceneWindows.isSupported].
+// Multiple Windows on a tablet, each a task running `MainActivity` (`singleInstancePerTask`) with
+// its own [RootStore]. A phone has one window: every multi-window path checks
+// [SceneWindows.isSupported].
 
-/**
- * iOS `AppFeature.State.init(window:)`: a further window's state, the saved server's Home restored
- * on [target].
- */
+/** A further window's state, the saved server's Home restored on [target]. */
 fun AppFeature.State.Companion.window(target: SessionWindowTarget?): AppFeature.State {
     val state = initial()
     val home = state.home ?: return state
@@ -50,8 +47,8 @@ val AppFeature.State.hasLiveCall: Boolean
     get() = home?.sessionDetail?.voice?.phase?.isTerminal == false
 
 /**
- * iOS `AppFeature.Action.isAppWide`: work that belongs to the app rather than a window, run only by
- * the window [WindowRoster] gives it to.
+ * Work that belongs to the app rather than a window, run only by the window [WindowRoster] gives it
+ * to.
  */
 val AppFeature.Action.isAppWide: Boolean
     get() = this == AppFeature.Action.SystemActionsTask ||
@@ -59,8 +56,8 @@ val AppFeature.Action.isAppWide: Boolean
         (this is AppFeature.Action.Home && action is HomeFeature.Action.SystemPublishRequested)
 
 /**
- * iOS `WindowAppFeature`: the root reducer of every window's store. App-wide work runs only in the
- * owning window, and only one window may have a call.
+ * The root reducer of every window's store. App-wide work runs only in the owning window, and only
+ * one window may have a call.
  */
 class WindowAppFeature(
     private val base: Reducer<AppFeature.State, AppFeature.Action>,
@@ -85,11 +82,11 @@ class WindowAppFeature(
 }
 
 /**
- * The window side of windows (iOS `SceneWindows`). `MainActivity` is `singleInstancePerTask`, so
- * a tablet can open further windows (each a task); [WindowRoster] decides what each one does.
+ * The window side of windows. `MainActivity` is `singleInstancePerTask`, so a tablet can open
+ * further windows (each a task); [WindowRoster] decides what each one does.
  */
 object SceneWindows {
-    /** iOS `UIApplication.supportsMultipleScenes` (iPad): a tablet, as `ThisDevice`. */
+    /** A tablet, as `ThisDevice`. */
     val isSupported: Boolean by lazy { ThisDevice.isTablet }
 
     val roster: WindowRoster by lazy { WindowRoster(multipleWindows = isSupported) }
@@ -101,12 +98,12 @@ object SceneWindows {
     /** The window whose store has the live call; a call starts in one window at a time. */
     private var callOwner: WeakReference<RootStore>? = null
 
-    /** The window last resumed: iOS `ActiveScene.current`, the window in use. */
+    /** The window last resumed. */
     private var active: WeakReference<RootStore>? = null
 
     private val windows: List<RootStore> get() = roster.members.filterIsInstance<RootStore>()
 
-    /** Installs the live [WindowsClient] (iOS `WindowsClient.liveValue`). */
+    /** Installs the live [WindowsClient]. */
     fun install() {
         DependencyValues.installRoot {
             this[WindowsClient] = WindowsClient(isAvailable = { isSupported }, open = ::open)
@@ -143,7 +140,7 @@ object SceneWindows {
     fun window(destination: NotificationDestination, receiving: RootStore): RootStore =
         window(destination, roster, appWideWork, active?.get()) ?: receiving
 
-    /** iOS `store(for:roster:work:active:)`: [window] for a given roster, work and window in use. */
+    /** [window] for a given roster, work and window in use. */
     fun window(destination: NotificationDestination, roster: WindowRoster, work: AppWideWork, active: RootStore?): RootStore? {
         val owner = work.window ?: roster.appWideOwner as? RootStore
         if (!roster.multipleWindows) return owner
@@ -169,14 +166,14 @@ object SceneWindows {
         }
     }
 
-    /** iOS `noteConnecting`: a new window's intent carries the session it should show. */
+    /** A new window's intent carries the session it should show. */
     internal fun noteConnecting(target: SessionWindowTarget) {
         if (isSupported) pendingTargets += target
     }
 
     internal fun takePendingTarget(): SessionWindowTarget? = pendingTargets.removeFirstOrNull()
 
-    /** Opens [target] in a window of its own beside this one (iOS `requestSceneSessionActivation`). */
+    /** Opens [target] in a window of its own beside this one. */
     fun open(target: SessionWindowTarget) {
         if (!isSupported) return
         val context = dependency(AppContext)
@@ -185,7 +182,7 @@ object SceneWindows {
             .onFailure { AppLog.app.error { "Couldn’t open a window: ${it::class.java.simpleName}" } }
     }
 
-    /** iOS `SessionWindowTarget.userActivity`: the intent that opens [target] in a window of its own ([RootStore.target] reads it back). */
+    /** The intent that opens [target] in a window of its own ([RootStore.target] reads it back). */
     internal fun intent(context: Context, target: SessionWindowTarget): Intent =
         Intent(context, MainActivity::class.java)
             .setAction(SessionWindowTarget.ACTION)
@@ -204,8 +201,8 @@ object SceneWindows {
 }
 
 /**
- * One window's part (iOS `WindowStore`), retained across configuration changes: its role
- * ([WindowRoster]) and its store, resolved on the first `onCreate`.
+ * One window's part, retained across configuration changes: its role ([WindowRoster]) and its
+ * store, resolved on the first `onCreate`.
  */
 class RootStore(
     internal val roster: WindowRoster = SceneWindows.roster,
@@ -233,7 +230,7 @@ class RootStore(
     /** A tablet's window follows the session it shows; a phone's one window doesn't. */
     val follows: Boolean get() = roster.multipleWindows
 
-    /** The session shown, as the window's restorable value (iOS `SessionWindowFollow.shown`). */
+    /** The session shown, as the window's restorable value. */
     val shown: SessionWindowTarget?
         get() {
             val home = store.state.home ?: return null
@@ -250,8 +247,8 @@ class RootStore(
     }
 
     /**
-     * iOS `resolve(target:primary:)`: the first time, joins [roster] and makes the window's store,
-     * [primary] for the primary role, else [makeStore]; then the window is attached.
+     * The first time, joins [roster] and makes the window's store, [primary] for the primary role,
+     * else [makeStore]; then the window is attached.
      */
     fun resolve(
         target: SessionWindowTarget?,
@@ -272,8 +269,8 @@ class RootStore(
     }
 
     /**
-     * On a tablet, haptics and announcements play only in the window in use (iOS's per-window
-     * `SceneWindow`); a phone's one window keeps the app's tracker.
+     * On a tablet, haptics and announcements play only in the window in use; a phone's one window
+     * keeps the app's tracker.
      */
     internal fun windowDependencies(): DependencyValues {
         if (!SceneWindows.isSupported) return DependencyValues.root
@@ -281,7 +278,7 @@ class RootStore(
             SceneWindowClient,
             SceneWindowClient(
                 front = { activity.get()?.let { !it.isFinishing && it.hasWindowFocus() } ?: false },
-                // The window's own id, so the browser's links open beside it (iOS `SceneWindow.sceneID`).
+                // The window's own id, so the browser's links open beside it.
                 scene = { activity.get()?.let(ActiveScene::sceneID) },
             ),
         )
@@ -311,7 +308,7 @@ class RootStore(
     }
 
     companion object {
-        /** iOS `WindowStore.secondaryStore`: a further window's own store. */
+        /** A further window's own store. */
         fun secondaryStore(target: SessionWindowTarget?, window: RootStore): Store<AppFeature.State, AppFeature.Action> =
             Store(AppFeature.State.window(target), WindowAppFeature(AppFeature(), window), dependencies = window.windowDependencies())
 
@@ -327,15 +324,15 @@ class RootStore(
 }
 
 /**
- * iOS `AppWideWork`: runs the app-wide tasks in the owning window's store. It moves inside every
- * roster change; with no owner it stays where it is.
+ * Runs the app-wide tasks in the owning window's store. It moves inside every roster change; with
+ * no owner it stays where it is.
  */
 class AppWideWork(private val roster: WindowRoster) {
     /** The window whose store listens to the inbox. */
     var window: RootStore? = null
         private set
 
-    /** iOS `store`: the store listening to the inbox. */
+    /** The store listening to the inbox. */
     val store: Store<AppFeature.State, AppFeature.Action>? get() = window?.takeUnless { it.isClosed }?.store
 
     init {

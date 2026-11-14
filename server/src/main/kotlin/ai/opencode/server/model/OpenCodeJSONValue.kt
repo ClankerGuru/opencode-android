@@ -20,7 +20,7 @@ import java.text.BreakIterator
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
 
-/** Port of iOS `OpenCodeJSONValue`: any JSON value, decoded leniently. */
+/** Any JSON value, decoded leniently. */
 @Serializable(with = OpenCodeJSONValueSerializer::class)
 sealed interface OpenCodeJSONValue {
     data object Null : OpenCodeJSONValue
@@ -142,14 +142,13 @@ private fun jsonString(text: String): String = buildString {
 }
 
 /**
- * Swift's `Double.formatted()`: `Locale.current` (English in the user's region, see
- * [appFormattingLocale]), grouped, and ICU's default of at most six fraction digits, rounded half
- * to even (`0.26575467567788` → "0.265755").
+ * English in the user's region (see [appFormattingLocale]), grouped, and at most six fraction
+ * digits, rounded half to even (`0.26575467567788` → "0.265755").
  */
 internal fun formatGroupedNumber(value: Double): String =
     DecimalFormat("#,##0.######", DecimalFormatSymbols(appFormattingLocale())).format(value)
 
-/** Swift's `Double.formatted(.number.grouping(.never))`: as [formatGroupedNumber], ungrouped. */
+/** As [formatGroupedNumber], ungrouped. */
 internal fun formatPlainNumber(value: Double): String =
     DecimalFormat("0.######", DecimalFormatSymbols(appFormattingLocale())).format(value)
 
@@ -169,18 +168,17 @@ internal fun utf8Length(text: String): Int {
     return count
 }
 
-/** iOS `String.nonEmpty`. */
 val String.nonEmpty: String? get() = ifEmpty { null }
 
-/** iOS `String.firstLine`: up to the first line break, else the whole string. */
+/** Up to the first line break, else the whole string. */
 val String.firstLine: String
     get() {
-        // Swift's `Character.isNewline`: LF, VT, FF, CR, NEL, LS, PS.
+        // LF, VT, FF, CR, NEL, LS, PS.
         val parts = split('\n', '\u000B', '\u000C', '\r', '\u2028', '\u2029', '\u0085').filter { it.isNotEmpty() }
         return parts.firstOrNull() ?: this
     }
 
-/** iOS `String.bounded(to:)`: at most [limit] characters (grapheme clusters, as Swift counts), then a truncation marker. */
+/** At most [limit] characters, then a truncation marker. */
 fun String.bounded(limit: Int): String {
     // UTF-8 length is never below the character count: a cheap first check.
     if (utf8Length(this) <= limit) return this
@@ -189,8 +187,7 @@ fun String.bounded(limit: Int): String {
 }
 
 /**
- * Where the first [limit] characters (Swift `Character`s: extended grapheme clusters) end,
- * or null when the text has no more than [limit] of them.
+ * Where the first [limit] characters end, or null when the text has no more than [limit] of them.
  */
 internal fun String.characterPrefixEnd(limit: Int): Int? {
     if (limit < 0 || codePointCount(0, length) <= limit) return null
@@ -201,5 +198,4 @@ internal fun String.characterPrefixEnd(limit: Int): Int? {
     return if (end == BreakIterator.DONE || end >= length) null else end
 }
 
-/** Swift's `trimmingCharacters(in: .whitespacesAndNewlines)`. */
 internal fun String.trimmedWhitespace(): String = trim { it.isWhitespace() || Character.isSpaceChar(it) }

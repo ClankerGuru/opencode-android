@@ -28,10 +28,7 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import java.util.UUID
 
-/**
- * How one delivery ended (iOS `SessionFeature.DeliveryOutcome`). Lives here because [PromptOutbox]
- * reports it.
- */
+/** How one delivery ended. Lives here because [PromptOutbox] reports it. */
 sealed interface DeliveryOutcome {
     /** [appliedModel] / [appliedAgent]: the model and agent this delivery applied before its prompt. */
     data class Sent(
@@ -58,12 +55,12 @@ sealed interface DeliveryOutcome {
 }
 
 /**
- * Sends from this phone waiting for the server, in the order they were made (iOS `PromptOutbox`).
- * Each session (or draft) is one lane that delivers one message at a time, so the server admits
- * them in order. It lives for the app's lifetime in its own scope, so leaving a session or the app
- * doesn't stop a lane. A send that fails for good, or that Stop holds back, holds the sends behind
- * it until it's retried or deleted. The retry loop itself is the session's delivery job; this class
- * only orders, holds and reports.
+ * Sends from this phone waiting for the server, in the order they were made. Each session (or
+ * draft) is one lane that delivers one message at a time, so the server admits them in order. It
+ * lives for the app's lifetime in its own scope, so leaving a session or the app doesn't stop a
+ * lane. A send that fails for good, or that Stop holds back, holds the sends behind it until it's
+ * retried or deleted. The retry loop itself is the session's delivery job; this class only orders,
+ * holds and reports.
  */
 class PromptOutbox(
     /**
@@ -440,7 +437,7 @@ class PromptOutbox(
             storage.delivered += messageID
             if (storage.delivered.size > 64) repeat(storage.delivered.size - 64) { storage.delivered.removeAt(0) }
             for (lane in storage.lanes.values) {
-                // iOS updates the lane's first match only.
+                // Updates the lane's first match only.
                 val index = lane.admitted.indexOfFirst { it.pending.messageID == messageID }
                 if (index < 0) continue
                 lane.admitted = lane.admitted.toMutableList().also {

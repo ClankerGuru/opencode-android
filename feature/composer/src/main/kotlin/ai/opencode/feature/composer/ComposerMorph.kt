@@ -32,9 +32,8 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Port of iOS `ComposerMorphTunables` (`composer.morph.*`): the composer, or a control in it,
- * morphing into a panel fitted to the keyboard's region. Baked defaults: lengths in dp, times in
- * seconds.
+ * The composer, or a control in it, morphing into a panel fitted to the keyboard's region. Baked
+ * defaults: lengths in dp, times in seconds.
  */
 object ComposerMorphTunables {
     /** Where a sheet folding into the composer gives its glass up (progress 1 → 0): on the tap it vanished and left the photos as a ghost. */
@@ -56,10 +55,10 @@ object ComposerMorphTunables {
      */
     const val photoContentLead = 0.4
     const val exitBlur = 10.0
-    /** iOS's backdrop blur (dp). Not drawn on Android, which dims with a scrim only (see [noBlurDimBoost]). */
+    /** Not drawn on Android, which dims with a scrim only (see [noBlurDimBoost]). */
     const val backdropBlur = 18.0
     /**
-     * iOS Reduce Transparency's dim boost, used when there is no backdrop blur. Android never blurs
+     * Reduce Transparency's dim boost, used when there is no backdrop blur. Android never blurs
      * what's behind a sheet (Material scrims only), so its dim is always boosted.
      */
     const val noBlurDimBoost = 1.6
@@ -85,17 +84,15 @@ object ComposerMorphTunables {
     const val composerSink = 28.0
 
     /**
-     * The curve the morph's bottom edge rides when a keyboard leaves or returns beneath it (iOS
-     * `DockedKeyboard.animation`). While the IME animates, the rest reads `WindowInsets.ime` frame
-     * by frame instead.
+     * The curve the morph's bottom edge rides when a keyboard leaves or returns beneath it. While
+     * the IME animates, the rest reads `WindowInsets.ime` frame by frame instead.
      */
     fun keyboard(): FiniteAnimationSpec<Float> = Motion.keyboard.animation()
 }
 
 /**
- * Port of iOS `ComposerMorph`: whether a morph is open and how far it has grown. A plain object, so
- * only the surface redraws as a finger drags it. Opening and closing in any order only retarget its
- * springs.
+ * Whether a morph is open and how far it has grown. A plain object, so only the surface redraws as
+ * a finger drags it. Opening and closing in any order only retarget its springs.
  */
 @Stable
 class ComposerMorph(private val scope: CoroutineScope) {
@@ -106,7 +103,7 @@ class ComposerMorph(private val scope: CoroutineScope) {
         private set
     /** The glass's travel from its source (0) to its rest (1). */
     val progress = Animatable(0f)
-    /** The bottom edge's travel (iOS `bottomOpen`). */
+    /** The bottom edge's travel. */
     val bottomProgress = Animatable(0f)
     /** How much of its content shows (0–1), on its own clock. */
     val content = Animatable(0f)
@@ -280,8 +277,8 @@ class ComposerMorph(private val scope: CoroutineScope) {
     }
 
     /**
-     * Animates [drag] (a release springing back, or a fold), starting at [initialVelocity]
-     * (dp/s) so a settle continues the finger (iOS `interpolatingSpring(initialVelocity:)`).
+     * Animates [drag] (a release springing back, or a fold), starting at [initialVelocity] (dp/s)
+     * so a settle continues the finger.
      */
     fun animateDrag(to: Float, animation: FiniteAnimationSpec<Float>?, initialVelocity: Float = 0f) {
         dragTask?.cancel()
@@ -329,10 +326,7 @@ fun rememberComposerMorph(): ComposerMorph {
     return remember { ComposerMorph(scope) }
 }
 
-/**
- * Port of iOS `ComposerMorphGeometry`: where a morph rests, as frames in one coordinate space
- * (root px). Radii in px.
- */
+/** Where a morph rests, as frames in one coordinate space (root px). Radii in px. */
 data class ComposerMorphGeometry(
     /** Where it grows from and folds back into: kept live, so a close retargets if the source moves. */
     val source: Rect,
@@ -442,7 +436,7 @@ data class ComposerMorphGeometry(
             return Rect(rect.left, rect.bottom - height, rect.right, rect.bottom) to 0f
         }
 
-        /** Glass opacity for a morphing sheet (see iOS `glassFade`). */
+        /** Glass opacity for a morphing sheet. */
         fun glassFade(
             progress: Float,
             menuProgress: Float = 0f,

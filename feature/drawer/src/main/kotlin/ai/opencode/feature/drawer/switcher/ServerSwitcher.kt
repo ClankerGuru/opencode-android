@@ -7,10 +7,10 @@ import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.friendlyName
 import java.text.Collator
 
-// Port of iOS `OpenCode/Drawer/ServerSwitcher.swift`: the rules the drawer's title
-// (`switcher/ServerFlowTitle.kt`) reads everything it shows from, [DrawerTitle.Presentation] and
-// the texts below. `OpenCodeServer.friendlyName` was moved down to `:server`
-// (`OpenCodeServerFriendlyName.kt`): the title shows a server only by it, never by an address.
+// The rules the drawer's title (`switcher/ServerFlowTitle.kt`) reads everything it shows from,
+// [DrawerTitle.Presentation] and the texts below. `OpenCodeServer.friendlyName` was moved down to
+// `:server` (`OpenCodeServerFriendlyName.kt`): the title shows a server only by it, never by an
+// address.
 
 /**
  * Saved servers, most recent first, with the one in use even if it was never saved, and its live
@@ -24,14 +24,13 @@ fun switchableServers(current: OpenCodeServer, saved: List<OpenCodeServer>): Lis
 }
 
 /**
- * The menu's servers: [switchableServers] in a steady order, so the menu never moves as servers
- * are used (iOS sorts by `friendlyName.localizedStandardCompare`: case-insensitive, numbers by
- * value).
+ * The menu's servers: [switchableServers] in a steady order, so the menu never moves as servers are
+ * used.
  */
 fun drawerTitleServers(current: OpenCodeServer, saved: List<OpenCodeServer>): List<OpenCodeServer> =
     switchableServers(current, saved).sortedWith { a, b -> localizedStandardCompare(a.friendlyName, b.friendlyName) }
 
-/** Finder-like ordering (iOS `localizedStandardCompare`): runs of digits compare by value, text by the locale's collator. */
+/** Finder-like ordering: runs of digits compare by value, text by the locale's collator. */
 internal fun localizedStandardCompare(a: String, b: String): Int {
     val collator = Collator.getInstance().apply { strength = Collator.SECONDARY }
     val left = chunks(a)
@@ -68,10 +67,8 @@ private fun chunks(text: String): List<String> {
  * address. No status shows while all is well; a confirmed outage dims it.
  */
 object DrawerTitle {
-    /** iOS `.animation(.easeInOut(duration: 0.25), value: presentation)`. */
     const val CROSS_FADE_MILLIS = 250
 
-    /** The test tag / iOS accessibility identifier. */
     const val TAG = "drawer-title"
 
     /** What the title shows for a server count and connection status. */
@@ -123,7 +120,7 @@ object DrawerTitle {
                 )
             }
 
-            /** iOS `DrawerTitle.presentation`, from the view's inputs. */
+            /** From the view's inputs. */
             fun of(
                 servers: List<OpenCodeServer>,
                 status: HomeConnectionFeature.State.ConnectionStatus,

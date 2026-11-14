@@ -49,9 +49,9 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /**
- * Port of iOS `SessionFeatureTests+AgentSelection.swift`: Agent Selection (experimental). Each
- * test's shared keys live in its own in-memory store. `Shared` values aren't compared by the store,
- * so their asserts are checked on the shared value after the step.
+ * Agent Selection (experimental). Each test's shared keys live in its own in-memory store. `Shared`
+ * values aren't compared by the store, so their asserts are checked on the shared value after the
+ * step.
  */
 class SessionFeatureTestsAgentSelection {
     private val agents = listOf(

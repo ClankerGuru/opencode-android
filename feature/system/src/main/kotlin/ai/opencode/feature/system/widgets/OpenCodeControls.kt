@@ -64,16 +64,14 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 
 /**
- * Port of `OpenCodeWidgets/OpenCodeControls.swift` and `OpenCodeWidgetsBundle.swift`: iOS's
- * Control Center, Lock Screen and Action button controls become Quick Settings tiles and
- * home-screen widgets. Each opens the app through [SystemActionActivity], which runs the
- * control's intent (`ControlIntents`). Start Call and Open Session are set up for a session,
- * Last Viewed Session by default (a widget's Choose Session; a tile always means Last Viewed
- * Session, since tiles take no configuration). The Live Activities half of the bundle is
+ * IOS's Control Center, Lock Screen and Action button controls become Quick Settings tiles and
+ * home-screen widgets. Each opens the app through [SystemActionActivity], which runs the control's
+ * intent (`ControlIntents`). Start Call and Open Session are set up for a session, Last Viewed
+ * Session by default (a widget's Choose Session; a tile always means Last Viewed Session, since
+ * tiles take no configuration). The Live Activities half of the bundle is
  * `liveactivity/LiveUpdateNotifications.kt`.
  */
 object OpenCodeControls {
-    /** iOS `ControlCenter.reloadControls(ofKind:)` for the controls that name a session. */
     suspend fun reloadSessionControls(context: Context) {
         runCatching {
             StartCallWidget().updateAll(context)
@@ -84,7 +82,7 @@ object OpenCodeControls {
         }
     }
 
-    /** The controls' copy of the directory (iOS `SessionDirectory.forQueries()` in the extension). */
+    /** The controls' copy of the directory. */
     fun directory(context: Context): SessionDirectory =
         ControlDirectoryStore.file(context.filesDir).load() ?: SessionDirectory.loadOrEmpty(SessionDirectory.file(context.filesDir)).forControls
 
@@ -97,7 +95,7 @@ object OpenCodeControls {
             .setData(Uri.parse("opencode-control://$kind/${target ?: ""}"))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-    // MARK: Widget configuration (iOS SessionControlConfiguration)
+    // MARK: Widget configuration
 
     internal val targetKey = stringPreferencesKey("session-target")
     internal val titleKey = stringPreferencesKey("session-title")
@@ -166,7 +164,7 @@ class NewSessionTileService : OpenCodeTileService() {
 
 // MARK: Home-screen widgets
 
-/** Shared widget behaviour: one button, labelled like iOS's control. */
+/** Shared widget behaviour: one button, labelled. */
 abstract class OpenCodeControlWidget : GlanceAppWidget() {
     override val stateDefinition: GlanceStateDefinition<*> = PreferencesGlanceStateDefinition
 
@@ -197,7 +195,7 @@ abstract class OpenCodeControlWidget : GlanceAppWidget() {
         listOfNotNull(title(value), detail(value)).joinToString(", ")
 }
 
-/** iOS `StartCallControl`: Label("Start Call", waveform) over the choice's name. */
+/** Label("Start Call", waveform) over the choice's name. */
 class StartCallWidget : OpenCodeControlWidget() {
     override val kind = OpenCodeControlKind.START_CALL
     override fun symbol(value: SessionControlValue) = SFSymbol.Waveform
@@ -205,7 +203,7 @@ class StartCallWidget : OpenCodeControlWidget() {
     override fun detail(value: SessionControlValue): String = value.title
 }
 
-/** iOS `OpenSessionControl`: the choice's name (square.and.pencil for New Session) over its project. */
+/** The choice's name (square.and.pencil for New Session) over its project. */
 class OpenSessionWidget : OpenCodeControlWidget() {
     override val kind = OpenCodeControlKind.OPEN_SESSION
     override fun symbol(value: SessionControlValue) = if (value.isNewSession) SFSymbol.SquareAndPencil else SFSymbol.BubbleLeft
@@ -213,7 +211,6 @@ class OpenSessionWidget : OpenCodeControlWidget() {
     override fun detail(value: SessionControlValue) = value.detail
 }
 
-/** iOS `NewSessionControl`. */
 class NewSessionWidget : OpenCodeControlWidget() {
     override val kind = OpenCodeControlKind.NEW_SESSION
     override fun symbol(value: SessionControlValue) = SFSymbol.SquareAndPencil
@@ -252,7 +249,7 @@ private fun ControlButton(symbol: SFSymbol, title: String, detail: String?, desc
     Row(
         modifier = GlanceModifier.fillMaxSize()
             .background(GlanceTheme.colors.secondaryContainer)
-            // The desktop dock's 12 dp corners (iOS's control is a 28 pt capsule).
+            // The desktop dock's 12 dp corners.
             .cornerRadius(12.dp)
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .clickable(actionStartActivity(intent))

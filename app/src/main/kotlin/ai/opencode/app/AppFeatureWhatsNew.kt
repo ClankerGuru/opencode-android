@@ -5,10 +5,7 @@ import ai.opencode.core.store.Reducer
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
 
-/*
- * Port of iOS `WhatsNewAcrossHomes` (`Settings/WhatsNew/WhatsNewFeature.swift`), applied in
- * `AppFeature.body` as `.keepingWhatsNewAcrossHomes()`.
- */
+/* Applied in `AppFeature.body` as `.keepingWhatsNewAcrossHomes()`. */
 
 /**
  * What’s New stays as it was, or what was read is marked seen, as one Home replaces another. On

@@ -43,11 +43,10 @@ import kotlin.coroutines.coroutineContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-/** iOS `OpenCodeServer.fileReadRequest(_ target:)`. */
 fun OpenCodeServer.fileReadRequest(target: AgentFileReference.Target): Request? =
     fileReadRequest(location = target.location, relativePath = target.relativePath)
 
-/** Why a file the agent named couldn't open (iOS `AgentFileError`). */
+/** Why a file the agent named couldn't open. */
 sealed class AgentFileError : Exception() {
     data object Unreadable : AgentFileError()
     data object NotFound : AgentFileError()
@@ -79,8 +78,8 @@ sealed class AgentFileError : Exception() {
         }
 
         /**
-         * A transport failure in words the viewer shows (iOS shows `localizedDescription`).
-         * Never the address: Android exception messages carry hosts and paths.
+         * A transport failure in words the viewer shows. Never the address: Android exception
+         * messages carry hosts and paths.
          */
         fun network(error: Throwable): AgentFileError = Network(
             when (error) {
@@ -93,7 +92,7 @@ sealed class AgentFileError : Exception() {
     }
 }
 
-/** What the server says about a file before the phone commits to it (iOS `AgentFileProbe`). */
+/** What the server says about a file before the phone commits to it. */
 data class AgentFileProbe(
     val size: Long?,
     val mime: String?,
@@ -115,7 +114,7 @@ data class AgentFileProbe(
                 response.code == 416 -> contentRange?.let(::totalLength) ?: 0L
                 else -> response.body.contentLength().takeIf { it >= 0 } ?: response.header("Content-Length")?.trim()?.toLongOrNull()
             }
-            // iOS `mimeType`: the media type without parameters.
+            // The media type without parameters.
             val mime = response.header("Content-Type")?.substringBefore(';')?.trim()?.lowercase()?.ifEmpty { null }
             return AgentFileProbe(size, mime, supportsRanges, response.header("ETag"), response.header("Last-Modified"))
         }
@@ -130,8 +129,8 @@ data class AgentFileProbe(
 }
 
 /**
- * Downloads into the cache with progress, revalidating with the server's validators when it
- * sends them (iOS `AgentFileLoader`). One read per call; the viewer owns trying again.
+ * Downloads into the cache with progress, revalidating with the server's validators when it sends
+ * them. One read per call; the viewer owns trying again.
  */
 object AgentFileLoader {
     /** Above this, a file that can't stream asks before downloading. */
@@ -155,8 +154,8 @@ object AgentFileLoader {
     }
 
     /**
-     * The transport's pool with iOS `URLSession`'s 60 s idle interval. Sent once, like iOS's
-     * reads under `NetworkRetry.$policy.withValue(.once)`: the viewer's Try Again is the retry.
+     * The transport's pool with a 60 s idle interval. Sent once: the viewer's Try Again is the
+     * retry.
      */
     internal fun client(transport: OpenCodeTransport = dependency(OpenCodeTransport)): OkHttpClient =
         transport.request.newBuilder()
@@ -338,9 +337,9 @@ internal suspend fun Call.await(): Response = suspendCancellableCoroutine { cont
 }
 
 /**
- * Streams a file to ExoPlayer through authenticated range requests (iOS `StreamingFileLoader`,
- * an `AVAssetResourceLoaderDelegate`). Each byte range ExoPlayer asks for is one request with
- * the server's credentials; only 206 answers stream, anything else fails the load.
+ * Streams a file to ExoPlayer through authenticated range requests. Each byte range ExoPlayer asks
+ * for is one request with the server's credentials; only 206 answers stream, anything else fails
+ * the load.
  */
 @OptIn(UnstableApi::class)
 class StreamingFileLoader(

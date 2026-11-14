@@ -51,11 +51,9 @@ import java.time.Instant
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * The `HomeFeature` tests of iOS `TranscriptBenchmarkTests.swift` (the `ProjectionCache` pair is
- * `:feature:session`'s; the env-gated benchmarks aren't ported). Compose has no observation probe,
- * so step 4 of `backgroundStreamingIsolationAndScrollFastPathRegression` checks the chrome values
- * don't change on a streaming delta. Not ported:
- * `appFeatureStoreBuildsReducerBodiesOncePerInstance` (Kotlin reducers have no `body` cache).
+ * Compose has no observation probe, so step 4 of
+ * `backgroundStreamingIsolationAndScrollFastPathRegression` checks the chrome values don't change
+ * on a streaming delta.
  */
 class TranscriptBenchmarkTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -188,7 +186,7 @@ class TranscriptBenchmarkTests {
         settle()
         assertEquals(0, attentionCalls.value)
 
-        // 4. The chrome doesn't change on a streaming delta (iOS: registers no observation on `items`).
+        // 4. The chrome doesn't change on a streaming delta.
         fun chrome(d: SessionFeature.State) = listOf(d.errorMessage, d.isTranscriptLoading, d.hasBackgroundWork, d.backgroundShells, d.canChooseProject)
         val chromeBefore = chrome(store.state.sessionDetail!!)
         store.send(

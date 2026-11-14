@@ -16,8 +16,8 @@ import kotlin.math.abs
 import kotlin.math.min
 
 /**
- * iOS `OnePickerMotion`: the per-frame pose, observed only by the leaves that draw it. Set only
- * when it changes ([OnePickerSimulation.FramePose] is a data class, so snapshot state compares it).
+ * The per-frame pose, observed only by the leaves that draw it. Set only when it changes
+ * ([OnePickerSimulation.FramePose] is a data class, so snapshot state compares it).
  */
 @Stable
 class OnePickerMotion(pose: OnePickerSimulation.FramePose) {
@@ -26,14 +26,13 @@ class OnePickerMotion(pose: OnePickerSimulation.FramePose) {
 }
 
 /**
- * Port of iOS `OnePickerController`: drives [OnePickerSimulation] one frame at a time and owns what
- * One Picker remembers across open and close. [OnePickerFrameDriver] steps [stepFrame] on Compose's
- * frame clock until it answers [FrameAction.Stop]; the surface reports the IME's target frame
- * through [handleKeyboardFrameChange].
+ * Drives [OnePickerSimulation] one frame at a time and owns what One Picker remembers across open
+ * and close. [OnePickerFrameDriver] steps [stepFrame] on Compose's frame clock until it answers
+ * [FrameAction.Stop]; the surface reports the IME's target frame through
+ * [handleKeyboardFrameChange].
  */
 @Stable
 class OnePickerController {
-    /** iOS `MotionDisplayLink.Action`. */
     enum class FrameAction { Continue, Stop }
 
     /** Stepped every frame, so unobserved: views read the coarse mirrors below, set only when they change. */
@@ -86,17 +85,17 @@ class OnePickerController {
     var handedKeyboardToComposer: Boolean = false
     var onDidSettleClosed: (() -> Unit)? = null
 
-    /** The composer's live frame in the picker's space (iOS: its presentation layer, or `composerRectSource` unhosted). */
+    /** The composer's live frame in the picker's space. */
     var composerRectSource: (() -> Rect?)? = null
 
-    /** The docked keyboard's frame in the window (iOS `DockedKeyboard.frameInScreen`). */
+    /** The docked keyboard's frame in the window. */
     var keyboardFrameSource: (() -> Rect?)? = null
 
-    /** The window's offset in the picker's space and its height (iOS `noteWindowSpace`). */
+    /** The window's offset in the picker's space and its height. */
     var windowFrameInSpace: Rect = Rect.Zero
     var windowHeight: Double? = null
 
-    /** iOS `displayLink` running: [OnePickerFrameDriver] steps frames while this is set. */
+    /** [OnePickerFrameDriver] steps frames while this is set. */
     var wantsFrames by mutableStateOf(false)
         private set
 
@@ -458,9 +457,8 @@ class OnePickerController {
     }
 
     /**
-     * The keyboard is moving to [endScreenFrame] (null or off screen: leaving). Only retargets
-     * the springs; the next frame draws. iOS reads the keyboard's curve off a probe view; Android
-     * rides `Motion.keyboard`, iOS's fallback.
+     * The keyboard is moving to [endScreenFrame] (null or off screen: leaving). Only retargets the
+     * springs; the next frame draws. Rides `Motion.keyboard`'s curve.
      */
     fun handleKeyboardFrameChange(endScreenFrame: Rect?) {
         val ride = Motion.keyboard.curve().springParameters
@@ -528,7 +526,7 @@ class OnePickerController {
     }
 
     companion object {
-        /** `ComposerTunables.cornerRadius`: the desktop dock's 12 on Android (iOS's capsule is 28). */
+        /** `ComposerTunables.cornerRadius`: the desktop dock's 12 on Android. */
         const val COMPOSER_CORNER_RADIUS = 12.0
 
         private val IDLE_POSE = OnePickerSimulation.FramePose(
@@ -546,10 +544,7 @@ class OnePickerController {
     }
 }
 
-/**
- * iOS `MotionDisplayLink` for [OnePickerController]: steps it on the frame clock while it wants
- * frames, stopping when a step settles.
- */
+/** Steps it on the frame clock while it wants frames, stopping when a step settles. */
 @Composable
 fun OnePickerFrameDriver(controller: OnePickerController) {
     val running = controller.wantsFrames

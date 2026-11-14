@@ -293,7 +293,7 @@ class OpenCodeClientFamilyTests {
         }
     }
 
-    /** iOS reads the cancelled task's error as an `OpenCodeClientError`; a cancelled Kotlin job throws `CancellationException`. */
+    /** A cancelled Kotlin job throws `CancellationException`. */
     @Test
     fun callerCancellationCancelsHeldHTTPRequests() = runTest {
         val fixture = FamilyHTTPFixture(children = emptyMap(), held = setOf("root", "active"))

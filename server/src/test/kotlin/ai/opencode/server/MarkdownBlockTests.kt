@@ -9,12 +9,6 @@ import org.junit.Assert.assertSame
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `MarkdownBlockTests.swift`, the `:server` part: `OpenCodeClient.markdownImage`
- * decoding a data URI into the client's own cache. iOS keys the cache by
- * `persistenceID|directory|source`; here that key is [OpenCodeClient.markdownImageKey]. The
- * Markdown parser's tests are `:feature:transcript`'s, highlighting `:feature:media`'s.
- */
 class MarkdownBlockTests {
     @get:Rule val isolation = TestIsolationRule()
 

@@ -8,9 +8,9 @@ import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `SelfViewReceipts`: read receipts in flight or just sent, so the stream can drop
- * their `session.viewed` echo. Echoes carry no request ID, so a receipt matches by server, session
- * and idle, and goes at once when it can no longer echo.
+ * Read receipts in flight or just sent, so the stream can drop their `session.viewed` echo. Echoes
+ * carry no request ID, so a receipt matches by server, session and idle, and goes at once when it
+ * can no longer echo.
  */
 class SelfViewReceipts(private val now: () -> Duration = { System.nanoTime().nanoseconds }) {
     private data class Receipt(

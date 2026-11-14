@@ -11,8 +11,8 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
- * Port of iOS `PerfFrameClock`: how late each frame callback came for the frame it was due to
- * prepare, so a refresh-rate change costs nothing. Seconds.
+ * How late each frame callback came for the frame it was due to prepare, so a refresh-rate change
+ * costs nothing. Seconds.
  */
 class PerfFrameClock {
     data class Frame(
@@ -48,8 +48,8 @@ class PerfFrameClock {
 }
 
 /**
- * Port of iOS `PerfFrameWindow`: callback lateness summed over a window: long frames, the hitch
- * time they add, the frames they drop, and main-thread stalls. Pure.
+ * Callback lateness summed over a window: long frames, the hitch time they add, the frames they
+ * drop, and main-thread stalls. Pure.
  */
 class PerfFrameWindow {
     var frames = 0
@@ -87,9 +87,8 @@ class PerfFrameWindow {
 }
 
 /**
- * Port of iOS `PerfFrameSampler`: during a `perf-frames` lab run, posts `frames_window` every half
- * second and `frame_stall` per stall. The prepared frame is `frameTimeNanos` + the current refresh
- * period, re-read every frame.
+ * During a `perf-frames` lab run, posts `frames_window` every half second and `frame_stall` per
+ * stall. The prepared frame is `frameTimeNanos` + the current refresh period, re-read every frame.
  */
 object PerfFrameSampler {
     /** The `perf-frames` launch extra; set by `DevTools.handleLaunchIntent`. */
@@ -159,8 +158,8 @@ private object PerfFrameLink : Choreographer.FrameCallback {
 }
 
 /**
- * Port of iOS `PerfFrameLatency`: main-thread latency from a named moment to the frame showing its
- * result, posted as a `perf_<name>` mark. One at a time, each name at most every 250 ms.
+ * Main-thread latency from a named moment to the frame showing its result, posted as a
+ * `perf_<name>` mark. One at a time, each name at most every 250 ms.
  */
 object PerfFrameLatency {
     val isEnabled: Boolean get() = PerfFrameSampler.isEnabled

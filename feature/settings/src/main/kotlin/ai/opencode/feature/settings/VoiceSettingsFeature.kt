@@ -40,9 +40,7 @@ import kotlinx.coroutines.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Port of iOS `VoiceSettingsFeature` (`Settings/SettingsView.swift`) with `VoiceServerPicker.swift`'s
- * state extension: Settings › Voice. The shared values are read live through [shared]; the reducer
- * writes them only when they change.
+ * The shared values are read live through [shared]; the reducer writes them only when they change.
  */
 class VoiceSettingsFeature : Reducer<VoiceSettingsFeature.State, VoiceSettingsFeature.Action> {
     data class State(

@@ -62,8 +62,7 @@ import ai.opencode.server.remember
 import kotlinx.coroutines.launch
 
 /**
- * Port of iOS `AppFeature` (`OpenCode/App/AppFeature.swift`, `AppFeature+Servers.swift`): routes
- * between the connection screen and Home, owns the manual server form, pairing (scan, paste,
+ * Routes between the connection screen and Home, owns the manual server form, pairing (scan, paste,
  * opened links with confirmation), saved-server edit and removal, the connect → health → Home
  * snapshot state machine, and routes notification taps and system actions to Home.
  *
@@ -147,14 +146,13 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
 
         val knownServers: List<OpenCodeServer> get() = savedServers.value + listOfNotNull(savedServer.value)
 
-        /** iOS `home?.server`. */
         val homeServer: OpenCodeServer? get() = home?.server
 
         /**
-         * Cold launch keeps the splash until there's something to show (iOS
-         * `isColdLaunchContentReady`): no Home; an open session's rows or its first content frame;
-         * a draft at once; else Home's list. A failed connection shows at once too; the splash
-         * gives up after `LaunchBloomController.TIMEOUT_MILLIS` (1.5 s) regardless.
+         * Cold launch keeps the splash until there's something to show: no Home; an open session's
+         * rows or its first content frame; a draft at once; else Home's list. A failed connection
+         * shows at once too; the splash gives up after `LaunchBloomController.TIMEOUT_MILLIS` (1.5
+         * s) regardless.
          */
         val isColdLaunchContentReady: Boolean
             get() {
@@ -165,7 +163,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                 return detail.items.isNotEmpty() || detail.hasRenderedFirstContentFrame
             }
 
-        /** iOS `home.snapshotLoaded`: Home has heard from its server once. */
+        /** Home has heard from its server once. */
         val isHomeSnapshotLoaded: Boolean get() = home?.snapshotLoaded == true
 
         /** A blank username field means the server's default user, like the web app. */
@@ -275,7 +273,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         }
 
         companion object {
-            /** iOS `State.init()`: restores the last server and its cached Home so launch shows it at once. */
+            /** Restores the last server and its cached Home so launch shows it at once. */
             fun initial(): State {
                 migrateBeforeRestore()
                 val saved = shared(ServerSharedKeys.savedServer)
@@ -290,7 +288,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
                 state = state.load(server)
                 val cache = cached.value[server.persistenceID]
                 state = state.withHome(server, cache?.snapshot)
-                // iOS: a restored Home reconnects, and its cached run state expires on its own.
+                // A restored Home reconnects, and its cached run state expires on its own.
                 val home = state.home ?: return state
                 return state.copy(
                     home = home.copy(
@@ -303,7 +301,6 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
             }
         }
 
-        /** iOS `HomeFeature.State(server:snapshot:loaded:)`. */
         internal fun withHome(server: OpenCodeServer, snapshot: OpenCodeHomeSnapshot?): State = copy(
             home = HomeFeature.State(
                 server = server,
@@ -315,11 +312,11 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         internal fun withoutHome(): State = copy(home = null)
 
         /**
-         * Whether Home can stay up while another server connects (iOS `keepsHome(switchingTo:)`):
-         * it shows the switch in the drawer ([HomeFeature.State.switchingTo], set by
-         * [showingSwitch]), and that server's Home replaces it when ready. Not for the server in
-         * use (a reconnect, or an edit of it), nor during a call or a recording
-         * (`voiceCallActivity`/`dictationActivity`), which end with this Home.
+         * Whether Home can stay up while another server connects: it shows the switch in the drawer
+         * ([HomeFeature.State.switchingTo], set by [showingSwitch]), and that server's Home
+         * replaces it when ready. Not for the server in use (a reconnect, or an edit of it), nor
+         * during a call or a recording (`voiceCallActivity`/`dictationActivity`), which end with
+         * this Home.
          */
         fun keepsHome(switchingTo: OpenCodeServer): Boolean {
             val home = home ?: return false
@@ -329,7 +326,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
             return !home.hasLiveCallOrRecording
         }
 
-        /** The kept Home shows the switch to [server] (the mutating half of iOS `keepsHome`). */
+        /** The kept Home shows the switch to [server]. */
         fun showingSwitch(server: OpenCodeServer): State = copy(home = home?.copy(switchingTo = server))
     }
 
@@ -464,17 +461,14 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         data object NotificationErrorDismissed : Action
         /** Listens for shortcuts, widgets and intents for as long as the app runs. */
         data object SystemActionsTask : Action
-        /**
-         * The app-wide work moved to another window's store (`AppWideWork`): stop listening, as iOS
-         * cancels this store's `systemActionsTask` task.
-         */
+        /** The app-wide work moved to another window's store (`AppWideWork`): stop listening. */
         data object SystemActionsTaskEnded : Action
         /** From an app shortcut, a widget, an intent or an `opencode://` link. */
         data class SystemActionReceived(val action: SystemAction) : Action
         /** A session the action names that the list doesn't have. */
         data class SystemSessionLoaded(val action: SystemAction, val sessionID: String, val result: Result<OpenCodeSession>) : Action
         data object SystemActionErrorDismissed : Action
-        /** The app became active: take what the share sheet left (iOS `pendingSharesRequested`). */
+        /** The app became active: take what the share sheet left. */
         data object PendingSharesRequested : Action
         data class SharesReceived(val shares: List<ReceivedShare>) : Action
         data object ShareErrorDismissed : Action
@@ -523,10 +517,8 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         childID = { it.id },
     )
 
-    /** iOS `.keepingWhatsNewAcrossHomes()` (`AppFeatureWhatsNew.kt`). */
     private val whatsNewBody: Reducer<State, Action> = body.keepingWhatsNewAcrossHomes()
 
-    /** iOS `Scope(\.welcome) { WelcomeFeature() }` then `welcomeRequests` (`AppFeatureWelcome.kt`). */
     private val welcomeBody: Reducer<State, Action> = combine(
         whatsNewBody,
         scope(
@@ -541,11 +533,10 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
 
     /**
      * Leaving Home cancels a call or a recording without Home seeing it end, so their ongoing
-     * notifications are ended, and the call's log saved, here (iOS `.onChange` of `voiceCallActivity`/`dictationActivity`).
-     * Android's call notification is voice's foreground service, keyed by the call's presence ID.
-     * Then the screen stays on during a call, set at once rather than from an effect so a quick
-     * on-then-off can't land out of order (watched from here so leaving Home mid-call lets the
-     * screen sleep again too).
+     * notifications are ended, and the call's log saved, here. Android's call notification is
+     * voice's foreground service, keyed by the call's presence ID. Then the screen stays on during
+     * a call, set at once rather than from an effect so a quick on-then-off can't land out of order
+     * (watched from here so leaving Home mid-call lets the screen sleep again too).
      */
     private val liveBody: Reducer<State, Action> = sharingScreenWithAgents(welcomeBody)
         .onChange({ it.home?.sessionDetail?.voice?.callPresenceID }) { old, _, state ->
@@ -559,15 +550,14 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
             val dictationLiveActivity = dependency(DictationLiveActivityClient)
             Reduced(state, Effect.run { dictationLiveActivity.update(null, null) })
         }
-        // And a followed run's, which can't update once its Home is gone (iOS
-        // AppFeature+LiveActivities): Home leaving, or another server's replacing it.
+        // And a followed run's, which can't update once its Home is gone: Home leaving, or another
+        // server's replacing it.
         .onChange({ state -> state.home?.takeIf { it.sessionActivity != null }?.id }) { old, _, state ->
             if (old == null || state.home?.id == old) return@onChange Reduced(state)
             val sessionLiveActivity = dependency(SessionLiveActivityClient)
             Reduced(state, Effect.run { sessionLiveActivity.update(null, null) })
         }
-        // A call that goes with its Home never reaches a terminal phase, so its log is saved
-        // here (saving one already saved does nothing; iOS AppFeature+LiveActivities).
+        // A call that goes with its Home never reaches a terminal phase, so its log is saved here.
         .onChange({ it.home?.sessionDetail?.voice?.callLogID }) { old, _, state ->
             if (old == null || state.home?.sessionDetail?.voice?.callLogID == old) return@onChange Reduced(state)
             val voiceCallLog = dependency(VoiceCallLogClient)
@@ -693,9 +683,9 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
     }
 
     /**
-     * iOS `BindingReducer().onChange(of: \.server)`: only an actual edit invalidates the attempt
-     * in flight. While connecting a manual entry, a field flushing its final value after Connect
-     * retries with the completed entry instead of silently abandoning the attempt.
+     * Only an actual edit invalidates the attempt in flight. While connecting a manual entry, a
+     * field flushing its final value after Connect retries with the completed entry instead of
+     * silently abandoning the attempt.
      */
     private fun serverEdited(old: State, new: State): Reduced<State, Action> {
         if (old.server == new.server || new.connectionAttempt == null) return Reduced(new)
@@ -752,7 +742,6 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         else -> Reduced(state)
     }
 
-    /** iOS `.linkTapped(url)` / `.browser(.pairingLinkTapped(url))` that `OpenCodePairingLink` handles. */
     private fun pairingLinkURL(action: SessionFeature.Action): String? {
         val url = when (action) {
             is SessionFeature.Action.LinkTapped -> action.url
@@ -892,12 +881,10 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         return copy(home = home.copy(sessions = listOf(session) + home.sessions))
     }
 
-    /** iOS `.home(.sessionTapped(id))`. */
     private fun openSession(state: State, sessionID: String): Effect<Action> {
         return Effect.send(Action.Home(HomeFeature.Action.SessionTapped(sessionID)))
     }
 
-    /** iOS `.home(.systemActionOpened(destination, startsCall:, inBackground:, origin:))`. */
     private fun openInHome(action: SystemAction, destination: SystemAction.Destination): Effect<Action> =
         Effect.send(
             Action.Home(
@@ -1078,9 +1065,8 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
     }
 
     /**
-     * Races every address at once ([ServerLinkClient.probe]): the first that answers as this
-     * server is used now, while the server is saved with the address order it was paired or
-     * entered with (iOS `connect(_:)`).
+     * Races every address at once ([ServerLinkClient.probe]): the first that answers as this server
+     * is used now, while the server is saved with the address order it was paired or entered with.
      */
     internal fun connect(
         state: State,
@@ -1097,7 +1083,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         val link = dependency(ServerLinkClient)
         val localNetwork = dependency(LocalNetworkPermission)
         val health = Effect.run<Action> { send ->
-            // Android 17 asks on the first local network connection, as iOS does.
+            // Android 17 asks on the first local network connection.
             if (localNetwork.blocks(attempt.server)) localNetwork.request()
             val result = try {
                 Result.success(link.probe(attempt.server))
@@ -1123,7 +1109,7 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
     }
 
     companion object {
-        /** A typed address without a scheme means plain HTTP on a LAN or tailnet (iOS `withDefaultScheme`). */
+        /** A typed address without a scheme means plain HTTP on a LAN or tailnet. */
         fun withDefaultScheme(address: String): String {
             if (address.isEmpty() || address.contains("://")) return address
             return "http://$address"

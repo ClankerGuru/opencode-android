@@ -6,8 +6,7 @@ import kotlin.math.max
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-// The model half of iOS `Session/AgentActivity/ShellGlyph.swift`: the meter, its client and
-// the probe. The glyph view is `agentactivity/ShellGlyph.kt`.
+// The meter, its client and the probe. The glyph view is `agentactivity/ShellGlyph.kt`.
 
 /** Where a running shell's output is read from: its session's server and directory. */
 data class ShellGlyphProbe(val server: OpenCodeServer, val directory: String)
@@ -89,7 +88,7 @@ class ShellOutputMeter {
     }
 }
 
-/** The reducers' handle on [ShellOutputMeter] (iOS `@Dependency(\.shellOutputMeter)`). */
+/** The reducers' handle on [ShellOutputMeter]. */
 class ShellOutputMeterClient(
     val record: (id: String, size: Int) -> Unit,
 ) {

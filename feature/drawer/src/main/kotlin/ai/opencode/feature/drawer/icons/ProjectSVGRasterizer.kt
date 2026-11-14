@@ -13,10 +13,9 @@ import kotlin.math.min
 
 /**
  * Lightweight off-main-thread SVG rasterizer for project favicons and logos (`<svg>`, `<g>`,
- * `<rect>`, `<circle>`, `<ellipse>`, `<line>`, `<polygon>`, `<polyline>`, `<path>`, local
- * `<image>` and Composer background paints), a port of iOS `ProjectSVGRasterizer`.
- * Unsupported image layers return null so the tile falls back to the project's initial.
- * Runs on any thread; never fetches anything.
+ * `<rect>`, `<circle>`, `<ellipse>`, `<line>`, `<polygon>`, `<polyline>`, `<path>`, local `<image>`
+ * and Composer background paints). Unsupported image layers return null so the tile falls back to
+ * the project's initial. Runs on any thread; never fetches anything.
  */
 object ProjectSVGRasterizer {
     fun rasterize(data: ByteArray, side: Int, depth: Int = 0): Bitmap? {
@@ -94,7 +93,7 @@ object ProjectSVGRasterizer {
     private fun alphaByte(alpha: Float): Int = (alpha.coerceIn(0f, 1f) * 255 + 0.5f).toInt()
 
     internal data class RGBA(val r: Float, val g: Float, val b: Float, val a: Float) {
-        /** As an sRGB colour int, with the command's group [opacity] applied (iOS `setAlpha`). */
+        /** As an sRGB colour int, with the command's group [opacity] applied. */
         fun argb(opacity: Float): Int =
             android.graphics.Color.argb((a * opacity).coerceIn(0f, 1f), r.coerceIn(0f, 1f), g.coerceIn(0f, 1f), b.coerceIn(0f, 1f))
     }
@@ -439,7 +438,7 @@ object ProjectSVGRasterizer {
     }
 }
 
-/** Parses SVG `<path d="…">` commands into a [Path] (iOS `SVGPathParser`). Arcs draw as lines, as on iOS. */
+/** Parses SVG `<path d="…">` commands into a [Path]. Arcs draw as lines. */
 internal object SVGPathParser {
     private sealed interface Token {
         data class Command(val char: Char) : Token

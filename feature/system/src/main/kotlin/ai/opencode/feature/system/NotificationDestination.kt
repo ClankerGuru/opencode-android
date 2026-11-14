@@ -1,6 +1,6 @@
 package ai.opencode.feature.system
 
-/** Port of iOS `NotificationDestination`: where a tapped notification leads, a saved server and one of its sessions. */
+/** Where a tapped notification leads, a saved server and one of its sessions. */
 data class NotificationDestination(
     /** The saved server's persistence ID (the key its `ref` is saved under). */
     val serverKey: String,
@@ -14,7 +14,7 @@ data class NotificationDestination(
     companion object {
         /** The action of a session notification's explicit intent to the app's launcher activity. */
         const val ACTION_OPEN = "ai.opencode.action.OPEN_SESSION_NOTIFICATION"
-        /** Extra keys, as iOS's notification payload. */
+        /** Extra keys, matching the notification payload. */
         const val EXTRA_SERVER = "server"
         const val EXTRA_SESSION = "session"
     }

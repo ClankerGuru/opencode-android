@@ -44,15 +44,14 @@ data class CaptionTarget(
 )
 
 /**
- * One voice call attached to the open session (iOS `VoiceFeature`). It follows the screen:
- * the drawer moves it to another session, and New Session moves it to the draft, where the
- * first spoken request creates the session. The voice model converses; the target session
- * does the work; its reply comes back as speech.
+ * One voice call attached to the open session. It follows the screen: the drawer moves it to
+ * another session, and New Session moves it to the draft, where the first spoken request creates
+ * the session. The voice model converses; the target session does the work; its reply comes back as
+ * speech.
  *
- * Composed like iOS's body: [VoiceTimeline] sees the state an action arrives to, then the
- * call's own reducer, then [VoiceCallLogging] writes the call log from the result. On Android
- * the call also owns its ongoing-call presence (the foreground service iOS's Home drives as a
- * Live Activity): [presenceEffect] starts, updates and stops it from what the state shows.
+ * Composed: [VoiceTimeline] sees the state an action arrives to, then the call's own reducer, then
+ * [VoiceCallLogging] writes the call log from the result. On Android the call also owns its
+ * ongoing-call presence: [presenceEffect] starts, updates and stops it from what the state shows.
  *
  * The extension files hold the rest of the reducer: `VoiceFeatureStart.kt`,
  * `VoiceFeatureDelegation.kt`, `VoiceFeatureInstructions.kt`, `VoiceFeatureContext.kt`,
@@ -71,7 +70,7 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
         val moveReason: String? = null,
         /** The session is waiting on a native approval or answer. */
         val targetNeedsInput: Boolean = false,
-        /** Set through [withPhase], which keeps `replyWatch.callPhase` in step (iOS `didSet`). */
+        /** Set through [withPhase], which keeps `replyWatch.callPhase` in step. */
         val phase: Phase = Phase.Connecting,
         val isMuted: Boolean = false,
         val isAssistantSpeaking: Boolean = false,
@@ -186,22 +185,21 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
         /** The delegator asked to hang up once its goodbye is spoken. */
         val endsAfterDelegation: Boolean = false,
         /**
-         * Raise to Talk's live value for the call's start (iOS `@ObservationStateIgnored let`):
-         * one box shared by every copy of this state; equal to any other box.
+         * Raise to Talk's live value for the call's start: one box shared by every copy of this
+         * state; equal to any other box.
          */
         val atEarBox: VoiceAtEarBox = VoiceAtEarBox(),
         /**
-         * Raise to Talk: the phone is at the user's ear, so the call plays from
-         * the earpiece. Applied again on connect: a raise starts the call there.
-         * Set through [withAtEar], which keeps [atEarBox] in step (iOS `didSet`).
+         * Raise to Talk: the phone is at the user's ear, so the call plays from the earpiece.
+         * Applied again on connect: a raise starts the call there. Set through [withAtEar], which
+         * keeps [atEarBox] in step.
          */
         val isAtEar: Boolean = false,
         /** The newest finished compaction the session screen has seen, by session ID. */
         val compactions: Map<String, String> = emptyMap(),
         /**
-         * Android: the identity of the call's ongoing-call foreground service (iOS's Live
-         * Activity, which Home drives there). Set when a start goes ahead, cleared once the
-         * call's card is closed.
+         * Android: the identity of the call's ongoing-call foreground service. Set when a start
+         * goes ahead, cleared once the call's card is closed.
          */
         val callPresenceID: UUID? = null,
     ) {
@@ -316,7 +314,7 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
         /** The server [serverVoiceSupport] describes. */
         val supportServer: OpenCodeServer get() = serverVoiceBroker ?: target.server
 
-        // iOS `@Shared` fields: read where they're used, never stored in the state.
+        // Read where they're used, never stored in the state.
         val voiceEngine: VoiceEngine get() = shared(VoiceSharedKeys.voiceEngine).value
         val serverVoiceProvider: ServerVoiceProvider get() = shared(VoiceSharedKeys.serverVoiceProvider).value
         val voiceServer: VoiceServerChoice get() = shared(VoiceSharedKeys.voiceServerChoice).value
@@ -407,10 +405,10 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
             return if (workTarget.sessionID == null) isOnDraft && work.move == moves else workTarget.sessionID == target.sessionID
         }
 
-        /** iOS `phase = …` with its `didSet`: the reply watch follows the call's phase. */
+        /** The reply watch follows the call's phase. */
         fun withPhase(phase: Phase): State = copy(phase = phase, replyWatch = replyWatch.copy(callPhase = phase.replyWatchPhase))
 
-        /** iOS `isAtEar = …` with its `didSet`: the box the call's start reads follows it. */
+        /** The box the call's start reads follows it. */
         fun withAtEar(isAtEar: Boolean): State {
             atEarBox.current = isAtEar
             return copy(isAtEar = isAtEar)
@@ -581,7 +579,7 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
             /** A session's title to name it by, or null while it reads as untitled ([SessionTitle.isPlaceholder]). */
             fun usableTitle(title: String): String? = if (SessionTitle.isPlaceholder(title)) null else title.trim()
 
-            /** A call on [session], picking up the tail an earlier call left there (iOS `init(server:session:)`). */
+            /** A call on [session], picking up the tail an earlier call left there. */
             operator fun invoke(server: OpenCodeServer, session: OpenCodeSession): State {
                 val previous = shared(VoiceSharedKeys.voiceTranscripts).value["${server.id}:${session.id}"]
                 val previousLines = VoiceTranscriptRecord.continuityLines(previous?.tail ?: emptyList())
@@ -595,8 +593,8 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
             }
 
             /**
-             * A call started on a new session's draft in [draftDirectory]; its first
-             * request creates the session there (iOS `init(server:draftDirectory:model:)`).
+             * A call started on a new session's draft in [draftDirectory]; its first request
+             * creates the session there.
              */
             operator fun invoke(server: OpenCodeServer, draftDirectory: String, model: OpenCodeModelRef?): State = State(
                 target = VoiceWorkTarget(server = server, sessionID = null, directory = draftDirectory),
@@ -605,7 +603,6 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
                 tail = VoiceTranscriptTail(lines = emptyList()),
             )
 
-            /** iOS `URL(fileURLWithPath:).lastPathComponent`. */
             internal fun lastPathComponent(path: String): String {
                 val trimmed = path.trimEnd('/')
                 if (trimmed.isEmpty()) return if (path.isEmpty()) "" else "/"
@@ -671,7 +668,7 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
         data class DelegatorKeptPick(val sessionID: String, val model: OpenCodeModelRef) : Action
         data class DelegatorExplained(val sessionID: String) : Action
 
-        /** iOS `Result<VoiceDelegator.Outcome, OpenCodeClientError>`: a failure carries an `OpenCodeClientError`. */
+        /** A failure carries an `OpenCodeClientError`. */
         data class DelegatorFinished(val callID: String, val result: Result<VoiceDelegator.Outcome>) : Action
         data class ReplyWatch(val event: ai.opencode.feature.voice.ReplyWatch.Event) : Action
         data object MuteTapped : Action
@@ -714,17 +711,14 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
         data class SessionDelegatorReconciledTools(val calls: List<OpenCodeRunMessage.ToolCall>) : Action
         data class SessionDelegatorSessionDeleted(val sessionID: String) : Action
 
-        /**
-         * Android: Mute or End from the call's ongoing notification (iOS Home's
-         * `voiceCallCommand` from the Live Activity, which the call owns here).
-         */
+        /** Android: Mute or End from the call's ongoing notification. */
         data class CallCommand(val command: VoiceCallCommands.Action) : Action
         data class Delegate(val action: DelegateAction) : Action
     }
 
-    /** iOS `Action.Delegate`: what the parent (Session, Home) handles. */
+    /** What the parent (Session, Home) handles. */
     sealed interface DelegateAction {
-        /** Open Settings › Voice at [page] (the failure card's fix; iOS replaced `checkAPIKey`). */
+        /** Open Settings › Voice at [page]. */
         data class OpenVoiceSettings(val page: VoiceSettingsPage) : DelegateAction
 
         /** The session delegator created its Automatic “Voice” session. */
@@ -789,7 +783,7 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
         /** Android: the ongoing notification's Mute/End commands for this call. */
         data object CallCommands : CancelID
 
-        /** Android: an ended call's notification lingering before it goes (iOS `endedLinger`). */
+        /** Android: an ended call's notification lingering before it goes. */
         data object PresenceLinger : CancelID
     }
 
@@ -810,7 +804,7 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
         return Reduced(logged, Effect.merge(core.effect, presence))
     }
 
-    /** iOS's child `Scope`s: the floating stage, the screen request, the open link, the call audio. */
+    /** The floating stage, the screen request, the open link, the call audio. */
     private fun scopeChildren(state: State, action: Action): Reduced<State, Action> {
         when (action) {
             is Action.FloatingStage -> {
@@ -1415,7 +1409,7 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
         )
     }
 
-    // region Call log (iOS `VoiceCallLogging`, composed after the call's reducer)
+    // region Call log (composed after the call's reducer)
 
     /** Writes the call log from what [action] changed; a terminal call's log is finished and let go. */
     private fun logCall(state: State, action: Action): State {
@@ -1472,14 +1466,13 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
 
     // endregion
 
-    // region Ongoing-call presence (Android; iOS Home's Live Activity `onChange`)
+    // region Ongoing-call presence
 
     /**
-     * Starts, updates or stops the call's foreground service when what it shows changes:
-     * never per second (its chronometer counts on its own). Mirrors iOS
-     * `VoiceLiveActivity.content(for:previous:now:)`: no presence for a call the user or
-     * the model hung up; “Call ended” for one that failed or dropped, which goes after
-     * [endedLinger] or when its card closes.
+     * Starts, updates or stops the call's foreground service when what it shows changes: never per
+     * second (its chronometer counts on its own). No presence for a call the user or the model hung
+     * up; “Call ended” for one that failed or dropped, which goes after [endedLinger] or when its
+     * card closes.
      */
     private fun presenceEffect(old: State, new: State): Effect<Action> {
         val before = old.presence()
@@ -1573,7 +1566,7 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
                 return servers + listOfNotNull(current)
             }
 
-        /** How long an ended call's notification lingers (iOS `LiveVoiceActivity.endedLinger`, 3 s). */
+        /** How long an ended call's notification lingers. */
         val endedLinger: Duration = 3.seconds
 
         const val maxWaitAttempts = 4
@@ -1582,8 +1575,8 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
 }
 
 /**
- * What the call's ongoing notification shows (iOS `VoiceLiveActivity.content(for:)`):
- * null when there's no call presence, including a call the user or the model hung up.
+ * What the call's ongoing notification shows: null when there's no call presence, including a call
+ * the user or the model hung up.
  */
 internal fun VoiceFeature.State.presence(): VoiceCallServiceState? {
     val id = callPresenceID ?: return null
@@ -1598,6 +1591,6 @@ internal fun VoiceFeature.State.presence(): VoiceCallServiceState? {
     return VoiceCallServiceState(callID = id, phase = servicePhase, muted = isMuted, connectedAt = connectedAt)
 }
 
-/** An effect's failure as the `OpenCodeClientError` message iOS's typed throws carry. */
+/** An effect's failure. */
 internal val Throwable.clientMessage: String
     get() = message ?: toString()

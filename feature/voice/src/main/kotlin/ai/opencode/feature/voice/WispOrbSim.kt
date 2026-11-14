@@ -8,10 +8,9 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Wisp's `OrbSim` (`wisp-orb/src/sim.rs`, iOS `WispOrbSim`): the 240 Hz state machine that
- * steps voices, mode mixes, power, gaze and the coupled medium, then hands one frame of
- * uniforms to the cell pass and the fragment shader. A plain object stepped by the renderer at
- * display rate; nothing here touches the store.
+ * Wisp's `OrbSim`: the 240 Hz state machine that steps voices, mode mixes, power, gaze and the
+ * coupled medium, then hands one frame of uniforms to the cell pass and the fragment shader. A
+ * plain object stepped by the renderer at display rate; nothing here touches the store.
  */
 class WispOrbSim {
     var state = WispOrbState.sleeping
@@ -419,8 +418,8 @@ class WispOrbSim {
 data class WispOrbPlacement(val centerX: Float, val centerY: Float, val pixelsPerPoint: Float)
 
 /**
- * One frame for the Wisp orb's passes (iOS `WispOrbUniforms`, same layout: 63 `float4`s), kept
- * as one flat array so it uploads as a single `float4` array uniform. Slot names follow iOS.
+ * One frame for the Wisp orb's passes, kept as one flat array so it uploads as a single `float4`
+ * array uniform.
  */
 class WispOrbUniforms {
     val data = FloatArray(count * 4).also {

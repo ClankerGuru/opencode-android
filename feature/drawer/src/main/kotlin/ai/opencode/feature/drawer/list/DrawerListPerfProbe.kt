@@ -8,11 +8,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Port of iOS `DrawerListPerfProbe.swift`: the drawer list's first render and memory. Marks
- * `drawer_list_first_frame` on the first frame that lays out four or more rows ([frame]), then
- * `drawer_list_footprint` once a second for 20 s, through [AppLog.perf]. A lab harness turns on
- * [isEnabled] before the drawer is built; off, nothing runs. Footprint is the process's PSS
- * (`Debug.getPss()`, KB).
+ * The drawer list's first render and memory. Marks `drawer_list_first_frame` on the first frame
+ * that lays out four or more rows ([frame]), then `drawer_list_footprint` once a second for 20 s,
+ * through [AppLog.perf]. A lab harness turns on [isEnabled] before the drawer is built; off,
+ * nothing runs. Footprint is the process's PSS (`Debug.getPss()`, KB).
  */
 object DrawerListPerfProbe {
     @Volatile

@@ -68,10 +68,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * A Markdown image (iOS `MarkdownImage`). A web image loads through Coil; a `data:` image or a
- * file outside the session's folder loads through the server client's Markdown image reader
- * (`OpenCodeClient.markdownImage`, desktop's `readLocalImage`) once it's on screen. Tapping it
- * opens the zoom viewer; one that didn't load says so, and a tap tries again.
+ * A Markdown image. A web image loads through Coil; a `data:` image or a file outside the session's
+ * folder loads through the server client's Markdown image reader (`OpenCodeClient.markdownImage`,
+ * desktop's `readLocalImage`) once it's on screen. Tapping it opens the zoom viewer; one that
+ * didn't load says so, and a tap tries again.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -100,8 +100,8 @@ fun MarkdownImage(
     // Marks the hosting row revised before an async load, failure, or retry resizes it.
     val row = remember { AgentImageRowAnchor() }
     AgentImageRowAnchor.Placement(row)
-    // iOS shows a cached image on the first frame; Android keeps its decoded copy for that, so
-    // a row coming back on screen doesn't decode on the main thread.
+    // Android keeps the decoded copy, so a row coming back on screen doesn't decode on the main
+    // thread.
     val cachedImage = remember(cacheKey) { decodedImages.image(cacheKey)?.asImageBitmap() }
     val shown = image ?: cachedImage
     fun applyState(nextImage: ImageBitmap?, nextFailed: Boolean, hadImage: Boolean) {
@@ -185,7 +185,6 @@ fun MarkdownImage(
     }
 }
 
-/** iOS `MarkdownImage`'s statics. */
 object MarkdownImage {
     /** Whether changing between placeholder, loaded image, and failed card alters the row's height. */
     fun revisesRow(hadImage: Boolean, wasFailed: Boolean, nextImage: Boolean, nextFailed: Boolean): Boolean =
@@ -218,7 +217,7 @@ private fun FailedImageCard(name: String, fallbackFile: AgentFileReference?, onR
                 .heightIn(min = 48.dp)
                 .clip(shape)
                 .background(colors.userBubble, shape)
-                // iOS `accessibilityHint("Tries again")`: TalkBack reads “Double-tap to try again”.
+                // TalkBack reads “Double-tap to try again”.
                 .combinedClickable(onClickLabel = stringResource(R.string.transcript_image_retry_click_label), onClick = onRetry, onLongClick = { menu = true })
                 .semantics {
                     contentDescription = name

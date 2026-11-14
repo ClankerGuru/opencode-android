@@ -15,13 +15,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.max
 
-/** Android's minimum touch target (Material / Android accessibility), the counterpart of iOS's 44 pt. */
+/** Android's minimum touch target (Material / Android accessibility). */
 val OpenCodeMinTapTarget: Dp = 48.dp
 
 /**
- * The one owner of a control's hit shape (iOS `openCodeTapTarget`): at least [minSize] both ways,
- * content centred. Put it after `clickable`. [accessibility] merges the content into one TalkBack
- * node.
+ * The one owner of a control's hit shape: at least [minSize] both ways, content centred. Put it
+ * after `clickable`. [accessibility] merges the content into one TalkBack node.
  */
 fun Modifier.openCodeTapTarget(minSize: Dp = OpenCodeMinTapTarget, accessibility: Boolean = true): Modifier {
     val minimum = max(OpenCodeMinTapTarget.value, minSize.value).dp
@@ -40,16 +39,16 @@ fun Modifier.openCodeTapTarget(minSize: Dp = OpenCodeMinTapTarget, accessibility
 private fun constrainMax(max: Int) = if (max == Constraints.Infinity) Int.MAX_VALUE else max
 
 enum class OpenCodeIconButtonStyle {
-    /** Bare glyph (toolbar icons; iOS plain buttons inside a shared glass bar). */
+    /** Bare glyph. */
     Standard,
 
-    /** A standalone control (iOS `openCodeGlassCircle`): the desktop's neutral icon button. */
+    /** A standalone control: the desktop's neutral icon button. */
     Circle,
 }
 
 /**
- * An icon control with the 48 dp target built in (iOS `openCodeGlassCircle(_:tint:)`). [size] is
- * the visible face; [tint] fills [OpenCodeIconButtonStyle.Circle].
+ * An icon control with the 48 dp target built in. [size] is the visible face; [tint] fills
+ * [OpenCodeIconButtonStyle.Circle].
  */
 @Composable
 fun OpenCodeIconButton(

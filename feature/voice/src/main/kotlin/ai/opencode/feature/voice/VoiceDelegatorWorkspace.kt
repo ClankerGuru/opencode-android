@@ -55,9 +55,8 @@ import kotlin.time.Duration.Companion.seconds
  * request thinks the user is (it moves with `open_session`) and the prompts
  * it sent, so their replies can be spoken later.
  *
- * iOS actor → every entry point runs on one confined dispatcher, so state is
- * touched by one coroutine at a time and, as with an actor, other calls
- * interleave only at suspension points.
+ * Every entry point runs on one confined dispatcher, so state is touched by one coroutine at a time
+ * and other calls interleave only at suspension points.
  */
 class VoiceDelegatorWorkspace(
     private val client: OpenCodeClient,
@@ -187,10 +186,7 @@ class VoiceDelegatorWorkspace(
         val endCall: suspend () -> Unit = {},
         /** A Voice message carried the long header into this session. */
         val explained: suspend (sessionID: String) -> Unit,
-        /**
-         * The server admitted a Voice message into a session (iOS hands a
-         * `SessionFeature.PendingPrompt`; see [VoiceAdmittedPrompt]).
-         */
+        /** The server admitted a Voice message into a session. */
         val sent: suspend (sessionID: String, prompt: VoiceAdmittedPrompt) -> Unit = { _, _ -> },
         /**
          * A tool read or waited on a finished session and handed the delegator
@@ -965,7 +961,7 @@ class VoiceDelegatorWorkspace(
         if (log != null) {
             val data = log.boundedJSON()
             val fileName = "voice-call-${log.id.toString().lowercase()}.json"
-            // `java.io.tmpdir` is the app's cache directory on Android (iOS `temporaryDirectory`).
+            // `java.io.tmpdir` is the app's cache directory on Android.
             val tempFile = File(System.getProperty("java.io.tmpdir") ?: "", "${UUID.randomUUID().toString().uppercase()}-$fileName")
             var uploadedPath: String? = null
             try {
@@ -1322,9 +1318,8 @@ class VoiceDelegatorWorkspace(
         }
 
         /**
-         * A form answer as iOS reads it from `JSONSerialization`: a JSON bool (or
-         * a number Foundation bridges to `Bool`, exactly 0 or 1), a number, a
-         * string, a list of strings, any other list stringified, else its text.
+         * A form answer: a JSON bool (or a number Foundation bridges to `Bool`, exactly 0 or 1), a
+         * number, a string, a list of strings, any other list stringified, else its text.
          */
         private fun formValue(value: JsonElement): OpenCodeFormValue = when (value) {
             is JsonPrimitive -> when {
@@ -1339,7 +1334,7 @@ class VoiceDelegatorWorkspace(
             else -> OpenCodeFormValue.Str(value.toString())
         }
 
-        /** Swift `Character.isNumber`: digits and other numeric characters. */
+        /** Digits and other numeric characters. */
         private fun isNumber(char: Char): Boolean = char.isDigit() ||
             char.category == CharCategory.LETTER_NUMBER || char.category == CharCategory.OTHER_NUMBER
     }

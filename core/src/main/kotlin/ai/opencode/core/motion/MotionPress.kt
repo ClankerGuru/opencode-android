@@ -9,8 +9,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 
 /**
- * The press role's feedback (iOS `MotionPress`): scales to [MotionTunables.pressScale], or dims
- * under Reduce Motion. For custom surfaces; Material components draw their own ripple.
+ * The press role's feedback: scales to [MotionTunables.pressScale], or dims under Reduce Motion.
+ * For custom surfaces; Material components draw their own ripple.
  */
 object MotionPress {
     const val reducedOpacity: Float = 0.72f
@@ -24,7 +24,7 @@ object MotionPress {
         if (isPressed && reduceMotion) reducedOpacity else 1f
 }
 
-/** iOS `motionPressEffect(_:)`: the press role's scale (or Reduce Motion dim) for [isPressed]. */
+/** The press role's scale (or Reduce Motion dim) for [isPressed]. */
 @Composable
 fun Modifier.motionPressEffect(isPressed: Boolean, reduceMotion: Boolean = rememberReduceMotion()): Modifier {
     val phase = if (isPressed) MotionPhase.Enter else MotionPhase.Exit
@@ -45,7 +45,7 @@ fun Modifier.motionPressEffect(isPressed: Boolean, reduceMotion: Boolean = remem
     }
 }
 
-/** iOS `openCodePressStyle()`: [motionPressEffect] driven by a control's [interactionSource]. */
+/** [motionPressEffect] driven by a control's [interactionSource]. */
 @Composable
 fun Modifier.motionPress(interactionSource: InteractionSource, reduceMotion: Boolean = rememberReduceMotion()): Modifier {
     val isPressed by interactionSource.collectIsPressedAsState()

@@ -13,9 +13,8 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
 
 /**
- * Settings › Voice › Delegator (the `voiceSessionDelegator` experiment): whether GPT-Live
- * uses its built-in Responses API delegator or steers a real OpenCode session on the
- * connected server (iOS `VoiceDelegatorChoice.swift`).
+ * Settings › Voice › Delegator (the `voiceSessionDelegator` experiment): whether GPT-Live uses its
+ * built-in Responses API delegator or steers a real OpenCode session on the connected server.
  */
 @Serializable(with = VoiceDelegatorChoice.Serializer::class)
 sealed interface VoiceDelegatorChoice {
@@ -63,7 +62,7 @@ sealed interface VoiceDelegatorChoice {
             BuiltIn -> ""
             AutomaticSession -> "automatic"
             ViewedSession -> "viewed"
-            // Sorted keys, as iOS's encoder writes them; null fields left out.
+            // Null fields left out.
             is PickedSession -> pickedJSON.encodeToString(Picked.serializer(), picked)
         }
 
@@ -81,7 +80,6 @@ sealed interface VoiceDelegatorChoice {
     companion object {
         private val pickedJSON = Json { ignoreUnknownKeys = true; explicitNulls = false }
 
-        /** iOS `init(rawValue:)`. */
         fun of(rawValue: String): VoiceDelegatorChoice = when (rawValue) {
             "", "built-in" -> BuiltIn
             "automatic" -> AutomaticSession
@@ -93,7 +91,7 @@ sealed interface VoiceDelegatorChoice {
         }
     }
 
-    /** Stored as its raw value, as iOS `AppStorage` stores a `RawRepresentable`. */
+    /** Stored as its raw value. */
     object Serializer : KSerializer<VoiceDelegatorChoice> {
         override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("VoiceDelegatorChoice", PrimitiveKind.STRING)
         override fun serialize(encoder: Encoder, value: VoiceDelegatorChoice) = encoder.encodeString(value.rawValue)

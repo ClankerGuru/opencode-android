@@ -57,14 +57,8 @@ import java.time.Instant
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Port of iOS `SessionSheetTests.swift`.
- *
- * Not ported here: `homeOpensForksAndRoutesSheetActionsThroughTheDrawerPaths` (HomeFeature,
- * :feature:drawer); `contextDecodingMatchesTheTUI`, `sheetRoutesMatchTheV2Contract`,
- * `alwaysNotifyMergesIntoTheSessionsMetadataAndDecodes`, `modelCatalogCarriesTheContextWindow`
- * (`OpenCodeClient` wire decoding, ported in :server's `SessionSheetWireTests`).
- * `contextFractionUsesTheReplyModelsWindow`'s compact `"32% of 400K"` line runs under Robolectric in
- * [SessionSheetFrameworkTests] (`SessionContextText` formats with `android.icu`).
+ * `contextFractionUsesTheReplyModelsWindow`'s compact `"32% of 400K"` line runs under Robolectric
+ * in [SessionSheetFrameworkTests] (`SessionContextText` formats with `android.icu`).
  */
 class SessionSheetTests {
     private val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
@@ -421,7 +415,7 @@ class SessionSheetTests {
         }
         assertNull(store.state.sessionSheet?.failure)
         assertEquals("Sheet", store.state.session?.title)
-        settle() // The failure's timer starts sleeping before time moves (iOS effects start eagerly).
+        settle() // The failure's timer starts sleeping before time moves.
         clock.advance(2_200.milliseconds)
         store.receive(sheet(SessionSheetFeature.Action.AutoRenameFailureCleared)) { it.updatingSheet { copy(autoRenameFailed = false) } }
         store.finish()
@@ -882,15 +876,15 @@ class SessionSheetTests {
     }
 }
 
-/** iOS `\.sessionSheet.<case>`: a `.sessionSheet(...)` action of child case [T]. */
+/** A `.sessionSheet(...)` action of child case [T]. */
 @Suppress("FunctionName")
 private inline fun <reified T : SessionSheetFeature.Action> SessionSheetActionMatcher(
     crossinline where: (T) -> Boolean = { true },
 ): (Action) -> Boolean = { action -> ((action as? Action.SessionSheet)?.action as? T)?.let(where) == true }
 
 /**
- * The `android.icu` line of iOS `contextFractionUsesTheReplyModelsWindow`: `SessionContextText`
- * compacts the window with `CompactDecimalFormat`, which needs Android's ICU (Robolectric).
+ * `SessionContextText` compacts the window with `CompactDecimalFormat`, which needs Android's ICU
+ * (Robolectric).
  */
 @org.junit.runner.RunWith(org.robolectric.RobolectricTestRunner::class)
 @org.robolectric.annotation.Config(sdk = [35])
@@ -898,7 +892,7 @@ class SessionSheetFrameworkTests {
     @Test fun contextFractionUsesTheReplyModelsWindow() {
         assertEquals("32% of 400K", SessionContextText.summary(tokens = 128_000, limit = 400_000, locale = java.util.Locale.US))
         assertEquals("53,200 tokens", SessionContextText.summary(tokens = 53_200, limit = null, locale = java.util.Locale.US))
-        // English in the user's region, as iOS's `Locale.current` in an English-only bundle.
+        // English in the user's region.
         val german = ai.opencode.core.ui.appFormattingLocale(java.util.Locale.GERMANY)
         assertEquals("53.200 tokens", SessionContextText.summary(tokens = 53_200, limit = null, locale = german))
         assertEquals("32% used of 400.000 tokens", SessionContextText.accessibilityValue(tokens = 128_000, limit = 400_000, locale = german))

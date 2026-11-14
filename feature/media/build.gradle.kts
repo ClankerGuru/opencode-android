@@ -6,8 +6,8 @@ android {
     namespace = "ai.opencode.feature.media"
 }
 
-// Feature dependencies mirror iOS type references; the graph is acyclic:
-// media, voice, system < transcript, composer, settings < session < drawer < app.
+// The graph is acyclic: media, voice, system < transcript, composer, settings < session < drawer <
+// app.
 dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)

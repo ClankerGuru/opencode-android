@@ -21,21 +21,16 @@ import org.robolectric.shadows.ShadowVibrator
 import java.io.File
 
 /**
- * `:core`'s part of iOS `HapticsAuditTests.swift` (`LiveHapticsTests`). The audit suite proper
- * (`HapticsAuditTests`: which Session/Home actions play which `Haptic`) drives `SessionFeature`
- * and `HomeFeature`, so it belongs to `:feature:session` / `:feature:drawer`;
- * `theCallsFallbacksComeFromTheVocabulary` (`VoiceCallHaptic`) belongs to `:feature:voice`.
  * `aRequestArrivingInTheBackgroundPlaysNothing` reads Android's foreground gate
- * (`ProcessLifecycleOwner` + `Vibrator`), so it runs under Robolectric in [LiveHapticsFrameworkTests].
+ * (`ProcessLifecycleOwner` + `Vibrator`), so it runs under Robolectric in
+ * [LiveHapticsFrameworkTests].
  */
 class LiveHapticsTests {
     @get:Rule val isolation = TestIsolationRule()
 
     /**
-     * iOS forbids raw `UIFeedbackGenerator`/`.sensoryFeedback` outside `HapticsClient.swift`.
      * Android's equivalents are the `Vibrator` APIs and Compose/View haptic feedback; only
-     * `HapticsClient.kt` and the voice call's pattern engine (`VoiceHapticEngine.kt`, iOS's
-     * `CHHapticEngine`, which iOS's scan also allows) may use them.
+     * `HapticsClient.kt` and the voice call's pattern engine may use them.
      */
     @Test
     fun noDirectFeedbackGeneratorsOrSensoryFeedbackOutsideHapticsClientAndShareExtension() {
@@ -68,8 +63,8 @@ class LiveHapticsTests {
     }
 
     /**
-     * The + menu opening and choosing its rows feel as light as a photo pick, lighter than
-     * `.tap`'s impact. The `AttachmentMenuPress`/`RecentPhotoPeek` half is `:feature:composer`'s.
+     * The + menu opening and choosing its rows feel as light as a photo pick, lighter than `.tap`'s
+     * impact.
      */
     @Test
     fun thePlusMenusTapsAreAsLightAsAPick() {
@@ -78,11 +73,7 @@ class LiveHapticsTests {
     }
 }
 
-/**
- * [LiveHapticsTests]' foreground gate under Robolectric: iOS's `LiveHaptics(isActive:)` is
- * Android's [LiveHaptics] reading `ProcessLifecycleOwner` (resumed = the app is in front), and a
- * haptic that plays reaches the (shadow) `Vibrator`.
- */
+/** [LiveHapticsTests]' foreground gate under Robolectric. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class LiveHapticsFrameworkTests {

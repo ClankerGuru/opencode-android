@@ -59,11 +59,11 @@ internal object PhotoPillMetrics {
 }
 
 /**
- * The photo sheet's trailing button (iOS `PlusPhotoPillControl`): “All Photos” with no picks
- * (expands the sheet), then “Add 1 Photo” / “Add 2 Photos”. A neutral desktop button (light fill
- * and hairline) that becomes the accent fill once something is picked, as the system photo
- * picker's Done does; the filled button's width follows its label. A long press offers All Photos (with picks) and,
- * under limited access, Select More Photos….
+ * The photo sheet's trailing button: “All Photos” with no picks (expands the sheet), then “Add 1
+ * Photo” / “Add 2 Photos”. A neutral desktop button (light fill and hairline) that becomes the
+ * accent fill once something is picked, as the system photo picker's Done does; the filled button's
+ * width follows its label. A long press offers All Photos (with picks) and, under limited access,
+ * Select More Photos….
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

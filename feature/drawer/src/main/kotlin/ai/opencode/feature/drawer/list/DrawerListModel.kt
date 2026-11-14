@@ -17,12 +17,10 @@ import ai.opencode.server.model.OpenCodeSession
 import java.time.Instant
 
 /*
- * Port of iOS `DrawerListModel.swift`: what the drawer's list shows, built from Home's state in one
- * pass. Rows get these values, never a store. Pure: the list view keys a `LazyColumn` by
- * [DrawerListItem.key] and compares [DrawerListRow]s to decide what recomposes.
+ * What the drawer's list shows, built from Home's state in one pass. Rows get these values, never a
+ * store. Pure: the list view keys a `LazyColumn` by [DrawerListItem.key] and compares
+ * [DrawerListRow]s to decide what recomposes.
  *
- * iOS's `DrawerListStyle` / `DrawerRowStyleSnapshot` (a per-update snapshot of every Tuning Panel
- * value, so UIKit cells never read `TuningStore` while scrolling) has no Android counterpart:
  * `DrawerTunables` are constants here, so rows read them directly.
  */
 
@@ -31,7 +29,7 @@ enum class DrawerListSection { top, pinned, recents }
 sealed interface DrawerListItem {
     data object CatchUp : DrawerListItem
     data object WhatsNew : DrawerListItem
-    /** Under Catch Up while the server has archived sessions (Android; iOS has no Archived page). */
+    /** Under Catch Up while the server has archived sessions. */
     data object Archived : DrawerListItem
     data object DeletionError : DrawerListItem
     data class Header(val kind: DrawerSectionHeaderKind) : DrawerListItem
@@ -77,7 +75,7 @@ data class DrawerListRow(
     /** Whether the row is chosen while the drawer selects rows ([DrawerSelection]); null when it isn't. */
     val checked: Boolean? = null,
 ) {
-    /** TalkBack's state for the row (iOS `accessibilityValue`). */
+    /** TalkBack's state for the row. */
     val accessibilityValue: String
         get() {
             val parts = mutableListOf<String>()
@@ -109,12 +107,12 @@ data class DrawerListShortcuts(
     val showsCatchUp: Boolean get() = catchUpCount > 0 || catchUpFinished
 }
 
-/** The list's view-local inputs beyond Home's state (iOS `DrawerListInputs`, minus UIKit insets). */
+/** The list's view-local inputs beyond Home's state. */
 data class DrawerListInputs(
     val selectedSessionID: String?,
     val reducedMotion: Boolean,
     val increasedContrast: Boolean,
-    /** iOS `DrawerTunables.sectionBreak == .header`: section headers always show. */
+    /** Section headers always show. */
     val alwaysShowsHeaders: Boolean = true,
     /** Server Flow: the server the drawer shows, which may still be connecting. */
     val serverSwap: ServerSwapTarget? = null,
@@ -145,10 +143,10 @@ data class DrawerListModel(
         const val ghostCount = 5
 
         /**
-         * Home's state as the drawer shows it: shortcuts, then Pinned and Recents with their headers.
-         * [timestamp] is iOS `DrawerTimestamp.text(for:now:)`; [project] resolves a row's project
-         * (iOS `OpenCodeProject.resolved(for:in:)`). Every row has a project: a session in the home folder
-         * or at the server's root gets one derived from its directory, so its tile is stable from the first frame.
+         * Home's state as the drawer shows it: shortcuts, then Pinned and Recents with their
+         * headers. [project] resolves a row's project. Every row has a project: a session in the
+         * home folder or at the server's root gets one derived from its directory, so its tile is
+         * stable from the first frame.
          */
         fun build(
             state: HomeFeature.State,
@@ -205,7 +203,7 @@ data class DrawerListModel(
                 if (error != null) add(DrawerListItem.DeletionError)
             }
 
-            // One pass for both lists (iOS f5636460).
+            // One pass for both lists.
             val sessions = state.drawerSessions
             val pinned = sessions.pinned
             val recents = sessions.recents

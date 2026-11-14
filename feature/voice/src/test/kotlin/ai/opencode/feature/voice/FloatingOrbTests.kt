@@ -18,11 +18,10 @@ import kotlin.math.hypot
 
 /**
  * Living Orb's floating orb: its looks, what a touch on it was, how it drifts and rests, and its
- * surface's bounds and lifetime (iOS `FloatingOrbTests` + `FloatingOrbSurfaceTests`).
+ * surface's bounds and lifetime.
  *
- * iOS `aFinishedCallsSurfaceDeallocates(lifts:)` is not ported: it mounts the overlay in a
- * UIKit window and watches the store deallocate, which a JVM unit test can't host. Its Android
- * half, the motions letting go of what they captured, is [stoppingTheLiftLetsGoOfItsRest].
+ * Its Android half, the motions letting go of what they captured, is
+ * [stoppingTheLiftLetsGoOfItsRest].
  */
 class FloatingOrbTests {
     @get:Rule val isolation = TestIsolationRule()

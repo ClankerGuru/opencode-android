@@ -75,12 +75,11 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * iOS `InboxSidebarList.swift` (Inbox Sidebar, experimental): the drawer's sessions as an inbox,
- * one item per session. Tapping opens the session; holding it chooses it ([DrawerSelection]).
+ * The drawer's sessions as an inbox, one item per session. Tapping opens the session; holding it
+ * chooses it ([DrawerSelection]).
  *
- * Android: iOS swipes these rows (Mark as Read, Archive); here a sideways swipe stays the
- * drawer's, as in any navigation drawer, and the actions are in selection mode's bar. Archived
- * sessions are a page of their own ([ArchivedEntryRow], [ArchivedPage]).
+ * A sideways swipe stays the drawer's, as in any navigation drawer; the actions are in selection
+ * mode's bar. Archived sessions are a page of their own ([ArchivedEntryRow], [ArchivedPage]).
  */
 @Composable
 internal fun InboxSidebarList(
@@ -101,7 +100,7 @@ internal fun InboxSidebarList(
     val archiveError by store.observe { it.inboxSidebarStatus.archiveError }
     val snapshotLoaded by store.observe { it.snapshotLoaded }
     val catchUpSessionCount = pluralStringResource(R.plurals.drawer_catch_up_session_count, catchUpCount, catchUpCount)
-    // iOS `TimelineView(.everyMinute)`: ages tick over on the minute.
+    // Ages tick over on the minute.
     var now by remember { mutableStateOf(Instant.now()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -111,9 +110,8 @@ internal fun InboxSidebarList(
     }
     val listState = rememberLazyListState()
     // As in DrawerListView: a list resting at its top stays there when a row arrives above the
-    // first one (the archive error, Catch Up, a session that just got busy), as iOS's List keeps
-    // its zero offset; LazyColumn would keep the old first row anchored by key and leave the new
-    // ones scrolled under the header.
+    // first one (the archive error, Catch Up, a session that just got busy); LazyColumn would keep
+    // the old first row anchored by key and leave the new ones scrolled under the header.
     val restsAtTop = remember { booleanArrayOf(true) }
     LaunchedEffect(listState) {
         snapshotFlow { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 }
@@ -261,7 +259,7 @@ internal fun InboxSidebarSessionRow(
     }
 }
 
-/** iOS `InboxSidebarRowView`: dot, title and age, project, then what the session needs. */
+/** Dot, title and age, project, then what the session needs. */
 @Composable
 internal fun InboxSidebarRowView(row: InboxSidebarRow, now: Instant, checked: Boolean?) {
     val colors = OpenCodeTheme.colors
@@ -301,8 +299,8 @@ internal fun InboxSidebarRowView(row: InboxSidebarRow, now: Instant, checked: Bo
             Box(Modifier.size(8.dp).background(if (row.unread) colors.signal else Color.Transparent, CircleShape))
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            // iOS: Text + Spacer(minLength: 8) + age. The title takes all the width the age
-            // leaves (a second weighted spacer would cap it at half), so the age stays trailing.
+            // Text + Spacer(minLength: 8) + age. The title takes all the width the age leaves (a
+            // second weighted spacer would cap it at half), so the age stays trailing.
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     row.title,
@@ -342,6 +340,5 @@ internal fun rememberInboxSidebarOn(): Boolean {
 
 internal object InboxSidebarMetrics {
     val edge = 20.dp
-    /** iOS `.orange` beside Needs your input. */
     val needsInputTint = Color(0xFFFF9F0A)
 }

@@ -20,8 +20,8 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 
 /**
- * Whether no call, dictation or media holds the audio session (part of iOS's `AudioSessionOwner`).
- * The app installs the owner from `:feature:voice`; until then the system audio mode is read.
+ * Whether no call, dictation or media holds the audio session. The app installs the owner from
+ * `:feature:voice`; until then the system audio mode is read.
  */
 interface AudioSessionIdleState {
     fun <T> withIdleState(body: (isIdle: Boolean) -> T): T
@@ -53,17 +53,13 @@ sealed interface SoundEffectsEvent {
     data object ResignedActive : SoundEffectsEvent
     data object EnteredBackground : SoundEffectsEvent
 
-    /** iOS `AVAudioSession.interruptionNotification`; Android: a call or communication mode. */
+    /** Android: a call or communication mode. */
     data class Interruption(val began: Boolean) : SoundEffectsEvent
 
-    /**
-     * iOS `routeChangeNotification`. [ownConfiguration] is iOS's `.categoryChange` /
-     * `.routeConfigurationChange`, which activating for a sound posts itself.
-     */
     data class RouteChange(val ownConfiguration: Boolean = false) : SoundEffectsEvent
 }
 
-/** The observers playback registers with (iOS `NotificationCenter`; a plain one in tests). */
+/** The observers playback registers with. */
 class SoundEffectsEventCenter {
     private val lock = Any()
     private val observers = mutableListOf<(SoundEffectsEvent) -> Unit>()
@@ -85,10 +81,10 @@ interface SoundEffectsAudio {
     /** Reads the sounds into memory. Never touches the audio session. */
     fun load()
 
-    /** iOS `.ambient`, then active: only right before a permitted play. */
+    /** Then active: only right before a permitted play. */
     fun activate()
 
-    /** iOS: inactive with `.notifyOthersOnDeactivation`, so other apps' audio resumes. */
+    /** Inactive with `.notifyOthersOnDeactivation`, so other apps' audio resumes. */
     fun deactivate()
 
     /** Starts [effect]. [finished] runs once it plays out, never after [stop]. */
@@ -202,7 +198,7 @@ class SoundEffectsPlayback(
     companion object {
         /**
          * What ends a sound early. Our own configuration change doesn't: activating for a sound
-         * posts it on iOS.
+         * posts it.
          */
         fun stopReason(event: SoundEffectsEvent): StopReason? = when (event) {
             SoundEffectsEvent.EnteredBackground -> StopReason.background

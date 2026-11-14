@@ -61,14 +61,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
-/** The fill iOS gives cards (`secondarySystemBackground`): the user bubble's colour. */
+/** The user bubble's colour. */
 @Composable
 internal fun cardFill(): Color = OpenCodeTheme.colors.userBubble
 
 /**
- * Sent files on a user message, trailing like the message's images. An uploaded file opens in
- * the viewer from the server's copy (iOS `Composer/FileAttachmentViews.swift`
- * `TranscriptFileChips`, with media's `FileAttachmentCard`).
+ * Sent files on a user message, trailing like the message's images. An uploaded file opens in the
+ * viewer from the server's copy.
  */
 @Composable
 internal fun TranscriptFileChips(
@@ -77,8 +76,7 @@ internal fun TranscriptFileChips(
     trailingCorners: UserSurfaceCorners = UserSurfaceCorners.round,
     modifier: Modifier = Modifier,
 ) {
-    // iOS anchors the row trailing only `for: .alignment`: a row that fits sits at the end, one
-    // that doesn't starts at its first card.
+    // A row that fits sits at the end, one that doesn't starts at its first card.
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
         val scroll = rememberScrollState()
         Row(
@@ -132,9 +130,9 @@ private fun FileChip(file: OpenCodeTranscriptFile, onOpen: ((AgentFileReference)
 }
 
 /**
- * A long paste's card: its name, length and first lines fading out (iOS `PastedTextCard`). A tap
- * opens the whole text in the Pasted Text viewer, zooming out of the card (its zoom source is
- * `pasted-<file id>`); the session presents it for [TranscriptAction.OpenPastedText].
+ * A long paste's card: its name, length and first lines fading out. A tap opens the whole text in
+ * the Pasted Text viewer, zooming out of the card (its zoom source is `pasted-<file id>`); the
+ * session presents it for [TranscriptAction.OpenPastedText].
  */
 @Composable
 internal fun PastedTextCard(id: String, text: String, summary: PastedTextSummary, corners: UserSurfaceCorners) {
@@ -166,7 +164,7 @@ internal fun PastedTextCard(id: String, text: String, summary: PastedTextSummary
                 color = OpenCodeTheme.colors.text,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                // iOS `Spacer(minLength: 6)` gives way before the title does.
+                // The spacer gives way before the title does.
                 modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(6.dp))
@@ -204,8 +202,8 @@ internal fun PastedTextCard(id: String, text: String, summary: PastedTextSummary
 }
 
 /**
- * A shared location's card: a map, its place and address, and its coordinates (iOS
- * `SharedLocationCard`, the sent card only). Tapping opens the maps link.
+ * A shared location's card: a map, its place and address, and its coordinates. Tapping opens the
+ * maps link.
  */
 @Composable
 internal fun SharedLocationCard(
@@ -238,8 +236,8 @@ internal fun SharedLocationCard(
                 onClick(openInMapsLabel) { onOpen(location.mapsURL); true }
             },
     ) {
-        // iOS `SharedLocationMap`: a still map under the pin. Android has no MapKit snapshot (the
-        // composer's `LocationClient.snapshot` seam is empty too), so the tile and pin alone.
+        // A still map under the pin. Android has no MapKit snapshot (the composer's
+        // `LocationClient.snapshot` seam is empty too), so the tile and pin alone.
         Box(
             Modifier
                 .fillMaxWidth()
@@ -281,8 +279,8 @@ internal fun SharedLocationCard(
 }
 
 /**
- * A message's images, trailing: 200 alone, 130 each when several; up to three fit the column,
- * more scroll, starting at the first image (iOS `TranscriptUserMessageView.images`).
+ * A message's images, trailing: 200 alone, 130 each when several; up to three fit the column, more
+ * scroll, starting at the first image.
  */
 @Composable
 internal fun UserMessageImages(
@@ -311,8 +309,7 @@ internal fun UserMessageImages(
             .graphicsLayer { alpha = if (isPending) 0.6f else 1f },
         contentAlignment = Alignment.CenterEnd,
     ) {
-        // iOS anchors the strip trailing only `for: .alignment`: a strip that fits sits at the end,
-        // one that doesn't starts at its first image.
+        // A strip that fits sits at the end, one that doesn't starts at its first image.
         if (images.size <= 3) {
             strip(Modifier)
         } else {

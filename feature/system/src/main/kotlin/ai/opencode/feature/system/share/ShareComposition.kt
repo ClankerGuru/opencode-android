@@ -10,9 +10,8 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Port of iOS `ShareComposition`: the share sheet's decisions, kept apart from its views: which
- * session it opens on, what a send asks the server for, what a failure offers, and what it
- * leaves for the app.
+ * The share sheet's decisions, kept apart from its views: which session it opens on, what a send
+ * asks the server for, what a failure offers, and what it leaves for the app.
  */
 object ShareComposition {
     /** Send → Sent → close, so it reads as one motion and never flashes. */
@@ -156,7 +155,7 @@ object ShareComposition {
         return (listOf(line).filter { it.isNotEmpty() } + parts).joinToString(" · ")
     }
 
-    /** iOS `count > limit ? prefix(limit - 1) + "…"`, counting grapheme clusters (Swift `Character`s). */
+    /** Counting grapheme clusters. */
     private fun clippedCharacters(text: String, limit: Int): String {
         val breaks = java.text.BreakIterator.getCharacterInstance().apply { setText(text) }
         val boundaries = ArrayList<Int>()
@@ -168,6 +167,5 @@ object ShareComposition {
         return text.substring(0, boundaries[limit - 2]) + "…"
     }
 
-    /** Swift's `Character.isNewline`. */
     private val NEWLINES = Regex("\r\n|[\n\r\u000B\u000C\u0085\u2028\u2029]")
 }

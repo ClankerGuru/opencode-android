@@ -69,14 +69,12 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /*
- * Port of iOS `DrawerListSupportCells.swift`: the list's rows that aren't sessions: the Pinned and
- * Recents headers (or a gap or hairline between sections), Catch Up and What’s New above them
- * collapsing on the drawer's shortcut spring, no sessions / no results, and a failed deletion.
- * iOS hosts the SwiftUI ones in collection view cells (`DrawerListHostedCell`, whose safe-area
- * override has no Compose counterpart); here they are plain items of the same `LazyColumn`.
+ * The list's rows that aren't sessions: the Pinned and Recents headers (or a gap or hairline
+ * between sections), Catch Up and What’s New above them collapsing on the drawer's shortcut spring,
+ * no sessions / no results, and a failed deletion. They are plain items of the same `LazyColumn`.
  */
 
-/** Pinned or Recents, as a header row or a gap or hairline between sections (iOS `DrawerListHeaderCell`). */
+/** Pinned or Recents, as a header row or a gap or hairline between sections. */
 @Composable
 fun DrawerListHeaderCell(kind: DrawerSectionHeaderKind, pinDrag: DrawerPinDrag, modifier: Modifier = Modifier) {
     val title = if (kind == DrawerSectionHeaderKind.Pinned) stringResource(R.string.drawer_section_pinned) else stringResource(R.string.drawer_section_recents)
@@ -135,9 +133,8 @@ enum class DrawerListShortcutKind { CatchUp, WhatsNew }
 
 /**
  * Catch Up or What’s New above the sections, collapsing on the drawer's shortcut spring
- * ([DrawerShortcutMotion]): height, insets, scale and blur. The row reads the motion in its
- * layout and layer blocks, so the spring never recomposes the list (iOS: never reaches the
- * collection view as anything but a size change).
+ * ([DrawerShortcutMotion]): height, insets, scale and blur. The row reads the motion in its layout
+ * and layer blocks, so the spring never recomposes the list.
  */
 @Composable
 fun DrawerListShortcutRow(
@@ -253,8 +250,8 @@ private fun CatchUpButton(
 }
 
 /**
- * The What’s New row (iOS `WhatsNewButton` in `Settings/WhatsNew/WhatsNewView.swift`): a gift, the
- * title and an accent dot; holding it offers Hide. Drawn here because the drawer owns the row.
+ * The What’s New row: a gift, the title and an accent dot; holding it offers Hide. Drawn here
+ * because the drawer owns the row.
  */
 @Composable
 fun DrawerWhatsNewButton(action: () -> Unit, onHide: () -> Unit, modifier: Modifier = Modifier) {
@@ -297,10 +294,10 @@ fun DrawerWhatsNewButton(action: () -> Unit, onHide: () -> Unit, modifier: Modif
 }
 
 /**
- * The shortcut's collapse (iOS `DrawerListShortcutRow.collapse`): scale toward the top
- * ([DrawerMotionTunables.SHORTCUT_SCALE]), `MotionBlurReveal` (fade, blur up to
- * [DrawerMotionTunables.shortcutBlur]), height `rowHeight × progress` until open, insets, and no
- * touches unless it wants to be open. Everything per frame is read in layout and layer blocks.
+ * The shortcut's collapse: scale toward the top ([DrawerMotionTunables.SHORTCUT_SCALE]),
+ * `MotionBlurReveal` (fade, blur up to [DrawerMotionTunables.shortcutBlur]), height `rowHeight ×
+ * progress` until open, insets, and no touches unless it wants to be open. Everything per frame is
+ * read in layout and layer blocks.
  */
 @Composable
 private fun Collapse(
@@ -343,14 +340,14 @@ private fun Collapse(
     }
 }
 
-/** iOS `.allowsHitTesting(false)`: takes the touches so nothing in the row reacts. */
+/** Takes the touches so nothing in the row reacts. */
 private fun Modifier.blockingTouches(): Modifier = pointerInput(Unit) {
     awaitPointerEventScope {
         while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
     }
 }
 
-/** No sessions, or no results for a search, on the text edge (iOS `DrawerListEmptyRow`). */
+/** No sessions, or no results for a search, on the text edge. */
 @Composable
 fun DrawerListEmptyRow(search: String, modifier: Modifier = Modifier) {
     Column(
@@ -375,7 +372,7 @@ fun DrawerListEmptyRow(search: String, modifier: Modifier = Modifier) {
 
 /**
  * Under the last row: a spinner while the next page is read, or the read that failed with Try
- * Again (iOS `DrawerListFooterRow`; Material's progress indicator and text button).
+ * Again.
  */
 @Composable
 fun DrawerListFooterRow(footer: DrawerListFooter, retry: () -> Unit, modifier: Modifier = Modifier) {
@@ -412,7 +409,7 @@ fun DrawerListFooterRow(footer: DrawerListFooter, retry: () -> Unit, modifier: M
     }
 }
 
-/** A deletion that failed, above the sections (iOS `DrawerListDeletionErrorRow`). */
+/** A deletion that failed, above the sections. */
 @Composable
 fun DrawerListDeletionErrorRow(message: String, modifier: Modifier = Modifier) {
     val red = OpenCodeTheme.colors.destructive

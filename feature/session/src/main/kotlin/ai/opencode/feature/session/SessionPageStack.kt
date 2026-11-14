@@ -72,13 +72,12 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * A screen pushed over the session (a subagent, or a web page), keyed by its identity (iOS
- * `SessionStackPage`). The page's UI comes from [SessionPageStack]'s `content` slot, not from
- * this value.
+ * A screen pushed over the session (a subagent, or a web page), keyed by its identity. The page's
+ * UI comes from [SessionPageStack]'s `content` slot, not from this value.
  *
  * @property id the page's identity; a page keeps its composition (scroll, tasks) while its id stays.
- * @property paneTitle what TalkBack announces when the stack comes to rest with this page on top
- *   (Android's form of iOS's `UIAccessibility.screenChanged`); null announces nothing.
+ * @property paneTitle What TalkBack announces when the stack comes to rest with this page on top;
+ *     null announces nothing.
  * @property yieldsBackSwipe while true the stack's back gestures stand aside on this page: a web
  *   page with its own history goes back through it first (its own back handler and pan), as
  *   Safari does. Read when the stack recomposes and when a pan starts.
@@ -91,10 +90,10 @@ class SessionStackPage(
 )
 
 /**
- * Subagent (and browser) screens pushed over the session, like a navigation stack (iOS
- * `SessionPageStack`). Pushes and pops use Material's shared axis X ([PageTransitions]); going back
- * (a rightward pan under [BackSwipeRules], or predictive back) is Android's back preview, springing
- * back on cancel ([Motion.drawerSlide]). Under Reduce Motion they cross-fade.
+ * Subagent (and browser) screens pushed over the session, like a navigation stack. Pushes and pops
+ * use Material's shared axis X ([PageTransitions]); going back (a rightward pan under
+ * [BackSwipeRules], or predictive back) is Android's back preview, springing back on cancel
+ * ([Motion.drawerSlide]). Under Reduce Motion they cross-fade.
  *
  * Covered screens stay composed (each in its own
  * [androidx.compose.runtime.saveable.SaveableStateHolder] entry), so their scroll position and
@@ -292,9 +291,8 @@ private fun sharedAxisAlpha(distance: Float, incoming: Boolean): Float {
 
 /**
  * One page's horizontal scrollers (code, tables, attachments), also passed on to the drawer's
- * regions: the back pan leaves a rightward drag to a scroller on the top page that can still
- * scroll back toward its start (iOS `BackSwipeRules.scrollerClaims`). Covered pages stay laid
- * out under the top one, so each page keeps its own.
+ * regions: the back pan leaves a rightward drag to a scroller on the top page that can still scroll
+ * back toward its start. Covered pages stay laid out under the top one, so each page keeps its own.
  */
 private class PageHorizontalScrollers(private val drawer: DrawerPanExclusion?) : DrawerPanExclusion {
     private class Scroller(val coordinates: LayoutCoordinates, val canScrollBackward: () -> Boolean)
@@ -340,11 +338,10 @@ internal enum class StackTransition { Push, Pop, Back }
 private const val ROOT_KEY = "ai.opencode.session.stack.root"
 
 /**
- * The rightward back pan over a pushed page (iOS `BackPanGestureRecognizer`), from anywhere,
- * under [BackSwipeRules]: an edge touch always takes it; elsewhere a touch on a horizontal
- * scroller that can still scroll back ([scrollerClaims], decided at touch-down as iOS does), a
- * drag already claimed by content under the finger (a slider), or one begun after a rest keeps
- * doing that. It watches after the content (main pass) until it chooses, then takes the touch (initial
+ * The rightward back pan over a pushed page, from anywhere, under [BackSwipeRules]: an edge touch
+ * always takes it; elsewhere a touch on a horizontal scroller that can still scroll back, a drag
+ * already claimed by content under the finger (a slider), or one begun after a rest keeps doing
+ * that. It watches after the content (main pass) until it chooses, then takes the touch (initial
  * pass, consuming), so content under the finger lets go.
  */
 private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.backPan(
@@ -478,7 +475,7 @@ internal class SessionPageStackMotion(
         return (1f - (progress - commitFrom) / left).coerceIn(0f, 1f)
     }
 
-    /** iOS `pan.isActive`, minus `isEnabled` (the composable's `enabled`). */
+    /** Minus `isEnabled` (the composable's `enabled`). */
     fun panActive(): Boolean = canGoBack && !isPopping && pages.lastOrNull()?.yieldsBackSwipe?.invoke() != true
 
     /**
@@ -638,7 +635,6 @@ internal class SessionPageStackMotion(
         job = scope.launch {
             motionFrameLoop(frameDurationSeconds = frameDuration) { tick ->
                 elapsed += tick.dt
-                // iOS `Motion.reduced.animate(reduceMotion: true)`.
                 val t = min(elapsed / Motion.reduced.curve(reduceMotion = true).duration, 1.0).toFloat()
                 topAlpha = from + (to - from) * Motion.EaseInOut.transform(t)
                 if (t >= 1f) {
@@ -662,7 +658,7 @@ internal class SessionPageStackMotion(
     private fun stopMotion() {
         job?.cancel()
         job = null
-        // A cross-fade cut short ends where it was going, as UIKit's animation would.
+        // A cross-fade cut short ends where it was going.
         if (fading) {
             fading = false
             topAlpha = 1f
@@ -675,9 +671,9 @@ internal class SessionPageStackMotion(
     }
 
     /**
-     * iOS `SessionPageStack.touchRecovery` inspect: a pop whose page has already left (slid off
-     * the edge or faded out) but never landed still has the leaving page on top taking every
-     * touch. A drag in flight or a pop still on screen keeps its transition.
+     * A pop whose page has already left (slid off the edge or faded out) but never landed still has
+     * the leaving page on top taking every touch. A drag in flight or a pop still on screen keeps
+     * its transition.
      */
     fun strandedPopFault(): TouchRecovery.Fault? {
         if (!isPopping || dragging || landing == null) return null
@@ -777,9 +773,8 @@ internal class SessionPageStackMotion(
 }
 
 /**
- * The drawer's spring for one page slide (iOS `BackSwipeSpring` driving `DrawerSpring.step`):
- * critically damped at [Motion.drawerSlide]'s ω, stopping on the edge rather than passing it.
- * Distances in dp (iOS points), velocity in dp/s.
+ * The drawer's spring for one page slide: critically damped at [Motion.drawerSlide]'s ω, stopping
+ * on the edge rather than passing it. Distances in dp, velocity in dp/s.
  */
 private class PageStackSpring(position: Float, var velocity: Float, target: Float, upper: Float) {
     private val lower = 0f

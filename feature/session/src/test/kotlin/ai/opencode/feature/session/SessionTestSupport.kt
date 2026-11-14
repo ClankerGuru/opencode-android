@@ -26,21 +26,17 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 
 /**
- * Shared setup for the ports of the iOS session tests (`SessionFeatureTests` and its
- * extensions, `RunErrorTests`, `RequestAnswerTests`, …). iOS keeps these helpers on the
- * `SessionFeatureTests` struct (`testServer`, `testSession`, `makeState`); here they live in
- * one object so test files never clash. File-specific helpers stay private to their file.
+ * They live in one object so test files never clash. File-specific helpers stay private to their
+ * file.
  */
 internal object SessionTestSupport {
-    /** iOS `testServer`. */
     val testServer = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
 
-    /** Swift's `Date.distantPast`. */
     val distantPast: Instant = Instant.parse("0001-01-01T00:00:00Z")
 
     fun date(seconds: Long): Instant = Instant.ofEpochSecond(seconds)
 
-    /** iOS `testSession(...)` (`updatedAt: .now` → a fixed instant; tests compare ids, not dates). */
+    /** `updatedAt` is a fixed instant; tests compare ids, not dates. */
     fun testSession(
         id: String = "ses_1",
         title: String = "Chat",
@@ -64,7 +60,6 @@ internal object SessionTestSupport {
         agent = agent,
     )
 
-    /** iOS `LockIsolated`. */
     class LockIsolated<T>(initial: T) {
         @Volatile private var current: T = initial
         val value: T get() = synchronized(this) { current }
@@ -77,20 +72,17 @@ internal object SessionTestSupport {
         fun update(block: (T) -> T) = synchronized(this) { current = block(current) }
     }
 
-    /**
-     * iOS `$0.$modelDisplayNamesByServer.withLock { $0[server.persistenceID] = .init(models: …) }`
-     * inside a receive. `Shared` compares by reference, so the port checks the write after it.
-     */
+    /** `Shared` compares by reference, so the port checks the write after it. */
     fun SessionFeature.State.assertRemembersModelNames(models: List<OpenCodeModel>) =
         org.junit.Assert.assertEquals(ModelDisplayNames(models), modelDisplayNamesByServer.value[server.persistenceID])
 
     fun <T> LockIsolated<List<T>>.append(value: T) = update { it + value }
     fun LockIsolated<Int>.increment(): Int = withValue { (it + 1) to (it + 1) }
 
-    /** Lets launched effects run (iOS effects start eagerly on the main actor). */
+    /** Lets launched effects run. */
     suspend fun settle(times: Int = 50) = repeat(times) { yield() }
 
-    /** Records played haptics (iOS `HapticsClient.recording`). */
+    /** Records played haptics. */
     class HapticsRecorder {
         private val played = mutableListOf<Haptic>()
         val log: List<Haptic> get() = synchronized(played) { played.toList() }
@@ -98,10 +90,9 @@ internal object SessionTestSupport {
     }
 
     /**
-     * One test's dependency world: an in-memory shared store that states (built before the
-     * store, as iOS does) and stores share, and the scope effects run in. The store's scope is
-     * not a child of the test, so effects a test leaves running are cancelled by
-     * [skipInFlightEffects] (iOS `store.skipInFlightEffects()`), and at the end of [sessionTest].
+     * One test's dependency world: an in-memory shared store that states and stores share, and the
+     * scope effects run in. The store's scope is not a child of the test, so effects a test leaves
+     * running are cancelled by [skipInFlightEffects], and at the end of [sessionTest].
      */
     class Harness(scope: CoroutineScope) {
         val sharedStore: SharedStore = SharedStore.inMemory()
@@ -117,7 +108,6 @@ internal object SessionTestSupport {
         /** Builds a value that reads shared keys (a `SessionFeature.State`) in this world. */
         fun <R> state(block: () -> R): R = DependencyValues.withValues(values, block)
 
-        /** iOS `makeState(...)` (`SessionFeatureTests`). */
         fun makeState(
             session: OpenCodeSession? = null,
             cachedItems: List<OpenCodeTranscriptItem> = emptyList(),
@@ -136,8 +126,8 @@ internal object SessionTestSupport {
         }
 
         /**
-         * iOS `TestStore(initialState:) { SessionFeature() } withDependencies: { … }`. The reducer is
-         * built inside the store's dependencies, since `SessionFeature` reads some at construction.
+         * The reducer is built inside the store's dependencies, since `SessionFeature` reads some
+         * at construction.
          */
         fun store(
             state: SessionFeature.State,
@@ -176,11 +166,10 @@ internal object SessionTestSupport {
         }
     }
 
-    /** iOS `withDependencies { … } operation: { … }` in a test: a test container with these overrides. */
+    /** A test container with these overrides. */
     suspend fun <R> withTestDependencies(update: DependencyValues.Builder.() -> Unit, block: suspend () -> R): R =
         withContext(DependencyValues.testing().update(update).asContextElement()) { block() }
 
-    /** iOS `store.receive(\.case)`. */
     suspend fun <S, A : Any, T : A> TestStore<S, A>.receive(
         case: KClass<T>,
         timeout: Duration = 5.seconds,

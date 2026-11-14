@@ -24,9 +24,8 @@ import java.util.Locale
 import java.util.UUID
 
 /**
- * Where a composer file comes from (iOS `ComposerFileSource`). Every source ends as a private
- * staged copy the upload streams from. Pickers, drops and transcript files all arrive as [Uri]s, so
- * iOS's `.url` and `.itemProvider` are both [Url].
+ * Where a composer file comes from. Every source ends as a private staged copy the upload streams
+ * from. Pickers, drops and transcript files all arrive as [Uri]s.
  */
 sealed interface ComposerFileSource {
     /** From the Files picker (`ACTION_OPEN_DOCUMENT`) or a dropped file. */
@@ -58,8 +57,8 @@ object ComposerFileRouting {
 }
 
 /**
- * Stages picked files off the main thread (iOS `ComposerFileImporter`). File imports don't
- * supersede one another. [isLoading] is Compose state.
+ * Stages picked files off the main thread. File imports don't supersede one another. [isLoading] is
+ * Compose state.
  */
 class ComposerFileImporter(private val scope: CoroutineScope) {
     private var active by mutableIntStateOf(0)
@@ -154,7 +153,7 @@ object ComposerUriStaging {
 
 /**
  * The system pickers behind the + menu's Files and Photos. Activity results need an Activity, so
- * the screen launches these intents and routes the result [uris] like iOS's `importPickedFiles`.
+ * the screen launches these intents and routes the result [uris].
  */
 object ComposerPickers {
     /** Files: any document, several at once. */
@@ -182,7 +181,7 @@ object ComposerPickers {
         return listOfNotNull(data.data)
     }
 
-    /** iOS `InlinePhotoSelection.isVideo`: a picked item whose type is a movie. */
+    /** A picked item whose type is a movie. */
     fun isVideo(uri: Uri, context: Context = dependency(AppContext)): Boolean =
         context.contentResolver.getType(uri)?.startsWith("video/") == true
 }

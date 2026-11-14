@@ -43,15 +43,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-// The cards of iOS `Composer/FileAttachmentViews.swift` the agent's files share with the
-// composer: `FileAttachmentCard` and `AgentFileCards`. They live here, below the composer and
-// the transcript, because media's image gallery shows file cards between its previews; the
-// composer's own chips (`ComposerFileChip`, `TranscriptFileChips`) stay in `:feature:composer`.
+// `FileAttachmentCard` and `AgentFileCards`. They live here, below the composer and the transcript,
+// because media's image gallery shows file cards between its previews; the composer's own chips
+// (`ComposerFileChip`, `TranscriptFileChips`) stay in `:feature:composer`.
 
 /**
- * The two-line file card desktop uses for attachments (session-ui `AttachmentCard`): the name
- * above a type label, here with a type glyph (iOS `FileAttachmentCard`). [symbolName] is an
- * SF Symbol name.
+ * The two-line file card desktop uses for attachments (session-ui `AttachmentCard`): the name above
+ * a type label, here with a type glyph. [symbolName] is an SF Symbol name.
  */
 @Composable
 fun FileAttachmentCard(
@@ -96,7 +94,7 @@ fun FileAttachmentCard(
     }
 }
 
-/** How many lines a card's detail may take (iOS `.lineLimit(detailLines)`). */
+/** How many lines a card's detail may take. */
 internal val LocalFileAttachmentDetailLines = compositionLocalOf { 1 }
 
 /** A card's detail text with the card's line limit. */
@@ -112,9 +110,9 @@ fun FileAttachmentDetail(text: String, modifier: Modifier = Modifier, color: Col
 }
 
 /**
- * Media and documents the agent pointed at, beneath the paragraph that names them (iOS
- * `AgentFileCards`). Each opens in the viewer, which flies from its card, and drags the file out
- * to other apps with [LocalMediaDragContext]'s server.
+ * Media and documents the agent pointed at, beneath the paragraph that names them. Each opens in
+ * the viewer, which flies from its card, and drags the file out to other apps with
+ * [LocalMediaDragContext]'s server.
  */
 @Composable
 fun AgentFileCards(files: List<AgentFileReference>, onOpen: (AgentFileReference) -> Unit, modifier: Modifier = Modifier) {
@@ -134,8 +132,8 @@ fun AgentFileCards(files: List<AgentFileReference>, onOpen: (AgentFileReference)
                 trailingSymbolName = if (file.kind.isTimeBased) "play.fill" else "chevron.right",
                 modifier = Modifier
                     .heightIn(min = 48.dp)
-                    // Holding drags the file out (iOS `.transcriptDragSource(.agentFile(file:))`), served by
-                    // the row's context; outside the clip and fill so the lifted card is the card as drawn.
+                    // Holding drags the file out, served by the row's context; outside the clip and
+                    // fill so the lifted card is the card as drawn.
                     .mediaDragSource(MediaDragPayload.AgentFile(file))
                     .clip(shape)
                     .background(OpenCodeTheme.colors.userBubble)

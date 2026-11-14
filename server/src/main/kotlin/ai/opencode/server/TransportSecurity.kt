@@ -4,12 +4,12 @@ import okhttp3.Interceptor
 import java.net.UnknownServiceException
 
 /**
- * Plain HTTP only to private networks (iOS App Transport Security). Android's network security
- * config can't name address ranges, so the manifest permits cleartext and this refuses the rest
- * with the platform's own [UnknownServiceException].
+ * Plain HTTP only to private networks. Android's network security config can't name address ranges,
+ * so the manifest permits cleartext and this refuses the rest with the platform's own
+ * [UnknownServiceException].
  */
 object TransportSecurity {
-    /** Overlay and private-use names ATS's local networking misses (iOS `NSExceptionDomains`, with subdomains). */
+    /** Overlay and private-use names ATS's local networking misses. */
     private val exceptionDomains = listOf("ts.net", "netbird.cloud", "netbird.selfhosted", "home.arpa", "internal")
 
     /** Whether a plain-HTTP load to [host] is allowed. */

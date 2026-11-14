@@ -97,9 +97,9 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-// Port of iOS `Session/ComposerViews.swift`: the composer's layout, controls, pills and banners.
+// The composer's layout, controls, pills and banners.
 
-/** iOS `ComposerTextStyle`: Dynamic Type text styles for the message field and placeholder. */
+/** Dynamic Type text styles for the message field and placeholder. */
 enum class ComposerTextStyle(val rawValue: String) {
     footnote("footnote"), subheadline("subheadline"), callout("callout"), body("body"), headline("headline");
 
@@ -114,13 +114,12 @@ enum class ComposerTextStyle(val rawValue: String) {
 }
 
 /**
- * iOS `ComposerTunables`: the composer's size, spacing and control geometry, as the shipped
- * defaults (dp for iOS points, seconds for durations). The developer Tuning Panel isn't ported.
- * Visual sizes are separate from hit targets, which stay at least 48 dp.
+ * The composer's size, spacing and control geometry, as the shipped defaults. The developer Tuning
+ * Panel isn't ported. Visual sizes are separate from hit targets, which stay at least 48 dp.
  */
 object ComposerTunables {
     const val barHeight = 56f
-    /** The desktop dock's 12 (iOS's capsule is 28). */
+    /** The desktop dock's 12. */
     const val cornerRadius = 12f
     val textStyle = ComposerTextStyle.body
 
@@ -170,13 +169,13 @@ object ComposerTunables {
     /** The composer's mic glyph; the Call Tray's Mute wears the same one (OC-473). */
     const val micSymbol = "mic"
 
-    /** iOS `micFont`: body medium at the default 17 pt. */
+    /** Body medium at the default 17 pt. */
     val micFont: TextStyle get() = OpenCodeTextStyles.body.copy(fontWeight = FontWeight.Medium)
 }
 
 // region ComposerLayout
 
-/** iOS `VerticalAlignment.composerFoldTop`: where a subview of a folded [ComposerFoldLayout] starts to stay. */
+/** Where a subview of a folded [ComposerFoldLayout] starts to stay. */
 val ComposerFoldTop = HorizontalAlignmentLine(::min)
 
 /**
@@ -185,10 +184,9 @@ val ComposerFoldTop = HorizontalAlignmentLine(::min)
  */
 val ComposerOverflowTop = HorizontalAlignmentLine(::min)
 
-/** iOS `ComposerLayout.Inline`: answering a pending request, the field stays on the control row. */
+/** Answering a pending request, the field stays on the control row. */
 data class ComposerLayoutInline(val hasLeading: Boolean, val lineHeight: Float)
 
-/** iOS `ComposerLayout`'s statics. */
 object ComposerLayoutMetrics {
     /** Expanded, the text starts where the +'s ink does. */
     val expandedTextInset: Float get() = ComposerTunables.expandedTextLeading
@@ -197,10 +195,9 @@ object ComposerLayoutMetrics {
     val configuredRowHeight: Float get() = max(32f, ComposerTunables.barHeight - 2 * ComposerTunables.innerVertical)
 
     /**
-     * iOS `pickerTargetDrop`: how far the row's pickers (model, agent) sit their targets below
-     * their ink, down to the glass's bottom edge (the composer pads its bottom by
-     * `innerVertical`), away from the text above. Taps aimed at the text kept opening the model
-     * picker.
+     * How far the row's pickers (model, agent) sit their targets below their ink, down to the
+     * glass's bottom edge (the composer pads its bottom by `innerVertical`), away from the text
+     * above. Taps aimed at the text kept opening the model picker.
      *
      * Only the pickers: they're bare text with no visible edge, so where their target sits can't
      * be seen. + and the mic, Send and Call are glass or circle faces, and their target stays on
@@ -226,16 +223,16 @@ object ComposerLayoutMetrics {
 }
 
 /**
- * iOS `ComposerLayout`: three stable children (input, leading controls, trailing control). Only
- * their placement changes, so keyboard focus never moves to a replacement field. Provides
- * [ComposerFoldTop] where the control row starts, so a folded [ComposerFoldLayout] keeps only it.
+ * Three stable children (input, leading controls, trailing control). Only their placement changes,
+ * so keyboard focus never moves to a replacement field. Provides [ComposerFoldTop] where the
+ * control row starts, so a folded [ComposerFoldLayout] keeps only it.
  *
  * [progress] is the row's expansion, 0 collapsed … 1 expanded, read frame by frame from the
- * keyboard morph (iOS `KeyboardDrivenComposerLayout`); the field insets its first line by
- * `expandedTopInset` × progress itself (`topInsetFraction`), so its lines are measured without it.
+ * keyboard morph; the field insets its first line by `expandedTopInset` × progress itself
+ * (`topInsetFraction`), so its lines are measured without it.
  *
- * Android: control slots are measured at least 48 dp tall (touch targets) and centre on the
- * 44 dp visual row, overhanging it by 2 dp each side, as iOS's targets do past its glass.
+ * Android: control slots are measured at least 48 dp tall (touch targets) and centre on the 44 dp
+ * visual row, overhanging it by 2 dp each side.
  *
  * Android: offered less height than it wants (a short window with the keys up), the field gives
  * way down to [inputLineHeight] (one line, dp), and scrolls; the control row never does. Past
@@ -325,17 +322,17 @@ fun ComposerLayout(
 
 private object ComposerFoldsMarker
 
-/** iOS `composerFolds()`: folds away with the composer while dictating (a [ComposerFoldLayout] child). */
+/** Folds away with the composer while dictating (a [ComposerFoldLayout] child). */
 fun Modifier.composerFolds(): Modifier = layoutId(ComposerFoldsMarker)
 
 /**
- * iOS `ComposerFoldLayout`: the composer's column (attachments, the field and its controls, status
- * lines), stacked like a leading column. Folded, it's only as tall as what stays: the children not
- * marked [composerFolds], from their [ComposerFoldTop] line down. Everything else keeps its place,
- * outside the bounds, for the composer's (clipped) edge to pass over.
+ * The composer's column (attachments, the field and its controls, status lines), stacked like a
+ * leading column. Folded, it's only as tall as what stays: the children not marked [composerFolds],
+ * from their [ComposerFoldTop] line down. Everything else keeps its place, outside the bounds, for
+ * the composer's (clipped) edge to pass over.
  *
- * @param foldProgress 0 unfolded … 1 folded; animate it (iOS animates the layout itself).
- * @param attachmentRevealProgress the location row's reveal (iOS `Animatable` data).
+ * @param foldProgress 0 unfolded … 1 folded; animate it.
+ * @param attachmentRevealProgress The location row's reveal.
  */
 @Composable
 fun ComposerFoldLayout(
@@ -396,9 +393,8 @@ fun ComposerFoldLayout(
 private val Measurable.folds: Boolean get() = layoutId == ComposerFoldsMarker
 
 /**
- * iOS `ComposerFoldLayout`'s static geometry: each child's top, and the visible range.
- * `foldProgress` (default: `isFolded`'s end) blends the unfolded and the folded ranges, so the
- * column's height passes through every height in between (iOS f0670c5d).
+ * Each child's top, and the visible range. `foldProgress` (default: `isFolded`'s end) blends the
+ * unfolded and the folded ranges, so the column's height passes through every height in between.
  */
 object ComposerFoldFrames {
     data class Result(val frames: List<Float>, val visible: ClosedFloatingPointRange<Float>)
@@ -445,7 +441,6 @@ object ComposerFoldFrames {
 
 // region Trailing control
 
-/** iOS `ComposerTrailingControl`. */
 sealed interface ComposerTrailingControl {
     data class Send(val enabled: Boolean) : ComposerTrailingControl
     data object Stop : ComposerTrailingControl
@@ -484,7 +479,7 @@ sealed interface ComposerTrailingControl {
     }
 }
 
-/** iOS `ComposerControls`: the trailing control and where dictation sits beside it. */
+/** The trailing control and where dictation sits beside it. */
 data class ComposerControls(
     val trailing: ComposerTrailingControl,
     val secondaryMic: MicPlacement,
@@ -534,10 +529,9 @@ data class ComposerControls(
 // region Folded controls
 
 /**
- * iOS `composerHidden(_:fadesOnReveal:)` (`ComposerFoldedControl`): folded away once faded out
- * (under the dictation bar, or a request's + until it's the recording's ×). Its space stays; it
- * leaves TalkBack and stops taking touches. Unfolding fades it in with the row (`Motion.swap`,
- * after `Motion.contentDelay`) unless [fadesOnReveal] is false.
+ * Folded away once faded out (under the dictation bar, or a request's + until it's the recording's
+ * ×). Its space stays; it leaves TalkBack and stops taking touches. Unfolding fades it in with the
+ * row (`Motion.swap`, after `Motion.contentDelay`) unless [fadesOnReveal] is false.
  */
 @Composable
 fun ComposerHidden(
@@ -572,7 +566,7 @@ fun ComposerHidden(
     Box(modifier.then(folded)) { content() }
 }
 
-/** Swallows every touch aimed at this element (iOS `.allowsHitTesting(false)` over controls). */
+/** Swallows every touch aimed at this element. */
 internal fun Modifier.blockTouches(): Modifier = pointerInput(Unit) {
     awaitPointerEventScope {
         while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
@@ -584,8 +578,8 @@ internal fun Modifier.blockTouches(): Modifier = pointerInput(Unit) {
 // region Control label
 
 /**
- * iOS `ComposerControlLabel`: a trailing control's glyph in its circle. The circle grows with the
- * font scale up to 44 dp; the 48 dp target comes from the enclosing control.
+ * A trailing control's glyph in its circle. The circle grows with the font scale up to 44 dp; the
+ * 48 dp target comes from the enclosing control.
  */
 @Composable
 fun ComposerControlLabel(
@@ -640,16 +634,16 @@ fun ComposerControlLabel(
 
 // region Pills
 
-/** iOS `ComposerPillLabel`: a pill above the composer (background work or pending messages). */
+/** A pill above the composer (background work or pending messages). */
 @Composable
 fun ComposerPillLabel(
     title: String,
     modifier: Modifier = Modifier,
     rolls: Boolean = false,
     onClick: (() -> Unit)? = null,
-    /** iOS `accessibilityHint`: TalkBack's click label (“Double tap to …”). */
+    /** TalkBack's click label (“Double tap to …”). */
     onClickLabel: String? = null,
-    /** iOS `accessibilityLabel`: read instead of [title], not after it. */
+    /** Read instead of [title], not after it. */
     accessibilityLabel: String? = null,
     leading: @Composable () -> Unit,
 ) {
@@ -679,7 +673,7 @@ fun ComposerPillLabel(
     }
 }
 
-/** iOS `ComposerPillContent`: a pill's glyph and title, without its surface. No chevron. */
+/** A pill's glyph and title, without its surface. No chevron. */
 @Composable
 fun ComposerPillContent(title: String, rolls: Boolean = false, leading: @Composable () -> Unit) {
     val style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium, fontFeatureSettings = "tnum")
@@ -702,10 +696,10 @@ fun ComposerPillContent(title: String, rolls: Boolean = false, leading: @Composa
 }
 
 /**
- * iOS `JumpToLatestPill`: scales and fades in and out on a spring, retargeting mid-flight; it
- * leaves the tree (and TalkBack) once its outro settles. In a pill row beside the queued pill its
- * slot (the gap before it included) opens and closes on the same spring. Reduce Motion cross-fades.
- * While [veiled] (read when drawn) it keeps its state but isn't drawn, touched or read out (AI-01).
+ * Scales and fades in and out on a spring, retargeting mid-flight; it leaves the tree (and
+ * TalkBack) once its outro settles. In a pill row beside the queued pill its slot (the gap before
+ * it included) opens and closes on the same spring. Reduce Motion cross-fades. While [veiled] (read
+ * when drawn) it keeps its state but isn't drawn, touched or read out (AI-01).
  */
 @Composable
 fun JumpToLatestPill(
@@ -728,10 +722,9 @@ fun JumpToLatestPill(
     val slotOpen = if (reduceMotion) (if (isShown) 1f else 0f) else presence.value.coerceIn(0f, 1f)
     val interactions = remember { MutableInteractionSource() }
     val slotWidth = if (collapsesSlot) (48f + JumpToLatestPillMotion.gap) * slotOpen else 48f
-    // iOS `allowsHitTesting(isShown)`: only a shown pill takes touches. Leaving (its fade-out) or
-    // gone, a tap or a drag reaches the transcript under it; the 48 dp slot never takes any, as
-    // iOS's empty frame. A finger already down on the pill keeps [modifier] (the borrowed drag)
-    // to release as the pill leaves under it (iOS `PassesDragsToTranscript.isDragging`).
+    // Only a shown pill takes touches. Leaving (its fade-out) or gone, a tap or a drag reaches the
+    // transcript under it; the 48 dp slot never takes any. A finger already down on the pill keeps
+    // [modifier] (the borrowed drag) to release as the pill leaves under it.
     var touched by remember { mutableStateOf(false) }
     val tracksTouch = remember {
         Modifier.pointerInput(Unit) {
@@ -798,7 +791,7 @@ object JumpToLatestPillMotion {
     const val gap = 8f
 }
 
-/** iOS `ComposerBanner`: a full-width bar that takes the composer's place, on its same surface. */
+/** A full-width bar that takes the composer's place, on its same surface. */
 @Composable
 fun ComposerBanner(
     symbol: SFSymbol,
@@ -840,8 +833,8 @@ fun ComposerBanner(
 // endregion
 
 /**
- * iOS `HorizontalScrollEdgeFade`: fades a horizontal list's leading and trailing edges, each only
- * while content runs past it, instead of clipping hard.
+ * Fades a horizontal list's leading and trailing edges, each only while content runs past it,
+ * instead of clipping hard.
  */
 @Composable
 fun Modifier.horizontalScrollEdgeFade(state: LazyListState, width: Dp = 20.dp, isEnabled: Boolean = true): Modifier {
@@ -872,9 +865,9 @@ fun Modifier.horizontalScrollEdgeFade(state: LazyListState, width: Dp = 20.dp, i
 }
 
 /**
- * iOS `ComposerSendLabel`: New Plus Menu's one fixed Send. Empty, it's a neutral face
- * ([OpenCodeSurfaces.neutralFill]) with a secondary arrow, so it stays legible on the white
- * composer, and fades to the send colours as text arrives (iOS dims the disc to 0.3 instead).
+ * New Plus Menu's one fixed Send. Empty, it's a neutral face ([OpenCodeSurfaces.neutralFill]) with
+ * a secondary arrow, so it stays legible on the white composer, and fades to the send colours as
+ * text arrives.
  */
 @Composable
 fun ComposerSendLabel(enabled: Boolean, showsProgress: Boolean, visualOffsetX: Float, modifier: Modifier = Modifier) {

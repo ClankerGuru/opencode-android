@@ -25,10 +25,10 @@ import ai.opencode.feature.voice.tracksSessionDelegatorTools
 import ai.opencode.server.OpenCodeLiveContentEvent
 
 /*
- * Port of iOS `HomeFeature+Sessions.swift`: what the open session and pushed subagents did that
- * Home coordinates (sends, receipts, family reads, model picks, delegate requests), matched after
- * the screen has reduced the action, how Home forwards server events to the screens that care, and
- * the root's call (which a pushed subagent's screen shows and targets).
+ * What the open session and pushed subagents did that Home coordinates (sends, receipts, family
+ * reads, model picks, delegate requests), matched after the screen has reduced the action, how Home
+ * forwards server events to the screens that care, and the root's call (which a pushed subagent's
+ * screen shows and targets).
  */
 
 internal fun HomeFeature.reduceSubagent(state: State, id: Int, action: SessionFeature.Action): HomeReduced {
@@ -66,7 +66,7 @@ internal fun HomeFeature.reduceSubagent(state: State, id: Int, action: SessionFe
     }
 }
 
-/** The call on the root follows the model pick and requests of the subagent on top (iOS `syncTopSubagentVoiceTarget(id:)`). */
+/** The call on the root follows the model pick and requests of the subagent on top. */
 private fun State.syncingTopSubagentVoiceTarget(id: Int): State {
     if (subagentStack.lastOrNull()?.navigationID != id) return this
     val detail = subagentStack.last()
@@ -74,8 +74,8 @@ private fun State.syncingTopSubagentVoiceTarget(id: Int): State {
 }
 
 /**
- * A call started from a pushed subagent: the root owns it, so it lives as long as the stack, and
- * it starts targeted at the screen on top (iOS `startCallOnTop(_:)`).
+ * A call started from a pushed subagent: the root owns it, so it lives as long as the stack, and it
+ * starts targeted at the screen on top.
  */
 internal fun HomeFeature.startCallOnTop(state: State): HomeReduced {
     val root = state.sessionDetail ?: return Reduced(state)
@@ -355,7 +355,9 @@ internal fun shouldForwardFamilyRunState(
 internal fun forwardToSubagentFamilies(state: State, member: String, action: SessionFeature.Action): Effect<Action> =
     forwardToSubagents(state, action) { screen -> screen.familySessions.any { it.id == member } }
 
-/** A content batch for the screens showing [sessionID], and a step's end for the call's reply watch (iOS `notifyVoiceContentBatch`). */
+/**
+ * A content batch for the screens showing [sessionID], and a step's end for the call's reply watch.
+ */
 internal fun notifyVoiceContentBatch(state: State, sessionID: String, events: List<OpenCodeLiveContentEvent>): Effect<Action> {
     val hasStepEnded = events.any { it is OpenCodeLiveContentEvent.StepEnded }
     val voiceEffect = if (hasStepEnded && state.sessionDetail?.voice?.replyWatch?.isWatching(sessionID) == true) {
@@ -378,7 +380,7 @@ internal fun notifyVoiceContentBatch(state: State, sessionID: String, events: Li
     return Effect.merge(Effect.send(Action.detail(SessionFeature.Action.ContentBatch(sessionID, events))), voiceEffect, delegatorToolsEffect, pushed)
 }
 
-/** A run ended: the call's reply watch settles it, or just hears it stopped (iOS `notifyVoiceExecutionEnded`). */
+/** A run ended: the call's reply watch settles it, or just hears it stopped. */
 internal fun notifyVoiceExecutionEnded(state: State, sessionID: String): Reduced<State, Action> {
     val voice = state.sessionDetail?.voice ?: return Reduced(state)
     val relays = voice.usesSessionDelegator && voice.replyWatch.awaitsParentRelay(sessionID)
@@ -392,7 +394,7 @@ internal fun notifyVoiceExecutionEnded(state: State, sessionID: String): Reduced
     return Reduced(state, Effect.merge(settle, forward))
 }
 
-/** A list snapshot: the call's reply watch settles what stopped running (iOS `notifyVoiceSnapshot`). */
+/** A list snapshot: the call's reply watch settles what stopped running. */
 internal fun notifyVoiceSnapshot(state: State, activeIDs: Set<String>): Reduced<State, Action> {
     val voice = state.sessionDetail?.voice ?: return Reduced(state)
     if (!voice.replyWatch.hasSettledWatch(activeIDs)) {
@@ -408,10 +410,10 @@ internal fun notifyVoiceSnapshot(state: State, activeIDs: Set<String>): Reduced<
 }
 
 /**
- * iOS `.delegate(.openSession(session, toolID))`: the voice agent (or a fork) puts a session on
- * screen. Settings, What’s New, a deletion confirmation and every mounted session's sheets go, the
- * drawer closes, and Home's normal path moves there. A voice open (`toolID`) navigates only while
- * App's operation authorizes it, and in this same turn.
+ * The voice agent (or a fork) puts a session on screen. Settings, What’s New, a deletion
+ * confirmation and every mounted session's sheets go, the drawer closes, and Home's normal path
+ * moves there. A voice open (`toolID`) navigates only while App's operation authorizes it, and in
+ * this same turn.
  */
 private fun HomeFeature.openSessionFromDelegate(state: State, delegate: SessionFeature.Delegate.OpenSession): HomeReduced {
     val toolID = delegate.toolID

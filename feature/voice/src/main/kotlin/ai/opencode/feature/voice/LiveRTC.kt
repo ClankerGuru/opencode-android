@@ -77,7 +77,7 @@ object LiveRTC {
                 .post(requestBody(config, sdp).toRequestBody(voiceJsonMediaType)).build() },
             answer = { data ->
                 val root = VoiceWireJson.parseToJsonElement(data.decodeToString()).jsonObject
-                // Swift's Answer requires both session.id and transport.sdp.
+                // An answer requires both session.id and transport.sdp.
                 require(root["session"]?.jsonObject?.get("id")?.stringValue != null)
                 root["transport"]?.jsonObject?.get("sdp")?.stringValue ?: throw ServerVoiceError.InvalidResponse
             },

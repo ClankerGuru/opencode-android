@@ -16,15 +16,6 @@ import org.junit.Rule
 import org.junit.Test
 import java.util.Base64
 
-/**
- * Port of the transcript half of iOS `OpenCodeTests/PastedTextTests.swift`: a Pasted Text card
- * read back from history or the inbox renders as the same [TranscriptUserMessage]
- * (`PastedTextRoundTripTests`), and a long user bubble folds (`UserBubbleFoldTests`).
- *
- * The rest of the iOS file tests `PastedText`/`PastedTextSummary` (`:server`), `AgentTextDocument`
- * (`:feature:media`), the composer's outbox and `SessionFeature` (`:feature:session`); hosting
- * sizes (`UIHostingController`) can't exist here.
- */
 class PastedTextTests {
     @get:Rule
     val isolation = TestIsolationRule()
@@ -90,7 +81,7 @@ class PastedTextTests {
 
     // UserBubbleFoldTests
 
-    /** The body style at the default font scale (iOS `.large`): 22 sp lines, 2 sp apart, at density 1. */
+    /** The body style at the default font scale: 22 sp lines, 2 sp apart, at density 1. */
     private val metrics = UserBubbleFold.Metrics(lineHeight = 22f, lineSpacing = UserBubbleFold.lineSpacing)
 
     private fun lines(count: Int): String = (1..count).joinToString("\n") { "Line $it" }
@@ -103,7 +94,6 @@ class PastedTextTests {
         assertTrue(metrics.folded > metrics.height(8))
     }
 
-    /** The message half; copying it (`SessionFeature`'s `.copyTextTapped`, pasteboard and `.tap`) is `:feature:session`'s. */
     @Test
     fun copyingASentUserMessageCopiesItsFullText() {
         val foldedText = lines(30)

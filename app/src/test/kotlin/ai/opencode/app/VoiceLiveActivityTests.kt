@@ -20,10 +20,7 @@ import org.junit.Test
 import java.time.Instant
 import java.util.UUID
 
-/**
- * Port of iOS `VoiceLiveActivityTests.swift`, the `AppFeature` part: leaving Home mid-call ends its
- * ongoing notification.
- */
+/** The `AppFeature` part: leaving Home mid-call ends its ongoing notification. */
 class VoiceLiveActivityTests {
     @get:Rule val isolation = TestIsolationRule()
 

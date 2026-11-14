@@ -32,10 +32,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/**
- * Port of iOS `OnboardingTunables` (`Settings/Onboarding/SignalField.swift`): the onboarding's
- * tuning values, baked to their defaults.
- */
+/** The onboarding's tuning values, baked to their defaults. */
 internal object OnboardingTunables {
     /** Ripple speed (pt/s). */
     const val rippleSpeed = 120.0
@@ -90,9 +87,9 @@ internal object OnboardingTunables {
 }
 
 /**
- * What the dot field draws: the view's coarse scene. The renderer springs its own channels
- * toward it every frame, so a change mid-flight retargets from where the light is, with its
- * velocity. Lengths are dp (iOS points) in the field's own coordinates.
+ * What the dot field draws: the view's coarse scene. The renderer springs its own channels toward
+ * it every frame, so a change mid-flight retargets from where the light is, with its velocity.
+ * Lengths are dp in the field's own coordinates.
  */
 internal data class SignalFieldScene(
     val phase: Phase,

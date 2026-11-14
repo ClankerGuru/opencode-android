@@ -11,7 +11,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Port of iOS `ComposerMorphPhaseTests.swift`. */
 class ComposerMorphPhaseTests {
     /**
      * A fold waiting for its next turn is dropped when the morph opens or closes another way, and

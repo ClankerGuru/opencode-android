@@ -52,10 +52,9 @@ import kotlin.math.roundToInt
 
 /**
  * Holding + with the New Plus Menu on: a strip of the newest photos stands over the composer;
- * sliding along it picks one and letting go adds it (iOS `RecentPhotoPeek`). Only shown when the
- * library is already readable, so a hold never raises the access dialog. Hold for
- * [PlusMenuTunables.HOLD_DURATION] before calling [show]. Geometry is in screen pixels; set
- * [density].
+ * sliding along it picks one and letting go adds it. Only shown when the library is already
+ * readable, so a hold never raises the access dialog. Hold for [PlusMenuTunables.HOLD_DURATION]
+ * before calling [show]. Geometry is in screen pixels; set [density].
  */
 class RecentPhotoPeek(private val haptics: HapticsClient = dependency(HapticsClient)) : AttachmentPlusPeek {
     override var isShown: Boolean by mutableStateOf(false)
@@ -139,19 +138,16 @@ class RecentPhotoPeek(private val haptics: HapticsClient = dependency(HapticsCli
     }
 }
 
-/**
- * The bottom band's scrim: Android never blurs behind an overlay, so it dims with a Material scrim
- * where iOS blurs.
- */
+/** The bottom band's scrim: Android never blurs behind an overlay. */
 private const val PEEK_SCRIM_DIM = 0.32f
 private const val PEEK_RADIUS = 14f
 private const val PEEK_LIFT = 1.14f
 private const val PEEK_RISE = 6f
 
 /**
- * The strip (iOS `RecentPhotoPeekOverlay` + `RecentPhotoPeekBackdrop`). Mount it full-screen over
- * the session; it takes no touches and is hidden from TalkBack. Tiles arrive out of + one after
- * another, out of a blur, and leave the same way; Reduce Motion fades them in place.
+ * The strip. Mount it full-screen over the session; it takes no touches and is hidden from
+ * TalkBack. Tiles arrive out of + one after another, out of a blur, and leave the same way; Reduce
+ * Motion fades them in place.
  */
 @Composable
 fun RecentPhotoPeekOverlay(
@@ -232,7 +228,7 @@ fun RecentPhotoPeekOverlay(
                         translationY = fromY * away
                         val clamped = shown.coerceIn(0f, 1f)
                         alpha = clamped
-                        // Out of a blur (iOS `PeekArrival`: (1 − shown) × 10).
+                        // Out of a blur.
                         val blur = if (reduceMotion || clamped > 0.98f || clamped < 0.02f) 0f else (1 - clamped) * 10f * density
                         renderEffect = transitionBlurEffect(blur)
                     },

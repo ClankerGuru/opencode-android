@@ -7,11 +7,6 @@ import ai.opencode.server.model.OpenCodeTranscriptItem
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * The `:feature:transcript` test of iOS `OpenCodeTests/RequestReviewTests.swift`
- * ([QuestionRowSummary], [TranscriptEntry]); the request dock tests are `:feature:session`'s and
- * `:feature:composer`'s.
- */
 class RequestReviewTests {
     private fun call(json: String): OpenCodeToolCall {
         val items = OpenCodeClient.decodeTranscript("""{"data":[{"id":"msg_a","type":"assistant","content":[$json]}]}""".toByteArray())

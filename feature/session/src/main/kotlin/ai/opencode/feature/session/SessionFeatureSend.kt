@@ -50,7 +50,8 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import java.util.UUID
 
-// Port of iOS `SessionFeature+Send.swift`: sends and their delivery. Undo lives in `SessionFeatureUndo.kt`, the outbox in `SessionFeatureOutbox.kt`.
+// Sends and their delivery. Undo lives in `SessionFeatureUndo.kt`, the outbox in
+// `SessionFeatureOutbox.kt`.
 
 /** Sends, failed sends, run errors, and undo. Null: the action passes on. */
 internal fun SessionFeature.reduceSending(state: State, action: Action): Reduced<State, Action>? {

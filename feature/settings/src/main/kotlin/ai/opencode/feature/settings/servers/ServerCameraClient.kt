@@ -15,7 +15,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import kotlinx.coroutines.CompletableDeferred
 
-/** iOS `AVAuthorizationStatus` for video, as far as Android can tell it. */
+/** Camera authorization status, as far as Android can tell it. */
 enum class CameraAuthorization {
     /** Not asked yet in this process (or asked and the answer can still change). */
     notDetermined,
@@ -26,8 +26,7 @@ enum class CameraAuthorization {
 }
 
 /**
- * Camera access for pairing (iOS `ServerCameraClient`, plus the `AVCaptureDevice` reads
- * `PairingScannerView` makes). Honest about hardware: [isAvailable] is false on a device or emulator
+ * Camera access for pairing. Honest about hardware: [isAvailable] is false on a device or emulator
  * without a camera, and [authorize] then answers false without asking.
  *
  * Android asks through an Activity, so the live [authorize] goes through the permission launcher
@@ -35,7 +34,7 @@ enum class CameraAuthorization {
  * the current grant.
  */
 class ServerCameraClient(
-    /** A camera exists (iOS `AVCaptureDevice.default(for: .video) != nil`). */
+    /** A camera exists. */
     val isAvailable: () -> Boolean = { false },
     val authorization: () -> CameraAuthorization = { CameraAuthorization.notDetermined },
     /** Asks for access if it isn't decided yet; true when the camera may be used. */
@@ -72,7 +71,7 @@ class ServerCameraClient(
             )
         }
 
-        /** iOS `testValue`: no camera, never allowed. */
+        /** No camera, never allowed. */
         override val testValue: ServerCameraClient = ServerCameraClient()
     }
 }

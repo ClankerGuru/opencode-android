@@ -32,9 +32,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlin.time.TimeSource
 
-// Port of iOS `SessionFeature+Delivery.swift`.
-
-/** iOS `SessionFeature.FailedSend`: a message whose send failed. Retry reuses its ID, which the server admits at most once. */
+/** A message whose send failed. Retry reuses its ID, which the server admits at most once. */
 data class FailedSend(
     val pending: PendingPrompt,
     val reason: String,
@@ -56,7 +54,7 @@ data class FailedSend(
     }
 }
 
-/** iOS `SessionFeature.DeliveryNote`: why a send hasn't reached the server yet, when the reader needs to know. */
+/** Why a send hasn't reached the server yet, when the reader needs to know. */
 enum class DeliveryNote {
     /** An earlier send failed, and this one waits behind it. */
     waiting;
@@ -67,10 +65,8 @@ enum class DeliveryNote {
         }
 }
 
-/** iOS `IdentifiedArrayOf<FailedSend>.ids`. */
 val List<FailedSend>.ids: List<String> get() = map { it.id }
 
-/** iOS `failedSends[id: id]`. */
 fun List<FailedSend>.withID(id: String): FailedSend? = firstOrNull { it.id == id }
 
 /**
@@ -94,7 +90,7 @@ internal fun SessionFeature.Companion.deliveryJob(
     pageReader: PageReaderClient,
 ): PromptOutbox.Job {
     suspend fun deliver(handle: PromptOutbox.Handle): DeliveryOutcome {
-        // The send's backoff (iOS `sendRetryPolicy`, `RetryPolicy.send`).
+        // The send's backoff.
         val schedule = RetrySchedule(RetryPolicy.send, clock, networkPath.retryEnvironment)
         val log = AppLog.send
         val sendID = handle.current().messageID

@@ -27,8 +27,8 @@ import java.time.Instant
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `ServerFlowTests.swift`, the `AppFeature` part. A `Shared` here is a reference, so
- * shared values are checked after the step.
+ * The `AppFeature` part. A `Shared` here is a reference, so shared values are checked after the
+ * step.
  */
 class ServerFlowTests {
     @get:Rule val isolation = TestIsolationRule()

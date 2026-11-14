@@ -39,22 +39,22 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.seconds
 
-// The call's part of iOS `SessionView`: which store is the screen's call (`callStore`), its
-// presentation (`callPresentation`/`voiceStore`), the failed and ended cards above the composer,
-// and the screen's `.task`s that start it once, listen for Raise to Talk and keep a GPT-Live socket
-// warm. The call floats over the screen (Living Orb, :feature:voice's `FloatingCallOverlay`) and
-// the composer stays a composer.
+// The session screen's call: which store is the screen's call (`callStore`), its presentation
+// (`callPresentation`/`voiceStore`), the failed and ended cards above the composer, and the tasks
+// that start it once, listen for Raise to Talk and keep a GPT-Live socket warm. The call floats
+// over the screen (Living Orb,:feature:voice's `FloatingCallOverlay`) and the composer stays a
+// composer.
 
 /**
- * iOS `callStore`: the call on this screen, its own (`store.scope(\.voice, action: \.voice.presented)`)
- * or the one its root owns ([hostedCall], a pushed subagent's).
+ * The call on this screen, its own (`store.scope(\.voice, action: \.voice.presented)`) or the one
+ * its root owns ([hostedCall], a pushed subagent's).
  */
 @Composable
 internal fun StoreOf<State, Action>.rememberCallStore(hostedCall: VoiceStoreOf?): VoiceStoreOf? =
     rememberOptionalScope<VoiceFeature.State, VoiceFeature.Action>({ it.voice }, { Action.voicePresented(it) }) ?: hostedCall
 
 /**
- * The screen's call tasks (iOS `sessionScaffold`'s `.task`s and the composer area's `.task(id: hasCall)`):
+ * The screen's call tasks.
  * - once per call, the call starts (`.startIfNeeded`): it keeps running while the drawer swaps sessions;
  * - Raise to Talk listens while the setting is on, Voice is available and the app is active; the
  *   reducer decides what a raise does;
@@ -88,7 +88,7 @@ internal fun SessionCallTasks(store: StoreOf<State, Action>, callStore: VoiceSto
     val currentHasCall by rememberUpdatedState(hasCall)
     LaunchedEffect(warmsPhoneConnection && isVoiceAvailable && !hasCall && active) {
         if (!(warmsPhoneConnection && isVoiceAvailable && !hasCall && active)) return@LaunchedEffect
-        // iOS reads the lab's key in DEBUG builds; VoiceLabEnvironment answers null in release ones.
+        // VoiceLabEnvironment answers null in release ones.
         val stored = store.state.openAIAPIKey.value ?: withContext(Dispatchers.IO) { VoiceLabDemo.labAPIKey }
         val key = stored?.trim()?.takeIf { it.isNotEmpty() } ?: return@LaunchedEffect
         val warmer = dependency(LiveSocketWarmerClient)
@@ -105,10 +105,10 @@ internal fun SessionCallTasks(store: StoreOf<State, Action>, callStore: VoiceSto
 }
 
 /**
- * iOS `safeAreaInset`'s cards above the composer: a call that couldn't connect
- * ([VoiceCallFailure]: the provider's failure card, or Check API Key/Open Settings and Try Again),
- * whose connection was lost ([VoiceCallEnded]: Close and Rejoin), or that is connecting through a
- * server ([VoiceConnectingCaption]: “Connecting via My Mac…”, fading in and out).
+ * A call that couldn't connect ([VoiceCallFailure]: the provider's failure card, or Check API
+ * Key/Open Settings and Try Again), whose connection was lost ([VoiceCallEnded]: Close and Rejoin),
+ * or that is connecting through a server ([VoiceConnectingCaption]: “Connecting via My Mac…”,
+ * fading in and out).
  */
 @Composable
 internal fun SessionCallCards(callStore: VoiceStoreOf?) {
@@ -126,7 +126,7 @@ internal fun SessionCallCards(callStore: VoiceStoreOf?) {
         else -> Unit
     }
     val connecting = place?.takeIf { phase == VoiceFeature.State.Phase.Connecting }?.let { it to statusText }
-    // The caption fades out as it last read (iOS's removal transition), not as the next phase.
+    // The caption fades out as it last read, not as the next phase.
     var shown by remember { mutableStateOf(connecting) }
     if (connecting != null && connecting != shown) shown = connecting
     AnimatedVisibility(visible = connecting != null, enter = fadeIn(), exit = fadeOut()) {

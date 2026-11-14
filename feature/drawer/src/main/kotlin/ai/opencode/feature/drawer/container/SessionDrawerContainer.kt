@@ -115,24 +115,17 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
 /**
- * Port of `OpenCode/Drawer/SessionDrawerContainer.swift`: the frame-locked drawer and Catch Up
- * container. The session card recedes over the drawer under the finger and rides
- * `DrawerSpring` when released ([SessionDrawerController.motion]); every per-frame value is
- * snapshot state read in layout/draw blocks, so dragging never recomposes [content] (the session
- * and its pushed subagents) or [drawer]. Home hears only [onArrived] and the commit haptic.
+ * The frame-locked drawer and Catch Up container. The session card recedes over the drawer under
+ * the finger and rides `DrawerSpring` when released ([SessionDrawerController.motion]); every
+ * per-frame value is snapshot state read in layout/draw blocks, so dragging never recomposes
+ * [content] (the session and its pushed subagents) or [drawer]. Home hears only [onArrived] and the
+ * commit haptic.
  *
  * During Catch Up the same card, with the same composed session ([content] is movable content),
  * insets into [CatchUpStack] above [chrome], and morphs back out onto the session or the open
  * drawer (`SessionDrawerController.updateCatchUp`). A window at least
  * [SidebarMetrics.minimumWindowWidth] wide shows [drawer] as a sidebar beside the card instead
  * ([sidebarShown] non-null), and only Catch Up's card swipes remain.
- *
- * iOS hosting plumbing maps as: `UIHostingController`s → composables (the drawer is composed
- * only while it can show, as iOS defers `pendingDrawer`); `CADisplayLink` → `motionFrameLoop`;
- * `UIViewPropertyAnimator` morphs → one frame loop with UIKit's duration-spring curves;
- * `snapshotView` → [SessionDrawerController.captureCardThen] pictures; `safeAreaRegions` →
- * `LocalDrawerKeyboardSignals` (the session leaves the IME out while the hold excludes it);
- * `accessibilityPerformEscape` → system back.
  *
  * @param isPresented whether the phone's drawer is open (Home's `isSessionDrawerPresented`);
  *   [onPresentationChanged] writes a drag's or tap's decision back.
@@ -197,11 +190,11 @@ fun SessionDrawerContainer(
     val sheet by rememberUpdatedState(isSheetPresented)
     val currentCatchUp by rememberUpdatedState(catchUp)
 
-    // Android only (QA FB-07; iOS has no system back): Back on the shut card opens the session
-    // list, as the drawer button does, instead of leaving the app; Back on a list Back opened
-    // leaves it. Registered before the card composes, so the session's own handlers (menus,
-    // sheets, selection, a pushed subagent) still take Back first. Predictive back pulls the
-    // card part of the way open; a button or TalkBack back opens it at once.
+    // Android only: Back on the shut card opens the session list, as the drawer button does,
+    // instead of leaving the app; Back on a list Back opened leaves it. Registered before the card
+    // composes, so the session's own handlers (menus, sheets, selection, a pushed subagent) still
+    // take Back first. Predictive back pulls the card part of the way open; a button or TalkBack
+    // back opens it at once.
     var openedByBack by remember { mutableStateOf(false) }
     LaunchedEffect(motion.isPresented) { if (!motion.isPresented) openedByBack = false }
     PredictiveBackHandler(
@@ -228,8 +221,8 @@ fun SessionDrawerContainer(
 
     val cardLayer = rememberGraphicsLayer()
     val chromeLayer = rememberGraphicsLayer()
-    // One composed session moves between the full-screen card and Catch Up's stack, so entering
-    // and leaving Catch Up never rebuilds it (iOS keeps one hosted `SessionView`).
+    // One composed session moves between the full-screen card and Catch Up's stack, so entering and
+    // leaving Catch Up never rebuilds it.
     val cardContent = remember(cardLayer, keyboardHold, panRegions) {
         movableContentOf {
             Box(
@@ -239,9 +232,8 @@ fun SessionDrawerContainer(
                         cardLayer.record { this@drawWithContent.drawContent() }
                         drawLayer(cardLayer)
                     }
-                    // iOS `excludesKeyboard`: a card the keyboard is leaving, or drawer search
-                    // owning it, lays out as if there were no keyboard (the session's
-                    // `imePadding` sees it consumed).
+                    // A card the keyboard is leaving, or drawer search owning it, lays out as if
+                    // there were no keyboard (the session's `imePadding` sees it consumed).
                     .then(if (keyboardHold.excludesKeyboard) Modifier.consumeWindowInsets(WindowInsets.ime) else Modifier),
             ) {
                 CompositionLocalProvider(
@@ -270,7 +262,7 @@ fun SessionDrawerContainer(
     val drawerShows = morph == CatchUpModeMorph.EnterCatchUp || morph == CatchUpModeMorph.ReturnToDrawer || entering ||
         (catchUp == null && (motion.isDrawerAvailable || controller.isSidebarComposed))
     // Once shown, the drawer stays composed (hidden while it can't show), so its list keeps its
-    // place across visits, as iOS keeps its hosted drawer.
+    // place across visits.
     val drawerEverShown = remember { booleanArrayOf(false) }
     if (drawerShows) drawerEverShown[0] = true
     // Android: composed hidden once the app has settled after launch, so the first open doesn't
@@ -281,11 +273,11 @@ fun SessionDrawerContainer(
         drawerPrewarmed = true
     }
     val drawerComposed = drawerShows || drawerEverShown[0] || drawerPrewarmed
-    // While it can't show, the composed drawer builds nothing and nothing in it ticks (iOS f5636460):
-    // shut, or a sidebar that's slid away.
+    // While it can't show, the composed drawer builds nothing and nothing in it ticks: shut, or a
+    // sidebar that's slid away.
     val drawerHidden = rememberUpdatedState(!drawerShows || (sidebarShown != null && !controller.isSidebarVisible))
-    // Android: the phone's drawer is a Material modal drawer. It slides in over the session,
-    // which stays put under a scrim, instead of the session sliding aside as iOS's card does.
+    // Android: the phone's drawer is a Material modal drawer. It slides in over the session, which
+    // stays put under a scrim.
     val modal = sidebarShown == null
     val scrimColor = if (modal) MaterialTheme.colorScheme.scrim.copy(alpha = MODAL_SCRIM_ALPHA) else DrawerScrim.color(isDark, colors.highContrast)
     val closeDrawerDescription = stringResource(R.string.drawer_close_description)
@@ -564,7 +556,7 @@ fun SessionDrawerContainer(
                 }
                 controller.composerSlice?.let { slice ->
                     // The stack card's composer strip sliding into the session, over a cover that
-                    // hides the live composer until it lands (iOS `composerSlice`/`composerCover`).
+                    // hides the live composer until it lands.
                     val canvas = colors.canvas
                     Box(
                         Modifier

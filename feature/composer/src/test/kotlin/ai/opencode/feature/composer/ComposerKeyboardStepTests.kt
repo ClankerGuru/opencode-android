@@ -6,8 +6,8 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * iOS `ComposerKeyboardStepTests`: what the composer glides by when the keyboard's predictive bar
- * hides or returns without an animation: only what the keyboard's cover of its window changed
+ * What the composer glides by when the keyboard's predictive bar hides or returns without an
+ * animation: only what the keyboard's cover of its window changed
  * (`DockedKeyboard.unanimatedStep`).
  */
 class ComposerKeyboardStepTests {

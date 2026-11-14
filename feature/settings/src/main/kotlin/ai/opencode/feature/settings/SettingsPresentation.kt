@@ -39,11 +39,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /**
- * Port of iOS `Settings/SettingsPresentation.swift`: Settings opens full screen over the drawer
- * and the session with its own stack, keeps what's beneath from being touched while it's up, and
- * goes back to what was showing (the open drawer exactly as it was). Home stays composed
- * underneath, never replaced by a navigation push, so a session's work never restarts on the way
- * back.
+ * Settings opens full screen over the drawer and the session with its own stack, keeps what's
+ * beneath from being touched while it's up, and goes back to what was showing (the open drawer
+ * exactly as it was). Home stays composed underneath, never replaced by a navigation push, so a
+ * session's work never restarts on the way back.
  *
  * Settings comes and goes on Material's shared axis ([PageTransitions]), and back at its root is
  * Android's predictive back preview. On a pushed page the stack's own back pops it first
@@ -52,16 +51,15 @@ import kotlinx.coroutines.launch
  * Home (`:feature:drawer`) wraps its content with this and passes Settings' content.
  *
  * While Settings covers Home completely and at rest ([SettingsCover]), what's beneath reads
- * [LocalScreenCovered] as true and pauses its running animations (iOS `ScreenCoveredTrait`, which
- * Home's drawer container sets from the same cover).
+ * [LocalScreenCovered] as true and pauses its running animations.
  *
- * @param isShown iOS `HomeFeature.State.isSettingsShown` (`settings != null`).
+ * @param isShown
  * @param atRoot whether Settings shows its root page (`path.isEmpty()`): only then does the back
  *   gesture close Settings.
  * @param onClose the back gesture committed (send `SettingsFeature.Action.BackTapped`, which closes
  *   at the root via `SettingsDelegate.Close`).
  * @param settings Settings itself ([SettingsView]); kept composed while it leaves.
- * @param cover iOS `SettingsCover`: Home can hold it to read [SettingsCover.covers] itself.
+ * @param cover Home can hold it to read [SettingsCover.covers] itself.
  * @param content what's beneath (Home).
  */
 @Composable
@@ -85,7 +83,7 @@ fun SettingsPresentation(
     val scope = rememberCoroutineScope()
     val focus = LocalFocusManager.current
     val shown by rememberUpdatedState(isShown)
-    // A cancelled back swipe springs home on the release role (iOS `Motion.release`).
+    // A cancelled back swipe springs home on the release role.
     val springBack = MotionRole.Release.animation<Float>()
     val density = LocalDensity.current
     val slidePx = with(density) { PageTransitions.SlideDistance.toPx() }
@@ -165,7 +163,7 @@ fun SettingsPresentation(
                         clip = back > 0f
                     },
             ) {
-                // iOS `.hidesFromProblemReports()`: Settings shows server credentials.
+                // Settings shows server credentials.
                 HidesFromProblemReports()
                 settings()
             }
@@ -220,13 +218,13 @@ private fun settingsAlpha(p: Float, closing: Boolean): Float {
 private val MoveSpec: AnimationSpec<Float>
     get() = tween(Motion.millis(PageTransitions.DURATION_SECONDS), easing = FastOutSlowInEasing)
 
-/** The cross-fade under reduce motion: the surface role's reduced fade (iOS `Motion.surface`). */
+/** The cross-fade under reduce motion: the surface role's reduced fade. */
 private val FadeSpec: AnimationSpec<Float> get() = MotionRole.Surface.animation(reduceMotion = true)
 
 /**
- * iOS `SettingsCover`: whether Settings or What’s New covers Home completely and at rest, which
- * pauses the running animations beneath ([LocalScreenCovered]). Follows the presentation itself,
- * not `isSettingsShown`: uncovered the moment it moves (closing, a back swipe under the finger),
+ * Whether Settings or What’s New covers Home completely and at rest, which pauses the running
+ * animations beneath ([LocalScreenCovered]). Follows the presentation itself, not
+ * `isSettingsShown`: uncovered the moment it moves (closing, a back swipe under the finger),
  * covered again only when a move that ends fully open lands (the push, a swipe springing back).
  */
 class SettingsCover {

@@ -22,8 +22,8 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * Port of iOS `WindowSnapshot`: the window as a JPEG within the report's budget, via `PixelCopy`.
- * Never in the background, over a [CredentialSurface], or from a `FLAG_SECURE` window.
+ * The window as a JPEG within the report's budget, via `PixelCopy`. Never in the background, over a
+ * [CredentialSurface], or from a `FLAG_SECURE` window.
  */
 object WindowSnapshot {
     /** Resumed activities, last resumed last (several in multi-window). Main thread only. */
@@ -57,7 +57,6 @@ object WindowSnapshot {
         })
     }
 
-    /** iOS `isAllowed(applicationState:credentialSurfaces:firstResponder:)`. */
     fun isAllowed(isActive: Boolean, credentialSurfaces: Int, isSecureWindow: Boolean): Boolean =
         isActive && credentialSurfaces == 0 && !isSecureWindow
 
@@ -82,7 +81,7 @@ object WindowSnapshot {
         val view = window.decorView
         val secure = window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0
         if (view.width <= 0 || view.height <= 0 || !isAllowed(!activity.isFinishing, CredentialSurface.visible, secure)) return null
-        // iOS renders at no more than 2× points.
+        // Renders at no more than 2× points.
         val density = activity.resources.displayMetrics.density
         val scale = min(1f, 2f / density)
         val full = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
@@ -101,8 +100,8 @@ object WindowSnapshot {
 }
 
 /**
- * iOS `ProblemReportCapture`: the app window at the moment of a trace, as a JPEG. A screenshot
- * taken flashes the window and plays the shutter after it (`ScreenCaptureFeedback`).
+ * The app window at the moment of a trace, as a JPEG. A screenshot taken flashes the window and
+ * plays the shutter after it (`ScreenCaptureFeedback`).
  */
 class ProblemReportCapture(val screenshot: suspend () -> ByteArray? = { null }) {
     companion object Key : DependencyKey<ProblemReportCapture> {

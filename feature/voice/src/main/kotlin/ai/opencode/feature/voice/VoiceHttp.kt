@@ -14,8 +14,8 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 /**
- * One HTTP exchange read whole (iOS `URLSession.data(for:)`'s `(Data, URLResponse)`), for the
- * voice calls that talk to OpenAI, xAI or a server's voice routes outside `OpenCodeClient`.
+ * One HTTP exchange read whole, for the voice calls that talk to OpenAI, xAI or a server's voice
+ * routes outside `OpenCodeClient`.
  */
 class VoiceHttpResponse(val statusCode: Int, val headers: Headers, val body: ByteArray) {
     fun header(name: String): String? = headers[name]
@@ -23,7 +23,7 @@ class VoiceHttpResponse(val statusCode: Int, val headers: Headers, val body: Byt
 
 internal val voiceJsonMediaType = "application/json".toMediaType()
 
-/** [this] with every timeout set to [seconds] (iOS `URLRequest.timeoutInterval`). */
+/** [this] with every timeout set to [seconds]. */
 internal fun OkHttpClient.withVoiceTimeout(seconds: Long): OkHttpClient = newBuilder()
     .connectTimeout(seconds, TimeUnit.SECONDS)
     .readTimeout(seconds, TimeUnit.SECONDS)

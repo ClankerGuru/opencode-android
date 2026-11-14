@@ -28,10 +28,9 @@ import kotlin.math.abs
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `SessionFeatureTests+QuietPolling.swift`. Timed reads (the pending-work polls and the
- * watchdog) go quiet while the server isn't answering and while the app is in the background, since
- * traffic into a dead route can stall a whole VPN tunnel. A reconnect and the return start them
- * again at once. The tests that build Home's state are `:feature:drawer`'s.
+ * Timed reads (the pending-work polls and the watchdog) go quiet while the server isn't answering
+ * and while the app is in the background, since traffic into a dead route can stall a whole VPN
+ * tunnel. A reconnect and the return start them again at once.
  */
 class SessionFeatureTestsQuietPolling {
     /**

@@ -4,12 +4,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.Instant
 
-/**
- * The `:feature:transcript` test of iOS `OpenCodeTests/SessionRefreshReviewTests.swift`
- * (`SharedLocationTests`, [TranscriptUserMessage]); the rest is `:feature:session`'s and
- * `:feature:composer`'s. The prompt is what composer's `SharedLocation.prompt(text:)` writes for
- * iOS's `spot` (this module can't see `:feature:composer`, whose port checks that block).
- */
 class SharedLocationTests {
     private val prompt = listOf(
         "<shared-location>",

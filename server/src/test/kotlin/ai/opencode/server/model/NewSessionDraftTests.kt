@@ -6,11 +6,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `NewSessionDraftTests.swift`, the `:server` part: `OpenCodeProject.folder` and
- * `OpenCodeClient.directoryListing` (here `live.directoryListing`). The draft screen's tests are
- * `:feature:session`'s, Home's `:feature:drawer`'s and the server switch `:app`'s.
- */
 class NewSessionDraftTests {
     @get:Rule val isolation = TestIsolationRule()
 

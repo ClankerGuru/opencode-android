@@ -9,7 +9,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import java.util.Base64
 
-/** Bytes as a base64 string, as Swift's `Data` encodes. */
+/** Bytes as a base64 string. */
 object Base64ByteArraySerializer : KSerializer<ByteArray> {
     override val descriptor = PrimitiveSerialDescriptor("Base64ByteArray", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: ByteArray) = encoder.encodeString(Base64.getEncoder().encodeToString(value))
@@ -198,7 +198,7 @@ sealed interface OpenCodeTranscriptItem {
         val kind: TranscriptNoticeKind? = null,
     ) : OpenCodeTranscriptItem
 
-    /** Legacy on iOS (older builds' failed sends); kept so the item set matches. Nothing makes it. */
+    /** Kept so the item set matches. Nothing makes it. */
     @Serializable @SerialName("sendFailure")
     data class SendFailure(override val id: String, val message: String) : OpenCodeTranscriptItem
 
@@ -221,7 +221,7 @@ data class OpenCodeCompaction(
     val status: Status,
     /** The provider compacted its own context; there is no local summary. */
     val isProvider: Boolean = false,
-    /** The local summary's Markdown (iOS keeps it parsed; see [OpenCodeTranscriptItem]). */
+    /** The local summary's Markdown. */
     val summary: String = "",
     val errorMessage: String? = null,
     /** Usage of the compaction request itself, not the resulting context size. */

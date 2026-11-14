@@ -133,9 +133,8 @@ internal fun <V> VoiceStoreOf?.watch(select: (VoiceFeature.State) -> V): V? {
 }
 
 /**
- * The composer's own metrics the call bar lays itself out against (iOS `ComposerTunables`,
- * `Session/ComposerViews.swift`). Composer is a module above voice, so voice keeps the iOS
- * defaults here; Session's `ComposerTunables` uses the same values (dp = iOS pt).
+ * The composer's own metrics the call bar lays itself out against. Composer is a module above
+ * voice; Session's `ComposerTunables` uses the same values.
  */
 object ComposerMetrics {
     /** `composer.size.barHeight`. */
@@ -148,10 +147,7 @@ object ComposerMetrics {
     const val innerHorizontal = 6f
 }
 
-/**
- * The call's surfaces (iOS Liquid Glass) as Material 3 tonal surfaces: no blur or glass
- * imitation.
- */
+/** The call's surfaces as Material 3 tonal surfaces: no blur or glass imitation. */
 object VoiceCallSurfaceDefaults {
     /**
      * The composer and the call's cards: the desktop dock's raised surface
@@ -205,7 +201,7 @@ object VoiceCallSurfaceDefaults {
 
 /**
  * A call surface: the desktop dock's flat fill, a hairline [border] and a small raised shadow
- * (`--v2-elevation-raised`), instead of iOS glass.
+ * (`--v2-elevation-raised`).
  */
 fun Modifier.callSurface(shape: Shape, color: Color, border: Color = Color.Unspecified): Modifier =
     callSurface({ shape }, color, border)
@@ -221,7 +217,7 @@ private fun Modifier.callSurface(shape: () -> Shape, color: Color, border: Color
     if (border.isSpecified) drawOutline(outline, border, style = Stroke(1.dp.toPx()))
 }
 
-/** Touches on this element and its children are dropped (iOS `.allowsHitTesting(false)` over content that shouldn't act). */
+/** Touches on this element and its children are dropped. */
 internal fun Modifier.blocksTouches(): Modifier = pointerInput(Unit) {
     awaitPointerEventScope {
         while (true) {
@@ -348,10 +344,10 @@ private fun Modifier.reachFade(
 }
 
 /**
- * The composer capsule's surface (iOS `composerSurface(panel:…)`, e5c22780). It grows up out of
- * the bar for a pending request's [panel] (D-31 B), the call's rows, or an [expansion] (the
- * model list): one shape, never a second surface, drawn above the capsule's frame so the layout
- * around it never changes; it measures as [content] (the bar) alone.
+ * The composer capsule's surface. It grows up out of the bar for a pending request's [panel] (D-31
+ * B), the call's rows, or an [expansion] (the model list): one shape, never a second surface, drawn
+ * above the capsule's frame so the layout around it never changes; it measures as [content] (the
+ * bar) alone.
  *
  * Only the reach shows: unrevealed room above the bar is clipped from both drawing and touches
  * ([TopInsetRect]), so it passes touches through to the transcript beneath. Reduce Motion
@@ -639,8 +635,8 @@ private class BottomRevealShape(private val height: Float, private val cornerRad
 fun Modifier.hiddenUnderComposerPanel(isHidden: Boolean): Modifier = this then HiddenElement(isHidden, HiddenKind.composerPanel)
 
 /**
- * The composer itself, while the Living Orb's card stands over the screen's foot (iOS
- * `hiddenUnderFloatingCall`): it fades on the composer panel's curves and stops taking touches.
+ * The composer itself, while the Living Orb's card stands over the screen's foot: it fades on the
+ * composer panel's curves and stops taking touches.
  */
 fun Modifier.hiddenUnderFloatingCall(isHidden: Boolean): Modifier = this then HiddenElement(isHidden, HiddenKind.floatingCall)
 
@@ -700,7 +696,7 @@ private class HiddenNode(var isHidden: Boolean, var kind: HiddenKind) :
     override fun onCancelPointerInput() = Unit
 }
 
-/** Lays out [wide] when it fits the width, else [narrow] (SwiftUI `ViewThatFits(in: .horizontal)`). */
+/** Lays out [wide] when it fits the width, else [narrow]. */
 @Composable
 private fun ViewThatFitsHorizontally(modifier: Modifier = Modifier, wide: @Composable () -> Unit, narrow: @Composable () -> Unit) {
     SubcomposeLayout(modifier) { constraints ->

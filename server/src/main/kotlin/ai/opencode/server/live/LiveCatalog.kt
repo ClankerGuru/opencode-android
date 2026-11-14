@@ -34,7 +34,7 @@ import java.text.Collator
 import java.util.Locale
 import kotlin.time.Duration.Companion.seconds
 
-// Composer autocomplete (iOS `OpenCodeClient+Catalog.swift`).
+// Composer autocomplete.
 
 internal suspend fun requestSkills(server: OpenCodeServer, directory: String?): List<OpenCodeAutocompleteSkill> =
     request<DataPayload<List<OpenCodeAutocompleteSkill>>>("/api/skill", query = locationQuery(directory), timeout = 20.seconds, server = server).data
@@ -133,7 +133,7 @@ internal suspend fun requestSwitchModel(server: OpenCodeServer, sessionID: Strin
     )
 }
 
-// Capabilities (iOS `OpenCodeClient+Capabilities.swift`).
+// Capabilities.
 
 internal fun pathComponent(value: String): String = percentEncodePath(value, keepSlash = false)
 
@@ -229,7 +229,7 @@ internal fun standardCollator(): Collator = Collator.getInstance(Locale.getDefau
 internal suspend fun requestServerCapabilities(server: OpenCodeServer): OpenCodeServerCapabilities {
     try {
         return coroutineScope {
-            // Failures are values until awaited in order, as Swift's `async let` tuple awaits them.
+            // Failures are values until awaited in order.
             val mcp = async { capturedRequest<LocatedPayload<List<MCPServerPayload>>>("/api/mcp", timeout = 20.seconds, server = server) }
             val skills = async { capturedRequest<LocatedPayload<List<OpenCodeAutocompleteSkill>>>("/api/skill", timeout = 20.seconds, server = server) }
             val integrations = async { capturedRequest<LocatedPayload<List<IntegrationPayload>>>("/api/integration", timeout = 20.seconds, server = server) }

@@ -20,11 +20,6 @@ import java.net.URI
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * Port of the `:server` half of iOS `AppFeatureTests.swift`: pairing-link decoding, live
- * redemption, reachability ranking and the Home cache's wire format. The `AppFeature` reducer
- * half is `:app`'s `AppFeatureTests`.
- */
 class AppFeatureTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -204,7 +199,7 @@ class AppFeatureTests {
         )) {
             assertNull(link, OpenCodePairingLink.decode(link))
             assertTrue(link, OpenCodePairingLink.isPairingEndpoint(link))
-            // iOS skips what `URL(string:)` rejects (the `!` code); the string checks apply to every link here.
+            // The string checks apply to every link here.
             assertTrue(link, OpenCodePairingLink.shouldHandleOpenURL(link))
             assertNull(link, OpenCodePairingLink.shareableURL(link))
         }

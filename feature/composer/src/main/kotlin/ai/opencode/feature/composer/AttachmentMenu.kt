@@ -79,7 +79,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/** Where the attachment menu is (iOS `AttachmentMenuPhase`). */
+/** Where the attachment menu is. */
 enum class AttachmentMenuPhase {
     Closed,
     Menu,
@@ -87,7 +87,7 @@ enum class AttachmentMenuPhase {
     Photos,
 }
 
-/** The menu's curves (iOS `AttachmentMenuMotion`). */
+/** The menu's curves. */
 object AttachmentMenuMotion {
     /** The surface grows up out of + while the + turns into a ×. */
     fun <T> open(reduceMotion: Boolean): FiniteAnimationSpec<T> = Motion.panelOpen.animation(reduceMotion = reduceMotion)
@@ -95,7 +95,6 @@ object AttachmentMenuMotion {
     fun <T> close(reduceMotion: Boolean): FiniteAnimationSpec<T> = Motion.panelClose.animation(reduceMotion = reduceMotion)
 }
 
-/** iOS `AttachmentMenuMetrics` (points → dp). */
 object AttachmentMenuMetrics {
     /** The composer's, so the menu reads as the same surface (the desktop dock's 12). */
     val cornerRadius: Dp = 12.dp
@@ -110,16 +109,14 @@ object AttachmentMenuMetrics {
     val overComposerFloor: Dp = 12.dp
 }
 
-/**
- * The New Plus Menu's values (iOS `PlusMenuTunables`, baked to their defaults). Seconds and points.
- */
+/** The New Plus Menu's values. Seconds and points. */
 object PlusMenuTunables {
     const val MENU_BLUR = 3.5f
     const val MENU_SCALE = 0.96f
     /** A row's reveal spans this much of the open (× open). */
     const val ROW_SPAN = 0.65f
     const val HOLD_DURATION = 0.18
-    /** iOS's peek backdrop blur (pt). Not drawn on Android, which dims the band with a scrim. */
+    /** Peek backdrop blur (dp). Not drawn on Android, which dims the band with a scrim. */
     const val PEEK_BLUR = 10f
     const val PEEK_DIM = 0f
     const val PEEK_FEATHER = 56f
@@ -136,7 +133,7 @@ object PlusMenuTunables {
     /** A picked photo draws this far inside its tile, rounded (dp): the system photo picker's selection. */
     const val SELECTED_TILE_INSET = 10f
     const val SELECTED_TILE_RADIUS = 12f
-    /** How far the menu's foot sits below the composer's (iOS overlaps the keys in its own window). */
+    /** How far the menu's foot sits below the composer's. */
     const val MENU_DROP = 80f
     /** The menu's width, × the screen's. */
     const val MENU_WIDTH = 0.63f
@@ -146,8 +143,8 @@ object PlusMenuTunables {
     /** The menu's leading edge in from the composer's. */
     const val MENU_INSET = 0f
 
-    // iOS `PlusMenuGlassSurface.swift`. The collapsing glass's size where it leaves, as a fraction
-    // of the + frame (1 leaves a +-sized disc, which reads as a pop).
+    // The collapsing glass's size where it leaves, as a fraction of the + frame (1 leaves a +-sized
+    // disc, which reads as a pop).
     const val COLLAPSE_END = 0.25f
     /** The scale the + pops back from as the glass arrives (1 is a fade only). */
     const val PLUS_POP = 0.8
@@ -158,9 +155,9 @@ object PlusMenuTunables {
 // region Rows
 
 /**
- * The menu's rows (iOS `AttachmentMenuRows`). A hidden measuring copy reports where each row
- * rests ([onRowFrame], root coordinates), so choosing by a slide from + never depends on the
- * surface mid-flight. [onPaste] asks the session to read the clipboard.
+ * The menu's rows. A hidden measuring copy reports where each row rests ([onRowFrame], root
+ * coordinates), so choosing by a slide from + never depends on the surface mid-flight. [onPaste]
+ * asks the session to read the clipboard.
  *
  * @param buttonCenterX where the + glyph's center sits from the panel's leading edge (dp); the
  *   rows' icons line up under it.
@@ -217,8 +214,7 @@ fun AttachmentMenuRows(
                     val reveal = if (staggeredEntrance) {
                         Modifier.menuRowEntranceReveal(entranceProgress, max(count - 1 - index, 0), count, entranceBlur, entranceScale)
                     } else Modifier
-                    // Android divergence: a ripple answers a tap (iOS lights the row while pressed);
-                    // the press-and-slide highlight stays.
+                    // A ripple answers a tap; the press-and-slide highlight stays.
                     Box(
                         reveal
                             .fillMaxWidth()
@@ -276,8 +272,7 @@ private fun AttachmentMenuRowLabel(item: AttachmentMenuItem, iconWidth: Dp, inse
 
 /**
  * Staggers the + menu's rows bottom-up out of the + seed (and back into it on close), each row
- * unblurring, scaling from its bottom leading corner, and lifting into its slot as one layer
- * (iOS `MenuRowEntranceReveal`).
+ * unblurring, scaling from its bottom leading corner, and lifting into its slot as one layer.
  */
 fun Modifier.menuRowEntranceReveal(progress: Float, bottomIndex: Int, totalCount: Int, blur: Float, scale: Float): Modifier {
     val clamped = progress.coerceIn(0f, 1f)
@@ -308,8 +303,7 @@ fun Modifier.menuRowEntranceReveal(progress: Float, bottomIndex: Int, totalCount
 
 /**
  * Measures where the + menu stands: the seed the surface grows from, the menu's frame and where
- * each row rests (iOS `AttachmentMenuMeasure`). Draws nothing; put it in a full-screen box over the
- * session.
+ * each row rests. Draws nothing; put it in a full-screen box over the session.
  */
 @Composable
 fun AttachmentMenuMeasure(
@@ -318,7 +312,7 @@ fun AttachmentMenuMeasure(
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
-    // The docked keyboard's top in the measure's space (iOS `DockedKeyboard.frameInScreen`).
+    // The docked keyboard's top in the measure's space.
     val imeBottom = WindowInsets.ime.getBottom(density)
     val navigationBarBottom = WindowInsets.navigationBars.getBottom(density)
     /** Each row's frame within the rows, from the measuring copy. */
@@ -437,15 +431,15 @@ internal fun attachmentMenuFrames(
     return AttachmentMenuFrames(button, seed, menu)
 }
 
-/** An eased 0–1 ramp from [from] to [to] (iOS `attachmentMenuSmoothstep`). */
+/** An eased 0–1 ramp from [from] to [to]. */
 internal fun attachmentMenuSmoothstep(from: Float, to: Float, x: Float): Float {
     val t = ((x - from) / (to - from)).coerceIn(0f, 1f)
     return t * t * (3 - 2 * t)
 }
 
 /**
- * What the composer's dismiss area closes (iOS `ComposerDismissTarget`). It reaches over the
- * whole transcript, so it's mounted only for something on screen.
+ * What the composer's dismiss area closes. It reaches over the whole transcript, so it's mounted
+ * only for something on screen.
  */
 enum class ComposerDismissTarget {
     AttachmentMenu,
@@ -462,7 +456,7 @@ enum class ComposerDismissTarget {
     }
 }
 
-/** Dismisses the menu on a tap or a downward drag (iOS `AttachmentMenuDismissArea`). */
+/** Dismisses the menu on a tap or a downward drag. */
 @Composable
 fun AttachmentMenuDismissArea(onDismiss: () -> Unit, modifier: Modifier = Modifier, extent: Dp? = null) {
     Box(

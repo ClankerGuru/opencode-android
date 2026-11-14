@@ -16,10 +16,9 @@ import ai.opencode.feature.transcript.SessionSeenWatermarks
 import ai.opencode.feature.transcript.sessionSeenWatermarks
 import ai.opencode.server.OpenCodeServer
 
-// Port of iOS `AppFeature+Migrations.swift`: preferences saved by earlier builds, moved once at
-// launch.
+// Preferences saved by earlier builds, moved once at launch.
 
-/** Runs every launch migration, in iOS's order. */
+/** Runs every launch migration. */
 internal fun migrateSettingsIfNeeded(savedServers: List<OpenCodeServer>) {
     val store = dependency(SharedStore)
     recordInstallHistory(store, savedServers)
@@ -28,7 +27,6 @@ internal fun migrateSettingsIfNeeded(savedServers: List<OpenCodeServer>) {
     removeRetiredOrbStyles(store)
 }
 
-/** iOS `AppFeature.retiredOrbStyleKey`. */
 internal const val RETIRED_ORB_STYLE_KEY = "living-orb-style"
 
 private fun removeRetiredOrbStyles(store: SharedStore) {
@@ -55,18 +53,12 @@ private fun recordInstallHistory(store: SharedStore, savedServers: List<OpenCode
     AppLog.app.info { "fresh install marked What’s New seen entries=${all.size}" }
 }
 
-/**
- * iOS `AppFeature.State.migrateBeforeRestore()`: runs in [AppFeature.State.initial], before Home
- * restores the saved server.
- */
+/** Runs in [AppFeature.State.initial], before Home restores the saved server. */
 internal fun migrateBeforeRestore() {
     retireNewMessagesDivider(dependency(SharedStore))
 }
 
-/**
- * iOS `retireNewMessagesDivider(in:)`: clears the stale seen watermarks once, so they fall back to
- * the server's viewed time.
- */
+/** Clears the stale seen watermarks once, so they fall back to the server's viewed time. */
 internal fun retireNewMessagesDivider(store: SharedStore) {
     val key = SharedKey.appStorage("experimental-new-messages-divider", false)
     if (!store.contains(key)) return

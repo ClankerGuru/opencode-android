@@ -21,9 +21,7 @@ import org.junit.Rule
 import org.junit.Test
 import java.util.UUID
 
-/**
- * Port of iOS `BrowserTests.swift` (`BrowserLinkPolicyTests`). URLs are strings on Android.
- */
+/** URLs are strings on Android. */
 class BrowserLinkPolicyTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -118,7 +116,6 @@ class BrowserLinkPolicyTests {
     }
 }
 
-/** Port of iOS `BrowserFeatureTests` (`BrowserTests.swift`). */
 class BrowserFeatureTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -383,11 +380,7 @@ class BrowserFeatureTests {
     }
 }
 
-/**
- * Port of iOS `LinkMenuTests` (`BrowserTests.swift`): what the menu offers. The menu actions'
- * effects run in `SessionFeature` (`:feature:session`); WebKit's context-menu configuration has
- * no Android counterpart (the WebView's hold menu is ours, see `BrowserWebViews.linkMenuActions`).
- */
+/** What the menu offers. */
 class LinkMenuTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -456,7 +449,7 @@ class LinkMenuTests {
         assertEquals(kept.flatMap { url -> actionsFor(url).map { it to url } }, plan.actions)
         assertEquals(6, kept.size)
 
-        // A few links keep the flat list iOS has, with no More Links.
+        // A few links keep the flat list, with no More Links.
         val few = links.take(6)
         val fits = LinkMenuText.accessibilityActions(few, actionsFor)
         assertEquals(few.flatMap { url -> actionsFor(url).map { it to url } }, fits.actions)
@@ -521,10 +514,6 @@ class LinkMenuTests {
     }
 }
 
-/**
- * The menu half of iOS `OpenLinksInAppsTests.theMenuOffersTheAppBrowserOnlyWhenATapMightSkipIt`;
- * its universal-link probe runs in `SessionFeature` (`:feature:session`).
- */
 class OpenLinksInAppsTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -552,7 +541,6 @@ class OpenLinksInAppsTests {
     }
 }
 
-/** Port of iOS `BrowserObscuredInsetsTests` (`BrowserWebViewHost.obscuredInsets` → [BrowserInsets.obscured]). */
 class BrowserObscuredInsetsTests {
     @Test
     fun negativeInsetsNeverReachTheWebView() {

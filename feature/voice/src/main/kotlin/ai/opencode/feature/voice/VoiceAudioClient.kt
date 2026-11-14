@@ -246,8 +246,10 @@ sealed class VoiceAudioError(message: String) : Exception(message) {
     }
 }
 object AudioEngineGuard {
-    /** The framework's `IllegalStateException`s (iOS: raised `NSException`s) become errors; a
-     * cancellation (itself an `IllegalStateException` on the JVM) passes through, as iOS's does. */
+    /**
+     * The framework's `IllegalStateException`s become errors; a cancellation (itself an
+     * `IllegalStateException` on the JVM) passes through.
+     */
     fun <T> perform(operation: String, body: () -> T): T = try { body() } catch (error: IllegalStateException) {
         if (error is CancellationException) throw error
         val reason = error.message ?: "no reason given"

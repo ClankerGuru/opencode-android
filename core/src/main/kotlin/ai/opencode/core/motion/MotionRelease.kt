@@ -7,8 +7,8 @@ import kotlin.math.min
 import kotlin.math.pow
 
 /**
- * The release rule (iOS `MotionRelease`): commits on a flick toward the target, never away, else on
- * passing halfway. Velocities in dp/s.
+ * The release rule: commits on a flick toward the target, never away, else on passing halfway.
+ * Velocities in dp/s.
  */
 object MotionRelease {
     const val commitProgress: Double = 0.5
@@ -30,10 +30,7 @@ object MotionRelease {
     }
 }
 
-/**
- * An overscroll band with an exact inverse (iOS `MotionRubberBand`), so a grab mid-band resumes
- * without a jump.
- */
+/** An overscroll band with an exact inverse, so a grab mid-band resumes without a jump. */
 class MotionRubberBand(dimension: Double, coefficient: Double = 0.55) {
     val dimension: Double = max(dimension, 1.0)
     val coefficient: Double = max(coefficient, 0.01)
@@ -74,8 +71,8 @@ class MotionRubberBand(dimension: Double, coefficient: Double = 0.55) {
 }
 
 /**
- * A morph between two frames (iOS `MotionFlightGeometry`): width leads, so a pill widens before
- * it grows tall, while height and centre move linearly and land exactly on the target.
+ * A morph between two frames: width leads, so a pill widens before it grows tall, while height and
+ * centre move linearly and land exactly on the target.
  */
 object MotionFlightGeometry {
     fun rect(from: Rect, to: Rect, progress: Float, lead: Float = MotionTunables.widthLead.value.toFloat()): Rect {

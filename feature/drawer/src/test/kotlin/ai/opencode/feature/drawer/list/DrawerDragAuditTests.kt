@@ -8,8 +8,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Port of iOS `DrawerDragAuditTests.swift`: a lifted drawer row tracks the finger 1:1 with a
- * frame's latency allowed, is never clipped, and floats above the drawer's chrome.
+ * A lifted drawer row tracks the finger 1:1 with a frame's latency allowed, is never clipped, and
+ * floats above the drawer's chrome.
  */
 class DrawerDragAuditTests {
     private val width = 220f

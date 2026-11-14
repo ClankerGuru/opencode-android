@@ -78,9 +78,8 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
 /**
- * Port of iOS `ServerDetailsTray` (`Settings/ServerDetailsTrays.swift`): the sheet a Server
- * Details tile or banner opens, one job per tray. Skills open full height; the rest at half
- * height first (iOS detents `.medium`, `.large`).
+ * The sheet a Server Details tile or banner opens, one job per tray. Skills open full height; the
+ * rest at half height first.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -150,14 +149,12 @@ private fun MCPServersTray(
     send: (ServerDetailsFeature.Action) -> Unit,
     close: () -> Unit,
 ) {
-    // iOS pushes one server inside the tray's own NavigationStack.
     var detail by rememberSaveable { mutableStateOf<String?>(null) }
     BackHandler(enabled = detail != null) { detail = null }
     val reduceMotion = rememberReduceMotion()
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val slidePx = with(LocalDensity.current) { PageTransitions.SlideDistance.roundToPx() }
-    // Android divergence: the server's page comes and goes on Material's shared axis, as Settings'
-    // pages do (iOS pushes it full width over a list that moves a third of the way left).
+    // The server's page comes and goes on Material's shared axis, as Settings' pages do.
     AnimatedContent(
         targetState = detail,
         transitionSpec = {
@@ -167,8 +164,8 @@ private fun MCPServersTray(
             } else {
                 PageTransitions.backward(slidePx, rtl, reduceMotion)
             }.using(
-                // The sheet keeps its height through the move (iOS's tray sits at its detent):
-                // it grows at once for a taller page and shrinks only once the move is done.
+                // The sheet keeps its height through the move: it grows at once for a taller page
+                // and shrinks only once the move is done.
                 SizeTransform(clip = true) { initial, target ->
                     if (target.height >= initial.height) snap() else snap(delayMillis = Motion.millis(PageTransitions.DURATION_SECONDS))
                 },
@@ -217,7 +214,6 @@ private fun MCPServersList(
                     index == servers.lastIndex -> RoundedCornerShape(bottomStart = OpenCodeRadius.panel, bottomEnd = OpenCodeRadius.panel)
                     else -> RoundedCornerShape(0.dp)
                 }
-                // iOS `.animation(Motion.layout.animation(reduceMotion:), value: servers)`.
                 Column(Modifier.animateItem(MotionRole.Layout.animation(reduceMotion = reduceMotion), MotionRole.Layout.animation(reduceMotion = reduceMotion, visibilityThreshold = IntOffset.VisibilityThreshold), MotionRole.Layout.animation(reduceMotion = reduceMotion)).padding(horizontal = 16.dp).clip(shape).background(OpenCodeTheme.colors.groupedCard)) {
                     MCPServerRow(
                         mcp = mcp,
@@ -254,7 +250,6 @@ private fun MCPServerRow(mcp: OpenCodeMCPServer, onOpen: () -> Unit, action: () 
     }
 }
 
-/** iOS `MCPServerTray.actionTitle(_:)`. */
 internal fun actionTitle(status: OpenCodeMCPServer.Status): String = when (status) {
     is OpenCodeMCPServer.Status.NeedsAuth -> "Sign In"
     is OpenCodeMCPServer.Status.Failed -> "Retry"
@@ -262,7 +257,6 @@ internal fun actionTitle(status: OpenCodeMCPServer.Status): String = when (statu
     else -> "Connect"
 }
 
-/** iOS `MCPServerTray.actionKind(_:)`. */
 internal fun actionKind(status: OpenCodeMCPServer.Status): CapsuleKind = when (status) {
     is OpenCodeMCPServer.Status.NeedsAuth -> CapsuleKind.Prominent
     is OpenCodeMCPServer.Status.Failed -> CapsuleKind.Inverse
@@ -322,7 +316,7 @@ private fun MCPServerTray(
                     }
                 }
                 is OpenCodeMCPServer.Status.NeedsAuth -> Text(
-                    // iOS says “in Safari”; Android opens the default browser.
+                    // Android opens the default browser.
                     "Its tools work once you sign in. Sign In opens ${brand.name} in your browser.",
                     style = SettingsText.title,
                     color = OpenCodeTheme.colors.secondaryText,
@@ -409,7 +403,6 @@ private fun AccountRow(account: OpenCodeAccount) {
     }
 }
 
-/** iOS `OpenCodeAccount.methodTitle`. */
 val OpenCodeAccount.methodTitle: String
     get() = when (method) {
         OpenCodeAccount.Method.OAuth -> "Sign-In"

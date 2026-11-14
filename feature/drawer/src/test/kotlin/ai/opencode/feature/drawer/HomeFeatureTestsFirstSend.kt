@@ -33,8 +33,8 @@ import org.junit.Test
 import ai.opencode.core.testing.TestIsolationRule
 
 /**
- * Port of iOS `FirstSendSurvivesNavigationTests`: a new session's first prompt is sent even when
- * the screen changes while the session is still being created.
+ * A new session's first prompt is sent even when the screen changes while the session is still
+ * being created.
  */
 class FirstSendSurvivesNavigationTests {
     @get:Rule val isolation = TestIsolationRule()

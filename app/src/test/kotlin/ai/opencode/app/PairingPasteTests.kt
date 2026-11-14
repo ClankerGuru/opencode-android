@@ -8,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 
-/** Port of iOS `PairingPasteTests`: the welcome's Paste. Ordinary mistakes stay beside Paste, never the error report card. */
+/** The welcome's Paste. Ordinary mistakes stay beside Paste, never the error report card. */
 class PairingPasteTests {
     @get:Rule val isolation = TestIsolationRule()
 

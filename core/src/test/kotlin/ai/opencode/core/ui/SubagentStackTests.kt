@@ -7,12 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `SubagentStackTests.swift`, the `:core` part:
- * `backRulesLetTheEdgeWinAndContentKeepItsClaims` ([BackSwipeRules]; iOS `BackSwipeSpring.goesBack`
- * is [BackSwipeRules.goesBack]). iOS distances are points; the decision distance is passed as
- * iOS's 8 so the same numbers apply. The stack itself is `:feature:drawer`'s.
- */
+/** The decision distance is passed. */
 class SubagentStackTests {
     @get:Rule val isolation = TestIsolationRule()
 

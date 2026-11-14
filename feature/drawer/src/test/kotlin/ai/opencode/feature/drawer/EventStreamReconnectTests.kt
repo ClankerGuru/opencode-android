@@ -38,9 +38,8 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `EventStreamReconnectTests` (in `NetworkRetryTests.swift`): the event stream
- * reconnects on the shared backoff, at once on a network change, and resyncs from REST each time it
- * connects.
+ * The event stream reconnects on the shared backoff, at once on a network change, and resyncs from
+ * REST each time it connects.
  */
 class EventStreamReconnectTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -53,7 +52,7 @@ class EventStreamReconnectTests {
         sessionDetail = null,
     )
 
-    /** A cancellable scope on the test's scheduler (iOS's effect `Task`). */
+    /** A cancellable scope on the test's scheduler. */
     private fun TestScope.effectScope() = CoroutineScope(coroutineContext + Job())
 
     private fun matching(name: String, test: (HomeFeature.Action) -> Boolean) = test to name

@@ -64,10 +64,7 @@ import java.util.UUID
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
-/**
- * Android counterpart of iOS `MotionPlaygroundView` + `MotionPlaygroundStages`: one example per
- * motion role, with a Reduce Motion switch.
- */
+/** One example per motion role, with a Reduce Motion switch. */
 @Composable
 fun MotionPlaygroundView(modifier: Modifier = Modifier) {
     val systemReduceMotion = rememberReduceMotion()
@@ -97,7 +94,7 @@ fun MotionPlaygroundView(modifier: Modifier = Modifier) {
     }
 }
 
-/** iOS `MotionStage`: a title, an optional action, and the example on a plain surface. */
+/** A title, an optional action, and the example on a plain surface. */
 @Composable
 private fun MotionStage(
     title: String,
@@ -195,7 +192,10 @@ private fun PressStage(reduceMotion: Boolean) {
     }
 }
 
-/** iOS `ReleaseStage`: drag the card between two slots; the release rule picks the side and the band resists past the ends. */
+/**
+ * Drag the card between two slots; the release rule picks the side and the band resists past the
+ * ends.
+ */
 @Composable
 private fun ReleaseStage(reduceMotion: Boolean) {
     val scope = rememberCoroutineScope()
@@ -238,7 +238,7 @@ private fun ReleaseStage(reduceMotion: Boolean) {
     }
 }
 
-/** iOS `FlightStage`: a thumbnail flies between two frames, its width leading its height. */
+/** A thumbnail flies between two frames, its width leading its height. */
 @Composable
 private fun FlightStage(reduceMotion: Boolean) {
     val scope = rememberCoroutineScope()
@@ -262,7 +262,7 @@ private fun FlightStage(reduceMotion: Boolean) {
     }
 }
 
-/** iOS `AmbientStage`: a breathing dot and a sweep bar on the one ambient clock. */
+/** A breathing dot and a sweep bar on the one ambient clock. */
 @Composable
 private fun AmbientStage(reduceMotion: Boolean) {
     MotionStage("Ambient") {

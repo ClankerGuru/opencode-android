@@ -20,22 +20,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.Instant
 
-/**
- * The SessionFeature half of iOS `SessionLinkTests.swift`.
- *
- * Not ported here: parsing/presentation (`recognizesCompleteIDsInInlineCodeAndText`,
- * `leavesPartialAndEmbeddedIDsAlone`, `aWindowsPathIsNotALink`, `copiedMarkdownKeepsTheIDAsWritten`,
- * `showsTheTitleOrAShortIDAndMapsArrivals`, `longTitlesAreShortened`,
- * `holdingOffersCopyIDAndVoiceOverOpensBySessionName`, `aStreamedDeltaLeavesTheRowsLinkContextEqual`,
- * `reinjectingAnEqualContextDoesNotRedrawItsReaders`, `markingChecksTheSourceAndStillFindsEscapedIDs`,
- * `theSourceGuardNeverSkipsALinkTheFullScanFinds`, `onlyTextThatPresentsLinksCarriesChips`;
- * :feature:transcript); `linkURLRoundTripsItsIDAndTitle` (:server, already ported); the HomeFeature
- * tests (`homeAnswersFromItsList…`, `anIDTheServerDoesNotKnowStaysShort`,
- * `tappingASubagentLinkPushesItAndARootOpensIt`, `aLinkThatCannotOpenPlaysAnError`,
- * `linkLookupsQueueBeyondSix…`, `aLinkLookupThatLandsAfterLeavingItsScreenOpensNothing`,
- * `aRowWhoseLookupFailedAsksAgainWhenItNextAppears`; :feature:drawer); `testSessionLinkCPU`
- * (env-gated benchmark).
- */
 class SessionLinkTests {
     private companion object {
         const val ID = "ses_ea0cb2871ffeNzq62aRonBKB2l"

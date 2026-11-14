@@ -19,14 +19,7 @@ import org.junit.Test
 import java.util.Base64
 import java.util.UUID
 
-/**
- * Port of iOS `ClientToolsTests.swift`, its protocol and transport tests (MARK: Protocol,
- * Transport). The reducer's tests are in `:feature:system`, the app's in `:app`.
- *
- * Android divergence: the phone's MCP server is named `android` (agents see `android_voice_*`),
- * and OkHttp takes `http(s)` URLs for web sockets, so the socket request's scheme is `https`/`http`
- * where iOS's is `wss`/`ws`.
- */
+/** Its protocol and transport tests (MARK: Protocol, Transport). */
 class ClientToolsTests {
     @get:Rule val isolation = TestIsolationRule()
 

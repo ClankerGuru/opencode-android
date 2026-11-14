@@ -4,8 +4,7 @@ import java.net.URI
 import java.time.Instant
 
 /**
- * Port of iOS `SessionActivity.swift`: a run started by a send from this phone reads in an
- * ongoing notification (iOS: on the Lock Screen and in the Dynamic Island) while the app is away
+ * A run started by a send from this phone reads in an ongoing notification while the app is away
  * (Session Live Activity, Experimental). Tapping it opens the session, where a pending request
  * docks. No message text while it works: the lock screen is for anyone to see.
  */

@@ -16,10 +16,9 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `SystemIntents.swift`. Each opens the app (through [SystemActionActivity]),
- * where `perform` runs and hands its action to [SystemActionInbox]. Android's equivalents of
- * App Intents are app shortcuts, App Actions capabilities (`res/xml/shortcuts.xml`), Quick
- * Settings tiles and widgets.
+ * Each opens the app (through [SystemActionActivity]), where `perform` runs and hands its action to
+ * [SystemActionInbox]. Android's equivalents of App Intents are app shortcuts, App Actions
+ * capabilities (`res/xml/shortcuts.xml`), Quick Settings tiles and widgets.
  */
 object OpenSessionIntent {
     val TITLE: String get() = localized(R.string.system_open_session)

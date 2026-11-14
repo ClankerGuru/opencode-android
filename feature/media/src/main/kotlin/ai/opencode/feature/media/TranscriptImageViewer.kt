@@ -90,16 +90,15 @@ import java.util.Locale
 
 // MARK: - Photo save
 
-/** iOS `PhotoSaveClientError`. */
 sealed class PhotoSaveClientError : Exception() {
-    /** The system refused the write (iOS: add-only Photos access denied). */
+    /** The system refused the write. */
     data object Denied : PhotoSaveClientError()
 }
 
 /**
- * Saves an image to the photo library (iOS `PhotoSaveClient`, `@Dependency(\.photoSave)`).
- * Android: a MediaStore insert into Pictures, which needs no permission at this app's
- * minimum SDK (35; `WRITE_EXTERNAL_STORAGE` only mattered on Android 9 and earlier).
+ * Saves an image to the photo library. Android: a MediaStore insert into Pictures, which needs no
+ * permission at this app's minimum SDK (35; `WRITE_EXTERNAL_STORAGE` only mattered on Android 9 and
+ * earlier).
  */
 class PhotoSaveClient(
     val saveImage: suspend (Bitmap) -> Unit = {},
@@ -143,9 +142,8 @@ class PhotoSaveClient(
 // MARK: - Share
 
 /**
- * Shares an image through the system share sheet (iOS `ImageShareClient`,
- * `@Dependency(\.imageShare)`): written to the cache and offered with `ACTION_SEND` through
- * [MediaFileProvider].
+ * Shares an image through the system share sheet: written to the cache and offered with
+ * `ACTION_SEND` through [MediaFileProvider].
  */
 class ImageShareClient(
     val share: suspend (Bitmap, String) -> Unit = { _, _ -> },
@@ -217,7 +215,6 @@ val TranscriptImagePreview.Page.displayTitle: String?
 
 // MARK: - Feature
 
-/** iOS `TranscriptImageViewerFeature`. */
 class TranscriptImageViewerFeature : Reducer<TranscriptImageViewerFeature.State, TranscriptImageViewerFeature.Action> {
     data class State(
         val preview: TranscriptImagePreview,
@@ -303,7 +300,6 @@ class TranscriptImageViewerFeature : Reducer<TranscriptImageViewerFeature.State,
                         } catch (cancellation: kotlinx.coroutines.CancellationException) {
                             throw cancellation
                         } catch (error: Throwable) {
-                            // iOS logs the NSError's domain and code; a Swift enum error's code is its case index.
                             val code = if (error is PhotoSaveClientError.Denied) 0 else -1
                             AppLog.app.error { "Photo save failed: ${error::class.java.name} code=$code" }
                             false
@@ -385,9 +381,9 @@ class TranscriptImageViewerFeature : Reducer<TranscriptImageViewerFeature.State,
 // MARK: - View
 
 /**
- * Transcript images, full screen (iOS `TranscriptImageViewer`): swipe between them, pinch or
- * double-tap to zoom, single-tap to toggle controls, drag down to put them back. Opens
- * showing only the photo (controls visible when TalkBack is on).
+ * Transcript images, full screen: swipe between them, pinch or double-tap to zoom, single-tap to
+ * toggle controls, drag down to put them back. Opens showing only the photo (controls visible when
+ * TalkBack is on).
  */
 @Composable
 fun TranscriptImageViewer(
@@ -411,8 +407,8 @@ fun TranscriptImageViewer(
     val talkBack = rememberTalkBackEnabled()
     val pages = state.preview.pages
 
-    // iOS `init`: the status bar and the image on screen, before the flight starts; again
-    // once a `media:<hash>` page's image arrives.
+    // The status bar and the image on screen, before the flight starts; again once a `media:<hash>`
+    // page's image arrives.
     val hasImage = state.selectedPage?.image != null
     DisposableEffect(viewer, state.selectedID, hasImage) {
         viewer.show(sourceID = state.selectedID, image = state.selectedPage?.image)
@@ -491,7 +487,7 @@ fun TranscriptImageViewer(
         }
 
         val safe = WindowInsets.systemBarsIgnoringVisibility.union(WindowInsets.displayCutout)
-        // The controls swap in and out (iOS `Motion.swap`).
+        // The controls swap in and out.
         val reduceMotion = rememberReduceMotion()
         val enter = fadeIn(MotionRole.Swap.animation(MotionPhase.Enter, reduceMotion))
         val exit = fadeOut(MotionRole.Swap.animation(MotionPhase.Exit, reduceMotion))
@@ -601,11 +597,10 @@ fun TranscriptImageViewer(
     }
 }
 
-/** iOS `TranscriptImageViewer.controlsAreVisible`. */
 fun controlsAreVisible(isShowingControls: Boolean, voiceOver: Boolean, chromeHidden: Boolean): Boolean =
     (isShowingControls || voiceOver) && !chromeHidden
 
-/** iOS `accessibilityVoiceOverEnabled`: TalkBack (touch exploration) is on. Live-updating. */
+/** TalkBack (touch exploration) is on. Live-updating. */
 @Composable
 internal fun rememberTalkBackEnabled(): Boolean {
     val context = LocalContext.current

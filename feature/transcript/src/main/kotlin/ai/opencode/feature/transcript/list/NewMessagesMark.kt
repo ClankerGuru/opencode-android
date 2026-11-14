@@ -9,13 +9,12 @@ import androidx.compose.runtime.Immutable
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * What arrived while the reader was away (iOS `NewMessagesMark`): from the first row that wasn't on
- * screen when they last left the session. The list brings them to it at the end; a New divider
- * sits above it when it doesn't fit on screen.
+ * What arrived while the reader was away: from the first row that wasn't on screen when they last
+ * left the session. The list brings them to it at the end; a New divider sits above it when it
+ * doesn't fit on screen.
  *
- * The session-state half of iOS's file (`SessionFeature.State.noteLeaving/noteOpening/
- * noteOwnSend/absorbFittingNewMessages/updateNewMessagesMark`, `newMessagesContext = 20`) is
- * reducer logic and belongs to `:feature:session`; it builds marks with [firstUnseen].
+ * The session-state half is reducer logic in `:feature:session`; it builds marks with
+ * [firstUnseen].
  */
 @Immutable
 data class NewMessagesMark(
@@ -27,7 +26,7 @@ data class NewMessagesMark(
     val generation: Int,
 ) {
     companion object {
-        /** Rows kept above the New divider (iOS `SessionFeature.State.newMessagesContext`). */
+        /** Rows kept above the New divider. */
         const val NEW_MESSAGES_CONTEXT = 20
 
         /**
@@ -87,8 +86,7 @@ data class NewMessagesMark(
 
         /**
          * Counts the rows the mark's span reads (a turn rebuilt, the own-message check) while a
-         * test holds it, so the test can prove a streamed row doesn't read the transcript again
-         * (iOS's DEBUG `@TaskLocal tally`).
+         * test holds it, so the test can prove a streamed row doesn't read the transcript again.
          */
         class Tally {
             private val value = AtomicInteger(0)
@@ -102,7 +100,7 @@ data class NewMessagesMark(
         @PublishedApi
         internal var tally: Tally? = null
 
-        /** Runs [block] with [tally] counting the span reads (iOS `$tally.withValue`). */
+        /** Runs [block] with [tally] counting the span reads. */
         inline fun <T> withTally(tally: Tally, block: () -> T): T {
             val previous = this.tally
             this.tally = tally
@@ -140,8 +138,7 @@ data class NewMessagesMark(
 
 /**
  * Unseen baseline kept when a settled mark starts at the top of a paged window (`earlierHistory`
- * not exhausted), so loading an earlier page can move the divider to the true first unseen row
- * (iOS `NewMessagesEarlierBaseline`).
+ * not exhausted), so loading an earlier page can move the divider to the true first unseen row.
  */
 @Immutable
 data class NewMessagesEarlierBaseline(
@@ -151,7 +148,9 @@ data class NewMessagesEarlierBaseline(
     val unread: Boolean,
 )
 
-/** New rows from [itemID] through [lastItemID] (of [count] rows) that start no entry of their own (iOS `NewMessagesFold`). */
+/**
+ * New rows from [itemID] through [lastItemID] (of [count] rows) that start no entry of their own.
+ */
 @Immutable
 data class NewMessagesFold(val itemID: String, val lastItemID: String?, val count: Int) {
     companion object {

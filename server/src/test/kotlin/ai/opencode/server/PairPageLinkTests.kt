@@ -9,7 +9,7 @@ import org.junit.Rule
 import org.junit.Test
 import java.util.Base64
 
-/** `https://opencode.ai/pair#<base64url {"code","urls"}>`, the link a pairing QR opens. Port of iOS `PairPageLinkTests.swift`. */
+/** `https://opencode.ai/pair#<base64url {"code","urls"}>`, the link a pairing QR opens. */
 class PairPageLinkTests {
     @get:Rule val isolation = TestIsolationRule()
 

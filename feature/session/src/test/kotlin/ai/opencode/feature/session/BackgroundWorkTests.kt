@@ -103,7 +103,6 @@ private fun Harness.state(
     isRunning: Boolean = false,
 ): SessionFeature.State = state { SessionFeature.State.session(server, session, cachedItems = cachedItems, isRunning = isRunning) }
 
-/** iOS `TestStore(initialState:) { ShellOutputFeature() }`. */
 private fun Harness.outputStore(
     state: ShellOutputFeature.State,
     dependencies: ai.opencode.core.dependencies.DependencyValues.Builder.() -> Unit = {},
@@ -124,7 +123,7 @@ private suspend fun show(
 
 private fun draft(text: String): Action = Action.Binding(BindingAction.Draft(text))
 
-/** Non-exhaustive receives of actions whose effects race (iOS's main actor orders them). */
+/** Non-exhaustive receives of actions whose effects race. */
 private suspend fun TestStore<SessionFeature.State, Action>.receiveInAnyOrder(vararg cases: kotlin.reflect.KClass<out Action>) {
     val remaining = cases.toMutableList()
     while (remaining.isNotEmpty()) {
@@ -137,14 +136,12 @@ private suspend fun TestStore<SessionFeature.State, Action>.receiveInAnyOrder(va
 private val missing = OpenCodeClientError(message = "Missing", statusCode = 404)
 
 /**
- * Port of iOS `BackgroundWorkTests.swift`: Move to Background, the shell output sheet and the
- * panel's drag. `glassRadiusFitsCapsuleAndPanelThroughoutMorph` checks `OpenCodeShapeGeometry`
- * (iOS `GlassGeometry`). Every test is ported.
+ * Move to Background, the shell output sheet and the panel's drag.
+ * `glassRadiusFitsCapsuleAndPanelThroughoutMorph` checks `OpenCodeShapeGeometry`.
  */
 class BackgroundWorkTests {
     @Test fun glassRadiusFitsCapsuleAndPanelThroughoutMorph() {
-        // The 44 pt target contains 34 pt of surface. Android diverges from iOS on purpose: the
-        // desktop's 12 dp corners fit it whole (iOS's 28 clamps to 17 end caps).
+        // The 44 pt target contains 34 pt of surface. The desktop's 12 dp corners fit it whole.
         val capsuleHeight = 44f - 2 * BackgroundWorkMotion.capsuleInset
         assertEquals(12f, OpenCodeShapeGeometry.radius(BackgroundWorkMotion.panelRadius, capsuleHeight))
         assertEquals(BackgroundWorkMotion.panelRadius, OpenCodeShapeGeometry.radius(BackgroundWorkMotion.panelRadius, 160f))
@@ -350,7 +347,7 @@ class BackgroundWorkTests {
         assertFalse(store.state.showsMoveToBackground)
         assertEquals(setOf("msg_a-tool-call_1"), store.state.movedWorkKeys)
         store.receive(Action.MoveToBackgroundFinished(session.id, "msg_a-tool-call_1", null, isAutomatic = true))
-        // iOS receives the shells, then the admission; here the two effects race, so either order.
+        // The two effects race, so either order.
         store.receiveInAnyOrder(Action.ShellsResponse::class, Action.PromptAdmitted::class)
         assertEquals(listOf(listed), store.state.shells)
         assertEquals(listOf("background:ses_bg", "prompt:ses_bg:steer:Check the failing snapshot"), calls.value)
@@ -711,7 +708,7 @@ class BackgroundWorkTests {
         assertEquals(320_000, store.state.endCursor)
         assertEquals(ShellOutputFeature.initialTailBytes, store.state.output.toByteArray().size)
         assertTrue(store.state.hasEarlierOutput)
-        // iOS reads `endOfCapture`; Android's route takes an Int, so the probe reads at Int.MAX_VALUE.
+        // Android's route takes an Int, so the probe reads at Int.MAX_VALUE.
         assertEquals("The first read only learns the size", Int.MAX_VALUE, capture.reads.value.first().first)
         assertTrue(capture.reads.value.drop(1).all { it.second == ShellOutputFeature.pageBytes })
     }
@@ -728,7 +725,7 @@ class BackgroundWorkTests {
         store.send(ShellOutputFeature.Action.Task)
         store.receive(ShellOutputFeature.Action.OutputReceived::class)
         val reads = capture.reads.value.size
-        // iOS `task.cancel()`: the view going away ends `.task`.
+        // The view going away ends `.task`.
         store.send(ShellOutputFeature.Action.TaskEnded)
         capture.append("more\n")
         clock.advance(10.seconds)
@@ -954,7 +951,6 @@ class BackgroundWorkTests {
         assertTrue(drag.offset < 0 && drag.offset > -BackgroundWorkTunables.upwardRubberBand)
         val roundTrip = BackgroundWorkDrag.rubberBandedOffset(BackgroundWorkDrag.rawPull(drag.offset))
         assertTrue(abs(roundTrip - drag.offset) < 0.001f)
-        // Swift reads `drag.velocity` after `end` ran.
         val released = drag.end(-200f)
         assertEquals(BackgroundWorkDrag.ReleaseDecision.ReturnToPanel(velocity = drag.velocity), released)
 

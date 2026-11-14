@@ -39,10 +39,8 @@ private fun JsonObject.keyNames(): List<String> = keys.sorted()
 private val distantPast: Instant = Instant.parse("0001-01-01T00:00:00Z")
 
 /**
- * Port of iOS `VoiceSessionToolsTests.swift`: the delegator's session discovery tools
- * (`list_sessions` with the drawer's unread, waiting and running state, and `search_sessions`).
- *
- * Not here: `homePublishesTheDrawerStateOnlyDuringACall` drives `HomeFeature` (:feature:home).
+ * The delegator's session discovery tools (`list_sessions` with the drawer's unread, waiting and
+ * running state, and `search_sessions`).
  */
 class VoiceSessionToolsTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
@@ -54,9 +52,8 @@ class VoiceSessionToolsTests {
     private val sessions: List<OpenCodeSession> get() = listOf(earpiece, upload, docs, math)
 
     /**
-     * Earpiece and upload run; upload waits on a permission; docs is
-     * unread; math and earpiece are pinned, math first. Only the iOS folder
-     * is in Home's attention set.
+     * Earpiece and upload run; upload waits on a permission; docs is unread; math and earpiece are
+     * pinned, math first. Only the iOS folder is in Home's attention set.
      */
     private fun board(attentionKnown: Boolean = true, isLive: Boolean = true, directories: Set<String> = setOf("/Users/kit/opencode-ios")) = VoiceSessionBoard(
         serverID = server.persistenceID,
@@ -212,8 +209,7 @@ class VoiceSessionToolsTests {
         assertEquals(listOf(docs.id), unread.map { it["id"].string() })
         val running = rows(tools, "list_sessions", """{"filter":"running"}""")
         assertEquals(listOf(earpiece.id, upload.id), running.map { it["id"].string() })
-        // The iOS folder is outside Home's attention set here: the waiting
-        // session leads, and the other running one can't be ruled out.
+        // The waiting session leads, and the other running one can't be ruled out.
         val waiting = rows(tools, "list_sessions", """{"filter":"needs_input"}""")
         assertEquals(listOf(upload.id, earpiece.id), waiting.map { it["id"].string() })
         assertEquals(listOf<JsonElement?>(JsonPrimitive(true), JsonPrimitive("unknown")), waiting.map { it["needs_input"] })
@@ -457,8 +453,6 @@ class VoiceSessionToolsTests {
 /**
  * The delegator's model tools: `list_models` and `switch_model`, for the
  * session on screen, another session, and a draft.
- *
- * Not here: `theScreenFollowsOnlyItsOwnSessionsSwitch` drives `SessionFeature` (:feature:session).
  */
 class VoiceModelToolsTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")

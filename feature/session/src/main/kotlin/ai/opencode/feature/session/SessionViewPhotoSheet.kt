@@ -92,26 +92,21 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlin.math.max
 
-// Port of iOS `Session/SessionView+PhotoSheet.swift`. The New Plus Menu (graduated in iOS p217):
-// the menu's surface grows into the composer's photo sheet (`PlusPhotoSheet` inside
-// `ComposerMorphSurface`, [SessionPlusPhotoSheet]):
-// the camera first, then the newest photos, Back and Add along its foot, two detents, and the
-// picks flying into the composer's thumbnails (`PhotoFlights`). A hold on + shows the newest photos
-// over the composer (`RecentPhotoPeek`).
+// The New Plus Menu: the menu's surface grows into the composer's photo sheet (`PlusPhotoSheet`
+// inside `ComposerMorphSurface`, [SessionPlusPhotoSheet]): the camera first, then the newest
+// photos, Back and Add along its foot, two detents, and the picks flying into the composer's
+// thumbnails (`PhotoFlights`). A hold on + shows the newest photos over the composer
+// (`RecentPhotoPeek`).
 
 /**
- * iOS `SessionView`'s New Plus Menu `@State`s (`attachmentMenu`, `attachmentMenuRestoresFocus`,
- * `photoSheet`, `photoSheetDetent`, `photoSheetSource`, `photoSheetLandsOn`,
- * `photoSheetFoldsToComposer`, `photoSheetKeepsMenu`, `photoSheetRestoresFocus`,
- * `photoSheetRestingComposer`, `plusPhotos`, `photoFlights`, `plusCamera`, `recentPeek`) and the
- * extension's functions. A plain object owned by `SessionView`; [env] is refreshed every
- * composition with what the functions read from the screen.
+ * A plain object owned by `SessionView`; [env] is refreshed every composition with what the
+ * functions read from the screen.
  */
 @Stable
 class SessionPhotoSheetState internal constructor(private val scope: CoroutineScope) {
-    /** The + menu's phase (iOS `attachmentMenu`). */
+    /** The + menu's phase. */
     var attachmentMenu by mutableStateOf(AttachmentMenuPhase.Closed)
-    /** The keyboard comes back as the menu closes (iOS `attachmentMenuRestoresFocus`). */
+    /** The keyboard comes back as the menu closes. */
     var attachmentMenuRestoresFocus by mutableStateOf(false)
 
     val morph = ComposerMorph(scope)
@@ -125,15 +120,15 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         private set
     var foldsToComposer by mutableStateOf(false)
         private set
-    /** Back from the sheet hands the keyboard back under the menu (iOS `photoSheetKeepsMenu`). */
+    /** Back from the sheet hands the keyboard back under the menu. */
     var keepsMenu = false
     /**
-     * iOS `photoSheetMenuTakesBack`: the menu takes its glass back as the back fold lands
-     * ([handMenuBackOnLanding]), not at the morph's longer generic settle.
+     * The menu takes its glass back as the back fold lands ([handMenuBackOnLanding]), not at the
+     * morph's longer generic settle.
      */
     var menuTakesBack by mutableStateOf(false)
         private set
-    /** iOS `photoSheetRestoresFocus`: the keyboard comes back as the sheet folds onto the composer. */
+    /** The keyboard comes back as the sheet folds onto the composer. */
     var restoresFocus by mutableStateOf(false)
         private set
     private var restingComposer: Rect? = null
@@ -144,13 +139,13 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
     val recentPeek = RecentPhotoPeek()
 
     /**
-     * iOS `plusMenuRests`: no menu, sheet, camera or recent-photo peek up, so nothing in the
+     * No menu, sheet, camera or recent-photo peek up, so nothing in the
      * + menu's overlay is there to read.
      */
     val plusMenuRests: Boolean
         get() = attachmentMenu == AttachmentMenuPhase.Closed && !morph.isShown && !recentPeek.isShown && !camera.expanded
 
-    /** iOS `PlusMenuGlassSurface(isOpen:)`: the + menu's own surface shows its rows (not handed to the photo sheet). */
+    /** The + menu's own surface shows its rows (not handed to the photo sheet). */
     val plusMenuIsOpen: Boolean
         get() = attachmentMenu == AttachmentMenuPhase.Menu && (!morph.isShown || menuTakesBack)
 
@@ -174,14 +169,13 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
     private val reducedMotion get() = env.reducedMotion
     private val ceiling: Float get() = env.headerHeight + ModelPickerTunables.headerGap.toFloat()
 
-    /** The composer in screen px (iOS `scrollEdgeBridge.composerFrame`), or null before it's laid out. */
+    /** The composer in screen px, or null before it's laid out. */
     val composerOnScreen: Rect?
         get() = env.host?.attachmentAnchors?.composer?.takeIf { it != Rect.Zero }?.translate(env.rootOffset)
 
     /**
-     * iOS `composerSheetTop(composer:)` (dp): where a sheet grown from the composer rests: the
-     * composer's top with the keyboard up; with it down, as high as the composer would stand over
-     * the keyboard or `mediumMax` (470 dp).
+     * Where a sheet grown from the composer rests: the composer's top with the keyboard up; with it
+     * down, as high as the composer would stand over the keyboard or `mediumMax` (470 dp).
      */
     private fun composerSheetTop(composer: Rect): Float {
         val d = env.density
@@ -198,10 +192,10 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
     }
 
     /**
-     * Where the sheet rests when it opens over a raised keyboard (dp). iOS draws the sheet over the
-     * keys in its keyboard-down shape (`photoSheetCoversKeys`); an Android app can't draw over the
-     * keyboard, so the keyboard goes down as the sheet opens and the sheet takes that same shape:
-     * the composer's top once it has dropped to the navigation bar, lifted as with no keyboard.
+     * Where the sheet rests when it opens over a raised keyboard (dp). An Android app can't draw
+     * over the keyboard, so the keyboard goes down as the sheet opens and the sheet takes that same
+     * shape: the composer's top once it has dropped to the navigation bar, lifted as with no
+     * keyboard.
      */
     private fun composerSheetTopWithKeyboardDown(composer: Rect): Float {
         val d = env.density
@@ -210,7 +204,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         return composer.top / d + drop - minLift
     }
 
-    /** The software keyboard is up (iOS's `software` test: taller than 120 dp). */
+    /** The software keyboard is up. */
     private val keyboardIsUp: Boolean get() = env.imeBottomPx / env.density > 120
 
     private fun composerAnchor(): Rect = env.host?.attachmentAnchors?.composer ?: Rect.Zero
@@ -235,7 +229,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         scope.launch { top.snapTo(to) }
     }
 
-    /** iOS `openPhotoSheet()`: the menu's surface grows into the sheet, resting on the keyboard when it's up. */
+    /** The menu's surface grows into the sheet, resting on the keyboard when it's up. */
     fun openPhotoSheet() {
         val host = env.host ?: return
         val menu = host.attachmentAnchors.menu
@@ -271,7 +265,6 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         )
     }
 
-    /** iOS `dragPhotoSheet(_:)` (dp). */
     fun dragPhotoSheet(translation: Float) {
         if (!morph.isOpen) return
         val next = withMeasuredDetent()
@@ -279,7 +272,6 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         detent = next
     }
 
-    /** iOS `settlePhotoSheet(predicted:velocity:)` (dp, dp/s). */
     fun settlePhotoSheet(predicted: Float?, velocity: Float) {
         if (!morph.isOpen || morph.drag == 0f) return
         val next = withMeasuredDetent()
@@ -292,15 +284,14 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
             is PlusPhotoSheetDetent.Settlement.Stay -> {
                 val from = top.value + morph.drag
                 detent = next
-                // The release spring carries the finger's speed; iOS's normalized velocity is a
-                // fraction of the distance per second.
+                // The release spring carries the finger's speed.
                 val velocity = Motion.release.initialVelocity(settlement.initialVelocity, reducedMotion)
                 springTop(settlement.top, Motion.release.animation(reduceMotion = reducedMotion), velocity * (settlement.top - from))
             }
         }
     }
 
-    /** iOS `togglePhotoSheetExpand()`: the grabber's tap, or All Photos. */
+    /** The grabber's tap, or All Photos. */
     fun togglePhotoSheetExpand() {
         if (!morph.isOpen) return
         val next = withMeasuredDetent()
@@ -310,7 +301,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         springTop(next.top, Motion.layout.animation(phase, reducedMotion))
     }
 
-    /** iOS `backFromPhotoSheet()`: the sheet folds onto the menu, which comes back with the keyboard if it was up. */
+    /** The sheet folds onto the menu, which comes back with the keyboard if it was up. */
     fun backFromPhotoSheet() {
         if (!morph.isOpening) return
         // The picks are dropped, but their badges stay until the sheet has folded away.
@@ -331,9 +322,9 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
     }
 
     /**
-     * iOS `handMenuBackOnLanding()`: the menu takes its glass back as the fold lands, in that
-     * frame; until then the menu stays handed off and the card sits under the returning
-     * keyboard. One frame: the menu draws as the sheet goes.
+     * The menu takes its glass back as the fold lands, in that frame; until then the menu stays
+     * handed off and the card sits under the returning keyboard. One frame: the menu draws as the
+     * sheet goes.
      */
     private fun handMenuBackOnLanding() {
         if (foldsToComposer) return
@@ -341,7 +332,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         morph.reset()
     }
 
-    /** iOS `raiseMessageKeyboard()`: the message field takes the keyboard back with the menu still up. */
+    /** The message field takes the keyboard back with the menu still up. */
     private fun raiseMessageKeyboard() {
         val host = env.host ?: return
         keepsMenu = true
@@ -349,8 +340,8 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
     }
 
     /**
-     * iOS `closePhotoSheet(restoresFocus:)`: Add, a capture, a tap outside or dragging down dismiss
-     * the sheet and the menu: it slides down and fades while the composer comes back.
+     * Add, a capture, a tap outside or dragging down dismiss the sheet and the menu: it slides down
+     * and fades while the composer comes back.
      */
     fun closePhotoSheet(restoresFocus: Boolean = true) {
         if (!morph.isOpening) return
@@ -367,7 +358,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         morph.fold(Motion.panelClose.animation(reduceMotion = reducedMotion), reduceMotion = reducedMotion)
     }
 
-    /** iOS `foldPhotoSheet()`: dismissed downward where something else closed the menu. */
+    /** Dismissed downward where something else closed the menu. */
     fun foldPhotoSheet() {
         restoresFocus = false
         library.clearPicks()
@@ -388,7 +379,6 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         }
     }
 
-    /** iOS `closeAttachmentMenu()`. */
     fun closeAttachmentMenu() {
         if (morph.isOpening) return closePhotoSheet()
         if (morph.isShown && !foldsToComposer) {
@@ -398,7 +388,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         attachmentMenu = AttachmentMenuPhase.Closed
     }
 
-    /** iOS `toggleAttachmentMenu()`'s New Plus Menu half: a sheet still folding goes at once. */
+    /** A sheet still folding goes at once. */
     fun prepareMenuOpening() {
         if (!morph.isOpening) {
             if (morph.isShown) morph.reset()
@@ -406,7 +396,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         }
     }
 
-    /** iOS `attachmentMenu`'s `onChange` to `.closed`: closed some other way, the sheet goes too. */
+    /** Closed some other way, the sheet goes too. */
     fun menuClosed() {
         if (morph.isOpening) {
             foldPhotoSheet()
@@ -417,7 +407,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         keepsMenu = false
     }
 
-    /** iOS `photoSheet.isShown`'s `onChange` to false: folded away, the menu's place is its own again. */
+    /** Folded away, the menu's place is its own again. */
     fun sheetFolded() {
         library.clearPicks()
         library.resetClosingPicks()
@@ -427,7 +417,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         if (detent.isExpanded) detent = detent.copy(isExpanded = false)
     }
 
-    /** iOS `resetPhotoSheet()`: gone at once (another session, the experiment switched off). */
+    /** Gone at once (another session, the experiment switched off). */
     fun resetPhotoSheet() {
         morph.reset()
         detent = PlusPhotoSheetDetent()
@@ -442,7 +432,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         library.resetSavedScrollPosition()
     }
 
-    /** iOS `showRecentPhotos()`: a hold on +: the newest photos over the composer, if readable and the menu isn't up. */
+    /** A hold on +: the newest photos over the composer, if readable and the menu isn't up. */
     fun showRecentPhotos(): Boolean {
         val composer = composerOnScreen ?: return false
         if (attachmentMenu != AttachmentMenuPhase.Closed || !library.canRead || library.photos.isEmpty()) return false
@@ -450,7 +440,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         return recentPeek.isShown
     }
 
-    /** iOS `captureCameraPhoto(_:)` (the sheet's camera): attaches at once, flying from the viewfinder. */
+    /** Attaches at once, flying from the viewfinder. */
     fun captureCameraPhoto(data: ByteArray) {
         val importer = env.importer ?: return
         val batch = UUID.randomUUID()
@@ -476,9 +466,9 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
     }
 
     /**
-     * iOS `addLibraryPhotos(_:)`: photos from the library (the sheet's Add, or the peek), attached as
-     * images. Each flies from its tile into its thumbnail as the sheet folds away; its attachment's
-     * ID is chosen now so the flight knows it. A video attaches as its frame, as on iOS.
+     * Photos from the library (the sheet's Add, or the peek), attached as images. Each flies from
+     * its tile into its thumbnail as the sheet folds away; its attachment's ID is chosen now so the
+     * flight knows it. A video attaches as its frame.
      */
     fun addLibraryPhotos(ids: List<String>) {
         val importer = env.importer ?: return
@@ -504,7 +494,7 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         startImageImport(picks.map { pick -> ComposerImageSource.Loader(pick.attachment) { library.imageData(pick.photo) } }, batch)
     }
 
-    /** iOS `startImageImport(_:batch:arrival:onAdded:)`'s flight bookkeeping around the screen's importer. */
+    /** The flight bookkeeping around the screen's importer. */
     private fun startImageImport(sources: List<ComposerImageSource>, batch: UUID, onAdded: (() -> Unit)? = null) {
         val importer = env.importer ?: return
         importer.startImageImport(
@@ -519,7 +509,6 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         )
     }
 
-    /** iOS `photoFlights.attachmentsChanged(store.pendingAttachments.map(\.id))`. */
     fun attachmentsChanged() {
         val ids = env.store?.state?.pendingAttachments?.mapNotNull { runCatching { UUID.fromString(it.id) }.getOrNull() } ?: return
         flights.attachmentsChanged(ids)
@@ -538,19 +527,18 @@ fun rememberSessionPhotoSheetState(): SessionPhotoSheetState {
 /** The screen's New Plus Menu state, for the composer's + (the hold peek) and its attachment row (flight slots). */
 internal val LocalSessionPhotoSheet = staticCompositionLocalOf<SessionPhotoSheetState?> { null }
 
-/** iOS `PlusPhotoSheetContent.grabberHeight`. */
 private const val GRABBER_HEIGHT = 22f
 
-/** UIKit's normal deceleration: a throw's predicted travel is velocity × 0.499 s (SwiftUI `predictedEndTranslation`). */
+/** A throw's predicted travel is velocity × 0.499 s. */
 private const val PREDICTION_SECONDS = 0.499f
 
 /**
- * iOS `photoSheetSurface`: the New Plus Menu's photo sheet, grown out of the + menu's surface
- * (`ComposerMorphSurface`) over the keyboard's place: the grabber, the composer's
- * [PlusPhotoSheetContent] (the camera first, then the newest photos), and [PlusPhotoSheetFoot]
- * (Back, All Photos / Add) along its foot. Dragging the grabber, or the grid while it can't scroll,
- * moves it between its detents or dismisses it; a tap outside dismisses it. The sheet's camera
- * ([PlusCameraSurface]) grows from its tile over the screen. Mount full-screen over the session.
+ * The New Plus Menu's photo sheet, grown out of the + menu's surface (`ComposerMorphSurface`) over
+ * the keyboard's place: the grabber, the composer's [PlusPhotoSheetContent] (the camera first, then
+ * the newest photos), and [PlusPhotoSheetFoot] (Back, All Photos / Add) along its foot. Dragging
+ * the grabber, or the grid while it can't scroll, moves it between its detents or dismisses it; a
+ * tap outside dismisses it. The sheet's camera ([PlusCameraSurface]) grows from its tile over the
+ * screen. Mount full-screen over the session.
  */
 @Composable
 fun SessionPlusPhotoSheet(state: SessionPhotoSheetState, modifier: Modifier = Modifier) {
@@ -575,7 +563,7 @@ fun SessionPlusPhotoSheet(state: SessionPhotoSheetState, modifier: Modifier = Mo
             density = px,
         )
     }
-    // Dismissed, it slides down from where it rests (iOS `dismissesDown`); Back folds it onto the menu.
+    // Dismissed, it slides down from where it rests; Back folds it onto the menu.
     val landsOn = if (state.foldsToComposer && screen != Rect.Zero) {
         ComposerMorphGeometry.downwardDismissSource(rest(screen), (ComposerMorphTunables.dismissDrop * px).toFloat())
     } else {
@@ -596,7 +584,7 @@ fun SessionPlusPhotoSheet(state: SessionPhotoSheetState, modifier: Modifier = Mo
             stretchesUpward = true,
             backdropDim = ComposerMorphTunables.photoBackdropDim,
             // It rests on the keyboard when it's up, and stays on it as it folds back onto the menu
-            // instead of dropping behind the keys (iOS d82670c2).
+            // instead of dropping behind the keys.
             contentHasKeyboard = true,
             keyboardStaysAsItFolds = true,
             retainsContent = true,
@@ -614,8 +602,8 @@ private fun PhotoSheetBody(state: SessionPhotoSheetState) {
     val density = LocalDensity.current.density
     val isExpanded = state.detent.isExpanded
     val currentExpanded by rememberUpdatedState(isExpanded)
-    // iOS `sheetDragGesture`: compact, the grid doesn't scroll and every drag moves the sheet;
-    // expanded, a pull down from the grid's top collapses it.
+    // Compact, the grid doesn't scroll and every drag moves the sheet; expanded, a pull down from
+    // the grid's top collapses it.
     val connection = remember(state) {
         object : NestedScrollConnection {
             var dragging = false
@@ -698,7 +686,7 @@ private fun PhotoSheetBody(state: SessionPhotoSheetState) {
     }
 }
 
-/** iOS `PlusPhotoSheetContent.grabber`: a 36 × 5 capsule in a 22 dp band; drag moves the sheet, tap toggles Half/Full. */
+/** A 36 × 5 capsule in a 22 dp band; drag moves the sheet, tap toggles Half/Full. */
 @Composable
 private fun PhotoSheetGrabber(
     isExpanded: Boolean,
@@ -788,16 +776,14 @@ internal fun SessionPhotoSheetEnvironment(
             rootOffset = rootOffset,
         )
     }
-    // iOS `scenePhase != .active` and `onDisappear`: no flight survives an inactive or gone screen.
+    // No flight survives an inactive or gone screen.
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
     val lifecycleState by lifecycle.currentStateAsState()
     val resumed = lifecycleState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
     LaunchedEffect(resumed) { if (!resumed) state.flights.reset() }
     DisposableEffect(state) { onDispose { state.flights.reset() } }
-    // iOS `.onGeometryChange` on the composer: `photoFlights.composer(frame)`.
     val composer = host.attachmentAnchors.composer
     LaunchedEffect(composer, rootOffset) { if (composer != Rect.Zero) state.flights.composer(composer.translate(rootOffset)) }
-    // iOS `onChange(of: composerAttachmentIDs)`.
     val attachmentIDs by store.observe { s -> s.pendingAttachments.map { it.id } }
     LaunchedEffect(attachmentIDs) { state.attachmentsChanged() }
 }

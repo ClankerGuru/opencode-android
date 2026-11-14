@@ -28,7 +28,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
-/** iOS `StarterPromptTunables`. */
 object StarterPromptTunables {
     /** Header to prompts. */
     const val headerGap = 2f
@@ -38,8 +37,8 @@ object StarterPromptTunables {
 }
 
 /**
- * The first computer's ready session: questions any project can answer from its files alone, so
- * the first send shows the agent reading and replying (iOS `firstSessionStarters`).
+ * The first computer's ready session: questions any project can answer from its files alone, so the
+ * first send shows the agent reading and replying.
  */
 val SessionFeature.State.Companion.firstSessionStarters: List<String>
     get() = listOf(
@@ -56,8 +55,8 @@ val SessionFeature.State.composingRetiresStarterPrompts: Boolean
     get() = starterPrompts.isNotEmpty() && hasPromptContent
 
 /**
- * iOS `StarterPromptList`: starter prompts above a draft's recent projects. A tap types the prompt
- * into the composer for the person to send; composing, they fade away.
+ * Starter prompts above a draft's recent projects. A tap types the prompt into the composer for the
+ * person to send; composing, they fade away.
  */
 @Composable
 fun StarterPromptList(prompts: List<String>, onPick: (String) -> Unit, modifier: Modifier = Modifier) {

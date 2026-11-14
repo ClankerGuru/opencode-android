@@ -28,10 +28,10 @@ class VoiceScreenActivityRegistry {
     }
     private var lastResumed: WeakReference<Activity>? = null
 
-    /** The resumed activities, for a voice screenshot (iOS's foreground-active scenes). Main thread. */
+    /** The resumed activities, for a voice screenshot. Main thread. */
     val resumedActivities: List<Activity> get() = activities.mapNotNull { it.get() }
 
-    /** The activity resumed last (iOS `ActiveScene.current`, the scene last touched). */
+    /** The activity resumed last. */
     val lastTouched: Activity? get() = lastResumed?.get()
     fun acquire() = main { holds++; apply() }
     fun release() = main { holds = (holds - 1).coerceAtLeast(0); apply() }

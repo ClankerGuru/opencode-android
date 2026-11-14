@@ -99,9 +99,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import java.util.UUID
 import kotlin.math.roundToInt
 
-/** Port of iOS `BrowserMetrics`. */
 object BrowserMetrics {
-    /** The controls, like the session header's: Android's 48 dp minimum touch target (iOS 44 pt). */
+    /** The controls, like the session header's: Android's 48 dp minimum touch target. */
     val controlSize = OpenCodeMinTapTarget
     /** The back button's row at the top, where the session header's sits. */
     val headerClearance = TranscriptMetrics.clustered + controlSize + 8.dp
@@ -110,16 +109,15 @@ object BrowserMetrics {
 }
 
 /**
- * The page pushed over the session (D-40, Push In): the web view edge to edge, a back button
- * where the drawer button sits, and a bar at the bottom (the page's back and forward, its title
- * and host, Share, Open in Browser, and Ask). Ask raises a composer over the bar; the question goes to the
+ * The page pushed over the session (D-40, Push In): the web view edge to edge, a back button where
+ * the drawer button sits, and a bar at the bottom (the page's back and forward, its title and host,
+ * Share, Open in Browser, and Ask). Ask raises a composer over the bar; the question goes to the
  * session with the page attached, and a capsule shows the reply's progress. Going back from the
- * first page closes it: the back button, or the stack's back gesture (which steps back through
- * the page's history first: see [browserBackAction]). Port of iOS `BrowserPage`: the session
- * passes its scoped browser store and how the reply to the last question is going.
+ * first page closes it: the back button, or the stack's back gesture (which steps back through the
+ * page's history first: see [browserBackAction]). The session passes its scoped browser store and
+ * how the reply to the last question is going.
  *
- * @param replyStatus the reply capsule's state (iOS `SessionFeature.State.browserReplyStatus`);
- *   null hides it.
+ * @param replyStatus The reply capsule's state; null hides it.
  * @param workingIndicator the session's `WorkingIndicator`, shown in the capsule while the
  *   agent works on the question (`needsInput`: a request waiting on you).
  */
@@ -151,7 +149,7 @@ fun BrowserPage(
         store.send(BrowserFeature.Action.CloseTapped)
     }
 
-    // The safe area (the keyboard's too, as iOS's bottom safe area is while it shows).
+    // The safe area.
     val safeArea = WindowInsets.safeDrawing.asPaddingValues()
     val safeTop = safeArea.calculateTopPadding()
     val canvas = OpenCodeTheme.colors.canvas
@@ -161,7 +159,6 @@ fun BrowserPage(
             .fillMaxSize()
             .background(canvas)
             .onPreviewKeyEvent { event ->
-                // iOS's ⌘[ on the back button.
                 val back = event.type == KeyEventType.KeyDown && event.key == Key.LeftBracket && (event.isMetaPressed || event.isCtrlPressed)
                 if (back) close()
                 back
@@ -245,8 +242,7 @@ fun BrowserPage(
 
 /**
  * What the stack's back gesture does on this page: Ask goes away first, then the page's own
- * history, then the page leaves (iOS: the escape action puts Ask away, the web view's back swipe
- * steps its history, and the stack's swipe pops).
+ * history, then the page leaves.
  */
 fun browserBackAction(browser: BrowserFeature.State): BrowserFeature.Action = when {
     browser.isAsking -> BrowserFeature.Action.AskDismissed
@@ -254,15 +250,12 @@ fun browserBackAction(browser: BrowserFeature.State): BrowserFeature.Action = wh
     else -> BrowserFeature.Action.CloseTapped
 }
 
-/**
- * The page's place in the session's stack: stable for one visit, and never a detail's identity
- * (iOS `BrowserPage.stackID`: the UUID's first eight bytes with bit 62 set).
- */
+/** The page's place in the session's stack: stable for one visit, and never a detail's identity. */
 fun browserStackID(pageID: UUID): Long = pageID.mostSignificantBits or (1L shl 62)
 
 /**
- * iOS `appear`: Ask and the reply capsule rise from the bottom as panels (panel open) and fold
- * away on panel close; under Reduce Motion, the reduced cross-fade.
+ * Ask and the reply capsule rise from the bottom as panels (panel open) and fold away on panel
+ * close; under Reduce Motion, the reduced cross-fade.
  */
 private fun appear(reduceMotion: Boolean): EnterTransition {
     if (reduceMotion) return fadeIn(MotionRole.PanelOpen.animation(reduceMotion = true))
@@ -302,7 +295,7 @@ private fun Bar(store: StoreOf<BrowserFeature.State, BrowserFeature.Action>, pag
                 }
                 Address(page, onTap = { store.send(BrowserFeature.Action.AddressTapped) }, Modifier.weight(1f))
                 if (page != null) {
-                    // iOS `ShareLink`: the system's share sheet, presented by the button itself.
+                    // The system's share sheet, presented by the button itself.
                     BarButton("square.and.arrow.up", stringResource(CoreR.string.common_share), "browser-share", enabled = true) {
                         dependency(LinkShareSheet).present(page.url)
                     }
@@ -324,7 +317,6 @@ private fun Bar(store: StoreOf<BrowserFeature.State, BrowserFeature.Action>, pag
                 .semantics { contentDescription = if (isAsking) cancelDescription else askDescription }
                 .testTag("browser-ask"),
         ) {
-            // iOS `.contentTransition(.symbolEffect(.replace))`.
             Crossfade(isAsking, Modifier.fillMaxSize(), animationSpec = tween((Motion.fadeStandard * 1000).toInt()), label = "browser-ask") { asking ->
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     OpenCodeIcon(if (asking) "xmark" else "text.bubble", contentDescription = null, tint = OpenCodeTheme.colors.text)
@@ -344,7 +336,6 @@ private fun BarButton(systemImage: String, label: String, tag: String, enabled: 
             .testTag(tag),
         contentAlignment = Alignment.Center,
     ) {
-        // iOS `.primary` / `.tertiary`.
         val colors = OpenCodeTheme.colors
         OpenCodeIcon(systemImage, contentDescription = null, tint = if (enabled) colors.text else colors.tertiaryText)
     }
@@ -453,7 +444,6 @@ private fun AskComposer(
                 Box(
                     Modifier
                         .size(34.dp)
-                        // iOS `Color.primary` / `Color.secondary.opacity(0.4)` under `systemBackground`.
                         .background(
                             if (canSend) colors.text else colors.secondaryText.copy(alpha = colors.secondaryText.alpha * 0.4f),
                             CircleShape,
@@ -520,9 +510,9 @@ private fun ReplyCapsule(
 }
 
 /**
- * Hosts the page's [android.webkit.WebView] from [BrowserWebViews], which outlives this view,
- * so a rebuilt page keeps its history and scroll position. Also shows the hold menu for links
- * held in the page. Port of iOS `BrowserWebViewHost`.
+ * Hosts the page's [android.webkit.WebView] from [BrowserWebViews], which outlives this view, so a
+ * rebuilt page keeps its history and scroll position. Also shows the hold menu for links held in
+ * the page.
  */
 @Composable
 fun BrowserWebViewHost(
@@ -542,9 +532,8 @@ fun BrowserWebViewHost(
     var held by remember { mutableStateOf<Triple<String, Float, Float>?>(null) }
     val pages = BrowserWebViews.shared
 
-    // Made once per page, on first show and when the page changes: a page discarded later (the
-    // page closing) isn't made again while the view slides away (iOS mounts in `makeUIView` and
-    // on a page change only).
+    // Made once per page, on first show and when the page changes: a page discarded later (the page
+    // closing) isn't made again while the view slides away.
     fun mount(container: FrameLayout) {
         val webView = pages.webView(pageID, url, isDark)
         if (webView.parent !== container) {
@@ -555,11 +544,10 @@ fun BrowserWebViewHost(
         pages.resume(pageID)
     }
 
-    // On every update: the page's handlers, appearance and insets, and the window it's in (iOS
-    // `bindCallbacks`: `noteScene`, and `.sceneChanged` when the page moves to another window).
+    // On every update: the page's handlers, appearance and insets, and the window it's in.
     fun bind(container: FrameLayout) {
         pages.setHostContext(pageID, container.context)
-        // The app's appearance, live (iOS: the web view follows its trait collection).
+        // The app's appearance, live.
         pages.setAppearance(pageID, isDark)
         pages.setObscuredInsets(pageID, insets)
         pages.setEventHandler(pageID, onEvent)
@@ -568,7 +556,7 @@ fun BrowserWebViewHost(
         pages.noteScene(pageID, sceneID)
         if (sceneID != null && sceneID != coordinator.sceneID) {
             coordinator.sceneID = sceneID
-            // After this update, as iOS's `Task { @MainActor in … }`.
+            // After this update.
             container.post { onEvent(BrowserFeature.Action.SceneChanged(sceneID)) }
         }
     }

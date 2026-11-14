@@ -13,8 +13,7 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
-// Port of iOS `Session/BackgroundWorkMotion.swift`. Lengths are in points on iOS and dp here;
-// velocities in dp/s.
+// Velocities in dp/s.
 
 /**
  * Where the background-work surface is: one surface animates its bounds between the capsule's and
@@ -29,7 +28,7 @@ enum class BackgroundWorkStage {
     panel,
 }
 
-/** iOS `BackgroundWorkTunables`' shipped defaults (the tuning UI is not ported). */
+/** Shipped defaults; there's no tuning UI. */
 object BackgroundWorkTunables {
     /** Drag closes past (dp). */
     const val dragCloses: Float = 56f
@@ -86,14 +85,14 @@ object BackgroundWorkMotion {
     fun <T> resize(): FiniteAnimationSpec<T> = Motion.layout.animation()
 
     const val capsuleInset: Float = 5f
-    /** The desktop dock's 12 (iOS's glass is 28): the capsule is a 34 dp chip with 12 dp corners. */
+    /** The desktop dock's 12: the capsule is a 34 dp chip with 12 dp corners. */
     const val panelRadius: Float = 12f
 }
 
 /**
  * Pure state machine for dragging `BackgroundWorkPanel` down toward its capsule or rubber-banding
- * upward, including scroll-top takeover, threshold haptics, release decision, and mid-return
- * regrab continuity. Mutable like the Swift value type; [copy] gives an independent value.
+ * upward, including scroll-top takeover, threshold haptics, release decision, and mid-return regrab
+ * continuity. [copy] gives an independent value.
  */
 data class BackgroundWorkDrag(
     /** Current effective vertical offset in dp (`> 0` downward, `< 0` upward rubber-banded). */
@@ -292,7 +291,7 @@ class BackgroundWorkDragController(private val haptics: HapticsClient) {
     val offset: Float get() = offsetState.floatValue
     val isReturning: Boolean get() = returningState.value
 
-    /** Remove animations, set by the view (iOS reads `MotionReduce.isEnabled`). */
+    /** Remove animations, set by the view. */
     var reduceMotion: Boolean = false
 
     private var returnSolver = SpringSolver(Motion.release, value = 0.0, target = 0.0, positionEpsilon = 0.15, velocityEpsilon = 2.0)

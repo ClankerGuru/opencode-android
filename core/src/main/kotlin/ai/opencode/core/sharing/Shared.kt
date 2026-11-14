@@ -10,7 +10,7 @@ import kotlinx.serialization.json.Json
 
 /**
  * Port of swift-sharing's `SharedKey`: an identity, a default, a serializer and where the value
- * lives. Keep iOS's `id` strings and defaults.
+ * lives.
  */
 class SharedKey<T>(
     val id: String,
@@ -21,19 +21,19 @@ class SharedKey<T>(
     override fun toString(): String = "SharedKey($storage:$id)"
 
     companion object {
-        /** iOS `.appStorage(name)` (UserDefaults) → DataStore Preferences. Non-secret preferences only. */
+        /** Non-secret preferences only. */
         inline fun <reified T> appStorage(name: String, default: T) =
             SharedKey(name, default, kotlinx.serialization.serializer<T>(), SharedStorageKind.AppStorage)
 
-        /** iOS `.fileStorage(dir/name)` → a JSON file under the matching Android directory. */
+        /** `.fileStorage(dir/name)` → a JSON file under the matching Android directory. */
         inline fun <reified T> fileStorage(directory: FileDirectory, fileName: String, default: T) =
             SharedKey(fileName, default, kotlinx.serialization.serializer<T>(), SharedStorageKind.File(directory))
 
-        /** iOS `.keychain(name)` → an Android Keystore-encrypted, no-backup file. Anything carrying a secret. */
+        /** An Android Keystore-encrypted, no-backup file, for anything carrying a secret. */
         inline fun <reified T> keychain(name: String, default: T) =
             SharedKey(name, default, kotlinx.serialization.serializer<T>(), SharedStorageKind.Keychain)
 
-        /** iOS `.inMemory(name)`: process-lifetime only. */
+        /** Process-lifetime only. */
         inline fun <reified T> inMemory(name: String, default: T) =
             SharedKey(name, default, kotlinx.serialization.serializer<T>(), SharedStorageKind.InMemory)
     }
@@ -46,13 +46,12 @@ sealed interface SharedStorageKind {
     data object InMemory : SharedStorageKind
 }
 
-/** iOS's `.documentsDirectory` / `.cachesDirectory` / `.applicationSupportDirectory`. */
 enum class FileDirectory {
-    /** `filesDir/documents` (iOS Documents). */
+    /** `filesDir/documents`. */
     Documents,
-    /** `cacheDir` (iOS Caches: the system may clear it). */
+    /** `cacheDir`. */
     Caches,
-    /** `filesDir/support` (iOS Application Support). */
+    /** `filesDir/support`. */
     ApplicationSupport,
 }
 
@@ -67,10 +66,10 @@ class Shared<T> internal constructor(
     val value: T get() = reference.state.value
     val flow: StateFlow<T> get() = reference.state.asStateFlow()
 
-    /** Writes [newValue] if it differs (iOS `$shared.withLock { $0 = newValue }`). */
+    /** Writes [newValue] if it differs. */
     fun set(newValue: T) = reference.update { newValue }
 
-    /** iOS `$shared.withLock { ... }`: an atomic read-modify-write; unchanged results are not saved. */
+    /** An atomic read-modify-write; unchanged results are not saved. */
     fun update(transform: (T) -> T) = reference.update(transform)
 
     override fun equals(other: Any?): Boolean = other is Shared<*> && other.reference === reference
@@ -133,14 +132,14 @@ class SharedStore internal constructor(private val bytes: SharedBytes) {
     fun flush() = bytes.flush()
 
     /**
-     * Whether [key] has a saved value, not just its default (iOS `defaults.object(forKey:) !=
-     * nil`). For one-time migrations of keys earlier builds wrote.
+     * Whether [key] has a saved value, not just its default. For one-time migrations of keys
+     * earlier builds wrote.
      */
     fun contains(key: SharedKey<*>): Boolean = bytes.read(key.storage, key.id) != null
 
     /**
-     * Removes [key]'s saved value (iOS `defaults.removeObject(forKey:)`); a reference already
-     * open falls back to the key's default. For one-time migrations of retired keys.
+     * Removes [key]'s saved value; a reference already open falls back to the key's default. For
+     * one-time migrations of retired keys.
      */
     fun remove(key: SharedKey<*>) {
         val ref = synchronized(references) { references[key.storage to key.id] }

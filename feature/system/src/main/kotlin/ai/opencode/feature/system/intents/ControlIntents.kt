@@ -6,12 +6,11 @@ import ai.opencode.feature.system.R
 import ai.opencode.feature.system.SystemAction
 import ai.opencode.feature.system.SessionDirectory
 /**
- * Port of iOS `ControlIntents.swift`: Control Center and Lock Screen controls → Android Quick
- * Settings tiles and home-screen widgets. Each tap opens the app through
- * [SystemActionActivity], which runs [perform] and posts a [SystemAction]. Start Call and Open
- * Session are set up for a session (the widget's Choose Session; a tile is Last Viewed
- * Session). Their buttons carry only the choice's ID, so a tap never reads the directory:
- * the app's router resolves it.
+ * Control Center and Lock Screen controls → Android Quick Settings tiles and home-screen widgets.
+ * Each tap opens the app through [SystemActionActivity], which runs [perform] and posts a
+ * [SystemAction]. Start Call and Open Session are set up for a session (the widget's Choose
+ * Session; a tile is Last Viewed Session). Their buttons carry only the choice's ID, so a tap never
+ * reads the directory: the app's router resolves it.
  */
 object OpenCodeControlKind {
     const val START_CALL = "ai.opencode.mobilecode.control.start-call"
@@ -41,7 +40,7 @@ fun SystemAction.Companion.controlTarget(id: String?, startsCall: Boolean): Syst
     return chosen ?: SystemAction(destination = SystemAction.Destination.LastViewed, startsCall = startsCall)
 }
 
-/** Port of iOS `SessionControlValue`: what a session control shows, its choice's name as it reads today. */
+/** What a session control shows, its choice's name as it reads today. */
 data class SessionControlValue(
     /** The choice's [SessionEntity] ID; null is Last Viewed Session. */
     val targetID: String?,

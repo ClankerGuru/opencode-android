@@ -34,12 +34,10 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of the iOS `VoiceLiveTests.swift` harness. iOS runs the coordinator's actor on real
- * time; here it runs on the test's virtual time ([TestScope.virtualClock]), so the same
- * waits and limits hold exactly and instantly.
+ * The coordinator runs on the test's virtual time ([TestScope.virtualClock]), so waits and limits
+ * hold exactly and instantly.
  */
 
-/** iOS `ContinuousClock.now` inside `runTest`: virtual time. */
 val TestScope.now: Duration get() = testScheduler.currentTime.milliseconds
 
 /** A [Clock] on the test's virtual time. */
@@ -51,16 +49,13 @@ fun TestScope.virtualClock(): Clock = object : Clock {
 /** A [DateClient] on the test's virtual time (rotation deadlines are wall-clock instants). */
 fun TestScope.virtualDate(): DateClient = DateClient { Instant.ofEpochMilli(testScheduler.currentTime) }
 
-/** iOS `URLError(.networkConnectionLost)`. */
 class NetworkConnectionLost : IOException("The network connection was lost.")
 
-/** iOS `URLError(.notConnectedToInternet)`. */
 class NotConnectedToInternet : IOException("The Internet connection appears to be offline.")
 
-/** iOS `JSONDecoder().decode(RealtimeJSON.self, from:)`. */
 fun decodeJSON(data: ByteArray): RealtimeJSON = Json.parseToJsonElement(data.decodeToString())
 
-/** Steps through a call's events like iOS's `AsyncThrowingStream` iterator: null once it ends, throws why it dropped. */
+/** Steps through a call's events: null once it ends, throws why it dropped. */
 class EventIterator(flow: Flow<VoiceCallEvent>, scope: CoroutineScope) {
     private val channel = Channel<VoiceCallEvent>(Channel.UNLIMITED)
     val job: Job = scope.launch {
@@ -82,7 +77,6 @@ class EventIterator(flow: Flow<VoiceCallEvent>, scope: CoroutineScope) {
         return null
     }
 
-    /** iOS `while let event = try await iterator.next(), event != target {}`. */
     suspend fun skipUntil(target: VoiceCallEvent) {
         while (true) {
             val event = next() ?: return
@@ -91,7 +85,6 @@ class EventIterator(flow: Flow<VoiceCallEvent>, scope: CoroutineScope) {
     }
 }
 
-/** iOS `LiveCallCoordinatorTests.FakeLiveSocket`. */
 class FakeLiveSocket(val config: LiveSessionConfig) {
     private val serverEvents = Channel<LiveServerEvent>(Channel.UNLIMITED)
     val events: Flow<LiveServerEvent> = serverEvents.consumeAsFlow()
@@ -106,9 +99,8 @@ class FakeLiveSocket(val config: LiveSessionConfig) {
     private var commentaryCount = 0
 
     /**
-     * While set, the first commentary sent stalls inside the socket's send.
-     * Clearing it lets the send go on at once without moving virtual time, as
-     * iOS's real-time poll does while its test clock stands still.
+     * While set, the first commentary sent stalls inside the socket's send. Clearing it lets the
+     * send go on at once without moving virtual time.
      */
     var stallFirstCommentary: Boolean
         get() = stall.value
@@ -121,12 +113,10 @@ class FakeLiveSocket(val config: LiveSessionConfig) {
         stall.first { !it }
     }
 
-    /** iOS `server.yield(_:)`. */
     fun yieldEvent(event: LiveServerEvent) {
         serverEvents.trySend(event)
     }
 
-    /** iOS `server.finish(throwing:)`. */
     fun finish(error: Throwable) {
         serverEvents.close(error)
     }
@@ -156,7 +146,7 @@ class FakeLiveSocket(val config: LiveSessionConfig) {
     }
 }
 
-/** iOS `LiveCallCoordinatorTests.Harness`. Build it inside `runTest`. */
+/** Build it inside `runTest`. */
 class LiveHarness(
     private val test: TestScope,
     timing: VoiceCallTiming = VoiceCallTiming(
@@ -204,20 +194,16 @@ class LiveHarness(
 
     val audioLevels: VoiceAudioLevels get() = values[VoiceAudioLevels]
 
-    /** iOS `harness.opened` iterator's `next()`. */
     suspend fun nextOpened(): FakeLiveSocket = openedChannel.receive()
 
-    /** iOS `harness.capture.yield(_:)`. */
     fun capture(pcm: ByteArray) {
         captureChannel.trySend(pcm)
     }
 
-    /** iOS `harness.audioEvents.yield(_:)`. */
     fun audioEvent(event: VoiceAudioEvent) {
         audioChannel.trySend(event)
     }
 
-    /** iOS `coordinator.pendingAppendCount` (DEBUG-only there; internal state here). */
     suspend fun pendingAppendCount(): Int = coordinator.serialized {
         coordinator.pendingAppendCount
     }
@@ -282,7 +268,7 @@ class LiveHarness(
     }
 }
 
-/** iOS `waitUntil`: polls every 5 ms for up to 5 s (virtual time). Whether it came true. */
+/** Polls every 5 ms for up to 5 s (virtual time). Whether it came true. */
 suspend fun waitUntil(timeout: Duration = 5.seconds, condition: () -> Boolean): Boolean {
     var waited = Duration.ZERO
     while (!condition() && waited < timeout) {
@@ -302,11 +288,9 @@ fun FakeLiveSocket.appendContents(): List<String> = commands.mapNotNull {
     }
 }
 
-/** iOS `LiveCallCoordinatorTests.commentary(_:)`. */
 fun FakeLiveSocket.commentary(): List<Pair<String?, String>> =
     commands.mapNotNull { (it as? LiveCommand.AppendCommentary)?.let { c -> c.delegationID to c.content } }
 
-/** iOS `LiveCallCoordinatorTests.appends(_:)`. */
 fun FakeLiveSocket.appends(): List<Pair<String, String>> = commands.mapNotNull {
     when (it) {
         is LiveCommand.AppendInstructions -> "instructions" to it.content
@@ -350,7 +334,7 @@ fun TestScope.voiceTestStore(
     return TestStore(state, VoiceFeature(), effectScope, all)
 }
 
-/** iOS's per-closure `$0.voiceCall.x = …` overrides: a client whose unset closures do nothing. */
+/** A client whose unset closures do nothing. */
 fun testVoiceCall(
     start: suspend (String, RealtimeSessionConfig) -> Flow<VoiceCallEvent> = { _, _ -> kotlinx.coroutines.flow.emptyFlow() },
     completeFunction: suspend (String, String) -> Unit = { _, _ -> },
@@ -378,7 +362,6 @@ fun testVoiceCall(
     updateDelegatorInstructions = updateDelegatorInstructions,
 )
 
-/** iOS's `$0.voiceWork.x = …` overrides. */
 fun testVoiceWork(
     submit: suspend (VoiceWorkTarget, String) -> VoiceWorkAdmission = { _, _ -> VoiceWorkAdmission(promptID = "msg_test") },
     awaitReply: suspend (OpenCodeServer, String, String) -> String? = { _, _, _ -> null },
@@ -390,7 +373,6 @@ fun testVoiceWork(
     recentMessages = recentMessages,
 )
 
-/** iOS `AsyncThrowingStream.makeStream()` of call events. */
 class CallEvents {
     private val channel = Channel<VoiceCallEvent>(Channel.UNLIMITED)
     val flow: Flow<VoiceCallEvent> = channel.consumeAsFlow()
@@ -402,7 +384,7 @@ class CallEvents {
     }
 }
 
-/** iOS `AsyncStream<String>` a dependency waits on: the first value, or null once finished. */
+/** The first value, or null once finished. */
 class Gate<T> {
     private val channel = Channel<T>(Channel.UNLIMITED)
     fun yieldValue(value: T) {
@@ -423,9 +405,7 @@ fun isDelegatorFinished(action: VoiceFeature.Action) = action is VoiceFeature.Ac
 fun isDelegateEnded(action: VoiceFeature.Action) = action == VoiceFeature.Action.Delegate(VoiceFeature.DelegateAction.Ended)
 
 /**
- * iOS `receive(_:timeout:)` for an action that follows work on a real-thread actor
- * (`VoiceDelegatorWorkspace`'s confined lane): waits on real time, as iOS does, without
- * moving virtual time, so the effects' own sleeps stay where they are.
+ * Waits on real time, without moving virtual time, so the effects' own sleeps stay where they are.
  */
 suspend fun <S, A> TestStore<S, A>.receiveAfterActorWork(
     matches: (A) -> Boolean,

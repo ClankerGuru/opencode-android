@@ -19,11 +19,6 @@ import org.junit.Rule
 import org.junit.Test
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `ServerSwitchingTests` (Home's half): Home keeps a server's name across a
- * reconnect, and the drawer title's presentation. Server names/headers live in `:server`,
- * `ServerTitleFeature` in `:feature:settings` and the `AppFeature` switching tests in `:app`.
- */
 class ServerSwitchingTests {
     @get:Rule val isolation = TestIsolationRule()
 

@@ -21,10 +21,6 @@ import ai.opencode.server.model.OpenCodeTranscriptItem
 import java.time.Instant
 import java.util.UUID
 
-/**
- * The shared fixtures of iOS `ComposerAutocompleteTests` (its `makeStore`, samples and `chip`), used by
- * the ports of `ComposerAutocompleteTests.swift` and `ComposerSessionMentionTests.swift` (an extension of it).
- */
 internal object ComposerAutocompleteTestSupport {
     val server = OpenCodeServer(url = "http://localhost:9", username = "opencode", password = "pw")
     val session = OpenCodeSession(
@@ -66,11 +62,10 @@ internal object ComposerAutocompleteTestSupport {
         ),
     )
 
-    /** iOS `UUID(uuidString: "00000000-0000-0000-0000-%012d")`: the suffix's decimal digits as hex digits. */
+    /** The suffix's decimal digits as hex digits. */
     fun chip(suffix: Int, item: AutocompleteItem): ComposerAutocompleteChip =
         ComposerAutocompleteChip(item, id = UUID.fromString("00000000-0000-0000-0000-%012d".format(suffix)))
 
-    /** iOS `makeStore(state:exhaustive:configureState:configureDependencies:)`. */
     fun Harness.makeStore(
         state: SessionFeature.State? = null,
         exhaustive: Boolean = true,

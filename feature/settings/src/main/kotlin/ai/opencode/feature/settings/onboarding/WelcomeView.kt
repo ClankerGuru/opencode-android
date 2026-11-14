@@ -82,7 +82,7 @@ import kotlinx.coroutines.delay
 import kotlin.math.max
 import kotlin.math.min
 
-/** The welcome's words, in one place so the headline is easy to swap (iOS `WelcomeCopy`). */
+/** The welcome's words, in one place so the headline is easy to swap. */
 object WelcomeCopy {
     val HEADLINE: String get() = localized(R.string.settings_onboarding_headline)
     val HEADLINE_SPOKEN: String get() = localized(R.string.settings_onboarding_headline_spoken)
@@ -92,16 +92,15 @@ object WelcomeCopy {
     const val INSTALL_COMMAND = "curl -fsSL https://opencode.ai/v2/install | bash"
 }
 
-/** iOS `.orange` (systemOrange) for the problem line and paste errors. */
+/** System orange for the problem line and paste errors. */
 @Composable
 private fun systemOrange(): Color = if (OpenCodeTheme.colors.isDark) Color(0xFFFF9F0A) else Color(0xFFFF9500)
 
 /**
- * The first-run welcome (Experimental › Welcome Preview, iOS `WelcomeView`): the mark, the
- * headline and the laptop-and-phone scene, then one pairing step. Values from `AppFeature` come
- * in as props: [progress] while a pairing runs, [problem] when it failed. [mark] is the app mark,
- * which lives in `:app`'s resources. Close (preview only) calls [onClose] after sending
- * `CloseTapped`, so the presenter dismisses it.
+ * The first-run welcome: the mark, the headline and the laptop-and-phone scene, then one pairing
+ * step. Values from `AppFeature` come in as props: [progress] while a pairing runs, [problem] when
+ * it failed. [mark] is the app mark, which lives in `:app`'s resources. Close (preview only) calls
+ * [onClose] after sending `CloseTapped`, so the presenter dismisses it.
  */
 @Composable
 fun WelcomeView(
@@ -130,8 +129,7 @@ fun WelcomeView(
     Column(
         Modifier
             .fillMaxSize()
-            // iOS `.background(Color(.systemBackground).ignoresSafeArea())`: Show Welcome lays
-            // it over Settings and Home, which must not show through.
+            // Show Welcome lays it over Settings and Home, which must not show through.
             .background(OpenCodeTheme.colors.canvas)
             .statusBarsPadding()
             .navigationBarsPadding(),
@@ -323,8 +321,8 @@ private fun Actions(
 }
 
 /**
- * Other Ways to Connect (iOS `WelcomeOtherWays`): the terminal command, a pasted link, a typed
- * address, and the install line for people without OpenCode yet.
+ * Other Ways to Connect: the terminal command, a pasted link, a typed address, and the install line
+ * for people without OpenCode yet.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -400,7 +398,7 @@ private fun OtherWaysButton(title: String, symbol: SFSymbol?, onClick: () -> Uni
     }
 }
 
-/** A terminal command; tapping copies it (iOS `WelcomeCommand`). The checkmark stays 1.5 s. */
+/** A terminal command; tapping copies it. The checkmark stays 1.5 s. */
 @Composable
 private fun WelcomeCommand(command: String, onCopy: (String) -> Unit) {
     var copied by remember { mutableStateOf(false) }
@@ -449,16 +447,15 @@ private fun WelcomeCommand(command: String, onCopy: (String) -> Unit) {
 }
 
 /**
- * One of two views sharing a place (iOS `welcomeSwap`): it arrives as the other leaves, with a
- * 0.96 scale and a fade; leaving is quicker than arriving. Android has no cheap blur on API 31-,
- * and the fade carries it, so the blur is left out.
+ * One of two views sharing a place: it arrives as the other leaves, with a 0.96 scale and a fade;
+ * leaving is quicker than arriving. Android has no cheap blur on API 31-, and the fade carries it,
+ * so the blur is left out.
  */
 @Composable
 private fun Modifier.welcomeSwap(shown: Boolean, reduced: Boolean): Modifier {
     val step = WelcomeTunables.step.spring
     val progress by animateFloatAsState(
         if (shown) 1f else 0f,
-        // iOS `.speed(1.4)` on the way out.
         animationSpec = if (shown) step.animation(reduced) else MotionSpring(step.duration / 1.4, step.bounce).animation(reduced),
         label = "welcome-swap",
     )
@@ -472,7 +469,7 @@ private fun Modifier.welcomeSwap(shown: Boolean, reduced: Boolean): Modifier {
         .then(if (shown) Modifier else Modifier.clearAndSetSemantics {})
 }
 
-/** The first appearance: rises on the intro spring (iOS `welcomeEntrance`). */
+/** The first appearance: rises on the intro spring. */
 private fun Modifier.welcomeEntrance(p: Float, reduced: Boolean, dy: Dp = 6.dp, scale: Float = 1f): Modifier = graphicsLayer {
     alpha = p
     val s = if (reduced) 1f else scale + (1 - scale) * p

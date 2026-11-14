@@ -62,8 +62,8 @@ internal fun locationQuery(directory: String?): List<Pair<String, String>> =
 /** A route as the log shows it: IDs stay, a pairing code doesn't. */
 /**
  * Advertises `X-OpenCode-Capabilities: experimental-media-uri` (merged into an existing
- * comma-separated list); the server decides whether to answer with media references or inline
- * data. Sent with every request that carries correlation headers, as iOS `applyCapabilities`.
+ * comma-separated list); the server decides whether to answer with media references or inline data.
+ * Sent with every request that carries correlation headers.
  */
 internal fun applyCapabilities(request: Request.Builder): Request.Builder {
     val capability = OpenCodeMediaReference.CAPABILITY
@@ -78,10 +78,7 @@ internal const val CAPABILITIES_HEADER = "X-OpenCode-Capabilities"
 
 internal fun loggablePath(path: String): String = if (path.startsWith("/auth/")) "/auth/…" else path
 
-/**
- * An exception's `URLError` equivalent and type (iOS logs domain and code, then the
- * underlying error's): never its message, which can carry the URL.
- */
+/** An exception's `URLError` equivalent and type: never its message, which can carry the URL. */
 internal fun logDescription(error: Throwable): String {
     if (error is kotlin.coroutines.cancellation.CancellationException) return "cancelled"
     val type = error::class.java.simpleName
@@ -181,7 +178,7 @@ internal suspend inline fun <reified T> request(
     return decodedAs(response.data)
 }
 
-/** [request] with the failure captured as a value (iOS `capturedRequest`). */
+/** [request] with the failure captured as a value. */
 internal suspend inline fun <reified T> capturedRequest(
     path: String,
     query: List<Pair<String, String>> = emptyList(),

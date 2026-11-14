@@ -9,8 +9,6 @@ import java.time.Instant
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
-// iOS `VoiceFeature+Context.swift`.
-
 fun VoiceFeature.State.viewingSession(at: Instant): OpenCodeSession? =
     target.sessionID?.let { OpenCodeSession(id = it, serverTitle = sessionTitle, projectID = "", directory = target.directory, updatedAt = at) }
 
@@ -49,7 +47,7 @@ fun VoiceFeature.State.recordHandoff(sessionID: String, at: Instant): VoiceFeatu
  */
 internal val voiceContextDeadline: Duration = 600.milliseconds
 
-/** The work's result, or null if it takes longer than [limit] (iOS `VoiceFeature.bounded`). */
+/** The work's result, or null if it takes longer than [limit]. */
 internal suspend fun <T> voiceBounded(limit: Duration, work: suspend () -> T): T? = withTimeoutOrNull(limit) { work() }
 
 internal suspend fun fetchRecentMessages(target: VoiceWorkTarget): List<String> {
@@ -89,5 +87,5 @@ internal fun delegatorContext(state: VoiceFeature.State, otherRequests: Int): St
     return text
 }
 
-/** iOS `later.timeIntervalSince(earlier)`, in seconds. */
+/** In seconds. */
 internal fun secondsBetween(earlier: Instant, later: Instant): Double = java.time.Duration.between(earlier, later).toNanos() / 1e9

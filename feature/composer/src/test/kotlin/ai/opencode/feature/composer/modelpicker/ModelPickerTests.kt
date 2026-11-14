@@ -22,23 +22,10 @@ import org.robolectric.annotation.GraphicsMode
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Port of iOS `ModelPickerTests.swift`.
- *
  * The model picker (D-20 round 7 option 1): the list's sections, the level scale the meter and
  * its panel step through, the meter's press, and picks that wait for the next send.
  *
- * Skipped → `:feature:session` (they drive `SessionFeature`'s reducer, which lives there):
- * `openingTheListRefreshesTheCatalogWithoutASheet`, `openingKeepsATypedQueryAndClosingClearsIt`,
- * `picksAndLevelsWaitForTheNextSend`, `holdingARowFavoritesThatProvidersModel`,
- * `plainPickerSheetSortsFavoritesAndKeepsSheetOpenWhenChangingThinking`,
- * `openingPickerWhileLoadingRestartsModelCatalogFetchAndCancelsHungLoad`,
- * `failedModelCatalogRecordsErrorAndRetriesOnReopen`,
- * `theSheetsLevelMenuPicksAndStaysOpenAndARowTapCloses`,
- * `aPickFromALevelDragThatTickedIsQuietOnRelease`, `aRowLevelIsASelectionOnlyWhenTheLevelChanges`,
- * and the reducer half of `searchParsesTrailingLevelAndReturnPicksBestMatchAtThatLevel`.
- *
- * Dropped: `searchableSheetsAvoidForcedNavigationBarDrawerOnMac` (SwiftUI `SearchFieldPlacement`
- * on Mac and an iOS source scan).
+ * Dropped: `searchableSheetsAvoidForcedNavigationBarDrawerOnMac`.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -130,7 +117,7 @@ class ModelPickerTests {
         assertEquals("gemini 2 5 pro", ModelSearch.normalize("Gémini 2,5 – Pro"))
     }
 
-    /** iOS reads `filteredModels`/`modelSections` off `SessionFeature.State`; here off [ModelPickerState], which the session builds. */
+    /** Off [ModelPickerState], which the session builds. */
     @Test fun bothPickersShareTheSearch() {
         val sections = ModelPickerSection.sections(catalog, setOf(opus.id), filter = "anthropic opus")
         assertEquals(listOf("Anthropic", "OpenRouter"), sections.map { it.title })
@@ -236,7 +223,7 @@ class ModelPickerTests {
         )
     }
 
-    /** TalkBack's grabber reads and adjusts the rest like a sheet's (iOS `.increment`/`.decrement` → +1/−1). */
+    /** TalkBack's grabber reads and adjusts the rest like a sheet's. */
     @Test fun theGrabberAdjustsTheRest() {
         assertEquals("Half", ModelListDetent.Medium.accessibilityValue)
         assertEquals("Full", ModelListDetent.Large.accessibilityValue)
@@ -356,7 +343,6 @@ class ModelPickerTests {
         )
     }
 
-    /** The parse half; the reducer half (`.modelSearchSubmitted`) is skipped → `:feature:session`. */
     @Test fun searchParsesTrailingLevelAndReturnPicksBestMatchAtThatLevel() {
         val parsedHigh = ModelSearch.parseLevelQuery("argon high")
         assertTrue(parsedHigh.terms == listOf("argon") && parsedHigh.level == "high")

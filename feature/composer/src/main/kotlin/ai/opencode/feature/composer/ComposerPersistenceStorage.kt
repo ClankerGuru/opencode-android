@@ -7,10 +7,9 @@ import java.nio.file.StandardCopyOption
 import java.util.UUID
 
 /**
- * The bytes behind [ComposerPersistence] (iOS `ComposerPersistenceStorage`):
- * `filesDir/support/composer-state.json` and one blob per inline attachment in
- * `ComposerAttachments/<uuid>`. App-private files are encrypted at rest; `:app`'s backup rules
- * exclude both.
+ * The bytes behind [ComposerPersistence]: `filesDir/support/composer-state.json` and one blob per
+ * inline attachment in `ComposerAttachments/<uuid>`. App-private files are encrypted at rest;
+ * `:app`'s backup rules exclude both.
  */
 class ComposerPersistenceStorage(
     val identity: String,

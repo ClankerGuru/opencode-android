@@ -10,8 +10,7 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 
 /**
- * Port of iOS `System/Notifications/NotificationContent.swift` (1ddd36b2): a notification is
- * rebuilt from authenticated fields only, never from clear routing siblings.
+ * A notification is rebuilt from authenticated fields only, never from clear routing siblings.
  *
  * FCM data values are strings, so a push carries the envelope as a JSON object string under
  * `opencode` (`{"v":2,"ref":…,"box":…}`), as APNs carries it as a dictionary. [Shown] stands in
@@ -45,7 +44,7 @@ object NotificationContent {
         }
     }
 
-    /** What a session notification shows (iOS `UNMutableNotificationContent`). */
+    /** What a session notification shows. */
     data class Shown(val title: String, val body: String, val thread: String?, val envelope: JsonObject?)
 
     fun placeholder(): Shown = Shown(PLACEHOLDER_TITLE, PLACEHOLDER_BODY, thread = null, envelope = null)

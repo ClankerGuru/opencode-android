@@ -6,9 +6,8 @@ import ai.opencode.core.strings.localized
 import android.content.pm.PackageManager
 
 /**
- * Port of iOS `AppVersion` (`Settings/SettingsView.swift`): what's running, “Version 0.2.3 (226) ·
- * ec7d822”. Android reads the package's version name and code; the commit comes from the
- * `opencode.commit` manifest meta-data when the app stamps one.
+ * What's running, “Version 0.2.3 (226) · ec7d822”. Android reads the package's version name and
+ * code; the commit comes from the `opencode.commit` manifest meta-data when the app stamps one.
  */
 data class AppVersion(val version: String, val build: String, val commit: String?) {
     val label: String get() = "Version $version ($build)" + (commit?.let { " · $it" } ?: "")

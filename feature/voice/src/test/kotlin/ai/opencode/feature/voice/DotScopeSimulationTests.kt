@@ -15,12 +15,6 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
-/**
- * Port of iOS `DotScopeSimulationTests.swift`. Dropped: the three `MTKView`/`UIHostingController`
- * probes (`coveredScopeDrawMeasurement`, `coveredScopeEnvironmentPausesMetalDisplayLink`,
- * `browserAndCatchUpPauseScopesAndUnhideRedraws`): they drive UIKit windows and Metal display
- * links, which have no JVM equivalent (Android draws the scope with AGSL in Compose).
- */
 class DotScopeSimulationTests {
     private val grid = DotScopeGrid(pixelWidth = 1248, pixelHeight = 168, scale = 3f)
 
@@ -268,7 +262,6 @@ class DotScopeSimulationTests {
         return DotScopeSimulation.Scan.beamX(progress = beam.progress, width = grid.width) + beam.overshoot
     }
 
-    /** iOS `@Test(arguments: [0.0, 1.0 / 60, 2.0 / 60])`. */
     @Test fun theBeamLeavesTheCallButtonFromTheFirstFrame() {
         for (delay in listOf(0.0, 1.0 / 60, 2.0 / 60)) {
             val frame = 1.0 / 60
@@ -286,8 +279,7 @@ class DotScopeSimulationTests {
     }
 
     /**
-     * iOS also drives an `MTKView`'s `preferredFramesPerSecond` and a covering sheet; Android's
-     * scope skips every other display frame while quiet, and a cover pauses it through
+     * Android's scope skips every other display frame while quiet, and a cover pauses it through
      * `LocalDotScopeCovered`.
      */
     @Test fun quietScopesHalveTheirRateAndCoveringSheetsPauseThem() {

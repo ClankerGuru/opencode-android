@@ -25,7 +25,7 @@ import kotlin.time.Duration.Companion.seconds
 
 private typealias CallContentPhase = VoiceCallActivityAttributes.ContentState.Phase
 
-/** Port of iOS `VoiceLiveActivity`: how a voice call reads on the lock screen and in the status bar. */
+/** How a voice call reads on the lock screen and in the status bar. */
 object VoiceLiveActivity {
     typealias Content = VoiceCallActivityAttributes.ContentState
 
@@ -71,7 +71,6 @@ object VoiceLiveActivity {
     fun attributes(call: Call) = VoiceCallActivityAttributes(call.serverID, call.sessionID)
 }
 
-/** Port of iOS `VoiceLiveActivityClient`. */
 class VoiceLiveActivityClient(
     /**
      * Shows `content` in the call's one Live Update, starting it if needed; null dismisses it
@@ -103,7 +102,7 @@ class VoiceLiveActivityClient(
     }
 }
 
-/** Port of iOS `LiveActivityStatus`: what a problem report says about Live Updates. */
+/** What a problem report says about Live Updates. */
 data class LiveActivityStatus(val isEnabled: Boolean? = null, val last: String? = null) {
     val summary: String?
         get() {
@@ -122,14 +121,14 @@ data class LiveActivityStatus(val isEnabled: Boolean? = null, val last: String? 
 }
 
 /**
- * Port of iOS `LiveVoiceActivity`: owns the one voice-call Live Update. Requests run in
- * order, so an end never overtakes the update before it. Every step it takes is recorded in
- * `AppLog.voice`, so a report shows why one didn't show.
+ * Owns the one voice-call Live Update. Requests run in order, so an end never overtakes the update
+ * before it. Every step it takes is recorded in `AppLog.voice`, so a report shows why one didn't
+ * show.
  */
 class LiveVoiceActivity(private val system: System) {
     typealias Content = VoiceCallActivityAttributes.ContentState
 
-    /** A Live Update's state (iOS `ActivityState`). */
+    /** A Live Update's state. */
     enum class State(val rawValue: String) {
         Pending("pending"), Active("active"), Stale("stale"), Ended("ended"), Dismissed("dismissed");
 
@@ -137,7 +136,7 @@ class LiveVoiceActivity(private val system: System) {
         val isShowing: Boolean get() = this == Pending || this == Active || this == Stale
     }
 
-    /** The notification system, by Live Update ID (iOS: ActivityKit). */
+    /** The notification system, by Live Update ID. */
     class System(
         val areActivitiesEnabled: () -> Boolean,
         /** Null once the system no longer knows the Live Update. */
@@ -470,7 +469,7 @@ class LiveVoiceActivity(private val system: System) {
 
         internal val shared: LiveVoiceActivity by lazy { LiveVoiceActivity(LiveUpdateSystem.voice(dependency(AppContext))) }
 
-        /** A Live Update button with nothing listening: end what shows (iOS `Activity.endAll`). */
+        /** A Live Update button with nothing listening: end what shows. */
         internal suspend fun endAllFromCommand() = shared.enqueue(Request.EndAll)
 
         fun describe(error: Throwable): String = (error as? LiveUpdateSystem.RequestError)?.reason ?: error::class.java.simpleName
@@ -480,8 +479,7 @@ class LiveVoiceActivity(private val system: System) {
 }
 
 /**
- * Port of iOS `LiveActivityRunner`: serializes Live Update requests and runs the 5-minute
- * stale-date heartbeat while one is showing.
+ * Serializes Live Update requests and runs the 5-minute stale-date heartbeat while one is showing.
  */
 class LiveActivityRunner(private val clock: Clock, private val scope: CoroutineScope) {
     private val mutex = Mutex()

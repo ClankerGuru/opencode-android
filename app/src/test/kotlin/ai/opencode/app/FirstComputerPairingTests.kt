@@ -42,9 +42,8 @@ import org.junit.Test
 import java.time.Instant
 
 /**
- * Port of iOS `FirstComputerPairingTests.swift`, the `AppFeature` halves. `makeDraft` draws a new
- * session ID, so `theFirstComputerOpensAReadySessionInItsLatestProject` receives it
- * non-exhaustively.
+ * The `AppFeature` halves. `makeDraft` draws a new session ID, so
+ * `theFirstComputerOpensAReadySessionInItsLatestProject` receives it non-exhaustively.
  */
 class FirstComputerPairingTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -63,7 +62,7 @@ class FirstComputerPairingTests {
 
     private fun project(directory: String, name: String? = null) = OpenCodeProject(id = directory, name = name ?: directory, directory = directory)
 
-    /** Kit's own computer: the home folder holds the newest session. */
+    /** The home folder holds the newest session. */
     private val snapshot: OpenCodeHomeSnapshot
         get() = OpenCodeHomeSnapshot(
             projects = listOf(project("/Users/kit"), project("/Users/kit/code/api", name = "api"), project("/Users/kit/code/web", name = "web")),

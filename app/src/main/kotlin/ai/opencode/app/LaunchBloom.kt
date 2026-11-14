@@ -5,15 +5,11 @@ import ai.opencode.core.dependencies.dependency
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
-/**
- * Port of iOS `LaunchBloom.swift`'s cold-launch policy on the AndroidX splash screen: the cover
- * stays until content is ready, at most [TIMEOUT_MILLIS]. Main thread only.
- */
+/** The cover stays until content is ready, at most [TIMEOUT_MILLIS]. Main thread only. */
 object LaunchBloomController {
-    /** iOS `LaunchTunables.timeout` default. */
     const val TIMEOUT_MILLIS = 1_500L
 
-    /** iOS `hasCompletedColdLaunch`: once true the cover never shows again in this process. */
+    /** Once true the cover never shows again in this process. */
     internal var hasCompletedColdLaunch = false
 
     /** When the cover went up; null until [start]. */
@@ -24,7 +20,7 @@ object LaunchBloomController {
         if (startedAt == null) startedAt = dependency(Clock).now()
     }
 
-    /** iOS `isRunning`: the cover is up. */
+    /** The cover is up. */
     val isRunning: Boolean get() = startedAt != null && !hasCompletedColdLaunch
 
     /** Ends the cover now: something the person asked for is about to show. */

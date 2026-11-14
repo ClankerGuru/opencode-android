@@ -5,10 +5,8 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 /**
- * The transcript half of iOS `MediaReferenceTests` (the mosaic tile's load key). The wire and
- * decoding tests are `:server`'s, the loader's and the viewer's `:feature:media`'s.
- * `toolMosaicTakesALoadedShapeRevisesItsRowAndKeepsItThroughAPurge` hosts the mosaic in a
- * window; its shape logic is `TranscriptLayoutTests`' `ToolImageMosaic.aspects`/`change`.
+ * `toolMosaicTakesALoadedShapeRevisesItsRowAndKeepsItThroughAPurge` hosts the mosaic in a window;
+ * its shape logic is `TranscriptLayoutTests`' `ToolImageMosaic.aspects`/`change`.
  */
 class MediaReferenceTests {
     private val hashA = "a1".repeat(32)

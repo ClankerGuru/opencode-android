@@ -2,7 +2,7 @@ package ai.opencode.app
 
 import java.lang.ref.WeakReference
 
-/** A window's part in the app, decided by [WindowRoster] (iOS `WindowRosterMember`). */
+/** A window's part in the app, decided by [WindowRoster]. */
 interface WindowRosterMember {
     /** The window's role changed after it joined. */
     fun rosterAssigned(role: WindowRoster.Role)
@@ -12,9 +12,9 @@ interface WindowRosterMember {
 }
 
 /**
- * Port of iOS `WindowRoster`, driven by windows connecting and disconnecting. The first connected
- * window is primary; on a tablet others are secondary with their own store. The app-wide owner is
- * the connected primary, else the first connected secondary.
+ * Driven by windows connecting and disconnecting. The first connected window is primary; on a
+ * tablet others are secondary with their own store. The app-wide owner is the connected primary,
+ * else the first connected secondary.
  */
 class WindowRoster(
     /** The device has several windows (a tablet). */

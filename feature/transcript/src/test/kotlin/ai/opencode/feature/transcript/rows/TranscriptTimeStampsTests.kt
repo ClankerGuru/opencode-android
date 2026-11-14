@@ -21,13 +21,10 @@ import java.util.Locale
 import kotlin.math.abs
 
 /**
- * Port of iOS `OpenCodeTests/TranscriptTimeStampsTests.swift`: day and time stamps over the
- * messages that open a day or resume after a pause.
+ * Day and time stamps over the messages that open a day or resume after a pause.
  *
  * The stamp text comes from `android.icu` (`DateFormat` skeletons, `RelativeDateTimeFormatter`),
- * which is a stub in plain JVM tests, so the class runs under Robolectric. Where an iOS test
- * also checks [TranscriptTimeStamps.date], that half runs under the iOS name and the formatting
- * half is the `…Stamps` test beside it.
+ * which is a stub in plain JVM tests, so the class runs under Robolectric.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -307,7 +304,7 @@ class TranscriptTimeStampsTests {
         assertEquals("Heute\t8:00", result[id(today)])
     }
 
-    /** Y-02: iOS's `Locale.current` in an English-only bundle: English words, the region's formats. */
+    /** English words, the region's formats. */
     @Test
     fun writesEnglishInTheUsersRegion() {
         assertEquals(Locale.forLanguageTag("en-DE"), appFormattingLocale(Locale.GERMANY))

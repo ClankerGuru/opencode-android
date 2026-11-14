@@ -17,12 +17,6 @@ import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of the Home half of iOS `ServerVoiceTests.swift`
- * (`serverVoiceReprobesOnceWhenUnsupportedAndClearsCacheOnReconnect`'s step 2). Everything
- * else in that file, and the call half of this test, is `:feature:voice`'s
- * (`ServerVoiceTests.kt` there).
- */
 class ServerVoiceTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -30,8 +24,7 @@ class ServerVoiceTests {
 
     /**
      * 2. In HomeFeature, transport errors in checkServerVoiceSupport leave the
-     * cache `.unknown`, and event-stream `.connected` clears any cached entry.
-     * (iOS resets the process-wide shared voice state first; each test here has its own store.)
+     * Cache `.unknown`, and event-stream `.connected` clears any cached entry.
      */
     @Test
     fun serverVoiceReprobesOnceWhenUnsupportedAndClearsCacheOnReconnect() = homeTest { h ->

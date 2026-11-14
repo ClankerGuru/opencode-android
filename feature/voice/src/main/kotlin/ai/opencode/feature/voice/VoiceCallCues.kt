@@ -20,12 +20,9 @@ import kotlin.math.pow
 import kotlin.math.sin
 
 /**
- * The call's sounds, ported from Wisp (`wisp-audio` cues, wisp b55d486): each pack's cues are
- * bundled as 24 kHz mono IMA4 CAFs, byte for byte iOS's `Voice/Sounds`, as Java resources under
- * `ai/opencode/feature/voice/sounds` (`call_<pack>_<cue>.caf`), rendered from Wisp's own
- * synthesis (or, for Crystal Glass and Warm Analog, its recorded stems) with their levels baked
- * in, so they play at the gain Wisp plays them. Re-render them from Wisp with iOS's
- * `scripts/wisp-call-sounds/render.sh` and copy them here, rather than editing them.
+ * The call's sounds, ported from Wisp (`wisp-audio` cues, wisp b55d486). Re-render them from Wisp
+ * with the iOS repo's `scripts/wisp-call-sounds/render.sh` and copy them here, rather than editing
+ * them.
  */
 @Serializable
 @Suppress("EnumEntryName")
@@ -184,9 +181,8 @@ object VoiceCallSoundBank {
 
 /**
  * Decodes the bundled cues: a Core Audio Format file holding Apple IMA4 (34-byte packets of 64
- * frames, mono), trimmed to the packet table's valid frames, as AVAudioFile reads it into
- * Float32 (each Int16 sample / 32 768). Android has no CAF or IMA4 decoder, and decoding the
- * iOS bytes keeps the cues identical (the loop's 36 000 frames included).
+ * frames, mono), trimmed to the packet table's valid frames, as AVAudioFile reads it into Float32
+ * (each Int16 sample / 32 768). Android has no CAF or IMA4 decoder.
  */
 internal object CAFIMA4 {
     private const val bytesPerPacket = 34
@@ -353,7 +349,7 @@ object VoiceShutterSound {
     private fun render(): FloatArray {
         val rate = PCM.sampleRate
         val out = FloatArray((length * rate).toInt())
-        // iOS's `UInt32` linear congruential noise: Int arithmetic wraps the same way.
+        // Int arithmetic wraps the same way.
         var seed = 0x5EED_1108
         fun noise(): Float {
             seed = seed * 1_664_525 + 1_013_904_223

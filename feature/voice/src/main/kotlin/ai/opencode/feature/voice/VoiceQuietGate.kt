@@ -3,9 +3,8 @@ package ai.opencode.feature.voice
 import ai.opencode.core.tuning.Tunable
 import kotlin.time.Duration
 
-// Port of iOS `VoiceQuietGate.swift` (`extension ReplyWatch { struct QuietGate }`).
-// The type and its `note…` updates are declared in `ReplyWatch.kt` so it keeps
-// the name `ReplyWatch.QuietGate`; its policy lives here.
+// The type and its `note…` updates are declared in `ReplyWatch.kt` so it keeps the name
+// `ReplyWatch.QuietGate`; its policy lives here.
 
 /** GPT-Live turn-taking, read when a call starts. */
 object VoiceTurnTunables {
@@ -14,7 +13,7 @@ object VoiceTurnTunables {
     val bargeIn = Tunable("call.turns.bargeIn", "Talk-Over Stop (s)", default = 0.6, range = 0.0..2.0, step = 0.1)
 }
 
-/** iOS `VoiceCallTiming.quietGate` (VoiceCallClient.swift): the gate for this call's timing. */
+/** The gate for this call's timing. */
 val VoiceCallTiming.quietGate: ReplyWatch.QuietGate
     get() = ReplyWatch.QuietGate(
         quietWindow = liveAppendQuiet,

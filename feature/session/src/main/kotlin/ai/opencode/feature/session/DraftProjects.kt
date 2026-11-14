@@ -87,7 +87,7 @@ import androidx.compose.ui.unit.dp
 import java.text.Normalizer
 import kotlin.math.roundToInt
 
-/** iOS `ProjectPickerTunables`: the shipped defaults (developer tuning isn't ported). */
+/** The shipped defaults (developer tuning isn't ported). */
 object ProjectPickerTunables {
     val rowInset = 16.dp
     val rowPadding = 10.dp
@@ -98,9 +98,9 @@ object ProjectPickerTunables {
 }
 
 /**
- * Port of iOS `DraftProjectOrder`: screen-local slots, not recency. A refresh or another pick
- * must not move a folder out from under the finger. An unlisted choice uses the last slot. A
- * new draft visit or server starts again from its current recency order.
+ * Screen-local slots, not recency. A refresh or another pick must not move a folder out from under
+ * the finger. An unlisted choice uses the last slot. A new draft visit or server starts again from
+ * its current recency order.
  *
  * Immutable: [update] returns the next order. [identity] is the draft's
  * `SessionFeature.State.TaskIdentity` (typed `Any?` so this file doesn't depend on it).
@@ -136,14 +136,13 @@ data class DraftProjectOrder(
     }
 
     companion object {
-        /** iOS `SessionFeature.State.recentProjectLimit`. */
         const val RECENT_PROJECT_LIMIT = 5
     }
 }
 
 /**
- * Port of iOS `ProjectHeaderSubtitle`: the header's project name, replaced with an upward
- * slide-and-fade (iOS blur-replace) when it changes; a cross-fade under Reduce Motion.
+ * The header's project name, replaced with an upward slide-and-fade when it changes; a cross-fade
+ * under Reduce Motion.
  */
 @Composable
 fun ProjectHeaderSubtitle(
@@ -158,7 +157,7 @@ fun ProjectHeaderSubtitle(
         targetState = project,
         modifier = modifier,
         transitionSpec = {
-            // iOS `.titleRoll` on `Motion.swap`; a subtitle swapped in place without animation doesn't move.
+            // A subtitle swapped in place without animation doesn't move.
             if (!animates) (fadeIn(snap()) togetherWith fadeOut(snap())) using null
             else MotionTransition.roll(MotionRollDirection.Up, reducedMotion, density).content
         },
@@ -167,12 +166,12 @@ fun ProjectHeaderSubtitle(
 }
 
 /**
- * Port of iOS `DraftProjectList`: a draft's recent projects, listed above the composer (D-34).
- * The chosen one carries a filled folder, its name in semibold primary, and a quiet highlight.
- * All Projects opens the Project sheet, which also browses the server's folders. Composing, the
- * list folds down to the chosen row, which then opens the sheet: the other rows fade and blur
- * out where they are, riding up with the composer, while the chosen one glides down to sit on
- * it ([DraftProjectStack]). Reduce Motion cross-fades.
+ * A draft's recent projects, listed above the composer (D-34). The chosen one carries a filled
+ * folder, its name in semibold primary, and a quiet highlight. All Projects opens the Project
+ * sheet, which also browses the server's folders. Composing, the list folds down to the chosen row,
+ * which then opens the sheet: the other rows fade and blur out where they are, riding up with the
+ * composer, while the chosen one glides down to sit on it ([DraftProjectStack]). Reduce Motion
+ * cross-fades.
  *
  * Values the SessionView group passes from `SessionFeature.State`:
  * @param identity `state.taskIdentity` (a new visit or server restarts the screen order).
@@ -208,9 +207,9 @@ fun DraftProjectList(
         animationSpec = if (reducedMotion) snap() else Motion.layout.animation(if (isComposing) MotionPhase.Exit else MotionPhase.Enter),
         label = "draftProjectFold",
     )
-    // iOS `matchedGeometryEffect(id: "chosen")`: one highlight that slides between rows. Its
-    // position is a fractional row index the stack resolves against the rows' live placement,
-    // so it rides the fold with the chosen row. Folded, a pick swaps in place (iOS animation nil).
+    // One highlight that slides between rows. Its position is a fractional row index the stack
+    // resolves against the rows' live placement, so it rides the fold with the chosen row. Folded,
+    // a pick swaps in place.
     val highlightIndex = remember { Animatable(chosenIndex?.toFloat() ?: 0f) }
     var highlightShown by remember { mutableStateOf(chosenIndex != null) }
     LaunchedEffect(chosenIndex, isComposing, reducedMotion) {
@@ -299,7 +298,7 @@ private fun DraftProjectRow(
     tag: String,
     takesTouches: Boolean,
 ) {
-    // Reduce Motion: the row's own highlight cross-fades in place (iOS `layout`, the reduced fade).
+    // Reduce Motion: the row's own highlight cross-fades in place.
     val highlight by animateFloatAsState(if (chosen && ownHighlight) 1f else 0f, Motion.reduced.animation(reduceMotion = true), label = "draftProjectHighlight")
     val selectedDescription = stringResource(R.string.session_project_selected_description)
     Row(
@@ -313,8 +312,8 @@ private fun DraftProjectRow(
             .padding(start = 17.dp, end = 16.dp)
             .testTag(tag)
             .clearAndSetSemantics {
-                // iOS's `.isSelected` trait as words: `selected` would make the row checkable,
-                // and TalkBack would offer "double-tap to toggle" on a row that picks.
+                // `selected` would make the row checkable, and TalkBack would offer "double-tap to
+                // toggle" on a row that picks.
                 if (chosen) stateDescription = selectedDescription
                 contentDescription = title
             },
@@ -337,8 +336,8 @@ private fun DraftProjectRow(
 /**
  * A row folded away: it fades and blurs out where it is, quickly, so it's gone before the chosen
  * row glides past; unfolding, it comes back just behind. Hidden rows leave TalkBack, and [content]
- * gets `hidden` to drop its touch handling (iOS `.allowsHitTesting(!isHidden)`): taps pass
- * through to the chosen row, which sits in the last row's slot when folded.
+ * gets `hidden` to drop its touch handling: taps pass through to the chosen row, which sits in the
+ * last row's slot when folded.
  */
 @Composable
 private fun DraftProjectFade(isHidden: Boolean, reducedMotion: Boolean, content: @Composable (hidden: Boolean) -> Unit) {
@@ -360,14 +359,13 @@ private fun DraftProjectFade(isHidden: Boolean, reducedMotion: Boolean, content:
 }
 
 /**
- * Port of iOS `DraftProjectStack`: the list's rows, stacked from the bottom (the composer's
- * edge). Folded to one row, it's that row's height and that row sits at the bottom; the rest
- * keep the places they had, measured from the bottom, so while they fade they ride with the
- * composer instead of being left behind or dropping. [fold] (0…1) animates between the two.
+ * The list's rows, stacked from the bottom (the composer's edge). Folded to one row, it's that
+ * row's height and that row sits at the bottom; the rest keep the places they had, measured from
+ * the bottom, so while they fade they ride with the composer instead of being left behind or
+ * dropping. [fold] (0…1) animates between the two.
  *
- * [highlight] is drawn behind the rows at the fractional row index [highlightIndex] reads
- * (iOS's matched-geometry highlight): between two rows it interpolates their live frames.
- * A null [highlightIndex] leaves it out.
+ * [highlight] is drawn behind the rows at the fractional row index [highlightIndex] reads: between
+ * two rows it interpolates their live frames. A null [highlightIndex] leaves it out.
  */
 @Composable
 fun DraftProjectStack(
@@ -412,9 +410,8 @@ fun DraftProjectStack(
 private fun lerpFloat(start: Float, stop: Float, fraction: Float): Float = start + (stop - start) * fraction
 
 /**
- * Port of iOS `ProjectPickerSheet`: search, Choose Folder… (the server's folders), then every
- * project, the chosen one checked. One navigation stack throughout, so nothing swaps under it
- * while it slides away.
+ * Search, Choose Folder… (the server's folders), then every project, the chosen one checked. One
+ * navigation stack throughout, so nothing swaps under it while it slides away.
  *
  * Values the SessionView group passes from `SessionFeature`:
  * @param projects `state.filteredProjects`.
@@ -436,9 +433,7 @@ fun ProjectPickerSheet(
     onCancel: () -> Unit,
     folderBrowser: StoreOf<FolderBrowserFeature.State, FolderBrowserFeature.Action>?,
 ) {
-    // iOS's `[.medium, .large]` detents. In a compact-height window (a landscape phone) UIKit
-    // ignores detents and presents the sheet at full height; half of it there showed only the
-    // title, the search and a row under the gesture bar (QA F-36).
+    // Half of it there showed only the title, the search and a row under the gesture bar (QA F-36).
     val compactHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() } < 480.dp
     ModalBottomSheet(
         onDismissRequest = onCancel,
@@ -481,7 +476,6 @@ private fun ProjectList(
     onCancel: () -> Unit,
     folderBrowser: StoreOf<FolderBrowserFeature.State, FolderBrowserFeature.Action>?,
 ) {
-    // iOS `.screenName("Project Picker")` names the screen for Scrawl recordings, not for TalkBack.
     Column(Modifier.fillMaxWidth()) {
         SheetTitleBar(
             title = stringResource(R.string.session_project_picker_title),
@@ -528,7 +522,6 @@ private fun ProjectList(
                             .padding(horizontal = ProjectPickerTunables.rowInset, vertical = ProjectPickerTunables.rowPadding)
                             .clearAndSetSemantics {
                                 contentDescription = project.name
-                                // iOS's `.isSelected` trait as words, not a checkable `selected`.
                                 stateDescription = listOfNotNull(if (chosen) selectedDescription else null, project.directory).joinToString(", ")
                                 role = Role.Button
                             },
@@ -551,8 +544,8 @@ private fun ProjectList(
 }
 
 /**
- * Port of iOS `FolderBrowserView`: one folder on the server, its path, the folders inside it,
- * and Select. The title menu climbs to any folder above it.
+ * One folder on the server, its path, the folders inside it, and Select. The title menu climbs to
+ * any folder above it.
  */
 @Composable
 fun FolderBrowserView(store: StoreOf<FolderBrowserFeature.State, FolderBrowserFeature.Action>, route: FolderBrowserFeature.Route) {
@@ -652,7 +645,7 @@ fun FolderBrowserView(store: StoreOf<FolderBrowserFeature.State, FolderBrowserFe
     }
 }
 
-/** iOS `localizedStandardContains`: case- and diacritic-insensitive. */
+/** Case- and diacritic-insensitive. */
 private fun visibleFolders(folders: List<String>, filter: String): List<String> {
     if (filter.isEmpty()) return folders
     val needle = folded(filter)
@@ -704,13 +697,11 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
     )
 }
 
-/** iOS `ContentUnavailableView.search(text:)`. */
 @Composable
 private fun SearchUnavailable(text: String) {
     Unavailable(SFSymbol.Magnifyingglass, stringResource(R.string.session_folder_search_empty_title, text), stringResource(R.string.session_folder_search_empty_message))
 }
 
-/** iOS `ContentUnavailableView`. */
 @Composable
 private fun Unavailable(symbol: SFSymbol, title: String, description: String? = null, action: Pair<String, () -> Unit>? = null) {
     Column(

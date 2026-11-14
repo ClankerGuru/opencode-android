@@ -39,10 +39,7 @@ import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `ClientToolsTests.swift`, its app tests (MARK: App, and the delegator tests under
- * MARK: Transport).
- */
+/** Its app tests (MARK: App, and the delegator tests under MARK: Transport). */
 class ClientToolsTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -57,7 +54,6 @@ class ClientToolsTests {
         updatedAt = Instant.ofEpochSecond(1_700_000_000),
     )
 
-    /** iOS `AppFeature.State()` with Home on [server] showing [session]. */
     private fun appWithSession(): AppFeature.State = shared.run {
         val home = HomeFeature.State(server, OpenCodeHomeSnapshot(projects = emptyList(), sessions = listOf(session), activeSessionIDs = emptySet()))
         AppFeature.State.initial().copy(home = home.copy(sessionDetail = SessionFeature.State.session(server, session)))

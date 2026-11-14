@@ -6,19 +6,19 @@ import android.app.NotificationManager
 import android.content.Context
 
 /**
- * Android notification channels for what iOS shows as Live Activities and notifications.
- * Created on first use (idempotent). One per kind, so each can be silenced on its own.
+ * Android notification channels for Live Updates and notifications. Created on first use
+ * (idempotent). One per kind, so each can be silenced on its own.
  */
 object SystemNotificationChannels {
-    /** A voice call's Live Update (iOS: the call's Live Activity). */
+    /** A voice call's Live Update. */
     const val VOICE_CALL = "voice-call"
-    /** A hands-free recording's Live Update (iOS: the dictation Live Activity). */
+    /** A hands-free recording's Live Update. */
     const val DICTATION = "dictation"
-    /** A run sent from this phone, while the app is away (iOS: the Session Live Activity). */
+    /** A run sent from this phone, while the app is away. */
     const val SESSION_RUN = "session-run"
-    /** A session finished or needs input (iOS: the relay's push). */
+    /** A session finished or needs input. */
     const val SESSIONS = "sessions"
-    /** The share sheet's “sent” and “continue” notices (iOS: `ShareNotifier`). */
+    /** The share sheet's “sent” and “continue” notices. */
     const val SHARE = "share"
 
     fun ensure(context: Context) {

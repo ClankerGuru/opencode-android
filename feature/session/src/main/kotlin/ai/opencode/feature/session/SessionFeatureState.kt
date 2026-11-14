@@ -38,21 +38,20 @@ import java.util.UUID
 import ai.opencode.core.experiments.key
 import ai.opencode.core.sharing.shared
 
-// Port of iOS `SessionFeature+State.swift` (and the computed members of `SessionFeature.swift`'s
-// `State`): computed properties as extension `val`s, `mutating func`s as `fun State.x(): State`.
-// iOS get/set pairs are a getter plus a `withX(value)` setter. Nested types live in `State`
-// (`SessionFeature.kt`), since Kotlin keeps nested declarations in the class body. As on iOS
-// (67a3fb61), dictation, models, requests and transcript state are in `SessionFeatureState<Area>.kt`.
+// Computed properties as extension `val`s, `mutating func`s as `fun State.x(): State`. Get/set
+// pairs are a getter plus a `withX(value)` setter. Nested types live in `State`
+// (`SessionFeature.kt`), since Kotlin keeps nested declarations in the class body. Dictation,
+// models, requests and transcript state are in `SessionFeatureState<Area>.kt`.
 
-// region Draft (iOS `draft` `didSet`)
+// region Draft
 
-/** Sets [State.draft], keeping iOS's `didSet`: an edit drops [State.nonSendNewlineDraft]. */
+/** An edit drops [State.nonSendNewlineDraft]. */
 fun State.withDraft(text: String): State =
     copy(draft = text, nonSendNewlineDraft = if (nonSendNewlineDraft != text) null else nonSendNewlineDraft)
 
 // endregion
 
-// region Members of `SessionFeature.swift`'s State
+// region State members
 
 /** Null when there's nothing to show: the send failed or was cancelled, or the turn ended without prose. */
 val State.browserPeek: State.BrowserPeek?
@@ -72,7 +71,6 @@ val State.browserPeek: State.BrowserPeek?
         return if (waiting || isRunning || isAwaitingReply) State.BrowserPeek(null) else null
     }
 
-/** iOS `syncShellToolStatuses()`. */
 fun State.syncShellToolStatuses(): State {
     val next = State.shellToolStatuses(items)
     val nextSubagents = State.subagentToolSessionIDs(items)
@@ -167,7 +165,7 @@ val State.errorMessage: String?
         return loadError
     }
 
-/** iOS `errorMessage`'s setter: writes [State.loadError]. */
+/** Writes [State.loadError]. */
 fun State.withErrorMessage(value: String?): State = copy(loadError = value)
 
 val State.effectiveDirectory: String? get() = session?.directory ?: draftProject?.directory
@@ -232,8 +230,8 @@ fun State.updateRequestDock(transform: (RequestDockFeature.State<DraftState>) ->
     copy(requestDock = transform(requestDock))
 
 /**
- * iOS `answerDraftsIncludingBar` (`Composer/SessionStatePersistence.swift`): [answerDrafts] with the
- * words on the bar now, which are only filed there when the bar moves to another page or request.
+ * [answerDrafts] with the words on the bar now, which are only filed there when the bar moves to
+ * another page or request.
  */
 val State.answerDraftsIncludingBar: Map<String, String>
     get() {
@@ -292,8 +290,7 @@ val State.workingRunSignal: WorkingRun.Signal
 
 /**
  * A reply's text for the browser peek: its prose, one block per line. Tables and images wait for
- * the transcript. (iOS keeps inline styling in an `AttributedString`; this takes the plain text of
- * the reply's Markdown, which Android items carry raw.)
+ * the transcript.
  */
 fun State.Companion.peekText(markdown: String): String {
     val result = StringBuilder()
@@ -348,8 +345,8 @@ val State.voiceRoute: VoiceRoute
 val State.isVoiceAvailable: Boolean get() = voiceLabOverride || (voiceModeEnabled.value && voiceRoute.isAvailable)
 
 /**
- * iOS's `#if DEBUG` voice lab switches: a scripted call, a stand-in server, or the lab's key make
- * the call button available. [VoiceLabDemo] answers nothing in release builds.
+ * A scripted call, a stand-in server, or the lab's key make the call button available.
+ * [VoiceLabDemo] answers nothing in release builds.
  */
 private val voiceLabOverride: Boolean
     get() = VoiceLabDemo.isEnabled || VoiceLabDemo.hasStandInServer || VoiceLabDemo.labAPIKey != null
@@ -682,7 +679,6 @@ val State.draftState: DraftState
         undoSnapshot = composerAttachments.undoSnapshot,
     )
 
-/** iOS `draftState`'s setter. */
 fun State.withDraftState(value: DraftState): State =
     withDraft(value.text).copy(
         autocomplete = autocomplete.copy(chips = value.chips),
@@ -737,8 +733,8 @@ fun State.currentModelReads(input: String): Boolean {
 // region Models and projects
 
 /**
- * Where a session whose folder is gone can move: its project's folder, when that's somewhere
- * else and isn't the home folder (iOS `missingFolderMoveTarget`).
+ * Where a session whose folder is gone can move: its project's folder, when that's somewhere else
+ * and isn't the home folder.
  */
 val State.missingFolderMoveTarget: OpenCodeProject?
     get() {

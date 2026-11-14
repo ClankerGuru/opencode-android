@@ -85,7 +85,7 @@ sealed interface ServerVoiceTransportResponse {
     data class Websocket(val url: String, val token: String, val expiresAt: Long?) : ServerVoiceTransportResponse
 
     companion object {
-        /** Throws on an unknown type or a missing field (iOS `init(from:)`). */
+        /** Throws on an unknown type or a missing field. */
         fun decode(json: JsonElement): ServerVoiceTransportResponse {
             val container = json as? JsonObject ?: throw IllegalArgumentException("Expected an object")
             fun string(key: String): String =
@@ -107,7 +107,7 @@ sealed interface ServerVoiceTransportResponse {
     }
 }
 
-/** iOS `ServerVoiceSessionEnvelope`: `{data: {transport}}`. */
+/** `{data: {transport}}`. */
 object ServerVoiceSessionEnvelope {
     fun transport(data: ByteArray): ServerVoiceTransportResponse {
         val root = VoiceWireJson.parseToJsonElement(data.decodeToString()) as? JsonObject ?: throw IllegalArgumentException()
@@ -142,10 +142,9 @@ object ServerVoiceModels {
     }
 
     /**
-     * Whether a server listing `models` can broker a call: it holds a key for
-     * GPT-Live, Realtime or Gemini Live. Grok never counts, since a Grok call
-     * always uses the phone's xAI key (`VoiceRoute.resolve`). iOS dropped it with
-     * its Voice Server picker; kept until Settings' picker moves to the Voice Provider page.
+     * Whether a server listing `models` can broker a call: it holds a key for GPT-Live, Realtime or
+     * Gemini Live. Grok never counts, since a Grok call always uses the phone's xAI key
+     * (`VoiceRoute.resolve`). Kept until Settings' picker moves to the Voice Provider page.
      */
     fun offersVoice(models: List<ServerVoiceModel>): Boolean = models.any { it.available && brokered(it.model) != null }
 
@@ -173,10 +172,10 @@ object ServerVoiceModels {
 }
 
 /**
- * A short, stable name for a saved server that carries none of its addresses or credentials
- * (iOS `VoiceDelegatorWorkspace.serverID`). Ported here as a top-level function because
- * [VoiceServerChoice] needs it before `VoiceDelegatorWorkspace` exists (wave 3); the
- * workspace should call this rather than redeclare the hash.
+ * A short, stable name for a saved server that carries none of its addresses or credentials. Ported
+ * here as a top-level function because [VoiceServerChoice] needs it before
+ * `VoiceDelegatorWorkspace` exists (wave 3); the workspace should call this rather than redeclare
+ * the hash.
  */
 fun voiceServerID(server: OpenCodeServer): String =
     "srv_" + MessageDigest.getInstance("SHA-256").digest(server.persistenceID.toByteArray())
@@ -227,7 +226,6 @@ sealed interface VoiceServerChoice {
     }
 
     companion object {
-        /** iOS `init(rawValue:)`. */
         fun of(rawValue: String): VoiceServerChoice = when (rawValue) {
             "" -> Automatic
             "connected" -> Connected
@@ -235,11 +233,10 @@ sealed interface VoiceServerChoice {
             else -> Saved(rawValue)
         }
 
-        /** iOS `init(_ server:)`. */
         fun of(server: OpenCodeServer): VoiceServerChoice = Saved(voiceServerID(server))
     }
 
-    /** Stored as its raw value, as iOS `AppStorage` stores a `RawRepresentable`. */
+    /** Stored as its raw value. */
     object Serializer : KSerializer<VoiceServerChoice> {
         override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("VoiceServerChoice", PrimitiveKind.STRING)
         override fun serialize(encoder: Encoder, value: VoiceServerChoice) = encoder.encodeString(value.rawValue)
@@ -256,7 +253,6 @@ sealed class ServerVoiceError(message: String) : Exception(message) {
 
     data object InvalidResponse : ServerVoiceError("Couldn’t start voice: The server returned an invalid response.")
 
-    /** iOS `errorDescription`. */
     val errorDescription: String get() = message ?: ""
 
     override fun fillInStackTrace(): Throwable = this
@@ -331,10 +327,8 @@ object ServerVoiceSupportDetector {
 }
 
 /**
- * The server's voice routes. Like iOS, these go straight through the server transport
- * (`OpenCodeTransport.request`, iOS `openCodeTransport.request`), not `NetworkRetry`:
- * the support check and model list answer "unknown"/null on failure, and a session
- * start is not repeated.
+ * The server's voice routes. The support check and model list answer "unknown"/null on failure, and
+ * a session start is not repeated.
  */
 class ServerVoiceClient(
     val checkSupport: suspend (server: OpenCodeServer) -> ServerVoiceSupport,

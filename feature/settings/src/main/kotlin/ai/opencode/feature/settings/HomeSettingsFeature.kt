@@ -39,13 +39,13 @@ import ai.opencode.feature.voice.VoiceSharedKeys
 import ai.opencode.server.OpenCodeServer
 
 /**
- * Port of iOS `Drawer/HomeSettingsFeature.swift`, moved down to `:feature:settings`: preferences
- * and their platform effects. Every write goes through [setShared], which skips unchanged values.
+ * Moved down to `:feature:settings`: preferences and their platform effects. Every write goes
+ * through [setShared], which skips unchanged values.
  *
  * Developer Mode and Demo Call Audio are written by `:devtools`' `DevToolsFeature` instead.
  */
 class HomeSettingsFeature : Reducer<HomeSettingsFeature.State, HomeSettingsFeature.Action> {
-    /** Home's server, for the voice broker check (iOS `State.server`); the sidebar flag is a shared key. */
+    /** Home's server, for the voice broker check; the sidebar flag is a shared key. */
     data class State(val server: OpenCodeServer? = null)
 
     sealed interface Action {
@@ -165,7 +165,7 @@ class HomeSettingsFeature : Reducer<HomeSettingsFeature.State, HomeSettingsFeatu
                     saved = VoiceFeature.savedServers,
                     readiness = readiness,
                 )
-                // iOS's Home always has a server; Android's state can be empty before one connects.
+                // The state can be empty before a server connects.
                 val home = state.server
                 val asksModels = home != null && pick.isAutomatic && provider == ServerVoiceProvider.openAI
                 val broker = pick.server

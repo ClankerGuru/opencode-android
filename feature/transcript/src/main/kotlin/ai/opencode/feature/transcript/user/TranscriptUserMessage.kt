@@ -11,9 +11,8 @@ import androidx.compose.runtime.Immutable
 
 /**
  * One user message, whether still pending (steering or queued, from the inbox) or delivered (a
- * transcript user group). Both render through [TranscriptUserMessageView] so a pending row
- * promotes in place: the same view brightens and its label fades, instead of one row replacing
- * another (iOS `TranscriptUserMessage`).
+ * transcript user group). Both render through [TranscriptUserMessageView] so a pending row promotes
+ * in place: the same view brightens and its label fades, instead of one row replacing another.
  */
 @Immutable
 data class TranscriptUserMessage(
@@ -102,7 +101,7 @@ data class TranscriptUserMessage(
     }
 }
 
-/** The same glyphs as Send's menu: Steer and Queue (iOS `OpenCodeDelivery.symbolName`). */
+/** The same glyphs as Send's menu: Steer and Queue. */
 val OpenCodeDelivery.symbolName: String
     get() = when (this) {
         OpenCodeDelivery.Steer -> "arrow.turn.up.right"

@@ -13,8 +13,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * Port of iOS `OpenCodeApp`'s DEBUG lab launch hooks, read from the launch intent's extras (`--es
- * lab-server-url …`). Debug builds only, applied before anything reads the store.
+ * Debug lab launch hooks, read from the launch intent's extras (`--es lab-server-url …`). Debug
+ * builds only, applied before anything reads the store.
  */
 internal object LabLaunch {
     fun apply(intent: Intent?) {
@@ -37,7 +37,6 @@ internal object LabLaunch {
         seedVoiceKeys(intent)
     }
 
-    /** iOS `LabVoiceKeys.seed`. */
     private fun seedVoiceKeys(intent: Intent) {
         listOf("lab-openai-key" to SharedKeys.openAIAPIKey, "lab-xai-key" to SharedKeys.xaiAPIKey).forEach { (extra, key) ->
             if (!intent.hasExtra(extra)) return@forEach
@@ -47,7 +46,6 @@ internal object LabLaunch {
         }
     }
 
-    /** iOS `installLabPasteboardTextIfRequested`. */
     private fun pasteboardText(kind: String): String? = when (kind) {
         "log" -> (0 until 40).joinToString("\n") { index ->
             if (index == 0) "Fatal error: Index out of range in UploadQueue.drain()"

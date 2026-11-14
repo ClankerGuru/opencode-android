@@ -6,13 +6,13 @@ android {
     namespace = "ai.opencode.feature.drawer"
 }
 
-// Feature dependencies mirror iOS type references; the graph is acyclic:
-// media, voice, system < transcript, composer, settings < session < drawer < app.
+// The graph is acyclic: media, voice, system < transcript, composer, settings < session < drawer <
+// app.
 dependencies {
     api(project(":feature:session"))
     api(project(":feature:settings"))
     api(project(":feature:system"))
-    // Report a Problem (iOS `TraceUploadsFeature`, scoped on Home as `traces`).
+    // Report a Problem.
     implementation(project(":devtools"))
 }
 

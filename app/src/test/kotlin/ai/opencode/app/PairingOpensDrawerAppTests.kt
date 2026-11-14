@@ -38,10 +38,7 @@ import org.junit.Test
 import java.time.Instant
 import java.util.UUID
 
-/**
- * Port of iOS `PairingOpensDrawerAppTests.swift`: pairing a new computer opens the drawer on its
- * sessions once its list loads.
- */
+/** Pairing a new computer opens the drawer on its sessions once its list loads. */
 class PairingOpensDrawerAppTests {
     @get:Rule val isolation = TestIsolationRule()
 

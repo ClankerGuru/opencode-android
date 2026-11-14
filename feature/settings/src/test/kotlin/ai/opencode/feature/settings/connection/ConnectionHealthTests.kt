@@ -28,9 +28,8 @@ import kotlin.math.max
 import kotlin.math.pow
 
 /**
- * Port of iOS `ConnectionHealthTests.swift`: the connection card's status machine and beat shapes:
- * the status follows the trace, so each change lands at its moment on it. Not here:
- * `routesClassifyParsedAddressesNotSpellings` (`:server`'s port).
+ * The connection card's status machine and beat shapes: the status follows the trace, so each
+ * change lands at its moment on it.
  */
 class ConnectionHealthTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -436,9 +435,8 @@ class ConnectionHealthTests {
     }
 
     /**
-     * iOS answers through a request handler; here an OkHttp interceptor on the probe's client
-     * answers. iOS also checks `NetworkRetry.policy == .once` inside the handler: the policy is a
-     * coroutine-local bound around the call, which OkHttp's dispatcher thread can't observe.
+     * An OkHttp interceptor on the probe's client answers. The policy is a coroutine-local bound
+     * around the call, which OkHttp's dispatcher thread can't observe.
      */
     @Test fun probeSendsCustomHeadersAndRecordsServerContact() = runTest {
         val server = OpenCodeServer(

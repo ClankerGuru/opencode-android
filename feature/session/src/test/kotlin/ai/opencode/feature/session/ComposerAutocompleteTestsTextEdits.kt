@@ -15,10 +15,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Port of iOS `ComposerAutocompleteTests+TextEdits.swift`: a keystroke's single action and the
- * draft's shape (perf audit finding 6).
- */
+/** A keystroke's single action and the draft's shape (perf audit finding 6). */
 class ComposerAutocompleteTestsTextEdits {
     private fun Harness.seeded() = makeStore(
         exhaustive = false,

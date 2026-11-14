@@ -30,25 +30,6 @@ import kotlinx.coroutines.awaitCancellation
 import org.junit.Test
 import java.time.Instant
 
-/**
- * Port of the `SessionFeature` half of iOS `ModelPickerTests.swift` (its Reducer section, and
- * the store parts of the search tests), keeping iOS names.
- *
- * Not ported here (`:feature:composer`, the picker's own types): favoritesThenOneSectionPerProviderInTheServersOrder,
- * aModelSeveralProvidersOfferIsListedUnderEach, searchDropsFavoritesAndMatchesNamesAndProviders,
- * aProvidersNameListsItsModels, wordsMatchInAnyOrderAcrossNameAndProvider, betterMatchesComeFirstThenFavorites,
- * emptyAndPunctuationQueriesKeepTheList, levelsRunFromTheDefaultUpThroughTheSortedVariants,
- * scrubbingStepsOneLevelPerThirtyPointsFromWhereTheHoldBegan, aDragKeepsTheOwnerItStartedWith,
- * theListRestsLikeASheetsDetents, aDragCatchesTheGlassWhereItIsAndACancelledOneSettles,
- * aCancelledDragSettlesFromWhereTheFingerLeftIt, theGrabberAdjustsTheRest, aFocusRestoreRunsOnceUnlessCancelled,
- * theArcFillsToTheLevelAtAnyCount, theBackdropIsStrongestOverTheComposerAndGoneAtBothEnds,
- * shortNamesStripRedundantVendorWordsAndDisambiguateSharedShortNames,
- * theSheetsRecentSitsAfterFavoritesWithoutThemUpToItsLimit.
- * Not ported (iOS-only): searchableSheetsAvoidForcedNavigationBarDrawerOnMac (SwiftUI's
- * `SearchFieldPlacement` on Mac and a source scan of the Swift views).
- * `searchParsesTrailingLevelAndReturnPicksBestMatchAtThatLevel` keeps both halves here: the
- * `ModelSearch.parseLevelQuery` checks (`:server`) lead into the store's pick.
- */
 class ModelPickerTests {
     private val cirrusZen = OpenCodeModel(modelID = "cirrus-4", providerID = "opencode", name = "Cirrus 4", variants = listOf("low", "high"))
     private val mini = OpenCodeModel(modelID = "cirrus-4-mini", providerID = "opencode", name = "Cirrus 4 Mini")

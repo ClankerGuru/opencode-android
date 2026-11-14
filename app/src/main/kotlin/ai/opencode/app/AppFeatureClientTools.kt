@@ -26,7 +26,7 @@ import ai.opencode.server.clienttools.ClientToolCall
 import ai.opencode.server.clienttools.ClientToolsTarget
 import kotlin.coroutines.cancellation.CancellationException
 
-// Port of iOS `AppFeature+ClientTools.swift`: the phone's client tools, all for a live call.
+// The phone's client tools, all for a live call.
 
 /** The directory a call's delegator session lives in, read from the server. */
 data class ClientToolsLocation(val sessionID: String, val directory: String)
@@ -182,10 +182,7 @@ private fun AppFeature.State.clientToolScreenBlock(includingRequestDock: Boolean
 
 private enum class ClientToolsLocateID { Locate }
 
-/**
- * iOS `sharingScreenWithAgents(_:)`: one socket follows [clientToolsTarget], another
- * [delegatorClientToolsTarget].
- */
+/** One socket follows [clientToolsTarget], another [delegatorClientToolsTarget]. */
 internal fun sharingScreenWithAgents(base: Reducer<AppFeature.State, AppFeature.Action>): Reducer<AppFeature.State, AppFeature.Action> {
     val sockets = combine(
         // A lookup can arrive before a queued observation action. Always give the coordinator the

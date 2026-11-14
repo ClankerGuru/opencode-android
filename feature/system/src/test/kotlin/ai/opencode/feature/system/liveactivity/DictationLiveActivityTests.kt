@@ -17,12 +17,6 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
-/**
- * Port of iOS `DictationLiveActivityTests.swift`'s `theStopIntentSendsItsCommand`: the Live
- * Update's Stop button (iOS `StopDictationIntent`) is a [LiveActivityActionReceiver] broadcast,
- * which sends `.stop` to `LiveActivityCommands.dictation` (iOS `DictationCommands.shared`;
- * Robolectric). Its Home tests are `:feature:drawer`'s, its `DictationFeature` test `:feature:composer`'s.
- */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class DictationLiveActivityTests {

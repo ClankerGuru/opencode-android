@@ -21,10 +21,7 @@ import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
 
-/**
- * Port of iOS `SessionLiveActivityTests.swift`, the `AppFeature` part: AppFeature ends a followed
- * run's activity when its Home goes.
- */
+/** The `AppFeature` part: AppFeature ends a followed run's activity when its Home goes. */
 class SessionLiveActivityTests {
     @get:Rule val isolation = TestIsolationRule()
 

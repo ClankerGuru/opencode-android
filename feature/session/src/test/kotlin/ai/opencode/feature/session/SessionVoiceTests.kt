@@ -46,15 +46,15 @@ import java.time.Instant
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Port of iOS `SessionVoiceTests.swift`: a voice call hosted by its session, both driven by their
- * real reducers. Every server read is stubbed and delegated work resolves only on cue.
+ * A voice call hosted by its session, both driven by their real reducers. Every server read is
+ * stubbed and delegated work resolves only on cue.
  */
 class SessionVoiceTests {
     private val server = OpenCodeServer(url = "http://voice.invalid", username = "", password = "")
     private val root = OpenCodeSession(id = "ses_root", serverTitle = "Root", projectID = "p", directory = "/project", updatedAt = distantPast)
     private val child = OpenCodeSession(id = "ses_child", serverTitle = "Child", projectID = "p", directory = "/project", updatedAt = distantPast, parentID = "ses_root")
 
-    /** iOS `Cue`: answers that resolve (or fail) only when the test says so, by key. */
+    /** Answers that resolve (or fail) only when the test says so, by key. */
     private class Cue<Value>(keys: List<String>) {
         private val channels: Map<String, Channel<Result<Value>>> = keys.associateWith { Channel(Channel.UNLIMITED) }
 
@@ -88,8 +88,6 @@ class SessionVoiceTests {
             this[UuidClient] = UuidClient.incrementing()
             this[Clock] = ImmediateClock()
             this[DateClient] = DateClient.constant(Instant.EPOCH)
-            // iOS records a voice admission in the outbox the session reads; Android's `:app`
-            // installs this bridge over the composer's outbox (`AppDependencies`).
             val outbox = PromptOutbox()
             this[PromptOutbox] = outbox
             this[VoiceAdmissionRecorder] = VoiceAdmissionRecorder { prompt, sessionID, serverKey ->
@@ -166,13 +164,11 @@ class SessionVoiceTests {
         store.receive(Action.RefreshResponse::class)
     }
 
-    /** iOS `\.voice.presented.<case>`. */
     private inline fun <reified T : VoiceFeature.Action> voice(): (Action) -> Boolean = { action ->
         val presented = ((action as? Action.Voice)?.action as? ai.opencode.core.store.PresentationAction.Presented)?.action
         presented is T
     }
 
-    /** iOS `\.voice.presented.delegate.ended`. */
     private val voiceEnded: (Action) -> Boolean = { action ->
         val presented = ((action as? Action.Voice)?.action as? ai.opencode.core.store.PresentationAction.Presented)?.action
         presented is VoiceFeature.Action.Delegate && presented.action == VoiceFeature.DelegateAction.Ended
@@ -427,7 +423,7 @@ class SessionVoiceTests {
     private companion object {
         private val instructionPattern = Regex("\"instruction\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
 
-        /** iOS `handoffBody(text)?["instruction"]`: the delegation's own words. */
+        /** The delegation's own words. */
         fun instruction(text: String): String =
             VoiceHandoff.parse(text)?.instruction ?: instructionPattern.find(text)?.groupValues?.get(1) ?: ""
 

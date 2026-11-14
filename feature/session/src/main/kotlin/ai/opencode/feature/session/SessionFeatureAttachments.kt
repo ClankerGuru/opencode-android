@@ -12,9 +12,8 @@ import ai.opencode.feature.composer.ComposerAttachmentsFeature
 import ai.opencode.feature.composer.ComposerFileAttachment
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
 
-// Port of iOS `SessionFeature+Attachments.swift`: attachments, uploads, and Location as the session
-// sees them. `:feature:composer`'s `ComposerAttachmentsFeature` reduces the rest of each action
-// first.
+// Attachments, uploads, and Location as the session sees them. `:feature:composer`'s
+// `ComposerAttachmentsFeature` reduces the rest of each action first.
 
 private fun SessionFeature.appendAttachment(state: State, attachment: OpenCodeOutgoingAttachment, haptic: Boolean = true): Reduced<State, Action> {
     val parked = state.parkedComposer

@@ -17,11 +17,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `SoundEffectsTests.swift`, the `:feature:settings` part (Settings › Experimental ›
- * Sound Effects through [HomeSettingsFeature]). The live gate and playback tests are `:core`'s;
- * the session, Home and Catch Up tests belong to those modules.
- */
 class SoundEffectsTests {
     @get:Rule val isolation = TestIsolationRule()
 

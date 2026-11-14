@@ -7,12 +7,11 @@ import ai.opencode.feature.transcript.list.NewMessagesFold
 import ai.opencode.feature.transcript.list.NewMessagesMark
 import ai.opencode.server.model.OpenCodeTranscriptItem
 
-// The `SessionFeature.State` members of iOS `Transcript/NewMessagesMark.swift`. They extend the
-// session's state, so they live in this module; `NewMessagesMark` (with `firstUnseen`,
-// `ownPrompts` and the span tally), `NewMessagesEarlierBaseline`, `NewMessagesFold` and the list's
-// `NewMessagesPlacement` belong to `:feature:transcript`.
+// They extend the session's state, so they live in this module; `NewMessagesMark` (with
+// `firstUnseen`, `ownPrompts` and the span tally), `NewMessagesEarlierBaseline`, `NewMessagesFold`
+// and the list's `NewMessagesPlacement` belong to `:feature:transcript`.
 
-/** Rows kept above the New divider (iOS `SessionFeature.State.newMessagesContext`). */
+/** Rows kept above the New divider. */
 val SessionFeature.State.Companion.newMessagesContext: Int get() = NewMessagesMark.NEW_MESSAGES_CONTEXT
 
 /** What was on screen as the reader leaves, kept until the read that follows their return settles what's new. */

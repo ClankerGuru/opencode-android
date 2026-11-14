@@ -48,13 +48,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-// Port of iOS `Composer/AgentPicker.swift`. Agent Selection (experimental `agentSelection`,
-// OC-511): choose the primary agent (Build, Plan, or a custom one) from the composer.
+// Agent Selection (experimental `agentSelection`, OC-511): choose the primary agent (Build, Plan,
+// or a custom one) from the composer.
 //
 // The experiment's switch lives in Settings (`ExperimentalFeature`, above this module), so the
 // composables take `isEnabled` from their host instead of reading `@Shared(.experimental(...))`.
 
-/** iOS `SharedKey` extensions declared in `AgentPicker.swift`. */
 object AgentPickerSharedKeys {
     /** The agent new sessions start with (an agent ID); empty is the server's default. Declared in `:core` (Settings writes it). */
     val defaultAgentID = ai.opencode.core.sharing.SharedKeys.defaultAgentID
@@ -66,20 +65,19 @@ object AgentPickerSharedKeys {
     val knownPrimaryAgents = ai.opencode.server.ServerSharedKeys.knownPrimaryAgents
 }
 
-/** The description's first sentence, for a menu's subtitle (iOS `shortDescription`). */
+/** The description's first sentence, for a menu's subtitle. */
 val OpenCodeAutocompleteAgent.shortDescription: String?
     get() {
         val text = description?.trim()?.takeIf { it.isNotEmpty() } ?: return null
-        // Swift's `split(separator: ".", maxSplits: 1)` omits empty pieces, so leading dots
-        // don't count: the first non-empty run before a dot, or the whole text when none.
+        // The first non-empty run before a dot, or the whole text when none.
         val rest = text.trimStart('.')
         val sentence = if (rest.isEmpty()) text else rest.substringBefore('.')
         return sentence.trim()
     }
 
 /**
- * iOS `ComposerAgentChip`: the agent chip beside the model chip, only while Agent Selection is
- * on ([isEnabled]). [isFolded] hides it as the composer folds (iOS `composerHidden`).
+ * The agent chip beside the model chip, only while Agent Selection is on ([isEnabled]). [isFolded]
+ * hides it as the composer folds.
  */
 @Composable
 fun ComposerAgentChip(
@@ -107,8 +105,8 @@ fun ComposerAgentChip(
 }
 
 /**
- * iOS `AgentChip`: the current agent's name, opening a menu of the server's primary agents.
- * [targetDrop]: how far its target sits below its ink (the composer's `pickerTargetDrop`).
+ * The current agent's name, opening a menu of the server's primary agents. [targetDrop]: how far
+ * its target sits below its ink (the composer's `pickerTargetDrop`).
  */
 @Composable
 fun AgentChip(
@@ -126,8 +124,8 @@ fun AgentChip(
     LaunchedEffect(Unit) { onOpen() }
     val chooseAgentDescription = stringResource(R.string.composer_agent_choose_description)
     val secondary = OpenCodeTheme.colors.secondaryText
-    // The whole menu moves its target down and its ink back up (iOS e16d3e8e), so the menu
-    // drops from the lowered target too.
+    // The whole menu moves its target down and its ink back up, so the menu drops from the lowered
+    // target too.
     Box(modifier.offset(y = targetDrop)) {
         Row(
             Modifier
@@ -188,10 +186,10 @@ fun AgentChip(
 }
 
 /**
- * iOS `DefaultAgentSection`: Settings › Composer › Default Agent, the agent new sessions start
- * with, only while Agent Selection is on. Reads [AgentPickerSharedKeys.defaultAgentID] and
- * [AgentPickerSharedKeys.knownPrimaryAgents]; [onChange] hands the choice to the settings
- * reducer, which writes the key.
+ * Settings › Composer › Default Agent, the agent new sessions start with, only while Agent
+ * Selection is on. Reads [AgentPickerSharedKeys.defaultAgentID] and
+ * [AgentPickerSharedKeys.knownPrimaryAgents]; [onChange] hands the choice to the settings reducer,
+ * which writes the key.
  *
  * Note: Settings sits beside (not above) this module, so the settings area needs these keys and
  * this section moved to a module it can see (`:server`); see the composer parity row.

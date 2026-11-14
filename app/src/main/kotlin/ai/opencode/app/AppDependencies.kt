@@ -35,14 +35,14 @@ import java.util.Locale
  * Cross-module services installed at the root because they live above the module that calls them.
  */
 internal object AppDependencies {
-    /** Detached uploads (iOS `Task.detached(priority: .utility)`). */
+    /** Detached uploads. */
     private val uploadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun install(application: Application) {
         val registry = VoiceScreenActivityRegistry()
         DependencyValues.installRoot {
-            // Sound Effects borrow the idle audio session through voice's owner (iOS
-            // `SoundEffectsPlayback`): none plays while a call, dictation or media holds it.
+            // Sound Effects borrow the idle audio session through voice's owner: none plays while a
+            // call, dictation or media holds it.
             this[AudioSessionIdleState] = object : AudioSessionIdleState {
                 override fun <T> withIdleState(body: (isIdle: Boolean) -> T): T =
                     dependency(AudioSessionOwner).withIdleState(body)
@@ -50,9 +50,8 @@ internal object AppDependencies {
                 override fun onHolderActivating(stop: () -> Unit) =
                     dependency(AudioSessionOwner).onHolderActivating(stop)
             }
-            // iOS `LiveScreenCaptureFeedback.playShutterSound`.
             this[ScreenCaptureShutterSound] = ShutterSystemSound.live()
-            // iOS `VoiceFeature+Admission`: `PromptOutbox.recordAdmitted` with the send voice made.
+            // `PromptOutbox.recordAdmitted` with the send voice made.
             this[VoiceAdmissionRecorder] = VoiceAdmissionRecorder { prompt, sessionID, serverKey ->
                 dependency(PromptOutbox).recordAdmitted(
                     PendingPrompt(
@@ -68,7 +67,6 @@ internal object AppDependencies {
                     serverKey,
                 )
             }
-            // iOS `DeveloperMode` as the delegator's `send_call_log` uses it.
             this[VoiceLogUploader] = VoiceLogUploader(
                 isEnabled = { DeveloperMode.isEnabled },
                 upload = { log -> DeveloperModeUploads.uploadVoiceLog(log.id, log.boundedJSON()) },
@@ -78,18 +76,16 @@ internal object AppDependencies {
             this[VoiceCallLogUploadClient] = VoiceCallLogUploadClient { log ->
                 DeveloperModeUploads.uploadVoiceLog(log.id, log.boundedJSON())
             }
-            // iOS `developerModeChanged(true)`: every saved call log goes up, detached.
+            // Every saved call log goes up, detached.
             this[SavedVoiceLogUploads] = SavedVoiceLogUploads {
                 uploadScope.launch {
                     for (log in dependency(VoiceCallLogClient).list()) DeveloperModeUploads.uploadVoiceLog(log.id, log.boundedJSON())
                 }
             }
-            // iOS `DiagnosticsClient.voice` and `LabMarks.mark`.
             this[VoiceDiagnostics] = VoiceDiagnostics(
                 voice = { name, sessionID, detail, excerpt -> DiagnosticsRecorder.shared.recordVoice(name, sessionID, detail, excerpt) },
                 labMark = { name -> LabMarks.mark(name) },
             )
-            // iOS `DiagnosticsRecorder.recordVoiceMark` / `recordVoiceSocket`.
             this[VoiceCallDiagnostics] = VoiceCallDiagnostics(
                 recordMark = { name -> DiagnosticsRecorder.shared.recordMark(name, null) },
                 recordSocketEvent = { event ->

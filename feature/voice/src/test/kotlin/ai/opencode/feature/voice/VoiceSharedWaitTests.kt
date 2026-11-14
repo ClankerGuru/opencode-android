@@ -27,8 +27,6 @@ import java.time.Instant
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `VoiceSharedWaitTests.swift`.
- *
  * A session has one `/wait` however many wait on it: its reply watches and
  * the delegator's `wait_for_session` share it, each leaves on its own, and
  * the poll stops with the last of them or with the call.
@@ -171,8 +169,8 @@ class VoiceSharedWaitTests {
         assertEquals(0, coordinator.openWaitCount())
         assertEquals(listOf("ses_home"), poll.calls.value)
 
-        // Already cancelled: it never opens a wait.
-        // An unstructured task, as on iOS: its `leftWait` doesn't fail this test's scope.
+        // Already cancelled: it never opens a wait. An unstructured task: its `leftWait` doesn't
+        // fail this test's scope.
         val late = detachedScope(coroutineContext).async {
             coroutineContext.job.cancel()
             coordinator.sharedWaitForIdle(server, sessionID = "ses_home", client = client)

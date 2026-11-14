@@ -13,10 +13,9 @@ import kotlin.time.Duration.Companion.seconds
  * resolves every prompt to an explicit outcome, and gates spoken notices on
  * call phase and speaker quiet time.
  *
- * Port of iOS `ReplyWatch` (a mutating struct): here an immutable value whose
- * [transition] returns the next value and its effects. The quiet gate
- * ([QuietGate]) lives in `VoiceQuietGate.kt`; the result limits and notice
- * copy in `VoiceWorkClient.kt`, as on iOS.
+ * An immutable value whose [transition] returns the next value and its effects. The quiet gate
+ * ([QuietGate]) lives in `VoiceQuietGate.kt`; the result limits and notice copy in
+ * `VoiceWorkClient.kt`.
  */
 data class ReplyWatch(
     val watched: List<Prompt> = emptyList(),
@@ -394,7 +393,7 @@ data class ReplyWatch(
 
     fun removeCompleted(promptIDs: Set<String>): ReplyWatch = copy(completed = completed.filterNot { it.promptID in promptIDs })
 
-    /** The next state and its effects (iOS `transition(_:)`; `step(_:)` is its mutating form). */
+    /** The next state and its effects. */
     fun transition(event: Event): Pair<ReplyWatch, List<Effect>> {
         val machine = Machine(this)
         val effects = machine.step(event)
@@ -407,7 +406,7 @@ data class ReplyWatch(
      */
     fun claimers(sessionID: String): Set<String> = Machine(this).claimers(sessionID)
 
-    /** The mutable working copy one transition runs on, mirroring the Swift `mutating` methods. */
+    /** The mutable working copy one transition runs on. */
     private class Machine(watch: ReplyWatch) {
         var watched = watch.watched.toMutableList()
         var completed = watch.completed.toMutableList()
@@ -918,10 +917,10 @@ data class ReplyWatch(
      * assistant's post-speech [quietWindow], and a brief pause after the latest
      * user transcript delta are always enforced and never counted toward [maxHold].
      *
-     * Declared here so it stays `ReplyWatch.QuietGate` (Kotlin can't nest a type
-     * from an extension); its policy (`delay`, `answerDelay`, `userSpeechHold`,
-     * `holdReason`) and `live` are in `VoiceQuietGate.kt`, as on iOS. A value:
-     * each `note…` returns the next gate. Instants are `Clock.now()` readings.
+     * Declared here so it stays `ReplyWatch.QuietGate` (Kotlin can't nest a type from an
+     * extension); its policy (`delay`, `answerDelay`, `userSpeechHold`, `holdReason`) and `live`
+     * are in `VoiceQuietGate.kt`. A value: each `note…` returns the next gate. Instants are
+     * `Clock.now()` readings.
      */
     data class QuietGate(
         val quietWindow: Duration = Duration.ZERO,

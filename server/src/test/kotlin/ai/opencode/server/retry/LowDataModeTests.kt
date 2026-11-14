@@ -7,11 +7,8 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * The `:server` half of iOS `LowDataModeTests.swift`: [NetworkPathMonitor.Snapshot]'s Data Saver
- * (`isConstrained`) and metered (`isExpensive`) flags and the large-prefetch rule. The preview and
- * image loaders are `:feature:media`'s. `constrainedNetworkRefusalIsNeverRetryableTransportFailure`
- * is dropped: it checks `URLError.networkUnavailableReason == .constrained` (iOS refuses
- * per-request with `allowsConstrainedNetworkAccess`); Android has no such refusal error, so
+ * `constrainedNetworkRefusalIsNeverRetryableTransportFailure` is dropped: it checks
+ * `URLError.networkUnavailableReason ==.constrained`; Android has no such refusal error, so
  * `TransportFailure` has nothing to classify.
  */
 class LowDataModeTests {

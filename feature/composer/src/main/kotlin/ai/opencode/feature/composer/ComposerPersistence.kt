@@ -15,11 +15,10 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Typed drafts, unsent outbox lanes and failed sends that outlive the process (iOS
- * `ComposerPersistence`), keyed by server persistence ID and session ID (null: the New Session
- * draft). Typing is debounced (500 ms) and written at once by [flush]. Entries untouched for 30
- * days, or of a deleted session or server, are removed with their blobs. Draft text is never
- * logged.
+ * Typed drafts, unsent outbox lanes and failed sends that outlive the process, keyed by server
+ * persistence ID and session ID (null: the New Session draft). Typing is debounced (500 ms) and
+ * written at once by [flush]. Entries untouched for 30 days, or of a deleted session or server, are
+ * removed with their blobs. Draft text is never logged.
  */
 class ComposerPersistence(
     val identity: String = "",
@@ -60,12 +59,11 @@ class ComposerPersistence(
     val removeAll: () -> Unit = {},
 ) {
     companion object Key : DependencyKey<ComposerPersistence> {
-        /** `filesDir/support` (iOS Application Support/OpenCode), where `TranscriptCachePersistence` also writes. */
+        /** `filesDir/support`, where `TranscriptCachePersistence` also writes. */
         fun defaultDirectory(): File = File(dependency(AppContext).applicationContext.filesDir, "support")
 
         override val liveValue: ComposerPersistence by lazy {
-            // iOS DEBUG lab switches, read as debug system properties (`VoiceLabEnvironment`):
-            // a lab server run keeps drafts in memory unless asked to persist them.
+            // A lab server run keeps drafts in memory unless asked to persist them.
             if (VoiceLabEnvironment.string("OPENCODE_LAB_SERVER_URL") != null && !VoiceLabEnvironment.flag("OPENCODE_LAB_PERSIST_COMPOSER")) {
                 return@lazy inMemory()
             }
@@ -111,7 +109,7 @@ class ComposerPersistence(
                 scheduleSessionState = writer::scheduleSessionState,
                 removeSession = writer::removeSession,
                 removeServer = writer::removeServer,
-                // iOS `await writer.flush()` runs off the main actor; the write never blocks the caller's thread.
+                // The write never blocks the caller's thread.
                 flush = { withContext(Dispatchers.IO) { writer.flush() } },
                 removeAll = writer::removeAll,
             )

@@ -67,8 +67,8 @@ private const val MAX_FRAME_BYTES = 16 * 1024 * 1024
  */
 internal fun subscribeEvents(server: OpenCodeServer): Flow<OpenCodeServerEvent> = flow {
     // The events sent and not yet taken by the collector. `callbackFlow` doesn't expose its
-    // buffer's fill level, which iOS reads from each `yield`'s result; the batcher sheds deltas
-    // for sessions off screen once half the buffer is waiting.
+    // buffer's fill level; the batcher sheds deltas for sessions off screen once half the buffer is
+    // waiting.
     val waiting = AtomicInteger(0)
     emitAll(eventSource(server, waiting).onEach { waiting.decrementAndGet() })
 }
@@ -341,7 +341,7 @@ internal class PoolResetWatch(private val link: ServerLinkClient) {
     }
 }
 
-/** The event stream's diagnostics marks (iOS `DiagnosticsRecorder.stream`): line counts and timings only. */
+/** The event stream's diagnostics marks: line counts and timings only. */
 private class StreamDiagnostics(private val operationID: String) {
     private val recorder = DiagnosticsRecorder.shared
     private val requestID = UUID.randomUUID().toString().uppercase()
@@ -379,7 +379,7 @@ private class StreamDiagnostics(private val operationID: String) {
 private fun streamTransportError(error: Exception): OpenCodeClientError =
     transportError(error, ai.opencode.server.retry.TransportFailure.of(error))
 
-/** The fields events carry; any type mismatch drops `data` for the frame, as iOS's `try?` does. */
+/** The fields events carry; any type mismatch drops `data` for the frame. */
 @Serializable
 internal data class EventPayload(
     val sessionID: String? = null,

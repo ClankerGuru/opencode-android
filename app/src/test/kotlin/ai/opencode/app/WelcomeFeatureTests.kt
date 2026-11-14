@@ -15,10 +15,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `WelcomeFeatureTests.swift`. Here the presenting view's `onClose` sends the
- * dismissal. The animated story's tests aren't ported yet.
- */
+/** Here the presenting view's `onClose` sends the dismissal. */
 class WelcomeFeatureTests {
     @get:Rule val isolation = TestIsolationRule()
 

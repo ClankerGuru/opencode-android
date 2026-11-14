@@ -17,13 +17,6 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
-/**
- * Port of iOS `OnePickerSettlingTests`. `cancelledPullDownSettlesThroughTheLatestCallbacks` drives
- * the Compose list's [OnePickerPullDown] (its nested-scroll pull) in place of the UIKit
- * coordinator. Not ported: `focusRestoreRefusedWhileTheSessionSheetLeavesWaitsForItsDismiss`
- * (UIKit refuses `becomeFirstResponder` while a sheet leaves; a Compose `FocusRequester` isn't
- * refused by a leaving sheet, so session has no `MessageFieldFocusHandback` to test).
- */
 class OnePickerSettlingTests {
     @get:Rule val isolation = TestIsolationRule()
 

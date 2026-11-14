@@ -19,9 +19,7 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-/** Helpers for the ports of `VoiceResultSpeechTests.swift` and its neighbours. */
-
-/** iOS `var watch = ReplyWatch(…)` with its `mutating step`: the Kotlin value returns copies. */
+/** The Kotlin value returns copies. */
 class Watch(var value: ReplyWatch = ReplyWatch(callPhase = ReplyWatch.CallPhase.live)) {
     fun step(event: ReplyWatch.Event): List<ReplyWatch.Effect> = value.transition(event).let { value = it.first; it.second }
     fun noteUserActed() { value = value.noteUserActed() }
@@ -33,11 +31,9 @@ class Watch(var value: ReplyWatch = ReplyWatch(callPhase = ReplyWatch.CallPhase.
     val pendingAnswers get() = value.pendingAnswers
 }
 
-/** iOS `_ = voice.replyWatch.step(event)`. */
 fun VoiceFeature.State.stepping(event: ReplyWatch.Event): VoiceFeature.State =
     copy(replyWatch = replyWatch.transition(event).first)
 
-/** iOS `_ = voice.tail.record(role, text, id:)`. */
 fun VoiceFeature.State.recording(role: VoiceTranscriptTail.Role, text: String, id: String? = null): VoiceFeature.State =
     copy(tail = tail.record(role, text, id).tail)
 
@@ -52,7 +48,6 @@ class SpeechTestShared {
         DependencyValues.withValues(DependencyValues.testing().update { this[SharedStore] = store }, block)
 }
 
-/** iOS `LockIsolated`. */
 class Locked<T>(initial: T) {
     @Volatile private var current: T = initial
     val value: T get() = synchronized(this) { current }
@@ -69,12 +64,12 @@ fun detachedScope(context: CoroutineContext): CoroutineScope = CoroutineScope(co
 
 fun CoroutineScope.skipInFlightEffects() = cancel()
 
-/** iOS `eventually(timeout:)`: polls until [condition] holds. */
+/** Polls until [condition] holds. */
 suspend fun eventually(timeout: Duration = 5.seconds, condition: () -> Boolean) {
     withTimeout(timeout) { while (!condition()) delay(10) }
 }
 
-/** [eventually], reducing what effects send while it waits (iOS reduces them as they arrive). */
+/** [eventually], reducing what effects send while it waits. */
 suspend fun <S, A> TestStore<S, A>.eventuallyReducing(timeout: Duration = 5.seconds, condition: () -> Boolean) {
     withTimeout(timeout) {
         while (true) {
@@ -102,5 +97,5 @@ val JsonObject.stringMap: Map<String, Any?>
 
 fun userText(id: String, text: String) = OpenCodeTranscriptItem.UserText(id = id, text = text)
 
-/** iOS `.assistantMarkdown(id:, blocks: OpenCodeMarkdownBlock.blocks(from:))`: Android keeps the trimmed Markdown. */
+/** Android keeps the trimmed Markdown. */
 fun assistantMarkdown(id: String, text: String) = OpenCodeTranscriptItem.AssistantMarkdown(id = id, text = text.trim())

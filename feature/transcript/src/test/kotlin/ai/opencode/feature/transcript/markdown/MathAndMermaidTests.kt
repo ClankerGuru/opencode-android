@@ -11,12 +11,9 @@ import org.junit.Rule
 import org.junit.Test
 
 /*
- * Port of iOS `OpenCodeTests/MathAndMermaidTests.swift`: inline and display math in the block
- * parser ([MathSyntax], [OpenCodeMarkdownBlock]) and Mermaid fences becoming diagram blocks.
+ * Inline and display math in the block parser ([MathSyntax], [OpenCodeMarkdownBlock]) and Mermaid
+ * fences becoming diagram blocks.
  *
- * Skipped (owner): `mermaidCacheKeys`, `onlyRejectedDiagramsAreCachedAsFailures`,
- * `mermaidDiagramTypes`, `mermaidCardFitsTheWidthAndHeightCap` → `:feature:media`
- * (`MermaidCacheKey`, `MermaidRenderer`, `MermaidSyntax`, `MermaidDiagramCard`).
  * Dropped: `mathSurvivesTheTranscriptCache`: a JSON round trip of parsed blocks; Android never
  * persists them (rows keep raw text and re-parse).
  */

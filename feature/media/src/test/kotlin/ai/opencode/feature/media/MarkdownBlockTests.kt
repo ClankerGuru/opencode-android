@@ -6,11 +6,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Port of iOS `MarkdownBlockTests.swift`'s [SyntaxHighlighter] tests; the rest of that file is
- * `:feature:transcript`'s. iOS reads the highlighted `AttributedString`'s runs with a foreground
- * colour; here those are the [AnnotatedString]'s span styles, in order.
- */
 class MarkdownBlockTests {
     private val palette = SyntaxHighlighter.Palette(
         keyword = Color.Red, string = Color.Green, number = Color.Blue, comment = Color.Gray, type = Color.Magenta,
@@ -43,7 +38,7 @@ class MarkdownBlockTests {
         assertTrue(coloredWords.contains("# note"))
     }
 
-    /** iOS `@Test(arguments:)`: each case in turn. */
+    /** Each case in turn. */
     @Test fun highlightingKeepsUnicodeAndPartialTokenBoundaries() {
         val cases = listOf(
             Triple("swift", "🧑🏽‍💻 let café = \"e\u0301 🐈\" // τέλος\nreturn café", listOf("let", "\"e\u0301 🐈\"", "// τέλος", "return")),

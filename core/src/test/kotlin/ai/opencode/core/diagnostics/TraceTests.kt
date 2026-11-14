@@ -17,14 +17,6 @@ import java.time.Instant
 import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
-/*
- * Ports of the `:core` suites in iOS `TraceTests.swift`: `DiagnosticsJournalTests`,
- * `InternalBuildTests`, `ProblemReportBundleTests`, `DiagnosticsPrivacyTests` (the recorder and
- * journal halves) and `CrashReportTests`. The rest of the file: `TraceUploadsTests` and the
- * screenshot/metrics privacy tests are `:devtools`' (`devtools/src/test/.../traces/TraceTests.kt`),
- * `VoiceTimelineTests` is `:feature:voice`'s, `TeamFeedbackTests` can't exist on Android.
- */
-
 private fun temporaryDirectory(): File = Files.createTempDirectory("reports-test-").toFile()
 
 private fun event(
@@ -34,7 +26,7 @@ private fun event(
     kind: DiagnosticsEvent.Kind = DiagnosticsEvent.Kind.Mark,
 ): DiagnosticsEvent = DiagnosticsEvent(id = UUID.randomUUID(), kind = kind, monotonicSeconds = at, wallDate = wall, name = name)
 
-/** iOS's `UserDefaults(suiteName:)`: the recorder's two switches in memory. */
+/** The recorder's two switches in memory. */
 private class MemorySettings : DiagnosticsSettings {
     val values = HashMap<String, Boolean>()
     override fun bool(key: String): Boolean? = values[key]
@@ -117,9 +109,8 @@ class DiagnosticsJournalTests {
 }
 
 /**
- * Android's `InternalBuild.detect` takes the installer package (Google Play = iOS's App Store
- * receipt): a sideloaded or Firebase App Distribution install (no Play installer) is internal,
- * as TestFlight's sandbox receipt is on iOS.
+ * Android's `InternalBuild.detect` takes the installer package: a sideloaded or Firebase App
+ * Distribution install (no Play installer) is internal.
  */
 class InternalBuildTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -161,7 +152,6 @@ class InternalBuildTests {
     }
 }
 
-/** Android's summary says “OpenCode Android” where iOS's says “OpenCode iOS”. */
 class ProblemReportBundleTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -247,10 +237,6 @@ class ProblemReportBundleTests {
     }
 }
 
-/**
- * `screenshotsOnlyInTheForegroundAndAwayFromCredentials` and `diagnosticsIndexesMetricsByRequest`
- * are `:devtools`' (`WindowSnapshot`, `Troubleshooting`).
- */
 class DiagnosticsPrivacyTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -305,7 +291,6 @@ class DiagnosticsPrivacyTests {
         assertTrue(export.contains("/auth/connect/<redacted>"))
     }
 
-    /** iOS's `didChange` notifications → the recorder's coalesced `changes` counter. */
     @Test
     fun changeNotificationsAreCoalesced() = runBlocking {
         val recorder = DiagnosticsRecorder(enabled = true)

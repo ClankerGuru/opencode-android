@@ -23,8 +23,8 @@ import kotlinx.coroutines.isActive
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.seconds
 
-// iOS `VoiceFeature+SessionDelegator.swift`: GPT-Live delegations steered into a real
-// OpenCode session (the `voiceSessionDelegator` experiment).
+// GPT-Live delegations steered into a real OpenCode session (the `voiceSessionDelegator`
+// experiment).
 
 private suspend fun isCancelled(): Boolean = !currentCoroutineContext().isActive
 
@@ -36,7 +36,7 @@ fun State.tracksSessionDelegatorTools(sessionID: String): Boolean =
 
 /**
  * The session this call's delegator steers, or will on its first turn, when it isn't the call's
- * own: the phone's client tools open a socket in its directory too (iOS `sessionDelegatorElsewhereID`).
+ * own: the phone's client tools open a socket in its directory too.
  */
 val State.sessionDelegatorElsewhereID: String?
     get() {
@@ -63,7 +63,7 @@ private fun State.withTurn(index: Int, change: (VoiceSessionDelegator.State.Turn
         delegator.copy(turns = delegator.turns.toMutableList().also { it[index] = change(it[index]) })
     }
 
-/** iOS `replyWatch.step(_:)`: the next state and the watch's effects. */
+/** The next state and the watch's effects. */
 private fun State.stepWatch(event: ReplyWatch.Event): Pair<State, List<ReplyWatch.Effect>> {
     val (watch, effects) = replyWatch.transition(event)
     return copy(replyWatch = watch) to effects

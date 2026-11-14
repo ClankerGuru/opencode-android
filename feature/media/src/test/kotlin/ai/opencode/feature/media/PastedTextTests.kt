@@ -5,11 +5,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * The `:feature:media` test of iOS `PastedTextTests.swift` › `PastedTextThresholdTests`
- * (`AgentTextDocument(plainText:)`, the viewer a large paste opens in); the rest of that suite is
- * `:server`'s `model/PastedTextTests.kt`.
- */
 class PastedTextThresholdTests {
     @get:Rule val isolation = TestIsolationRule()
 

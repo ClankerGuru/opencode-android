@@ -19,12 +19,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
 
-/**
- * iOS `PhotoLibraryAccessTests`: the photo library stays untouched until the photo sheet asks
- * for access. `livePhotoLibraryMakesNoManagerBeforeAFetch` and `lazyPhotoManagerIsMadeOnceOnFirstUse`
- * test iOS's lazily made `PHCachingImageManager` (`LazyPhotoManager`); the MediaStore client has
- * no manager to make, so they aren't ported.
- */
+/** The photo library stays untouched until the photo sheet asks for access. */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])

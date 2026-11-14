@@ -27,9 +27,8 @@ import org.junit.Test
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `OpenCodeTests/EventStreamPressureTests.swift`: a slow main thread under heavy delta
- * load across sessions. The stream sheds what's off screen instead of overflowing, and an overflow
- * after a quiet stretch reconnects at the shortest wait.
+ * A slow main thread under heavy delta load across sessions. The stream sheds what's off screen
+ * instead of overflowing, and an overflow after a quiet stretch reconnects at the shortest wait.
  */
 class EventStreamPressureTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -37,8 +36,8 @@ class EventStreamPressureTests {
     private val server = OpenCodeServer(url = "https://home.example", username = "", password = "")
 
     /**
-     * iOS `AsyncThrowingStream.makeStream(bufferingPolicy: .bufferingNewest(8))`: an eight-slot
-     * buffer nothing drains until the store subscribes, reporting the slots left on every send.
+     * An eight-slot buffer nothing drains until the store subscribes, reporting the slots left on
+     * every send.
      */
     private class EightSlots {
         val channel = Channel<OpenCodeServerEvent>(8)
@@ -201,8 +200,8 @@ class EventStreamPressureTests {
             it.copy(isEventStreamLive = true, isRecovering = false, recoveryFailures = 0)
         }
         // The 2 s advance also reaches the quiet grace. This TestStore reduces an effect's action
-        // when it's received (iOS's as soon as it's sent), so the grace has already fired; the
-        // reconnect settled recovery, so it changes nothing.
+        // when it's received, so the grace has already fired; the reconnect settled recovery, so it
+        // changes nothing.
         store.receive(HomeConnectionFeature.Action.ReconnectingGraceElapsed)
         // Kept up for the quiet stretch, then fell behind: a climbing backoff would wait at least
         // 2 s; a restarted one at most 1 s.

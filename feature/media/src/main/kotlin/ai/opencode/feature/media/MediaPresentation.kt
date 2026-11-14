@@ -109,8 +109,8 @@ import kotlin.math.roundToInt
 // MARK: - Sources
 
 /**
- * Which corners of a source are rounded (iOS `CACornerMask`): a collage tile rounds only the
- * collage's own. Absolute (not start/end), like the mask and the flight's window frame.
+ * Which corners of a source are rounded: a collage tile rounds only the collage's own. Absolute
+ * (not start/end), like the mask and the flight's window frame.
  */
 data class MediaCorners(
     val topLeft: Boolean = true,
@@ -149,14 +149,13 @@ data class MediaCorners(
 }
 
 /**
- * The views full-screen media zooms out of and back into (iOS `MediaZoomSources`). Thumbnails
- * register their layout coordinates by media ID; lists reuse items, so each source carries the
- * media it shows now and lookups check it. A UI registry like iOS's `MediaZoomSources.shared`
- * (not a business service), only touched on the main thread.
+ * The views full-screen media zooms out of and back into. Thumbnails register their layout
+ * coordinates by media ID; lists reuse items, so each source carries the media it shows now and
+ * lookups check it. A UI registry, only touched on the main thread.
  */
 @Stable
 class MediaZoomSources internal constructor() {
-    /** A registered view (iOS `MediaZoomSourceView`). */
+    /** A registered view. */
     class Source internal constructor() {
         /** The first is the media this view shows; the rest are pages it stands in for, like the collage's “+2” tile. */
         var mediaIDs: List<String> = emptyList()
@@ -215,7 +214,7 @@ class MediaZoomSources internal constructor() {
     }
 
     companion object {
-        /** The process's one registry (iOS `MediaZoomSources.shared`). */
+        /** The process's one registry. */
         val shared: MediaZoomSources = MediaZoomSources()
     }
 }
@@ -271,18 +270,16 @@ private class MediaZoomSourceNode(
 }
 
 /**
- * Marks a card or row that opens full-screen media, so the viewer zooms out of it and back
- * into it (iOS `.mediaZoomSource(id:cornerRadius:)`). Only its frame and shape are used; the
- * card itself stays visible.
+ * Marks a card or row that opens full-screen media, so the viewer zooms out of it and back into it.
+ * Only its frame and shape are used; the card itself stays visible.
  */
 fun Modifier.mediaZoomSource(id: String, cornerRadius: Dp = 0.dp): Modifier =
     this then MediaZoomSourceElement(listOf(id), cornerRadius, MediaCorners.All)
 
 /**
- * An image the full-screen viewer zooms out of and back into (iOS `MediaThumbnail`), so the
- * flight can start and land on exactly its frame and shape. It leaves the transcript (alpha 0)
- * while its media is up full screen. Decorative: the button around it carries the label and
- * takes the taps.
+ * An image the full-screen viewer zooms out of and back into, so the flight can start and land on
+ * exactly its frame and shape. It leaves the transcript (alpha 0) while its media is up full
+ * screen. Decorative: the button around it carries the label and takes the taps.
  *
  * @param ids the media this shows, then any pages it stands in for.
  * @param fits fill crops to the frame; fit sizes itself to the image, at most [maxHeight] tall.
@@ -317,9 +314,12 @@ fun MediaThumbnail(
     )
 }
 
-/** iOS `sizeThatFits`: fill takes the proposal (the image's size where unspecified); fit fits the image, at most [maxHeight] tall. */
+/**
+ * Fill takes the proposal (the image's size where unspecified); fit fits the image, at most
+ * [maxHeight] tall.
+ */
 private fun Modifier.thumbnailSize(image: Bitmap, fits: Boolean, maxHeight: Dp): Modifier = layout { measurable, constraints ->
-    // iOS sizes decoded originals at scale 1: pixels as points.
+    // Pixels as points.
     val imageSize = Size(image.width.dp.toPx(), image.height.dp.toPx())
     val width = if (constraints.hasBoundedWidth) constraints.maxWidth.toFloat() else imageSize.width
     val proposedHeight = if (constraints.hasBoundedHeight) constraints.maxHeight.toFloat() else Float.POSITIVE_INFINITY
@@ -330,7 +330,7 @@ private fun Modifier.thumbnailSize(image: Bitmap, fits: Boolean, maxHeight: Dp):
         Size(width, if (proposedHeight.isInfinite()) imageSize.height else proposedHeight)
     }
     // The image keeps its own frame (its clip, and where flights start and land) even when the
-    // caller insists on a larger one (`fillMaxWidth`): centred in it, as a SwiftUI frame does.
+    // caller insists on a larger one (`fillMaxWidth`): centred in it.
     val w = size.width.roundToInt().coerceIn(0, constraints.maxWidth)
     val h = size.height.roundToInt().coerceIn(0, constraints.maxHeight)
     val placeable = measurable.measure(androidx.compose.ui.unit.Constraints.fixed(w, h))
@@ -342,8 +342,8 @@ private fun Modifier.thumbnailSize(image: Bitmap, fits: Boolean, maxHeight: Dp):
 // MARK: - Viewer
 
 /**
- * What the presentation needs from the full-screen content, and what the content needs from
- * the presentation (iOS `MediaViewerState`). Content reads it from [LocalMediaViewer].
+ * What the presentation needs from the full-screen content, and what the content needs from the
+ * presentation. Content reads it from [LocalMediaViewer].
  */
 @Stable
 class MediaViewerState(sourceID: String?) {
@@ -406,13 +406,12 @@ class MediaViewerState(sourceID: String?) {
     }
 }
 
-/** iOS `EnvironmentValues.mediaViewer`. */
 val LocalMediaViewer = staticCompositionLocalOf<MediaViewerState?> { null }
 
 /**
- * A badge on a thumbnail's corner (a composer photo's ×, a video's duration). It rides the
- * flight pinned to that corner at its own size (the bitmap's pixels), fading out as the image
- * flies in and back in as it flies home (iOS `MediaFlightAccessory`).
+ * A badge on a thumbnail's corner (a composer photo's ×, a video's duration). It rides the flight
+ * pinned to that corner at its own size (the bitmap's pixels), fading out as the image flies in and
+ * back in as it flies home.
  */
 class MediaFlightAccessory(
     val image: Bitmap,
@@ -424,13 +423,12 @@ class MediaFlightAccessory(
 }
 
 /**
- * Full-screen media and files (iOS `MediaPresenter`). Media opens the Photos way: it flies out
- * of what was tapped, follows a drag down while shrinking, rounding toward the thumbnail's
- * corners and letting the session show through, and flies back on release (or springs back
- * from a short drag). Documents zoom out of their source, and a swipe down (from anywhere a
- * scroll view doesn't take it) shrinks them toward it and zooms them home, as the system zoom's
- * does. Under Reduce Motion both cross-fade, and a drag down fades them out. One viewer at a
- * time.
+ * Full-screen media and files. Media opens the Photos way: it flies out of what was tapped, follows
+ * a drag down while shrinking, rounding toward the thumbnail's corners and letting the session show
+ * through, and flies back on release (or springs back from a short drag). Documents zoom out of
+ * their source, and a swipe down (from anywhere a scroll view doesn't take it) shrinks them toward
+ * it and zooms them home, as the system zoom's does. Under Reduce Motion both cross-fade, and a
+ * drag down fades them out. One viewer at a time.
  *
  * [MediaView] owns the presenter and provides it as [LocalMediaPresenter] to the content it
  * hosts; the transcript image viewer goes through the store ([presentImage]).
@@ -481,17 +479,14 @@ class MediaPresenter internal constructor() {
         return true
     }
 
-    /** iOS `SessionView.presentImage`: the transcript image viewer, through [MediaFeature]. */
+    /** The transcript image viewer, through [MediaFeature]. */
     fun presentImage(preview: TranscriptImagePreview) {
         if (presentation != null) return
         sendImage(preview)
     }
 
     companion object {
-        /**
-         * Media plays in a dark room; documents and text viewers follow the app's appearance
-         * (iOS `interfaceStyle(isMedia:)`; the DEBUG lab override is iOS-only).
-         */
+        /** Media plays in a dark room; documents and text viewers follow the app's appearance. */
         fun isDarkRoom(isMedia: Boolean): Boolean = isMedia
     }
 }
@@ -500,9 +495,8 @@ class MediaPresenter internal constructor() {
 val LocalMediaPresenter = staticCompositionLocalOf<MediaPresenter?> { null }
 
 /**
- * The Photos drag (iOS `MediaDismissDrag`): how media shrinks, rounds, and lets the session
- * show through as it's pulled down, and when letting go puts it away. Distances in one unit;
- * [dismisses] takes dp and dp/s (iOS points).
+ * The Photos drag: how media shrinks, rounds, and lets the session show through as it's pulled
+ * down, and when letting go puts it away. Distances in one unit; [dismisses] takes dp and dp/s.
  */
 data class MediaDismissDrag(val screenHeight: Float) {
     /** How far down the media is at its smallest and the session fully shows. */
@@ -543,10 +537,9 @@ internal object MediaBackPreview {
 }
 
 /**
- * The viewer's motion roles (iOS `MediaViewerController` on `Motion`): fly in, content open and
- * the zoom dismissal on surface; a short drag back to the photo on panel open (its slight bounce
- * keeps Photos' cushion); home to the thumbnail on flight; nowhere to land, carried on and faded
- * on panel close; the backdrop's fade in on dim.
+ * The viewer's motion roles: fly in, content open and the zoom dismissal on surface; a short drag
+ * back to the photo on panel open (its slight bounce keeps Photos' cushion); home to the thumbnail
+ * on flight; nowhere to land, carried on and faded on panel close; the backdrop's fade in on dim.
  */
 internal object MediaMotion {
     val open = MotionRole.Surface
@@ -558,7 +551,7 @@ internal object MediaMotion {
     const val fade = 0.2
 }
 
-/** The content's transform about the host's centre (iOS `host.view.transform`). */
+/** The content's transform about the host's centre. */
 internal data class HostTransform(val scale: Float = 1f, val tx: Float = 0f, val ty: Float = 0f) {
     companion object {
         val Identity = HostTransform()
@@ -582,9 +575,8 @@ internal class FlightAccessories(val badges: List<MediaFlightAccessory>, frame: 
 }
 
 /**
- * Drives one presentation (iOS `MediaViewerController`): the flight, the backdrop, the
- * content's transform, the dismiss drag and the status bar. A plain object owning per-frame
- * motion; the host composable draws its state.
+ * Drives one presentation: the flight, the backdrop, the content's transform, the dismiss drag and
+ * the status bar. A plain object owning per-frame motion; the host composable draws its state.
  */
 @Stable
 internal class MediaViewerController(
@@ -666,7 +658,7 @@ internal class MediaViewerController(
         }
     }
 
-    /** Whether the status bar is hidden (iOS `prefersStatusBarHidden`). */
+    /** Whether the status bar is hidden. */
     val statusBarHidden: Boolean
         get() {
             if (isLeaving || !state.statusBarHidden) return false
@@ -678,7 +670,7 @@ internal class MediaViewerController(
         if (statusBarLight != light) statusBarLight = light
     }
 
-    /** iOS `viewDidAppear`: the presentation runs once the content has laid out. */
+    /** The presentation runs once the content has laid out. */
     fun open() {
         if (hasOpened) return
         hasOpened = true
@@ -832,11 +824,11 @@ internal class MediaViewerController(
     // MARK: Drag
 
     /**
-     * iOS `gestureRecognizerShouldBegin`: down and steeper than sideways; never on a zoomed image.
-     * Media claims the drag before its content ([fromContent] false: pages turn only once a drag
-     * has shown it isn't a dismissal). Documents (the system zoom's swipe down, or the fade) take
-     * only a drag their content left alone ([fromContent] true): a scroll view scrolled away from
-     * its top keeps it, and one at its top hands it over through [documentDismissConnection].
+     * Down and steeper than sideways; never on a zoomed image. Media claims the drag before its
+     * content ([fromContent] false: pages turn only once a drag has shown it isn't a dismissal).
+     * Documents (the system zoom's swipe down, or the fade) take only a drag their content left
+     * alone ([fromContent] true): a scroll view scrolled away from its top keeps it, and one at its
+     * top hands it over through [documentDismissConnection].
      */
     fun shouldBegin(translation: Offset, fromContent: Boolean): Boolean {
         if (isLeaving) return false
@@ -1252,11 +1244,10 @@ internal class MediaViewerController(
     }
 
     /**
-     * Documents (zoom or fade): a drag down their scroll view can't take. iOS begins the
-     * dismissal only when the scroll view under the finger is at its top as the drag starts
-     * (`gestureRecognizerShouldBegin`); here a scroll view at its top hands over the downward
-     * delta it can't use. A drag that already scrolled keeps scrolling. Once dismissing, the
-     * scroll view gets nothing (the finger drives the page) and the fling is the release.
+     * Documents (zoom or fade): a drag down their scroll view can't take. A scroll view at its top
+     * hands over the downward delta it can't use. A drag that already scrolled keeps scrolling.
+     * Once dismissing, the scroll view gets nothing (the finger drives the page) and the fling is
+     * the release.
      */
     val documentDismissConnection: NestedScrollConnection = object : NestedScrollConnection {
         private var dragging = false
@@ -1313,9 +1304,8 @@ internal class MediaViewerController(
     }
 
     /**
-     * iOS `MediaViewerController.touchRecovery` inspect: a dismissal whose surface has already
-     * faded out (the backdrop, or the page for documents and Reduce Motion) but never finished
-     * still covers the session and takes its touches.
+     * A dismissal whose surface has already faded out (the backdrop, or the page for documents and
+     * Reduce Motion) but never finished still covers the session and takes its touches.
      */
     fun strandedExitFault(): TouchRecovery.Fault? {
         if (!isLeaving || finished) return null
@@ -1328,14 +1318,13 @@ internal class MediaViewerController(
         return TouchRecovery.Fault(TouchRecovery.Reason.Closed, this)
     }
 
-    /** iOS `touchRecovery` release: drops the flight and leaves at once. */
+    /** Drops the flight and leaves at once. */
     fun recoverStrandedExit() {
         flightGeneration += 1
         flightJob?.cancel()
         finish()
     }
 
-    /** iOS `viewDidDisappear`. */
     fun disposed() {
         flightJob?.cancel()
         backdropJob?.cancel()
@@ -1354,7 +1343,7 @@ internal class MediaViewerController(
 
     // MARK: Animation
 
-    /** iOS `role.animate(phase, reduceMotion:velocity:)`: one curve of progress 0 → 1 for every property. */
+    /** One curve of progress 0 → 1 for every property. */
     private suspend fun spring(role: MotionRole, velocity: Float = 0f, phase: MotionPhase = MotionPhase.Enter, update: (Float) -> Unit) {
         val spec = role.animation(phase, reducesMotion, visibilityThreshold = 0.0005f)
         animate(0f, 1f, initialVelocity = role.initialVelocity(velocity, reducesMotion), animationSpec = spec) { value, _ -> update(value) }
@@ -1378,10 +1367,9 @@ internal class MediaViewerController(
 }
 
 /**
- * The presented viewer (iOS `MediaViewerController`'s view): a black backdrop (hidden for
- * documents), the flight, and the content with its chrome above it, over the whole window. It takes
- * every touch while up, hides the content below from TalkBack (the host does), dismisses on
- * back, and runs the dark room's status bar.
+ * The presented viewer: a black backdrop (hidden for documents), the flight, and the content with
+ * its chrome above it, over the whole window. It takes every touch while up, hides the content
+ * below from TalkBack (the host does), dismisses on back, and runs the dark room's status bar.
  */
 @Composable
 internal fun MediaViewerHost(
@@ -1541,7 +1529,7 @@ private fun DrawScope.drawFlight(flight: Flight, bitmap: ImageBitmap) {
         withTransform({ scale(flight.scale, flight.scale, pivot = frame.center) }) {
             val path = Path().apply { addRoundRect(flight.corners.roundRect(frame, flight.radius)) }
             clipPath(path) {
-                // Aspect fill (iOS `.scaleAspectFill`).
+                // Aspect fill.
                 val imageW = bitmap.width.toFloat()
                 val imageH = bitmap.height.toFloat()
                 val scale = max(frame.width / imageW, frame.height / imageH)
@@ -1563,13 +1551,12 @@ private fun DrawScope.drawFlight(flight: Flight, bitmap: ImageBitmap) {
 }
 
 /**
- * The dismiss pan (iOS `dismissPan`, one finger). For media ([fromContent] false) it looks at
- * every touch before the content (the initial pass), and claims a drag heading down more than
- * sideways once it passes the touch slop, unless the image is zoomed. Claimed drags are
- * consumed, so the pager and the zoom never see them: pages turn only once a drag has shown it
- * isn't a dismissal. For documents ([fromContent] true) it looks after the content (the main
- * pass) and claims only a drag nothing in it took: a scroll view (scrolled or not) consumes
- * its drags, and one at its top hands its overscroll over through
+ * The dismiss pan. For media ([fromContent] false) it looks at every touch before the content (the
+ * initial pass), and claims a drag heading down more than sideways once it passes the touch slop,
+ * unless the image is zoomed. Claimed drags are consumed, so the pager and the zoom never see them:
+ * pages turn only once a drag has shown it isn't a dismissal. For documents ([fromContent] true) it
+ * looks after the content (the main pass) and claims only a drag nothing in it took: a scroll view
+ * (scrolled or not) consumes its drags, and one at its top hands its overscroll over through
  * [MediaViewerController.documentDismissConnection].
  */
 private suspend fun PointerInputScope.dismissDrag(controller: MediaViewerController, slop: Float, fromContent: Boolean) {
@@ -1631,10 +1618,10 @@ private suspend fun PointerInputScope.trackPointer(controller: MediaViewerContro
 }
 
 /**
- * The dark room's status bar (iOS `preferredStatusBarStyle` / `prefersStatusBarHidden`): light
- * icons over the black backdrop, the session's own once it shows through, hidden while the
- * photo viewer's controls are hidden. When the viewer goes the bar follows the app's current
- * appearance (as [ai.opencode.core.ui.OpenCodeAppTheme] sets it), not the one it opened over.
+ * The dark room's status bar: light icons over the black backdrop, the session's own once it shows
+ * through, hidden while the photo viewer's controls are hidden. When the viewer goes the bar
+ * follows the app's current appearance (as [ai.opencode.core.ui.OpenCodeAppTheme] sets it), not the
+ * one it opened over.
  */
 @Composable
 private fun StatusBarEffect(controller: MediaViewerController) {
@@ -1658,8 +1645,8 @@ private fun StatusBarEffect(controller: MediaViewerController) {
 }
 
 /**
- * Back dismisses the viewer (iOS's accessibility escape). The platform's back dispatcher at
- * overlay priority, so it wins over the app's own handlers while the viewer is up.
+ * Back dismisses the viewer. The platform's back dispatcher at overlay priority, so it wins over
+ * the app's own handlers while the viewer is up.
  */
 @Composable
 internal fun MediaBackHandler(enabled: Boolean, onBack: () -> Unit) {

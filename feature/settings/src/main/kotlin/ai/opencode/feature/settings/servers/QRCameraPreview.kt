@@ -44,9 +44,8 @@ import java.util.concurrent.Executors
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
- * The back camera's live picture, reading QR codes from it: the Android counterpart of the
- * `AVCaptureSession` + QR metadata output both iOS scanners build (`PairingScannerView`'s
- * `ScannerController`, `OnboardingCameraPreview`). Bind it only once camera access is granted.
+ * The back camera's live picture, reading QR codes from it. Bind it only once camera access is
+ * granted.
  *
  * @param isRunning the session runs only while true (and while the screen is started).
  * @param once report one code per appearance (the pairing scanner: a QR in frame fires repeatedly);

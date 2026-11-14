@@ -52,8 +52,7 @@ import kotlin.coroutines.resume
 
 /**
  * The in-app browser's web views, for reducers: read the open page at send, navigate, open a link
- * outside the app, and discard a page's web content. Port of iOS `PageReaderClient`
- * (`\.pageReader`).
+ * outside the app, and discard a page's web content.
  */
 class PageReaderClient(
     /**
@@ -67,7 +66,7 @@ class PageReaderClient(
     val scrollToTop: suspend (UUID) -> Unit,
     /**
      * Opens a link in whatever claims it, from the window with this scene ID (or the one in use),
-     * so the app it opens appears beside that window (iOS `ActiveScene.open(_:sceneID:)`).
+     * so the app it opens appears beside that window.
      */
     val openExternal: suspend (url: String, sceneID: String?) -> Unit,
     /** Forgets the page entirely. */
@@ -101,14 +100,13 @@ class PageReaderClient(
  *
  * Privacy: every page shares one WebView profile (`opencode-browser`, when the WebView supports
  * profiles) whose cookies, storage and cache are cleared the first time a page opens in each run,
- * so cookies and logins last until the app quits and never mix with other web content: pages
- * open signed out and what the agent can read is public by default. (iOS's store never reaches
- * disk; Android WebView has no in-memory profile, so clearing at first use stands in for it.)
- * Only public `http(s)` pages load ([BrowserLinkPolicy]), in the page and in its frames; other
- * links go to the system. Media waits for a tap. Port of iOS `BrowserWebViews`.
+ * so cookies and logins last until the app quits and never mix with other web content: pages open
+ * signed out and what the agent can read is public by default. Only public `http(s)` pages load
+ * ([BrowserLinkPolicy]), in the page and in its frames; other links go to the system. Media waits
+ * for a tap.
  *
- * iOS runs the page reader in its own `WKContentWorld`; Android's WebView has no content worlds,
- * so the reader runs in the page's world, wrapped in a function that leaves no globals behind.
+ * Android's WebView has no content worlds, so the page reader runs in the page's world, wrapped in
+ * a function that leaves no globals behind.
  */
 class BrowserWebViews private constructor() {
     class Entry(var url: String, val id: UUID) {
@@ -126,13 +124,13 @@ class BrowserWebViews private constructor() {
         val context = MutableContextWrapper(dependency(AppContext))
         /** The app's appearance, which the page reads as `prefers-color-scheme` (see [BrowserThemeContext]). */
         val themed = BrowserThemeContext(context)
-        /** The back button above and the bar below, in dp (iOS `obscuredContentInsets`). */
+        /** The back button above and the bar below, in dp. */
         var insets = BrowserInsets()
         /** The insets' document-start script, replaced when they change. */
         var insetsScript: ScriptHandler? = null
         /** The width the insets were last given for, in dp (desktop pages scale them by it). */
         var insetsWidth = 0f
-        /** A video playing full screen (iOS's media presentation), and how to end it. */
+        /** A video playing full screen, and how to end it. */
         var fullscreen: View? = null
         var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
     }
@@ -141,8 +139,8 @@ class BrowserWebViews private constructor() {
     private var clearedThisRun = false
 
     /**
-     * The page's web view, made on first use. [isDark] is the app's appearance (iOS: a web view
-     * follows its window's interface style); later changes come through [setAppearance].
+     * The page's web view, made on first use. [isDark] is the app's appearance; later changes come
+     * through [setAppearance].
      */
     fun webView(id: UUID, url: String, isDark: Boolean = false): WebView {
         val entry = entries.getOrPut(id) { Entry(url, id) }
@@ -175,8 +173,8 @@ class BrowserWebViews private constructor() {
     }
 
     /**
-     * The back button above and the bar below (iOS `obscuredContentInsets`): the page draws edge
-     * to edge and scrolls under them, and its first and last pixels still scroll clear of them.
+     * The back button above and the bar below: the page draws edge to edge and scrolls under them,
+     * and its first and last pixels still scroll clear of them.
      */
     fun setObscuredInsets(id: UUID, insets: BrowserInsets) {
         val entry = entries[id] ?: return
@@ -251,7 +249,7 @@ class BrowserWebViews private constructor() {
 
     // Back swipe: the session stack's back gesture, while the page has history (`canGoBack`),
     // drives these; from the first page the stack pops instead, so there's only ever one back
-    // gesture (iOS `BrowserPageContainer`).
+    // gesture.
 
     /** The page follows the back gesture, [fraction] of its width. */
     fun backProgress(id: UUID, fraction: Float) {
@@ -318,9 +316,8 @@ class BrowserWebViews private constructor() {
 
     /**
      * What holding [url] in a page offers. A pairing link (valid or malformed) gets a static,
-     * non-fetching card and only Copy and Share (or nothing); other links get the reply links'
-     * menu without Open in App Browser (they're already in it). iOS shows WebKit's own menu for
-     * those; Android's WebView has none.
+     * non-fetching card and only Copy and Share (or nothing); other links get the reply links' menu
+     * without Open in App Browser (they're already in it). Android's WebView has none.
      */
     fun linkMenuActions(url: String): List<LinkMenuAction> {
         val noExperiments = ExperimentalFeatures { false }
@@ -358,7 +355,7 @@ class BrowserWebViews private constructor() {
             loadWithOverviewMode = true
             cacheMode = WebSettings.LOAD_DEFAULT
         }
-        // iOS shows a page in dark only when the page itself supports it (no algorithmic darkening).
+        // Shows a page in dark only when the page itself supports it (no algorithmic darkening).
         if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
             WebSettingsCompat.setAlgorithmicDarkeningAllowed(webView.settings, false)
         }
@@ -589,7 +586,7 @@ class BrowserWebViews private constructor() {
             return true
         }
 
-        /** A video going full screen (WebKit presents its own player): over the whole window. */
+        /** A video going full screen: over the whole window. */
         override fun onShowCustomView(view: View, callback: CustomViewCallback) {
             val activity = activityOf(entry.context.baseContext)
             if (activity == null || entry.fullscreen != null) {
@@ -612,7 +609,7 @@ class BrowserWebViews private constructor() {
         override fun onHideCustomView() = exitFullscreen(entry)
     }
 
-    /** Ends a full-screen video (iOS `closeAllMediaPresentations`). */
+    /** Ends a full-screen video. */
     private fun exitFullscreen(entry: Entry) {
         val view = entry.fullscreen ?: return
         val callback = entry.fullscreenCallback
@@ -669,11 +666,10 @@ class BrowserWebViews private constructor() {
     }
 
     companion object {
-        /** Process-wide, like iOS's `.shared`; reducers reach it only through [PageReaderClient]. */
+        /** Process-wide; reducers reach it only through [PageReaderClient]. */
         val shared: BrowserWebViews by lazy { BrowserWebViews() }
 
         private const val PROFILE_NAME = "opencode-browser"
-        /** iOS `SessionPageStack.parallax` (`SettingsPresentation.parallax`). */
         private const val PARALLAX = 0.3f
 
         private val isDebuggable: Boolean
@@ -771,13 +767,12 @@ class BrowserWebViews private constructor() {
 
 /**
  * The page's obscured insets in dp: the back button's row above, the bar (and Ask, and the
- * keyboard) below, and the side safe areas (iOS `UIEdgeInsets` for `obscuredContentInsets`).
+ * keyboard) below, and the side safe areas.
  */
 data class BrowserInsets(val top: Float = 0f, val left: Float = 0f, val bottom: Float = 0f, val right: Float = 0f) {
     companion object {
         /**
-         * iOS `BrowserWebViewHost.obscuredInsets`: never negative (mid-rotation or mid-drawer-slide
-         * the safe area can briefly report one).
+         * Never negative (mid-rotation or mid-drawer-slide the safe area can briefly report one).
          */
         fun obscured(insets: BrowserInsets) = BrowserInsets(
             top = maxOf(0f, insets.top),

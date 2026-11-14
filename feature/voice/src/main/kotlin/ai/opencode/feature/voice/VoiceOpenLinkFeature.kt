@@ -26,11 +26,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Port of iOS `VoiceOpenLinkFeature`: an agent asking, during a call, to open a link on the
- * phone (`android_voice_open_url`, Open Links from Calls). The person answers on a card above
- * the composer: Open hands the link to the system, which opens a verified app link in its app
- * when it's installed (else the browser) and an app's own scheme in its app; Not Now, a minute's
- * silence or the call ending return a refusal. Nothing opens without a tap.
+ * An agent asking, during a call, to open a link on the phone (`android_voice_open_url`, Open Links
+ * from Calls). The person answers on a card above the composer: Open hands the link to the system,
+ * which opens a verified app link in its app when it's installed (else the browser) and an app's
+ * own scheme in its app; Not Now, a minute's silence or the call ending return a refusal. Nothing
+ * opens without a tap.
  */
 class VoiceOpenLinkFeature : Reducer<VoiceOpenLinkFeature.State, VoiceOpenLinkFeature.Action> {
     data class State(
@@ -69,10 +69,9 @@ class VoiceOpenLinkFeature : Reducer<VoiceOpenLinkFeature.State, VoiceOpenLinkFe
         fun scheme(scheme: String): String = "Only https links and app links can be opened, not $scheme: links."
     }
 
-    /** Why a link can't be opened (iOS `Failure`). */
+    /** Why a link can't be opened. */
     data class Failure(val message: String)
 
-    /** iOS `Result<URL, Failure>`. */
     sealed interface Link {
         data class Valid(val url: URI) : Link
         data class Invalid(val failure: Failure) : Link
@@ -228,8 +227,8 @@ class VoiceOpenLinkFeature : Reducer<VoiceOpenLinkFeature.State, VoiceOpenLinkFe
 }
 
 /**
- * iOS's `\.openURL` for a call's link: hands it to the system (`ACTION_VIEW`), which opens a
- * verified app link in its app, else the browser. False when nothing on the phone opens it.
+ * Hands it to the system (`ACTION_VIEW`), which opens a verified app link in its app, else the
+ * browser. False when nothing on the phone opens it.
  */
 class VoiceOpenURLClient(val open: suspend (String) -> Boolean) {
     companion object Key : DependencyKey<VoiceOpenURLClient> {

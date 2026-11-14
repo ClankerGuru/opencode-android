@@ -27,8 +27,8 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-// The app's one retry policy for talking to the OpenCode server. Rationale,
-// parameters, and the audit of every call site: iOS docs/network-resilience.md.
+// The app's one retry policy for talking to the OpenCode server. Rationale, parameters, and the
+// audit of every call site.
 
 /** Whether a request can be sent twice without a second effect. */
 enum class RequestIdempotency {
@@ -64,7 +64,7 @@ enum class TransportFailure(val rawValue: String) {
     companion object {
         private val CLEARTEXT_REFUSAL = Regex("CLEARTEXT communication to (\\S+) not permitted")
 
-        /** iOS's `URLError` code table. Nil for cancellation and failures sending again won't change. */
+        /** Nil for cancellation and failures sending again won't change. */
         fun ofUrlErrorCode(code: Int): TransportFailure? = when (code) {
             UrlErrorCode.NOT_CONNECTED_TO_INTERNET, UrlErrorCode.CANNOT_FIND_HOST, UrlErrorCode.CANNOT_CONNECT_TO_HOST,
             UrlErrorCode.DNS_LOOKUP_FAILED, UrlErrorCode.INTERNATIONAL_ROAMING_OFF, UrlErrorCode.DATA_NOT_ALLOWED,
@@ -78,12 +78,12 @@ enum class TransportFailure(val rawValue: String) {
 
         /**
          * The JVM/OkHttp exception, classified through its `URLError` equivalent: refused,
-         * unresolvable and unroutable connections were never sent; resets, aborts, broken
-         * pipes and truncated responses (the POSIX errors iOS also maps) were interrupted.
+         * unresolvable and unroutable connections were never sent; resets, aborts, broken pipes and
+         * truncated responses were interrupted.
          */
         fun of(error: Throwable): TransportFailure? {
             if (error is CancellationException) return null
-            // iOS reads only the listed POSIX codes; EACCES (no permission to open a socket) is none of them.
+            // EACCES (no permission to open a socket) is none of them.
             if (error is SocketException && error.message?.contains("EACCES") == true) return null
             return UrlErrorCode.fromThrowable(error)?.let(::ofUrlErrorCode)
         }
@@ -497,7 +497,7 @@ object NetworkRetry {
     }
 }
 
-/** Runs [block] with every `OpenCodeClient` request in it on [policy] (iOS `NetworkRetry.$policy.withValue`). */
+/** Runs [block] with every `OpenCodeClient` request in it on [policy]. */
 suspend fun <R> withRetryPolicy(policy: RetryPolicy?, block: suspend () -> R): R = NetworkRetry.policy.withValue(policy, block)
 
 /**
@@ -547,8 +547,7 @@ class RetryBudget(val total: Duration, private val clock: Clock = dependency(Clo
         suspend fun start(total: Duration): RetryBudget = RetryBudget(total, NetworkRetry.resolvedClock())
 
         /**
-         * The work's result, or null if it takes longer than [limit] (wall time, as iOS: never a
-         * retry loop's scripted `NetworkRetry.clock`); the work is cancelled then.
+         * The work's result, or null if it takes longer than [limit]; the work is cancelled then.
          */
         suspend fun <T> bounded(limit: Duration, clock: Clock? = null, work: suspend () -> T?): T? {
             val resolved = clock ?: Clock.liveValue

@@ -87,10 +87,10 @@ data class FloatingCallStageContentLayout(
 )
 
 /**
- * What the card and the full sheet show, laid out at the size it's given (iOS
- * `FloatingCallStageContent`): the session and duration above the bloom, the call's details (full
- * sheet only) and status below it, the live transcript, and the controls. The shape's surface and
- * dot field are drawn by the floating call's surface. Sizes in dp.
+ * What the card and the full sheet show, laid out at the size it's given: the session and duration
+ * above the bloom, the call's details (full sheet only) and status below it, the live transcript,
+ * and the controls. The shape's surface and dot field are drawn by the floating call's surface.
+ * Sizes in dp.
  *
  * [layout] is read while measuring and drawing, not composing: a drag between the card and the
  * sheet moves and resizes it every frame without recomposing anything inside it.
@@ -257,10 +257,9 @@ private fun smooth(low: Float, high: Float, value: Float): Float {
 private fun transcriptNow(): Double = System.nanoTime() / 1e9
 
 /**
- * The call so far, you and the agent, newest at the bottom (iOS `FloatingCallTranscript`): the
- * column is anchored to the bottom and older lines rise out under a fade. The agent's words
- * arrive one by one as they stream ([CaptionWordRenderer]). It never scrolls, so a vertical drag
- * anywhere moves the sheet.
+ * The call so far, you and the agent, newest at the bottom: the column is anchored to the bottom
+ * and older lines rise out under a fade. The agent's words arrive one by one as they stream
+ * ([CaptionWordRenderer]). It never scrolls, so a vertical drag anywhere moves the sheet.
  */
 @Composable
 fun FloatingCallTranscript(store: VoiceStoreOf, modifier: Modifier = Modifier) {
@@ -436,7 +435,7 @@ private fun FloatingCallCaptionLine(line: CaptionReveal.Line, now: () -> Double,
     )
 }
 
-/** Words wrapped greedily, one view each (iOS `CaptionWordFlow`): a word never moves once placed. */
+/** Words wrapped greedily, one view each: a word never moves once placed. */
 private fun floatingCallWordFlow(spaceWidth: Int) = MeasurePolicy { measurables, constraints ->
     val width = constraints.maxWidth
     var x = 0

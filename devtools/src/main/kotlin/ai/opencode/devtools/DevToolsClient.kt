@@ -148,10 +148,7 @@ class DevToolsClient(
     }
 }
 
-/**
- * iOS `DiagnosticsClient.developerModeChanged(true)`: uploads every saved voice call log. `:app`
- * installs the live value; the default does nothing.
- */
+/** Uploads every saved voice call log. `:app` installs the live value; the default does nothing. */
 class SavedVoiceLogUploads(
     /** Starts the uploads and returns at once; they outlive the screen that asked. */
     val uploadAll: () -> Unit = {},

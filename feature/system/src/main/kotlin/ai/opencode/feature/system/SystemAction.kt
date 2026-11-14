@@ -12,9 +12,9 @@ import java.net.URLDecoder
 import java.util.UUID
 
 /**
- * Port of iOS `SystemAction`: where app shortcuts, Quick Settings tiles, widgets, launcher
- * quick actions, the share sheet's notifications and `opencode://` links take you. Every
- * surface makes one of these, and `AppFeature` routes it like a tapped notification.
+ * Where app shortcuts, Quick Settings tiles, widgets, launcher quick actions, the share sheet's
+ * notifications and `opencode://` links take you. Every surface makes one of these, and
+ * `AppFeature` routes it like a tapped notification.
  */
 data class SystemAction(
     /** `SessionDirectory.serverKey(...)`; null means the server on screen. */
@@ -27,7 +27,7 @@ data class SystemAction(
      * background Start Voice Call, which has already shown the call's Live Update).
      */
     val startsInBackground: Boolean = false,
-    /** Which surface made it, for the call trigger log line (iOS `SystemAction.Origin`). */
+    /** Which surface made it, for the call trigger log line. */
     val origin: SystemActionOrigin = SystemActionOrigin.other,
 ) {
     sealed interface Destination {
@@ -69,7 +69,7 @@ data class SystemAction(
             }
         }
 
-        /** Spotlight's identifiers on iOS; here a session shortcut's ID: its session's scoped ID. */
+        /** Spotlight's identifiers; here a session shortcut's ID: its session's scoped ID. */
         fun fromScopedIdentifier(identifier: String): SystemAction? {
             val scoped = ScopedID.parse(identifier) ?: return null
             return SystemAction(scoped.serverKey, Destination.Session(scoped.id))
@@ -82,12 +82,12 @@ data class SystemAction(
 }
 
 /**
- * Port of iOS `SystemActionInbox`: carries actions from shortcuts, tiles, widgets and links
- * (which run in the app's process) to `AppFeature`. Actions posted before anything listens
- * (a shortcut that launched the app) wait for the first listener.
+ * Carries actions from shortcuts, tiles, widgets and links (which run in the app's process) to
+ * `AppFeature`. Actions posted before anything listens (a shortcut that launched the app) wait for
+ * the first listener.
  *
  * Process-wide delivery plumbing, reached only through [SystemIntegrationClient.actions] by
- * reducers; the system entry points post to it directly, as iOS intents do.
+ * reducers; the system entry points post to it directly.
  */
 class SystemActionInbox {
     private class Listener(val id: UUID, val channel: SendChannel<SystemAction>)
@@ -116,7 +116,7 @@ class SystemActionInbox {
             waiting.clear()
             replaced
         }
-        // Finished outside the lock, as iOS does: its termination handler takes the lock.
+        // Finished outside the lock: its termination handler takes the lock.
         replaced?.channel?.close()
         awaitClose {
             synchronized(lock) { if (listener?.id == id) listener = null }

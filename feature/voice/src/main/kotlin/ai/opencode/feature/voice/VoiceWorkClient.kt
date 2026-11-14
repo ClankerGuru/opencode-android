@@ -151,11 +151,10 @@ fun ReplyWatch.Outcome.notice(title: String, answering: List<String>, alreadyTol
 }
 
 /**
- * Wakes in-flight `/wait` calls when SSE or `/api/session/active` reports a
- * session has settled, so a wedged long-poll socket never holds back a reply.
- * It also owns each session's `/wait`: every reply watch and delegator wait
- * on a session shares one long poll, cancelled once none of them is left.
- * (iOS actor → a [Mutex]-guarded class.)
+ * Wakes in-flight `/wait` calls when SSE or `/api/session/active` reports a session has settled, so
+ * a wedged long-poll socket never holds back a reply. It also owns each session's `/wait`: every
+ * reply watch and delegator wait on a session shares one long poll, cancelled once none of them is
+ * left.
  */
 class VoiceWorkCoordinator {
     /**
@@ -198,8 +197,8 @@ class VoiceWorkCoordinator {
                 existing.joined[id] = result
             } else {
                 val generation = nextID++
-                // Like iOS's unstructured `Task`, the shared wait keeps the caller's
-                // context (dependencies, retry policy, dispatcher) but outlives it.
+                // The shared wait keeps the caller's context (dependencies, retry policy,
+                // dispatcher) but outlives it.
                 val job = scope.launch(currentCoroutineContext().minusKey(Job), start = CoroutineStart.LAZY) {
                     val outcome = try {
                         client.waitForIdle(server, sessionID)
@@ -392,7 +391,6 @@ class VoiceWorkClient(
     /** Recent plain-text messages for the voice model's context. */
     val recentMessages: suspend (server: OpenCodeServer, sessionID: String, limit: Int) -> List<String>,
 ) {
-    /** iOS `newestReply(in:tracked:)`'s tuple. */
     data class NewestReply(val reply: String?, val promptIDs: Set<String>)
 
     companion object Key : DependencyKey<VoiceWorkClient> {
@@ -854,14 +852,13 @@ class VoiceWorkClient(
          * mistakes it for a reply that was itself cut off.
          */
         fun excerpt(text: String, limit: Int = excerptLimit, readMore: String? = null): String {
-            // Swift's `split` drops empty pieces, so blank lines collapse too.
+            // Empty pieces are dropped, so blank lines collapse too.
             val collapsed = text.split(*newlineSeparators).filter { it.isNotEmpty() }.joinToString(" ")
             if (collapsed.length <= limit) return collapsed
             if (readMore == null) return collapsed.take(limit) + "…"
             return collapsed.take(limit) + truncationMarker(collapsed.length - limit, readMore)
         }
 
-        /** Swift's `Character.isNewline`. */
         private fun isNewline(char: Char): Boolean =
             char == '\n' || char == '\r' || char == '\u000B' || char == '\u000C' ||
                 char == '\u0085' || char == '\u2028' || char == '\u2029'

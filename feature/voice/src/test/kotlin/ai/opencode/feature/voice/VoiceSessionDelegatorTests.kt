@@ -49,7 +49,6 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-/** Port of `VoiceSessionDelegatorTests.swift`. */
 class VoiceSessionDelegatorTests {
     private data class SentPrompt(val sessionID: String, val text: String, val delivery: OpenCodeDelivery?, val messageID: String?)
 
@@ -65,10 +64,6 @@ class VoiceSessionDelegatorTests {
 
     // MARK: - Choice, Route Availability & Wire Helpers
 
-    /**
-     * iOS also checks `VoiceSettingsFeature`'s delegator row here; that half belongs to
-     * `:feature:settings` (skipped, owner).
-     */
     @Test fun choiceRoundTripsWithoutStoringServerURLsAndReportsRouteAvailability() {
         val picked = VoiceDelegatorChoice.PickedSession(
             VoiceDelegatorChoice.Picked(
@@ -201,7 +196,6 @@ class VoiceSessionDelegatorTests {
         }
     }
 
-    /** Reaches `:server`'s internal decoders through its test fixture [WireDecoders]. */
     @Test fun sseIgnoresSupersededExecutionInterruptionsAndDecodesRunMessageToolCalls() {
         val supersededFrame = """{"type":"session.execution.interrupted","data":{"sessionID":"ses_voice","reason":"superseded"}}"""
         assertNull(WireDecoders.decodeStreamFrame(supersededFrame))
@@ -358,7 +352,6 @@ class VoiceSessionDelegatorTests {
         assertEquals(OpenCodeDelivery.Steer, firstPrompt.delivery)
         assertEquals("msg_voice_2", firstPrompt.messageID)
         assertTrue(firstPrompt.text.contains("[Voice call active]"))
-        // Android names the device "Phone" where iOS says "iPhone" (docs/parity/voice.md).
         assertTrue(firstPrompt.text, firstPrompt.text.contains("[Phone context] Viewing session \"Session View\" (ses_view)"))
         assertTrue(firstPrompt.text, firstPrompt.text.contains("[Voice delta]\nUser: Check the failing tests.\nVoice: Checking now."))
         assertEquals(1, completed.value.size)
@@ -429,7 +422,7 @@ class VoiceSessionDelegatorTests {
         shared.set(VoiceSharedKeys.voiceDelegatorChoice, VoiceDelegatorChoice.PickedSession(picked))
         val state = liveDelegatorState(shared).recording(VoiceTranscriptTail.Role.user, "Run the smoke tests.", "u1")
 
-        // iOS `AsyncStream<String>`: finishing without a value answers nil.
+        // Finishing without a value answers nil.
         val waitGate1 = CompletableDeferred<String?>()
         val waitGate2 = CompletableDeferred<String?>()
         val abandoned = Locked(listOf<String>())
@@ -580,11 +573,6 @@ class VoiceSessionDelegatorTests {
         effects.skipInFlightEffects()
     }
 
-    /**
-     * iOS drives steps 1–4 (say, pin, open, watch from an off-screen delegator session's
-     * `contentBatch`) through `HomeFeature`, which lives in `:feature:drawer` (skipped, owner).
-     * Step 5 runs on `VoiceFeature` alone and is ported here.
-     */
     @Test fun phoneSideToolEffectsApplyOpenPinWatchSayAndEndCallFromToolInput() = runBlocking {
         val shared = preserveSettings()
 
@@ -899,7 +887,6 @@ class VoiceSessionDelegatorTests {
 
     // MARK: - Point 3: GPT-Live Wire Framing & 900 ms Action-Claim Backstop
 
-    /** iOS keeps this one in `extension LiveCallCoordinatorTests`; it drives the coordinator, not the reducer. */
     @Test fun sessionDelegatorAnswersBoundDelegationWithCommentaryAndUnboundSpeechAndClaimBackstopWithInstructions() = runTest {
         val harness = LiveHarness(
             this,
@@ -915,8 +902,8 @@ class VoiceSessionDelegatorTests {
             ),
         )
         val events = EventIterator(harness.start(), backgroundScope)
-        // iOS `harness.start(unboundSpeechUsesInstructions: true)`: the shared harness's start
-        // takes no such flag, so the call's config gets it before anything is appended.
+        // The shared harness's start takes no such flag, so the call's config gets it before
+        // anything is appended.
         harness.coordinator.serialized {
             harness.coordinator.config = harness.coordinator.config?.copy(unboundSpeechUsesInstructions = true)
         }

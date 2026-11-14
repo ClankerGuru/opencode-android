@@ -41,10 +41,7 @@ import org.junit.Test
 import java.time.Instant
 import java.util.UUID
 
-/**
- * Port of iOS `VoiceOpenSessionReviewTests.swift` (the app-level parts). The root's pending request
- * here is a permission, not a question form.
- */
+/** The root's pending request here is a permission, not a question form. */
 class VoiceOpenSessionReviewTests {
     @get:Rule val isolation = TestIsolationRule()
 

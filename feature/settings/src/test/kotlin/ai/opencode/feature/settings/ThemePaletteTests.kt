@@ -16,12 +16,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `ThemePaletteTests.swift`, the `:feature:settings` part (the rest is `:core`'s port).
- * Home's `.settings(…)` actions are [HomeSettingsFeature]'s here, so that reducer is driven. The
- * `TranscriptTunables` half is `:feature:transcript`'s; `ThemePalette.applyToWindows` is
- * UIKit-only, and `appearanceTunablesRegisterSoftEdgeControls` needs the unported tuning store.
- */
+/** Home's `.settings(…)` actions are [HomeSettingsFeature]'s here, so that reducer is driven. */
 class ThemePaletteTests {
     @get:Rule val isolation = TestIsolationRule()
 

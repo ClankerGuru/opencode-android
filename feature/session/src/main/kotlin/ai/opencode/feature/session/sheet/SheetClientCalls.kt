@@ -5,7 +5,7 @@ import ai.opencode.core.strings.localized
 import ai.opencode.server.OpenCodeClientError
 import kotlinx.coroutines.CancellationException
 
-/** Runs [block], returning the client error it threw (iOS `do throws(OpenCodeClientError)`), or null. */
+/** Runs [block], returning the client error it threw, or null. */
 internal suspend fun clientError(block: suspend () -> Unit): OpenCodeClientError? = try {
     block()
     null

@@ -8,10 +8,6 @@ import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
 
-/**
- * Port of the notification-callback tests of iOS `WireRequestTests.swift`. The
- * request-shape tests are `:server`'s (`WireRequestTests.kt` there).
- */
 class WireRequestTests {
     @get:Rule val isolation = TestIsolationRule()
 

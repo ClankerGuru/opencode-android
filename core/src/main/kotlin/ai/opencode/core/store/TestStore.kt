@@ -30,7 +30,6 @@ class TestStore<S, A>(
     var dependencies: DependencyValues = DependencyValues.testing().update(dependencies)
         private set
 
-    /** iOS `store.dependencies.x = ...` after construction. */
     fun updateDependencies(block: DependencyValues.Builder.() -> Unit) {
         dependencies = dependencies.update(block)
     }

@@ -42,8 +42,8 @@ import kotlin.math.sin
 import kotlin.math.tan
 
 /**
- * Still maps of a shared location, rendered once per place, size and appearance and cached (iOS
- * `SharedLocationSnapshots`). Composed from OpenStreetMap raster tiles over a 600 m region; dark
+ * Still maps of a shared location, rendered once per place, size and appearance and cached.
+ * Composed from OpenStreetMap raster tiles over a 600 m region; dark
  * snapshots are inverted and hue-turned tiles. Tile policy
  * (operations.osmfoundation.org/policies/tiles): a User-Agent naming the app, HTTP caching
  * honoured, a handful of tiles per card, and the card credits “© OpenStreetMap contributors”. Never
@@ -142,7 +142,6 @@ internal class SharedLocationSnapshots(private val context: Context) {
 
     companion object {
         const val TILE_SIZE = 256
-        /** Like iOS's `MKCoordinateRegion(center:latitudinalMeters: 600, longitudinalMeters: 600)`. */
         const val REGION_METERS = 600.0
         const val MAX_ZOOM = 19
         private const val MAX_TILES = 16

@@ -10,8 +10,8 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Port of iOS `ConnectionHealth`: the Settings connection card's model: one beat per health check,
- * drawn like an EKG, and the status the card shows.
+ * The Settings connection card's model: one beat per health check, drawn like an EKG, and the
+ * status the card shows.
  *
  * The status follows the trace, not the network, so it lags the link by a beat: a measured state
  * lands on its beat's spike, Reconnecting when the first unanswered check would have been answered,

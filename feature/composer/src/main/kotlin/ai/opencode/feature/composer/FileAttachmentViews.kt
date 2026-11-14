@@ -35,9 +35,8 @@ import androidx.compose.ui.unit.dp
 import java.text.NumberFormat
 
 /**
- * The transcript metrics these chips share (iOS `TranscriptMetrics`). `FileAttachmentCard`,
- * `FileAttachmentDetail` and `AgentFileCards` live in `:feature:media`, which the transcript
- * and its image gallery use too.
+ * The transcript metrics these chips share. `FileAttachmentCard`, `FileAttachmentDetail` and
+ * `AgentFileCards` live in `:feature:media`, which the transcript and its image gallery use too.
  */
 object FileAttachmentMetrics {
     val cardCornerRadius: Dp = 14.dp
@@ -45,12 +44,11 @@ object FileAttachmentMetrics {
     val standard: Dp = 12.dp
 }
 
-/** A composer file: name, size, and upload progress, or a retry when the upload failed (iOS `ComposerFileChip`). */
+/** A composer file: name, size, and upload progress, or a retry when the upload failed. */
 object ComposerFileChip {
     /** The least height: larger text grows the chip rather than clipping it. */
     val height: Dp = 76.dp
     val width: Dp = 220.dp
-    /** iOS `ComposerFileChip.cornerRadius`'s default: 22. */
     val cornerRadius: Dp = 22.dp
 
     fun subtitle(file: ComposerFileAttachment): String = AttachmentFileType.subtitle(file.name, file.mime, file.size)

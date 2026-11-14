@@ -23,8 +23,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Port of iOS `LiveDictationTests.swift`.
- *
  * Presses, stops and cancels against a fake microphone and model: each only
  * ever touches its own recording, and the shared audio session is released
  * only while dictation still owns it.
@@ -41,7 +39,7 @@ class LiveDictationTests {
         }
     }
 
-    /** iOS `LockIsolated<[T]>`: a list read and appended from any thread. */
+    /** A list read and appended from any thread. */
     class Log<T> {
         private val items = mutableListOf<T>()
         val value: List<T> get() = synchronized(items) { items.toList() }
@@ -143,11 +141,7 @@ class LiveDictationTests {
         }
     }
 
-    /**
-     * The press's effect adopting its recording, as iOS's `Task { try await dictation.start(press) }`:
-     * a Swift task always runs its body, so `start` is entered even when the task is cancelled
-     * at once. A default-start coroutine cancelled before it is dispatched never would.
-     */
+    /** A default-start coroutine cancelled before it is dispatched never would. */
     private fun adopt(dictation: LiveDictation, press: Int) =
         background.async(start = CoroutineStart.UNDISPATCHED) { dictation.start(press) }
 

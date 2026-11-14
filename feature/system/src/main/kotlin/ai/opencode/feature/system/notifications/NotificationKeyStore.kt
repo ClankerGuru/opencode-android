@@ -15,17 +15,14 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /**
- * Port of iOS `System/Notifications/NotificationKeyStore.swift`: this phone's P-256
- * key and the derived key for each notification ref. Unlike the keychain shared keys, every
- * unavailable read and failed write is an error: enrollment must not send a public key whose
- * private key wasn't saved.
+ * This phone's P-256 key and the derived key for each notification ref. Unlike the keychain shared
+ * keys, every unavailable read and failed write is an error: enrollment must not send a public key
+ * whose private key wasn't saved.
  *
- * iOS keeps a device-only, after-first-unlock keychain item (service
- * `ai.opencode.mobilecode.notification-keys.v2`, account = ref) shared with the notification
- * extension. Android has no extension (FCM delivers to the app process), so [Storage.live]
- * seals each record with a non-exportable Android Keystore AES key into
- * `noBackupFilesDir/notification-keys/`, which never leaves the device or reaches a backup.
- * The app is the only writer, so the [NotificationKeyCache] stays true.
+ * Android has no extension (FCM delivers to the app process), so [Storage.live] seals each record
+ * with a non-exportable Android Keystore AES key into `noBackupFilesDir/notification-keys/`, which
+ * never leaves the device or reaches a backup. The app is the only writer, so the
+ * [NotificationKeyCache] stays true.
  */
 class NotificationKeyStore(
     private val storage: Storage,
@@ -41,7 +38,7 @@ class NotificationKeyStore(
     interface Storage {
         fun read(ref: String): ByteArray?
 
-        /** Writes a new record; `false` when one already exists (iOS `errSecDuplicateItem`). */
+        /** Writes a new record; `false` when one already exists. */
         fun add(ref: String, data: ByteArray): Boolean
 
         /** Replaces an existing record. */
@@ -129,15 +126,14 @@ class NotificationKeyStore(
 
         private fun decode(text: String): ByteArray = runCatching { Base64.getDecoder().decode(text) }.getOrElse { throw Failure.InvalidKey }
 
-        /** iOS `NotificationKeyStore.live`: the app's store, with its cache. */
+        /** The app's store, with its cache. */
         val live: NotificationKeyStore by lazy { NotificationKeyStore(Storage.live, NotificationKeyCache()) }
     }
 }
 
 /**
- * Port of iOS `NotificationKeyCache`: each read unseals a file, so a derived key is read once
- * per ref. A read that overlaps an invalidation isn't kept: it may hold the key that was just
- * replaced or removed.
+ * Each read unseals a file, so a derived key is read once per ref. A read that overlaps an
+ * invalidation isn't kept: it may hold the key that was just replaced or removed.
  */
 class NotificationKeyCache {
     private val lock = Any()

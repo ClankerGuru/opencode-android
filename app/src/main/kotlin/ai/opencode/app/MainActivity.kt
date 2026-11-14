@@ -44,9 +44,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
- * The app's window (iOS's scene). Its [Store] lives in a retained [RootStore] (iOS `WindowStore`)
- * so configuration changes keep state and in-flight effects. [route] turns intents into
- * [AppFeature.Action]s.
+ * The app's window. Its [Store] lives in a retained [RootStore] so configuration changes keep state
+ * and in-flight effects. [route] turns intents into [AppFeature.Action]s.
  */
 class MainActivity : ComponentActivity() {
     private val root: RootStore by viewModels()
@@ -108,7 +107,7 @@ class MainActivity : ComponentActivity() {
             LifecycleEventObserver { _, event ->
                 when (event) {
                     Lifecycle.Event.ON_START -> store.send(AppFeature.Action.ForegroundChanged(true))
-                    // iOS `scenePhase == .active`: take what the share sheet left.
+                    // Take what the share sheet left.
                     Lifecycle.Event.ON_RESUME -> {
                         SceneWindows.resumed(root)
                         store.send(AppFeature.Action.PendingSharesRequested)
@@ -194,10 +193,7 @@ class MainActivity : ComponentActivity() {
         return pending.await()
     }
 
-    /**
-     * iOS `SessionWindowFollow`: on a tablet the window's restorable value follows the session it
-     * shows.
-     */
+    /** On a tablet the window's restorable value follows the session it shows. */
     private fun followShownSession() {
         lifecycleScope.launch {
             store.states.collect { state ->
@@ -222,10 +218,7 @@ class MainActivity : ComponentActivity() {
         outState.putString(SessionWindowTarget.EXTRA_SESSION_ID, shown.sessionID)
     }
 
-    /**
-     * A finger coming down arms touch recovery's sampler (iOS `TouchRecoveryArmRecognizer` on
-     * every window): it only watches, never consumes.
-     */
+    /** A finger coming down arms touch recovery's sampler: it only watches, never consumes. */
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         if (event.actionMasked == MotionEvent.ACTION_DOWN) dependency(TouchRecoveryClient).touched()
         return super.dispatchTouchEvent(event)
@@ -239,7 +232,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        // A window asked again for its own session shows it (iOS `onContinueUserActivity`).
+        // A window asked again for its own session shows it.
         if (intent.action == SessionWindowTarget.ACTION && root.follows) {
             val next = RootStore.target(intent, null) ?: return
             if (next != root.shown) store.send(AppFeature.Action.Home(HomeFeature.Action.SessionTapped(next.sessionID)))
@@ -252,8 +245,8 @@ class MainActivity : ComponentActivity() {
         val action = route(intent) ?: return
         LaunchBloomController.completeColdLaunch()
         if (action is AppFeature.Action.NotificationOpened) {
-            // iOS `SceneWindows.store(for:primary:)`: the window showing that session, else the
-            // one in use on its server, else the one doing the app-wide work.
+            // The window showing that session, else the one in use on its server, else the one
+            // doing the app-wide work.
             val window = SceneWindows.window(action.destination, receiving = root)
             if (window !== root) SceneWindows.bringToFront(window, this)
             window.store.send(action)
@@ -263,10 +256,7 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        /**
-         * iOS `AppView.onOpenURL` and `SessionNotifications.onOpen`: a notification tap, an
-         * `opencode://` system action link, or a pairing link.
-         */
+        /** A notification tap, an `opencode://` system action link, or a pairing link. */
         fun route(intent: Intent?): AppFeature.Action? {
             intent ?: return null
             if (intent.action == NotificationDestination.ACTION_OPEN) {

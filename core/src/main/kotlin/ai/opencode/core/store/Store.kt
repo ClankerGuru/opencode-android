@@ -21,7 +21,7 @@ import kotlinx.coroutines.withContext
  * so a composable takes `StoreOf<Feature.State, Feature.Action>` regardless of depth.
  */
 interface StoreOf<S, A> {
-    /** The state right now (synchronous, like reading `store.state` in SwiftUI). */
+    /** The state right now. */
     val state: S
     /** Every distinct state, starting with the current one. */
     val states: Flow<S>

@@ -10,10 +10,9 @@ import ai.opencode.core.ui.SFSymbol
 import java.text.Normalizer
 
 /**
- * Port of iOS `SessionEntity`: a session, or one of two choices that aren't one yet:
- * **Last Viewed Session** and **New Session**. Real sessions are server-scoped
- * (`<serverKey>:<sessionID>`). Widgets' Choose Session and Ask OpenCode's session picker
- * list these from the [SessionDirectory], never the network.
+ * A session, or one of two choices that aren't one yet: **Last Viewed Session** and **New
+ * Session**. Real sessions are server-scoped (`<serverKey>:<sessionID>`). Widgets' Choose Session
+ * and Ask OpenCode's session picker list these from the [SessionDirectory], never the network.
  */
 data class SessionEntity(
     val id: String,
@@ -51,7 +50,7 @@ data class SessionEntity(
     }
 }
 
-/** Port of iOS `ProjectEntity`: `<serverKey>:<projectID>`. */
+/** `<serverKey>:<projectID>`. */
 data class ProjectEntity(val id: String, val name: String) {
     val symbol: SFSymbol get() = SFSymbol.Folder
 
@@ -63,7 +62,7 @@ data class ProjectEntity(val id: String, val name: String) {
     }
 }
 
-/** Port of iOS `SessionQuery`: reads the published directory. */
+/** Reads the published directory. */
 object SessionQuery {
     fun entities(directory: SessionDirectory, identifiers: List<String>) = directory.sessionEntities(identifiers)
     fun entities(directory: SessionDirectory, matching: String) = directory.sessionEntities(matching)
@@ -71,7 +70,6 @@ object SessionQuery {
     fun defaultResult(directory: SessionDirectory) = SessionEntity.lastViewed(directory.current)
 }
 
-/** Port of iOS `ProjectQuery`. */
 object ProjectQuery {
     fun entities(directory: SessionDirectory, identifiers: List<String>) = directory.projectEntities(identifiers)
     fun entities(directory: SessionDirectory, matching: String) = directory.projectEntities(matching)

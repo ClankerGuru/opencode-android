@@ -30,17 +30,16 @@ import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
 import ai.opencode.feature.voice.VoiceRoutePreferences
 
 /*
- * Port of iOS `HomeFeature+Settings.swift`, and the Settings half of `HomeFeature` and
- * `SettingsPresentation`: Home presents `:feature:settings`' [SettingsFeature] ([State.settings]),
- * keeps it told about the connection and notifications, and answers what it asks for
- * ([SettingsDelegate]) through Home's own actions and delegates. What's New's Try It leaves the
- * page and the drawer for the session, then opens where the feature is.
+ * And the Settings half of `HomeFeature` and `SettingsPresentation`: Home presents
+ * `:feature:settings`' [SettingsFeature] ([State.settings]), keeps it told about the connection and
+ * notifications, and answers what it asks for ([SettingsDelegate]) through Home's own actions and
+ * delegates. What's New's Try It leaves the page and the drawer for the session, then opens where
+ * the feature is.
  */
 
 /**
- * Settings opened with Home's current connection and notification state already in it, and
- * Home's sessions for Voice's Delegator pick (iOS `VoiceSettingsView(server: home.server,
- * sessions: home.sessions)`), so that page doesn't wait on its own load.
+ * Settings opened with Home's current connection and notification state already in it, and Home's
+ * sessions for Voice's Delegator pick, so that page doesn't wait on its own load.
  */
 internal fun State.presentingSettings(settings: SettingsFeature.State): State {
     val home = settingsHome
@@ -101,16 +100,15 @@ internal fun State.refreshingWhatsNewButton(): State {
 }
 
 /**
- * Settings closed, by whatever closed it: what was read in What's New is seen now (iOS
- * `whatsNew(.closed)` on `isSettingsShown` turning off), so its dots stay while you read and the
- * drawer's row leaves on the way back.
+ * Settings closed, by whatever closed it: what was read in What's New is seen now, so its dots stay
+ * while you read and the drawer's row leaves on the way back.
  */
 internal fun settingsClosed(whatsNew: WhatsNewFeature.State, state: State): State {
     WhatsNewFeature().reduce(whatsNew, WhatsNewFeature.Action.Closed)
     return state.refreshingWhatsNewButton()
 }
 
-/** The drawer's What's New row (iOS `.whatsNew(.buttonTapped)`, `.whatsNew(.hideTapped)`). */
+/** The drawer's What's New row. */
 internal fun HomeFeature.reduceWhatsNew(state: State, action: WhatsNewFeature.Action): HomeReduced = when (action) {
     // Pushed over the open drawer, like Settings.
     WhatsNewFeature.Action.ButtonTapped ->
@@ -148,7 +146,7 @@ internal fun reducePreferences(state: State, action: HomeSettingsFeature.Action)
 internal fun HomeFeature.reduceSettingsScreen(state: State, action: PresentationAction<SettingsFeature.Action>): HomeReduced {
     val presented = (action as? PresentationAction.Presented)?.action ?: return Reduced(state)
     return when (presented) {
-        // iOS removed `.serversRequested` with Title Is the Switch (c75d4a1e): nothing sends it.
+        // Nothing sends it.
         SettingsFeature.Action.ServersTapped -> Reduced(state)
         // Settings › Experimental › Show Welcome: the first-run welcome, over Settings and Home.
         is SettingsFeature.Action.Settings ->
@@ -193,7 +191,7 @@ internal fun HomeFeature.tryWhatsNew(destination: WhatsNewEntry.Destination, ent
         WhatsNewEntry.Destination.NewSession, is WhatsNewEntry.Destination.Prompt ->
             if (state.connectionStatus == HomeConnectionFeature.State.ConnectionStatus.disconnected) return Reduced(state)
         // Before Voice is set up, Settings pushes Voice's page over the entry instead and never
-        // asks (`SettingsFeature`); checked again here as iOS does.
+        // asks (`SettingsFeature`); checked again here.
         WhatsNewEntry.Destination.Call -> if (!VoiceRoutePreferences().isAvailable(state.server)) return Reduced(state)
         WhatsNewEntry.Destination.ModelList -> Unit
     }
@@ -243,10 +241,6 @@ internal fun HomeFeature.tryWhatsNew(destination: WhatsNewEntry.Destination, ent
     }
 }
 
-/**
- * iOS `.settings(.experimentalFeatureChanged(.sessionLiveActivity, false))` and
- * `.settings(.experimentalFeatureApplied(.sessionLiveActivity, false))` (All Experiments).
- */
 internal val HomeSettingsFeature.Action.switchesOffSessionLiveActivity: Boolean
     get() {
         if (this is HomeSettingsFeature.Action.ExperimentalFeatureChanged) {

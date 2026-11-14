@@ -23,9 +23,8 @@ import org.junit.Test
 import java.time.Instant
 
 /**
- * iOS `VoiceRequestDockTests.swift`: a request raised during a call shows its form while the call
- * floats over the screen, and the voice agent's steered approvals answer it. iOS's third test,
- * `theDelegatorsAnswerRereadsTheRequests`, drives `VoiceFeature` alone and is the voice area's.
+ * A request raised during a call shows its form while the call floats over the screen, and the
+ * voice agent's steered approvals answer it.
  */
 class VoiceRequestDockTests {
     @get:Rule val isolation = TestIsolationRule()

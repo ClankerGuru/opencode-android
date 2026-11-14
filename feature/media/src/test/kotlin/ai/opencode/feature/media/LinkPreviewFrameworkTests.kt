@@ -11,8 +11,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * The `LinkPreviewTests` (`LinkPreviewTests.swift`) case that detects bare URLs: link detection
- * runs the framework's `Patterns.WEB_URL`, which only Robolectric provides on the JVM.
+ * The `LinkPreviewTests` case that detects bare URLs: link detection runs the framework's
+ * `Patterns.WEB_URL`, which only Robolectric provides on the JVM.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])

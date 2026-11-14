@@ -41,7 +41,6 @@ import org.junit.Test
 import java.time.Instant
 import kotlin.time.Duration.Companion.seconds
 
-/** Port of iOS `VoiceFeatureTests+Delegation.swift` (an extension of `VoiceFeatureTests`). */
 class VoiceFeatureTestsDelegation {
     private lateinit var h: Harness
 
@@ -52,7 +51,7 @@ class VoiceFeatureTestsDelegation {
         // Each test starts from no saved conversation (the shared store is the test's own).
         val store = h.store(h.state { State(server, session) }) {
             this[DateClient] = DateClient.constant(Instant.EPOCH)
-            // Android: an ended call's notification lingers on the clock (iOS's Live Activity is Home's).
+            // Android: an ended call's notification lingers on the clock.
             this[Clock] = ImmediateClock()
             voiceCall { copy(completeFunction = { _, _ -> }) }
             configure()
@@ -383,10 +382,8 @@ class VoiceFeatureTestsDelegation {
                 copy(
                     submit = { _, _ ->
                         entered.yield()
-                        // Held until the hang-up cancels it; the server still admits the
-                        // prompt, so the POST reports success after the call is over.
-                        // (Swift's `for await` on a cancelled task just ends; a cancelled
-                        // Kotlin receive throws, so the stand-in swallows it the same way.)
+                        // Held until the hang-up cancels it; the server still admits the prompt, so
+                        // the POST reports success after the call is over.
                         try {
                             admission.awaitFinish()
                         } catch (_: CancellationException) {
@@ -697,8 +694,8 @@ class VoiceFeatureTestsDelegation {
         }
 
         store.send(Action.Start)
-        // iOS counts `haptics.cancelPendingVoiceStart`; Android's is `VoiceCallSounds.cancelPendingStart`,
-        // which ends the connecting stage the tap began.
+        // Counts `VoiceCallSounds.cancelPendingStart`, which ends the connecting stage the tap
+        // began.
         assertTrue(h.haptics.sounds.stageElapsed(DotScopeSimulation.Stage.connecting) != null)
         store.receive(Action.CallEnded::class)
         assertNull("The scanner's timeline from the tap ends with the start", h.haptics.sounds.stageElapsed(DotScopeSimulation.Stage.connecting))

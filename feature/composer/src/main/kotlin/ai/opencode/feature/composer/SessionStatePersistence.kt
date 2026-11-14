@@ -9,13 +9,13 @@ import kotlinx.serialization.Serializable
 import java.time.Instant
 
 /**
- * What a session keeps across relaunch besides its composer (iOS `PersistedSessionState`):
- * the model picked for its next send, and the pending requests' answers in progress.
+ * What a session keeps across relaunch besides its composer: the model picked for its next send,
+ * and the pending requests' answers in progress.
  */
 @Serializable
 data class PersistedSessionState(
     val pendingModel: OpenCodeModelRef? = null,
-    // Swift's synthesized `Decodable` ignores property defaults: `requests` must be present.
+    // These keys are required: decoding ignores property defaults.
     @Required val requests: RequestAnswers = RequestAnswers(),
 ) {
     @Serializable
@@ -49,8 +49,8 @@ data class SessionStateRecord(
 )
 
 /**
- * iOS `PersistedComposerState.applySessionState(_:serverID:sessionID:at:)`: the state with the
- * session's record written (or removed once empty), or null when nothing changed.
+ * The state with the session's record written (or removed once empty), or null when nothing
+ * changed.
  */
 fun PersistedComposerState.applySessionState(
     update: PersistedSessionState.Update,
@@ -71,21 +71,20 @@ fun PersistedComposerState.applySessionState(
     return copy(sessionStates = records.ifEmpty { null })
 }
 
-/** iOS `removeSessionStates(where:)`: the state without the matching records, or null when none matched. */
+/** The state without the matching records, or null when none matched. */
 fun PersistedComposerState.removeSessionStates(shouldRemove: (SessionStateRecord) -> Boolean): PersistedComposerState? {
     val records = sessionStates ?: return null
     if (records.none(shouldRemove)) return null
     return copy(sessionStates = records.filterNot(shouldRemove).ifEmpty { null })
 }
 
-// The "SessionFeature" half of iOS `SessionStatePersistence.swift`. Those reducers live in the
-// session and drawer areas, above this module, so their logic is here as plain functions over
-// values (like `ComposerPersistenceIntegration.kt`); those areas call them from their reducers.
+// Those reducers live in the session and drawer areas, above this module, so their logic is here as
+// plain functions over values (like `ComposerPersistenceIntegration.kt`); those areas call them
+// from their reducers.
 
 /**
- * iOS `SessionFeature.State.answerDraftsIncludingBar`: `answerDrafts` with the words on the bar
- * now ([barText], the session's draft text), which are only filed there when the bar moves to
- * another page or request.
+ * `answerDrafts` with the words on the bar now ([barText], the session's draft text), which are
+ * only filed there when the bar moves to another page or request.
  */
 fun <Draft> RequestDockFeature.State<Draft>.answerDraftsIncludingBar(barText: String): Map<String, String> {
     val shown = answerShownTarget
@@ -94,8 +93,8 @@ fun <Draft> RequestDockFeature.State<Draft>.answerDraftsIncludingBar(barText: St
 }
 
 /**
- * What the persisted session state watches for changes (iOS `SessionFeature.PersistedSessionWatch`).
- * The session reducer compares the old and new watch (`onChange`) and calls [reconcilePersistedSession].
+ * What the persisted session state watches for changes. The session reducer compares the old and
+ * new watch (`onChange`) and calls [reconcilePersistedSession].
  */
 data class PersistedSessionWatch(
     val serverID: String,
@@ -104,7 +103,7 @@ data class PersistedSessionWatch(
     val update: PersistedSessionState.Update,
 ) {
     companion object {
-        /** iOS `SessionFeature.State.persistedSessionWatch`; [barText] is the session's draft text. */
+        /** [barText] is the session's draft text. */
         fun <Draft> of(
             serverID: String,
             session: OpenCodeSession?,
@@ -135,7 +134,7 @@ data class PersistedSessionWatch(
     }
 }
 
-/** iOS `SessionFeature.reconcilePersistedSession(from:in:)`: the same screen's pick or answers changed. */
+/** The same screen's pick or answers changed. */
 fun ComposerPersistence.reconcilePersistedSession(old: PersistedSessionWatch, current: PersistedSessionWatch) {
     val sessionID = current.sessionID ?: return
     if (!current.readsOnView || old.serverID != current.serverID || old.sessionID != sessionID) return
@@ -143,8 +142,8 @@ fun ComposerPersistence.reconcilePersistedSession(old: PersistedSessionWatch, cu
 }
 
 /**
- * iOS `SessionFeature.restorePersistedAnswers(_:)`: requests that just arrived take back the
- * answers saved for them before a relaunch; the bar picks its words up when it docks.
+ * Requests that just arrived take back the answers saved for them before a relaunch; the bar picks
+ * its words up when it docks.
  */
 fun <Draft> ComposerPersistence.restorePersistedAnswers(
     requestDock: RequestDockFeature.State<Draft>,
@@ -173,10 +172,9 @@ fun <Draft> ComposerPersistence.restorePersistedAnswers(
 }
 
 /**
- * iOS `HomeFeature.State.restorePersistedPick(into:)`: after a relaunch a session's waiting
- * model pick comes back with it. A visit this launch already carries the pick (or its absence),
- * so [hasSnapshot] (`sessionSnapshots[session.id] != nil`) skips it. Returns the pick for the
- * screen's `currentModel` and `pendingModel`, or null to leave them.
+ * After a relaunch a session's waiting model pick comes back with it. A visit this launch already
+ * carries the pick (or its absence), so [hasSnapshot] (`sessionSnapshots[session.id] != nil`) skips
+ * it. Returns the pick for the screen's `currentModel` and `pendingModel`, or null to leave them.
  */
 fun ComposerPersistence.restorePersistedPick(
     serverID: String,

@@ -38,14 +38,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `NewSessionDraftTests`' Home tests: drafts Home opens (`makeDraft`) and the fresh
- * task identity each draft-from-a-draft gets. The draft screen's own project sheet and sends are
- * `:feature:session`'s; `switchingServersFromADraft…` is `:app`'s (`AppFeature`).
- * `keepsIdentityMovesAdvanceVisitAndRunTask` is left to `:feature:session`'s port too: its
- * subject is the screen's `.task` under a carried recording or call (`stopSessionWork`,
- * `supersedeRunWork`), driven through Android's `DictationFeature`/`VoiceFeature` states.
- */
 class NewSessionDraftTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -61,7 +53,7 @@ class NewSessionDraftTests {
     @Test
     fun aNewDraftVisitRestoresCurrentProjectRecency() {
         var home = HomeFeature.State(server, OpenCodeHomeSnapshot(projects = projects, sessions = emptyList(), activeSessionIDs = emptySet()))
-        // iOS's `makeDraft()` is mutating: Home keeps the state it returns.
+        // Home keeps the state it returns.
         val first = home.makeDraft().let { (next, draft) -> home = next; draft }
         var order = DraftProjectOrder()
         order = order.update(first.recentProjects, chosen = first.draftProject, identity = first.taskIdentity)

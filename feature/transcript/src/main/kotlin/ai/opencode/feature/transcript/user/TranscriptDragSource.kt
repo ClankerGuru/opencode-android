@@ -58,13 +58,12 @@ import androidx.compose.ui.unit.Dp
 import java.util.Locale
 
 /**
- * Server and directory context for resolving agent file references dragged out of a transcript
- * row (iOS `TranscriptDragContext`).
+ * Server and directory context for resolving agent file references dragged out of a transcript row.
  */
 @Immutable
 data class TranscriptDragContext(val server: OpenCodeServer? = null, val directory: String? = null)
 
-/** Visual framing used when lifting a drag preview (iOS `TranscriptDragSurfaceStyle`). */
+/** Visual framing used when lifting a drag preview. */
 enum class TranscriptDragSurfaceStyle {
     /** A rounded card or image tile. */
     Card,
@@ -77,9 +76,8 @@ enum class TranscriptDragSurfaceStyle {
 }
 
 /**
- * What a transcript surface provides when dragged into another app or the composer (iOS
- * `TranscriptDragPayload`). Android carries it as [ClipData] ([clipData]); the MIME types are
- * the iOS `UTType`s' equivalents ([mimeTypes]).
+ * What a transcript surface provides when dragged into another app or the composer. Android carries
+ * it as [ClipData] ([clipData]).
  */
 @Immutable
 sealed interface TranscriptDragPayload {
@@ -126,7 +124,7 @@ sealed interface TranscriptDragPayload {
     /** Inline `opencode-file://` file links inside a paragraph, list item, or quote. */
     data class InlineFileLinks(val text: AnnotatedString, val lineSpacing: Float) : TranscriptDragPayload
 
-    /** The file name the drop destination sees (iOS `suggestedName`). */
+    /** The file name the drop destination sees. */
     val suggestedName: String
         get() = when (this) {
             is Code -> "snippet.${fileExtension(language) ?: "txt"}"
@@ -142,7 +140,7 @@ sealed interface TranscriptDragPayload {
             is InlineFileLinks -> "message.txt"
         }
 
-    /** The MIME types offered, richest first (iOS registered `UTType`s). */
+    /** The MIME types offered, richest first. */
     val mimeTypes: List<String>
         get() = when (this) {
             is Code -> {
@@ -160,11 +158,10 @@ sealed interface TranscriptDragPayload {
         }
 
     /**
-     * The drag's data, built when the drag starts (iOS `makeItemProvider`). Text travels as
-     * text; images and files as `content://` URIs from media's [AgentFileDragProvider], which
-     * reads a server file only when the drop target opens it. A path no server resolves
-     * drags as its plain text, as on iOS. [appContext] serves the URIs; without it (no drag in
-     * progress) only text payloads have data.
+     * The drag's data, built when the drag starts. Text travels as text; images and files as
+     * `content://` URIs from media's [AgentFileDragProvider], which reads a server file only when
+     * the drop target opens it. A path no server resolves drags as its plain text. [appContext]
+     * serves the URIs; without it (no drag in progress) only text payloads have data.
      */
     fun clipData(context: TranscriptDragContext = TranscriptDragContext(), appContext: Context? = null): ClipData? {
         val label = suggestedName
@@ -252,7 +249,7 @@ sealed interface TranscriptDragPayload {
             }
         }
 
-        /** The MIME type for a code block's fence language (iOS `codeUTType(for:)`). */
+        /** The MIME type for a code block's fence language. */
         fun codeMimeType(language: String?): String? {
             val ext = fileExtension(language) ?: return null
             return when (ext) {
@@ -296,7 +293,7 @@ sealed interface TranscriptDragPayload {
             return "image/png"
         }
 
-        /** The MIME type for an agent or attached file (iOS `fileUTType(fileName:mime:kind:)`). */
+        /** The MIME type for an agent or attached file. */
         fun fileMimeType(fileName: String, mime: String?, kind: AgentFileReference.Kind = AgentFileReference.Kind.of(fileName)): String {
             val ext = AttachmentFileType.fileExtension(fileName)
             if (ext.isNotEmpty()) {
@@ -325,18 +322,14 @@ sealed interface TranscriptDragPayload {
 }
 
 /**
- * Makes this transcript surface draggable into other apps and the composer (iOS
- * `.transcriptDragSource`, shipped for everyone), with iOS's arbitration between its menu and
- * its drag: holding it lifts it ([onLift] runs, where a row opens its menu, as iOS's context
- * menu lifts the same surface), and moving the held finger past the touch slop starts the drag
- * (closing that menu through [onDragStart]) with [payload]'s [ClipData]. A tap, a scroll, or a
- * move before the hold lands stays the surface's and the list's; once the hold lands, the rest
- * of the gesture is the drag source's, so the release doesn't also tap the surface under it and
- * the list doesn't scroll under the open menu.
+ * Holding it lifts it, and moving the held finger past the touch slop starts the drag (closing that
+ * menu through [onDragStart]) with [payload]'s [ClipData]. A tap, a scroll, or a move before the
+ * hold lands stays the surface's and the list's; once the hold lands, the rest of the gesture is
+ * the drag source's, so the release doesn't also tap the surface under it and the list doesn't
+ * scroll under the open menu.
  *
- * The drag's shadow is iOS's lift preview: the surface as drawn, over its fill
- * ([TranscriptDragSurfaceStyle.Card] on the card fill, the rest on the transcript's background),
- * clipped to [cornerRadius] (at least 10 dp for a band).
+ * The surface as drawn, over its fill ([TranscriptDragSurfaceStyle.Card] on the card fill, the rest
+ * on the transcript's background), clipped to [cornerRadius] (at least 10 dp for a band).
  */
 fun Modifier.transcriptDragSource(
     payload: TranscriptDragPayload?,
@@ -389,9 +382,8 @@ private class TranscriptDragSourceElement(
 }
 
 /**
- * One gesture for the hold, the menu and the drag (iOS `UIContextMenuInteraction` and
- * `UIDragInteraction` on one view), and the surface recorded as drawn for the drag's lift
- * preview.
+ * One gesture for the hold, the menu and the drag, and the surface recorded as drawn for the drag's
+ * lift preview.
  */
 private class TranscriptDragSourceNode(
     var payload: TranscriptDragPayload?,
@@ -424,7 +416,7 @@ private class TranscriptDragSourceNode(
             val recorded = layer
             val shadowFill = fill
             startDragAndDropTransfer(DragAndDropTransferData(clip, flags = flags), size.toSize()) {
-                // iOS's lift snapshot: the surface over its fill, in its rounded shape.
+                // The surface over its fill, in its rounded shape.
                 val outline = shape.createOutline(size, layoutDirection, this)
                 val path = Path().apply { addOutline(outline) }
                 clipPath(path) {
@@ -470,8 +462,8 @@ private class TranscriptDragSourceNode(
     }
 
     /**
-     * iOS `selectionOwnsHold`: a reply selection on the move owns its touch, and so does a hold
-     * that selects code or a formula: nothing lifts from under them.
+     * A reply selection on the move owns its touch, and so does a hold that selects code or a
+     * formula: nothing lifts from under them.
      */
     private fun selectionOwnsHold(position: androidx.compose.ui.geometry.Offset): Boolean {
         val selection = currentValueOf(LocalTranscriptReplySelection) ?: return false

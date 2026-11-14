@@ -12,11 +12,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
 
-/**
- * The Live Updates' buttons (iOS `EndVoiceCallIntent`, `ToggleVoiceMuteIntent`,
- * `StopDictationIntent`, which are `LiveActivityIntent`s run in the app's process) and a
- * Live Update swiped away (iOS `activityStateUpdates` reporting `.dismissed`).
- */
+/** The Live Updates' buttons and a Live Update swiped away. */
 class LiveActivityActionReceiver : BroadcastReceiver() {
     enum class Kind { VoiceCall, Dictation, SessionRun }
 

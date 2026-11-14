@@ -4,15 +4,15 @@ import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 
 /**
- * The transcript's store seam. iOS has no transcript reducer: the session builds the list's
- * `Configuration` from its own state and rows call `send(SessionFeature.Action)`; row UI state
- * (`TranscriptDisclosureState`) lives with the list. Here the session sets [State.configuration]
- * (or calls [TranscriptList] directly) and maps [Action.Delegate] to its own actions.
+ * The transcript's store seam. The session builds the list's `Configuration` from its own state and
+ * rows call `send(SessionFeature.Action)`; row UI state (`TranscriptDisclosureState`) lives with
+ * the list. Here the session sets [State.configuration] (or calls [TranscriptList] directly) and
+ * maps [Action.Delegate] to its own actions.
  */
 class TranscriptFeature : Reducer<TranscriptFeature.State, TranscriptFeature.Action> {
     data class State(
         val configuration: TranscriptConfiguration = TranscriptConfiguration(),
-        /** Incremented when the reader taps Jump to latest (iOS `SessionScrollEdgeBridge.jumpRequest`). */
+        /** Incremented when the reader taps Jump to latest. */
         val jumpRequest: Int = 0,
         /** Whether the list's scroll behavior shows Jump to latest. */
         val showsJumpButton: Boolean = false,

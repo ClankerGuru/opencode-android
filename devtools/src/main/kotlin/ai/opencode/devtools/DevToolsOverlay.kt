@@ -52,8 +52,8 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 
 /**
- * Wraps the app's root content with the developer tools (iOS `TuningOverlay`). Outside debug builds
- * with Developer Mode off it is just [content].
+ * Wraps the app's root content with the developer tools. Outside debug builds with Developer Mode
+ * off it is just [content].
  */
 @Composable
 fun DevToolsOverlay(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
@@ -100,8 +100,8 @@ fun DevToolsOverlay(modifier: Modifier = Modifier, content: @Composable () -> Un
 }
 
 /**
- * Slow Motion is on (iOS `SlowMotionBadge`): a speed tag under the status bar that never takes a
- * touch, so a recording shows its speed.
+ * Slow Motion is on: a speed tag under the status bar that never takes a touch, so a recording
+ * shows its speed.
  */
 @Composable
 private fun SlowMotionBadge(scale: Double) {
@@ -126,8 +126,8 @@ private fun SlowMotionBadge(scale: Double) {
 }
 
 /**
- * iOS `TuningGestures`: three-finger double tap, or four fingers held for 0.45 s, summons; a
- * two-finger triple tap toggles Slow Motion. Observes in the Initial pass and never consumes.
+ * Three-finger double tap, or four fingers held for 0.45 s, summons; a two-finger triple tap
+ * toggles Slow Motion. Observes in the Initial pass and never consumes.
  */
 fun Modifier.summonGesture(onSummon: () -> Unit, onToggleSlowMotion: () -> Unit = {}): Modifier = this.then(
     Modifier.pointerInput(Unit) {

@@ -45,12 +45,6 @@ import java.time.Instant
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `SessionFeatureTests+Sending.swift`.
- *
- * Not ported here (`:feature:drawer`, `HomeFeature`): `twoSessionsInARowEachGetStartingUpAndAFinale`
- * (it builds details through `HomeFeature.makeDetail`, a module above this one).
- */
 class SessionFeatureTestsSending {
     private fun user(id: String, text: String) = OpenCodeTranscriptItem.UserText(id = id, text = text)
     private fun assistant(id: String, text: String) = OpenCodeTranscriptItem.AssistantMarkdown(id = id, text = text)

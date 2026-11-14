@@ -7,9 +7,9 @@ import kotlin.math.abs
 import kotlin.math.max
 
 /**
- * Second-order spring (iOS `AutocompleteSpring`) that keeps position and velocity across retargets,
- * so interrupted motion never jumps. `lead` divides the duration so one axis can lead another;
- * [copy] gives an independent value.
+ * Second-order spring that keeps position and velocity across retargets, so interrupted motion
+ * never jumps. `lead` divides the duration so one axis can lead another; [copy] gives an
+ * independent value.
  */
 data class AutocompleteSpring(
     var x: Double = 0.0,

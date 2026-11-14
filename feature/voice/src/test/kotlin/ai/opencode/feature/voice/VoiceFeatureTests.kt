@@ -38,14 +38,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 
-/**
- * Port of iOS `VoiceFeatureTests.swift`: the tests whose store is `VoiceFeature`.
- *
- * Not ported here (their store belongs to another module): `voiceAvailabilityRequiresBothAdvancedToggleAndAPIKey`
- * (SessionFeature, :feature:session); `delegatorMovesTheScreenSendsAVoiceMessageAndReportsTheReply`,
- * `delegatorPinsUnpinsAndOpensADraft`, `aSwitchMidDelegationStillDeliversToTheOriginalSession`
- * (HomeFeature, :feature:drawer).
- */
+/** The tests whose store is `VoiceFeature`. */
 class VoiceFeatureTests {
     private lateinit var h: Harness
 

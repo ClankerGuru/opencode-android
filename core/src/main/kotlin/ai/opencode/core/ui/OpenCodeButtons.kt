@@ -15,7 +15,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/** A button's role (iOS `ButtonRole`). Red is only for [Destructive]. */
+/** A button's role. Red is only for [Destructive]. */
 enum class OpenCodeButtonRole { Normal, Destructive }
 
 object OpenCodeButtonDefaults {
@@ -27,10 +27,7 @@ object OpenCodeButtonDefaults {
     val contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
 }
 
-/**
- * The primary action: Next, Send, Connect, Done (iOS `openCodePrimaryButton()`). Red for
- * [OpenCodeButtonRole.Destructive].
- */
+/** The primary action: Next, Send, Connect, Done. Red for [OpenCodeButtonRole.Destructive]. */
 @Composable
 fun OpenCodePrimaryButton(
     onClick: () -> Unit,
@@ -41,7 +38,7 @@ fun OpenCodePrimaryButton(
 ) {
     val colors = if (role == OpenCodeButtonRole.Destructive) {
         val red = OpenCodeTheme.colors.destructive
-        // systemRed in every theme; iOS labels destructive prominent buttons white.
+        // SystemRed in every theme.
         ButtonDefaults.buttonColors(containerColor = red, contentColor = Color.White)
     } else {
         ButtonDefaults.buttonColors()
@@ -68,8 +65,8 @@ fun OpenCodePrimaryButton(
 ) = OpenCodePrimaryButton(onClick, modifier, enabled, role) { ButtonLabel(text) }
 
 /**
- * The neutral companion: Back, Skip, Cancel, Not Now (iOS `openCodeSecondaryButton()`). Destructive
- * keeps the neutral fill with red text.
+ * The neutral companion: Back, Skip, Cancel, Not Now. Destructive keeps the neutral fill with red
+ * text.
  */
 @Composable
 fun OpenCodeSecondaryButton(

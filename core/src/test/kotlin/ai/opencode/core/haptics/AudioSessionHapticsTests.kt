@@ -5,12 +5,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `AudioSessionHapticsTests.swift` › `AudioSessionHaptics`. The category and mode are
- * iOS's `AVAudioSession` raw values (Android reports `AudioManager`'s mode and no category).
- * `LiveDictationAudioSessionTests` is an opt-in suite on the simulator's real microphone and audio
- * session (`OPENCODE_LIVE_DICTATION=1`), not ported.
- */
 class AudioSessionHapticsTests {
     @get:Rule val isolation = TestIsolationRule()
 

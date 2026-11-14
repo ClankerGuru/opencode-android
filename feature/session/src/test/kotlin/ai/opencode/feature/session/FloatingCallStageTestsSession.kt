@@ -6,10 +6,6 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The `:feature:session` half of iOS `FloatingCallStageTests.swift`: `RequestDockCall` lives with
- * `SessionView+FloatingCall` here (`:feature:voice`'s `FloatingCallStageTests.kt` holds the rest).
- */
 class FloatingCallStageTestsSession {
     @Test fun eachRequestDockingOnTheShowingScreenShrinksTheCall() {
         val first = State.TaskIdentity(serverID = "s", visit = 1, sessionID = "ses_1")

@@ -18,15 +18,15 @@ import java.util.ServiceLoader
 import java.util.UUID
 
 /**
- * Port of iOS `OpenCodeTests/TestIsolationGuard.swift`: catches a test that leaks process-wide
- * state into the next one, resets it, and fails the test that leaked.
+ * Catches a test that leaks process-wide state into the next one, resets it, and fails the test
+ * that leaked.
  *
- * Android keeps far less global state than iOS: shared keys and clients live in each test's
- * dependency container ([DependencyValues.testing], a `TestStore`'s), so they can't leak.
- * What can: the process-wide singletons ([AnimationTimeScale.shared], [TuningStore.shared],
- * [DiagnosticsRecorder.shared], [TuningAccess]), values written through the process root
- * outside a store (`shared(key)` in a plain test, which resolves the root's test container),
- * and unmocked network (`:server`'s `TestNetworkBlock`, plugged in by its test fixtures).
+ * Shared keys and clients live in each test's dependency container ([DependencyValues.testing], a
+ * `TestStore`'s), so they can't leak. What can: the process-wide singletons
+ * ([AnimationTimeScale.shared], [TuningStore.shared], [DiagnosticsRecorder.shared],
+ * [TuningAccess]), values written through the process root outside a store (`shared(key)` in a
+ * plain test, which resolves the root's test container), and unmocked network (`:server`'s
+ * `TestNetworkBlock`, plugged in by its test fixtures).
  *
  * Apply [TestIsolationRule] to a test class (`@get:Rule val isolation = TestIsolationRule()`).
  * After each test it reports blocked network requests and dirty [probes] as failures, resets
@@ -51,7 +51,7 @@ object TestIsolationGuard {
         fun install(guard: TestIsolationGuard)
     }
 
-    /** iOS `ScopeGate`: serializes top-level scopes so interleaving async tests can't mix state. */
+    /** Serializes top-level scopes so interleaving async tests can't mix state. */
     class ScopeGate {
         private val mutex = Mutex()
         suspend fun acquire() = mutex.lock()
@@ -99,7 +99,7 @@ object TestIsolationGuard {
 
     fun latestActiveContext(): TestContext? = synchronized(lock) { activeContexts.lastOrNull() }
 
-    /** iOS `recordBlockedNetworkRequest`: host only, never the path, query or credentials. */
+    /** Host only, never the path, query or credentials. */
     fun recordBlockedNetworkRequest(scheme: String, host: String, method: String) {
         val context = latestActiveContext()
         val message = "TestIsolationGuard [network]: ${context?.name ?: "<unknown-test>"} made unmocked network request ($method $scheme://$host)"
@@ -222,10 +222,7 @@ object TestIsolationGuard {
     )
 }
 
-/**
- * The JUnit side of [TestIsolationGuard] (iOS installs it for every test through a Swift Testing
- * trait and an `XCTestObservation`): `@get:Rule val isolation = TestIsolationRule()`.
- */
+/** The JUnit side of [TestIsolationGuard]: `@get:Rule val isolation = TestIsolationRule()`. */
 class TestIsolationRule : TestRule {
     override fun apply(base: Statement, description: Description): Statement = object : Statement() {
         override fun evaluate() {

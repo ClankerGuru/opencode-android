@@ -46,8 +46,8 @@ internal class LiveSharedBytes private constructor(private val context: Context)
     @Volatile private var preferences: Preferences? = null
 
     /**
-     * File values waiting for the writer, newest only, by path (iOS `BackgroundFileWriter`):
-     * several changes before the writer gets to a file encode and write it once.
+     * File values waiting for the writer, newest only, by path: several changes before the writer
+     * gets to a file encode and write it once.
      */
     private val waitingFiles = HashMap<String, () -> ByteArray>()
 

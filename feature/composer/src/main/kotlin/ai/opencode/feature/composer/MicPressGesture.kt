@@ -17,10 +17,10 @@ import kotlin.math.min
 private typealias HoldArm = DictationFeature.Hold.Arm
 
 /**
- * Where a held mic's finger has gone (iOS `DictationHoldTracker`). Sliding up arms lock and sliding
- * left arms cancel, measured from where the finger is now, so one drag can swing between them. A
- * target arms once its progress reaches 1 and leads the other's, and stays armed until the finger
- * is [hysteresis] short of its line or the other leads by [dominanceMargin]. Distances in dp.
+ * Where a held mic's finger has gone. Sliding up arms lock and sliding left arms cancel, measured
+ * from where the finger is now, so one drag can swing between them. A target arms once its progress
+ * reaches 1 and leads the other's, and stays armed until the finger is [hysteresis] short of its
+ * line or the other leads by [dominanceMargin]. Distances in dp.
  */
 class DictationHoldTracker {
     /** Progress toward each target, 1 at its line. */
@@ -108,7 +108,7 @@ class DictationHoldTracker {
     }
 }
 
-/** The finger's travel while holding the mic, in dp, for the bar to follow (iOS `DictationDrag`, moved down). */
+/** The finger's travel while holding the mic, in dp, for the bar to follow. */
 data class DictationDrag(val translation: Offset = Offset.Zero)
 
 /** What the mic's press reports. */
@@ -171,10 +171,10 @@ class MicPress(var callbacks: MicPressCallbacks) {
 }
 
 /**
- * The mic's press (iOS `MicPressGesture`): it begins at touch-down with the touch's timestamp, so
- * recording starts the moment the finger lands; tap or hold is decided at the lift. Only the first
- * finger counts, and a touch a parent takes over or the system cancels ends as an interruption,
- * never a send. [isEnabled] is off while a recording is hands-free.
+ * The mic's press: it begins at touch-down with the touch's timestamp, so recording starts the
+ * moment the finger lands; tap or hold is decided at the lift. Only the first finger counts, and a
+ * touch a parent takes over or the system cancels ends as an interruption, never a send.
+ * [isEnabled] is off while a recording is hands-free.
  */
 @Composable
 fun Modifier.micPressGesture(isEnabled: Boolean, callbacks: MicPressCallbacks): Modifier {

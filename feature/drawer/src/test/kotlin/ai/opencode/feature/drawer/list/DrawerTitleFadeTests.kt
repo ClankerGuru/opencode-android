@@ -13,15 +13,10 @@ import org.junit.Test
 import kotlin.math.abs
 
 /**
- * Port of iOS `DrawerTitleFadeTests.swift`: a drawer title that overruns its row fades at its own
- * end and keeps its start in view, in either layout direction; while the time reveal slides a row
- * under the card, the whole row fades at the card's edge. Tested through the pure rules
- * [DrawerListTitleView] and [DrawerListSessionCell] draw with ([DrawerListTitle.placement],
- * [DrawerRevealFade]), in dp.
- *
- * Not ported: `aRelayoutMidRevealKeepsTheFadeAtTheEdge` (Compose computes the mask each frame, so a
- * relayout has no state to lose) and `catchUpFocusFindsItsElement` (walks UIKit views; Android uses
- * a `FocusRequester`).
+ * A drawer title that overruns its row fades at its own end and keeps its start in view, in either
+ * layout direction; while the time reveal slides a row under the card, the whole row fades at the
+ * card's edge. Tested through the pure rules [DrawerListTitleView] and [DrawerListSessionCell] draw
+ * with ([DrawerListTitle.placement], [DrawerRevealFade]), in dp.
  */
 class DrawerTitleFadeTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -129,11 +124,9 @@ class DrawerTitleFadeTests {
     }
 
     private companion object {
-        /** iOS's 200 × 24 pt title. */
         const val WIDTH = 200
         /** A title line far wider than its row. */
         const val LONG = 480
-        /** iOS `makeDrawerTestCell`'s 300 pt drawer. */
         const val CELL_WIDTH = 300f
     }
 }

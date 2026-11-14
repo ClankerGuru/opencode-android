@@ -4,16 +4,14 @@ import ai.opencode.core.strings.localized
 import java.security.MessageDigest
 import kotlin.math.roundToInt
 
-/** Port of iOS `MermaidTheme` (`Media/Mermaid/MermaidSyntax.swift`). */
 enum class MermaidTheme(val rawValue: String) {
     Light("light"),
     Dark("dark"),
 }
 
 /**
- * What a rendered diagram is cached under: its source, its theme, and the width it was drawn
- * for (0 for the diagram itself, before any drawing). Port of iOS `MermaidCacheKey`; [width] is
- * in dp, rounded like iOS points.
+ * What a rendered diagram is cached under: its source, its theme, and the width it was drawn for (0
+ * for the diagram itself, before any drawing). [width] is in dp, rounded.
  */
 data class MermaidCacheKey private constructor(
     val sourceHash: String,
@@ -28,7 +26,6 @@ data class MermaidCacheKey private constructor(
     val string: String get() = "$sourceHash|${theme.rawValue}|$width"
 }
 
-/** Port of iOS `MermaidSyntax`. */
 object MermaidSyntax {
     /** Hashes by source; emptied when full. */
     private val hashes = HashMap<String, String>()

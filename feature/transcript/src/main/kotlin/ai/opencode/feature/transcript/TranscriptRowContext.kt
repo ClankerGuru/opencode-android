@@ -9,10 +9,7 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.staticCompositionLocalOf
 
-/**
- * Per-row values the list hands each row beside its entry (iOS
- * `TranscriptListViewController.RowProps`). Equal props skip recomposition.
- */
+/** Per-row values the list hands each row beside its entry. Equal props skip recomposition. */
 @Immutable
 data class RowProps(
     val canSendNow: Boolean = false,
@@ -26,10 +23,9 @@ data class RowProps(
 )
 
 /**
- * View-local row state (tool, compaction, Show More, link-list disclosure) owned by the list,
- * never by a row (iOS `TranscriptDisclosureState`): a row leaving the screen and coming back
- * (LazyColumn disposes it) keeps what the reader opened. Snapshot-backed sets, so only rows
- * reading an ID recompose when it toggles.
+ * View-local row state (tool, compaction, Show More, link-list disclosure) owned by the list, never
+ * by a row: a row leaving the screen and coming back (LazyColumn disposes it) keeps what the reader
+ * opened. Snapshot-backed sets, so only rows reading an ID recompose when it toggles.
  */
 @Stable
 class TranscriptDisclosureState {
@@ -42,8 +38,8 @@ class TranscriptDisclosureState {
     val linkLists = mutableStateSetOf<String>()
 
     /**
-     * Set by the list: runs a toggle in a row as one motion (iOS `toggleDisclosure`). Without it
-     * the change lands at once. Arguments: row ID, opening, cross-fades, the toggle itself.
+     * Set by the list: runs a toggle in a row as one motion. Without it the change lands at once.
+     * Arguments: row ID, opening, cross-fades, the toggle itself.
      */
     var animateToggle: ((entryID: String, opening: Boolean, crossFades: Boolean, toggle: () -> Unit) -> Unit)? = null
 
@@ -59,10 +55,10 @@ class TranscriptDisclosureState {
 
     fun isOpen(kind: Kind, id: String): Boolean = id in set(kind)
 
-    /** Closes everything (iOS replaces the state on a session change). */
+    /** Closes everything. */
     fun clear() = Kind.entries.forEach { set(it).clear() }
 
-    /** Opens or closes [id] in the row for [entryID] (iOS `toggle(_:_:in:crossFades:)`). */
+    /** Opens or closes [id] in the row for [entryID]. */
     fun toggle(kind: Kind, id: String, entryID: String, crossFades: Boolean = false) {
         val target = set(kind)
         val opening = id !in target
@@ -73,8 +69,8 @@ class TranscriptDisclosureState {
     companion object {
         /**
          * For the list's `rememberSaveable`: what the reader opened outlives the activity being
-         * recreated (a dark mode switch, font size, process death), where iOS's view just
-         * redraws. The list is keyed by session, so each session keeps its own.
+         * recreated (a dark mode switch, font size, process death). The list is keyed by session,
+         * so each session keeps its own.
          */
         val Saver: Saver<TranscriptDisclosureState, Any> = listSaver<TranscriptDisclosureState, ArrayList<String>>(
             save = { state -> Kind.entries.map { ArrayList(state.set(it)) } },
@@ -85,10 +81,7 @@ class TranscriptDisclosureState {
     }
 }
 
-/**
- * What every transcript row reads from its surroundings (iOS environment values set on hosted
- * cells: `transcriptRowActions`, `sessionLinks`, `transcriptLayoutTuning`, `imagePreviews`).
- */
+/** What every transcript row reads from its surroundings. */
 @Stable
 class TranscriptRowContext(
     val server: OpenCodeServer?,
@@ -96,7 +89,7 @@ class TranscriptRowContext(
     val directory: String?,
     val disclosure: TranscriptDisclosureState,
     val send: (TranscriptAction) -> Unit,
-    /** Image previews inside the transcript (iOS `imagePreviews`); other Markdown surfaces show cards. */
+    /** Image previews inside the transcript; other Markdown surfaces show cards. */
     val imagePreviews: Boolean = true,
 )
 

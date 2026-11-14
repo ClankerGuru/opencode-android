@@ -70,7 +70,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.util.Locale
 
-/** Settings › Developer (iOS `DiagnosticsView`). [onClose] shows a back arrow on the main page. */
+/** Settings › Developer. [onClose] shows a back arrow on the main page. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DevToolsView(
@@ -343,7 +343,7 @@ private fun SlowMotionRow(scale: Double, onChange: (Double) -> Unit) {
     }
 }
 
-// Troubleshooting (iOS DiagnosticsView.troubleshooting)
+// Troubleshooting
 
 @Composable
 private fun TroubleshootingPage(state: DevToolsFeature.State) {
@@ -385,7 +385,7 @@ private fun TroubleshootingPage(state: DevToolsFeature.State) {
     }
 }
 
-/** iOS's Motion Watch row: kind, row kinds, frame count, row IDs and detail; monospaced. */
+/** Kind, row kinds, frame count, row IDs and detail; monospaced. */
 @Composable
 private fun MotionJumpRow(jump: MotionWatchEvent) {
     val mono = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)

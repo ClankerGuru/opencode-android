@@ -19,14 +19,13 @@ import androidx.compose.ui.platform.LocalFocusManager
  */
 interface DrawerKeyboardSignals {
     /**
-     * The card lays out without the keyboard (iOS `DrawerKeyboardHold.excludesKeyboard`): the
-     * session leaves `WindowInsets.ime` out while true.
+     * The card lays out without the keyboard: the session leaves `WindowInsets.ime` out while true.
      */
     val excludesKeyboard: Boolean
 
     /**
-     * Whether the field named [key] is held while the drawer moves or rests open (iOS
-     * `DrawerKeyboardHold.isHeld`), so input can't reach it.
+     * Whether the field named [key] is held while the drawer moves or rests open, so input can't
+     * reach it.
      */
     fun isHeld(key: Any): Boolean
 
@@ -34,8 +33,8 @@ interface DrawerKeyboardSignals {
     val holdsCardField: Boolean get() = false
 
     /**
-     * A text field on the card gained or lost focus (iOS `textDidBegin/EndEditing` on the card).
-     * [clearFocus] lets the drawer take the focus away when the card changes.
+     * A text field on the card gained or lost focus. [clearFocus] lets the drawer take the focus
+     * away when the card changes.
      */
     fun cardFieldFocusChanged(key: Any, focused: Boolean, clearFocus: () -> Unit)
 
@@ -80,8 +79,8 @@ fun Modifier.drawerKeyboardField(key: Any): Modifier = composed {
 }
 
 /**
- * Where the session drawer's pan never starts (iOS `DrawerPanExclusionSpace`). Regions are layout
- * nodes, so hit tests follow the card.
+ * Where the session drawer's pan never starts. Regions are layout nodes, so hit tests follow the
+ * card.
  */
 interface DrawerPanExclusion {
     /** Records ([coordinates] non-null) or clears the excluded region named [id]. */
@@ -149,10 +148,7 @@ fun Modifier.drawerPanSelectionHandles(handleClaims: (Offset) -> Boolean): Modif
     }
 }
 
-/**
- * The drawer's pan never starts on this element while [isEnabled] (iOS
- * `excludedFromDrawerPan(isEnabled:)`).
- */
+/** The drawer's pan never starts on this element while [isEnabled]. */
 fun Modifier.excludedFromDrawerPan(isEnabled: Boolean = true): Modifier = composed {
     val exclusion = LocalDrawerPanExclusion.current
     if (exclusion == null) {

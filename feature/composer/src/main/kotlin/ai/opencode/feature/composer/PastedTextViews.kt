@@ -73,10 +73,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 /**
- * A long paste ([PastedText]) as a card (iOS `PastedTextCard`): its name and length over its
- * first lines. In the composer it sits with images and files; on a sent message, where its
- * images go. A tap opens the whole text ([onOpen] presents [PastedTextViewer]; the media
- * area's presenter owns the zoom from the card).
+ * A long paste ([PastedText]) as a card: its name and length over its first lines. In the composer
+ * it sits with images and files; on a sent message, where its images go. A tap opens the whole text
+ * ([onOpen] presents [PastedTextViewer]; the media area's presenter owns the zoom from the card).
  *
  * [summary] is computed once with the text; the card never reads the text itself.
  */
@@ -120,8 +119,7 @@ fun PastedTextCard(
                 color = OpenCodeTheme.colors.text,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                // iOS `Spacer(minLength: 6)` gives way before the title does: the title takes the
-                // free width (drawn from the leading edge) and truncates only past it.
+                // The spacer gives way before the title does.
                 modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(6.dp))
@@ -163,9 +161,9 @@ fun PastedTextCard(
 }
 
 /**
- * The whole paste, with Copy and Share (iOS `PastedTextViewer`): numbered lines (wrapped, or
- * not), built off the main thread; past the code viewer's 2 MB limit, or with a line longer
- * than 16 KB, as plain selectable text laid out a chunk at a time.
+ * The whole paste, with Copy and Share: numbered lines (wrapped, or not), built off the main
+ * thread; past the code viewer's 2 MB limit, or with a line longer than 16 KB, as plain selectable
+ * text laid out a chunk at a time.
  *
  * Copy and Share go through the caller ([onCopy] → `PasteboardClient`, [onShare] → the share
  * sheet); the viewer only shows “Copied” for 1.5 s and plays `tap`.

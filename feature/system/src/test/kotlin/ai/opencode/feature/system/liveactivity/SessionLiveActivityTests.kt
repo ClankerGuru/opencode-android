@@ -11,12 +11,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 
-/**
- * Port of iOS `SessionLiveActivityTests.swift`'s mapping tests. Its Home store tests (a send
- * starts the activity, live steps, the background wait, settling, the experiment switching off)
- * are `:feature:drawer`'s, with `HomeFeature.State.sessionActivity`; `leavingHomeEndsAFollowedRunsActivity`
- * is `:app`'s once Home tracks the run.
- */
 class SessionLiveActivityTests {
     private typealias Content = SessionActivityAttributes.ContentState
     private typealias Run = SessionLiveActivity.Run

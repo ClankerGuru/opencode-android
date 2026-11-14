@@ -8,9 +8,9 @@ import java.io.File
 import java.time.Instant
 
 /**
- * Port of iOS `SessionDirectory`: what app shortcuts, tiles, widgets and launcher quick actions
- * know about your sessions, so they can offer and resolve them without the network. Titles and
- * project names only: never message text or credentials.
+ * What app shortcuts, tiles, widgets and launcher quick actions know about your sessions, so they
+ * can offer and resolve them without the network. Titles and project names only: never message text
+ * or credentials.
  *
  * The controls' copy ([forControls], [ControlDirectoryStore]) is kept so a change to what they show
  * (and only that) redraws them.
@@ -142,8 +142,8 @@ data class SessionDirectory(
 }
 
 /**
- * Port of iOS `ControlDirectoryStore`: the controls' copy of the directory, an app-private file
- * used to tell when the controls need redrawing.
+ * The controls' copy of the directory, an app-private file used to tell when the controls need
+ * redrawing.
  */
 class ControlDirectoryStore(
     val load: () -> SessionDirectory?,

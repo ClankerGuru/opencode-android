@@ -18,14 +18,6 @@ import org.junit.Assert.fail
 import org.junit.Test
 import java.util.UUID
 
-/*
- * The `:feature:transcript` suites of iOS `OpenCodeTests/AgentFileTests.swift`:
- * `AgentFileMarkdownTests` (less `toolRowsOfferViewableFiles`, `:server`) and `ToolSummaryTests`
- * (iOS `TranscriptEntryView.toolGroupLabel`/`toolGroupFailedNotices` → [ToolGroupLabel]).
- * `AgentFileReferenceTests` are `:server`'s; `AgentFileLoadingTests` and
- * `AgentFileAudioOwnershipTests` `:feature:media`'s.
- */
-
 private fun cards(blocks: List<OpenCodeMarkdownBlock>): List<List<String>> =
     blocks.mapNotNull { (it.kind as? Kind.Files)?.files?.map(AgentFileReference::path) }
 
@@ -33,7 +25,7 @@ class AgentFileMarkdownTests {
     @Test fun pathsInCodeAndLocalLinksBecomeFileLinks() {
         val blocks = OpenCodeMarkdownBlock.blocks("See `OpenCode/SessionView.swift:12`, [the spec](docs/spec.pdf), and [the site](https://opencode.ai).")
         val text = (blocks.firstOrNull()?.kind as? Kind.Paragraph)?.text ?: return fail("Expected a paragraph")
-        // iOS `runs.compactMap(\.link)`: equal neighbouring links coalesce into one run.
+        // Equal neighbouring links coalesce into one run.
         val urls = mutableListOf<String>()
         var previous: String? = null
         for (run in text.runs) {
@@ -77,9 +69,9 @@ class AgentFileMarkdownTests {
     }
 
     /**
-     * iOS round-trips the parsed blocks through JSON. Android's transcript snapshot keeps the
-     * reply's raw Markdown ([OpenCodeTranscriptItem.AssistantMarkdown]) and parses it on display,
-     * so the snapshot is the item: its cards come back after the round trip.
+     * Android's transcript snapshot keeps the reply's raw Markdown
+     * ([OpenCodeTranscriptItem.AssistantMarkdown]) and parses it on display, so the snapshot is the
+     * item: its cards come back after the round trip.
      */
     @Test fun cardsSurviveTheTranscriptSnapshot() {
         val item: OpenCodeTranscriptItem = OpenCodeTranscriptItem.AssistantMarkdown("a", "Rendered `out/demo.mp4`.")
@@ -102,8 +94,8 @@ class ToolSummaryTests {
         )
 
     /**
-     * Kit's phone: nine reads, two shells, seven image edits and more, one
-     * of which failed, count the tools and mark the failure.
+     * Nine reads, two shells, seven image edits and more, one of which failed, count the tools and
+     * mark the failure.
      */
     @Test fun longFailedMixCountsToolsAndFailures() {
         val tools = List(9) { tool("read") } + listOf(tool("shell"), tool("shell")) +

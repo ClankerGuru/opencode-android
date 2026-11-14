@@ -54,10 +54,6 @@ import java.util.UUID
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `AppFeatureTests.swift` (the `AppFeature` reducer half; the rest is `:server`'s
- * `AppFeatureTests`).
- */
 class AppFeatureTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -94,7 +90,7 @@ class AppFeatureTests {
 
     private fun gated(gate: GatedHome) = gate.client()
 
-    /** iOS `suspendedConnectionStore()`: probes and reads hold open until cancelled. */
+    /** Probes and reads hold open until cancelled. */
     private fun TestScope.suspendedConnectionStore(): TestStore<AppFeature.State, AppFeature.Action> {
         val clock = TestClock()
         val state = shared.appState()
@@ -1237,7 +1233,7 @@ class AppFeatureTests {
         store.finish()
     }
 
-    // Connecting picks the address, keeps the saved order: from iOS `ServerLinkConnectionTests`.
+    // Connecting picks the address, keeps the saved order.
 
     @Test
     fun connectFallsBackToAnAlternateAddressAndAdoptsIt() = runTest {

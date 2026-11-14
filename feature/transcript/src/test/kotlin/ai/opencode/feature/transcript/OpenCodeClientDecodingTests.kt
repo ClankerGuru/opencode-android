@@ -5,10 +5,6 @@ import ai.opencode.server.model.OpenCodeTranscriptItem
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * The `:feature:transcript` test of iOS `OpenCodeTests/OpenCodeClientDecodingTests.swift`
- * ([TranscriptEntry.build] over decoded run errors); the decoding tests are `:server`'s.
- */
 class OpenCodeClientDecodingTests {
     @Test
     fun aFailedRunShowsItsStepsErrorOnceNotTheIdleRepeat() {

@@ -25,10 +25,7 @@ import java.io.File
 import java.time.Instant
 import java.util.UUID
 
-/**
- * Port of iOS `VoiceCallLogLiveTests.swift`, the `AppFeature` part: leaving Home mid-call saves the
- * call's log.
- */
+/** The `AppFeature` part: leaving Home mid-call saves the call's log. */
 class VoiceCallLogLiveTests {
     @get:Rule val isolation = TestIsolationRule()
     @get:Rule val temporary = TemporaryFolder()

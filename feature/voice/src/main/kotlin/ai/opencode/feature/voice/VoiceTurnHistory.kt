@@ -4,7 +4,7 @@ package ai.opencode.feature.voice
  * Bounded 40-turn ring buffer and seed-offset bookkeeping shared by both
  * voice coordinators when seeding a replacement session.
  *
- * Immutable (a Swift value type): the iOS `mutating` methods return the updated history.
+ * Immutable: the mutating methods return the updated history.
  */
 data class VoiceTurnHistory(
     val turns: List<Turn> = emptyList(),

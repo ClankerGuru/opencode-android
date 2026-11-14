@@ -13,7 +13,7 @@ import ai.opencode.server.model.OpenCodeToolCall
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import ai.opencode.server.model.TranscriptNoticeKind
 
-/** Answer reading and writing the dock shares with its tests (iOS `RequestDockAnswer`, `RequestDockAnswer.swift`). */
+/** Answer reading and writing the dock shares with its tests. */
 object RequestDockAnswer {
     /**
      * A subagent's request names it, as the drawer does; a global or MCP form names its
@@ -99,7 +99,7 @@ object RequestDockAnswer {
         null -> false
     }
 
-    /** Whether the bar's words are the answer, rather than set aside for a choice (iOS extension in `RequestAnswer.swift`). */
+    /** Whether the bar's words are the answer, rather than set aside for a choice. */
     fun isCustom(text: String, value: OpenCodeFormValue?): Boolean {
         if (text.isBlank()) return false
         return when (value) {
@@ -111,9 +111,8 @@ object RequestDockAnswer {
     }
 
     /**
-     * The tool call that asks, from this transcript or a subagent's (iOS
-     * `RequestDockView.toolCall(for:)`): [transcripts] are the session's items followed by
-     * its family transcript cache.
+     * The tool call that asks, from this transcript or a subagent's: [transcripts] are the
+     * session's items followed by its family transcript cache.
      */
     fun toolCall(permission: OpenCodePermissionRequest, transcripts: List<List<OpenCodeTranscriptItem>>): OpenCodeToolCall? {
         val source = permission.source ?: return null

@@ -7,10 +7,7 @@ import ai.opencode.feature.drawer.HomeFeature.State
 import ai.opencode.feature.session.isDraft
 import ai.opencode.feature.voice.VoiceFeature
 
-/*
- * Port of iOS `HomeFeature+Traces.swift` (`Diagnostics/Traces/`): where the app is, for a Report a
- * Problem report, and which session the report also goes into.
- */
+/* Where the app is, for a Report a Problem report, and which session the report also goes into. */
 
 /** Where the app is, for a report. Tagged with the session ID and server persistence ID: never server addresses or message text. */
 internal val State.problemReportContext: ProblemReportContext

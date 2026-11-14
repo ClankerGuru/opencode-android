@@ -50,7 +50,6 @@ import kotlin.time.Duration.Companion.seconds
 
 enum class NotificationPermission { NotDetermined, Disabled, Enabled }
 
-/** Port of iOS `NotificationPermissionClient`. */
 class NotificationPermissionClient(
     val status: suspend () -> NotificationPermission,
     val request: suspend () -> NotificationPermission,
@@ -82,8 +81,8 @@ class NotificationPermissionClient(
 }
 
 /**
- * Port of iOS `NotificationKeysClient`: this phone's notification keys, off the
- * main thread. The live value is [NotificationKeyStore.live]; the test value has no keys.
+ * This phone's notification keys, off the main thread. The live value is
+ * [NotificationKeyStore.live]; the test value has no keys.
  */
 class NotificationKeysClient(
     /** This phone's public key for `ref`, made the first time. */
@@ -112,12 +111,12 @@ class NotificationKeysClient(
 }
 
 /**
- * Port of iOS `SessionNotificationsClient`: the callback URL a send attaches so the server's
- * notify plugin can tell this phone when the run ends. Null means "send without one":
- * notifications only ever enhance a send and never delay or fail it.
+ * The callback URL a send attaches so the server's notify plugin can tell this phone when the run
+ * ends. Null means "send without one": notifications only ever enhance a send and never delay or
+ * fail it.
  *
- * Senders bind it with `PromptContext.notificationCallbackURL.withValue(url) { … }` (iOS
- * `PromptNotification.$callbackURL`), which `:server` reads when building the prompt body.
+ * Senders bind it with `PromptContext.notificationCallbackURL.withValue(url) { … }`, which
+ * `:server` reads when building the prompt body.
  */
 class SessionNotificationsClient(
     /** Whether this build has a relay and a push channel to offer at all. */
@@ -129,7 +128,7 @@ class SessionNotificationsClient(
     val forget: suspend (String) -> Unit,
     /** The random `ref` a server's pushes carry, made and saved the first time it's asked for. */
     val ref: (String) -> String = { "" },
-    /** iOS adds the badge to a permission granted before the app asked; Android grants the count with notifications. */
+    /** Android grants the badge count with notifications. */
     val includeBadges: suspend () -> Unit = {},
     /** Tells notifications which session is on screen so its own don't show. */
     val setVisibleSession: (shown: Boolean, sessionID: String?) -> Unit = { _, _ -> },
@@ -170,14 +169,13 @@ class SessionNotificationsClient(
 }
 
 /**
- * How a session notification arriving in the foreground shows (iOS
- * `DeliveredNotifications.presentation`). The session on screen shows nothing; while In-App
- * Notices is on, the drawer button tells of the others, so they go only to the shade.
+ * How a session notification arriving in the foreground shows. The session on screen shows nothing;
+ * while In-App Notices is on, the drawer button tells of the others, so they go only to the shade.
  */
 enum class NotificationPresentation { None, Banner, ListOnly }
 
 /**
- * Port of iOS `SessionNotifications`: push registration and relay callback URLs.
+ * Push registration and relay callback URLs.
  *
  * Privacy: the relay is stateless. It seals the push token, the build's push environment and
  * a random per-server `ref` into the callback URL itself, so the OpenCode server never sees
@@ -191,13 +189,12 @@ enum class NotificationPresentation { None, Banner, ListOnly }
  * ([isEncryptedCallback]); a missing plugin, unavailable key store or failed exchange can
  * yield a generic "New activity" notification, never a clear-text one.
  *
- * Android pushes ride FCM: the build's push environment is [FCM_ENVIRONMENT] (`"fcm"`, iOS
- * `development`/`production`), and the token is the FCM registration token. The relay
- * (`packages/notify-relay`) seals APNs tokens only today, so it answers this registration
- * with 400 and every send goes without a callback, failing open as any relay outage does;
- * docs/parity/system.md lists the relay change FCM needs. Until a build carries a Firebase
- * configuration there is no environment at all ([isAvailable] false) and nothing is asked
- * of the relay. The whole path (permission, token wait, mint, saved callbacks, tap routing,
+ * Android pushes ride FCM: the build's push environment is [FCM_ENVIRONMENT], and the token is the
+ * FCM registration token. The relay (`packages/notify-relay`) seals APNs tokens only today, so it
+ * answers this registration with 400 and every send goes without a callback, failing open as any
+ * relay outage does; docs/parity/system.md lists the relay change FCM needs. Until a build carries
+ * a Firebase configuration there is no environment at all ([isAvailable] false) and nothing is
+ * asked of the relay. The whole path (permission, token wait, mint, saved callbacks, tap routing,
  * the push handler) is in place behind [PushTokenProvider].
  */
 class SessionNotifications internal constructor(private val tokens: PushTokenProvider) {
@@ -215,7 +212,7 @@ class SessionNotifications internal constructor(private val tokens: PushTokenPro
         return if (off) NotificationPresentation.Banner else NotificationPresentation.ListOnly
     }
 
-    /** A tapped notification's destination, delivered once something routes it (iOS `onOpen`). */
+    /** A tapped notification's destination, delivered once something routes it. */
     var onOpen: ((NotificationDestination) -> Unit)? = null
         set(value) {
             field = value
@@ -403,7 +400,7 @@ class SessionNotifications internal constructor(private val tokens: PushTokenPro
         if (ref != null) runCatching { keys.remove(ref) }
     }
 
-    /** The authenticated payload of a push envelope (iOS `verify(_:)`). */
+    /** The authenticated payload of a push envelope. */
     suspend fun verify(envelope: NotificationContent.Envelope): NotificationContent.Verified? = keys.verify(envelope)
 
     fun didRegister(token: String) {
@@ -424,7 +421,7 @@ class SessionNotifications internal constructor(private val tokens: PushTokenPro
         return NotificationDestination(serverKey, sessionID).takeIf { it.isValid }
     }
 
-    /** A tapped notification: its envelope is authenticated again, then routed (iOS `didReceive`). */
+    /** A tapped notification: its envelope is authenticated again, then routed. */
     suspend fun open(envelope: NotificationContent.Envelope) {
         val verified = verify(envelope) ?: return
         open(verified.ref, verified.payload.sessionID)
@@ -465,9 +462,8 @@ class SessionNotifications internal constructor(private val tokens: PushTokenPro
         const val FCM_ENVIRONMENT = "fcm"
 
         /**
-         * The push environment the relay seals (`APNSEnvironment` on iOS): [FCM_ENVIRONMENT]
-         * when the build carries a Firebase configuration (FCM can mint tokens), else null and
-         * the build offers no callback.
+         * The push environment the relay seals: [FCM_ENVIRONMENT] when the build carries a Firebase
+         * configuration (FCM can mint tokens), else null and the build offers no callback.
          */
         val environment: String? by lazy {
             FCM_ENVIRONMENT.takeIf { FcmPushTokenProvider.isConfigured(dependency(AppContext).applicationContext) }
@@ -486,9 +482,9 @@ class SessionNotifications internal constructor(private val tokens: PushTokenPro
         private val json = Json { ignoreUnknownKeys = true }
 
         /**
-         * iOS `isEncryptedCallback(_:relay:)`: only a `/v2/notify/<token>` URL on the relay's
-         * own HTTPS origin, with no user, password, query or fragment, is ever used as a
-         * callback. Old (`/v1/`) or foreign capabilities never reach a prompt.
+         * Only a `/v2/notify/<token>` URL on the relay's own HTTPS origin, with no user, password,
+         * query or fragment, is ever used as a callback. Old (`/v1/`) or foreign capabilities never
+         * reach a prompt.
          */
         fun isEncryptedCallback(url: String, relay: HttpUrl? = RELAY_URL.toHttpUrlOrNull()): Boolean {
             relay ?: return false
@@ -555,9 +551,9 @@ class SessionNotifications internal constructor(private val tokens: PushTokenPro
 }
 
 /**
- * The push channel's token, behind an interface (iOS: APNs registration). The live provider
- * is FCM's ([FcmPushTokenProvider]); it reports failure at once until a Firebase
- * configuration ships with the build, and every send goes without a callback.
+ * The push channel's token, behind an interface. The live provider is FCM's
+ * ([FcmPushTokenProvider]); it reports failure at once until a Firebase configuration ships with
+ * the build, and every send goes without a callback.
  */
 fun interface PushTokenProvider {
     /** Asks for the token; exactly one of the callbacks runs, now or later. */

@@ -7,9 +7,9 @@ import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 
 /**
- * Port of iOS `Settings/WhatsNew/WhatsNewFeature.swift`. What’s New: a drawer row while some
- * feature is unseen, the page it pushes, and Settings’ switch for the row. Smaller changes never
- * bring the row back. What’s new is seen once the page you read it on closes.
+ * What’s New: a drawer row while some feature is unseen, the page it pushes, and Settings’ switch
+ * for the row. Smaller changes never bring the row back. What’s new is seen once the page you read
+ * it on closes.
  *
  * The page lives on Settings' stack ([ai.opencode.feature.settings.SettingsFeature] with `root =
  * whatsNew`). The seen IDs and the row switch are shared keys ([seenIDs], [isButtonEnabled]).

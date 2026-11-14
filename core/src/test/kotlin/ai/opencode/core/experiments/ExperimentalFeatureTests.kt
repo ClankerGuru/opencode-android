@@ -16,26 +16,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `ExperimentalFeatureTests`. `theSessionsPageDividerSwitchKeepsTheSavedChoice`
- * drives `HomeSettingsFeature`, so it's in `:feature:settings`' `ExperimentalFeatureTests`.
- */
 class ExperimentalFeatureTests {
     @get:Rule val isolation = TestIsolationRule()
 
-    /** iOS `withDependencies { $0.defaultAppStorage = fresh }`: a fresh test container's storage. */
+    /** A fresh test container's storage. */
     private fun <R> withFreshStorage(block: () -> R): R = DependencyValues.withValues(DependencyValues.testing(), block)
 
     /**
-     * iOS `defaults.set(_:forKey:)` on a fresh suite: a raw saved value, written even when it
-     * equals the key's default (a nullable key, so `false` is stored rather than skipped).
+     * A raw saved value, written even when it equals the key's default (a nullable key, so `false`
+     * is stored rather than skipped).
      */
     private fun SharedStore.save(id: String, value: Boolean) = reference(SharedKey.appStorage<Boolean?>(id, null)).set(value)
 
-    /** iOS `defaults.object(forKey:) != nil`. */
     private fun SharedStore.has(id: String) = contains(SharedKey.appStorage<Boolean?>(id, null))
 
-    /** iOS `defaults.bool(forKey:)`. */
     private fun SharedStore.bool(id: String) = reference(SharedKey.appStorage(id, false)).value
 
     @Test
@@ -73,7 +67,7 @@ class ExperimentalFeatureTests {
     @Test
     fun everyExperimentHasACopyForSettings() {
         for (feature in ExperimentalFeature.allCases) {
-            // Android divergence: no summary under the title, so only the title is checked.
+            // No summary under the title, so only the title is checked.
             assertTrue(feature.title.isNotEmpty())
         }
         assertEquals("In-App Browser", ExperimentalFeature.inAppBrowser.title)
@@ -142,7 +136,6 @@ class ExperimentalFeatureTests {
         }
     }
 
-    /** `VoiceAudioDemoMode` lives in `:feature:voice`; its half of this test belongs there. */
     @Test
     fun voiceDemoModeRequiresDeveloperMode() {
         withFreshStorage {

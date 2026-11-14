@@ -14,10 +14,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `HapticsAuditTests`' Home test (`homeHaptics`). The session screen's audits are
- * `:feature:session`'s and `LiveHapticsTests` is `:core`'s.
- */
 class HapticsAuditTests {
     @get:Rule val isolation = TestIsolationRule()
 

@@ -33,10 +33,6 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.time.Instant
 
-/**
- * Port of the `:app` half of iOS `MultipleWindowsTests.swift` (window roster, app-wide work, call
- * ownership).
- */
 class MultipleWindowsTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -194,7 +190,7 @@ class WindowRosterTests {
     }
 }
 
-/** iOS `MultipleWindowsTests.windowTargetRoundTripsThroughItsActivity`: the target rides an `Intent` (Robolectric). */
+/** The target rides an `Intent` (Robolectric). */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], application = Application::class)
 class MultipleWindowsFrameworkTests {
@@ -217,8 +213,8 @@ class MultipleWindowsFrameworkTests {
 }
 
 /**
- * iOS `AppWideWorkTests`: [AppWideWork] with real window stores. Robolectric, because a [Store]
- * sends on Android's main looper.
+ * [AppWideWork] with real window stores. Robolectric, because a [Store] sends on Android's main
+ * looper.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], application = Application::class)
@@ -237,7 +233,7 @@ class AppWideWorkTests {
         idle()
     }
 
-    /** iOS `Recording`: `AppFeature`, noting which store each intent reached. */
+    /** `AppFeature`, noting which store each intent reached. */
     private fun recording(name: String) = object : Reducer<AppFeature.State, AppFeature.Action> {
         val base = AppFeature()
         override fun reduce(state: AppFeature.State, action: AppFeature.Action): Reduced<AppFeature.State, AppFeature.Action> {

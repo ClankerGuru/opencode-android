@@ -36,11 +36,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `VoiceLiveTests.swift`'s Home tests. The rest are `:feature:voice`'s
- * (`VoiceLiveTests.kt` there); `quietGateHonorsReducedReplyWaitMaxHoldCapAndNeverCutsOffSpeech`
- * is `:app`'s.
- */
 class VoiceLiveTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -110,7 +105,7 @@ class VoiceLiveTests {
         store.send(voiceEvent(VoiceCallEvent.FunctionCall(callID = "del_draft", name = "delegate", arguments = arguments())))
         store.receiveVoice(VoiceFeature.Action.SessionStarted::class)
         store.receiveVoice(VoiceFeature.Action.WorkAdmitted::class)
-        // iOS `Task.sleep(for: .milliseconds(40))`: effects the actions it reduces start run too.
+        // Effects the actions it reduces start run too.
         repeat(3) {
             delay(15)
             store.skipReceivedActions()
@@ -128,7 +123,7 @@ class VoiceLiveTests {
             { it.detailAction is SessionFeature.Action.FamilySessionRenamed },
             "sessionDetail.familySessionRenamed",
         )
-        // iOS `Task.sleep(for: .milliseconds(40))`: effects the actions it reduces start run too.
+        // Effects the actions it reduces start run too.
         repeat(3) {
             delay(15)
             store.skipReceivedActions()
@@ -142,7 +137,7 @@ class VoiceLiveTests {
         // `session.start`s and sends a short delta via `session.instructions.append`. The delegation on its way keeps going.
         store.send(HomeFeature.Action.SessionTapped(other.id))
         store.receiveVoice(VoiceFeature.Action.TargetChanged::class)
-        // iOS `Task.sleep(for: .milliseconds(40))`: effects the actions it reduces start run too.
+        // Effects the actions it reduces start run too.
         repeat(3) {
             delay(15)
             store.skipReceivedActions()

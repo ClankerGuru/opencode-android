@@ -19,7 +19,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/** Port of the `AppFeature` part of iOS `AppIconBadgeTests.swift` (forgetting an identity). */
 class AppIconBadgeTests {
     @get:Rule val isolation = TestIsolationRule()
 

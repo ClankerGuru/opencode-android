@@ -61,13 +61,8 @@ import org.junit.Test
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of the `SessionFeature` tests of iOS `VoiceFeatureTests+Screen.swift`, deferred from
- * `:feature:voice` (its `VoiceFeatureTestsScreen.kt` holds the rest), and the session half of
- * `aDraftCallsRefusedModelSendsNothing`.
- *
- * iOS voice writes `PromptOutbox` directly; Android's voice records through
- * `VoiceAdmissionRecorder`, which `:app` installs over the composer's outbox. Tests that assert
- * admissions install the same bridge ([recordInto]).
+ * Voice records through `VoiceAdmissionRecorder`, which `:app` installs over the composer's outbox.
+ * Tests that assert admissions install the same bridge ([recordInto]).
  */
 class VoiceFeatureTestsScreenSession {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
@@ -125,12 +120,10 @@ class VoiceFeatureTestsScreenSession {
         ),
     )
 
-    /** iOS `\.voice.presented.<case>`. */
     private inline fun <reified T : VoiceFeature.Action> voice(): (Action) -> Boolean = { action ->
         ((action as? Action.Voice)?.action as? PresentationAction.Presented)?.action is T
     }
 
-    /** iOS `\.voice.presented.delegate.<case>`. */
     private inline fun <reified T : VoiceFeature.DelegateAction> voiceDelegate(): (Action) -> Boolean = { action ->
         val presented = ((action as? Action.Voice)?.action as? PresentationAction.Presented)?.action
         presented is VoiceFeature.Action.Delegate && presented.action is T
@@ -138,7 +131,7 @@ class VoiceFeatureTestsScreenSession {
 
     private fun live(voice: VoiceFeature.State) = voice.withPhase(VoiceFeature.State.Phase.Live)
 
-    /** An empty `transcript` read that never returns (iOS's never-finishing stream). */
+    /** An empty `transcript` read that never returns. */
     private suspend fun neverItems(): List<OpenCodeTranscriptItem> = awaitCancellation()
 
     private fun DependencyValues.Builder.draftSessionClient(created: OpenCodeSession) {
@@ -220,7 +213,7 @@ class VoiceFeatureTestsScreenSession {
         }
         val store = h.store(state) {
             recordInto(outbox)
-            // iOS leaves the clock unimplemented; the call's reply-watch timers wait on it until skipped.
+            // The clock is unimplemented; the call's reply-watch timers wait on it until skipped.
             this[Clock] = ai.opencode.core.dependencies.TestClock()
             this[DateClient] = DateClient.constant(date(4_000))
             this[VoiceCallClient] = callClient(
@@ -497,9 +490,8 @@ class VoiceFeatureTestsScreenSession {
     }
 
     /**
-     * A refused model sends nothing: the call hears why, and the pick waits
-     * on the session it created. (The `VoiceWorkClient` half is in `:feature:voice`'s port; this is
-     * the session half, with that admission.)
+     * A refused model sends nothing: the call hears why, and the pick waits on the session it
+     * created.
      */
     @Test fun aDraftCallsRefusedModelSendsNothing() = sessionTest { h ->
         val created = OpenCodeSession(id = "ses_new", serverTitle = "Upload test", projectID = "p", directory = "/project", updatedAt = distantPast)

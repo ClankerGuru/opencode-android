@@ -14,11 +14,6 @@ import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `TraceTests`' Home tests (`TraceUploadsTests` there): where a problem report goes,
- * and that Home's report context carries no server address. The builder's outputs are
- * `:core`'s/`:devtools`' (`ProblemReportBuilder`, `TraceUploadsFeature`).
- */
 class TraceUploadsTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -50,7 +45,6 @@ class TraceUploadsTests {
         assertNull(empty.problemReportDestination(ProblemReportContext(screen = "Home")))
     }
 
-    /** Home's half of iOS `noReportOutputCarriesTheServerAddressOrUsername`. */
     @Test
     fun noReportOutputCarriesTheServerAddressOrUsername() {
         val secret = OpenCodeServer(url = "https://secret-box.ts.net:4096", username = "kituser", password = "pw")

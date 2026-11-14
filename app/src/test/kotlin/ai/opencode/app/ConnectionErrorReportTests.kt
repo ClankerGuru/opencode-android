@@ -18,10 +18,6 @@ import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.time.Instant
 
-/**
- * Port of the `AppFeature` half of iOS `ConnectionErrorReportTests.swift` (the
- * `ConnectionFailureDetail` half is `:server`'s `ConnectionErrorReportTests`).
- */
 class ConnectionErrorReportTests {
     @get:Rule val isolation = TestIsolationRule()
 

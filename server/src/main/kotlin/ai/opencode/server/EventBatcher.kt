@@ -16,11 +16,10 @@ import kotlin.time.Duration.Companion.seconds
  * What [EventBatcher] calls as events pass through, installed by the features that own them
  * (`DependencyValues.installRoot { this[EventBatcherHooks] = … }`):
  *
- * - [prepareMarkdown] projects a text part's Markdown off the reducer's path (iOS
- *   `MarkdownStreamClient.prepare`). For a streaming part, [text] is the accumulated text so
- *   far and the transcript applies `holdingPendingMarker` itself; for an ended part it's the
- *   final text.
- * - [record] sees every event once per upstream connection (iOS `AgentActivityLedger.record`).
+ * - [prepareMarkdown] projects a text part's Markdown off the reducer's path. For a streaming part,
+ *   [text] is the accumulated text so far and the transcript applies `holdingPendingMarker` itself;
+ *   for an ended part it's the final text.
+ * - [record] sees every event once per upstream connection.
  */
 class EventBatcherHooks(
     val prepareMarkdown: (partID: String, text: String, isStreaming: Boolean) -> Unit = { _, _, _ -> },
@@ -32,7 +31,7 @@ class EventBatcherHooks(
     }
 }
 
-/** What happened to one event [EventBatcher] handed downstream (iOS `AsyncStream.YieldResult`). */
+/** What happened to one event [EventBatcher] handed downstream. */
 sealed interface EventEmission {
     /** Queued, with [remaining] free slots left in the buffer. */
     data class Enqueued(val remaining: Int) : EventEmission
@@ -245,7 +244,7 @@ class EventBatcher(
     }
 
     companion object {
-        /** The event stream's buffer size (iOS `EventBatcher.bufferCapacity`). */
+        /** The event stream's buffer size. */
         const val BUFFER_CAPACITY = 128
         private const val BATCH_LIMIT = 256
         private const val OFFSCREEN_PART_BYTE_LIMIT = 512 * 1024

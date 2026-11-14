@@ -46,15 +46,6 @@ import org.junit.Rule
 import org.junit.Test
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `BrowserTests.swift`'s Home tests: `OpenLinksInAppsTests`' `HomeLinkLab` (a link
- * tap waiting on the system is dropped whenever its screen stops being the one on top) and
- * `BrowserLifetimeTests`' session switches. The rest of the file is `:feature:media`'s
- * (`BrowserLinkPolicyTests`, `PagePromptBodyTests`, `BrowserFeatureTests`,
- * `BrowserObscuredInsetsTests`, `BrowserPeekEndTests`) and `:feature:session`'s
- * (`BrowserSendTests`, `LinkMenuTests`, `BrowserVoiceTests`, the `SessionFeature` half of
- * `OpenLinksInAppsTests`, `aSubagentNeverOpensUnderItsParentsPage`).
- */
 class OpenLinksInAppsTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -300,10 +291,6 @@ class OpenLinksInAppsTests {
     }
 }
 
-/**
- * Port of iOS `BrowserLifetimeTests`' Home tests: the page leaves with its session
- * ([PageReaderClient.discard], which drops the `WebView`).
- */
 class BrowserLifetimeTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -365,8 +352,8 @@ class BrowserLifetimeTests {
 }
 
 /**
- * iOS `LinkProbeGate`: the system's universal-link check, held until the test answers it.
- * Records each check asked and cancelled, numbered per link.
+ * The system's universal-link check, held until the test answers it. Records each check asked and
+ * cancelled, numbered per link.
  */
 internal class LinkProbeGate {
     sealed interface Event {

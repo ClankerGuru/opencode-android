@@ -18,9 +18,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 
 /**
- * Port of iOS `Voice/VoiceProvider.swift` (ce694097, 9a634cb6): where a call goes (Automatic
- * or a pick), what each provider can do now, and why a failed call failed. The `voiceModelsByServer`
- * and `voiceModelsEpochs` keys live in [VoiceSharedKeys].
+ * Where a call goes (Automatic or a pick), what each provider can do now, and why a failed call
+ * failed. The `voiceModelsByServer` and `voiceModelsEpochs` keys live in [VoiceSharedKeys].
  */
 
 /**
@@ -352,9 +351,9 @@ enum class VoiceCallFix {
 }
 
 /**
- * Opens what a failed call's fix points at (iOS `openURL` in `failureFixTapped`): a web page,
- * or this app's system settings. `OpenURLClient` lives in `:feature:media`, above voice, so
- * the call keeps this small opener; inert under tests.
+ * Opens what a failed call's fix points at: a web page, or this app's system settings.
+ * `OpenURLClient` lives in `:feature:media`, above voice, so the call keeps this small opener;
+ * inert under tests.
  */
 class VoiceCallFixClient(
     val openURL: suspend (String) -> Unit,

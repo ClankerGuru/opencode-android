@@ -79,17 +79,15 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Port of `OpenCode/Drawer/DrawerButton.swift`: the session header's drawer button, its badge
- * dot, and the In-App Notice capsule it grows into.
+ * The session header's drawer button, its badge dot, and the In-App Notice capsule it grows into.
  *
  * Used by the session header: `:feature:session` sits below `:feature:drawer`, so Home passes
  * [DrawerButton] into the session as a slot rather than the session importing it.
  */
 
-/** Cross-fades the label when another event updates it in place (iOS `.id(shown.events.map { "\($0.sessionID)|\($0.kind)" })`). */
+/** Cross-fades the label when another event updates it in place. */
 private val InAppNotice.identity: String get() = events.joinToString(",") { "${it.sessionID}|${it.kind}" }
 
-/** iOS `.orange` / `.blue` (systemOrange / systemBlue), light and dark. */
 private object DrawerBadgeColors {
     fun orange(isDark: Boolean) = if (isDark) Color(0xFFFF9F0A) else Color(0xFFFF9500)
     fun blue(isDark: Boolean) = if (isDark) Color(0xFF0A84FF) else Color(0xFF007AFF)
@@ -106,12 +104,12 @@ private fun <T> grow(reduceMotion: Boolean = false) = MotionRole.PanelOpen.anima
 private fun <T> fold(reduceMotion: Boolean = false) = MotionRole.PanelOpen.animation<T>(MotionPhase.Exit, reduceMotion)
 
 /**
- * The session header's drawer button (iOS `DrawerButton`). With In-App Notices on, it grows into
- * a capsule that names another session's update (“Upload tests · Needs your input”), then folds
- * back into its dot. The glyph still opens the drawer; the label opens what it names.
+ * The session header's drawer button. With In-App Notices on, it grows into a capsule that names
+ * another session's update (“Upload tests · Needs your input”), then folds back into its dot. The
+ * glyph still opens the drawer; the label opens what it names.
  *
  * @param maxWidth how wide the capsule may grow: up to the header's trailing controls.
- * @param size the button's face (iOS 44 pt → 48 dp, Android's minimum target).
+ * @param size The button's face.
  * @param onNoticeTapped the label was tapped: open what it names.
  */
 @Composable
@@ -157,11 +155,11 @@ fun DrawerButton(
             shown = null
         }
     }
-    // The label measured a new width: the capsule grows to it (iOS `onGeometryChange` → `grow`).
+    // The label measured a new width: the capsule grows to it.
     LaunchedEffect(labelWidthPx) {
         if (expanded && !reducedMotion) scope.launch { reveal.animateTo(labelFrame, grow()) }
     }
-    // The header gave it more or less room: the capsule takes it at once (iOS `onChange(of: maxWidth)`).
+    // The header gave it more or less room: the capsule takes it at once.
     LaunchedEffect(maxWidth) {
         if (expanded && !reducedMotion) scope.launch { reveal.snapTo(labelFrame) }
     }
@@ -255,8 +253,8 @@ private fun DrawerButtonCapsule(
     } else {
         Modifier.wrapContentWidth(Alignment.Start, unbounded = true).layoutWidth { widthDp?.invoke() ?: size.value }
     }
-    // Android divergence: at rest the button is a plain top-app-bar icon (no glass circle); the
-    // capsule's fill shows only while it grows into a notice.
+    // At rest the button is a plain top-app-bar icon (no glass circle); the capsule's fill shows
+    // only while it grows into a notice.
     val openSessionsDescription = stringResource(R.string.drawer_button_open_sessions_description)
     val attentionState = stringResource(R.string.drawer_button_attention_state)
     val unreadState = stringResource(R.string.drawer_button_unread_state)
@@ -342,7 +340,7 @@ private fun Modifier.layoutWidth(widthDp: () -> Float): Modifier = layout { meas
     layout(width, placeable.height) { placeable.place(0, 0) }
 }
 
-/** “Upload tests · Needs your input”: orange while it needs you, quiet when done (iOS `DrawerNoticeLabel`). */
+/** “Upload tests · Needs your input”: orange while it needs you, quiet when done. */
 @Composable
 fun DrawerNoticeLabel(notice: InAppNotice, modifier: Modifier = Modifier) {
     val isDark = isDarkTheme()
@@ -377,10 +375,10 @@ fun DrawerNoticeLabel(notice: InAppNotice, modifier: Modifier = Modifier) {
 }
 
 /**
- * The drawer button's dot (iOS `DrawerBadgeDot`): another session needs input (orange) or is
- * unread (blue). It arrives on `MotionRole.MicroIn` and leaves on `microOut`; one already showing
- * when the button appears (opening or restoring a session) is simply there, and a change of
- * colour while it shows lands in place.
+ * The drawer button's dot: another session needs input (orange) or is unread (blue). It arrives on
+ * `MotionRole.MicroIn` and leaves on `microOut`; one already showing when the button appears
+ * (opening or restoring a session) is simply there, and a change of colour while it shows lands in
+ * place.
  */
 @Composable
 fun DrawerBadgeDot(badge: DrawerBadge?, modifier: Modifier = Modifier) {
@@ -414,9 +412,8 @@ fun DrawerBadgeDot(badge: DrawerBadge?, modifier: Modifier = Modifier) {
 }
 
 /**
- * The header's title while the drawer button's label covers it (iOS `steppingAside`): fades and
- * blurs out as the label grows, comes back as it folds, and stops taking touches and TalkBack
- * focus while aside.
+ * The header's title while the drawer button's label covers it: fades and blurs out as the label
+ * grows, comes back as it folds, and stops taking touches and TalkBack focus while aside.
  */
 fun Modifier.steppingAside(aside: Boolean, reducedMotion: Boolean): Modifier = composed {
     // Swaps out on `swap`'s exit (quicker than the capsule grows) on the frame the capsule starts

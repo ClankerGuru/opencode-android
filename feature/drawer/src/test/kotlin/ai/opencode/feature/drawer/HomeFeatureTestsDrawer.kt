@@ -50,10 +50,7 @@ import java.time.Instant
 import kotlin.math.abs
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `HomeFeatureTests` (`OpenCodeTests/HomeFeatureTests.swift`), the drawer's part:
- * pins, mutes, the pin drag, deletion, local sends and read state.
- */
+/** The drawer's part: pins, mutes, the pin drag, deletion, local sends and read state. */
 class HomeFeatureTestsDrawer {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -175,9 +172,9 @@ class HomeFeatureTestsDrawer {
         assertEquals(listOf("a", "b"), store.state.recentSessions.map { it.id })
     }
 
-    // region Pin drag (iOS drives `DrawerPinDrag` through a UIKit collection view and drag session)
+    // region Pin drag
 
-    /** The list a [DrawerPinDrag] moves (iOS `TestDrawerPinCollectionView`): visible items in list coordinates. */
+    /** The list a [DrawerPinDrag] moves: visible items in list coordinates. */
     private class TestDrawerPinHost(override val scope: CoroutineScope) : DrawerPinDragHost {
         val items = ArrayList<DrawerPinDragItem>()
         override fun visibleItems(): List<DrawerPinDragItem> = items.toList()

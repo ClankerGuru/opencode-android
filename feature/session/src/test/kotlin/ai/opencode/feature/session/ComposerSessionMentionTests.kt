@@ -48,17 +48,6 @@ import java.util.UUID
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of the `SessionFeature` tests of iOS `ComposerSessionMentionTests.swift` (extensions of
- * `ComposerAutocompleteTests` and `ComposerPersistenceTests`).
- *
- * Not ported here (:feature:composer, `OpenCodeAutocompleteSession` / `AutocompleteTrigger` / `AutocompleteFuzzy` /
- * `ComposerAutocompleteDraftResolution` alone): `sessionTitleMatchingAndServerSearchFollowDesktop`,
- * `sessionRowsSitBetweenSubagentsAndFilesWithDesktopLimits`, `draftTextMapsSentTokensBackToChipTitles`.
- * Not ported here (:feature:transcript, `SessionLink` / `SessionLinkText` alone, ported there): `sentSessionTokensRenderAsSessionLinks`.
- * Not ported here (:server, `OpenCodeClient.promptBody` is internal to :server): the wire-body tail of
- * `sendingASessionChipSendsDesktopsTokenAndShiftsLaterMentionSpans`.
- */
 class ComposerSessionMentionTests {
     private fun autocomplete(action: ComposerAutocompleteAction): Action = Action.Autocomplete(action)
     private fun draft(text: String): Action = Action.Binding(BindingAction.Draft(text))
@@ -272,7 +261,6 @@ class ComposerSessionMentionTests {
         h.skipInFlightEffects()
     }
 
-    /** iOS `extension ComposerPersistenceTests`. */
     @Test fun sessionMentionRidesTheOutboxAcrossRelaunchAsItsToken() = sessionTest { h ->
         val tempDir = Files.createTempDirectory("ComposerSessionMentionTests-").toFile()
         try {

@@ -15,11 +15,10 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * Catch Up's swipe, spring, stack and card tunables (iOS `CatchUpTunables`, `CatchUpStack.swift`),
- * as their baked defaults. iOS exposes them in Developer Mode's Tuning Panel with presets; Android
- * has no Tuning Panel (`:devtools` is Android-native), so only the defaults are ported.
+ * Catch Up's swipe, spring, stack and card tunables, as their baked defaults. Android has no Tuning
+ * Panel (`:devtools` is Android-native), so only the defaults are ported.
  *
- * Distances are iOS points, used as dp.
+ * Distances are in dp.
  */
 object CatchUpTunables {
     // Swipe
@@ -47,7 +46,7 @@ object CatchUpTunables {
     const val revealFraction = 0.78f
 
     // Card
-    /** Card corner radius (the desktop's 16 for large panels; iOS follows the screen's 40). */
+    /** Card corner radius. */
     const val cornerRadius = 16f
     /** Drag rotation (rad). */
     const val dragRotation = 0.16f
@@ -58,8 +57,8 @@ object CatchUpTunables {
 }
 
 /**
- * Snapshot of layout- and stack-pose-affecting Catch Up tunables (iOS `CatchUpLayoutTuning`).
- * Kept as a value so a future tuning surface can update the resting stack in place.
+ * Snapshot of layout- and stack-pose-affecting Catch Up tunables. Kept as a value so a future
+ * tuning surface can update the resting stack in place.
  */
 data class CatchUpLayoutTuning(
     val backScale: Float = CatchUpTunables.backScale,
@@ -72,7 +71,7 @@ data class CatchUpLayoutTuning(
     val sideInset: Float = CatchUpTunables.sideInset,
 )
 
-/** Projected-landing math and release decision for Catch Up card swipes (iOS `CatchUpSwipeMath`). */
+/** Projected-landing math and release decision for Catch Up card swipes. */
 object CatchUpSwipeMath {
     /**
      * Standard `UIScrollView` projection: distance travelled by [initialVelocity] (units/s) before
@@ -92,8 +91,8 @@ object CatchUpSwipeMath {
 
     /**
      * Decides whether a drag released at [translation] with [velocity] in a container of [width]
-     * commits to `markRead` (right), `keepUnread` (left), or snaps back (`null`). All values in
-     * the same unit (dp and dp/s, as iOS uses points).
+     * commits to `markRead` (right), `keepUnread` (left), or snaps back (`null`). All values in the
+     * same unit.
      */
     fun decision(
         translation: Offset,
@@ -126,17 +125,17 @@ object CatchUpSwipeMath {
 }
 
 /**
- * Damped 2D spring stepped per frame for Catch Up card snap-back (iOS `CatchUpSpring`). Starts
- * from the finger's release position and velocity and steps every visual property (card
- * transform, rotation, badge ring and back-card peek) in lockstep so catching a card mid-flight
- * takes over from where it's drawn. Units: dp and dp/s (iOS points).
+ * Damped 2D spring stepped per frame for Catch Up card snap-back. Starts from the finger's release
+ * position and velocity and steps every visual property (card transform, rotation, badge ring and
+ * back-card peek) in lockstep so catching a card mid-flight takes over from where it's drawn.
+ * Units: dp and dp/s.
  */
 class CatchUpSpring(
     var position: Offset,
     var velocity: Offset,
     val target: Offset = Offset.Zero,
 ) {
-    /** The release role's spring (iOS 03adf07a: drag releases land on `MotionRole.Release`). */
+    /** The release role's spring. */
     val omega: Float
     val zeta: Float
     private val initialSignX: Float
@@ -209,7 +208,7 @@ class CatchUpSpring(
     }
 }
 
-/** Layout shared by the Catch Up chrome and the inset cards (iOS `CatchUpMetrics`). */
+/** Layout shared by the Catch Up chrome and the inset cards. */
 object CatchUpMetrics {
     val readColor = Color(red = 0.08f, green = 0.57f, blue = 0.42f, alpha = 1f)
     val readControlColor = Color(red = 0.06f, green = 0.46f, blue = 0.34f, alpha = 1f)

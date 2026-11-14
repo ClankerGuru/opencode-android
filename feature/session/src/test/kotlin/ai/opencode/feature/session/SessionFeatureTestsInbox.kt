@@ -48,11 +48,7 @@ import org.junit.Assert.fail
 import org.junit.Test
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `SessionFeatureTests+Inbox.swift`. Parameterized tests loop over their arguments.
- * iOS's `TranscriptEntryView.toolGroupLabel(_:).text` / `toolGroupFailedNotices` are
- * `ToolGroupLabel.of(_:).first` / `ToolGroupLabel.failedNotices` here.
- */
+/** Parameterized tests loop over their arguments. */
 class SessionFeatureTestsInbox {
     private fun markdown(id: String, text: String) = OpenCodeTranscriptItem.AssistantMarkdown(id = id, text = text)
     private fun user(id: String, text: String) = OpenCodeTranscriptItem.UserText(id = id, text = text)
@@ -115,7 +111,6 @@ class SessionFeatureTestsInbox {
         store.exhaustive = false
         store.send(Action.VisibilityChanged(true)) { it.copy(isVisible = true) }
         store.send(Action.FirstContentFrameRendered)
-        // iOS's non-exhaustive finish leaves the pending-work poll running (TCA reports nothing).
         store.finishLikeTCA()
         assertTrue(store.state.viewedIdle.isEmpty())
     }

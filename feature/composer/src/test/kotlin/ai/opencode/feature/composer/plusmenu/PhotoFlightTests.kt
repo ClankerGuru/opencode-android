@@ -56,33 +56,22 @@ import kotlin.math.min
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Port of iOS `PhotoFlightTests.swift`.
- *
- * Geometry is at density 1 (px = dp = iOS points), so the iOS numbers carry over unchanged.
- * iOS's springs (`SpringSolver`) are core's [SpringSolver].
+ * Geometry is at density 1.
  *
  * Dropped:
- * - `aCleanFlightHasNoFindings`, `aFlightThatStartsAwayFromItsTileIsAPopIn`, `aFrameThatLeapsIsASnap`,
- *   `aCappedSolverHitchReportsLostFramesWithoutInventingAcceleration`, `anOvershootIsAReversal`,
- *   `turningBackForANewSlotIsARetargetNotAReversal`, `dippingWithTheComposerIsAReversalEvenWhenTheSlotMoved`,
- *   `vanishingWithoutLandingIsAPopOut`, `softeningAwayIsNoPopOut`, `landingOffItsThumbnailIsAMiss`:
- *   they test `PhotoFlightAudit` (Motion Watch / lab trace telemetry), not ported (n/a in the parity table).
- * - `requestGateResumesExactlyOnceAcrossCancelAndLateCompletion`: iOS's `OneShotRequestGate`
- *   guards a continuation and the request's own cancel (`arm`/`started`/`finish`); Android's
- *   [ai.opencode.feature.composer.OneShotRequestGate] is an `android.os.CancellationSignal` plus
- *   structured cancellation, with no such states.
+ * - Android's [ai.opencode.feature.composer.OneShotRequestGate] is an
+ *   `android.os.CancellationSignal` plus structured cancellation, with no such states.
  * - In `plusPhotoLibraryExposesVideoAssetsAndLabFixtureIncludesVideosAndCameraCapture`, the
  *   `renderLabCameraCapture` check: Android's lab fixture has no camera-capture render.
  *
- * Runs under Robolectric (native graphics, xxhdpi = iOS's 3× screen) so the lab fixture's image
- * data draws and decodes real Bitmaps.
+ * Runs under Robolectric so the lab fixture's image data draws and decodes real Bitmaps.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "xxhdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PhotoFlightTests {
-    /** iOS's main actor runs a callback made on it inline (`MainActor.assumeIsolated`): Main.immediate here. */
+    /** Main.immediate here. */
     private lateinit var main: kotlinx.coroutines.test.TestDispatcher
 
     @Before fun setUp() {
@@ -263,8 +252,8 @@ class PhotoFlightTests {
     }
 
     /**
-     * The library's reload warms the first thumbnails at its display scale; iOS races that warmup
-     * against the 2x/3x reads. A display scale of 1 keeps the warmup on its own cache key.
+     * The library's reload warms the first thumbnails at its display scale. A display scale of 1
+     * keeps the warmup on its own cache key.
      */
     @Test fun photoLibraryUpgradesOpportunisticThumbnailsRespectsScaleAndInvalidatesModifiedAssets() = runTest(main) {
         val modifiedDate1 = Instant.ofEpochSecond(1_000)
@@ -487,7 +476,6 @@ class PhotoFlightTests {
         assertEquals(listOf("stop", "stop", "start:asset-1@3x", "stop"), events)
     }
 
-    /** iOS's `withObservationTracking` is Compose's snapshot read observer plus an apply observer here. */
     @Test fun deniedAccessStartsWatchingAndReloadsWhenLaterAuthorizedAndCacheKeyIsObservable() = runTest(main) {
         var currentAccess = PhotoLibraryAccess.Denied
         val modifiedDate1 = Instant.ofEpochSecond(1_000)
@@ -1325,12 +1313,11 @@ class PhotoFlightTests {
     }
 
     private companion object {
-        /** iOS's `resting(at:keepingBottom:)` and `stretched` floor of 120 pt, in px at density 1. */
         const val MIN_HEIGHT = 120f
 
         fun rect(x: Float, y: Float, width: Float, height: Float) = Rect(Offset(x, y), Size(width, height))
 
-        /** iOS `SpringSolver(value:velocity:duration: 1)`: stepped with explicit (ω, ζ). */
+        /** Stepped with explicit (ω, ζ). */
         fun spring(value: Double, velocity: Double = 0.0) = SpringSolver(value = value, velocity = velocity, omega = 1.0)
     }
 

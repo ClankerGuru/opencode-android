@@ -27,11 +27,10 @@ class AppTestShared {
 
     fun <R> run(block: () -> R): R = DependencyValues.withValues(values, block)
 
-    /** iOS `AppFeature.State()`: the saved server and its cached Home restored. */
+    /** The saved server and its cached Home restored. */
     fun appState(): AppFeature.State = run { AppFeature.State.initial() }
 }
 
-/** iOS `TestStore(initialState:) { AppFeature() } withDependencies:`. */
 fun AppTestShared.appStore(
     state: AppFeature.State,
     scope: CoroutineScope,
@@ -50,7 +49,6 @@ fun detachedScope(context: CoroutineContext): CoroutineScope = CoroutineScope(co
 
 fun CoroutineScope.skipInFlightEffects() = cancel()
 
-/** iOS `LockIsolated`. */
 class Locked<T>(initial: T) {
     @Volatile private var current: T = initial
     val value: T get() = synchronized(this) { current }
@@ -58,19 +56,19 @@ class Locked<T>(initial: T) {
     fun update(block: (T) -> T) = synchronized(this) { current = block(current) }
 }
 
-/** iOS `eventually`: polls until [condition] holds. */
+/** Polls until [condition] holds. */
 suspend fun eventually(timeout: Duration = 5.seconds, condition: () -> Boolean) {
     withTimeout(timeout) { while (!condition()) delay(10) }
 }
 
-/** iOS `store.receive(\.case)`: the next action of type [T]. */
+/** The next action of type [T]. */
 suspend inline fun <reified T : AppFeature.Action> TestStore<AppFeature.State, AppFeature.Action>.receiveCase(
     noinline update: ((AppFeature.State) -> AppFeature.State)? = null,
 ) = receive({ it is T }, T::class.simpleName ?: "action", update = update)
 
 /**
- * iOS `gatedHomeStore`: health passes, and Home's snapshot waits for [GatedHome.snapshots].
- * Closing the channel without a value fails the read as cancelled.
+ * Health passes, and Home's snapshot waits for [GatedHome.snapshots]. Closing the channel without a
+ * value fails the read as cancelled.
  */
 class GatedHome {
     val snapshots = Channel<OpenCodeHomeSnapshot>(Channel.UNLIMITED)

@@ -10,8 +10,8 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * Port of iOS `DiagnosticsJournalWriteTests.swift`: the diagnostics journal writes events in
- * batches, and at once when the app may not come back to write them.
+ * The diagnostics journal writes events in batches, and at once when the app may not come back to
+ * write them.
  */
 class DiagnosticsJournalWriteTests {
     @get:Rule val isolation = TestIsolationRule()

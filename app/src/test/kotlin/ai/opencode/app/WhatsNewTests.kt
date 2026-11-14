@@ -17,17 +17,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `WhatsNewTests.swift` › `WhatsNewTryItTests`, the `AppFeature` part. What's New is
- * Settings' page on Android, so `isSettingsShown` is `settings != null`.
- */
+/** What's New is Settings' page on Android, so `isSettingsShown` is `settings != null`. */
 class WhatsNewTryItTests {
     @get:Rule val isolation = TestIsolationRule()
 
     private val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
     private val shared = AppTestShared()
 
-    /** iOS `home()`: What's New pushed over the drawer. */
+    /** What's New pushed over the drawer. */
     private fun home(): HomeFeature.State {
         val page = SettingsFeature.State.whatsNew(server)
         return HomeFeature.State(server, OpenCodeHomeSnapshot(projects = emptyList(), sessions = emptyList(), activeSessionIDs = emptySet()))

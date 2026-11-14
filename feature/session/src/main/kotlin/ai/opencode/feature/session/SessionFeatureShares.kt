@@ -6,14 +6,13 @@ import ai.opencode.feature.composer.ComposerFileAttachment
 import ai.opencode.feature.composer.SharedComposerDraft
 import ai.opencode.feature.session.SessionFeature.State
 
-// Port of the `extension SessionFeature.State` half of iOS `System/Share/ShareInbox.swift`:
-// how a session's composer takes what was shared to the app (or set aside from another
-// composer). Home (`:feature:drawer`) calls it when the composer on screen is the share's target.
+// How a session's composer takes what was shared to the app (or set aside from another composer).
+// Home (`:feature:drawer`) calls it when the composer on screen is the share's target.
 
 /**
- * iOS `absorb(_:)`: shared text follows whatever is already typed; images join the tray. Files
- * join as uploads that `queuedUploadsStarted` sets going. While the bar answers a request, what
- * was shared waits with the parked message.
+ * Shared text follows whatever is already typed; images join the tray. Files join as uploads that
+ * `queuedUploadsStarted` sets going. While the bar answers a request, what was shared waits with
+ * the parked message.
  */
 fun State.absorb(shared: SharedComposerDraft): State {
     // Send Later sends only what it brought: a composer already holding words, files or a
@@ -54,7 +53,7 @@ fun State.absorb(shared: SharedComposerDraft): State {
     return next
 }
 
-/** iOS `[ComposerAutocompleteChip].appendUnique(_:)`: chips not already there, by ID. */
+/** Chips not already there, by ID. */
 private fun List<ComposerAutocompleteChip>.appendingUnique(other: List<ComposerAutocompleteChip>): List<ComposerAutocompleteChip> {
     if (other.isEmpty()) return this
     val result = toMutableList()

@@ -12,12 +12,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * iOS `PlusMenuPlacementTests`. `restingAnchorsRefreshOnAViewportChangeButHoldThroughTheFold`
- * hosts a SwiftUI probe in a `UIWindow` it resizes, and
- * `keyboardBandHostComesDownOnBackgroundAndDisappearance` tests `KeyboardBandLifetime`, the
- * keyboard window's host (n/a: Android can't draw over the IME); both are dropped.
- */
 class PlusMenuPlacementTests {
     @get:Rule val isolation = TestIsolationRule()
 

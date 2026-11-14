@@ -9,8 +9,8 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Corner radii from the OpenCode desktop (`--radius-sm` 4 … `-xl` 10), under the iOS role names.
- * Sheets keep a 16 dp top radius.
+ * Corner radii from the OpenCode desktop (`--radius-sm` 4 … `-xl` 10). Sheets keep a 16 dp top
+ * radius.
  */
 object OpenCodeRadius {
     /** Tiny marks: inline code, checkbox insets (desktop 4). */
@@ -31,10 +31,7 @@ object OpenCodeRadius {
     val sheet: Dp = 16.dp
 }
 
-/**
- * Shapes for the iOS forms. [capsule] and [circle] stay true; controls iOS draws as glass capsules
- * use [control].
- */
+/** [capsule] and [circle] stay true. */
 object OpenCodeShape {
     val capsule = RoundedCornerShape(percent = 50)
 
@@ -71,10 +68,7 @@ object OpenCodeShapeGeometry {
     fun radius(radius: Float, height: Float): Float = min(max(0f, radius), max(0f, height) / 2)
 }
 
-/**
- * Spacing values the iOS app uses (its common `spacing:` and `.padding` values), in dp.
- * Prefer these to literals so layouts stay on the same grid as iOS.
- */
+/** Spacing values, in dp. Prefer these to literals so layouts stay on the same grid. */
 object OpenCodeSpacing {
     val s1: Dp = 1.dp
     val s2: Dp = 2.dp
@@ -90,12 +84,12 @@ object OpenCodeSpacing {
     val s24: Dp = 24.dp
     val s32: Dp = 32.dp
 
-    /** Screen and list-row horizontal inset (iOS `.padding(.horizontal, 16)`). */
+    /** Screen and list-row horizontal inset. */
     val screenHorizontal: Dp = s16
 
-    /** Default stack spacing between related items (iOS `spacing: 8`). */
+    /** Default stack spacing between related items. */
     val stack: Dp = s8
 
-    /** Between groups/sections (iOS `spacing: 12`). */
+    /** Between groups/sections. */
     val group: Dp = s12
 }

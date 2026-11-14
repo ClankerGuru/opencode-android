@@ -13,10 +13,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/**
- * Port of iOS `LabVoiceKeysTests`: the lab's launch extras seed the voice keys, and `NONE` clears
- * one.
- */
+/** The lab's launch extras seed the voice keys, and `NONE` clears one. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], application = Application::class)
 class LabVoiceKeysTests {

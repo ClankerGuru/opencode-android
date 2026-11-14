@@ -36,17 +36,14 @@ import kotlin.coroutines.resume
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-/** How much of the photo library the app may read (iOS `PhotoLibraryAccess`). */
+/** How much of the photo library the app may read. */
 enum class PhotoLibraryAccess {
     NotDetermined,
 
     /** Every photo. */
     Full,
 
-    /**
-     * Only the photos the person picked: iOS's limited library, Android 14+'s “Selected
-     * photos” (`READ_MEDIA_VISUAL_USER_SELECTED` without `READ_MEDIA_IMAGES`).
-     */
+    /** Only the photos the person picked. */
     Limited,
     Denied,
 
@@ -60,7 +57,7 @@ enum class PhotoLibraryAccess {
     val canRead: Boolean get() = this == Full || this == Limited
 }
 
-/** One photo or video in the library, by its MediaStore content URI (iOS `LibraryPhoto`). */
+/** One photo or video in the library, by its MediaStore content URI. */
 data class LibraryPhoto(
     val id: String,
     val created: Instant?,
@@ -95,8 +92,7 @@ fun interface PhotoPermissionRequester {
 
 /**
  * The photo library for the New Plus Menu's grid and recent strip: access, the newest photos,
- * thumbnails, and the full image to attach (iOS `PhotoLibraryClient`). Nothing else touches
- * MediaStore.
+ * thumbnails, and the full image to attach. Nothing else touches MediaStore.
  */
 class PhotoLibraryClient(
     val access: () -> PhotoLibraryAccess,
@@ -119,7 +115,7 @@ class PhotoLibraryClient(
     val manageLimitedSelection: () -> Unit,
     /** Installs (or, with null, removes) the activity seam permission requests go through. */
     val installRequester: (PhotoPermissionRequester?) -> Unit = {},
-    /** iOS `UIApplication.openSettingsURLString`: this app's system settings page. */
+    /** This app's system settings page. */
     val openSettings: () -> Unit = {},
 ) {
     companion object Key : DependencyKey<PhotoLibraryClient> {
@@ -150,7 +146,6 @@ class PhotoLibraryClient(
             manageLimitedSelection = {},
         )
 
-        /** iOS `labVideoDuration(forIndex:)`. */
         fun labVideoDuration(index: Int): Double? = when (index) {
             1 -> 14.0
             4 -> 8.0
@@ -159,8 +154,8 @@ class PhotoLibraryClient(
         }
 
         /**
-         * iOS `-lab-photo-fixture`: a library of drawn swatches, so previews and lab runs never
-         * wait on the device's photos or its access dialog. [limited] makes it a limited library.
+         * A library of drawn swatches, so previews and lab runs never wait on the device's photos
+         * or its access dialog. [limited] makes it a limited library.
          */
         fun labFixture(limited: Boolean): PhotoLibraryClient {
             val count = if (limited) 7 else 48
@@ -213,7 +208,7 @@ class PhotoLibraryClient(
 
 /**
  * Serializes the asset cache, preheat start/stop, and lifecycle generation under one lock so
- * [stopCaching] can't race a fetch. iOS `PhotoCacheGate`.
+ * [stopCaching] can't race a fetch.
  */
 class PhotoCacheGate<Asset>(
     private val stopAll: () -> Unit,

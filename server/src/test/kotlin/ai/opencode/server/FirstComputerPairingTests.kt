@@ -7,11 +7,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `FirstComputerPairingTests.swift`, the half that is `:server`'s
- * (`OpenCodeProject.isHomeFolder`). The `AppFeature` pairing tests live in `:app`'s
- * `FirstComputerPairingTests`, the starter prompts in `:feature:session`'s.
- */
 class FirstComputerPairingTests {
     @get:Rule val isolation = TestIsolationRule()
 

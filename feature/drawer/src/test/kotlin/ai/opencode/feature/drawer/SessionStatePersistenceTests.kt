@@ -21,9 +21,8 @@ import java.time.Instant
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * iOS `SessionStatePersistenceTests.swift`, Home's half: a relaunched session keeps its waiting
- * model pick, unless the server no longer offers it. The storage half is `:feature:composer`'s and
- * the request half `:feature:session`'s.
+ * Home's half: a relaunched session keeps its waiting model pick, unless the server no longer
+ * offers it.
  */
 class SessionStatePersistenceTests {
     @get:Rule val isolation = TestIsolationRule()

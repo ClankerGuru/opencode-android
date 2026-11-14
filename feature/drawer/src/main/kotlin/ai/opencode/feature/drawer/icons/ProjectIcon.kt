@@ -25,8 +25,8 @@ import kotlin.math.max
 import kotlin.math.min
 
 // Project metadata (`OpenCodeProjectIcon`, `ProjectMark`, `OpenCodeProject.initial` and
-// `avatarSource`) lives in `:server` (`model/Project.kt`, `model/Models.kt`); this file adds
-// the drawer's icon request, palette and decoded icon (iOS `ProjectIcon.swift`).
+// `avatarSource`) lives in `:server` (`model/Project.kt`, `model/Models.kt`); this file adds the
+// drawer's icon request, palette and decoded icon.
 
 /** The built-in OpenCode icon, drawn locally instead of fetching [ProjectMark.OPEN_CODE_FAVICON_URL]. */
 val ProjectMark.openCodeFaviconSVG: ByteArray
@@ -58,7 +58,7 @@ fun OpenCodeProject.Companion.resolved(session: OpenCodeSession, projects: List<
     return OpenCodeProject.unlisted(session)
 }
 
-/** [resolved] for many sessions: the projects indexed once (iOS `OpenCodeProject.Lookup`). */
+/** [resolved] for many sessions: the projects indexed once. */
 class OpenCodeProjectLookup(projects: List<OpenCodeProject>) {
     private val byID = HashMap<String, OpenCodeProject>()
     private val byDirectory = HashMap<String, OpenCodeProject>()
@@ -173,7 +173,6 @@ data class ProjectIconRequest(val server: OpenCodeServer, val projectID: String,
     }
 }
 
-/** iOS `URLComponents` parsing as the icon code uses it. */
 internal object ProjectIconURLs {
     class Relative(val path: String, val query: List<Pair<String, String>>)
 
@@ -207,7 +206,7 @@ internal object ProjectIconURLs {
         }
     }
 
-    /** iOS `removingPercentEncoding`: null for a malformed escape or invalid UTF-8; `+` stays `+`. */
+    /** Null for a malformed escape or invalid UTF-8; `+` stays `+`. */
     fun percentDecoded(text: String): String? {
         if (!text.contains('%')) return text
         val out = ByteArrayOutputStream(text.length)
@@ -301,7 +300,7 @@ class ProjectIcon private constructor(
             val header = trimmed.substring(0, comma).lowercase()
             val body = trimmed.substring(comma + 1)
             if (header.contains(";base64")) {
-                // iOS `.ignoreUnknownCharacters`: the MIME decoder skips anything outside the alphabet.
+                // The MIME decoder skips anything outside the alphabet.
                 return try { Base64.getMimeDecoder().decode(body) } catch (_: IllegalArgumentException) { null }
             }
             ProjectIconURLs.percentDecoded(body)?.let { return it.toByteArray(Charsets.UTF_8) }
@@ -320,7 +319,7 @@ class ProjectIcon private constructor(
         /**
          * The image, downsampled to [maximumPixels] on its long side, or null when it's smaller
          * than [minimumPixels] on its short side or larger than [maximumSourceDimension]. A
-         * multi-image file (ICO) decodes its largest image, as iOS picks it.
+         * multi-image file (ICO) decodes its largest image.
          */
         fun decodeRaster(data: ByteArray): Bitmap? = try {
             ImageDecoder.decodeBitmap(ImageDecoder.createSource(ByteBuffer.wrap(data))) { decoder, info, _ ->
@@ -357,7 +356,7 @@ class ProjectIcon private constructor(
         /**
          * Inspects alpha and luminance:
          * - Rejects blank or flat single-pixel-value images.
-         * - Crops macOS/iOS squircle transparent gutters when the interior is opaque.
+         * - Crops squircle icons' transparent gutters when the interior is opaque.
          * - Flags transparent glyphs for neutral backing + padding.
          */
         private fun prepare(square: Bitmap, side: Int): Pair<Bitmap, Backing>? {
@@ -376,7 +375,7 @@ class ProjectIcon private constructor(
             var visibleCount = 0
             var luminanceSum = 0.0
 
-            // iOS reads premultiplied RGBA bytes; compare and weigh the same values.
+            // Compare and weigh the same values.
             fun premultiplied(pixel: Int): IntArray {
                 val a = (pixel ushr 24) and 0xff
                 val r = (((pixel shr 16) and 0xff) * a + 127) / 255

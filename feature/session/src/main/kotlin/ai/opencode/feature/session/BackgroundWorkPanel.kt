@@ -144,11 +144,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-// Port of iOS `Session/BackgroundWorkPanel.swift`. iOS reads `SessionFeature` state inside the
-// presentation; here every view takes immutable values and action lambdas so `SessionView` can
-// wire it (`activeSubagents`, `backgroundShells`, `waitingSessionIDs`, `shellGlyphProbe`, and
-// `.subagentTapped` / `.shellOutputTapped`). The shell output sheet iOS presents from this
-// modifier (`.sheet(item: $store.scope(\.shellOutput, …))`) is SessionView's to present.
+// IOS reads `SessionFeature` state inside the presentation; here every view takes immutable values
+// and action lambdas so `SessionView` can wire it (`activeSubagents`, `backgroundShells`,
+// `waitingSessionIDs`, `shellGlyphProbe`, and `.subagentTapped` / `.shellOutputTapped`).
+// SessionView presents the shell output sheet.
 //
 // Liquid Glass → one M3 surface (`surfaceContainerHigh`) whose bounds morph between the
 // capsule's and the panel's on the same springs. Lengths are dp.
@@ -156,10 +155,9 @@ import kotlinx.coroutines.launch
 // MARK: Anchor and covered pills
 
 /**
- * The background-activity capsule's bounds, so the panel can grow out of it (iOS
- * `BackgroundActivityAnchorKey`). Create one per session screen with
- * [rememberBackgroundWorkAnchor], mark the capsule's place with [backgroundActivityAnchor], and
- * hand the same anchor to [BackgroundWorkPresentation].
+ * The background-activity capsule's bounds, so the panel can grow out of it. Create one per session
+ * screen with [rememberBackgroundWorkAnchor], mark the capsule's place with
+ * [backgroundActivityAnchor], and hand the same anchor to [BackgroundWorkPresentation].
  */
 @Stable
 class BackgroundWorkAnchor {
@@ -180,9 +178,8 @@ class BackgroundWorkAnchor {
 fun rememberBackgroundWorkAnchor(): BackgroundWorkAnchor = remember { BackgroundWorkAnchor() }
 
 /**
- * Marks the capsule the background-work panel anchors to. Like iOS's anchor preference, the mark
- * goes when its place does (the work ending takes the pill row's place away): the panel never
- * keeps a capsule, or its touch target, where the place last was.
+ * Marks the capsule the background-work panel anchors to. The panel never keeps a capsule, or its
+ * touch target, where the place last was.
  */
 fun Modifier.backgroundActivityAnchor(anchor: BackgroundWorkAnchor): Modifier = this then BackgroundActivityAnchorElement(anchor)
 
@@ -232,7 +229,7 @@ fun Modifier.coveredByBackgroundWork(): Modifier = composed {
 
 // MARK: Copy and sizes
 
-/** The panel's copy and sizing rules (iOS `BackgroundWorkPanel`'s statics). */
+/** The panel's copy and sizing rules. */
 object BackgroundWorkSummary {
     /** “1 subagent · 2 shells”, as the capsule reads. */
     fun summary(agents: List<OpenCodeSession>, shells: List<OpenCodeShell>): String = summary(agents.size, shells.size)
@@ -251,7 +248,6 @@ object BackgroundWorkSummary {
         (agents.size + shells.size) * 48f + (if (agents.isEmpty()) 0f else 30f) + (if (shells.isEmpty()) 0f else 30f) + 20f
 }
 
-/** iOS `ComposerTunables.pillGlyphGap` default (dp). */
 private const val PILL_GLYPH_GAP = 5f
 
 private val countsStyle: TextStyle
@@ -277,7 +273,7 @@ fun BackgroundWorkCapsuleSpace(agents: Int, shells: Int, modifier: Modifier = Mo
 /**
  * The capsule's glyph and counts, laid out like a composer pill's.
  *
- * @param sizingOnly an invisible layout copy: its counts don't roll (iOS `isRollingNumberSizingOnly`).
+ * @param sizingOnly An invisible layout copy: its counts don't roll.
  */
 @Composable
 fun BackgroundWorkCapsuleLabel(
@@ -370,7 +366,7 @@ private fun Opening(isOpen: Boolean, content: @Composable () -> Unit) {
     }
 }
 
-/** Blurs 3 dp while arriving or leaving (iOS `BlurFade`), never at rest. */
+/** Blurs 3 dp while arriving or leaving, never at rest. */
 private fun Modifier.blurringWith(scope: AnimatedVisibilityScope): Modifier = composed {
     val blur by scope.transition.animateFloat(label = "blur") { if (it == EnterExitState.Visible) 0f else 3f }
     transitionBlur(blur.dp)
@@ -395,7 +391,6 @@ fun BackgroundWorkGlyph(
     // Swapped in place as subagents come and go, like the words beside it. The disc's dot field
     // sits a little high in its frame: dropped, it is concentric with the capsule's end (OC-477).
     Row(modifier.offset(y = BackgroundWorkTunables.orbGlyphNudgeY.dp), horizontalArrangement = Arrangement.spacedBy(BackgroundWorkTunables.pairGap.dp)) {
-        // iOS `.motionSwapTransition()`.
         val swap = MotionTransition.swap(reduceMotion)
         AnimatedVisibility(agents.isNotEmpty(), enter = swap.enter, exit = swap.exit) {
             AgentActivityGlyph(
@@ -417,7 +412,10 @@ fun BackgroundWorkGlyph(
 
 // MARK: Presentation
 
-/** The surface's shape: the panel's corners ([BackgroundWorkMotion.panelRadius]), never more than half its height (iOS `GlassGeometry.radius`). */
+/**
+ * The surface's shape: the panel's corners ([BackgroundWorkMotion.panelRadius]), never more than
+ * half its height.
+ */
 private class BackgroundWorkShape(private val radius: Float) : Shape {
     override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
         val r = min(max(0f, radius * density.density), max(0f, size.height) / 2)
@@ -433,9 +431,9 @@ private class Retained {
 }
 
 /**
- * The background-work panel above the composer (iOS `View.backgroundWork(store:isPresented:…)`).
- * Wraps [content] (the session screen) and draws the capsule, the scrim and the panel over it,
- * anchored to the capsule's place marked with [backgroundActivityAnchor].
+ * The background-work panel above the composer. Wraps [content] (the session screen) and draws the
+ * capsule, the scrim and the panel over it, anchored to the capsule's place marked with
+ * [backgroundActivityAnchor].
  *
  * @param anchor the capsule's place, shared with [BackgroundWorkCapsuleSpace].
  * @param sessionID the session shown; a change resets the surface at once (the drawer swaps sessions in place).
@@ -496,7 +494,7 @@ fun BackgroundWorkPresentation(
     // A session that opens on running work shows its capsule at once.
     var capsuleShown by remember { mutableStateOf(hasWork) }
     var capsuleMounted by remember { mutableStateOf(hasWork) }
-    // TalkBack's way back to the capsule once the panel has folded into it (iOS: the modal panel ends on the capsule's button).
+    // TalkBack's way back to the capsule once the panel has folded into it.
     var capsuleFocus by remember { mutableStateOf<Int?>(null) }
     val capsuleFocusRequest = rememberAccessibilityFocusRequest(capsuleFocus)
     // 0 = the capsule's bounds, 1 = the panel's.
@@ -505,8 +503,8 @@ fun BackgroundWorkPresentation(
     var origin by remember { mutableStateOf(Offset.Zero) }
     var overlayWidth by remember { mutableFloatStateOf(0f) }
 
-    // iOS DEBUG `-lab-glass-trace`: the surface's path through each morph, and each stage it
-    // passed through and why it closed without landing (`fade`, `reset`).
+    // The surface's path through each morph, and each stage it passed through and why it closed
+    // without landing (`fade`, `reset`).
     val trace = remember { GlassMorphTrace() }
     val dragTrace = remember { GlassMorphTrace() }
     val stageLog = remember { ArrayList<String>() }
@@ -844,9 +842,9 @@ fun BackgroundWorkPresentation(
                     }
                     layout(0, 0) { placeable.place((left * density.density).roundToInt(), (top * density.density).roundToInt()) }
                 }
-                // At rest, the capsule rides its place in the frame the place moves (iOS draws it in
-                // the pill row): the bounds above are last frame's, so the drawing makes up the
-                // difference from where the place is laid out now. The next composition catches up.
+                // At rest, the capsule rides its place in the frame the place moves: the bounds
+                // above are last frame's, so the drawing makes up the difference from where the
+                // place is laid out now. The next composition catches up.
                 .drawWithContent {
                     anchor.motion()
                     val now = anchor.coordinates?.takeIf { it.isAttached }?.positionInRoot()
@@ -869,11 +867,10 @@ fun BackgroundWorkPresentation(
                         .graphicsLayer { alpha = 1f - progress.value }
                         .accessibilityFocusRequest(capsuleFocusRequest)
                         .then(
-                            // iOS draws the capsule's button only while its glass is up (`capsuleShown`):
-                            // a capsule fading with the work, or gone, takes no touch.
+                            // A capsule fading with the work, or gone, takes no touch.
                             if (stage == BackgroundWorkStage.closed && !hidden && capsuleShown) {
                                 Modifier
-                                    // iOS `CapsuleDragsTranscript`: a vertical drag on the capsule scrolls the transcript.
+                                    // A vertical drag on the capsule scrolls the transcript.
                                     .passesDragsToTranscript(transcript)
                                     .clickable(onClickLabel = showWorkLabel) {
                                         onToggle()
@@ -934,7 +931,7 @@ fun BackgroundWorkPresentation(
                         probe = probe,
                         scrollState = scrollState,
                         isLive = rowsOpen,
-                        // Landed open, TalkBack moves into the panel (iOS `.isModal` once settled).
+                        // Landed open, TalkBack moves into the panel.
                         focusRequest = rememberAccessibilityFocusRequest(if (settled && !hidden) motion else null),
                         onContentHeight = ::measured,
                         onOpenSubagent = { id ->
@@ -960,7 +957,7 @@ fun BackgroundWorkPresentation(
     }
 }
 
-/** Runs [action] with the old and new value when [value] changes (iOS `.onChange(of:)`), never on first composition. */
+/** Runs [action] with the old and new value when [value] changes, never on first composition. */
 @Composable
 private fun <T> OnChange(value: T, action: (old: T, new: T) -> Unit) {
     val previous = remember { arrayOfNulls<Any?>(1).also { it[0] = value } }
@@ -1095,8 +1092,7 @@ private fun BackgroundWorkRow(
         modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
-            // Android divergence: a ripple inset from the panel's edges answers the press (iOS
-            // lifts a soft highlight there).
+            // A ripple inset from the panel's edges answers the press.
             .padding(horizontal = 8.dp)
             .clip(RoundedCornerShape(16.dp))
             .clickable(role = Role.Button, onClickLabel = accessibilityHint, onClick = onTap)
@@ -1169,7 +1165,6 @@ fun ShellElapsedTime(
     )
 }
 
-/** iOS `Duration.formatted(.time(pattern:))` and `.units(allowed: [.hours, .minutes, .seconds], width: .wide)`. */
 object ShellElapsedTimeFormat {
     fun clock(seconds: Long): String {
         val h = seconds / 3600
@@ -1200,15 +1195,14 @@ object ShellElapsedTimeFormat {
 // MARK: Debug traces
 
 /**
- * iOS DEBUG `glyphStepTrace`: the orbs and shell glyphs inside count their steps under this name
- * ([GlyphAdvanceProbe]) while [GlassMorphTrace] is enabled.
+ * The orbs and shell glyphs inside count their steps under this name ([GlyphAdvanceProbe]) while
+ * [GlassMorphTrace] is enabled.
  */
 val LocalGlyphStepTrace = compositionLocalOf<String?> { null }
 
 /**
- * iOS DEBUG `GlyphAdvanceProbe`: counts the steps the background-work surface's orbs and shell
- * glyphs take on a running frame loop, so a trace can tell whether they moved while the surface
- * morphed. Main thread only.
+ * Counts the steps the background-work surface's orbs and shell glyphs take on a running frame
+ * loop, so a trace can tell whether they moved while the surface morphed. Main thread only.
  */
 internal object GlyphAdvanceProbe {
     val steps = HashMap<String, Int>()
@@ -1219,8 +1213,7 @@ internal object GlyphAdvanceProbe {
 }
 
 /**
- * Port of iOS DEBUG `GlassMorphTrace` (`-lab-glass-trace`): follows the background-work surface
- * through a morph, frame by frame, and writes what it saw as iOS's accessibility value reads
+ * Follows the background-work surface through a morph, frame by frame, and writes what it saw
  * (`open: x,y,w,h@ms …|open-coverage: …|open-glyphs: …`) to [AppLog] under
  * `background-work-glass-trace`. Android draws the surface itself, so the shape followed is the
  * surface's own placed bounds (root dp, opacity-weighted) instead of a walk of the layer tree.
@@ -1228,10 +1221,12 @@ internal object GlyphAdvanceProbe {
  */
 internal class GlassMorphTrace(private val identifier: String = "background-work-glass-trace") {
     companion object {
-        /** iOS `-lab-glass-trace`: the lab's `debug.opencode.glass_trace=1` (debug builds only). */
+        /** The lab's `debug.opencode.glass_trace=1` (debug builds only). */
         val isEnabled: Boolean by lazy { VoiceLabEnvironment.flag("OPENCODE_LAB_GLASS_TRACE") }
 
-        /** iOS `-lab-count-trace` (`debug.opencode.count_trace=1`): also follows the capsule resizing as its counts change. */
+        /**
+         * Also follows the capsule resizing as its counts change (`debug.opencode.count_trace=1`).
+         */
         val tracesCounts: Boolean by lazy { isEnabled && VoiceLabEnvironment.flag("OPENCODE_LAB_COUNT_TRACE") }
     }
 
@@ -1256,7 +1251,7 @@ internal class GlassMorphTrace(private val identifier: String = "background-work
      * Starts following the surface and measuring it inside [region] (`<phase>-coverage: min
      * area,frames,the frame it was first found on`); [followingGlyphs] adds `<phase>-glyphs:
      * frames the orbs moved on, frames, the longest stretch in ms they held still`.
-     * [matchingCorner] (the counts trace) follows for 0.8 s instead of 2 s, as on iOS.
+     * [matchingCorner] (the counts trace) follows for 0.8 s instead of 2 s.
      */
     fun begin(phase: String, region: Rect? = null, matchingCorner: Boolean = false, followingGlyphs: Boolean = false): Int {
         if (!isEnabled) return generation
@@ -1340,7 +1335,9 @@ internal class GlassMorphTrace(private val identifier: String = "background-work
     }
 }
 
-/** iOS DEBUG `TracedFrames`: root-dp frames of the capsule's surface, the panel and where the panel is placed, for the trace. */
+/**
+ * Root-dp frames of the capsule's surface, the panel and where the panel is placed, for the trace.
+ */
 private class TracedFrames {
     var pill: Rect = Rect.Zero
     var panel: Rect = Rect.Zero

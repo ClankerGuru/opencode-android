@@ -5,7 +5,7 @@ import ai.opencode.server.model.AgentFileReference
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.net.IDN
 
-/** Where a link tapped in a reply goes (iOS `BrowserLinkRoute`). URLs are strings. */
+/** Where a link tapped in a reply goes. URLs are strings. */
 sealed interface BrowserLinkRoute {
     /** A file the agent named: the file viewer. */
     data class File(val reference: AgentFileReference) : BrowserLinkRoute
@@ -19,9 +19,8 @@ sealed interface BrowserLinkRoute {
 
 /**
  * Which links the in-app browser takes: public `http(s)` pages only. Local and private-network
- * hosts, links with credentials, and signed links (whose query is a bearer secret) keep opening
- * the way they always have, so the browser, and the page context it sends, never touch them.
- * Port of iOS `BrowserLinkPolicy`.
+ * hosts, links with credentials, and signed links (whose query is a bearer secret) keep opening the
+ * way they always have, so the browser, and the page context it sends, never touch them.
  */
 object BrowserLinkPolicy {
     fun route(url: String, inAppBrowser: Boolean): BrowserLinkRoute {
@@ -76,8 +75,7 @@ object BrowserLinkPolicy {
 /**
  * What the page's own navigations may do: public pages load, and nothing else ever loads in the
  * browser, in the page or in its frames. A link the reader taps to a private host or another app
- * goes to the system; one a script or a redirect follows is cancelled. Port of iOS
- * `BrowserNavigationPolicy`.
+ * goes to the system; one a script or a redirect follows is cancelled.
  */
 object BrowserNavigationPolicy {
     sealed interface Decision {

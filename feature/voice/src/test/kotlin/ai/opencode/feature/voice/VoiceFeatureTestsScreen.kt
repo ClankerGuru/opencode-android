@@ -25,18 +25,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 
-/**
- * Port of iOS `VoiceFeatureTests+Screen.swift` (an extension of `VoiceFeatureTests`): the tests
- * of `VoiceFeature.State` and `VoiceWorkClient`, and the one whose store is `VoiceFeature`.
- *
- * Not ported here (SessionFeature, :feature:session): `directDelegationAppearsWithoutAnEventStreamEcho`,
- * `serverDelegationAppearsWithoutAnEventStreamEcho`, `theCallCarriesTheScreensPickUntilItIsApplied`,
- * `aCallOnADraftCreatesAnEmptySessionAndMovesOntoIt`, `aDraftCallsRequestCreatesTheScreensSession`,
- * `aCallWhoseSessionCantBeCreatedStaysOnTheDraft`, `firstRequestOnADraftCreatesTheSessionAndTheScreenAdoptsIt`,
- * `aDraftCallsModelIsAppliedOnceToTheSessionItCreates`, `aKeptPickWaitsOnTheSessionsScreen`,
- * `aDraftsSessionIsNotAdoptedOnceItsRequestWasLetGo`; and the SessionFeature half of
- * `aDraftCallsRefusedModelSendsNothing` (its `VoiceWorkClient` half is below).
- */
 class VoiceFeatureTestsScreen {
     private lateinit var h: Harness
 

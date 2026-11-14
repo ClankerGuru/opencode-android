@@ -71,7 +71,7 @@ enum class DictationHoldRelease(val rawValue: String) {
     Expired("expired"),
     Background("background"),
 
-    /** Another app started playing (iOS `silenceSecondaryAudioHintNotification`). */
+    /** Another app started playing. */
     Silenced("silenced"),
 
     /** Someone else claimed the shared session ([AudioSessionGeneration]). */
@@ -86,10 +86,7 @@ enum class DictationHoldRelease(val rawValue: String) {
     }
 }
 
-/**
- * How long the audio session stays ready after a recording, in seconds. iOS
- * `composer.dictationAudio.*` Tunables, baked to their defaults.
- */
+/** How long the audio session stays ready after a recording, in seconds. */
 object DictationAudioTunables {
     /** Hold after a cancel or short press (s). */
     const val cancelHold: Double = 10.0
@@ -143,10 +140,10 @@ object DictationHoldPolicy {
 }
 
 /**
- * What dictation needs of the platform's audio (iOS `AVAudioSession`). Dictation never requests
- * audio focus, sets `MODE_IN_COMMUNICATION` or starts Bluetooth SCO. Activation is its claim on the
- * shared audio ([AudioSessionOwner]); the preferred input goes to `AudioRecord.setPreferredDevice`.
- * Sample rate and buffer preferences move no hardware.
+ * What dictation needs of the platform's audio. Dictation never requests audio focus, sets
+ * `MODE_IN_COMMUNICATION` or starts Bluetooth SCO. Activation is its claim on the shared audio
+ * ([AudioSessionOwner]); the preferred input goes to `AudioRecord.setPreferredDevice`. Sample rate
+ * and buffer preferences move no hardware.
  */
 interface DictationAudioSessionControlling {
     val isOtherAudioPlaying: Boolean
@@ -171,7 +168,7 @@ interface DictationAudioSessionControlling {
     fun preferredInputDevice(): AudioDeviceInfo?
 }
 
-/** iOS `AVAudioSession.Port` raw values, so route logs read the same on both platforms. */
+/** IOS `AVAudioSession.Port` raw values, so route logs read the same on both platforms. */
 object DictationPort {
     const val builtInMic = "MicrophoneBuiltIn"
     const val headsetMic = "MicrophoneWired"
@@ -271,24 +268,24 @@ object DictationAudioSession {
     var isRecording: Boolean = false
 }
 
-/** What ends a hold from outside: iOS's app and `AVAudioSession` notifications, mapped. */
+/** What ends a hold from outside. */
 enum class DictationAudioEvent {
-    /** iOS `didEnterBackgroundNotification`: the app's last activity stopped. */
+    /** The app's last activity stopped. */
     DidEnterBackground,
 
-    /** iOS `willEnterForegroundNotification`: an activity started again. */
+    /** An activity started again. */
     WillEnterForeground,
 
-    /** iOS `silenceSecondaryAudioHintNotification` `.begin`: other audio started playing. */
+    /** Other audio started playing. */
     OtherAudioBegan,
 
-    /** iOS `interruptionNotification` `.began`: the audio mode turned to a call. */
+    /** The audio mode turned to a call. */
     InterruptionBegan,
 
-    /** iOS `mediaServicesWereResetNotification`: the audio server died (`ERROR_DEAD_OBJECT`). */
+    /** The audio server died (`ERROR_DEAD_OBJECT`). */
     MediaServicesReset,
 
-    /** iOS `routeChangeNotification`: an audio device came or went. */
+    /** An audio device came or went. */
     RouteChanged,
 }
 
@@ -369,7 +366,7 @@ class DictationAudio(private val environment: Environment) {
         val pending: List<DictationHoldRelease> = emptyList(),
     )
 
-    /** Reentrant, like iOS's `NSRecursiveLock`. */
+    /** Reentrant. */
     private val lock = Any()
     private var recording: Recording? = null
     private var held: Hold? = null
@@ -472,7 +469,7 @@ class DictationAudio(private val environment: Environment) {
         session.setPreferredInput(port)
     }
 
-    /** The input [selectInput] picked, for the recorder (iOS: the session's preferred input). */
+    /** The input [selectInput] picked, for the recorder. */
     fun preferredInputDevice(): AudioDeviceInfo? = environment.session.preferredInputDevice()
 
     /** Recording [id]'s mic stopped. The session itself stays as it is until [release]. */
@@ -883,14 +880,14 @@ object LiveCapture {
             throw DictationError.AudioFormatUnavailable()
         }
         DictationAudioSession.isRecording = true
-        // iOS's background audio: the mic keeps going if the app leaves mid-recording.
+        // The mic keeps going if the app leaves mid-recording.
         val appContext = context.applicationContext
         DictationRecordingService.start(appContext)
 
         val audioManager = context.getSystemService(AudioManager::class.java)
         val main = Handler(Looper.getMainLooper())
-        // A call or another recorder taking the mic, and route changes (a headset
-        // plugged in) mid-recording, end it like iOS's interruptions.
+        // A call or another recorder taking the mic, and route changes (a headset plugged in)
+        // mid-recording, end it.
         var routed: Int? = null
         val routing = AudioRecord.OnRoutingChangedListener { router ->
             val id = router.routedDevice?.id

@@ -67,8 +67,8 @@ class ComposerKeyboardProgressTests {
     }
 
     /**
-     * iOS `.allowsHitTesting(false)` on the shut row's controls: a tap on them reaches the field
-     * laid out under them in another branch (the composer's input slot), and they still draw.
+     * A tap on them reaches the field laid out under them in another branch (the composer's input
+     * slot), and they still draw.
      */
     @Test fun shutControlsLetTheFieldUnderThemTakeTheTap() {
         for (passes in listOf(true, false)) {

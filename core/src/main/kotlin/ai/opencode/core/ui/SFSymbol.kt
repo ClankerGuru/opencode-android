@@ -4,8 +4,7 @@ import ai.opencode.core.R
 import androidx.annotation.DrawableRes
 
 /**
- * Every SF Symbol the iOS app uses, mapped to its Material Symbols Rounded drawable; the table is
- * in docs/parity/core-ui.md. To add one: `scripts/material-symbols.txt`,
+ * The table is in docs/parity/core-ui.md. To add one: `scripts/material-symbols.txt`,
  * `scripts/fetch-material-symbols.py`, an entry here and a parity row.
  */
 enum class SFSymbol(val sfName: String, @DrawableRes val drawable: Int) {
@@ -283,15 +282,15 @@ enum class SFSymbol(val sfName: String, @DrawableRes val drawable: Int) {
     companion object {
         private val byName: Map<String, SFSymbol> = entries.associateBy { it.sfName }
 
-        /** The entry for an iOS SF Symbol name, or `null` if the iOS app never used it. */
+        /** The entry for an SF Symbol name, or `null` if unmapped. */
         fun fromName(name: String): SFSymbol? = byName[name]
     }
 }
 
-/** Drawable for an iOS SF Symbol name; unknown names get a `help` glyph (never a crash). */
+/** Drawable for an SF Symbol name; unknown names get a `help` glyph (never a crash). */
 @DrawableRes
 fun sfSymbol(name: String): Int = SFSymbol.fromName(name)?.drawable ?: R.drawable.ms_help
 
-/** Drawable for an iOS SF Symbol name, or `null` if unmapped. */
+/** Drawable for an SF Symbol name, or `null` if unmapped. */
 @DrawableRes
 fun sfSymbolOrNull(name: String): Int? = SFSymbol.fromName(name)?.drawable

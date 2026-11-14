@@ -1,8 +1,8 @@
 package ai.opencode.core.log
 
 /**
- * Port of iOS `CallTrigger`: what asked for a call, logged once per start. In `:core` because
- * [SystemActionOrigin] is shared with `:feature:system`.
+ * What asked for a call, logged once per start. In `:core` because [SystemActionOrigin] is shared
+ * with `:feature:system`.
  */
 sealed interface CallTrigger {
     /** The composer's call button. */
@@ -46,7 +46,7 @@ sealed interface CallTrigger {
         @Volatile
         private var observer: ((CallTrigger) -> Unit)? = null
 
-        /** iOS `CallTrigger.$observer.withValue`: runs [body] with [seen] watching every log. */
+        /** Runs [body] with [seen] watching every log. */
         suspend fun <T> observing(seen: (CallTrigger) -> Unit, body: suspend () -> T): T {
             val previous = observer
             observer = seen
@@ -59,7 +59,7 @@ sealed interface CallTrigger {
     }
 }
 
-/** iOS `SystemAction.Origin`: which surface made a `SystemAction`. */
+/** Which surface made a `SystemAction`. */
 enum class SystemActionOrigin {
     /** Start Voice Call: the app shortcut, Assistant, or a home-screen shortcut pinned from it. */
     shortcut,

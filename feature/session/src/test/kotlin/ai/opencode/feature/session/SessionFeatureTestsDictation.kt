@@ -56,9 +56,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Port of iOS `SessionFeatureTests+Dictation.swift`. Parameterized tests loop over their
- * arguments. `PressMic` drives the real `LiveDictation` against a fake microphone and model, as
- * iOS's does (16-bit mono buffers stand in for `AVAudioPCMBuffer`s).
+ * Parameterized tests loop over their arguments. `PressMic` drives the real `LiveDictation` against
+ * a fake microphone and model.
  */
 class SessionFeatureTestsDictation {
     private val sentID = FailedSendsSupport.sentID
@@ -139,7 +138,7 @@ class SessionFeatureTestsDictation {
         }
     }
 
-    /** Holds an async step until the test opens it (iOS `LiveDictationTests.Gate`). */
+    /** Holds an async step until the test opens it. */
     internal class Gate(open: Boolean = false) {
         private val opened = CompletableDeferred<Unit>().apply { if (open) complete(Unit) }
         suspend fun await() = opened.await()
@@ -345,9 +344,8 @@ class SessionFeatureTestsDictation {
 
             store.send(Action.micPressBegan) { it.withDictationPhase(DictationFeature.Phase.Preparing) }
             store.send(end)
-            // iOS starts the end's effect (its stop reaching the dictation actor) before the next
-            // line; here it runs on the test's loop and the actor's thread, so wait until it has
-            // reached the actor before the grant (a fixed number of yields lost the race under load).
+            // Wait until the end's effect has reached the dictation actor before the grant (a fixed
+            // number of yields lost the race under load).
             mic.until { mic.ended.value > 0 }
             assertEquals("$end never reached the dictation actor", 1, mic.ended.value)
             mic.permitted.open()
@@ -447,10 +445,9 @@ class SessionFeatureTestsDictation {
     }
 
     /**
-     * Background audio keeps the mic on when the app leaves, and so does the
-     * recording: nothing stops, nothing is sent, and the words keep coming.
-     * A held mic's touch that UIKit ends as the scene goes inactive, as a lift
-     * or a cancel, locks the recording instead of sending it.
+     * Background audio keeps the mic on when the app leaves, and so does the recording: nothing
+     * stops, nothing is sent, and the words keep coming. A held mic's touch that ends as the scene
+     * goes inactive, as a lift or a cancel, locks the recording instead of sending it.
      */
     @Test fun leavingTheAppKeepsRecordingAndNeverSends() {
         for (touchEnd in listOf("tap", "lift", "cancel")) sessionTest { h ->

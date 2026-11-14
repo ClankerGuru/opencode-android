@@ -20,9 +20,8 @@ import android.view.animation.DecelerateInterpolator
 import java.lang.ref.WeakReference
 
 /**
- * Port of iOS `Core/ScreenCaptureFeedback.swift`: the flash and shutter when the app captures its
- * own screen. [ScreenCaptureFeedback.capture] captures first and flashes after, so the flash is
- * never in the picture.
+ * The flash and shutter when the app captures its own screen. [ScreenCaptureFeedback.capture]
+ * captures first and flashes after, so the flash is never in the picture.
  */
 class ScreenCaptureFeedbackClient(
     /** The app just captured its own screen in [Activity] (null when unknown): flash it and play the shutter. */
@@ -38,8 +37,8 @@ class ScreenCaptureFeedbackClient(
 }
 
 /**
- * The shutter outside the flash (iOS `LiveScreenCaptureFeedback.playShutterSound`). Its sounds live
- * in `:feature:voice`, so the app installs this at the root; until then a capture only flashes.
+ * The shutter outside the flash. Its sounds live in `:feature:voice`, so the app installs this at
+ * the root; until then a capture only flashes.
  */
 fun interface ScreenCaptureShutterSound {
     fun play()
@@ -61,7 +60,7 @@ object ScreenCaptureFeedback {
         return result
     }
 
-    /** The same for a capture that returns nothing when refused (iOS `capture(in:optional:)`). */
+    /** The same for a capture that returns nothing when refused. */
     inline fun <T : Any> captureOptional(scene: Activity?, capture: () -> T?): T? {
         val image = capture()
         if (image != null) dependency(ScreenCaptureFeedbackClient).shutter(scene)
@@ -105,8 +104,7 @@ data class ScreenFlashStyle(
 }
 
 /**
- * The live flash and shutter (iOS `LiveScreenCaptureFeedback`). Runs on the main thread; a
- * capture finishing elsewhere posts there.
+ * The live flash and shutter. Runs on the main thread; a capture finishing elsewhere posts there.
  */
 private class LiveScreenCaptureFeedback {
     private val main = Handler(Looper.getMainLooper())
@@ -141,10 +139,7 @@ private class ForegroundActivities : Application.ActivityLifecycleCallbacks {
 
     fun isResumed(activity: Activity): Boolean = resumed.any { it.get() === activity }
 
-    /**
-     * When the capture didn't say (iOS `flashScene`): the activity with window focus, else the only
-     * resumed one.
-     */
+    /** When the capture didn't say: the activity with window focus, else the only resumed one. */
     fun flashScene(): Activity? {
         val scenes = resumed.mapNotNull { it.get() }.filter { !it.isFinishing }
         scenes.firstOrNull { it.hasWindowFocus() }?.let { return it }
@@ -167,9 +162,8 @@ private class ForegroundActivities : Application.ActivityLifecycleCallbacks {
 }
 
 /**
- * A window over everything, including the IME, for one flash (iOS `ScreenFlash`). Not touchable or
- * focusable, hidden from accessibility, and removed when the decay ends so it holds no activity
- * alive.
+ * A window over everything, including the IME, for one flash. Not touchable or focusable, hidden
+ * from accessibility, and removed when the decay ends so it holds no activity alive.
  */
 private class ScreenFlash {
     private var window: View? = null
@@ -183,7 +177,7 @@ private class ScreenFlash {
         view.animate().cancel()
         view.setBackgroundColor(if (style.tone == ScreenFlashStyle.Tone.white) Color.WHITE else Color.BLACK)
         view.alpha = style.peak.toFloat()
-        // iOS `Motion.dim.animate(reduceMotion:)`: ease out, or ease in-out under Reduce Motion.
+        // Ease out, or ease in-out under Reduce Motion.
         view.animate()
             .alpha(0f)
             .setDuration((style.duration * 1_000).toLong())

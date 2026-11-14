@@ -32,12 +32,9 @@ import org.robolectric.annotation.GraphicsMode
 import java.util.UUID
 
 /**
- * Port of iOS `PhotoFlightTests+Reservations.swift` (an extension of `PhotoFlightTests`):
- * reserved attachment slots, held until their import arrives, fails or is cancelled, and a new
- * row held for the frame it mounts. Geometry at density 1, as in [PhotoFlightTests].
+ * Geometry at density 1, as in [PhotoFlightTests].
  *
- * iOS's display link for `revealHeldRow` is the caller's frame clock here: a
- * [BroadcastFrameClock] stands in for the next display frame.
+ * A [BroadcastFrameClock] stands in for the next display frame.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)

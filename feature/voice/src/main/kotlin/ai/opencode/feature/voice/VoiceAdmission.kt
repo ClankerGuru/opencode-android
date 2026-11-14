@@ -6,12 +6,9 @@ import ai.opencode.server.model.OpenCodeFileReference
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
 
 /**
- * A Voice message the server admitted into a session: the voice-owned stand-in
- * for iOS `SessionFeature.PendingPrompt` as voice builds it (`requestEpoch` 0;
- * inline attachments only for a Developer Mode screenshot). Session/Composer sit above voice, so voice
- * hands this to [VoiceAdmissionRecorder] and the app maps it onto its own
- * pending prompt. Path attachments carry [OpenCodeFileReference] (iOS wraps them
- * in `ComposerFileAttachment(uploaded:)`).
+ * A Voice message the server admitted into a session. Session/Composer sit above voice, so voice
+ * hands this to [VoiceAdmissionRecorder] and the app maps it onto its own pending prompt. Path
+ * attachments carry [OpenCodeFileReference].
  */
 data class VoiceAdmittedPrompt(
     val messageID: String,
@@ -21,20 +18,17 @@ data class VoiceAdmittedPrompt(
     val files: List<OpenCodeFileReference> = emptyList(),
     val delivery: OpenCodeDelivery = OpenCodeDelivery.Steer,
     /**
-     * Voice owns its run separately; remembering its row must not keep a
-     * composer's `isAwaitingReply` alive after the server reports idle.
-     * (iOS `PromptOutbox.recordAdmitted` sets it false.)
+     * Voice owns its run separately; remembering its row must not keep a composer's
+     * `isAwaitingReply` alive after the server reports idle.
      */
     val ownsRun: Boolean = false,
     val requestEpoch: Int = 0,
 )
 
 /**
- * iOS `PromptOutbox.recordAdmitted(_:sessionID:serverKey:)`: a send this phone
- * made outside the outbox (the voice agent's), once the server admitted it, so a
- * screen that opens on its session shows it like any admitted send. The live
- * value is inert; `:app` installs the composer's outbox through
- * `DependencyValues.installRoot`.
+ * A send this phone made outside the outbox (the voice agent's), once the server admitted it, so a
+ * screen that opens on its session shows it like any admitted send. The live value is inert; `:app`
+ * installs the composer's outbox through `DependencyValues.installRoot`.
  */
 class VoiceAdmissionRecorder(
     val recordAdmitted: (prompt: VoiceAdmittedPrompt, sessionID: String, serverKey: String) -> Unit,

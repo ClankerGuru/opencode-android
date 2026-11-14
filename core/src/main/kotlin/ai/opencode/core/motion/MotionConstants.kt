@@ -17,9 +17,8 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
 /**
- * A spring in SwiftUI's `(duration, bounce)` terms: ω = 2π / duration, ζ = 1 − bounce, so [spec] is
- * `spring(dampingRatio = ζ, stiffness = ω²)`. [fromResponse] takes the legacy
- * `response:dampingFraction:` form.
+ * ω = 2π / duration, ζ = 1 − bounce, so [spec] is `spring(dampingRatio = ζ, stiffness = ω²)`.
+ * [fromResponse] takes the legacy `response:dampingFraction:` form.
  */
 data class MotionSpring(val duration: Double, val bounce: Double = 0.0) {
     /** Angular frequency ω (rad/s). */
@@ -38,10 +37,7 @@ data class MotionSpring(val duration: Double, val bounce: Double = 0.0) {
         return SpringSpec(dampingRatio = dampingRatio, stiffness = stiffness * scale * scale, visibilityThreshold = visibilityThreshold)
     }
 
-    /**
-     * iOS `TunableSpring.animation(reduceMotion:delay:)`: the spring, or [Motion.reducedFadeSpec]
-     * under Reduce Motion.
-     */
+    /** The spring, or [Motion.reducedFadeSpec] under Reduce Motion. */
     fun <T> animation(reduceMotion: Boolean, delaySeconds: Double = 0.0, visibilityThreshold: T? = null): FiniteAnimationSpec<T> {
         if (reduceMotion) return Motion.reducedFadeSpec(delaySeconds)
         val base = spec(visibilityThreshold)
@@ -49,18 +45,17 @@ data class MotionSpring(val duration: Double, val bounce: Double = 0.0) {
     }
 
     companion object {
-        /** iOS `.spring(response:dampingFraction:)`. */
         fun fromResponse(response: Double, dampingFraction: Double): MotionSpring =
             MotionSpring(response, if (dampingFraction <= 1) 1 - dampingFraction else 1 / dampingFraction - 1)
     }
 }
 
 /**
- * The app's motion vocabulary (iOS `Motion`): fourteen [MotionRole]s plus shared geometry, stagger
- * and ambient values, backed by live [MotionTunables].
+ * The app's motion vocabulary: fourteen [MotionRole]s plus shared geometry, stagger and ambient
+ * values, backed by live [MotionTunables].
  */
 object Motion {
-    /** iOS `Motion.sectionTitles`: the Motion group's sections, in order. */
+    /** The Motion group's sections, in order. */
     val sectionTitles = listOf("Springs", "Fades", "Geometry", "Ambient")
 
     // Roles
@@ -87,7 +82,7 @@ object Motion {
     /** Per-item cascade delay across a staggered group (0.02 s). */
     val staggerStep: Double get() = MotionTunables.staggerStep.value
 
-    // Blur radii & entrance rises (iOS points → dp)
+    // Blur radii & entrance rises
 
     /** Subtle blur for compact capsules (3). */
     val blurSubtle: Dp get() = MotionTunables.blurSubtle.value
@@ -102,10 +97,13 @@ object Motion {
     /** Vertical rise for expanding panel content (10). */
     val panelRise: Dp get() = MotionTunables.panelRise.value
 
-    /** iOS `Motion.register(in:)`: [MotionTunables.register]. */
+    /** [MotionTunables.register]. */
     fun register(store: TuningStore = TuningStore.shared) = MotionTunables.register(store)
 
-    /** iOS `Motion.isRetiredKey`: the component-named keys the roles replaced (`motion.morphOpen.duration`, `motion.reducedFade`, …). */
+    /**
+     * The component-named keys the roles replaced (`motion.morphOpen.duration`,
+     * `motion.reducedFade`, …).
+     */
     fun isRetiredKey(key: String): Boolean {
         val parts = key.split('.')
         if (parts.size < 2 || parts[0] != "motion") return false
@@ -138,10 +136,8 @@ object Motion {
     /** Small badge, pill, or glyph entrance pop (0.26 s, 0.22 bounce). */
     @Deprecated("Use Motion.microIn")
     val microPop = MotionSpring(0.26, 0.22)
-    /** iOS `Motion.microExit` → `microOut` (same 0.18 s). */
     @Deprecated("Use Motion.microOut")
     val microExit: MotionSpring get() = microOut.spring
-    /** iOS `Motion.drawerSlide` → `release` (critically damped at ω 28.5, ≈ 0.22 s). */
     @Deprecated("Use Motion.release")
     val drawerSlide: MotionSpring get() = release.spring
 
@@ -158,22 +154,18 @@ object Motion {
     @Deprecated("Use MotionTunables.dimDuration", ReplaceWith("MotionTunables.dimDuration.value"))
     val fadeSlow: Double get() = MotionTunables.dimDuration.value
 
-    /** SwiftUI `.easeInOut` (CSS ease-in-out). */
     val EaseInOut = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)
 
-    /** SwiftUI `.easeOut` (CSS ease-out). */
     val EaseOut = CubicBezierEasing(0f, 0f, 0.58f, 1f)
 
-    /** iOS `Motion.reducedFadeAnimation`: [Motion.reduced]'s `.easeInOut(duration: reducedDuration)`. */
+    /** [Motion.reduced]'s `.easeInOut(duration: reducedDuration)`. */
     fun <T> reducedFadeSpec(delaySeconds: Double = 0.0): FiniteAnimationSpec<T> =
         tween(durationMillis = millis(MotionTunables.reducedDuration.value), delayMillis = millis(delaySeconds), easing = EaseInOut)
 
-    /** iOS `Tunable<Double>.easeOut(delay:reduceMotion:)` for a fade of [seconds]. */
     fun <T> easeOut(seconds: Double, delaySeconds: Double = 0.0, reduceMotion: Boolean = false): FiniteAnimationSpec<T> =
         if (reduceMotion) reducedFadeSpec(delaySeconds)
         else tween(durationMillis = millis(seconds), delayMillis = millis(delaySeconds), easing = EaseOut)
 
-    /** iOS `Tunable<Double>.easeInOut(delay:reduceMotion:)` for a fade of [seconds]. */
     fun <T> easeInOut(seconds: Double, delaySeconds: Double = 0.0, reduceMotion: Boolean = false): FiniteAnimationSpec<T> =
         if (reduceMotion) reducedFadeSpec(delaySeconds)
         else tween(durationMillis = millis(seconds), delayMillis = millis(delaySeconds), easing = EaseInOut)
@@ -182,7 +174,7 @@ object Motion {
     fun millis(seconds: Double): Int = (seconds * 1000 / AnimationTimeScale.shared.observedScale).roundToInt()
 }
 
-/** Delays any finite spec (Compose's `spring` has no delay parameter; SwiftUI's `.delay`). */
+/** Delays any finite spec. */
 internal fun <T> delayed(spec: FiniteAnimationSpec<T>, delaySeconds: Double): FiniteAnimationSpec<T> =
     DelayedSpec(spec, (delaySeconds * 1_000_000_000L).toLong())
 
@@ -211,8 +203,8 @@ private class DelayedVectorizedSpec<V : AnimationVector>(
 }
 
 /**
- * The [Motion] vocabulary as live tunables, same keys and defaults as iOS. Keep each declaration on
- * one line: `scripts/tune.py bake` rewrites its default.
+ * The [Motion] vocabulary as live tunables, same keys and defaults. Keep each declaration on one
+ * line: `scripts/tune.py bake` rewrites its default.
  */
 object MotionTunables {
     // Springs (duration s, bounce)
@@ -242,7 +234,7 @@ object MotionTunables {
     val staggerStep = Tunable("motion.fades.staggerStep", "Stagger step (s)", default = 0.02, range = 0.0..0.08, step = 0.005)
     val staggerCap = Tunable("motion.fades.staggerCap", "Stagger cap (s)", default = 0.10, range = 0.02..0.3, step = 0.01)
 
-    // Geometry & thresholds (iOS points → dp, ratios)
+    // Geometry & thresholds
 
     val pressScale = Tunable("motion.geometry.pressScale", "Press scale", default = 0.97f, range = 0.90..1.0, step = 0.005)
     val microInScale = Tunable("motion.geometry.microInScale", "Micro in scale", default = 0.85f, range = 0.5..1.0, step = 0.01)
@@ -255,7 +247,7 @@ object MotionTunables {
     val entranceRise = Tunable("motion.geometry.entranceRise", "Entrance rise (pt)", default = 6.dp, range = 0.0..20.0, step = 1.0)
     val panelRise = Tunable("motion.geometry.panelRise", "Panel rise (pt)", default = 10.dp, range = 0.0..28.0, step = 1.0)
     val widthLead = Tunable("motion.geometry.widthLead", "Flight width lead (×)", default = 1.65, range = 1.0..2.5, step = 0.05)
-    /** dp per second (iOS points per second). */
+    /** Dp per second. */
     val flickVelocity = Tunable("motion.geometry.flickVelocity", "Flick (pt/s)", default = 250.0, range = 100.0..900.0, step = 25.0)
 
     // Ambient clock (seconds)
@@ -264,8 +256,8 @@ object MotionTunables {
     val sweepPeriod = Tunable("motion.ambient.sweepPeriod", "Sweep period (s)", default = 1.60, range = 0.6..3.5, step = 0.05)
 
     /**
-     * iOS `Motion.register(in:)`: lists every role's tunables in the panel before anything has
-     * animated, in section order, and drops overrides left on keys this vocabulary retired.
+     * Lists every role's tunables in the panel before anything has animated, in section order, and
+     * drops overrides left on keys this vocabulary retired.
      */
     fun register(store: TuningStore = TuningStore.shared) {
         store.register(microInSpring)

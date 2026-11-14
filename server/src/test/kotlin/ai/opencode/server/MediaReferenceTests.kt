@@ -23,9 +23,8 @@ import org.junit.Test
 import java.util.Base64
 
 /**
- * The server half of iOS `MediaReferenceTests`: the capabilities header, decoding inline and
- * `media:<hash>` shapes and unavailable placeholders, and the live fetch. The loader and its
- * caches are tested in `:feature:media`; the tool mosaic in `:feature:transcript`.
+ * The capabilities header, decoding inline and `media:<hash>` shapes and unavailable placeholders,
+ * and the live fetch.
  */
 class MediaReferenceTests {
     @get:Rule val isolation = TestIsolationRule()

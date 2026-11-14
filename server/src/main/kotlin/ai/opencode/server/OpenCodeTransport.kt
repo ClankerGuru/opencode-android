@@ -14,8 +14,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * The OkHttp client pools behind the live client (iOS `URLSession`s). Read a pool where the call is
- * made, never keep one: [reset] swaps in fresh ones.
+ * The OkHttp client pools behind the live client. Read a pool where the call is made, never keep
+ * one: [reset] swaps in fresh ones.
  */
 class OpenCodeTransport private constructor(
     private val current: () -> Pools,
@@ -32,8 +32,8 @@ class OpenCodeTransport private constructor(
         val longPoll: OkHttpClient,
         val eventStream: OkHttpClient,
         /**
-         * Immutable `media:<hash>` blobs (iOS `media`: ephemeral, no URL cache, 20 s request
-         * interval). Defaults to [request] for test transports that stub one client.
+         * Immutable `media:<hash>` blobs. Defaults to [request] for test transports that stub one
+         * client.
          */
         val media: OkHttpClient = request,
     )
@@ -62,7 +62,7 @@ class OpenCodeTransport private constructor(
 
         /**
          * Fresh pools (their own dispatcher and connection pool), each request first passing
-         * [guard] (iOS ATS: [TransportSecurity]).
+         * [guard].
          */
         internal fun pools(guard: okhttp3.Interceptor?): Pools {
             // OkHttp caps calls per host at 5 by default; the event stream and a `/wait` long poll
@@ -97,8 +97,8 @@ class OpenCodeTransport private constructor(
 
         /**
          * The same pools behind [TestNetworkBlock]: a test reaches only the hosts its fixtures
-         * register (iOS `WireFixture`) and loopback (`MockWebServer`); anything else fails.
-         * Fixture hosts (`wire-<uuid>.invalid`) are plain HTTP, so the cleartext guard stays off.
+         * register and loopback (`MockWebServer`); anything else fails. Fixture hosts
+         * (`wire-<uuid>.invalid`) are plain HTTP, so the cleartext guard stays off.
          */
         override val testValue: OpenCodeTransport by lazy {
             fun OkHttpClient.blocked() = newBuilder().addInterceptor(TestNetworkBlock.interceptor).build()

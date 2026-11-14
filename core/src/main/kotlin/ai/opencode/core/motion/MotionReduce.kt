@@ -7,8 +7,8 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 
 /**
- * The one Reduce Motion translation (iOS `MotionReduce`): movement, scale, blur and rotation go
- * neutral and only opacity changes.
+ * The one Reduce Motion translation: movement, scale, blur and rotation go neutral and only opacity
+ * changes.
  */
 object MotionReduce {
     fun offset(value: Dp, reduceMotion: Boolean): Dp = if (reduceMotion) 0.dp else value
@@ -22,8 +22,8 @@ object MotionReduce {
 }
 
 /**
- * Where a view sits before it arrives or after it leaves (iOS `MotionPose`): opacity, scale,
- * blur and offset. [identity] is at rest.
+ * Where a view sits before it arrives or after it leaves: opacity, scale, blur and offset.
+ * [identity] is at rest.
  */
 data class MotionPose(
     val opacity: Float = 1f,
@@ -31,10 +31,10 @@ data class MotionPose(
     val blur: Dp = 0.dp,
     val offset: DpOffset = DpOffset.Zero,
 ) {
-    /** iOS `reduced(_:)`: under Reduce Motion only the opacity survives. */
+    /** Under Reduce Motion only the opacity survives. */
     fun reduced(reduceMotion: Boolean): MotionPose = if (reduceMotion) MotionPose(opacity = opacity) else this
 
-    /** iOS `scaled(by:)`: the pose [fraction] of the way from [identity]. */
+    /** The pose [fraction] of the way from [identity]. */
     fun scaled(by: Float): MotionPose = MotionPose(
         opacity = 1f - (1f - opacity) * by,
         scale = 1f - (1f - scale) * by,
@@ -67,8 +67,8 @@ data class MotionPose(
 }
 
 /**
- * iOS `motionPose(_:reduceMotion:)`: draws [pose] (reduced under Reduce Motion). Blur goes
- * through [transitionBlur], which is off on Android by default (docs/parity/core-ui.md).
+ * Draws [pose] (reduced under Reduce Motion). Blur goes through [transitionBlur], which is off on
+ * Android by default (docs/parity/core-ui.md).
  */
 fun Modifier.motionPose(pose: MotionPose, reduceMotion: Boolean): Modifier {
     val shown = pose.reduced(reduceMotion)

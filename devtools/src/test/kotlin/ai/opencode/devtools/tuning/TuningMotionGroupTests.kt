@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/** Port of iOS `TuningMotionGroupTests`, without the playground-enum and Mac tune page tests. */
+/** Without the playground-enum and Mac tune page tests. */
 class TuningMotionGroupTests {
     @get:Rule val isolation = TestIsolationRule()
 

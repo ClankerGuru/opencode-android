@@ -8,9 +8,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
 
 /**
- * One cancellable platform request (a MediaStore thumbnail or image read) that resumes exactly once
- * (iOS `OneShotRequestGate`): cancelling the coroutine cancels the request through its
- * [CancellationSignal], and a cancelled or failed request reads as null.
+ * One cancellable platform request (a MediaStore thumbnail or image read) that resumes exactly
+ * once: cancelling the coroutine cancels the request through its [CancellationSignal], and a
+ * cancelled or failed request reads as null.
  */
 class OneShotRequestGate {
     val signal = CancellationSignal()

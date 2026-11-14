@@ -35,7 +35,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/** Port of iOS `DrawerSessionPagesTests`: the drawer's older pages and its search over every session (p244). */
+/** The drawer's older pages and its search over every session (p244). */
 class DrawerSessionPagesTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -463,7 +463,6 @@ class DrawerSessionPagesTests {
         h.skipInFlightEffects()
     }
 
-    /** iOS `store.receive(\.sessionPages.case)`. */
     private suspend fun <T : SessionPagesAction> TestStore<HomeFeature.State, Action>.receivePages(
         case: KClass<T>,
         update: ((HomeFeature.State) -> HomeFeature.State)? = null,

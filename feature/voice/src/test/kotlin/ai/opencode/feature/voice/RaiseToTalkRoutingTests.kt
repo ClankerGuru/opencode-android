@@ -23,10 +23,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * The external (WebRTC) owner's controls, recording playback gain into the fake session as
- * iOS's `volumeChanged` and a restarted playback as `playbackStarted`.
- */
+/** The external (WebRTC) owner's controls, recording playback gain into the fake session. */
 internal class RecordingAudioControl(private val session: FakeVoiceAudioSession) : VoiceExternalAudioControl {
     override fun setMuted(muted: Boolean) {}
     override fun setPlaybackVolume(volume: Float) = session.record(Event.VolumeChanged(volume))
@@ -38,10 +35,9 @@ internal class RecordingAudioControl(private val session: FakeVoiceAudioSession)
 }
 
 /**
- * iOS `TestClock` for the speaker ramp. The engine runs its ramp on `Dispatchers.IO`, so [advance]
- * moves one ramp step at a time and waits for the woken step to land (sleep again or finish)
- * before the next. The engine's teardown waits (250/500 ms) settle at once and its backstop and
- * quality window (≥ 3 s) never wake, as iOS's engine sleeps those on the continuous clock.
+ * The engine runs its ramp on `Dispatchers.IO`, so [advance] moves one ramp step at a time and
+ * waits for the woken step to land (sleep again or finish) before the next. The engine's teardown
+ * waits (250/500 ms) settle at once and its backstop and quality window (≥ 3 s) never wake.
  */
 internal class RampClock : Clock {
     private val lock = Any()
@@ -82,7 +78,7 @@ internal class RampClock : Clock {
     }
 }
 
-/** iOS `SuspendingTestCoordinator`: a host coordinator whose finish check and end the test holds. */
+/** A host coordinator whose finish check and end the test holds. */
 internal class SuspendingTestCoordinator(
     private val onCheckIsFinished: suspend () -> Boolean,
     private val onEnd: suspend () -> Unit = {},
@@ -103,16 +99,7 @@ internal class SuspendingTestCoordinator(
     suspend fun waitForEndCall() = assertTrue(pollUntil { endCalls.get() >= 1 })
 }
 
-/**
- * Port of the audio-routing half of iOS `RaiseToTalkTests+Routing.swift` ([VoiceAudioEngine] and
- * [VoiceCallHost]); its `SessionFeature` tests are ported in `:feature:session`.
- *
- * Android's seam has no category or port override: activation is [Event.SetActive], and iOS's
- * `overrideOutputAudioPort(.none/.speaker)` is [Event.Route] (`atEar` true for the earpiece, false
- * for the speaker, either following an external device when one is connected). Android's audio
- * device callback carries no route-change reason, so iOS's `.oldDeviceUnavailable`,
- * `.newDeviceAvailable` and `.categoryChange` are all [VoiceAudioEngine.handleConfigurationChange].
- */
+/** Android's seam has no category or port override: activation is [Event.SetActive]. */
 class RaiseToTalkRoutingTests {
     private val volumes: (FakeVoiceAudioSession) -> List<Float> =
         { fake -> fake.events.filterIsInstance<Event.VolumeChanged>().map { it.volume } }
@@ -121,7 +108,6 @@ class RaiseToTalkRoutingTests {
         engine = VoiceEngine.gptLive, model = LiveSessionConfig.defaultModel, instructions = "test", tools = emptyList(), isAtEar = isAtEar,
     )
 
-    /** The `VoiceAudioEngine` half (the `SessionFeature` half is ported in `:feature:session`). */
     @Test fun setAtEarBeforeRunningIsNotLost() = routingTest {
         val fake = FakeVoiceAudioSession(builtInReceiver)
         val engine = routingEngine(fake, RampClock(), atEar = false)
@@ -175,7 +161,6 @@ class RaiseToTalkRoutingTests {
     }
 
     @Test fun externalRouteIgnoresTheEarAndLowering() = routingTest {
-        // iOS headphones, bluetoothHFP, bluetoothA2DP, carAudio, airPlay, usbAudio.
         val externalPorts = listOf(
             android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
             android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
@@ -453,10 +438,7 @@ class RaiseToTalkRoutingTests {
         audio.stop()
     }
 
-    /**
-     * iOS steps 2 (`.categoryChange`) and 3 (engine configuration change) are both Android's
-     * [VoiceAudioEngine.handleConfigurationChange]; the speaker route is re-applied there.
-     */
+    /** The speaker route is re-applied there. */
     @Test fun manualStartSpeakerOverrideIsReappliedAcrossRecoveryPaths() = routingTest {
         val fake = FakeVoiceAudioSession(builtInReceiver)
         val clock = RampClock()

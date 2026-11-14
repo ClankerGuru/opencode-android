@@ -8,9 +8,9 @@ import ai.opencode.feature.settings.serverdetails.OpenURLClient
 import java.net.URI
 
 /**
- * The first-run welcome (experimental Welcome Preview, iOS `WelcomeFeature`): the laptop and phone
- * scene with Get Started, then one pairing step with Scan Pairing Code and the rest behind Other
- * Ways to Connect. It pairs nothing itself: its requests go to `AppFeature`.
+ * The first-run welcome: the laptop and phone scene with Get Started, then one pairing step with
+ * Scan Pairing Code and the rest behind Other Ways to Connect. It pairs nothing itself: its
+ * requests go to `AppFeature`.
  *
  * Settings › Experimental › Show Welcome opens it over a paired app ([State.isPreview]).
  * [Action.CloseTapped] does nothing in the reducer; the presenting view's `onClose` dismisses it.
@@ -39,7 +39,7 @@ class WelcomeFeature : Reducer<WelcomeFeature.State, WelcomeFeature.Action> {
     }
 
     sealed interface Action {
-        /** iOS `BindingAction`: the Other Ways sheet's presentation, set by the view. */
+        /** The Other Ways sheet's presentation, set by the view. */
         data class OtherWaysShownChanged(val isShowing: Boolean) : Action
         data object GetStartedTapped : Action
         data object BackTapped : Action
@@ -49,7 +49,7 @@ class WelcomeFeature : Reducer<WelcomeFeature.State, WelcomeFeature.Action> {
         data object EnterAddressTapped : Action
         data class CopyTapped(val text: String) : Action
         data object OtherWaysDismissed : Action
-        /** iOS's `Link("Other Ways to Install")`, through `OpenURLClient` so the view opens nothing itself. */
+        /** Through `OpenURLClient` so the view opens nothing itself. */
         data object OtherWaysToInstallTapped : Action
         data object CloseTapped : Action
 

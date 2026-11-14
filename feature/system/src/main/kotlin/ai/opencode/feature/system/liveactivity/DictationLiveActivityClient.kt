@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import java.time.Instant
 
-/** Port of iOS `DictationLiveActivity`: how a recording reads on the lock screen and in the status bar. */
+/** How a recording reads on the lock screen and in the status bar. */
 object DictationLiveActivity {
     typealias Content = DictationActivityAttributes.ContentState
 
@@ -32,9 +32,7 @@ object DictationLiveActivity {
      * Stop and Send end it at once. Not during a call, which has its own; a call card left
      * after one ended doesn't count.
      *
-     * `SessionFeature.State` lives above this module: the session area passes the fields iOS
-     * reads (`voice?.phase.isTerminal ?: true`, `dictationPhase == .recording`,
-     * `dictationHold?.isLocked ?: true`, `session?.title`, `server.id`).
+     * `SessionFeature.State` lives above this module.
      */
     fun recording(
         hasDetail: Boolean,
@@ -56,7 +54,6 @@ object DictationLiveActivity {
     }
 }
 
-/** Port of iOS `DictationLiveActivityClient`. */
 class DictationLiveActivityClient(
     /** Shows `content` in the recording's one Live Update, starting it if needed; null ends it at once. `attributes` are only read on a start. */
     val update: suspend (DictationActivityAttributes.ContentState?, DictationActivityAttributes?) -> Unit,
@@ -79,10 +76,9 @@ class DictationLiveActivityClient(
 }
 
 /**
- * Port of iOS `LiveDictationActivity`: owns the one recording Live Update. Requests run in
- * order, so an end never overtakes the update before it. Like the call's, it pushes only when
- * what it shows changes; a heartbeat moves the stale date so a recording still running never
- * reads as stopped.
+ * Owns the one recording Live Update. Requests run in order, so an end never overtakes the update
+ * before it. Like the call's, it pushes only when what it shows changes; a heartbeat moves the
+ * stale date so a recording still running never reads as stopped.
  */
 class LiveDictationActivity internal constructor(private val system: LiveUpdateTracker, private val context: android.content.Context) {
     typealias Content = DictationActivityAttributes.ContentState

@@ -17,9 +17,9 @@ import java.util.UUID
 import kotlin.time.Duration
 
 /**
- * The debounced writer behind [ComposerPersistence] (iOS `ComposerPersistenceWriter`): keeps
- * the decoded state in memory, and writes it [debounce] after the last change (typing never
- * waits on disk), or at once on [flush] (backgrounding).
+ * The debounced writer behind [ComposerPersistence]: keeps the decoded state in memory, and writes
+ * it [debounce] after the last change (typing never waits on disk), or at once on [flush]
+ * (backgrounding).
  */
 internal class ComposerPersistenceWriter(
     private val storage: ComposerPersistenceStorage,
@@ -587,7 +587,7 @@ internal class ComposerPersistenceWriter(
         )
     }
 
-    /** iOS points the staged copy at `temporaryDirectory/<name>`; an uploaded file never reads it again. */
+    /** An uploaded file never reads it again. */
     private fun restoreUploadedFile(record: PersistedComposerState.UploadedFileRecord) = ComposerFileAttachment(
         ComposerStagedFile(
             id = record.id,

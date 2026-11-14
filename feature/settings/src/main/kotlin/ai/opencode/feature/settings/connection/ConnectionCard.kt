@@ -110,12 +110,12 @@ import java.util.WeakHashMap
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
-/** iOS `HomeFeature.State.credentialsRejectedStatus`: the HTTP status a refused sign-in comes back with. */
+/** The HTTP status a refused sign-in comes back with. */
 const val credentialsRejectedStatus = 401
 
 /**
- * The card's geometry (iOS `ConnectionCard.cornerRadius`, `boxInset`, `textInset`). On this branch
- * the card takes the Settings groups' desktop card radius, so it reads as one of them.
+ * The card's geometry. On this branch the card takes the Settings groups' desktop card radius, so
+ * it reads as one of them.
  */
 private object ConnectionCardMetrics {
     val cornerRadius = OpenCodeRadius.card
@@ -126,13 +126,13 @@ private object ConnectionCardMetrics {
     val scopeHeight = 96.dp
 }
 
-/** iOS `dynamicTypeSize.isAccessibilitySize`: the largest font scales (1.8× and 2×). */
+/** The largest font scales (1.8× and 2×). */
 @Composable
 private fun isAccessibilitySize(): Boolean = LocalDensity.current.fontScale > 1.5f
 
 /**
- * One monitor per Settings store, shared by the card and the server page pushed from it (iOS hands
- * the card's `ConnectionMonitor` to `ServerPage`). Weakly keyed: it goes with the store.
+ * One monitor per Settings store, shared by the card and the server page pushed from it. Weakly
+ * keyed: it goes with the store.
  */
 private val monitors = WeakHashMap<SettingsStore, ConnectionMonitor>()
 
@@ -144,7 +144,7 @@ private fun rememberConnectionMonitor(store: SettingsStore, server: OpenCodeServ
     return monitor
 }
 
-/** Runs the monitor's checks while this view is composed and the app is resumed (iOS `.task(id: isLive)`). */
+/** Runs the monitor's checks while this view is composed and the app is resumed. */
 @Composable
 private fun RunWhileResumed(monitor: ConnectionMonitor) {
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
@@ -155,11 +155,10 @@ private fun RunWhileResumed(monitor: ConnectionMonitor) {
 }
 
 /**
- * Port of iOS `ConnectionCard` (`Settings/ConnectionCard.swift`; D-21 · A · Monitor sweep, text
- * layout A2): the health checks as an EKG in an inset box, then the server's name with the status
- * trailing on the same line, then the address and route, quietest. The whole card is the button
- * (no chevron) and opens the server page; Retry sits inline while Offline, and Edit Server… when
- * the server refused the saved password, which no retry can fix.
+ * The health checks as an EKG in an inset box, then the server's name with the status trailing on
+ * the same line, then the address and route, quietest. The whole card is the button (no chevron)
+ * and opens the server page; Retry sits inline while Offline, and Edit Server… when the server
+ * refused the saved password, which no retry can fix.
  */
 @Composable
 fun ConnectionCard(
@@ -204,16 +203,14 @@ private fun ConnectionCardContent(
     val presentation = ConnectionStatusPresentation(monitor.display)
     val action = CardAction.of(presentation.status)
     val reduceMotion = rememberReduceMotion()
-    // Android divergence: a ripple answers the press (iOS shrinks the card to 97.5 % and tints it).
+    // A ripple answers the press.
     val interaction = remember { MutableInteractionSource() }
     val cardShape = RoundedCornerShape(ConnectionCardMetrics.cornerRadius)
     val wellShape = RoundedCornerShape(ConnectionCardMetrics.cornerRadius - ConnectionCardMetrics.boxInset)
     val wellFill = if (colors.isDark) Color.Black.copy(alpha = if (colors.highContrast) 0.5f else 0.32f) else colors.groupedCanvas
     val wellEdge = (if (colors.isDark) Color.White else Color.Black).copy(alpha = if (colors.highContrast) 0.16f else 0.06f)
-    // Android divergence: iOS's value carries the round trip, and VoiceOver leaves a focused element's
-    // changing value unspoken. TalkBack re-reads the focused card whenever anything it speaks changes
-    // (state, label or a merged child), so the card speaks the status word, not the live milliseconds:
-    // a new word is still read; the number stays on screen and on the server page's Status row.
+// TalkBack re-reads the focused card whenever anything it speaks changes, so the card speaks the
+// status word, not the live milliseconds; the number stays on screen and on the Status row.
     val accessibilityValue = stringResource(
         R.string.settings_connection_card_value_description,
         rememberSettledSpokenWord(presentation.spokenWord),
@@ -223,7 +220,7 @@ private fun ConnectionCardContent(
     val showServerLabel = stringResource(R.string.settings_connection_show_server_label)
 
     // Where the inline action sits: reserved after the status, the real button drawn over the card
-    // (outside its click and its merged semantics), as iOS's `RetryReservation`.
+    // (outside its click and its merged semantics).
     var root by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var slot by remember { mutableStateOf<Rect?>(null) }
 
@@ -277,7 +274,7 @@ private fun ConnectionCardContent(
         val anchor = slot
         AnimatedVisibility(
             visible = action != null && anchor != null,
-            // iOS: the retry arrives on micro.
+            // The retry arrives on micro.
             enter = MotionTransition.micro(reduceMotion).enter,
             exit = MotionTransition.micro(reduceMotion).exit,
             modifier = Modifier.matchParentSize().layout { measurable, constraints ->
@@ -294,8 +291,7 @@ private fun ConnectionCardContent(
             val shown = remember { mutableStateOf(action) }
             if (action != null) shown.value = action
             shown.value?.let { current ->
-                // iOS `RetryStyle` with a 44 pt (here 48 dp) target. Android divergence: a ripple
-                // inside the capsule answers the press (iOS dims it to 55 %).
+                // A ripple inside the capsule answers the press.
                 val actionInteraction = remember { MutableInteractionSource() }
                 RetryLabel(
                     title = current.title,
@@ -382,8 +378,8 @@ private fun CardAddress(monitor: ConnectionMonitor, stacked: Boolean) {
 }
 
 /**
- * Port of iOS `CardAction`: what the card offers inline beside its status: Retry while Offline,
- * and Edit Server… when the password was refused (Retry couldn't help).
+ * What the card offers inline beside its status: Retry while Offline, and Edit Server… when the
+ * password was refused (Retry couldn't help).
  */
 private enum class CardAction(@StringRes private val titleRes: Int) {
     retry(CoreR.string.common_retry),
@@ -402,9 +398,8 @@ private enum class CardAction(@StringRes private val titleRes: Int) {
 }
 
 /**
- * Port of iOS `ConnectionStatusPresentation`: the status as shown: a symbol for its kind, then the
- * live round trip. A measured state needs no word: the glyph names it and the trace shows it.
- * States without a number say their word.
+ * The status as shown: a symbol for its kind, then the live round trip. A measured state needs no
+ * word: the glyph names it and the trace shows it. States without a number say their word.
  */
 data class ConnectionStatusPresentation(
     val status: ConnectionHealth.Status,
@@ -423,7 +418,7 @@ data class ConnectionStatusPresentation(
         ;
 
         companion object {
-            /** iOS reads a DEBUG lab default (`lab-connection-status-style`); Android has no lab launch arguments. */
+            /** Android has no lab launch arguments. */
             val current: Style = glyph
         }
     }
@@ -478,11 +473,10 @@ data class ConnectionStatusPresentation(
 private const val SPOKEN_STATUS_SETTLE_MS = 500L
 
 /**
- * [word] once it has held for [SPOKEN_STATUS_SETTLE_MS]; until then the word before it. Android
- * divergence (iOS's VoiceOver leaves a focused element's value changes unspoken): TalkBack speaks
- * each new word on a focused node, and a dropped server passes through Reconnecting for a moment
- * (~150 ms) on its way to Offline. TalkBack read both changes after the second, so "Offline, …"
- * was spoken twice (QA F-62); a word that doesn't last isn't given to it. The screen still shows
+ * [word] once it has held for [SPOKEN_STATUS_SETTLE_MS]; until then the word before it. TalkBack
+ * speaks each new word on a focused node, and a dropped server passes through Reconnecting for a
+ * moment (~150 ms) on its way to Offline. TalkBack read both changes after the second, so "Offline,
+ * …" was spoken twice (QA F-62); a word that doesn't last isn't given to it. The screen still shows
  * every word at once.
  */
 @Composable
@@ -501,14 +495,14 @@ private fun rememberSettledSpokenWord(word: String): String {
 private fun ConnectionStatusPresentation.foreground(): Color =
     if (isAlert) OpenCodeTheme.colors.destructive else OpenCodeTheme.colors.secondaryText
 
-/** The round trip rolls on the layout role (iOS `Motion.layout`: 0.34 s, no bounce). */
+/** The round trip rolls on the layout role. */
 private val millisecondsRoll = RollingNumberStyle(duration = MotionTunables.layoutSpring.duration.value, bounce = 0.0)
 
 /**
- * Port of iOS `ConnectionStatusLabel`: a measured line keeps its identity, so its glyph swaps and
- * its digits roll in place. Any other change replaces the whole line where it stands on the
- * trailing edge (rising, as iOS's blur-replace up), so the glyph never slides across words; under
- * reduce motion, a cross-fade. Followed by the reserved width of the inline action.
+ * A measured line keeps its identity, so its glyph swaps and its digits roll in place. Any other
+ * change replaces the whole line where it stands on the trailing edge, so the glyph never slides
+ * across words; under reduce motion, a cross-fade. Followed by the reserved width of the inline
+ * action.
  */
 @Composable
 private fun ConnectionStatusLabel(
@@ -523,7 +517,7 @@ private fun ConnectionStatusLabel(
         AnimatedContent(
             targetState = presentation,
             contentKey = { if (it.milliseconds == null) it.word else "measured" },
-            // iOS `ConnectionMonitor`: the status line swaps in place on the swap role.
+            // The status line swaps in place on the swap role.
             transitionSpec = { MotionTransition.swap(reduceMotion).content },
             contentAlignment = Alignment.CenterEnd,
             label = "ConnectionStatus-$identity",
@@ -587,7 +581,7 @@ private fun StatusGlyph(presentation: ConnectionStatusPresentation, color: Color
     }
 }
 
-/** The inline action's capsule (iOS `RetryLabel`): subheadline semibold on a faint fill, 30 tall. */
+/** The inline action's capsule: subheadline semibold on a faint fill, 30 tall. */
 @Composable
 private fun RetryLabel(
     title: String,
@@ -613,9 +607,9 @@ private fun RetryLabel(
 }
 
 /**
- * Port of iOS `ServerPage`: the server in use: its connection, address, route and version, then
- * the one place to manage servers ([SettingsServersSection]: switch, add, rename, edit, remove),
- * and Rename. Opened from the connection card or the drawer's Manage Servers….
+ * The server in use: its connection, address, route and version, then the one place to manage
+ * servers ([SettingsServersSection]: switch, add, rename, edit, remove), and Rename. Opened from
+ * the connection card or the drawer's Manage Servers….
  */
 @Composable
 fun ServerPage(store: SettingsStore) {
@@ -737,14 +731,9 @@ fun ServerPage(store: SettingsStore) {
 }
 
 /**
- * The page's Status row (iOS `LabeledContent("Status")`): glyph, then the word and round trip.
- *
- * Android divergence: iOS's value is the word and the live round trip, and VoiceOver reads it as
- * it is when the row is reached but leaves its changes unspoken. TalkBack re-reads a focused node
- * whenever what it speaks changes, so it read the row again on every check (QA F-61). The spoken
- * round trip follows the live one while TalkBack is elsewhere, so the row still reads the current
- * number when reached, and holds while TalkBack is on it; a new status word (settled, as the
- * card's) is still read. The screen updates on every check.
+ * The page's Status row: glyph, then the word and round trip. TalkBack re-reads a focused node
+ * whenever what it speaks changes, so the spoken round trip follows the live one only while
+ * TalkBack is elsewhere and holds while TalkBack is on it; a new status word is still read.
  */
 @Composable
 private fun StatusRow(presentation: ConnectionStatusPresentation) {
@@ -791,11 +780,11 @@ private class SpokenStatus {
 }
 
 /**
- * iOS `LabeledContent` in a list: the label leading and the value trailing on one line when both
- * fit at their full widths; otherwise the value stacks under the label, leading, so the label
- * never breaks inside a word (QA D-01). Once stacked it stays stacked while shown at that width
- * and text size, so a value that changes width (Status's round trip, 9 ↔ 10 ms) can't flip the
- * row and move every row below it (QA H-02).
+ * The label leading and the value trailing on one line when both fit at their full widths;
+ * otherwise the value stacks under the label, leading, so the label never breaks inside a word (QA
+ * D-01). Once stacked it stays stacked while shown at that width and text size, so a value that
+ * changes width (Status's round trip, 9 ↔ 10 ms) can't flip the row and move every row below it (QA
+ * H-02).
  */
 @Composable
 private fun LabeledContent(label: String, modifier: Modifier = Modifier, value: @Composable () -> Unit) {

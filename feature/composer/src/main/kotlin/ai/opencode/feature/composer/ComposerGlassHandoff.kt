@@ -16,12 +16,12 @@ import androidx.compose.ui.semantics.semantics
 import kotlin.math.max
 
 /**
- * iOS `View.handsGlassOver(to:...)`: the morph's source hands its surface over as the morph starts
- * to grow (fading out in 0.12 s), and takes it back as the morph lands (after `close.duration ×
- * 0.62`, or [closeDelay]). With [sinksUnderSheet] the composer sinks
- * [ComposerMorphTunables.composerSink] and fades under a photo sheet instead; [pulledDown] (dp
- * below the sheet's rest) raises it with the finger. Modifiers can't provide a composition local,
- * so the host provides [attachmentMenuAnchorHold] through [LocalAttachmentMenuAnchorHold].
+ * The morph's source hands its surface over as the morph starts to grow (fading out in 0.12 s), and
+ * takes it back as the morph lands (after `close.duration × 0.62`, or [closeDelay]). With
+ * [sinksUnderSheet] the composer sinks [ComposerMorphTunables.composerSink] and fades under a photo
+ * sheet instead; [pulledDown] (dp below the sheet's rest) raises it with the finger. Modifiers
+ * can't provide a composition local, so the host provides [attachmentMenuAnchorHold] through
+ * [LocalAttachmentMenuAnchorHold].
  */
 fun Modifier.handsGlassOver(
     morph: ComposerMorph,
@@ -37,8 +37,8 @@ fun Modifier.handsGlassOver(
     if (sinksUnderSheet) {
         val hidden = morph.isOpen && !morph.foldPending
         val motion = Motion.panelOpen.animation<Float>(if (hidden) MotionPhase.Enter else MotionPhase.Exit, reduceMotion)
-        // iOS `ComposerUnderSheetPlacement`: `hidden ? 1 − rise : 0`, animated only as `hidden`
-        // changes; the rise follows the finger frame by frame.
+        // `hidden ? 1 − rise: 0`, animated only as `hidden` changes; the rise follows the finger
+        // frame by frame.
         val placement = remember { Animatable(if (hidden) 1f else 0f) }
         val lastShown = remember { floatArrayOf(placement.value) }
         LaunchedEffect(hidden, reduceMotion) {
@@ -74,8 +74,8 @@ fun Modifier.handsGlassOver(
 }
 
 /**
- * iOS `HandsGlassOver.anchorHold`: how the composer's + menu anchors follow it under a photo
- * sheet (frame by frame when no sheet is up or under Reduce Motion; held while it folds back).
+ * How the composer's + menu anchors follow it under a photo sheet (frame by frame when no sheet is
+ * up or under Reduce Motion; held while it folds back).
  */
 fun ComposerMorph.attachmentMenuAnchorHold(reduceMotion: Boolean): AttachmentMenuAnchorHold {
     if (!isShown || reduceMotion) return AttachmentMenuAnchorHold.Follows

@@ -26,7 +26,7 @@ enum class VoiceDelegationCloseReason(val rawValue: String) {
  * previous one; the control methods address the current call.
  */
 class VoiceCallClient(
-    /** The call's events until it ends (iOS `AsyncThrowingStream`): the flow completes, or throws why it dropped. */
+    /** The call's events until it ends: the flow completes, or throws why it dropped. */
     val start: suspend (apiKey: String, config: RealtimeSessionConfig) -> Flow<VoiceCallEvent>,
     val completeFunction: suspend (callID: String, output: String) -> Unit,
     /**
@@ -267,8 +267,6 @@ data class VoiceCallTiming(
      */
     val liveBargeIn: Duration = Duration.ZERO,
 ) {
-    // iOS `quietGate` (a `ReplyWatch.QuietGate`) is an extension next to ReplyWatch.
-
     /** [rotationDeadlines]'s result. */
     data class RotationDeadlines(val prepareAt: Instant, val forceAt: Instant)
 

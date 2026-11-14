@@ -22,11 +22,11 @@ import java.util.UUID
 import kotlin.time.Duration
 
 /**
- * Ports of the iOS test helpers `VoiceLatencyBudgetTests` uses: `WireFixture` (a scripted
- * server answering the live client's requests) and `ScriptedClock` (from `NetworkRetryTests`).
+ * `WireFixture` (a scripted server answering the live client's requests) and `ScriptedClock` (from
+ * `NetworkRetryTests`).
  */
 internal object VoiceLatencyBudgetTestSupport {
-    /** iOS `ScriptedClock`: sleeps return at once and are recorded; time moves by them and [advance]. */
+    /** Sleeps return at once and are recorded; time moves by them and [advance]. */
     class ScriptedClock : Clock {
         private var time = Duration.ZERO
         private val recorded = mutableListOf<Duration>()
@@ -43,7 +43,7 @@ internal object VoiceLatencyBudgetTestSupport {
         fun advance(by: Duration) = synchronized(this) { time += by }
     }
 
-    /** iOS `WireFixture`: every request to [server] is answered by the handler, no network. */
+    /** Every request to [server] is answered by the handler, no network. */
     class WireFixture(private val handler: (Request) -> Reply) {
         data class Request(val method: String, val path: String, val query: Map<String, String>, val body: String?) {
             val route: String get() = "$method $path"
@@ -61,13 +61,10 @@ internal object VoiceLatencyBudgetTestSupport {
             fun status(code: Int) = Reply.Status(code)
             fun json(status: Int, body: String) = Reply.Json(status, body)
 
-            /** iOS `URLError(.networkConnectionLost)`. */
             val networkConnectionLost: Reply get() = Reply.Failure(SocketException("Connection reset"))
 
-            /** iOS `URLError(.timedOut)`. */
             val timedOut: Reply get() = Reply.Failure(SocketTimeoutException("timeout"))
 
-            /** iOS `URLError(.cannotConnectToHost)`. */
             val cannotConnectToHost: Reply get() = Reply.Failure(ConnectException("Failed to connect"))
         }
 

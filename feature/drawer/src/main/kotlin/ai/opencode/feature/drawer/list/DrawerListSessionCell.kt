@@ -77,10 +77,10 @@ import kotlin.math.max
 import kotlin.math.min
 
 /*
- * Port of iOS `DrawerListSessionCell.swift`: a drawer session row. The project tile, the fading
- * title, the status (the Working ring or a dot), the selected highlight and the time the reveal
- * slides in all live in the slide, which the time reveal moves; the touch surface
- * ([drawerRowInteraction]: tap, hold to select, lift to pin or reorder) stays put over the row.
+ * A drawer session row. The project tile, the fading title, the status (the Working ring or a dot),
+ * the selected highlight and the time the reveal slides in all live in the slide, which the time
+ * reveal moves; the touch surface ([drawerRowInteraction]: tap, hold to select, lift to pin or
+ * reorder) stays put over the row.
  *
  * Per-frame values (the reveal's offset and progress, the pin drag's translation, the card-edge
  * fade) are read in layer and draw blocks only, so neither a reveal nor a drag recomposes a row.
@@ -88,7 +88,7 @@ import kotlin.math.min
  * instances so they skip.
  */
 
-/** What a session row does, as closures: the row never holds a store (iOS `DrawerListRowActions`). */
+/** What a session row does, as closures: the row never holds a store. */
 class DrawerListRowActions(
     val select: () -> Unit,
     val pressed: () -> Unit,
@@ -101,7 +101,7 @@ class DrawerListRowActions(
     val moveDrag: (fingerY: Float, uptimeMillis: Long) -> Unit,
     /** The finger lifted at this list point (dp); [cancelled] when its stream was taken away. */
     val endDrag: (fingerX: Float, fingerY: Float, cancelled: Boolean) -> Unit,
-    /** The row left the list mid-drag (iOS `Coordinator.dismantle`). */
+    /** The row left the list mid-drag. */
     val dismantled: () -> Unit,
     val lifted: (String?) -> Unit,
     val togglePin: () -> Unit,
@@ -122,7 +122,7 @@ object DrawerListSessionCell {
     /** The status slot (ring or dot). */
     val indicatorSize: Dp = 18.dp
 
-    /** iOS `.systemOrange`, the dot of a session that needs your input. */
+    /** The dot of a session that needs your input. */
     fun attentionColor(isDark: Boolean): Color = if (isDark) Color(0xFFFF9F0A) else Color(0xFFFF9500)
 }
 
@@ -152,8 +152,7 @@ fun DrawerListSessionCell(
     val moveUpLabel = stringResource(R.string.drawer_move_up)
     val moveDownLabel = stringResource(R.string.drawer_move_down)
 
-    // A row leaving the list mid-drag or mid-landing ends it (iOS `Coordinator.dismantle`: the
-    // drag under way, or the pin drag's row; `dismantled` checks the latter).
+    // A row leaving the list mid-drag or mid-landing ends it.
     DisposableEffect(row.session.id) {
         onDispose { currentActions.dismantled() }
     }
@@ -173,8 +172,8 @@ fun DrawerListSessionCell(
     }
     val titleStyle = DrawerListFonts.font(DrawerTunables.rowFont.font, weight)
 
-    // The dot and the ring arrive on `MotionRole.MicroIn` and leave on its exit (iOS 03adf07a),
-    // cross-fading under Reduce Motion, for the same session; another row's arrives in place.
+    // The dot and the ring arrive on `MotionRole.MicroIn` and leave on its exit, cross-fading under
+    // Reduce Motion, for the same session; another row's arrives in place.
     val previousID = remember { arrayOf(row.session.id) }
     val animateStatus = previousID[0] == row.session.id
     previousID[0] = row.session.id
@@ -207,8 +206,8 @@ fun DrawerListSessionCell(
 
     val held = hold.isDragActive || row.isLifted
     val raisedSurface = if (colors.isDark) MaterialTheme.colorScheme.surfaceContainerHigh else colors.canvas
-    // The raised surface leaves on swap's exit once a hold lets go (iOS `settleAfterMenu`), and a
-    // dropped row puts its surface down the same way, shadowless (iOS `land()`).
+    // The raised surface leaves on swap's exit once a hold lets go, and a dropped row puts its
+    // surface down the same way, shadowless.
     val surface = remember { Animatable(0f) }
     val wasLifted = remember { booleanArrayOf(false) }
     var landingSurface by remember { mutableStateOf(false) }
@@ -235,7 +234,7 @@ fun DrawerListSessionCell(
             .graphicsLayer {
                 translationY = pinDrag.translation(key) * density.density
                 alpha = pinDrag.alpha(key)
-                // The dragged row grows as it lifts (iOS `DrawerLiftedRowView.apply(lift:)`).
+                // The dragged row grows as it lifts.
                 val grow = if (row.isLifted) DrawerLiftedRowView.apply(pinDrag.liftProgress).scale else 1f
                 scaleX = grow
                 scaleY = grow
@@ -312,9 +311,9 @@ fun DrawerListSessionCell(
                 .clearAndSetSemantics {
                     testTag = "drawer-session-row-${row.session.id}"
                     contentDescription = row.session.title
-                    // iOS's `.selected` trait as words: `selected` would make the row checkable,
-                    // and TalkBack would offer "double-tap to toggle" on a row that opens.
-                    // While the drawer selects, the words say whether the row is chosen.
+                    // `selected` would make the row checkable, and TalkBack would offer "double-tap
+                    // to toggle" on a row that opens. While the drawer selects, the words say
+                    // whether the row is chosen.
                     val chosen = when (row.checked) {
                         true -> selectedText
                         false -> notSelectedText
@@ -489,10 +488,10 @@ private fun RevealedTime(time: String, reducedMotion: Boolean, progress: () -> F
 }
 
 /**
- * The card-edge fade while the time reveal slides a row under the card (iOS
- * `DrawerListSessionCell.applyReveal`'s mask): the whole row fades out over the last `titleFade`
- * before its resting trailing edge (the card's edge), the ramp moving onto that edge over the
- * first `revealFadeRamp` of slide so no point of slide steps the row's alpha.
+ * The card-edge fade while the time reveal slides a row under the card: the whole row fades out
+ * over the last `titleFade` before its resting trailing edge (the card's edge), the ramp moving
+ * onto that edge over the first `revealFadeRamp` of slide so no point of slide steps the row's
+ * alpha.
  */
 internal object DrawerRevealFade {
     /** A row at rest, or under Reduce Motion (the time cross-fades in place), is unmasked. */

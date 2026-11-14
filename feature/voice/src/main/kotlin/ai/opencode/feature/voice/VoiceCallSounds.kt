@@ -101,7 +101,7 @@ class VoiceCallSounds(
         haptics.cancel(VoiceHapticEngine.Kind.tick)
         fallbackTicks.forEach { it.cancel() }; fallbackTicks.clear()
     }
-    /** Whether the tick will play (iOS `LiveHaptics.voiceTick`): false once the call moved on. */
+    /** Whether the tick will play: false once the call moved on. */
     internal fun voiceTick(cue: DotScopeSimulation.Cue, at: Duration, audioDelay: Double): Boolean {
         if (!ticksAreDue) return false
         val pattern = VoiceHapticDesign.tick(cue, audioDelay)

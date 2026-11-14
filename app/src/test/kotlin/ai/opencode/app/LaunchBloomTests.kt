@@ -17,10 +17,6 @@ import org.junit.Rule
 import org.junit.Test
 import kotlin.time.Duration.Companion.milliseconds
 
-/**
- * Port of iOS `LaunchBloomTests.swift` against `LaunchBloomController`'s policy on the AndroidX
- * splash.
- */
 class LaunchBloomTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -29,7 +25,7 @@ class LaunchBloomTests {
 
     private fun <R> withClock(block: () -> R): R = DependencyValues.withValues(values, block)
 
-    /** iOS `makeController()` + `attachIfNeeded`: a fresh cover over a cold launch. */
+    /** A fresh cover over a cold launch. */
     private fun arm() = withClock {
         LaunchBloomController.hasCompletedColdLaunch = false
         LaunchBloomController.startedAt = null

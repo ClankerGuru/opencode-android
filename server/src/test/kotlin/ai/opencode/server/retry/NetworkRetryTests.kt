@@ -55,10 +55,6 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-// Port of iOS `OpenCodeTests/NetworkRetryTests.swift`. Its `EventStreamReconnectTests`
-// (`HomeFeature`) belong to `:feature:drawer`; `actionsALoopThatOwnsItsRetriesSendsStartEffectsOutsideIt`
-// (`runOwningRetries`) to `:feature:voice`.
-
 /**
  * A clock whose sleeps return at once, advancing its time and recording each wait, so a test
  * can read the schedule a retry loop chose.
@@ -213,7 +209,6 @@ class RetryPolicyTests {
         assertNull(TransportFailure.of(CancellationException()))
     }
 
-    /** Android's cleartext refusal (OkHttp's `UnknownServiceException`) stands for iOS ATS -1022. */
     @Test
     fun anATSRejectionOnlyBecomesTransientForAnAlreadyWorkingHTTPOrigin() {
         val contact = ServerContact()
@@ -452,7 +447,7 @@ class RetryPolicyTests {
         assertEquals(listOf(1, 2, 4).map { it.seconds }, clock.sleeps)
     }
 
-    /** iOS's cancelled run throws the last `OpenCodeClientError`; a cancelled coroutine ends with `CancellationException`. */
+    /** A cancelled coroutine ends with `CancellationException`. */
     @Test
     fun cancellationDuringBackoffEndsAtOnce() = runTest {
         val clock = TestClock()

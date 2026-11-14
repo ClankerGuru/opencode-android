@@ -12,13 +12,6 @@ import ai.opencode.server.model.OpenCodeTranscriptItem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.awaitCancellation
 
-/**
- * Support for the ported `SystemIntegrationTests`, `ShareHandoffTests` and `ShareComposerTests`
- * Home tests: a [TestStore] of [HomeFeature] whose initial state is built with the store's own
- * stateful dependencies (shared values, persisted composer drafts), so the screens' `Shared`
- * references and saved drafts are the ones the reducer sees (iOS builds its state against the
- * same process-wide storage the store reads).
- */
 internal class HomeTestContext(
     val shared: SharedStore = SharedStore.inMemory(),
     val composer: ComposerPersistence = ComposerPersistence.inMemory(),
@@ -53,5 +46,5 @@ internal val HomeFeature.Action.detailAction: SessionFeature.Action?
 internal val HomeFeature.Action.voiceAction: VoiceFeature.Action?
     get() = ((detailAction as? SessionFeature.Action.Voice)?.action as? PresentationAction.Presented)?.action
 
-/** iOS `hangingTranscript`: a transcript read that never answers. */
+/** A transcript read that never answers. */
 internal val hangingTranscript: suspend (OpenCodeServer, String, Int) -> List<OpenCodeTranscriptItem> = { _, _, _ -> awaitCancellation() }

@@ -12,7 +12,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Port of iOS `ModelSwitchRuleTests.swift`. */
 class ModelSwitchRuleTests {
     private val opus = OpenCodeModelRef(id = "claude-opus", providerID = "anthropic")
     private val haiku = OpenCodeModelRef(id = "claude-haiku", providerID = "anthropic")

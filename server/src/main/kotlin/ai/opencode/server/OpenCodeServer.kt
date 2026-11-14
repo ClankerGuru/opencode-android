@@ -15,7 +15,7 @@ import java.net.URI
 import java.util.Base64
 
 /**
- * A saved server: where it is, and how to authorize. Port of iOS `OpenCodeServer`.
+ * A saved server: where it is, and how to authorize.
  *
  * Manual entry: `OpenCodeServer(url = "http://192.168.1.5:4096", username = "opencode", password = "…",
  * headers = listOf(OpenCodeServer.Header("CF-Access-Client-Id", "…")))`. From a pairing code:
@@ -254,9 +254,8 @@ data class OpenCodeServer(
     }
 
     /**
-     * An OkHttp client (sharing [base]'s pools) that authorizes every request to this
-     * server's origins, for image loaders and media players. The Android counterpart of
-     * iOS's per-request `authorize`; requests elsewhere go out untouched.
+     * An OkHttp client (sharing [base]'s pools) that authorizes every request to this server's
+     * origins, for image loaders and media players. Requests elsewhere go out untouched.
      */
     fun httpClient(base: OkHttpClient): OkHttpClient = base.newBuilder()
         .addInterceptor(Interceptor { chain ->

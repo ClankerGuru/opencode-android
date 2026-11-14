@@ -13,8 +13,8 @@ import kotlin.math.floor
 import kotlin.math.max
 
 /**
- * Port of iOS `ShellGlyphTests.swift`: the shell glyph's physics (R1 Glide), fed as the app feeds
- * it: a byte rate becomes Poisson chunks, stepped at a fixed rate.
+ * The shell glyph's physics (R1 Glide), fed as the app feeds it: a byte rate becomes Poisson
+ * chunks, stepped at a fixed rate.
  */
 class ShellGlyphTests {
     /** Runs segments of (seconds, bytes per second) and records when each lap completes. */

@@ -8,8 +8,6 @@ import ai.opencode.core.store.merge
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 
-// iOS `VoiceFeature+Instructions.swift`.
-
 /** The page open over the session, for a live call. */
 internal fun instructViewing(state: VoiceFeature.State): Effect<VoiceFeature.Action> {
     val page = state.viewing

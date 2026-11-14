@@ -46,10 +46,7 @@ object OpenCodeFonts {
         Font(R.font.plex_mono_semibold, FontWeight.Bold),
     )
 
-    /**
-     * Berkeley Mono (variable), only for onboarding's brand marks, exactly as iOS restricts
-     * `BerkeleyMonoVariable` (the `opencode` wordmark, `opencode pair --remote`).
-     */
+    /** Berkeley Mono (variable), only for onboarding's brand marks. */
     @OptIn(ExperimentalTextApi::class)
     val berkeleyMono: FontFamily = FontFamily(
         listOf(FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold, FontWeight.Bold).map { weight ->
@@ -62,7 +59,7 @@ object OpenCodeFonts {
     )
 }
 
-/** The text styles under iOS's Dynamic Type names, sized to the desktop scale. */
+/** The text styles under Dynamic Type names, sized to the desktop scale. */
 object OpenCodeTextStyles {
     private fun style(size: Int, lineHeight: Int, weight: FontWeight = FontWeight.Normal, tracking: Double = 0.0) = TextStyle(
         fontFamily = OpenCodeFonts.system,
@@ -100,7 +97,7 @@ object OpenCodeTextStyles {
     val caption2 = style(11, 13)
 }
 
-/** Material 3 type roles mapped onto the iOS text styles. */
+/** Material 3 type roles mapped onto the text styles. */
 val OpenCodeTypography: Typography = with(OpenCodeTextStyles) {
     Typography(
         displayLarge = largeTitle,

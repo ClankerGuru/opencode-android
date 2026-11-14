@@ -23,8 +23,8 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Port of iOS `ServerSwitchingTests.swift`, the `AppFeature` part. A `Shared` here is a reference,
- * so shared values are checked after the step.
+ * The `AppFeature` part. A `Shared` here is a reference, so shared values are checked after the
+ * step.
  */
 class ServerSwitchingTests {
     @get:Rule val isolation = TestIsolationRule()

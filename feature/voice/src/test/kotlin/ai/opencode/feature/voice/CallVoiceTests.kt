@@ -39,7 +39,6 @@ import java.util.UUID
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-/** Port of iOS `CallVoiceTests.swift`. */
 class CallVoiceTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
     private val session = OpenCodeSession(id = "ses_voice", serverTitle = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = Instant.parse("0001-01-01T00:00:00Z"))
@@ -86,10 +85,6 @@ class CallVoiceTests {
         assertNull(CallVoice.marin.accent)
     }
 
-    /**
-     * iOS also checks `CallVoicePicker.rowValue` here; that picker lives in `:feature:settings`
-     * on Android (`VoiceSettingsView.kt`), so those five checks belong to its port.
-     */
     @Test fun anUnsupportedChoiceFallsBackToTheDefault() {
         assertEquals(CallVoice.quartz, CallVoice.quartz.resolved(VoiceEngine.gptLive))
         assertEquals(CallVoice.marin, CallVoice.quartz.resolved(VoiceEngine.realtime))
@@ -121,7 +116,7 @@ class CallVoiceTests {
         val store = TestStore(shared.run { VoiceFeature.State(server, session) }, VoiceFeature(), this) {
             this[SharedStore] = shared.store
             this[DateClient] = DateClient.constant(Instant.EPOCH)
-            // Android: the call's ongoing-notification ID (iOS's Home owns that Live Activity).
+            // Android: the call's ongoing-notification ID.
             this[UuidClient] = UuidClient.incrementing()
             this[RealtimePreflightClient] = RealtimePreflightClient(verify = { _, _ -> })
             this[VoiceCallClient] = speechVoiceCall(start = { _, config ->

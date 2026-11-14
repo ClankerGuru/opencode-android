@@ -16,11 +16,6 @@ import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.ServerSharedKeys
 import ai.opencode.server.rememberName
 
-/*
- * Port of iOS `AppFeature+Servers.swift` and the server-list cases of `AppFeature.swift`
- * (`serverDeleted`, `forgetIdentity`, `selectServer`).
- */
-
 /** Renames a saved server in place, without reconnecting; Home takes the name too. */
 internal fun renameServer(server: OpenCodeServer, name: String, state: AppFeature.State): AppFeature.State {
     val trimmed = name.trim()

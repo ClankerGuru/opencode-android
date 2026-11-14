@@ -7,14 +7,12 @@ import kotlin.math.PI
 import kotlin.math.max
 import kotlin.math.min
 
-/**
- * Which half of a role's motion is playing: arriving or leaving (iOS `MotionPhase`).
- */
+/** Which half of a role's motion is playing: arriving or leaving. */
 enum class MotionPhase { Enter, Exit }
 
 /**
- * A curve one role resolves to (iOS `MotionCurve`): a spring, an ease-out or an ease-in-out.
- * Compose specs ([animation]) and [SpringSolver] read the same numbers.
+ * A curve one role resolves to: a spring, an ease-out or an ease-in-out. Compose specs
+ * ([animation]) and [SpringSolver] read the same numbers.
  */
 sealed interface MotionCurve {
     val duration: Double
@@ -37,13 +35,13 @@ sealed interface MotionCurve {
 }
 
 /**
- * One of the fourteen motion roles (iOS `MotionRole`): the role picks the curve for each phase.
- * Under Reduce Motion every role is [Reduced]'s cross-fade.
+ * One of the fourteen motion roles: the role picks the curve for each phase. Under Reduce Motion
+ * every role is [Reduced]'s cross-fade.
  */
 enum class MotionRole {
     Press, MicroIn, MicroOut, Swap, Layout, Collapse, PanelOpen, PanelClose, Surface, Release, Flight, Keyboard, Dim, Reduced;
 
-    /** iOS `curve(_:reduceMotion:)`: the role's curve for [phase], or [Reduced]'s under Reduce Motion. */
+    /** The role's curve for [phase], or [Reduced]'s under Reduce Motion. */
     fun curve(phase: MotionPhase = MotionPhase.Enter, reduceMotion: Boolean = false): MotionCurve {
         if (reduceMotion) return Reduced.curve()
         val enter = phase == MotionPhase.Enter
@@ -65,17 +63,17 @@ enum class MotionRole {
         }
     }
 
-    /** iOS `spring`: the role's enter curve as a [MotionSpring] (an ease reads as a critically damped spring of its duration). */
+    /**
+     * The role's enter curve as a [MotionSpring] (an ease reads as a critically damped spring of
+     * its duration).
+     */
     val spring: MotionSpring
         get() {
             val curve = curve()
             return MotionSpring(curve.duration, curve.bounce)
         }
 
-    /**
-     * iOS `animation(_:reduceMotion:delay:)`: the Compose spec for [phase]. The delay applies
-     * only when motion isn't reduced.
-     */
+    /** The Compose spec for [phase]. The delay applies only when motion isn't reduced. */
     fun <T> animation(
         phase: MotionPhase = MotionPhase.Enter,
         reduceMotion: Boolean = false,
@@ -87,7 +85,7 @@ enum class MotionRole {
         return delayed(base, delaySeconds / AnimationTimeScale.shared.observedScale)
     }
 
-    /** iOS `staggered(_:phase:reduceMotion:)`: [animation] delayed by [staggerDelay] for item [index]. */
+    /** [animation] delayed by [staggerDelay] for item [index]. */
     fun <T> staggered(
         index: Int,
         phase: MotionPhase = MotionPhase.Enter,
@@ -95,14 +93,11 @@ enum class MotionRole {
         visibilityThreshold: T? = null,
     ): FiniteAnimationSpec<T> = animation(phase, reduceMotion, staggerDelay(index), visibilityThreshold)
 
-    /**
-     * iOS `animation(_:initialVelocity:reduceMotion:)`: the velocity to hand
-     * `Animatable.animateTo`, zero under Reduce Motion.
-     */
+    /** The velocity to hand `Animatable.animateTo`, zero under Reduce Motion. */
     fun initialVelocity(velocity: Float, reduceMotion: Boolean): Float = if (reduceMotion) 0f else velocity
 
     companion object {
-        /** iOS `MotionRole.staggerDelay(_:)`: `index × staggerStep`, capped at `staggerCap`. */
+        /** `index × staggerStep`, capped at `staggerCap`. */
         fun staggerDelay(index: Int): Double =
             min(max(index, 0) * MotionTunables.staggerStep.value, MotionTunables.staggerCap.value)
 
@@ -110,10 +105,7 @@ enum class MotionRole {
     }
 }
 
-/**
- * iOS `SpringSolver(role:phase:value:velocity:target:reduceMotion:)`: a solver on [role]'s
- * curve. Under Reduce Motion it runs the reduced curve from rest.
- */
+/** A solver on [role]'s curve. Under Reduce Motion it runs the reduced curve from rest. */
 fun SpringSolver(
     role: MotionRole,
     phase: MotionPhase = MotionPhase.Enter,
@@ -137,8 +129,7 @@ fun SpringSolver(
 }
 
 /**
- * iOS `SpringSolver.retarget(to:role:phase:preservingVelocity:reduceMotion:)`: aims at
- * [newTarget] on [role]'s curve, keeping position (and velocity unless motion is reduced).
+ * Aims at [newTarget] on [role]'s curve, keeping position (and velocity unless motion is reduced).
  */
 fun SpringSolver.retarget(
     newTarget: Double,

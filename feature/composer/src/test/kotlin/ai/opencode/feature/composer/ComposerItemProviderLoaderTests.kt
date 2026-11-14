@@ -33,18 +33,12 @@ import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `ComposerItemProviderLoaderTests.swift` ([ComposerImageImporter]).
- *
  * Runs under Robolectric (native graphics) so `loadsFileBackedAndUIImageProviders` reads real
  * `ContentResolver` streams and encodes/decodes real JPEGs: a `file:` Uri stands in for the
- * file-backed provider and a `content:` Uri for the file-URL one; iOS's in-memory `UIImage`
- * provider is `ComposerImageSource.Data` on Android, which never goes through the loader.
- * Dropped: `textViewRoutesImagePasteWithoutChangingText` (UIKit `ImagePasteTextView.paste`;
- * Android routes pastes through the field's `contentReceiver`).
- * `imageImportPreservesMixedSourceOrder` keeps its mixed order with a loader in place of the
- * item provider (the importer resolves item providers through the `AppContext` dependency).
- * Skipped → `:feature:session`: `composerOffersACallWhenVoiceIsSetUp`,
- * `composerControlPresentation` (`ComposerControls` lives in `SessionViewComposerControls.kt`).
+ * file-backed provider and a `content:` Uri for the file-URL one. Dropped:
+ * `textViewRoutesImagePasteWithoutChangingText`. `imageImportPreservesMixedSourceOrder` keeps its
+ * mixed order with a loader in place of the item provider (the importer resolves item providers
+ * through the `AppContext` dependency).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)

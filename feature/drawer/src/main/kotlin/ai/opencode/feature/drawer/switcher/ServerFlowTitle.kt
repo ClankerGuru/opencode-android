@@ -89,11 +89,10 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 
 /**
- * Port of iOS `ServerFlowTitle` (Server Flow, d8a311bd): the drawer's title with Server Flow on.
- * The server picked shows at once. Its name rolls in the way the menu goes ([ServerSwapMotion]),
- * the title's width springs to it, and an underline shimmers under it until the server answers,
- * then fills and fades. The menu checks the server shown and gives every server it knows about a
- * status glyph and word ([ServerMenuStatus]).
+ * The drawer's title with Server Flow on. The server picked shows at once. Its name rolls in the
+ * way the menu goes ([ServerSwapMotion]), the title's width springs to it, and an underline
+ * shimmers under it until the server answers, then fills and fades. The menu checks the server
+ * shown and gives every server it knows about a status glyph and word ([ServerMenuStatus]).
  *
  * @param servers in the menu's order ([drawerTitleServers]).
  */
@@ -123,7 +122,6 @@ fun ServerFlowTitle(
     val previous = remember { mutableStateOf<ServerSwapTarget?>(null) }
     val reducedMotion = rememberReduceMotion()
     SideEffect {
-        // iOS `.onChange(of: target, initial: true) { old, new in motion.sync(new, animated: old != new, reduceMotion:) }`.
         motion.sync(target, animated = previous.value != null && previous.value != target, reduceMotion = reducedMotion)
         previous.value = target
     }
@@ -165,7 +163,7 @@ fun ServerFlowTitle(
                                     }
                                 },
                                 leadingIcon = {
-                                    // A menu toggle draws the checkmark (iOS `Toggle` in a `Menu`).
+                                    // A menu toggle draws the checkmark.
                                     if (isShown) OpenCodeIcon(SFSymbol.Checkmark, contentDescription = null) else Spacer(Modifier.size(24.dp))
                                 },
                                 trailingIcon = serverStatus?.let { { OpenCodeIcon(it.systemImage, contentDescription = null) } },
@@ -225,10 +223,7 @@ fun ServerFlowTitle(
     }
 }
 
-/**
- * The Server Flow title wired to Home as iOS `HomeView.drawerHeader` wires it, sharing [motion]
- * with the list.
- */
+/** The Server Flow title wired to Home, sharing [motion] with the list. */
 @Composable
 fun ServerFlowTitle(
     store: StoreOf<HomeFeature.State, HomeFeature.Action>,
@@ -261,7 +256,7 @@ fun ServerFlowTitle(
 private val chevronSize = 18.dp
 private val chevronGap = 6.dp
 
-/** The chevron and its gap (iOS measures it, as it grows with Dynamic Type; Android's is a fixed 18 dp). */
+/** The chevron and its gap. */
 private val chevronWidth = chevronSize + chevronGap
 
 @Composable
@@ -315,8 +310,8 @@ private fun Names(shown: OpenCodeServer, presentation: DrawerTitle.Presentation,
             },
         contentAlignment = Alignment.CenterStart,
     ) {
-        // The shown name's width, truncated to the room, which the title springs to, so the
-        // chevron sits right after a truncated name (iOS ffbc8f9f).
+        // The shown name's width, truncated to the room, which the title springs to, so the chevron
+        // sits right after a truncated name.
         val id = shown.persistenceID
         Name(
             shown.friendlyName, presentation, limit = limit,
@@ -366,10 +361,9 @@ private fun Name(text: String, presentation: DrawerTitle.Presentation, limit: Dp
 }
 
 /**
- * iOS `ServerFlowUnderline`: the line under the name while a server connects. A sweep runs along it
- * once per `AmbientClock.sweepPeriod` (in step with every other sweep; eased by the iOS bezier
- * 0.4/0/0.2/1, which is `FastOutSlowInEasing`), and it fills when the server answers. Reduce Motion
- * holds the sweep. Hidden from TalkBack.
+ * The line under the name while a server connects. A sweep runs along it once per
+ * `AmbientClock.sweepPeriod`, and it fills when the server answers. Reduce Motion holds the sweep.
+ * Hidden from TalkBack.
  */
 @Composable
 fun ServerFlowUnderline(presence: Float, fill: Float, reducedMotion: Boolean, modifier: Modifier = Modifier) {

@@ -54,9 +54,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 /**
- * Port of iOS `Settings/ModelVisibilitySettings.swift`: Settings › Models (Hide Unused Models,
- * OC-510), which of this server's models the Today and Sheet pickers list, kept on this phone
- * per server (`ModelVisibility.modelVisibilityByServer`).
+ * Settings › Models (Hide Unused Models, OC-510), which of this server's models the Today and Sheet
+ * pickers list, kept on this phone per server (`ModelVisibility.modelVisibilityByServer`).
  */
 class ModelVisibilityFeature : Reducer<ModelVisibilityFeature.State, ModelVisibilityFeature.Action> {
     data class State(
@@ -188,7 +187,7 @@ private fun rememberModelsStore(store: SettingsStore, server: OpenCodeServer?): 
 
 private val placeholderServer = OpenCodeServer(url = "", username = "", password = "")
 
-/** Settings › Models (iOS `ModelVisibilitySettingsView`). */
+/** Settings › Models. */
 @Composable
 fun ModelVisibilitySettingsView(store: SettingsStore) {
     val models = rememberModelsStore(store, null)
@@ -284,8 +283,8 @@ fun ModelVisibilitySettingsView(store: SettingsStore) {
 }
 
 /**
- * One provider's page (iOS `ModelVisibilityProviderView`): hide the whole provider, or switch its
- * models. Search ranks with `ModelSearch`, as both model pickers do.
+ * One provider's page: hide the whole provider, or switch its models. Search ranks with
+ * `ModelSearch`, as both model pickers do.
  */
 @Composable
 fun ModelVisibilityProviderView(store: SettingsStore, providerID: String) {

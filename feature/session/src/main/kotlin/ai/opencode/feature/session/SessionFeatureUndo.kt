@@ -23,7 +23,7 @@ import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.PastedText
 import java.util.UUID
 
-// Port of iOS `SessionFeature+Undo.swift`: a send's draft back in the composer, and reverts.
+// A send's draft back in the composer, and reverts.
 
 /**
  * A send's words lead the draft (or follow it when reverting a turn), its attachments and files

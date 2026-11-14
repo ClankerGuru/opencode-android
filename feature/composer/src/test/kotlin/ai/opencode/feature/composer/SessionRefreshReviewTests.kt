@@ -24,19 +24,12 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * The `:feature:composer` half of iOS `OpenCodeTests/SessionRefreshReviewTests.swift`'s
- * `SharedLocationTests` ([SharedLocation], [LocationClient], [ComposerAttachmentsFeature],
- * [ComposerLocationEntrance]). The `SessionFeature` tests and
- * `composerFoldLayoutMatches…` (`ComposerFoldFrames`) are `:feature:session`'s;
- * `theTranscriptShowsTheCardAndOnlyTheTypedText` is `:feature:transcript`'s (ported there).
+ * Robolectric: the map stub is an `ImageBitmap` (an Android `Bitmap`). Time is the test scheduler's
+ * virtual time.
  *
- * Robolectric: the map stub is an `ImageBitmap` (an Android `Bitmap`); iOS's is a `UIImage()`.
- * Time is the test scheduler's virtual time (iOS waits the real 1.2 s).
- *
- * Dropped: `locationEntranceTrace…`'s `LocationAttachmentTrace` recorder and parser (a lab
- * trace; the entrance metrics it records are checked directly); `locationTappedDelivers…`'s
- * `OneShotRequestGate` half (iOS's bridge for `MKMapSnapshotter`, whose `cancel()` never calls back;
- * Android's snapshots come from cancellable OkHttp tile calls).
+ * Dropped: `locationEntranceTrace…`'s `LocationAttachmentTrace` recorder and parser (a lab trace;
+ * the entrance metrics it records are checked directly); `locationTappedDelivers…`'s
+ * `OneShotRequestGate` half.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])

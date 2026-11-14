@@ -11,28 +11,11 @@ import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
 
-/**
- * Port of the `:server` tests of iOS `TranscriptCachePersistenceTests.swift` (the transcript
- * cache's envelope and writer). Its Home tests are `:feature:drawer`'s
- * (`TranscriptCachePersistenceTests.kt` there).
- *
- * Also here: `transcriptSnapshotRoundTripsAndInvalidatesWhenSessionChanges`,
- * `transcriptPersistenceCoalescesAndKeepsProtectedFormat` and
- * `transcriptPersistenceBoundsLargeSnapshotsBeforeItsSingleFinalEncode`, which iOS keeps in
- * `HomeFeatureTests.swift` but which use only `:server` types.
- *
- * Not ported: `aWriteRefusedWhileLockedKeepsTheSnapshotAndWritesOnceUnlocked` and
- * `anUnlockWhileAWriteIsRefusedStillWritesIt` (iOS data protection refusing writes while the
- * phone is locked, unblocked by `protectedDataDidBecomeAvailable`; Android's app storage is
- * writable whenever the app runs, so the writer has no lock blocking — see
- * `TranscriptCachePersistence`).
- */
 class TranscriptCachePersistenceTests {
     @get:Rule val isolation = TestIsolationRule()
 
     private val decoder = Json { ignoreUnknownKeys = true; explicitNulls = false }
 
-    /** Swift's `Date.distantPast`. */
     private val distantPast: Instant = Instant.parse("0001-01-01T00:00:00Z")
 
     /** `Date(timeIntervalSince1970:)`. */
@@ -63,7 +46,6 @@ class TranscriptCachePersistenceTests {
         }
     }
 
-    // iOS `HomeFeatureTests.transcriptSnapshotRoundTripsAndInvalidatesWhenSessionChanges`.
     @Test
     fun transcriptSnapshotRoundTripsAndInvalidatesWhenSessionChanges() {
         val server = OpenCodeServer(url = "https://saved.example", username = "", password = "")
@@ -89,7 +71,6 @@ class TranscriptCachePersistenceTests {
         assertTrue(restored.validItems("another-server", listOf(session)).isEmpty())
     }
 
-    // iOS `HomeFeatureTests.transcriptPersistenceCoalescesAndKeepsProtectedFormat`.
     @Test
     fun transcriptPersistenceCoalescesAndKeepsProtectedFormat() {
         val memory = TranscriptCachePersistence.Storage.Memory()
@@ -106,7 +87,6 @@ class TranscriptCachePersistenceTests {
         assertEquals(second, decoder.decodeFromString(CachedTranscriptSnapshots.serializer(), requireNotNull(storage.data()).decodeToString()))
     }
 
-    // iOS `HomeFeatureTests.transcriptPersistenceBoundsLargeSnapshotsBeforeItsSingleFinalEncode`.
     @Test
     fun transcriptPersistenceBoundsLargeSnapshotsBeforeItsSingleFinalEncode() {
         val payload = "x".repeat(600_000)

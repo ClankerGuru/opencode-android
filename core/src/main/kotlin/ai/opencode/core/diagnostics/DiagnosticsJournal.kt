@@ -16,9 +16,9 @@ import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 
 /**
- * Port of iOS `DiagnosticsJournal`: the timeline on disk, a JSON-lines file per run plus one older
- * segment, written in batches at most [WRITE_INTERVAL_MS] apart. A foreground marker
- * (ON_RESUME/ON_STOP) tells whether the last run ended in the foreground.
+ * The timeline on disk, a JSON-lines file per run plus one older segment, written in batches at
+ * most [WRITE_INTERVAL_MS] apart. A foreground marker (ON_RESUME/ON_STOP) tells whether the last
+ * run ended in the foreground.
  */
 class DiagnosticsJournal(
     val directory: File,
@@ -169,7 +169,7 @@ class DiagnosticsJournal(
         }
     }
 
-    /** `waits` only where an async removal might never run (iOS termination; tests). */
+    /** `waits` only where an async removal might never run. */
     fun markBackground(waits: Boolean = false) {
         val leave = {
             // The next event may never come: what's waiting goes now.

@@ -45,20 +45,6 @@ import java.nio.file.Files
 import java.time.Instant
 import java.util.UUID
 
-/**
- * Port of the `SessionFeature` suite of iOS `FileAttachmentTests.swift` (`FileAttachmentFeatureTests`).
- *
- * Not ported here (:core / :feature:composer, `AttachmentFileType` alone): `AttachmentFileTypeTests`
- * (`mimeMirrorsDesktopNormalization`, `labelsMatchDesktopCards`, `namesStayASinglePathComponent`).
- * Not ported here (:server / :feature:transcript, prompt text and transcript decoding alone): `PromptPresentationTests`
- * (`modelTextAppendsDesktopReferenceLines`, `displayTextDropsOnlyReferenceLines`, `userMessagesRenderChipsInsteadOfReferenceLines`,
- * `fileOnlyMessagesHaveNoBubble`).
- * Not ported here (:feature:composer, `ComposerAttachmentsFeature` alone):
- * `composerAttachmentsFeatureReducesLocationAndAttachmentRemovalExhaustively`.
- * Not ported here (:server, the upload/prompt wire format): `FileAttachmentWireTests` (`promptWithFilesMatchesDesktopWireFormat`,
- * `uploadStreamsTheFileIntoTheServerTemporaryDirectory`, `uploadFailuresDistinguishAMissingRoute`).
- * Not ported here (:core / :feature:system, share staging): `ShareHandoffFileTests.sharedFilesMoveIntoTheAppStagingDirectory`.
- */
 class FileAttachmentFeatureTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
     private val session = OpenCodeSession(id = "ses_1", serverTitle = "Files", projectID = "p", directory = "/project", updatedAt = Instant.EPOCH)
@@ -76,8 +62,8 @@ class FileAttachmentFeatureTests {
     private fun Harness.fileState(): SessionFeature.State = state { SessionFeature.State.session(server = server, session = session, cachedItems = emptyList()) }
 
     /**
-     * iOS stages under the process's temporary directory; Android's staging folder hangs off the
-     * app context's cache, which a finished upload's cleanup reads.
+     * Android's staging folder hangs off the app context's cache, which a finished upload's cleanup
+     * reads.
      */
     private val appContext = object : ContextWrapper(null) {
         override fun getCacheDir(): File = File(System.getProperty("java.io.tmpdir") ?: "/tmp")

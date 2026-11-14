@@ -3,7 +3,6 @@ package ai.opencode.feature.composer
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** iOS `MotionSystemTests`: the composer's keyboard pose (the rest is `:core`'s, `:feature:drawer`'s and transcript's). */
 class MotionSystemTests {
     @Test fun composerKeyboardPoseExpandsWithTheKeyboardOrWhatHoldsItOpen() {
         val resting = ComposerKeyboardPose()

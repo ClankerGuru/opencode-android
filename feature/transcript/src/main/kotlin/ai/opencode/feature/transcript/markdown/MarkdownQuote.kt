@@ -1,8 +1,8 @@
 package ai.opencode.feature.transcript.markdown
 
 /**
- * Formats selected assistant reply text as a Markdown blockquote and appends it to the
- * composer draft with a trailing blank line ready for the reply (iOS `MarkdownQuote`).
+ * Formats selected assistant reply text as a Markdown blockquote and appends it to the composer
+ * draft with a trailing blank line ready for the reply.
  */
 object MarkdownQuote {
     fun blockquote(text: String): String? {

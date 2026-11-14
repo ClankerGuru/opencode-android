@@ -16,13 +16,6 @@ import java.util.Base64
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.measureTime
 
-/**
- * The `:server` half of iOS `PastedTextTests.swift`: a long paste becomes a Pasted Text card, an
- * inline `text/plain` file the model reads whole ([PastedText], [PastedTextSummary]), and the
- * prompt carries it. `plainDocumentSplitsLinesWithoutHighlighting` (`AgentTextDocument`) is
- * `:feature:media`'s; the composer, outbox and `SessionFeature` tests are `:feature:session`'s;
- * read-back and folding are `:feature:transcript`'s.
- */
 class PastedTextThresholdTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -95,7 +88,7 @@ class PastedTextThresholdTests {
     }
 }
 
-/** iOS `PastedTextRoundTripTests` (the wire half): what the app posts is what V2 stores. */
+/** What the app posts is what V2 stores. */
 class PastedTextRoundTripTests {
     @get:Rule val isolation = TestIsolationRule()
 

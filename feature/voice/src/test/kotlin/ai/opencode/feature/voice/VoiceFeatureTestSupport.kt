@@ -29,15 +29,10 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Shared setup for the ports of iOS `VoiceFeatureTests` (and its `+Delegation`,
- * `+CallLog`, `+Screen` extensions), `VoiceResumeTests` and `VoiceLatencyBudgetTests`.
- * Everything lives in this object so it never clashes with other test files' helpers.
- */
+/** Everything lives in this object so it never clashes with other test files' helpers. */
 internal object VoiceFeatureTestSupport {
     val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
 
-    /** Swift's `Date.distantPast`. */
     val distantPast: Instant = Instant.parse("0001-01-01T00:00:00Z")
     val session = OpenCodeSession(id = "ses_voice", serverTitle = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = distantPast)
 
@@ -46,7 +41,6 @@ internal object VoiceFeatureTestSupport {
 
     fun date(seconds: Long): Instant = Instant.ofEpochSecond(seconds)
 
-    /** iOS `LockIsolated`. */
     class LockIsolated<T>(initial: T) {
         @Volatile private var current: T = initial
         val value: T get() = synchronized(this) { current }
@@ -62,14 +56,13 @@ internal object VoiceFeatureTestSupport {
     fun <T> LockIsolated<List<T>>.append(value: T) = update { it + value }
     fun LockIsolated<Int>.increment(): Int = withValue { (it + 1) to (it + 1) }
 
-    /** iOS `.object(["text": .string(text)])`. */
     fun arguments(text: String? = null): RealtimeJSON =
         JsonObject(if (text == null) emptyMap() else mapOf("text" to JsonPrimitive(text)))
 
     fun delegateEvent(id: String = "call_1", text: String? = null): VoiceCallEvent =
         VoiceCallEvent.FunctionCall(callID = id, name = "delegate", arguments = arguments(text))
 
-    /** iOS `AsyncThrowingStream.makeStream()`: a call's events the test yields and finishes. */
+    /** A call's events the test yields and finishes. */
     class EventStream {
         private val channel = Channel<VoiceCallEvent>(Channel.UNLIMITED)
         val events: Flow<VoiceCallEvent> = channel.receiveAsFlow()
@@ -81,13 +74,13 @@ internal object VoiceFeatureTestSupport {
         }
     }
 
-    /** iOS `AsyncStream<Void>` used as a gate: suspends until the test yields or finishes it. */
+    /** Suspends until the test yields or finishes it. */
     class Gate {
         private val channel = Channel<Unit>(Channel.UNLIMITED)
         suspend fun await() {
             channel.receiveCatching()
         }
-        /** iOS `for await _ in stream {}`: returns only once the stream finishes. */
+        /** Returns only once the stream finishes. */
         suspend fun awaitFinish() {
             for (unit in channel) Unit
         }
@@ -99,10 +92,10 @@ internal object VoiceFeatureTestSupport {
         }
     }
 
-    /** Lets launched effects run (iOS effects start eagerly on the main actor). */
+    /** Lets launched effects run. */
     suspend fun settle(times: Int = 50) = repeat(times) { yield() }
 
-    /** iOS `while condition { await Task.yield() }`, bounded. */
+    /** Bounded. */
     suspend fun eventually(limit: Int = 2_000, condition: () -> Boolean) {
         var tries = 0
         while (!condition() && tries < limit) {
@@ -113,10 +106,9 @@ internal object VoiceFeatureTestSupport {
     }
 
     /**
-     * One test's dependency world: an in-memory shared store the states (built before
-     * the store, as iOS does) and the store share, and the scope effects run in. The
-     * store's scope is not a child of the test, so effects a test leaves running are
-     * cancelled by [skipInFlightEffects] (iOS `store.skipInFlightEffects()`).
+     * One test's dependency world: an in-memory shared store the states and the store share, and
+     * the scope effects run in. The store's scope is not a child of the test, so effects a test
+     * leaves running are cancelled by [skipInFlightEffects].
      */
     class Harness(scope: CoroutineScope) {
         val sharedStore: SharedStore = SharedStore.inMemory()
@@ -141,7 +133,7 @@ internal object VoiceFeatureTestSupport {
         ): TestStore<VoiceFeature.State, VoiceFeature.Action> = TestStore(state, VoiceFeature(), scope) {
             this[SharedStore] = sharedStore
             haptics.install(this)
-            // Android: every start mints the call's notification identity (iOS's Live Activity is Home's).
+            // Android: every start mints the call's notification identity.
             this[UuidClient] = UuidClient.incrementing()
             dependencies()
         }
@@ -159,7 +151,7 @@ internal object VoiceFeatureTestSupport {
         }
     }
 
-    /** iOS `withDependencies { … } operation: { … }` in a test: a test container with these overrides. */
+    /** A test container with these overrides. */
     suspend fun <R> withTestDependencies(update: DependencyValues.Builder.() -> Unit, block: suspend () -> R): R =
         withContext(DependencyValues.testing().update(update).asContextElement()) { block() }
 
@@ -169,7 +161,6 @@ internal object VoiceFeatureTestSupport {
     fun TestStore<VoiceFeature.State, VoiceFeature.Action>.transcripts(): Map<String, VoiceTranscriptRecord> =
         withDependencies { shared(VoiceSharedKeys.voiceTranscripts).value }
 
-    /** iOS `store.receive(\.case)`. */
     suspend fun <T : VoiceFeature.Action> TestStore<VoiceFeature.State, VoiceFeature.Action>.receive(
         case: KClass<T>,
         timeout: Duration = 5.seconds,
@@ -179,10 +170,9 @@ internal object VoiceFeatureTestSupport {
     suspend fun TestStore<VoiceFeature.State, VoiceFeature.Action>.receiveEnded() =
         receive(VoiceFeature.Action.Delegate(VoiceFeature.DelegateAction.Ended), timeout = 5.seconds)
 
-    /** iOS `voice.phase = .live` (its `didSet` keeps the reply watch in step). */
     fun VoiceFeature.State.live(): VoiceFeature.State = withPhase(VoiceFeature.State.Phase.Live)
 
-    /** A copy of the call client with some closures replaced (iOS `$0.voiceCall.x = …`). */
+    /** A copy of the call client with some closures replaced. */
     fun VoiceCallClient.copy(
         start: suspend (String, RealtimeSessionConfig) -> Flow<VoiceCallEvent> = this.start,
         completeFunction: suspend (String, String) -> Unit = this.completeFunction,
@@ -204,7 +194,7 @@ internal object VoiceFeatureTestSupport {
         retarget, setMuted, setAtEar, updateInstructions, end, delegatorRound, submitDelegatorInput, updateDelegatorInstructions,
     )
 
-    /** A copy of the work client with some closures replaced (iOS `$0.voiceWork.x = …`). */
+    /** A copy of the work client with some closures replaced. */
     fun VoiceWorkClient.copy(
         submit: suspend (VoiceWorkTarget, String) -> VoiceWorkAdmission = this.submit,
         awaitReply: suspend (OpenCodeServer, String, String) -> String? = this.awaitReply,
@@ -243,7 +233,6 @@ internal object VoiceFeatureTestSupport {
         this[VoiceWorkClient] = this[VoiceWorkClient].update()
     }
 
-    /** iOS `VoiceDelegatorClient(isEnabled: true) { key, input, previous in … }`. */
     fun delegator(respond: suspend (String, List<VoiceDelegator.InputItem>, String?) -> VoiceDelegator.Response) =
         VoiceDelegatorClient(isEnabled = true, respond = respond)
 
@@ -253,12 +242,11 @@ internal object VoiceFeatureTestSupport {
     fun call(callID: String, name: String, arguments: String) = VoiceDelegator.ToolCall(callID = callID, name = name, arguments = arguments)
 
     /**
-     * iOS `HapticsClient.recording(_:)` and `haptics.voice`: Android routes the voice cues
-     * through [VoiceCallSounds] (a call-scoped clock) and the vocabulary through
-     * [HapticsClient]. This records both on one step clock, so [log] keeps their order:
-     * `"voice.<cue>"` for a voice cue, the haptic's name for the rest. An engine that plays
-     * every pattern keeps the Android fallbacks out, except `callStarted`'s `confirm`, which
-     * is the cue itself here and is folded into it.
+     * Android routes the voice cues through [VoiceCallSounds] (a call-scoped clock) and the
+     * vocabulary through [HapticsClient]. This records both on one step clock, so [log] keeps their
+     * order: `"voice.<cue>"` for a voice cue, the haptic's name for the rest. An engine that plays
+     * every pattern keeps the Android fallbacks out, except `callStarted`'s `confirm`, which is the
+     * cue itself here and is folded into it.
      */
     class HapticsRecorder {
         private class StepClock : Clock {
@@ -288,10 +276,8 @@ internal object VoiceFeatureTestSupport {
             builder[HapticsClient] = haptics
         }
 
-        /** iOS `haptics.voice`'s recording. */
         val voice: List<VoiceCallHaptic> get() = sounds.snapshot().hapticEvents.map { it.haptic }
 
-        /** iOS `log.setValue([])`. */
         fun reset() {
             cut = clock.now()
         }

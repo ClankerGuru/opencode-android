@@ -20,14 +20,13 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ProcessLifecycleOwner
 
 /**
- * Port of iOS `Haptic`: every haptic the app plays, named by what it means. Answer the press, not
- * the animation; navigation and closing stay quiet. Play only through [HapticsClient] or
- * [HapticEffect].
+ * Every haptic the app plays, named by what it means. Answer the press, not the animation;
+ * navigation and closing stay quiet. Play only through [HapticsClient] or [HapticEffect].
  */
 enum class Haptic {
     tap, lightTap, selection, confirm, cancel, threshold, snap, attention, success, warning, error;
 
-    /** How each feels. iOS's generator/intensity table, mapped to Android composition primitives. */
+    /** How each feels. The haptic table, mapped to Android composition primitives. */
     val feedback: HapticFeedback
         get() = when (this) {
             tap -> HapticFeedback.Impact(HapticFeedback.Style.Light)
@@ -44,7 +43,6 @@ enum class Haptic {
         }
 }
 
-/** iOS's `HapticFeedback`: which UIKit generator and how strongly. */
 sealed interface HapticFeedback {
     enum class Style { Light, Medium, Heavy, Soft, Rigid }
     enum class Kind { Success, Warning, Error }
@@ -57,7 +55,7 @@ sealed interface HapticFeedback {
 /** Port of `HapticsClient` (`@Dependency(\.haptics)`). Voice call cues live in `:feature:voice`. */
 class HapticsClient(
     val play: (Haptic) -> Unit = {},
-    /** A touch that may end in this haptic began (iOS warms its generator; Android needs nothing). */
+    /** A touch that may end in this haptic began. */
     val prepare: (Haptic) -> Unit = {},
 ) {
     companion object Key : DependencyKey<HapticsClient> {
@@ -70,8 +68,7 @@ class HapticsClient(
 }
 
 /**
- * The views' way into the vocabulary (iOS `.haptic(_:trigger:condition:)`): plays [haptic]
- * when [trigger] changes and [condition] holds.
+ * The views' way into the vocabulary: plays [haptic] when [trigger] changes and [condition] holds.
  */
 @Composable
 fun <T> HapticEffect(haptic: Haptic, trigger: T, condition: (old: T, new: T) -> Boolean = { _, _ -> true }) {
@@ -107,8 +104,8 @@ internal class LiveHaptics(context: Context) {
     }
 
     /**
-     * Records what a haptic request met, for Developer Mode traces (iOS `LiveHaptics.trace`):
-     * one content-free `haptic_<kind>` mark while the diagnostics timeline or lab marks run.
+     * Records what a haptic request met, for Developer Mode traces: one content-free
+     * `haptic_<kind>` mark while the diagnostics timeline or lab marks run.
      */
     private fun trace(kind: String) {
         if (!DiagnosticsRecorder.shared.isEnabled && !LabMarks.isEnabled) return
@@ -164,10 +161,7 @@ internal class LiveHaptics(context: Context) {
     )
 }
 
-/**
- * The audio half of a haptic's trace line (iOS `AudioSessionHaptics`). `audio=` is the
- * `AudioManager` mode.
- */
+/** The audio half of a haptic's trace line. `audio=` is the `AudioManager` mode. */
 object AudioSessionHaptics {
     data class AudioState(val category: String, val mode: String, val allowsHaptics: Boolean, val dictating: Boolean, val otherAudio: Boolean)
 

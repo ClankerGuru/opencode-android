@@ -11,10 +11,9 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `VoiceAnswerHoldTests`. How a delegation's answer and the
- * results around it wait for speech, on a test clock: a loaded machine
- * stretching a pause can't change what the call does (the real clock failed
- * these in train smoke runs on Oct 25).
+ * How a delegation's answer and the results around it wait for speech, on a test clock: a loaded
+ * machine stretching a pause can't change what the call does (the real clock failed these in train
+ * smoke runs on Oct 25).
  */
 class VoiceAnswerHoldTests {
     private val answer = LiveCallCoordinatorTests.rulesAnswer

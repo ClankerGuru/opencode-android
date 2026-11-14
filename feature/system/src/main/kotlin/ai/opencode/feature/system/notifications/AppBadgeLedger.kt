@@ -7,9 +7,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * Port of iOS `AppBadgeLedger`: what the app icon's badge counts, left in the app's preferences
- * where the push handler reads it. A push arriving while the app isn't live adds its session, so
- * the count stays close to Catch Up until the app opens and counts again.
+ * What the app icon's badge counts, left in the app's preferences where the push handler reads it.
+ * A push arriving while the app isn't live adds its session, so the count stays close to Catch Up
+ * until the app opens and counts again.
  *
  * Session IDs, a hash of the server's identity and its random notification `ref` only: no titles,
  * usernames, addresses or credentials.
@@ -61,7 +61,7 @@ data class AppBadgeLedger(
         /** The hashed key a server's ledger is saved under, as the system's session IDs use. */
         fun serverKey(persistenceID: String): String = ShareConversation.serverKey(persistenceID)
 
-        /** iOS's App Group defaults → the app's own preferences file. */
+        /** Stored in the app's own preferences file. */
         fun groupDefaults(context: Context): SharedPreferences =
             context.applicationContext.getSharedPreferences(GROUP, Context.MODE_PRIVATE)
 

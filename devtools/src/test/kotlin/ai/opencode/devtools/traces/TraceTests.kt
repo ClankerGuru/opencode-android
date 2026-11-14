@@ -64,9 +64,6 @@ import java.time.Instant
 import java.util.Base64
 import java.util.UUID
 
-// Ports of the `:devtools` suites in iOS `TraceTests.swift`; the `:core` suites are in
-// `core/src/test/.../diagnostics/TraceTests.kt`.
-
 private fun event(
     name: String,
     at: Double = 0.0,
@@ -74,14 +71,12 @@ private fun event(
     kind: DiagnosticsEvent.Kind = DiagnosticsEvent.Kind.Mark,
 ): DiagnosticsEvent = DiagnosticsEvent(id = UUID.randomUUID(), kind = kind, monotonicSeconds = at, wallDate = wall, name = name)
 
-/** iOS `LockIsolated<[T]>`. */
 private class Recorded<T> {
     private val items = mutableListOf<T>()
     val value: List<T> get() = synchronized(this) { items.toList() }
     fun append(item: T) = synchronized(this) { items += item }
 }
 
-/** iOS `AsyncStream<Void>` used as a gate. */
 private class Gate {
     private val channel = Channel<Unit>(Channel.UNLIMITED)
     suspend fun await() {
@@ -92,10 +87,7 @@ private class Gate {
     }
 }
 
-/**
- * Port of iOS `TraceUploadsTests`. JVM tests can't read the app's debuggable flag, so the
- * recorder's own (false) answer stands in for iOS's Debug build.
- */
+/** JVM tests can't read the app's debuggable flag. */
 class TraceUploadsTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -509,7 +501,6 @@ class TraceUploadsTests {
                 NetworkRetry.clock.withValue(clock) {
                     NetworkRetry.environment.withValue(RetryEnvironment.online(unit = 0.0)) {
                         DeveloperModeUploads.upload(bundle) { request ->
-                            // iOS `URLError(.networkConnectionLost)`.
                             if (attempts.incrementAndGet() < 3) throw SocketException("Connection reset")
                             Response.Builder().request(request).protocol(Protocol.HTTP_1_1).code(201).message("Created")
                                 .body(ByteArray(0).toResponseBody()).build()
@@ -523,7 +514,7 @@ class TraceUploadsTests {
         assertEquals(2, clock.sleeps.size)
     }
 
-    /** iOS `ScriptedClock`: sleeps return at once, each recorded. */
+    /** Sleeps return at once, each recorded. */
     private class SleepRecordingClock : Clock {
         private var time = Duration.ZERO
         val sleeps = mutableListOf<Duration>()
@@ -565,7 +556,6 @@ class TraceUploadsTests {
     }
 }
 
-/** The `:devtools` half of iOS `DiagnosticsPrivacyTests` (the rest is `:core`'s). */
 class DiagnosticsPrivacyTests {
     @get:Rule val isolation = TestIsolationRule()
 

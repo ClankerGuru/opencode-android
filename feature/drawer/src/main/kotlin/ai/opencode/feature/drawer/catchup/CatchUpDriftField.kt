@@ -31,11 +31,10 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * The calm dot-matrix Drift field behind the Catch Up stack that blooms as the last card goes (iOS
- * `CatchUpDriftFieldView` + `CatchUpDriftRenderer` + `catchUpDriftFragment`), an AGSL
- * [RuntimeShader]. Reduce Motion holds one still frame; the field pauses while the screen isn't
- * resumed. Draw it edge to edge: the stage centre comes from the system-bar and cutout insets plus
- * the header and footer.
+ * The calm dot-matrix Drift field behind the Catch Up stack that blooms as the last card goes, an
+ * AGSL [RuntimeShader]. Reduce Motion holds one still frame; the field pauses while the screen
+ * isn't resumed. Draw it edge to edge: the stage centre comes from the system-bar and cutout insets
+ * plus the header and footer.
  */
 @Composable
 fun CatchUpDriftFieldView(isFinished: Boolean, modifier: Modifier = Modifier) {
@@ -57,8 +56,8 @@ fun CatchUpDriftFieldView(isFinished: Boolean, modifier: Modifier = Modifier) {
     }
     LaunchedEffect(isStill, isPaused) {
         if (isStill || isPaused) return@LaunchedEffect
-        // A slow drift: 30 frames a second look the same as 60 (iOS 22ddb6a0), so the field
-        // redraws only every other frame or so (a little early, so 60 Hz lands on every second).
+        // A slow drift: 30 frames a second look the same as 60, so the field redraws only every
+        // other frame or so (a little early, so 60 Hz lands on every second).
         val frameSeconds = 1.0 / CatchUpDriftRenderer.FRAMES_PER_SECOND
         while (true) {
             withFrameNanos { frameNanos ->
@@ -103,7 +102,7 @@ internal fun rememberTouchExplorationEnabled(): Boolean {
     }
     return enabled
 }
-/** Owns the shader and its uniforms (iOS `CatchUpDriftRenderer`). */
+/** Owns the shader and its uniforms. */
 internal class CatchUpDriftRenderer {
     private val shader = RuntimeShader(SHADER)
     private val startTime = clock()
@@ -170,9 +169,9 @@ internal class CatchUpDriftRenderer {
 
     companion object {
         /**
-         * The field drifts over seconds, so it's drawn 30 times a second (iOS `framesPerSecond`).
-         * Android draws it at the screen's own density: a [RuntimeShader] brush has no cheaper
-         * lower-resolution target short of an offscreen hardware renderer (iOS `resolution` 0.75).
+         * The field drifts over seconds, so it's drawn 30 times a second. Android draws it at the
+         * screen's own density: a [RuntimeShader] brush has no cheaper lower-resolution target
+         * short of an offscreen hardware renderer.
          */
         const val FRAMES_PER_SECOND = 30
         const val STACK_LEVEL = 0.28f
@@ -183,7 +182,7 @@ internal class CatchUpDriftRenderer {
         /** The frame clock's base (`System.nanoTime`) in seconds. */
         fun clock(): Double = System.nanoTime() / 1e9
 
-        /** iOS `DotScopeMetalShared.pearlPalette(dark:)`: warm for you, cool for the agent (base, core). */
+        /** Warm for you, cool for the agent (base, core). */
         val DARK = floatArrayOf(
             0.86f, 0.83f, 0.77f, 0.98f, 0.96f, 0.92f,
             0.70f, 0.75f, 0.84f, 0.92f, 0.95f, 1.0f,

@@ -12,12 +12,11 @@ import java.util.IdentityHashMap
 import kotlin.time.Duration
 
 /**
- * Port of iOS `AppLog`: the app's only log, to logcat (`OpenCode/<category>`) and a ring buffer for
- * reports. Log IDs, counts, lengths, statuses and timings only; never credentials, addresses or
- * content.
+ * The app's only log, to logcat (`OpenCode/<category>`) and a ring buffer for reports. Log IDs,
+ * counts, lengths, statuses and timings only; never credentials, addresses or content.
  */
 class AppLog private constructor(val category: String, subsystem: String = SUBSYSTEM, private val traces: Boolean = false) {
-    /** iOS `recentLines` reads only the app's own subsystem, so `opencode.perf` marks stay out of reports. */
+    /** Reads only the app's own subsystem, so `opencode.perf` marks stay out of reports. */
     private val recorded = subsystem == SUBSYSTEM
     private val tag = if (subsystem == SUBSYSTEM) "OpenCode/$category" else "$subsystem/$category"
 
@@ -35,7 +34,7 @@ class AppLog private constructor(val category: String, subsystem: String = SUBSY
         if (priority < minimumPriority) return
         val text = message().replace('\r', ' ').replace('\n', ' ')
         Log.println(priority, tag, text)
-        // `opencode.perf` lines double as Perfetto instants named by their first word (iOS signposts).
+        // `opencode.perf` lines double as Perfetto instants named by their first word.
         if (traces && Trace.isEnabled()) {
             Trace.beginSection("oc:" + text.substringBefore(' ').take(117))
             Trace.endSection()
@@ -93,12 +92,12 @@ internal val Throwable.logSummary: String
             (frame?.let { " at ${it.className}.${it.methodName}:${it.lineNumber}" } ?: "")
     }
 
-/** "1.25 s", "320 ms" (iOS `Duration.logSummary`). */
+/** "1.25 s", "320 ms". */
 val Duration.logSummary: String
     get() {
         val milliseconds = inWholeNanoseconds / 1_000_000.0
         if (milliseconds < 1_000) return "${Math.round(milliseconds)} ms"
-        // iOS formats with ICU (`fractionLength(0...2)`): half-even from the shortest decimal form.
+        // Half-even from the shortest decimal form.
         val text = BigDecimal.valueOf(milliseconds / 1_000).setScale(2, RoundingMode.HALF_EVEN).stripTrailingZeros().toPlainString()
         return "$text s"
     }

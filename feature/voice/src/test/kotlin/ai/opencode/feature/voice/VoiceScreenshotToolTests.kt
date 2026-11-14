@@ -38,24 +38,13 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `VoiceScreenshotToolTests.swift`.
- *
  * `capture_app_screenshot`: Developer Mode only, the app's own window sent
  * as an image with a secret-free app state, and an honest result.
  *
- * Dropped, as they probe UIKit rendering that has no JVM counterpart (the
- * Android capture is a `PixelCopy` of a resumed activity, refused while a
- * `CredentialSurface` is composed or the window is `FLAG_SECURE`; there are no
- * `UIWindow` hierarchies, `CredentialSurface.Marks` or `ScreenshotPolicy` to probe):
- * `refusesAnyWindowShowingAPasswordFieldMarkedOrNot`,
- * `onlyAPasswordFieldOnScreenRefuses`, `aPasswordFieldMidAnimationStillRefuses`,
- * `settingsCredentialsAreMarkedForEveryScreenshot`,
+ * Dropped: `refusesAnyWindowShowingAPasswordFieldMarkedOrNot`, `onlyAPasswordFieldOnScreenRefuses`,
+ * `aPasswordFieldMidAnimationStillRefuses`, `settingsCredentialsAreMarkedForEveryScreenshot`,
  * `problemReportsAndVoiceScreenshotsKeepSeparatePolicies`,
  * `captureDrawsTheHostedWindowNotABlankImage`.
- *
- * `appStateCarriesNamesAndCountsButNoSecrets` builds Home's part directly: iOS
- * takes it from the drawer's `HomeFeature.State.voiceAppStateHome`, which lives
- * in `:feature:drawer` (its owner).
  */
 class VoiceScreenshotToolTests {
     private val server = OpenCodeServer(url = "https://kit:hunter2@studio.example.ts.net:4096", username = "kit", password = "hunter2", name = "Studio")
@@ -252,7 +241,7 @@ class VoiceScreenshotToolTests {
     // App state
 
     @Test fun appStateCarriesNamesAndCountsButNoSecrets() {
-        // iOS: `HomeFeature.State` with a session detail whose draft is this, and Settings shown.
+        // `HomeFeature.State` with a session detail whose draft is this, and Settings shown.
         val draft = "my secret plan for the launch"
         val home = VoiceAppState.Home(
             drawerOpen = false, settingsShown = true, catchUpShown = false,

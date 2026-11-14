@@ -171,14 +171,12 @@ private const val HIGH_TEXT_CONTRAST = "high_text_contrast_enabled"
 
 /** Accessors for the design system inside [OpenCodeTheme]. */
 object OpenCodeTheme {
-    /** iOS semantic colours (`ThemePalette.*`). */
     val colors: OpenCodeColors
         @Composable @ReadOnlyComposable get() = LocalOpenCodeColors.current
 
-    /** Material roles (mapped from the iOS colours). */
+    /** Material roles. */
     val colorScheme: ColorScheme
         @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme
 
-    /** iOS text styles by name (`OpenCodeTheme.textStyles.footnote`). */
     val textStyles: OpenCodeTextStyles get() = OpenCodeTextStyles
 }

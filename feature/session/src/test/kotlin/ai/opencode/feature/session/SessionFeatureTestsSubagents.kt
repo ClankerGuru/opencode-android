@@ -43,19 +43,17 @@ import java.time.Instant
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-/** Port of iOS `SessionFeatureTests+Subagents.swift`. */
 class SessionFeatureTestsSubagents {
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
 
     private fun user(id: String, text: String) = OpenCodeTranscriptItem.UserText(id = id, text = text)
 
-    /** iOS `settleEffects()`: lets running effects reach their next clock sleep. */
+    /** Lets running effects reach their next clock sleep. */
     private suspend fun settleEffects() {
         settle(20)
         delay(30)
     }
 
-    /** iOS `eventually { … }`. */
     private suspend fun eventually(condition: () -> Boolean): Boolean {
         repeat(100) {
             if (condition()) return true

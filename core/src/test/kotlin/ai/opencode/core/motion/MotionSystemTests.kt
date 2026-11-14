@@ -27,21 +27,6 @@ import kotlin.math.exp
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-/**
- * Port of iOS `MotionSystemTests` (`OpenCodeTests/MotionSystemTests.swift`).
- *
- * Not here:
- * - `emptyStateMotionBreathesContinuouslyAndRevealsWithoutJumping` (`EmptyStateMotion`,
- *   `EmptyStateTunables`) belongs to `:feature:transcript`.
- * - `drawerShortcutSlotCollapsesMonotonicallyAndPreservesVelocityOnMidExitReversal`,
- *   `drawerShortcutMotionDisplayLinkStopsOnDrawerCloseCatchUpOpenAndBackground`,
- *   `drawerCatchUpFinishPlaysOncePerFinishThroughSearchHidingAndUnread`,
- *   `drawerShortcutCloseDelaySurvivesUnrelatedInputChangeAndUnmountsCleanly`
- *   (`DrawerShortcutSlot`, `DrawerShortcutMotion`) belong to `:feature:drawer`.
- * - `returnToDrawerDoesNotMoveLongReturnSession` probes a UIKit `SessionDrawerViewController`
- *   in a `UIWindow` (`:feature:drawer`, UIKit-only layout probe): deleted.
- * - `uiKitPresenceGateCompletesOnlyTheLatestTransition` (`UIKitPresenceGate`): UIKit-only, n/a.
- */
 class MotionSystemTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -52,7 +37,6 @@ class MotionSystemTests {
         Motion.register(store)
 
         val rows = store.descriptors.filter { it.group == "motion" }
-        // iOS `TuningPanel.sections(rows)` (`:devtools`): the rows' sections, titled, in order.
         val titles = ArrayList<String>()
         for (row in rows) {
             val title = row.section?.let(TuningTitle::format).orEmpty()
@@ -147,7 +131,7 @@ class MotionSystemTests {
         assertEquals(TuneValue.Number(0.5), store.overrides["motion.screenshotFlash.duration"])
     }
 
-    /** UIKit timing parameters and Core Animation fades are n/a on Android; Compose specs and the solver are checked. */
+    /** Compose specs and the solver are checked. */
     @Test
     fun everyRoleBecomesTheOneReduceMotionCrossFadeInEveryStack() {
         val fade = MotionCurve.EaseInOut(0.20)
@@ -177,7 +161,7 @@ class MotionSystemTests {
         assertEquals(0f, MotionReduce.rotation(90f, reduceMotion = true))
     }
 
-    /** iOS also checks UIKit and Core Animation (n/a); Compose specs and the solver share the curve's numbers. */
+    /** Compose specs and the solver share the curve's numbers. */
     @Test
     fun everyRoleDrivesSwiftUIUIKitCoreAnimationAndTheSolverWithTheSameNumbers() {
         for (role in MotionRole.entries) {
@@ -268,7 +252,7 @@ class MotionSystemTests {
         assertTrue(abs(band.band(240 + 1e-6, bounds) - 240) < 1e-5)
     }
 
-    /** Compose geometry is `Float`, so the exactness tolerances are float-sized (iOS: 1e-9 on `CGFloat`). */
+    /** Compose geometry is `Float`, so the exactness tolerances are float-sized. */
     @Test
     fun flightWidthLeadsHeightAndLandsExactly() {
         val from = Rect(offset = Offset(20f, 30f), size = Size(56f, 56f))
@@ -292,7 +276,6 @@ class MotionSystemTests {
         assertEquals("no lead is linear", 0.5f, MotionFlightGeometry.leading(0.5f, 1f))
     }
 
-    /** iOS also checks Core Animation `RenderServerLoop` phases (n/a: Compose loops read [AmbientClock] each frame). */
     @Test
     fun ambientLoopsLockToOneClock() {
         val period = MotionTunables.breathPeriod.defaultValue
@@ -307,10 +290,6 @@ class MotionSystemTests {
         assertEquals(1.0 / 30.0, AmbientRate.Background.minimumInterval, 0.0)
     }
 
-    /**
-     * iOS compares against `FlightSpring` (`Composer/PlusMenu/PhotoFlight.swift`), which Android
-     * doesn't have as a type; [FlightSpring] below is that Swift struct verbatim, as the oracle.
-     */
     @Test
     fun springSolverMatchesFlightSpringAndIsFrameRateInvariant() {
         for (bounce in listOf(0.0, 0.18, -0.15)) {
@@ -417,10 +396,9 @@ class MotionSystemTests {
     }
 
     /**
-     * iOS `MotionDisplayLink` → Android [motionFrameLoop] on Compose's frame clock, driven here by
-     * a 120 Hz test clock. Deleted: the `proMotionRange` (`CAFrameRateRange` 80–120) assertions,
-     * since Android has no per-link frame-rate request (the loop runs at the display's refresh
-     * rate), and `isRunning` (the loop is a suspend function that runs until it returns).
+     * Deleted: the `proMotionRange` (`CAFrameRateRange` 80–120) assertions, since Android has no
+     * per-link frame-rate request (the loop runs at the display's refresh rate), and `isRunning`
+     * (the loop is a suspend function that runs until it returns).
      */
     @Test
     fun motionDisplayLinkTicksAtProMotionRangeAndStopsOnRequest() = runTest {
@@ -442,7 +420,7 @@ class MotionSystemTests {
         assertTrue(ticks.all { it.dt > 0 && it.rawFrameDuration >= 1.0 / 240.0 })
     }
 
-    /** iOS `FlightSpring` (`Composer/PlusMenu/PhotoFlight.swift`), verbatim, as the reference. */
+    /** Verbatim, as the reference. */
     private class FlightSpring(var value: Double, var velocity: Double = 0.0) {
         fun step(toward: Double, omega: Double, zeta: Double, dt: Double) {
             val target = toward

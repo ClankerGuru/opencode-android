@@ -7,8 +7,7 @@ import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.PageShareRequest
 
 /**
- * One send on its way (iOS `SessionFeature.PendingPrompt`). Lives here because the outbox,
- * persistence and undelivered prompts carry it.
+ * One send on its way. Lives here because the outbox, persistence and undelivered prompts carry it.
  */
 data class PendingPrompt(
     val messageID: String,

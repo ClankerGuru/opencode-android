@@ -9,10 +9,9 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `eventually` (`OpenCodeTests/TestSupport.swift`): polls something an effect
- * changes outside a store's own actions, every [step] for up to [timeout]. Returns whether it
- * came true; wrap in `assertTrue` to require it. Under `runTest` the delays are virtual;
- * [wallClock] waits real time, for work on other threads (OkHttp calls).
+ * Polls something an effect changes outside a store's own actions, every [step] for up to
+ * [timeout]. Returns whether it came true; wrap in `assertTrue` to require it. Under `runTest` the
+ * delays are virtual; [wallClock] waits real time, for work on other threads (OkHttp calls).
  */
 suspend fun eventually(
     timeout: Duration = 3.seconds,

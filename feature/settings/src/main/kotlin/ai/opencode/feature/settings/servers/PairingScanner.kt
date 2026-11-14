@@ -72,8 +72,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 
 /**
- * Port of iOS `Settings/PairingScanner.swift`: the camera scanner for the QR code `opencode pair`
- * prints, presented full screen by `:app` (“Scan Pairing Code”).
+ * The camera scanner for the QR code `opencode pair` prints, presented full screen by `:app` (“Scan
+ * Pairing Code”).
  *
  * Honest about the camera, with a paste path every time: without a camera it asks for the pairing
  * link to be pasted; with access off it offers Open Settings (when Android would no longer ask) and
@@ -104,7 +104,7 @@ fun PairingScannerView(
     var cameraAccess by remember { mutableStateOf(camera.authorization()) }
     var pasteFailed by rememberSaveable { mutableStateOf(false) }
     val isAccessDenied = cameraAccess == CameraAuthorization.denied
-    // Coming back from system Settings with access turned on shows the camera (iOS relaunches).
+    // Coming back from system Settings with access turned on shows the camera.
     LifecycleResumeEffect(Unit) {
         if (cameraAccess == CameraAuthorization.denied && camera.authorization() == CameraAuthorization.authorized) {
             cameraAccess = CameraAuthorization.authorized
@@ -122,15 +122,15 @@ fun PairingScannerView(
     }
 
     // The capture session starts only once access is granted: asked while the prompt is up, it
-    // wouldn't start after Allow (iOS), so the camera waits for the answer.
+    // wouldn't start after Allow, so the camera waits for the answer.
     LaunchedEffect(Unit) {
         if (cameraAccess != CameraAuthorization.notDetermined || !isCameraAvailable) return@LaunchedEffect
         camera.authorize()
         cameraAccess = camera.authorization()
     }
 
-    // VoiceOver starts on the navigation title, a header (iOS `.navigationTitle`), and comes back to
-    // it once the camera prompt is answered; TalkBack would start on Cancel (QA OB-B-04).
+    // VoiceOver starts on the navigation title, a header, and comes back to it once the camera
+    // prompt is answered; TalkBack would start on Cancel (QA OB-B-04).
     val titleFocus = rememberAccessibilityFocusRequest(cameraAccess)
 
     val appearance = rememberAppAppearance()
@@ -336,7 +336,7 @@ private fun PairingScannerFallback(
     }
 }
 
-/** iOS `PasteButtonStyle`: prominent is a white primary button with black text; otherwise secondary. */
+/** Prominent is a white primary button with black text; otherwise secondary. */
 @Composable
 private fun PasteButton(prominent: Boolean, onClick: () -> Unit, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
     if (prominent) {
@@ -353,7 +353,7 @@ private fun PasteButton(prominent: Boolean, onClick: () -> Unit, content: @Compo
     }
 }
 
-/** Markdown's `code` spans (iOS `LocalizedStringKey`) in monospace. */
+/** Markdown's `code` spans in monospace. */
 internal fun inlineCode(text: String): AnnotatedString = buildAnnotatedString {
     text.split('`').forEachIndexed { index, part ->
         if (index % 2 == 1) withStyle(SpanStyle(fontFamily = OpenCodeFonts.monospace, fontWeight = FontWeight.Normal)) { append(part) }

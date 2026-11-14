@@ -18,11 +18,10 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `Settings/Onboarding/OnboardingPlaygroundFeature.swift`. Settings → Advanced →
- * Developer → Playgrounds → Onboarding: the onboarding's pages and their motion in a full-screen
- * sandbox. The camera is real when the app already has access, otherwise simulated; the server is
- * simulated by a timer. Nothing here reaches a server, the saved servers, the keychain or a
- * persisted setting.
+ * Settings → Advanced → Developer → Playgrounds → Onboarding: the onboarding's pages and their
+ * motion in a full-screen sandbox. The camera is real when the app already has access, otherwise
+ * simulated; the server is simulated by a timer. Nothing here reaches a server, the saved servers,
+ * the keychain or a persisted setting.
  *
  * [Action.CloseTapped] cancels the playground's effects; the view then calls its `onClose`, which
  * sends the parent's `PresentationAction.Dismiss`.
@@ -250,7 +249,6 @@ class OnboardingPlaygroundFeature : Reducer<OnboardingPlaygroundFeature.State, O
     private fun interrupt(state: State): Pair<State, Effect<Action>> =
         state.copy(isReplaying = false) to Effect.merge(Effect.cancel(CancelID.pairing), Effect.cancel(CancelID.replay))
 
-    /** iOS `.merge(interrupt(&state), <next>)`. */
     private inline fun interrupting(state: State, next: (State) -> Reduced<State, Action>): Reduced<State, Action> {
         val (interrupted, cancel) = interrupt(state)
         val reduced = next(interrupted)
@@ -308,8 +306,8 @@ class OnboardingPlaygroundFeature : Reducer<OnboardingPlaygroundFeature.State, O
 }
 
 /**
- * Whether the app may already use the camera. The playground never asks: without access it
- * shows a simulated feed. (iOS `OnboardingCameraClient`.)
+ * Whether the app may already use the camera. The playground never asks: without access it shows a
+ * simulated feed.
  */
 class OnboardingCameraClient(val isAuthorized: () -> Boolean) {
     companion object Key : DependencyKey<OnboardingCameraClient> {

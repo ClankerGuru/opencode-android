@@ -20,7 +20,7 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.random.Random
 
-/** What changed in a [TuningStore] (iOS `TuningEvent`, minus the Mac-only playground/capture events). */
+/** What changed in a [TuningStore]. */
 sealed interface TuningEvent {
     /** A key's value; null is back to its default. */
     data class Changed(val key: String, val value: TuneValue?) : TuningEvent
@@ -38,7 +38,9 @@ sealed interface TuningEvent {
     data class Presets(val presets: TuningPresets) : TuningEvent
 }
 
-/** Where overrides and hidden groups persist (iOS `UserDefaults`). Null in a [TuningStore] keeps everything in memory. */
+/**
+ * Where overrides and hidden groups persist. Null in a [TuningStore] keeps everything in memory.
+ */
 interface TuningPersistence {
     fun loadOverrides(): String?
     fun saveOverrides(json: String?)
@@ -47,8 +49,8 @@ interface TuningPersistence {
 }
 
 /**
- * Port of iOS `TuningStore`: the one place tuned values live. Overrides persist across launches.
- * Readable from any thread; [revision] is snapshot state, so reading composables recompose.
+ * The one place tuned values live. Overrides persist across launches. Readable from any thread;
+ * [revision] is snapshot state, so reading composables recompose.
  */
 class TuningStore(
     private val persistence: TuningPersistence?,
@@ -383,8 +385,8 @@ class TuningStore(
     // Copy as Kotlin / Copy Values
 
     /**
-     * The changed values as Kotlin (iOS "Copy as Swift"): each tunable's declaration with its
-     * tuned default (a spring's as one `TunableSpring`), and what it was.
+     * The changed values as Kotlin: each tunable's declaration with its tuned default (a spring's
+     * as one `TunableSpring`), and what it was.
      */
     fun kotlinSnippet(group: String? = null): String {
         val (descriptors, overrides) = synchronized(lock) { state.order.mapNotNull { state.descriptors[it] } to state.overrides.toMap() }
@@ -535,7 +537,7 @@ class SharedPreferencesTuningPersistence(context: Context) : TuningPersistence {
     }
 }
 
-/** Content-free timing for the opt-in preset benchmark (iOS `TuningPerf`; `-lab-tuning-perf` → [enabled]). */
+/** Content-free timing for the opt-in preset benchmark. */
 object TuningPerf {
     @Volatile var enabled: Boolean = false
 

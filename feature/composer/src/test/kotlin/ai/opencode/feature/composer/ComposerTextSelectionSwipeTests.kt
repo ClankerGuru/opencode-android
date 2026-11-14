@@ -7,11 +7,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * iOS `OpenCodeTests/ComposerTextSelectionSwipeTests.swift`: a drag the text field is selecting
- * with is never the composer's swipe. Checks `ComposerSwipeDown.selectionClaims` directly, with the
- * selected word's rect standing in for UIKit's `selectionRects`.
- */
+/** A drag the text field is selecting with is never the composer's swipe. */
 class ComposerTextSelectionSwipeTests {
     @Test
     fun aSelectingDragBelongsToTheText() {

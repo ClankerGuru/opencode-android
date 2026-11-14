@@ -18,18 +18,18 @@ import android.os.Looper
 import kotlin.math.max
 import kotlin.math.min
 
-/** What a frame callback wants next (iOS `MotionDisplayLink.Action`). */
+/** What a frame callback wants next. */
 enum class MotionFrameAction { Continue, Stop }
 
 /**
- * One frame of a [motionFrameLoop] (iOS `MotionDisplayLink.Tick`), in seconds. [dt] is capped at
- * `maxFrames` frames, so a hitch never teleports a spring, and scaled.
+ * One frame of a [motionFrameLoop], in seconds. [dt] is capped at `maxFrames` frames, so a hitch
+ * never teleports a spring, and scaled.
  */
 data class MotionTick(val dt: Double, val now: Double, val rawFrameDuration: Double, val scale: Double)
 
 /**
- * Port of iOS `MotionDisplayLink`: a per-frame loop on Compose's frame clock until [onTick] returns
- * [MotionFrameAction.Stop] or the coroutine is cancelled. Never read wall-clock time inside a step.
+ * A per-frame loop on Compose's frame clock until [onTick] returns [MotionFrameAction.Stop] or the
+ * coroutine is cancelled. Never read wall-clock time inside a step.
  */
 suspend fun motionFrameLoop(
     frameDurationSeconds: Double = 1.0 / 60.0,
@@ -44,7 +44,8 @@ suspend fun motionFrameLoop(
         val action = withFrameNanos { frameNanos ->
             val rawDt = if (previousNanos == 0L) rawFrame else min(max((frameNanos - previousNanos) / 1e9, 0.0), maxFrames * rawFrame)
             previousNanos = frameNanos
-            // iOS samples `AnimationTimeScale.shared.scale` every frame, so slow motion engaged mid-flight applies at once.
+            // Samples `AnimationTimeScale.shared.scale` every frame, so slow motion engaged
+            // mid-flight applies at once.
             val scale = timeScale ?: AnimationTimeScale.shared.scale
             val dt = rawDt * scale
             virtualNow += dt

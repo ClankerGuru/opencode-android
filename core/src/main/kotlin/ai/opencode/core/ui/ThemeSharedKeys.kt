@@ -3,8 +3,8 @@ package ai.opencode.core.ui
 import ai.opencode.core.sharing.SharedKey
 
 /**
- * Settings → Appearance's persisted choices (iOS `Theme.swift`), same names and defaults. Mutate
- * only from the Settings reducer.
+ * Settings → Appearance's persisted choices, same names and defaults. Mutate only from the Settings
+ * reducer.
  */
 object ThemeSharedKeys {
     /** The chosen theme; [AppTheme.OpenCode] (the desktop brand palette) by default on this branch. */

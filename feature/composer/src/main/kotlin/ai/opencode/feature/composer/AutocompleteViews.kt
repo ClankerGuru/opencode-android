@@ -115,11 +115,9 @@ import kotlin.math.tan
 // MARK: - Kind icons
 
 /**
- * Filled 24×24 kind icons ported from the Round 2 web study (`autocomplete.js` `ICON`), iOS
- * `AutocompleteKindIcon`: filled wrench (skill), person (subagent), file page (file), speech
- * bubble (session), slash square (command), magnifier (no matches). Every glyph is drawn on a
- * 24 dp grid with even-odd fill at the same optical weight. Rows use 22 dp, chips 14 dp
- * ([AutocompleteChipMetrics.iconSize]).
+ * Filled wrench (skill), person (subagent), file page (file), speech bubble (session), slash square
+ * (command), magnifier (no matches). Every glyph is drawn on a 24 dp grid with even-odd fill at the
+ * same optical weight. Rows use 22 dp, chips 14 dp ([AutocompleteChipMetrics.iconSize]).
  */
 @Composable
 fun AutocompleteKindIcon(
@@ -136,7 +134,7 @@ fun AutocompleteKindIcon(
     }
 }
 
-/** The 24-unit paths behind [AutocompleteKindIcon] (iOS `AutocompleteKindIcon.cgPath(for:size:)`). */
+/** The 24-unit paths behind [AutocompleteKindIcon]. */
 object AutocompleteKindPaths {
     private val cache = HashMap<AutocompleteItem.Kind, Path>()
 
@@ -163,9 +161,8 @@ object AutocompleteKindPaths {
 
         /**
          * `CGMutablePath.addArc(center:radius:startAngle:endAngle:clockwise:)`: `clockwise = false`
-         * sweeps toward increasing angles, `true` toward decreasing ones (the path's own
-         * coordinates; y points down here as in UIKit drawing). Joins with a line from the
-         * current point.
+         * sweeps toward increasing angles, `true` toward decreasing ones. Joins with a line from
+         * the current point.
          */
         fun arc(centerX: Double, centerY: Double, radius: Double, start: Double, end: Double, clockwise: Boolean) {
             var sweep = end - start
@@ -356,12 +353,11 @@ private fun tone(value: Double): Color {
 // MARK: - Panel
 
 /**
- * The growing autocomplete list mounted in the composer surface's panel slot (iOS
- * `ComposerAutocompletePanel`, mounted in `ComposerSurface`'s `panel`). Rows run bottom-up
- * from the composer text; the highlight sits concentric with the glass; edge fades show only
- * where rows overflow. One pointer handler owns the list (OC-474): a touch scrolls once it
- * passes the tap slop and never picks a row after that; a touch that stays within it picks the
- * row it lifts on. TalkBack activates rows through their click action.
+ * The growing autocomplete list mounted in the composer surface's panel slot. Rows run bottom-up
+ * from the composer text; the highlight sits concentric with the glass; edge fades show only where
+ * rows overflow. One pointer handler owns the list (OC-474): a touch scrolls once it passes the tap
+ * slop and never picks a row after that; a touch that stays within it picks the row it lifts on.
+ * TalkBack activates rows through their click action.
  */
 @Composable
 fun ComposerAutocompletePanel(
@@ -495,7 +491,7 @@ private fun AutocompleteListWindow(
                 )
             }
         }
-        // Leaving rows draw beneath entering ones (iOS `zIndex(row.isLeaving ? 0 : 1)`).
+        // Leaving rows draw beneath entering ones.
         val ordered = frame.rows.filter { it.isLeaving } + frame.rows.filter { !it.isLeaving }
         for (row in ordered) {
             if (row.alpha > 0.002 && row.rect.width > 0.2 && row.rect.height > 0.2) {
@@ -575,9 +571,8 @@ private fun AutocompleteRowContent(item: AutocompleteItem, params: AutocompleteP
     ) {
         AutocompleteKindIcon(item.kind, params.iconSize, iconColor)
         Spacer(Modifier.width(10.dp))
-        // iOS `HStack { title; Spacer(minLength: 8); label }`: SwiftUI offers the room to the
-        // least flexible text first, an equal share each, so a short command name stays whole
-        // and a long description truncates (a weighted title let the label take it all).
+        // Offers the room to the least flexible text first, an equal share each, so a short command
+        // name stays whole and a long description truncates.
         TitleAndLabel(
             title = {
                 Text(
@@ -607,9 +602,9 @@ private fun AutocompleteRowContent(item: AutocompleteItem, params: AutocompleteP
 }
 
 /**
- * Lays out [title] leading and [label] trailing on one line, as SwiftUI's HStack sizes two
- * one-line texts: the one with the narrower ideal width is offered half the room first and
- * takes what it needs; the other gets the rest. Either truncates only past that.
+ * Lays out [title] leading and [label] trailing on one line: the one with the narrower ideal width
+ * is offered half the room first and takes what it needs; the other gets the rest. Either truncates
+ * only past that.
  */
 @Composable
 private fun TitleAndLabel(
@@ -652,11 +647,11 @@ private fun TitleAndLabel(
 // MARK: - Chip flight
 
 /**
- * Renders in-flight chips lifting off from the chosen highlight row and landing on their
- * inline chip slot in the composer (iOS `AutocompleteFlightOverlay`). Solid opaque throughout.
- * Flight rects are composer-local dp (rows sit above, at negative y); the overlay shifts them
- * by where the composer ([AutocompleteMotionController.composerAnchor]) sits inside it, so it
- * can be mounted over the whole surface (the rows included). Never clips; not hit-testable.
+ * Renders in-flight chips lifting off from the chosen highlight row and landing on their inline
+ * chip slot in the composer. Solid opaque throughout. Flight rects are composer-local dp (rows sit
+ * above, at negative y); the overlay shifts them by where the composer
+ * ([AutocompleteMotionController.composerAnchor]) sits inside it, so it can be mounted over the
+ * whole surface (the rows included). Never clips; not hit-testable.
  */
 @Composable
 fun AutocompleteFlightOverlay(controller: AutocompleteMotionController, modifier: Modifier = Modifier) {
@@ -691,7 +686,7 @@ private fun AutocompleteFlightView(flight: AutocompleteSimulation.ChipFlight, pa
     val inset = params.rowInset + (AutocompleteChipMetrics.leadingPad - params.rowInset) * t
     val iconSize = params.iconSize + (AutocompleteChipMetrics.iconSize - params.iconSize) * t
     val gap = 10 + (AutocompleteChipMetrics.gap - 10) * t
-    // Body (17) to the chip's 15; sp scales with the font size setting like iOS's @ScaledMetric.
+    // Body (17) to the chip's 15; sp scales with the font size setting.
     val fontSize = 17 + (AutocompleteChipMetrics.fontSize - 17) * t
     val hiTone = if (isDark) AutocompleteChipMetrics.highlightToneDark else AutocompleteChipMetrics.highlightToneLight
     val chipTone = if (isDark) AutocompleteChipMetrics.chipToneDark else AutocompleteChipMetrics.chipToneLight
@@ -734,12 +729,12 @@ private fun AutocompleteFlightView(flight: AutocompleteSimulation.ChipFlight, pa
 
 // MARK: - Inline chips
 
-/** The inline chip font: 15 sp medium (iOS `AutocompleteChipMetrics.scaledFont`, subheadline-scaled). */
+/** The inline chip font: 15 sp medium. */
 val AutocompleteChipTextStyle: TextStyle = TextStyle(fontSize = AutocompleteChipMetrics.fontSize.sp, fontWeight = FontWeight.Medium)
 
 /**
- * A solid opaque inline chip placed over its token range in the composer text (iOS
- * `AutocompleteChipView`). Tapping it removes the chip; TalkBack reads its kind and title.
+ * A solid opaque inline chip placed over its token range in the composer text. Tapping it removes
+ * the chip; TalkBack reads its kind and title.
  */
 @Composable
 fun AutocompleteChip(
@@ -783,9 +778,9 @@ fun AutocompleteChip(
 }
 
 /**
- * How the draft is drawn while Composer Autocomplete is on: the active trigger tinted, and
- * each chip token's ink hidden, kept on one line and padded to its chip's exact width so the
- * chip overlay covers it (iOS `applyTextStyling(in:)`).
+ * How the draft is drawn while Composer Autocomplete is on: the active trigger tinted, and each
+ * chip token's ink hidden, kept on one line and padded to its chip's exact width so the chip
+ * overlay covers it.
  */
 data class AutocompleteTextStyling(
     val text: String,
@@ -826,8 +821,7 @@ data class AutocompleteChipRun(
 )
 
 /**
- * Bridges the composer's text field with Composer Autocomplete (iOS
- * `ComposerAutocompleteTextBridge`):
+ * Bridges the composer's text field with Composer Autocomplete.
  * - tints the active `@` or `/` trigger (`#9cc0ff` dark, system blue light);
  * - keeps chip tokens whole on one line (non-breaking characters) and reserves each chip's
  *   exact width ([outputTransformation] / [visualTransformation]);
@@ -837,8 +831,8 @@ data class AutocompleteChipRun(
  * - handles hardware ↑/↓, Escape, Tab and Return ([handleKeyEvent]);
  * - reports the caret ([selectionDidChange] / [notifyCaretAfterEdit]).
  *
- * The text input wires it as described on each member; the session view configures it from
- * the reducer state with [configure] (iOS `configuredAutocompleteBridge`).
+ * The text input wires it as described on each member; the session view configures it from the
+ * reducer state with [configure].
  */
 @Stable
 class ComposerAutocompleteTextBridge {
@@ -857,9 +851,8 @@ class ComposerAutocompleteTextBridge {
     var onCaretChanged: ((Int?) -> Unit)? = null
 
     /**
-     * Chips that would wrap mid-token where they stand, so they start the next line instead
-     * (iOS `shouldBreakLineByWordBeforeCharacterAt` refuses every break inside a chip, so TextKit
-     * breaks before it). Kept by [updateLineBreaks] from each layout.
+     * Chips that would wrap mid-token where they stand, so they start the next line instead. Kept
+     * by [updateLineBreaks] from each layout.
      */
     var breaksBefore: Set<UUID> by mutableStateOf(emptySet())
         internal set
@@ -880,7 +873,7 @@ class ComposerAutocompleteTextBridge {
     private var isUpdatingProgrammaticText = false
     private var lastSentCaretOffset: Int? = null
 
-    /** iOS `configuredAutocompleteBridge`: mirrors the reducer state and routes callbacks to [send]. */
+    /** Mirrors the reducer state and routes callbacks to [send]. */
     fun configure(
         state: ComposerAutocompleteState,
         isEnabled: Boolean,
@@ -914,7 +907,7 @@ class ComposerAutocompleteTextBridge {
         lastSentCaretOffset = caretUTF16Offset
     }
 
-    /** Call after each user edit (iOS `textViewDidChange` → `notifyCaretAfterEditIfNeeded`). */
+    /** Call after each user edit. */
     fun notifyCaretAfterEdit(text: String, selection: TextRange, composition: TextRange?) {
         emitCaretIfNeeded(text, selection, composition, requireDiffFromState = true)
     }
@@ -931,7 +924,7 @@ class ComposerAutocompleteTextBridge {
         return ComposerAutocompleteAction.CaretUpdate.Moved(actual)
     }
 
-    /** Call when the selection moves (iOS `textViewDidChangeSelection`). */
+    /** Call when the selection moves. */
     fun selectionDidChange(text: String, selection: TextRange, composition: TextRange?, committedText: String) {
         if (text != committedText) return
         emitCaretIfNeeded(committedText, selection, composition, requireDiffFromState = false)
@@ -953,8 +946,8 @@ class ComposerAutocompleteTextBridge {
 
     /**
      * Intercepts Return, Tab and single-character Backspace over inline chips before the field
-     * mutates text (iOS `shouldChangeText(in:range:replacementText:)`). [start] and [length]
-     * are the replaced UTF-16 range in [text]. Returns false when it handled the edit.
+     * mutates text. [start] and [length] are the replaced UTF-16 range in [text]. Returns false
+     * when it handled the edit.
      */
     fun shouldChangeText(text: String, start: Int, length: Int, replacement: String): Boolean {
         if (!isEnabled) return true
@@ -1010,9 +1003,9 @@ class ComposerAutocompleteTextBridge {
     }
 
     /**
-     * Hardware keys while the list is open (iOS `keyCommands`): ↑/↓ move the highlight,
-     * Escape dismisses, Tab and Return choose when a row is selectable. Use from
-     * `Modifier.onPreviewKeyEvent`. Returns true when consumed.
+     * Hardware keys while the list is open: ↑/↓ move the highlight, Escape dismisses, Tab and
+     * Return choose when a row is selectable. Use from `Modifier.onPreviewKeyEvent`. Returns true
+     * when consumed.
      */
     fun handleKeyEvent(event: KeyEvent): Boolean {
         if (!isEnabled || !isOpen) return false
@@ -1032,9 +1025,9 @@ class ComposerAutocompleteTextBridge {
     }
 
     /**
-     * Builds the styling for [text] (iOS `applyTextStyling(in:)`): measures each chip's title in
-     * [AutocompleteChipTextStyle] and its token in [baseStyle], shrinking the token's font when
-     * it is wider than its chip and padding its last character's advance to the chip's width.
+     * Builds the styling for [text]: measures each chip's title in [AutocompleteChipTextStyle] and
+     * its token in [baseStyle], shrinking the token's font when it is wider than its chip and
+     * padding its last character's advance to the chip's width.
      */
     fun buildStyling(
         text: String,
@@ -1155,7 +1148,7 @@ class ComposerAutocompleteTextBridge {
         }
     }
 
-    /** The chip's rect in the text field's layout, in px (iOS `chipRect(for:in:maxTextWidth:)`). */
+    /** The chip's rect in the text field's layout, in px. */
     fun chipRectPx(run: AutocompleteChipRun, layout: TextLayoutResult, density: Density): Rect? {
         if (run.end > layout.layoutInput.text.length || run.end <= run.start) return null
         val first = layout.getBoundingBox(run.start)
@@ -1184,10 +1177,7 @@ class ComposerAutocompleteTextBridge {
     /** The chip font's line height in dp, measured by [rememberAutocompleteTextStyling]. */
     internal var chipLineHeightDp: Double = 18.0
 
-    /**
-     * The chip's slot in composer-local dp for the flight to land on (iOS
-     * `chipSlotInWindow(chipID:)` converted to the composer, as `chipSlotProvider` does).
-     */
+    /** The chip's slot in composer-local dp for the flight to land on. */
     fun chipSlotInComposer(chipID: UUID, density: Density): AutocompleteRect? {
         val layout = textLayout ?: return null
         val text = textCoordinates?.takeIf { it.isAttached } ?: return null
@@ -1227,7 +1217,7 @@ fun Modifier.autocompleteComposerAnchor(bridge: ComposerAutocompleteTextBridge):
     onGloballyPositioned { bridge.composerCoordinates = it }
 
 /**
- * Measures and publishes the draft's styling to [bridge] (iOS `applyTextStyling`), so its
+ * Measures and publishes the draft's styling to [bridge], so its
  * [ComposerAutocompleteTextBridge.outputTransformation] / `visualTransformation` and
  * [AutocompleteInlineChips] agree. Call it in the text input with its text and style.
  */
@@ -1261,9 +1251,8 @@ fun rememberAutocompleteTextStyling(
 }
 
 /**
- * Draws the solid inline chips over their token ranges (iOS `layoutChips(in:)`). Place it in
- * the text field's decoration box, over the inner text field, at its origin. A chip in flight
- * stays hidden until it lands.
+ * Draws the solid inline chips over their token ranges. Place it in the text field's decoration
+ * box, over the inner text field, at its origin. A chip in flight stays hidden until it lands.
  */
 @Composable
 fun AutocompleteInlineChips(bridge: ComposerAutocompleteTextBridge, modifier: Modifier = Modifier) {
@@ -1319,7 +1308,6 @@ fun SyncComposerAutocomplete(
         bridge.configure(state, isEnabled, controller) { currentSend(it) }
         controller.chipSlotProvider = { id -> bridge.chipSlotInComposer(id, density) }
         controller.composerAnchor = { bridge.composerCoordinates?.takeIf { it.isAttached } }
-        // iOS `.onChange(of: store.autocomplete / composerFrame / usesComposerAutocomplete)`.
         val inputs = listOf(state, isEnabled, composerWidth, composerHeight, density, reducedMotion)
         if (last[0] == inputs) return@SideEffect
         val wasEnabled = (last[0] as? List<*>)?.get(1) as? Boolean

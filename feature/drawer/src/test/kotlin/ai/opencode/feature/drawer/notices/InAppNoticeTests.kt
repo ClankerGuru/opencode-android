@@ -34,15 +34,8 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `InAppNoticeTests.swift`: In-App Notices through `HomeFeature` (modes, suppression,
- * coalescing, repeats) and the delivered notifications Home clears.
- *
- * Parameterized iOS tests (`@Test(arguments:)`) run each argument in turn inside the one method.
- *
- * Not ported here (`:feature:system`, which posts and presents notifications on Android):
- * `bannersForOtherSessionsGoOnlyToNotificationCenterWhileNoticesAreOn` (iOS
- * `DeliveredNotifications.presentation`, Android `SessionNotifications.presentation`) and
- * `needsInputStatusesAreTheOnlyOnesClearedOnAnswer` (iOS `UNMutableNotificationContent` parsing).
+ * In-App Notices through `HomeFeature` (modes, suppression, coalescing, repeats) and the delivered
+ * notifications Home clears.
  */
 class InAppNoticeTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -379,7 +372,7 @@ class InAppNoticeTests {
             }
             assertNull(how, store.state.inAppNotice)
             // Only the short attention read is left; a 4 or 6 s timer would hold `finish` past its
-            // timeout (exhaustive here, so a lingering timer fails as iOS intends).
+            // timeout.
             clock.advance(200.milliseconds)
             store.skipReceivedActions()
             store.exhaustive = true

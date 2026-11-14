@@ -21,8 +21,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 /**
- * Port of the share target's `@Observable ShareModel` (OpenCodeShare/ShareModel.swift). As on
- * iOS the share sheet stays free of the store: a plain object holding one immutable [State]
+ * Port of the share target's `@Observable ShareModel`. A plain object holding one immutable [State]
  * that [ShareView] renders, with methods for what the sheet does. Runs on the main thread.
  */
 class ShareModel(
@@ -212,7 +211,6 @@ class ShareModel(
             val remaining = ShareComposition.SendMotion.remainingSending(elapsed)
             if (remaining > Duration.ZERO) delay(remaining)
             mutableState.update { it.copy(phase = Phase.Sent) }
-            // iOS's one `.sensoryFeedback(.success)` on Sent.
             haptics.play(Haptic.success)
             val title = if (destination is ShareComposition.Destination.Session) destination.title
             else localized(R.string.system_share_new_session_in_project, destination.projectName)

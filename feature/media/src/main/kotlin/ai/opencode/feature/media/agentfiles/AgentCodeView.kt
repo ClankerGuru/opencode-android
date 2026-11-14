@@ -37,22 +37,22 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.max
 
-/** iOS `Color.yellow.opacity(0.22)` / `systemYellow.withAlphaComponent(0.22)`: the `path:42` line. */
+/** The `path:42` line. */
 private val FocusLineBackground = Color(red = 1f, green = 0.8f, blue = 0f, alpha = 0.22f)
 
-/** The widest a line lays out unwrapped (iOS sizes its text container to 16,384 pt). */
+/** The widest a line lays out unwrapped. */
 private val MaxUnwrappedWidth: Dp = 16_384.dp
 
-/** iOS `TranscriptMetrics.codeFont`: subheadline, monospaced. */
+/** Subheadline, monospaced. */
 private val NumberedCodeStyle: TextStyle = OpenCodeTextStyles.subheadline.copy(fontFamily = OpenCodeFonts.monospace)
 
-/** iOS `AgentTextDocument.codeUIFont`: footnote 13, monospaced. */
+/** Footnote 13, monospaced. */
 private val LazyCodeStyle: TextStyle = OpenCodeTextStyles.footnote.copy(fontFamily = OpenCodeFonts.monospace)
 
 /**
  * Highlighted source with line numbers for small files, or a lazy unnumbered list of lines for
- * large ones (iOS `AgentCodeView` / `AgentLazyCodeView`). Lines scroll sideways together, or
- * wrap; a `path:42` reference opens centred on line 42. Only the lines on screen lay out.
+ * large ones. Lines scroll sideways together, or wrap; a `path:42` reference opens centred on line
+ * 42. Only the lines on screen lay out.
  */
 @Composable
 fun AgentCodeView(document: AgentTextDocument, wrapsLines: Boolean, modifier: Modifier = Modifier) {
@@ -74,7 +74,7 @@ fun AgentCodeView(document: AgentTextDocument, wrapsLines: Boolean, modifier: Mo
 
     BoxWithConstraints(modifier.fillMaxSize().testTag("agent-file-code")) {
         val viewportHeightPx = with(density) { maxHeight.toPx() }
-        // A `path:42` reference opens centred on line 42 (the lazy view only within the highlighted prefix, like iOS).
+        // A `path:42` reference opens centred on line 42.
         LaunchedEffect(document) {
             val target = when {
                 numbered -> document.focusLine?.minus(1)
@@ -98,7 +98,7 @@ fun AgentCodeView(document: AgentTextDocument, wrapsLines: Boolean, modifier: Mo
             LazyColumn(
                 state = listState,
                 modifier = Modifier.width(contentWidth).fillMaxHeight(),
-                // The last lines clear the navigation bar (iOS insets a scroll view's content by the safe area).
+                // The last lines clear the navigation bar.
                 contentPadding = PaddingValues(
                     top = TranscriptMetrics.standard,
                     bottom = TranscriptMetrics.standard + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),

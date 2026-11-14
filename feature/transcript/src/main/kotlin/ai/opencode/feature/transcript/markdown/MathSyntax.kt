@@ -1,10 +1,10 @@
 package ai.opencode.feature.transcript.markdown
 
 /**
- * TeX math in Markdown (iOS `MathSyntax`): inline `$…$`, `$$…$$` and `\(…\)` within text, and
- * display `$$…$$` and `\[…\]` on lines of their own. Code spans, code blocks, and escaped
- * dollars are never math, and neither is currency: an opening `$` is followed by a non-space,
- * its closing `$` follows a non-space and isn't followed by a digit, so “$5 and $10” stays text.
+ * TeX math in Markdown: inline `$…$`, `$$…$$` and `\(…\)` within text, and display `$$…$$` and
+ * `\[…\]` on lines of their own. Code spans, code blocks, and escaped dollars are never math, and
+ * neither is currency: an opening `$` is followed by a non-space, its closing `$` follows a
+ * non-space and isn't followed by a digit, so “$5 and $10” stays text.
  */
 object MathSyntax {
     /** How inline math was written, so copying a reply gives it back as is. */

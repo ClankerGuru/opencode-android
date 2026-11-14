@@ -14,9 +14,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Port of iOS `RequestAnswerTests.swift`: only `RequestDockFeature`'s own suite, with the fold's
- * pure rules (`RequestCollapse`, `RequestPanelGesture`, `RequestErrorLine`). The rest drive
- * `SessionFeature`/`HomeFeature` or probe UIKit text views (see docs/parity/composer.md "Tests").
+ * Only `RequestDockFeature`'s own suite, with the fold's pure rules (`RequestCollapse`,
+ * `RequestPanelGesture`, `RequestErrorLine`).
  */
 class RequestAnswerTests {
     private val json = Json { ignoreUnknownKeys = true }

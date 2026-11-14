@@ -34,10 +34,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `VoiceOpenLinkTests.swift`, its app tests (MARK: App). The feature tests are in
- * `:feature:voice`, the protocol test in `:server`.
- */
+/** Its app tests (MARK: App). */
 class VoiceOpenLinkTests {
     @get:Rule val isolation = TestIsolationRule()
 

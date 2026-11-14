@@ -27,22 +27,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /*
- * Port of iOS `OpenCodeTests/TranscriptSelectionTests.swift` (one continuous selection across a
- * reply). The document, its copy and quote text, and the autoscroll curve are ported as they are.
- *
  * Android differences:
- * - A Link Icon's slot draws one character (a word joiner carrying inline content; iOS: an image
- *   and a word joiner, two), and a typeset inline formula draws its source under one placeholder
- *   (iOS: one character), so the drawn counts differ; what each reads as is the same.
- *
- * Not ported:
- * - `glyphBoxesSitOnTheDrawnInk`: a UIKit `Text.Layout` pixel probe (Android reads glyph boxes
- *   from Compose's `TextLayoutResult`).
- * - `theListSelectsAcrossBlocksAsOneTextInput`, `touchesNeverLandInsideAnEmoji`: they host the
- *   UIKit list and drive its `UITextInput`. Their document halves (the copied text across a
- *   list and code, a selection widened to a whole emoji) are in
- *   `theReplySelectsAcrossBlocksAsOneDocument` and `selectionsNeverSplitAnEmoji`; the list's
- *   follow rules (iOS UI tests) are checked on the emulator.
+ * - A Link Icon's slot draws one character, and a typeset inline formula draws its source under one
+ *   placeholder, so the drawn counts differ; what each reads as is the same.
  */
 // Robolectric: link presentation parses hosts with `android.net.Uri`; words come from ICU.
 @RunWith(RobolectricTestRunner::class)
@@ -221,7 +208,6 @@ A second line in the same paragraph.
         assertEquals(160f, scroller.step(100f, 120f, 0.5f, 0f..500f))
     }
 
-    // Document half of iOS `theListSelectsAcrossBlocksAsOneTextInput`.
     @Test
     fun theReplySelectsAcrossBlocksAsOneDocument() {
         val document = document("## Plan\n\nFirst paragraph here.\n\n- One item\n- Two items\n\n```swift\nlet x = 1\n```\n\nLast words.", item = "a1")
@@ -242,7 +228,6 @@ A second line in the same paragraph.
         }
     }
 
-    // Document half of iOS `touchesNeverLandInsideAnEmoji`.
     @Test
     fun selectionsNeverSplitAnEmoji() {
         val document = document("Done 👩‍💻\n\nNext 🎉 here.", item = "a1")

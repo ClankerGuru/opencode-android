@@ -38,10 +38,7 @@ import java.util.UUID
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of `VoiceSessionDelegatorServerVoiceTests.swift` (an extension of iOS
- * `VoiceSessionDelegatorTests`): Server Voice × delegator matrix, console fallback and reconnect.
- */
+/** Server Voice × delegator matrix, console fallback and reconnect. */
 class VoiceSessionDelegatorServerVoiceTests {
     private val clientDelegation: RealtimeJSON = RealtimeJSONs.obj("type" to RealtimeJSONs.string("client"))
 
@@ -55,11 +52,7 @@ class VoiceSessionDelegatorServerVoiceTests {
     private fun userTranscript(itemID: String, text: String) =
         VoiceFeature.Action.CallEvent(VoiceCallEvent.UserTranscript(itemID = itemID, text = text, final = true))
 
-    /**
-     * iOS `$0.replyWatch.noteUserActed(); let cap = $0.tail.capture(); $0.tail.accept(cap);
-     * $0.delegatorWork = [callID]; _ = $0.replyWatch.step(.delegatorStarted(requestID:))`: a
-     * built-in delegation starting.
-     */
+    /** A built-in delegation starting. */
     private fun VoiceFeature.State.startingBuiltIn(callID: String): VoiceFeature.State {
         val acted = copy(replyWatch = replyWatch.noteUserActed())
         val captured = acted.tail.capture()
@@ -67,16 +60,12 @@ class VoiceSessionDelegatorServerVoiceTests {
             .stepping(ReplyWatch.Event.DelegatorStarted(requestID = callID))
     }
 
-    /** iOS's `.delegatorFinished(callID:, .success(outcome))` expectation. */
     private fun VoiceFeature.State.finishingBuiltIn(callID: String, responseID: String, reply: String): VoiceFeature.State =
         copy(delegatorWork = emptyList(), delegatorResponseID = responseID)
             .stepping(ReplyWatch.Event.Sent(emptyList()))
             .stepping(ReplyWatch.Event.DelegatorFinished(requestID = callID, spoken = reply))
 
-    /**
-     * The fields iOS's `.start` expectation leaves to the initial state, as Android's start sets
-     * them: the GPT-Live engine, provider and voice, and the call's ongoing-notification ID.
-     */
+    /** The GPT-Live engine, provider and voice, and the call's ongoing-notification ID. */
     private fun VoiceFeature.State.started(route: VoiceRoute, usesDelegator: Boolean, usesSessionDelegator: Boolean): VoiceFeature.State =
         copy(
             startedTarget = VoiceWorkTarget(server = server, sessionID = session.id, directory = session.directory),
@@ -96,7 +85,6 @@ class VoiceSessionDelegatorServerVoiceTests {
         withPhase(VoiceFeature.State.Phase.Live).copy(connectedAt = now)
     }
 
-    /** iOS `$0.voiceSessionDelegator.submit = { submission in … Admission(…) }` for the viewed session. */
     private fun admitting(promptText: String, submits: Locked<Int>) = VoiceSessionDelegator.Client(submit = { submission ->
         submits.update { it + 1 }
         VoiceSessionDelegator.Admission(
@@ -130,8 +118,8 @@ class VoiceSessionDelegatorServerVoiceTests {
     }
 
     /**
-     * iOS's session-delegator turn through an exhaustive store: the user's words, the delegate
-     * call admitted into the viewed session, its reply settling the turn, and the hang-up.
+     * The user's words, the delegate call admitted into the viewed session, its reply settling the
+     * turn, and the hang-up.
      */
     private suspend fun TestStore<VoiceFeature.State, VoiceFeature.Action>.sessionTurn(
         itemID: String,

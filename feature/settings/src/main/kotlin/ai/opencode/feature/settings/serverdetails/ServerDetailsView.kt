@@ -92,9 +92,8 @@ import androidx.compose.ui.unit.sp
 internal typealias ServerDetailsStore = StoreOf<ServerDetailsFeature.State?, ServerDetailsFeature.Action>
 
 /**
- * Port of iOS `ServerDetailsView` (`Settings/ServerDetailsView.swift`): problems as banners with
- * their action, then three tiles (MCP servers, Accounts, Skills) that each open a tray with the
- * full list. Values on a 4 dp grid; radii 26 tiles, 22 banners.
+ * Problems as banners with their action, then three tiles (MCP servers, Accounts, Skills) that each
+ * open a tray with the full list. Values on a 4 dp grid; radii 26 tiles, 22 banners.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -106,7 +105,7 @@ fun ServerDetailsPage(store: SettingsStore) {
         )
     }
     val stateOrNull by details.collectState()
-    // iOS keys the page by the server (`.id(persistenceID)`): a switch gets a fresh page and read.
+    // A switch gets a fresh page and read.
     val serverID = stateOrNull?.server?.persistenceID
     LaunchedEffect(details, serverID) { if (serverID != null) details.send(ServerDetailsFeature.Action.Task) }
     DisposableEffect(details) { onDispose { details.send(ServerDetailsFeature.Action.Disappeared) } }
@@ -114,7 +113,7 @@ fun ServerDetailsPage(store: SettingsStore) {
 
     val refresh = rememberPullToRefreshState()
     val reduceMotion = rememberReduceMotion()
-    // iOS `.refreshable` shows its spinner until the pulled read ends, not for other reloads.
+    // The pull-to-refresh spinner shows until the pulled read ends, not for other reloads.
     var pulled by remember { mutableStateOf(false) }
     val isLoading = stateOrNull?.isLoading == true
     LaunchedEffect(isLoading) { if (!isLoading) pulled = false }
@@ -198,7 +197,7 @@ fun ServerDetailsPage(store: SettingsStore) {
     HidesFromScreenshots(shown = state.awaitingCode)
 }
 
-/** iOS's “Paste the Code” alert for a `code` mode sign-in. */
+/** The “Paste the Code” alert for a `code` mode sign-in. */
 @Composable
 private fun CodeAlert(instructions: String, send: (ServerDetailsFeature.Action) -> Unit) {
     var code by rememberSaveable { mutableStateOf("") }
@@ -230,12 +229,10 @@ private fun CodeAlert(instructions: String, send: (ServerDetailsFeature.Action) 
     )
 }
 
-/** iOS `.animation(Motion.layout.animation(reduceMotion:), value: mcpServers)` over the banners and tiles. */
 private fun listPlacement(reduceMotion: Boolean) =
     MotionRole.Layout.animation(reduceMotion = reduceMotion, visibilityThreshold = IntOffset.VisibilityThreshold)
 private fun listFade(reduceMotion: Boolean) = MotionRole.Layout.animation<Float>(reduceMotion = reduceMotion)
 
-/** iOS `.animation(Motion.layout.animation(mcpError == nil ? .exit : .enter, ...), value: mcpError)`. */
 private fun errorPlacement(phase: MotionPhase, reduceMotion: Boolean) =
     MotionRole.Layout.animation(phase, reduceMotion, visibilityThreshold = IntOffset.VisibilityThreshold)
 private fun errorFade(phase: MotionPhase, reduceMotion: Boolean) = MotionRole.Layout.animation<Float>(phase, reduceMotion)
@@ -348,7 +345,7 @@ private fun OverviewTile(
     bottomPadding: androidx.compose.ui.unit.Dp = 18.dp,
     content: @Composable () -> Unit,
 ) {
-    // Android divergence: a ripple answers the press (iOS shrinks the tile to 98 %).
+    // A ripple answers the press.
     val shape = RoundedCornerShape(OpenCodeRadius.panel)
     Box(
         modifier
@@ -443,7 +440,6 @@ internal fun ProblemBanner(
     }
 }
 
-/** iOS `CapsuleActionStyle.Kind`. */
 internal enum class CapsuleKind { Prominent, Inverse, Tinted, Neutral }
 
 /** A capsule action in a row or banner: Sign In, Retry, Connect, Disconnect. */
@@ -457,7 +453,7 @@ internal fun CapsuleAction(title: String, kind: CapsuleKind, onClick: () -> Unit
         CapsuleKind.Tinted -> blue.copy(alpha = 0.15f) to blue
         CapsuleKind.Neutral -> tertiarySystemFill() to colors.text
     }
-    // Android divergence: a ripple inside the capsule answers the press (iOS shrinks it to 95 %).
+    // A ripple inside the capsule answers the press.
     val interaction = remember { MutableInteractionSource() }
     Box(
         modifier
@@ -485,7 +481,7 @@ internal fun CapsuleAction(title: String, kind: CapsuleKind, onClick: () -> Unit
 internal fun tertiarySystemFill(): Color =
     Color(0x76, 0x76, 0x80).copy(alpha = if (OpenCodeTheme.colors.isDark) 0.24f else 0.12f)
 
-/** iOS `ContentUnavailableView`: a symbol, a title, an optional description and action. */
+/** A symbol, a title, an optional description and action. */
 @Composable
 internal fun ServerDetailsUnavailable(
     symbol: SFSymbol,
@@ -510,7 +506,7 @@ internal fun ServerDetailsUnavailable(
     }
 }
 
-/** iOS `TrailingFade`: a soft right edge for text that runs past its tile (no hard crops). */
+/** A soft right edge for text that runs past its tile (no hard crops). */
 internal fun Modifier.trailingFade(): Modifier = graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
     .drawWithContent {
         drawContent()

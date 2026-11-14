@@ -91,11 +91,7 @@ object VoiceProgressLine {
         "Using Wisp" to "working on your Mac",
     )
 
-    /**
-     * The built-in delegator's tool as words to say, or null for one that
-     * says nothing useful (iOS `activity(delegatorTool:)`; Kotlin can't
-     * overload [activity] on the argument label).
-     */
+    /** The built-in delegator's tool as words to say, or null for one that says nothing useful. */
     fun activityForDelegatorTool(name: String): String? = when (name) {
         "send_message" -> "messaging a session"
         "read_session" -> "reading a session"

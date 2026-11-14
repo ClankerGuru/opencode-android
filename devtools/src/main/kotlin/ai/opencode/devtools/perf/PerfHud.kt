@@ -47,7 +47,7 @@ import androidx.compose.ui.unit.dp
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicInteger
 
-/** One half-second window of frame and recomposition stats (iOS `PerfFrameSampler`'s 500 ms windows). */
+/** One half-second window of frame and recomposition stats. */
 data class PerfWindow(
     val fps: Double = 0.0,
     val frames: Int = 0,

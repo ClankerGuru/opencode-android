@@ -7,10 +7,6 @@ import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
 
-/**
- * Port of iOS `SubagentStackTests.swift`, the `:server` part: `descendantsFollowTheFamilyTree`
- * ([SessionActivity.descendants]). The stack itself is `:feature:drawer`'s, the back rules `:core`'s.
- */
 class SubagentStackTests {
     @get:Rule val isolation = TestIsolationRule()
 

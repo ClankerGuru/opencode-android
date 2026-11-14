@@ -8,16 +8,6 @@ import ai.opencode.server.model.OpenCodeProject
 import org.junit.Assert.fail
 import org.junit.Test
 
-/**
- * Port of the `SessionFeature` half of iOS `FirstComputerPairingTests.swift` (its starter prompts).
- *
- * Not ported here: the pairing tests built on `AppFeature` (`theFirstComputerOpensAReadySessionInItsLatestProject`,
- * `pairingAgainAfterRemovingEveryComputerOpensTheDrawer`, `aFirstComputerWithOnlyItsHomeFolderOpensTheDrawer`,
- * `aSecondComputerOpensTheDrawerAndStillShakesHands`) and the What’s New ones (`aFreshInstallStartsWithWhatsNewRead`,
- * `anUpgradeKeepsWhatItHasntRead`, `anUpgradeWithEveryComputerRemovedKeepsWhatItHasntRead`,
- * `removingEveryComputerLaterKeepsWhatsNewUnread`) belong to :app and :feature:settings;
- * `homeFoldersAreNotProjects` checks :server's `OpenCodeProject.isHomeFolder`.
- */
 class FirstComputerPairingTests {
     private fun project(directory: String, name: String? = null) = OpenCodeProject(id = directory, name = name ?: directory, directory = directory)
 

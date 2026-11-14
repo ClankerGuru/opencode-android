@@ -6,8 +6,8 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Port of iOS `AnimationTimeScale`: slow motion from one virtual clock. Applied where motion is
- * defined (`Motion.*`, [MotionSpring.spec], `motionFrameLoop`), so a raw `tween(300)` doesn't slow.
+ * Slow motion from one virtual clock. Applied where motion is defined (`Motion.*`,
+ * [MotionSpring.spec], `motionFrameLoop`), so a raw `tween(300)` doesn't slow.
  */
 class AnimationTimeScale {
     private val lock = Any()
@@ -91,7 +91,7 @@ class AnimationTimeScale {
             return swiftRounded(clamped * 100) / 100
         }
 
-        /** iOS `-lab-time-scale <scale>` / `OPENCODE_LAB_TIME_SCALE`: an intent extra or environment value, normalized. */
+        /** An intent extra or environment value, normalized. */
         fun requestedLabScale(argument: String?, environment: String? = System.getenv("OPENCODE_LAB_TIME_SCALE")): Double? {
             for (raw in listOf(argument, environment)) {
                 val value = raw?.toDoubleOrNull() ?: continue

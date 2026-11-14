@@ -11,10 +11,10 @@ import android.media.AudioManager
 import java.util.concurrent.Executors
 
 /**
- * File playback's OS operations, injectable without touching audio hardware (iOS
- * `MediaPlaybackAudio`). Media can't see `:feature:voice`'s `AudioSessionOwner`, so it counts its
- * own holders and holds audio focus from the first to the last. A call or dictation already holding
- * audio ([isShared]) is joined, not interrupted.
+ * File playback's OS operations, injectable without touching audio hardware. Media can't see
+ * `:feature:voice`'s `AudioSessionOwner`, so it counts its own holders and holds audio focus from
+ * the first to the last. A call or dictation already holding audio ([isShared]) is joined, not
+ * interrupted.
  */
 class MediaPlaybackAudio(
     /**
@@ -25,12 +25,12 @@ class MediaPlaybackAudio(
     val activate: (shared: Boolean, onInterrupted: () -> Unit) -> Holder,
     /** Releases one holder; the last one abandons focus. */
     val deactivate: (Holder) -> Unit,
-    /** Whether a call or dictation already holds audio (iOS `owner.activeCount > 1`). */
+    /** Whether a call or dictation already holds audio. */
     val isShared: () -> Boolean,
     /** Where activation and release run, in order. The live one is never the main thread. */
     val perform: (() -> Unit) -> Unit = { it() },
 ) {
-    /** One viewer's claim on playback audio (iOS `AudioSessionOwner.Holder`). */
+    /** One viewer's claim on playback audio. */
     class Holder internal constructor(internal val onInterrupted: () -> Unit)
 
     companion object Key : DependencyKey<MediaPlaybackAudio> {

@@ -20,7 +20,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Port of iOS `LiveDelegationFeatureTests` (the `VoiceFeature` ones; see the report for the rest). */
 class LiveDelegationFeatureTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
     private val session = OpenCodeSession(id = "ses_voice", serverTitle = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = Instant.EPOCH)

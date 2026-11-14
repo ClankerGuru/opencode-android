@@ -19,9 +19,9 @@ import ai.opencode.feature.system.share.ShareSendRequest
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `SystemPromptSender`: Ask OpenCode's work, done in the background without the
- * app's store. It resolves the target from the published [SessionDirectory] and the saved
- * server's credentials, then sends like a voice delegation does.
+ * Ask OpenCode's work, done in the background without the app's store. It resolves the target from
+ * the published [SessionDirectory] and the saved server's credentials, then sends like a voice
+ * delegation does.
  */
 object SystemPromptSender {
     data class Sent(
@@ -50,7 +50,7 @@ object SystemPromptSender {
         }
     }
 
-    /** Every required step of one send, together (iOS `VoiceDelegatorWorkspace.Latency.standard.total`). */
+    /** Every required step of one send, together. */
     val budget = 30.seconds
 
     /** [target] is a [SessionEntity] ID; null means Last Viewed Session. */

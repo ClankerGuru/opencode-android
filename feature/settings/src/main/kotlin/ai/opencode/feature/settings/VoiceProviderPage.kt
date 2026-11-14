@@ -48,10 +48,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 /*
- * Port of iOS `Settings/VoiceProviderPage.swift` (ce694097): Settings ›
- * Voice's Voice Provider row, its page, and Your OpenAI Account. Tiles and statuses are voice's
- * `VoiceProviderTile`/`VoiceProviderStatus` (iOS `Voice/VoiceProviderViews.swift`), sized by
- * `VoiceProviderTunables`.
+ * Settings › Voice's Voice Provider row, its page, and Your OpenAI Account. Tiles and statuses are
+ * voice's `VoiceProviderTile`/`VoiceProviderStatus`, sized by `VoiceProviderTunables`.
  */
 
 /**

@@ -14,10 +14,9 @@ import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-// The pieces `WispOrbSim` steps at 240 Hz: a one-for-one port of Wisp's `wisp-orb` crate
-// (voice.rs, mode.rs, power.rs, coupling.rs, choreo.rs), by way of iOS
-// `WispOrbParts.swift`. Names and constants follow the Rust (and the Swift) so the three can be
-// read side by side.
+// The pieces `WispOrbSim` steps at 240 Hz: a one-for-one port of Wisp's `wisp-orb` crate (voice.rs,
+// mode.rs, power.rs, coupling.rs, choreo.rs). Names and constants follow the Rust so the three can
+// be read side by side.
 
 object WispOrb {
     const val step: Float = 1f / 240f
@@ -105,7 +104,7 @@ enum class WispOrbChoreo {
     }
 }
 
-/** A colour (or any three floats), iOS `SIMD3<Float>`. */
+/** A colour (or any three floats). */
 data class WispVec3(val x: Float, val y: Float, val z: Float) {
     operator fun plus(o: WispVec3) = WispVec3(x + o.x, y + o.y, z + o.z)
     operator fun minus(o: WispVec3) = WispVec3(x - o.x, y - o.y, z - o.z)

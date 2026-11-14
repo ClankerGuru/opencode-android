@@ -14,9 +14,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
 /**
- * Port of `OpenCodeNotifications/NotificationService.swift` plus the app delegate's
- * presentation: turns a session push into a notification, and decides how it shows in the
- * foreground and where a tap leads.
+ * Turns a session push into a notification, and decides how it shows in the foreground and where a
+ * tap leads.
  *
  * A push carries only the encrypted `v2` envelope under `opencode`. Its title,
  * body, session and status show only once [NotificationContent.verifiedPayload] opens the box
@@ -31,7 +30,7 @@ import kotlinx.serialization.json.jsonObject
  * channel exists (see [SessionNotifications]).
  */
 object SessionPushNotifications {
-    /** iOS `DeliveredNotifications.needsInputStatuses`: statuses a needs-input notification carries. */
+    /** Statuses a needs-input notification carries. */
     val needsInputStatuses = setOf("needs-input", "permission", "question", "form")
 
     private const val EXTRA_SESSION = "opencode.sessionID"
@@ -57,13 +56,13 @@ object SessionPushNotifications {
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setSilent(presentation == NotificationPresentation.ListOnly)
             .setPriority(if (presentation == NotificationPresentation.ListOnly) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_HIGH)
-        // The thread is "<ref>:<session>" (iOS `threadIdentifier`), set only after verifying.
+        // The thread is "<ref>:<session>", set only after verifying.
         shown.thread?.let { builder.setGroup(it) }
         builder.extras.putString(EXTRA_SESSION, sessionID)
         builder.extras.putString(EXTRA_STATUS, verified?.payload?.status)
         builder.extras.putString(EXTRA_ENVELOPE, shown.envelope?.toString())
         if (verified != null) {
-            // The badge the ledger counts for its session (iOS `NotificationService.badged`).
+            // The badge the ledger counts for its session.
             val defaults = AppBadgeLedger.groupDefaults(context)
             AppBadgeLedger.load(defaults)?.badgeAfterPush(sessionID = verified.payload.sessionID, ref = verified.ref)?.let { (ledger, badge) ->
                 ledger.save(defaults)
@@ -87,9 +86,8 @@ object SessionPushNotifications {
     }
 
     /**
-     * Port of iOS `DeliveredNotifications.remove`: every notification for these sessions, or
-     * only their needs-input ones once the request is answered. The drawer's
-     * `DeliveredNotificationsClient` calls this.
+     * Every notification for these sessions, or only their needs-input ones once the request is
+     * answered. The drawer's `DeliveredNotificationsClient` calls this.
      */
     fun remove(context: Context, sessionIDs: Set<String>, needsInputOnly: Boolean) {
         if (sessionIDs.isEmpty()) return
@@ -111,7 +109,7 @@ object SessionPushNotifications {
         }
     }
 
-    /** What [remove] reads from a shown notification (iOS `UNNotificationContent`'s thread and `opencode` user info). */
+    /** What [remove] reads from a shown notification. */
     internal data class Delivered(
         val tag: String? = null,
         val group: String? = null,
@@ -121,9 +119,9 @@ object SessionPushNotifications {
     )
 
     /**
-     * iOS `DeliveredNotifications.sessionID(of:)`: an encrypted preview names its session by the
-     * thread [handle] wrote after verifying, else by verifying again (a push that couldn't be
-     * decrypted when it arrived); anything else by its session extra, then its tag.
+     * An encrypted preview names its session by the thread [handle] wrote after verifying, else by
+     * verifying again (a push that couldn't be decrypted when it arrived); anything else by its
+     * session extra, then its tag.
      */
     internal fun sessionID(
         content: Delivered,
@@ -137,23 +135,21 @@ object SessionPushNotifications {
         return content.sessionID ?: content.tag
     }
 
-    /** iOS `DeliveredNotifications.isNeedsInput`. */
     internal fun isNeedsInput(content: Delivered): Boolean {
         // Encrypted previews are run completions, not local pending-request notices.
         if (encrypted(content) != null) return false
         return content.status in needsInputStatuses
     }
 
-    /** The `opencode` envelope when it is an encrypted one (iOS: `payload["v"] != nil`). */
+    /** The `opencode` envelope when it is an encrypted one. */
     private fun encrypted(content: Delivered): JsonObject? =
         content.envelope
             ?.let { runCatching { Json.parseToJsonElement(it).jsonObject }.getOrNull() }
             ?.takeIf { "v" in it }
 
     /**
-     * The app icon's count (iOS `setBadgeCount`): launchers count from the shown notifications'
-     * `number`, so the session notifications still in the shade are reposted silently with the
-     * ledger's count.
+     * The app icon's count: launchers count from the shown notifications' `number`, so the session
+     * notifications still in the shade are reposted silently with the ledger's count.
      */
     @SuppressLint("MissingPermission")
     fun applyBadge(context: Context, count: Int) {

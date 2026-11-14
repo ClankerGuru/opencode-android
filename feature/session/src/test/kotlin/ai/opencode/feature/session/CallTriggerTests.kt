@@ -18,10 +18,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Port of iOS `CallTriggerTests.swift`: what asked for each call is named in the log, and a
- * resting grip can't start one (docs/voice.md, The call composer). Here rather than in
- * `:feature:voice` because it reaches `SessionFeature`, the composer's call controls and
- * `:feature:system`'s intents.
+ * What asked for each call is named in the log, and a resting grip can't start one (docs/voice.md,
+ * The call composer).
  */
 class CallTriggerTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
@@ -54,7 +52,7 @@ class CallTriggerTests {
             names += CallTrigger.System(origin).logLine
         }
         assertEquals("Every system origin reads differently", origins.size, names.size)
-        // iOS names Back Tap here; Android's Start Voice Call is the app shortcut and Assistant.
+        // Android's Start Voice Call is the app shortcut and Assistant.
         assertTrue(CallTrigger.System(SystemActionOrigin.shortcut).logLine.contains("Assistant"))
     }
 

@@ -5,11 +5,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * iOS `BorrowedDragVerdictTests` (TranscriptBorrowedDragTests.swift). Not ported: the iOS drag's
- * own rubber band, coast and spring-back tests (Android scrolls the list itself and flings with
- * the platform's fling), and the UIKit list harness and display-link tests.
- */
 class BorrowedDragVerdictTests {
     /** Review finding: a sideways drag the drawer or back swipe takes is cancelled with no end; its verdict left the next vertical drag dead. */
     @Test

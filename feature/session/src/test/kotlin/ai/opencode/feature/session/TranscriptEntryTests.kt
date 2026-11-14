@@ -12,11 +12,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The `SessionFeature.State` window tests of iOS `OpenCodeTests/TranscriptEntryTests.swift`
- * (`windowStart`, `visibleItems`, `retainRenderedWindowStart`); the rest of the file is
- * `:feature:transcript`'s (`TranscriptEntryTests.kt`) and `:server`'s.
- */
 class TranscriptEntryTests {
     private fun tool(id: String): OpenCodeTranscriptItem = OpenCodeTranscriptItem.Tool(
         id,

@@ -35,8 +35,8 @@ private typealias ActivePayload = DataPayload<Map<String, ActiveSessionPayload>>
 internal suspend fun requestHomeSnapshot(server: OpenCodeServer): OpenCodeHomeSnapshot {
     try {
         return coroutineScope {
-            // Failures are values until awaited, in order, as Swift's `async let` tuple awaits
-            // them: a projects error wins over a sessions error that came back first.
+            // Failures are values until awaited, in order: a projects error wins over a sessions
+            // error that came back first.
             val projects = async { capturedRequest<List<ProjectPayload>>("/api/project", server = server) }
             val sessions = async {
                 capturedRequest<SessionsPayload>(
@@ -187,7 +187,7 @@ internal suspend fun requestSessionFamily(server: OpenCodeServer, root: OpenCode
     try {
         return coroutineScope {
             // Captured: an active-status failure surfaces after the walk (whose own error wins),
-            // as Swift's `async let` does, instead of cancelling it.
+            // instead of cancelling it.
             val active = async { capturedRequest<ActivePayload>("/api/session/active", server = server) }
             val sessions = mutableListOf(root)
             val queue = mutableListOf(root.id)

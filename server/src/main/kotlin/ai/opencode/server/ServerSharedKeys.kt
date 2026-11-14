@@ -349,10 +349,7 @@ private class TranscriptCacheWriter(private val storage: TranscriptCachePersiste
     }
 }
 
-/**
- * The server-typed shared keys of iOS `SharedKeys.swift`. Mutate only from reducers, only
- * when the value changes.
- */
+/** The server-typed shared keys. Mutate only from reducers, only when the value changes. */
 object ServerSharedKeys {
     /** The last successfully connected server, restored on launch. */
     val savedServer = SharedKey.keychain<OpenCodeServer?>("saved-server", null)
@@ -360,20 +357,20 @@ object ServerSharedKeys {
     /** Every server you've connected to, most recent first. */
     val savedServers = SharedKey.keychain<List<OpenCodeServer>>("saved-servers", emptyList())
 
-    /** Agent Selection: the primary agents last listed, for Settings › Composer › Default Agent (iOS `knownPrimaryAgents`). */
+    /** Agent Selection: the primary agents last listed, for Settings › Composer › Default Agent. */
     val knownPrimaryAgents = SharedKey.fileStorage<List<ai.opencode.server.model.OpenCodeAutocompleteAgent>>(
         FileDirectory.Documents,
         "primary-agents.json",
         emptyList(),
     )
 
-    /** Agent Selection: the agent picked in each session (session ID → agent ID; iOS `sessionAgents`). */
+    /** Agent Selection: the agent picked in each session. */
     val sessionAgents = SharedKey.fileStorage<Map<String, String>>(FileDirectory.Documents, "session-agents.json", emptyMap())
 
     /** Each saved server's last Home snapshot, keyed by its persistence ID. */
     val cachedHomeSnapshots = SharedKey.fileStorage<Map<String, CachedHomeSnapshot>>(FileDirectory.Caches, "home-snapshots.json", emptyMap())
 
-    /** The single snapshot builds before [cachedHomeSnapshots] kept (iOS only; kept so the key list matches). */
+    /** The single snapshot builds before [cachedHomeSnapshots] kept. */
     val legacyCachedHomeSnapshot = SharedKey.fileStorage<CachedHomeSnapshot?>(FileDirectory.Caches, "home-snapshot.json", null)
 
     /** In-memory backing of [cachedTranscriptSnapshots]; [TranscriptCachePersistence] owns the disk. */
@@ -383,8 +380,8 @@ object ServerSharedKeys {
     private val persistenceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     /**
-     * The transcript cache (iOS `@Shared(.cachedTranscriptSnapshots)`): loaded once per store
-     * from [TranscriptCachePersistence], and every change scheduled on its 500 ms writer.
+     * The transcript cache: loaded once per store from [TranscriptCachePersistence], and every
+     * change scheduled on its 500 ms writer.
      */
     fun cachedTranscriptSnapshots(): Shared<CachedTranscriptSnapshots> {
         val store = dependency(SharedStore)

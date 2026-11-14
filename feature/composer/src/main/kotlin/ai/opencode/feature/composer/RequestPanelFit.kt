@@ -26,9 +26,9 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * How the request panel fits under the header (iOS `RequestPanelFit`): a pure function of the room,
- * never of the panel's own height, so it can't feed back on itself. Heights are in whatever unit
- * the caller uses, consistently.
+ * How the request panel fits under the header: a pure function of the room, never of the panel's
+ * own height, so it can't feed back on itself. Heights are in whatever unit the caller uses,
+ * consistently.
  */
 object RequestPanelFit {
     /**
@@ -152,7 +152,7 @@ object RequestPanelFit {
     }
 }
 
-/** A request panel part that scrolls (iOS `requestPanelPart(natural:floor:priority:)`), read by [RequestPanelStack]. */
+/** A request panel part that scrolls, read by [RequestPanelStack]. */
 internal data class RequestPanelPartData(val cap: Dp, val floor: Dp, val priority: Double)
 
 private class RequestPanelPartModifier(val data: RequestPanelPartData) : ParentDataModifier {
@@ -170,10 +170,10 @@ internal fun Modifier.requestPanelPart(cap: Dp, floor: Dp, priority: Double): Mo
     this.then(RequestPanelPartModifier(RequestPanelPartData(cap, floor, priority)))
 
 /**
- * Proposes the request panel [cap] (or unbounded room without one), so its scrolling parts
- * take their natural heights where they fit and give up the difference in priority order
- * where they don't, and past their floors it scrolls ([RequestPanelFallback]). All in
- * layout: nothing is measured and fed back (iOS `RequestPanelCap`).
+ * Proposes the request panel [cap] (or unbounded room without one), so its scrolling parts take
+ * their natural heights where they fit and give up the difference in priority order where they
+ * don't, and past their floors it scrolls ([RequestPanelFallback]). All in layout: nothing is
+ * measured and fed back.
  */
 fun Modifier.requestPanelCap(cap: Dp?): Modifier = layout { measurable, constraints ->
     val capPx = cap?.let { max(it.roundToPx(), 0) }
@@ -184,11 +184,11 @@ fun Modifier.requestPanelCap(cap: Dp?): Modifier = layout { measurable, constrai
 }
 
 /**
- * A request panel that fits its room (iOS `RequestPanelFallback`): [column]'s parts squeezed
- * down to their floors ([requestPanelPart]) or, when even that's too tall, the whole column
- * scrolling with the [footer] (Allow Once and Always Allow) pinned below it, so the actions are
- * always on screen. [column]'s children must be direct children here (header, parts, lines):
- * the parts are laid out by [RequestPanelStack].
+ * A request panel that fits its room: [column]'s parts squeezed down to their floors
+ * ([requestPanelPart]) or, when even that's too tall, the whole column scrolling with the [footer]
+ * (Allow Once and Always Allow) pinned below it, so the actions are always on screen. [column]'s
+ * children must be direct children here (header, parts, lines): the parts are laid out by
+ * [RequestPanelStack].
  */
 @Composable
 internal fun RequestPanelFallback(
@@ -218,9 +218,8 @@ internal fun RequestPanelFallback(
 
 /**
  * Lays out the panel's column under its room: fixed children at their own heights, parts
- * ([requestPanelPart]) at their natural heights where they fit, else squeezed in priority
- * order down to their floors; past the floors the column keeps the parts whole and scrolls
- * (iOS's scrolling fallback, where `requestPanelScrolls` shows the parts whole).
+ * ([requestPanelPart]) at their natural heights where they fit, else squeezed in priority order
+ * down to their floors; past the floors the column keeps the parts whole and scrolls.
  */
 @Composable
 private fun RequestPanelStack(modifier: Modifier = Modifier, content: @Composable () -> Unit) {

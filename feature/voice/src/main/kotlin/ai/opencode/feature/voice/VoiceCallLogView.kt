@@ -109,17 +109,16 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * Settings → Voice → Call History: saved calls and uploaded diagnostics (iOS `VoiceCallLogList`).
- * Settings hosts it as a page; navigation and the Developer Mode links are the host's.
+ * Settings → Voice → Call History: saved calls and uploaded diagnostics. Settings hosts it as a
+ * page; navigation and the Developer Mode links are the host's.
  *
  * Reads and deletes the logs through [VoiceCallLogClient] off the main thread.
  *
  * @param onBack the top bar's Back.
  * @param onOpenCall pushes [VoiceCallReplayView] for a saved call.
- * @param onOpenWeb Developer Mode's Open on the Web (iOS `Link(destination: DeveloperMode.webURL)`);
- *   Diagnostics sit above Voice, so the host opens the page. `null` hides it.
- * @param onShareLink Developer Mode's Share Link (iOS `ShareLink(item: DeveloperMode.webURL)`);
- *   the host shares it. `null` hides it.
+ * @param onOpenWeb Developer Mode's Open on the Web; Diagnostics sit above Voice, so the host opens
+ *     the page. `null` hides it.
+ * @param onShareLink Developer Mode's Share Link; the host shares it. `null` hides it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -239,7 +238,7 @@ fun VoiceCallLogList(
     }
 }
 
-/** One saved call: its title and when it was, swiped away to delete (iOS `onDelete`). */
+/** One saved call: its title and when it was, swiped away to delete. */
 @Composable
 private fun VoiceCallLogRow(log: VoiceCallLog, onOpen: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier) {
     val swipe = rememberSwipeToDismissBoxState()
@@ -278,7 +277,7 @@ private fun VoiceCallLogRow(log: VoiceCallLog, onOpen: () -> Unit, onDelete: () 
     }
 }
 
-/** The list's and replay's text formats (iOS `VoiceCallLogList.duration`, `formatted(date: .abbreviated, time: .shortened)`). */
+/** The list's and replay's text formats. */
 object VoiceCallLogFormat {
     private val started = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
 
@@ -291,13 +290,12 @@ object VoiceCallLogFormat {
         return if (total < 60) localized(R.string.voice_call_log_duration_seconds, total) else localized(R.string.voice_call_log_duration_minutes, total / 60, total % 60)
     }
 
-    /** Swift's `Double.formatted()` for the playback speeds: “0.5”, “1”, “2”. */
     fun speed(value: Double, locale: Locale = appFormattingLocale()): String = NumberFormat.getInstance(locale).format(value)
 }
 
 /**
  * Replays one call: the four tracks fill in as the playhead passes, with what happened so far
- * listed beneath (iOS `VoiceCallReplayView`). Settings hosts it as a page.
+ * listed beneath. Settings hosts it as a page.
  *
  * @param onBack the top bar's Back; playback stops when the view leaves.
  */
@@ -307,8 +305,7 @@ fun VoiceCallReplayView(log: VoiceCallLog, onBack: () -> Unit, modifier: Modifie
     val reduceMotion = rememberReduceMotion()
     val playback = remember(log) { VoiceCallReplayPlayback(log.duration) }
 
-    // The playhead runs at 60 Hz while playing (iOS `TimelineView(.animation(minimumInterval:
-    // AmbientRate.foreground.minimumInterval, paused: !playing))`).
+    // The playhead runs at 60 Hz while playing.
     LaunchedEffect(playback, playback.playing) {
         if (!playback.playing) return@LaunchedEffect
         var last = 0L
@@ -342,8 +339,8 @@ fun VoiceCallReplayView(log: VoiceCallLog, onBack: () -> Unit, modifier: Modifie
 }
 
 /**
- * The replay's clock: where playback is, whether it plays, and how fast (iOS `time`, `playing`,
- * `speed`, `anchor`). A plain object with snapshot state; main thread only.
+ * The replay's clock: where playback is, whether it plays, and how fast. A plain object with
+ * snapshot state; main thread only.
  */
 private class VoiceCallReplayPlayback(val duration: Double) {
     var time by mutableDoubleStateOf(0.0)
@@ -580,7 +577,7 @@ private fun ReplayEvents(log: VoiceCallLog, playback: VoiceCallReplayPlayback, r
     val dark = OpenCodeTheme.colors.isDark
     val secondary = OpenCodeTheme.colors.secondaryText
     val all = remember(log, dark, secondary) { replayEvents(log, dark, secondary) }
-    // Updated at most every quarter second, as iOS's `TimelineView(minimumInterval: 0.25)`.
+    // Updated at most every quarter second.
     val shown by remember(all) {
         derivedStateOf {
             val now = if (playback.playing) floor(playback.now * 4) / 4 else playback.now
@@ -648,7 +645,7 @@ private fun ReplayEvents(log: VoiceCallLog, playback: VoiceCallReplayPlayback, r
     }
 }
 
-/** The replay's track colours and names (iOS `VoiceCallReplayView.color(_:)`, `.name(_:)`), as iOS's system colours. */
+/** The replay's track colours and names. */
 object VoiceCallLogColors {
     fun color(track: VoiceCallLog.Track, dark: Boolean): Color = when (track) {
         VoiceCallLog.Track.user -> if (dark) Color(1f, 0.624f, 0.039f) else Color(1f, 0.584f, 0f)

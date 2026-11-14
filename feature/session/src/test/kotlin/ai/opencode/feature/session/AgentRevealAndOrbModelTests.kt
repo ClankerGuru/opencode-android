@@ -34,16 +34,6 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The status-orb half of iOS `AgentRevealAndOrbModelTests.swift` (ActivityGyro, AgentActivityOrb,
- * SubagentActivity, WorkingActivity/WorkingRun, WorkingHandoffPose, the glyph model cache).
- *
- * Not ported here: `onlyAgentsMessagesReveal`, `revealRisesDecaysAndEndsOnThePlainBubble`,
- * `reduceMotionRevealOnlyFades`, `arrivalsAreRecordedOnce` (TranscriptUserMessage /
- * AgentMessageReveal, :feature:transcript); `metalOrbAndShellShaderMatchesReferenceAcrossAllStatesAppearancesAndSizes`,
- * `analyticalInnerGlowShaderMatchesExponentialFalloffAndCorners` (compare a Swift copy of the Metal
- * shaders against the CPU reference; Android draws them as AGSL RuntimeShaders, which need a device).
- */
 class AgentRevealAndOrbModelTests {
     @Test fun revisitingAnOrbKeepsItsSimulationAndBoundsRetention() {
         val cache = GlyphModelCache(::AgentActivityGlyphModel)

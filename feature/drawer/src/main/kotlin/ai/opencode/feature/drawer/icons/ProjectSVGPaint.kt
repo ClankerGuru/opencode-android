@@ -139,8 +139,8 @@ object ProjectSVGPaint {
 }
 
 /**
- * A minimal XML walk (iOS `XMLParser` with external entities off): no namespaces, no DTD
- * processing, so entities and references never resolve anything outside the document.
+ * A minimal XML walk: no namespaces, no DTD processing, so entities and references never resolve
+ * anything outside the document.
  */
 internal object ProjectXml {
     /**

@@ -1,8 +1,7 @@
 package ai.opencode.feature.settings.onboarding
 
 /**
- * Port of iOS `Settings/Onboarding/SignalFieldShaders.metal` to AGSL (`RuntimeShader`): the
- * onboarding's full-screen LED field on a fixed 7 dp grid. [SignalFieldRenderer] springs every
+ * The onboarding's full-screen LED field on a fixed 7 dp grid. [SignalFieldRenderer] springs every
  * input; this only draws, premultiplied over the page's background.
  *
  * Points are dp and `grid.y` is the density (px per dp); `fragCoord` is in the layer's pixels.

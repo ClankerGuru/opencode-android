@@ -14,9 +14,9 @@ import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 
 /**
- * Port of iOS `SystemQuickAction`: one launcher shortcut (Home Screen quick action). Shown at
- * most four: the static New Session (`res/xml/shortcuts.xml`), then Start Call while Voice is
- * set up, then the most recent sessions to fill the rest.
+ * One launcher shortcut (Home Screen quick action). Shown at most four: the static New Session
+ * (`res/xml/shortcuts.xml`), then Start Call while Voice is set up, then the most recent sessions
+ * to fill the rest.
  */
 data class SystemQuickAction(
     val kind: Kind,

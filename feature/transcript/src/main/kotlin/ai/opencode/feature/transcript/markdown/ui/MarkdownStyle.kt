@@ -23,9 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * Spacing and type for long-form Markdown (iOS `MarkdownStyle`). Sizes are sp, so they follow the
- * system font scale; iOS `lineSpacing` becomes the line height plus that spacing, trimmed above the
- * first line and below the last.
+ * Spacing and type for long-form Markdown. Sizes are sp, so they follow the system font scale.
  *
  * Every transcript text uses greedy line breaking ([LineBreak.Simple], no hyphens): appending text
  * never moves a word already laid out, so streamed text keeps its lines.
@@ -64,7 +62,7 @@ class MarkdownStyle(
         1 -> tuning.h1Size
         2 -> tuning.h2Size
         3 -> tuning.h3Size
-        // Deeper headings stay at H3's desktop size (iOS: `.headline` 17).
+        // Deeper headings stay at H3's desktop size.
         else -> 15f
     }
 
@@ -92,7 +90,7 @@ class MarkdownStyle(
     /** `paragraphGap` (16 by default: `flowHalf * 2`). */
     val paragraphGap: Dp get() = tuning.paragraphGap.dp
 
-    /** Space between two blocks (iOS `gap(after:before:)`). */
+    /** Space between two blocks. */
     fun gap(previous: OpenCodeMarkdownBlock.Kind?, block: OpenCodeMarkdownBlock.Kind): Dp {
         if (previous == null) return 0.dp
         if (previous is OpenCodeMarkdownBlock.Kind.Heading) return headingBelow
@@ -114,7 +112,6 @@ class MarkdownStyle(
         /** The default body size, for surfaces without a tuning snapshot (display math). */
         val bodyTextSize: TextUnit = 15.sp
 
-        /** iOS `TranscriptMetrics.codeFont` (`.subheadline.monospaced()`) with `codeLeading` (3) between lines. */
         fun codeTextStyle(codeLeading: Float = 3f): TextStyle = OpenCodeTextStyles.footnote.copy(
             fontFamily = OpenCodeFonts.monospace,
             lineHeight = (18f + codeLeading).sp,
@@ -150,7 +147,7 @@ class MarkdownStyle(
     }
 }
 
-/** The style for the current theme and tuning (iOS `MarkdownStyle(contrast:dynamicTypeSize:)`). */
+/** The style for the current theme and tuning. */
 @Composable
 @ReadOnlyComposable
 fun currentMarkdownStyle(): MarkdownStyle = MarkdownStyle(LocalTranscriptLayoutTuning.current, OpenCodeTheme.colors)

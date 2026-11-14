@@ -17,10 +17,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `AppFeatureTests+Migrations.swift`. Each test's in-memory `SharedStore` stands in for
- * iOS's throwaway `UserDefaults` suite.
- */
+/** Each test gets its own in-memory `SharedStore`. */
 class AppFeatureTestsMigrations {
     @get:Rule val isolation = TestIsolationRule()
 

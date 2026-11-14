@@ -37,23 +37,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `SystemIntegrationTests`' Home tests (`HomeFeature+System.swift`): the entry Home
- * publishes to the system directory, what Shortcuts, launcher actions and links open (and the
- * calls they start), and when Home publishes.
- *
- * Other modules' tests of this file: `SessionDirectoryTests`' `serverKeysAreShortStableAndHideTheAddress`,
- * `scopedIDsRoundTrip`, `writesAndLoadsFromTheAppGroupFile`, `removingTheCurrentServerClearsIt`,
- * and every test of `SystemEntityQueryTests`, `SessionControlTests`, `SystemActionTests`,
- * `QuickActionTests`, `SystemPromptSenderTests` and `SystemPublisherTests` are `:feature:system`'s;
- * `SystemRoutingTests`' AppFeature section (`theOpenServersHomeHandlesIt`,
- * `actionsWithoutAServerMeanTheOpenOne`, `anotherSavedServerConnectsFirst`,
- * `aForgottenServerExplainsItself`, `aSessionOutsideTheListIsFetchedFirst`,
- * `aControlsDeletedSessionSaysSo`, `listensForTheWholeRun`) and `SystemColdLaunchTests`'
- * `actionsWaitForTheFirstSnapshotThenOpenTheRememberedSession`,
- * `aRememberedSessionOutsideTheListIsFetched`, `aRememberedSessionThatsGoneFallsBackToTheNewest`
- * are `:app`'s (`AppFeature`).
- */
 class SystemIntegrationTests {
     @get:Rule val isolation = TestIsolationRule()
 

@@ -8,10 +8,9 @@ package ai.opencode.server.model
  * (`/` or `\`). Parsing marks it with a private `opencode-session://` link; the row shows the
  * session's title in its place and a tap opens the session.
  *
- * The URL/ID half of iOS `Transcript/SessionLinks.swift` `SessionLink`, moved down to `:server`
- * because the link menu (`:feature:media`) reads it. The rich-text marking (`mark`, `markRuns`,
- * `marked(plain:)`, `ids(in:)`) stays with the transcript's renderer, as extensions on this
- * object.
+ * In `:server` because the link menu (`:feature:media`) reads it. The rich-text marking (`mark`,
+ * `markRuns`, `marked(plain:)`, `ids(in:)`) stays with the transcript's renderer, as extensions on
+ * this object.
  */
 object SessionLink {
     const val SCHEME = "opencode-session"

@@ -11,8 +11,7 @@ import ai.opencode.core.store.Reducer
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.settings.onboarding.WelcomeFeature
 
-// Port of iOS `AppFeature+Welcome.swift`: the welcome's pairing requests, from the first run or
-// from Show Welcome over Home.
+// The welcome's pairing requests, from the first run or from Show Welcome over Home.
 internal val welcomeRequests = Reducer<AppFeature.State, AppFeature.Action> { state, action ->
     when (action) {
         is AppFeature.Action.Welcome ->
@@ -58,7 +57,7 @@ private fun welcome(
         }
     }
 
-/** iOS `updateWelcome(_:overHome:_:)`: the welcome over Home, or the first run's. */
+/** The welcome over Home, or the first run's. */
 private fun updatingWelcome(
     state: AppFeature.State,
     overHome: Boolean,

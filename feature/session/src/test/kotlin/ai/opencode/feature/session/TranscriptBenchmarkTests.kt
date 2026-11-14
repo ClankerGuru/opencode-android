@@ -8,13 +8,8 @@ import org.junit.Test
 import java.time.Instant
 
 /**
- * The `:feature:session` tests of iOS `OpenCodeTests/TranscriptBenchmarkTests.swift`
- * ([SessionTranscriptView.ProjectionCache]); the `HomeFeature`/`AppFeature` tests are
- * `:feature:drawer`'s and `:app`'s, and the env-gated benchmarks aren't ported.
- *
  * `projectionCacheTailPathAndConfigurationDiffersOnlyInTailAssistantMarkdown` drops its
- * `TranscriptListViewController.Configuration.differsOnlyInTailAssistantMarkdown` half: a UIKit
- * cell-reconfigure fast path (the lazy list recomposes only the changed row by key).
+ * `TranscriptListViewController.Configuration.differsOnlyInTailAssistantMarkdown` half.
  */
 class TranscriptBenchmarkTests {
     @Test

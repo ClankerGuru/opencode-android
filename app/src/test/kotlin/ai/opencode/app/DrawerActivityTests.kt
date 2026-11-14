@@ -24,8 +24,8 @@ import org.junit.Test
 import java.time.Instant
 
 /**
- * Port of iOS `DrawerActivityTests.swift`, the `AppFeature` part: a relaunch restores the cached
- * Home's running state only while it is fresh.
+ * The `AppFeature` part: a relaunch restores the cached Home's running state only while it is
+ * fresh.
  */
 class DrawerActivityTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -67,7 +67,6 @@ class DrawerActivityTests {
     }
 }
 
-/** Port of iOS `DrawerActivityTests.swift` › `DrawerDotTests`, the `AppFeature` test. */
 class DrawerDotTests {
     @get:Rule val isolation = TestIsolationRule()
 

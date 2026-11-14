@@ -24,9 +24,9 @@ import kotlin.math.min
 import kotlin.math.pow
 
 /**
- * Port of iOS `TouchRecovery`: releases a surface that keeps taking touches. A fault held over one
- * animation second (at most four real seconds) is released and logged as
- * `transcript_touch_recovered`. [inspect] returns null when healthy.
+ * Releases a surface that keeps taking touches. A fault held over one animation second (at most
+ * four real seconds) is released and logged as `transcript_touch_recovered`. [inspect] returns null
+ * when healthy.
  */
 class TouchRecovery(
     val owner: Owner,
@@ -213,10 +213,7 @@ class TouchRecovery(
     }
 }
 
-/**
- * Port of iOS `TouchRecoveryClient`: live recoveries are sampled only in armed windows (0 Hz at
- * rest). Tests get an inert client.
- */
+/** Live recoveries are sampled only in armed windows (0 Hz at rest). Tests get an inert client. */
 fun interface TouchRecoveryClient {
     suspend fun watch(recovery: TouchRecovery)
 
@@ -251,8 +248,8 @@ fun interface TouchRecoveryClient {
 }
 
 /**
- * Port of iOS `TouchRecoverySampler`: samples every live recovery four times a second, only for
- * [WINDOW] seconds after [arm] or [touched] (0 Hz at rest). Main thread only.
+ * Samples every live recovery four times a second, only for [WINDOW] seconds after [arm] or
+ * [touched] (0 Hz at rest). Main thread only.
  */
 class TouchRecoverySampler(
     private val clock: () -> Time = ::liveClock,

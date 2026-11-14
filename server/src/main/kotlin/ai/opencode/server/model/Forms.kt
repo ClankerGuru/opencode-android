@@ -18,7 +18,7 @@ import java.text.DecimalFormatSymbols
 import java.time.OffsetDateTime
 import java.util.Locale
 
-/** A form answer. Decodes like iOS: Bool, then number, then string, else a string list. */
+/** A form answer. Decodes: Bool, then number, then string, else a string list. */
 @Serializable(with = OpenCodeFormValueSerializer::class)
 sealed interface OpenCodeFormValue {
     data class Str(val value: String) : OpenCodeFormValue
@@ -38,7 +38,6 @@ sealed interface OpenCodeFormValue {
             if (symbols.decimalSeparator != '.') cleaned = cleaned.replace(symbols.decimalSeparator, '.')
             if (cleaned.isEmpty()) return null
             if (cleaned.endsWith(".")) cleaned = cleaned.dropLast(1)
-            // Swift's `Double(".")` is nil; so is a bare separator here.
             if (cleaned.isEmpty() || cleaned.last() in "dDfF") return null
             return cleaned.toDoubleOrNull()?.let(::Number)
         }

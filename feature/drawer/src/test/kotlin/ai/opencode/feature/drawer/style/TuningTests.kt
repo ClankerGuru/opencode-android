@@ -16,10 +16,8 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Port of iOS `TuningTests`' drawer suites. Android has no Tuning Panel (`DrawerTunables` are
- * the shipped defaults, see docs/parity/drawer.md), so what's ported is what the defaults and
- * the edge math promise. Deleted (no Tuning Panel, presets or `TuningStore` registration on
- * Android): `topAndBottomEdgeTunablesAreIndependentUnderTheDrawerGroup`,
+ * Deleted (no Tuning Panel, presets or `TuningStore` registration on Android):
+ * `topAndBottomEdgeTunablesAreIndependentUnderTheDrawerGroup`,
  * `presetsAreNumberedFromTodayAndValidForTheirKnobs`, `sidebarStylesStartFromTheShippedList`,
  * `applyingAPresetSetsItsKnobsAndTodayPutsThemBack`, `presetsListOnlyWhileTuningIsOn`,
  * `cardFeelsStayInRangeAndNativeRestoresOnlyTheirOwnControls`, `thePanelAppliesAPreset`.
@@ -48,9 +46,8 @@ class DrawerSpacingTests {
     /** What the drawer ships: Sidebar Grey spacing. */
     @Test
     fun defaultsAreWhatShipped() {
-        // Android diverges from iOS on purpose: the drawer follows the OpenCode desktop sidebar
-        // (6 dp row radius, 14 sp subheadline rows) and rows are 48 dp touch targets (iOS 44 pt).
-        // Everything else is iOS's.
+        // The drawer follows the OpenCode desktop sidebar (6 dp row radius, 14 sp subheadline rows)
+        // and rows are 48 dp touch targets.
         val shipped: List<Triple<String, Dp, Float>> = listOf(
             Triple("drawer.row.height", DrawerTunables.rowHeight, 48f),
             Triple("drawer.row.gap", DrawerTunables.rowGap, 0f),
@@ -107,7 +104,7 @@ class DrawerSpacingTests {
 
     @Test
     fun drawerRowsReadSelectedThenActiveThenReadThenMuted() {
-        // iOS `indicator`: unread, attention and running are indicators; none isn't.
+        // Unread, attention and running are indicators; none isn't.
         assertEquals(DrawerRowEmphasis.Selected, DrawerRowEmphasis.of(selected = true, muted = false, hasIndicator = true))
         assertEquals(DrawerRowEmphasis.Muted, DrawerRowEmphasis.of(selected = false, muted = true, hasIndicator = true))
         assertEquals(DrawerRowEmphasis.Active, DrawerRowEmphasis.of(selected = false, muted = false, hasIndicator = true))

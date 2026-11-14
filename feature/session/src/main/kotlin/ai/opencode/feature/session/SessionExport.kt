@@ -28,9 +28,9 @@ import java.time.format.FormatStyle
 import java.util.UUID
 
 /**
- * Port of iOS `SessionExport`: turns `GET /api/experimental/session/{id}/export` into a
- * shareable file. Markdown follows the TUI's `formatSessionTranscript` (tools, no thinking);
- * JSON is the server's `SessionTransfer` data, which `opencode import` reads.
+ * Turns `GET /api/experimental/session/{id}/export` into a shareable file. Markdown follows the
+ * TUI's `formatSessionTranscript` (tools, no thinking); JSON is the server's `SessionTransfer`
+ * data, which `opencode import` reads.
  */
 object SessionExport {
     class Failure : Exception()
@@ -87,7 +87,6 @@ object SessionExport {
         return header + "\n\n---\n\n" + body.joinToString("\n\n---\n\n") + "\n"
     }
 
-    /** iOS `.formatted(date: .abbreviated, time: .shortened)`. */
     private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
 
     private fun assistantPart(part: JsonObject): String? = when (part.string("type")) {
@@ -97,7 +96,7 @@ object SessionExport {
             val rawInput = state["input"]
             val input = when {
                 rawInput is JsonPrimitive && rawInput.isString -> rawInput.content
-                // iOS writes tool input without `.withoutEscapingSlashes`: `/` reads `\/`.
+                // `/` reads `\/`.
                 rawInput is JsonObject || rawInput is JsonArray -> prettyJSON(rawInput, escapesSlashes = true)
                 else -> "{}"
             }
@@ -140,8 +139,8 @@ object SessionExport {
 }
 
 /**
- * Port of iOS `SessionExportClient` (`@Dependency(\.sessionExport)`): writes an export to a
- * private cache file, hands it to the system share sheet, and removes it afterwards.
+ * Writes an export to a private cache file, hands it to the system share sheet, and removes it
+ * afterwards.
  *
  * Android: [share] builds the `ACTION_SEND` chooser Intent here (never in a composable) and
  * serves the file through [SessionExportFileProvider].
@@ -150,9 +149,9 @@ class SessionExportClient(
     /** Returns the written file's absolute path. */
     val write: (body: ByteArray, format: OpenCodeExportFormat, title: String, id: UUID) -> String,
     val remove: (path: String) -> Unit,
-    /** Opens the system share sheet for a written export (iOS `ActivitySharePresenter`). */
+    /** Opens the system share sheet for a written export. */
     val share: suspend (path: String) -> Unit,
-    /** Opens the system share sheet for plain text (iOS `ShareLink(item:subject:)`, Shell › Share Output). */
+    /** Opens the system share sheet for plain text. */
     val shareText: suspend (text: String, subject: String) -> Unit = { _, _ -> },
 ) {
     companion object Key : DependencyKey<SessionExportClient> {
@@ -175,7 +174,7 @@ class SessionExportClient(
             )
         }
 
-        /** Like iOS, the real writer against a temporary folder; sharing does nothing. */
+        /** Sharing does nothing. */
         override val testValue: SessionExportClient by lazy {
             val root = File(System.getProperty("java.io.tmpdir"), EXPORTS_DIRECTORY)
             SessionExportClient(

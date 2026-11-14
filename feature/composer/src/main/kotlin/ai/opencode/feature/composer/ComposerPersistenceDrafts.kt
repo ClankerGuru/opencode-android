@@ -13,10 +13,7 @@ import kotlinx.serialization.encoding.Encoder
 import java.time.Instant
 import java.util.UUID
 
-/**
- * A composer's draft (iOS `SessionFeature.State.DraftState`). Lives here because
- * [ComposerPersistence] stores it.
- */
+/** A composer's draft. Lives here because [ComposerPersistence] stores it. */
 data class DraftState(
     val text: String = "",
     val attachments: List<OpenCodeOutgoingAttachment> = emptyList(),
@@ -26,7 +23,6 @@ data class DraftState(
     val chips: List<ComposerAutocompleteChip> = emptyList(),
     val undoSnapshot: UndoSnapshot? = null,
 ) {
-    /** iOS `DraftState.isEmpty` (`ComposerPersistence.swift`). */
     val isEmpty: Boolean
         get() = text.isEmpty() && attachments.isEmpty() && files.isEmpty() && location == null && undoSnapshot == null
 
@@ -47,12 +43,12 @@ data class DraftState(
 
 /**
  * The composer as an undo/revert left it, plus the pre-undo snapshot Undo/Redo restores while the
- * reverted draft is untouched (iOS `SessionFeature.State.UndoSnapshot`).
+ * reverted draft is untouched.
  */
 @Serializable
 data class UndoSnapshot(
     val restoredDraft: String,
-    // Swift's synthesized `Decodable` ignores property defaults: these keys are required, as on iOS.
+    // These keys are required: decoding ignores property defaults.
     @Required val priorDraft: String = "",
     @Serializable(with = SharedLocationSerializer::class) val restoredLocation: SharedLocation? = null,
     @Serializable(with = SharedLocationSerializer::class) val priorLocation: SharedLocation? = null,
@@ -61,8 +57,8 @@ data class UndoSnapshot(
 )
 
 /**
- * What a share adds to one composer (iOS `SharedComposerDraft`). Here because it carries composer
- * types `:feature:system` can't see.
+ * What a share adds to one composer. Here because it carries composer types `:feature:system` can't
+ * see.
  */
 data class SharedComposerDraft(
     val text: String = "",
@@ -86,7 +82,6 @@ data class SharedComposerDraft(
         val sessionID: String? = null,
     )
 
-    /** iOS `init(composer:projectID:)`. */
     constructor(composer: DraftState, projectID: String? = null) : this(
         text = composer.text,
         attachments = composer.attachments,
@@ -97,7 +92,6 @@ data class SharedComposerDraft(
         projectID = projectID,
     )
 
-    /** iOS `init(restored:)`. */
     constructor(restored: RestoredComposerDraft) : this(restored.draft, restored.project?.id)
 
     val isEmpty: Boolean
@@ -138,7 +132,7 @@ data class SharedComposerDraft(
     }
 }
 
-/** Which composer a share lands in (iOS `SharedDraftTarget`). */
+/** Which composer a share lands in. */
 sealed interface SharedDraftTarget {
     data class Session(val id: String) : SharedDraftTarget
     data object NewSession : SharedDraftTarget
@@ -170,7 +164,7 @@ data class RestoredOutboxEntry(
     val updatedAt: Instant,
 )
 
-/** iOS `SharedLocation: Codable` (`ComposerPersistence.swift`): the same keys, `capturedAt` in `JSONEncoder`'s date shape. */
+/** The same keys, `capturedAt` in `JSONEncoder`'s date shape. */
 internal object SharedLocationSerializer : KSerializer<SharedLocation> {
     @Serializable
     private class Surrogate(

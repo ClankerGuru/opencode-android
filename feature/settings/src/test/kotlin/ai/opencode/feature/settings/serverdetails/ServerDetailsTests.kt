@@ -27,11 +27,6 @@ import org.junit.Test
 import java.net.URI
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `ServerDetailsTests.swift`. Not here: `decodesEveryMCPStatus`,
- * `decodesCredentialAndEnvironmentAccounts` and `onlyMCPConnectIsRetriedWhenUnsent` (`:server`'s
- * port).
- */
 class ServerDetailsTests {
     @get:Rule val isolation = TestIsolationRule()
 

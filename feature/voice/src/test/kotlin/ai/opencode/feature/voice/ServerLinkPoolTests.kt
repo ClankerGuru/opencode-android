@@ -6,10 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * The voice part of iOS `ServerLinkPoolTests`: a call log reads the network from the shared path
- * monitor. The rest of that suite is `:server`'s `ServerLinkPoolTests`.
- */
+/** A call log reads the network from the shared path monitor. */
 class ServerLinkPoolTests {
     @get:Rule val isolation = TestIsolationRule()
 

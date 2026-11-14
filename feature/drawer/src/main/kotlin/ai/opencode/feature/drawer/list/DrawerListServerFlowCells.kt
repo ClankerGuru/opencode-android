@@ -55,15 +55,15 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-// Port of iOS `DrawerListServerFlowCells.swift` (Server Flow, d8a311bd): the ghost rows that hold
-// the list while the server picked answers, and the note left after a switch went back.
+// The ghost rows that hold the list while the server picked answers, and the note left after a
+// switch went back.
 
-/** The ghost bars' lengths, as fractions of the row, in turn (iOS `DrawerListGhostCell.lengths`). */
+/** The ghost bars' lengths, as fractions of the row, in turn. */
 internal val drawerGhostLengths = listOf(0.72f, 0.54f, 0.8f, 0.46f, 0.64f)
 
 /**
- * iOS `DrawerListGhostCell`: a row's place while the server picked answers, a 12dp bar of a title's
- * length with a slow sweep (1.6 s, every bar in step; held under Reduce Motion). Hidden from TalkBack.
+ * A row's place while the server picked answers, a 12dp bar of a title's length with a slow sweep
+ * (1.6 s, every bar in step; held under Reduce Motion). Hidden from TalkBack.
  */
 @Composable
 fun DrawerListGhostCell(index: Int, reducedMotion: Boolean, modifier: Modifier = Modifier) {
@@ -71,8 +71,8 @@ fun DrawerListGhostCell(index: Int, reducedMotion: Boolean, modifier: Modifier =
     val base = colors.tertiaryText.copy(alpha = colors.tertiaryText.alpha * 0.35f)
     val shine = colors.tertiaryText.copy(alpha = colors.tertiaryText.alpha * 0.2f)
     val fraction = drawerGhostLengths[index % drawerGhostLengths.size]
-    // One ambient sweep per pass (iOS 03adf07a: `AmbientClock`, linear, in step with every sweep).
-    // A hidden drawer's ghosts hold still: no frame ticks for a drawer nobody sees.
+    // One ambient sweep per pass. A hidden drawer's ghosts hold still: no frame ticks for a drawer
+    // nobody sees.
     val hidden = LocalDrawerHidden.current.value
     val sweeps = !reducedMotion && !hidden
     val sweep = remember { mutableFloatStateOf(0f) }
@@ -109,8 +109,8 @@ fun DrawerListGhostCell(index: Int, reducedMotion: Boolean, modifier: Modifier =
 }
 
 /**
- * iOS `DrawerServerNoteRow`: the note left after a switch went back on its own, with the way to try
- * again (or pair again, for a sign-in it refused).
+ * The note left after a switch went back on its own, with the way to try again (or pair again, for
+ * a sign-in it refused).
  */
 @Composable
 fun DrawerServerNoteRow(note: ServerSwitchNote, onAction: () -> Unit, modifier: Modifier = Modifier) {
@@ -160,7 +160,7 @@ fun DrawerServerNoteRow(note: ServerSwitchNote, onAction: () -> Unit, modifier: 
 /**
  * Title Leads: a row of the server shown hangs off the title's name, the [index]th on screen
  * following the one above it ([ServerSwapMotion.row]). Off without a swap target. Under Reduce
- * Motion the rows only fade (iOS `swapTravel`).
+ * Motion the rows only fade.
  */
 internal fun Modifier.serverSwapRow(motion: ServerSwapMotion?, serverID: String, reducedMotion: Boolean, index: () -> Int): Modifier {
     if (motion == null) return this
@@ -174,11 +174,11 @@ internal fun Modifier.serverSwapRow(motion: ServerSwapMotion?, serverID: String,
 }
 
 /**
- * iOS `DrawerListController.leavingRows`: the pictures of the rows a server switch leaves, hanging
- * off their name as it goes. A `LazyColumn` drops the old server's items at once, so each row
- * records what it draws into its own layer ([serverSwapPicture]), and a switch takes the visible
- * rows' layers, drawn over the list ([drawLeaving]) until the name has gone. A taken layer belongs
- * to the leaving server: its row records into a new one before it draws again.
+ * The pictures of the rows a server switch leaves, hanging off their name as it goes. A
+ * `LazyColumn` drops the old server's items at once, so each row records what it draws into its own
+ * layer ([serverSwapPicture]), and a switch takes the visible rows' layers, drawn over the list
+ * ([drawLeaving]) until the name has gone. A taken layer belongs to the leaving server: its row
+ * records into a new one before it draws again.
  */
 internal class ServerSwapPictures(private val graphics: GraphicsContext) {
     private class Picture(val layer: GraphicsLayer, val top: Float)
@@ -203,9 +203,8 @@ internal class ServerSwapPictures(private val graphics: GraphicsContext) {
     }
 
     /**
-     * iOS `swapRows(from:_:)`: before the next server's rows compose, the rows on screen (as last
-     * laid out) become [server]'s leaving pictures. Rows coming back before they left turn round
-     * as live rows.
+     * Before the next server's rows compose, the rows on screen (as last laid out) become
+     * [server]'s leaving pictures. Rows coming back before they left turn round as live rows.
      */
     fun swap(server: String, next: String, info: LazyListLayoutInfo, firstVisible: Int, motion: ServerSwapMotion) {
         for (id in listOf(server, next)) leaving.remove(id)?.forEach { releaseLayer(it.layer) }
@@ -217,13 +216,12 @@ internal class ServerSwapPictures(private val graphics: GraphicsContext) {
             }
         if (pictures.isEmpty()) return
         leaving[server] = pictures
-        // Their chain starts where they are (iOS adds the snapshots at rest, then the exit moves
-        // them), not where the name has got to by the first step.
+        // Their chain starts where they are, not where the name has got to by the first step.
         motion.rows(server, pictures.size)
         version += 1
     }
 
-    /** iOS `placeSwapRows()` for the leaving pictures: each on its server's chain, faded with it. */
+    /** Each on its server's chain, faded with it. */
     fun DrawScope.drawLeaving(motion: ServerSwapMotion, travel: Float) {
         version
         if (leaving.isEmpty()) return

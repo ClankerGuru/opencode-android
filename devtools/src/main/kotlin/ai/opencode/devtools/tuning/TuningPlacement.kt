@@ -10,8 +10,8 @@ import kotlin.math.abs
 import kotlin.math.max
 
 /**
- * iOS `TuningPlacement`: where the tuning panel floats. The height is a share of the free band
- * above the keyboard, so it survives rotation; sides are physical.
+ * Where the tuning panel floats. The height is a share of the free band above the keyboard, so it
+ * survives rotation; sides are physical.
  */
 data class TuningPlacement(
     val side: Side = Side.Trailing,
@@ -21,14 +21,14 @@ data class TuningPlacement(
 ) {
     enum class Side { Leading, Trailing }
 
-    /** Stored as JSON in app storage (iOS `@AppStorage("tuning-placement")`). */
+    /** Stored as JSON in app storage. */
     val text: String
         get() = runCatching {
             json.encodeToString(Stored.serializer(), Stored(if (side == Side.Leading) Stored.Side.Leading else Stored.Side.Trailing, y, isTucked))
         }.getOrDefault("")
 
     companion object {
-        /** iOS `init(text:)`: anything unreadable (including a missing field) is the default. */
+        /** Anything unreadable (including a missing field) is the default. */
         fun fromText(text: String): TuningPlacement = runCatching {
             val stored = json.decodeFromString(Stored.serializer(), text)
             TuningPlacement(if (stored.side == Stored.Side.Leading) Side.Leading else Side.Trailing, stored.y, stored.isTucked)
@@ -37,7 +37,7 @@ data class TuningPlacement(
         private val json = Json { ignoreUnknownKeys = true }
     }
 
-    /** The wire form, field for field as Swift's synthesized `Codable` (every field required). */
+    /** The wire form, field for field. */
     @Serializable
     private class Stored(val side: Side, val y: Double, val isTucked: Boolean) {
         @Serializable
@@ -48,10 +48,7 @@ data class TuningPlacement(
     }
 }
 
-/**
- * iOS `TuningPlacementLayout`: the geometry a placement resolves in. All values are dp (points
- * on iOS); velocities are dp a second.
- */
+/** The geometry a placement resolves in. All values are dp; velocities are dp a second. */
 data class TuningPlacementLayout(
     /** Where the panel may sit: the safe area above the keyboard, inset. */
     val bounds: Rect,
@@ -109,7 +106,7 @@ data class TuningPlacementLayout(
         /** How much of the panel past the edge tucks it. */
         const val TUCK_SHARE = 0.35f
 
-        /** iOS `init(safeArea:screen:keyboardTop:)`: the safe area inset by [MARGIN], cut above the keyboard. */
+        /** The safe area inset by [MARGIN], cut above the keyboard. */
         fun of(safeArea: Rect, screen: Rect, keyboardTop: Float? = null): TuningPlacementLayout {
             var bounds = safeArea.deflate(MARGIN)
             if (keyboardTop != null && keyboardTop - MARGIN < bounds.bottom) {

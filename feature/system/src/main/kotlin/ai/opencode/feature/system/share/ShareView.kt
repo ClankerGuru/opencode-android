@@ -165,9 +165,9 @@ class ShareActions(
 )
 
 /**
- * Port of iOS `ShareView`: the share sheet as a composer: what was shared, large, at the top; the
- * sessions as chips right above an app-style composer; Send in the composer and Continue in
- * OpenCode beside the title. Wrap in `OpenCodeAppTheme {}`.
+ * The share sheet as a composer: what was shared, large, at the top; the sessions as chips right
+ * above an app-style composer; Send in the composer and Continue in OpenCode beside the title. Wrap
+ * in `OpenCodeAppTheme {}`.
  */
 @Composable
 fun ShareView(state: ShareModel.State, actions: ShareActions) {
@@ -181,8 +181,8 @@ fun ShareView(state: ShareModel.State, actions: ShareActions) {
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .padding(top = 8.dp)
-                // A swipe down cancels, as the system sheet's does on iOS; from Send until it
-                // closes the sheet is the send's to end, so it springs back.
+                // A swipe down cancels, as the system sheet's does; from Send until it closes the
+                // sheet is the send's to end, so it springs back.
                 .swipeDownToDismiss(enabled = !state.isBusy, reduceMotion = reduceMotion, onDismiss = actions.onCancel),
             shape = OpenCodeShape.sheetTop,
             color = colors.canvas,
@@ -216,9 +216,9 @@ fun ShareView(state: ShareModel.State, actions: ShareActions) {
 }
 
 /**
- * iOS's page-sheet swipe: the sheet follows a downward drag (on itself, or past the top of
- * what scrolls inside it), and goes when let go past half its height or flung down; anything
- * less springs back. Dismissal runs [onDismiss] once the sheet has slid away.
+ * The sheet follows a downward drag (on itself, or past the top of what scrolls inside it), and
+ * goes when let go past half its height or flung down; anything less springs back. Dismissal runs
+ * [onDismiss] once the sheet has slid away.
  */
 @Composable
 private fun Modifier.swipeDownToDismiss(enabled: Boolean, reduceMotion: Boolean, onDismiss: () -> Unit): Modifier {
@@ -232,8 +232,8 @@ private fun Modifier.swipeDownToDismiss(enabled: Boolean, reduceMotion: Boolean,
     val currentDismiss by rememberUpdatedState(onDismiss)
     val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     val flingVelocity = with(density) { SWIPE_DISMISS_VELOCITY.toPx() }
-    // The dimming behind the sheet fades with how far it has been pulled down, as iOS's
-    // sheet's dimming view does, so nothing pops when it closes.
+    // The dimming behind the sheet fades with how far it has been pulled down, so nothing pops when
+    // it closes.
     val window = androidx.activity.compose.LocalActivity.current?.window
     androidx.compose.runtime.LaunchedEffect(window) {
         if (window == null) return@LaunchedEffect
@@ -257,7 +257,7 @@ private fun Modifier.swipeDownToDismiss(enabled: Boolean, reduceMotion: Boolean,
         val goes = currentEnabled && offset > 0f && (offset > height / 2f || velocity > flingVelocity)
         if (goes) {
             dismissed = true
-            // As a committed sheet dismissal on iOS: the keyboard goes down alongside the sheet.
+            // As a committed sheet dismissal: the keyboard goes down alongside the sheet.
             keyboard?.hide()
         }
         settling = scope.launch {
@@ -439,7 +439,7 @@ private fun Modifier.sendingStage(phase: ShareModel.Phase, reduceMotion: Boolean
         .then(if (phase == ShareModel.Phase.Sent) Modifier.semantics { hideFromAccessibility() } else Modifier)
 }
 
-/** Takes no touches while [blocked] (iOS `allowsHitTesting(false)`), without dimming. */
+/** Takes no touches while [blocked], without dimming. */
 private fun Modifier.blockInput(blocked: Boolean): Modifier = if (!blocked) this else pointerInput(Unit) {
     awaitPointerEventScope {
         while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
@@ -771,9 +771,8 @@ private fun MessageBar(state: ShareModel.State, actions: ShareActions, reduceMot
     val fieldBlur by animateDpAsState(if (phase == ShareModel.Phase.Sent && !reduceMotion) 6.dp else 0.dp, phaseAnimation(reduceMotion), label = "fieldBlur")
     val fieldLift by animateDpAsState(if (phase == ShareModel.Phase.Sent && !reduceMotion) (-6).dp else 0.dp, phaseAnimation(reduceMotion), label = "fieldLift")
     val density = LocalDensity.current
-    // How far the centre of the field's last-line capitals sits above the field's bottom
-    // edge (iOS `lastLineCapCentre`, 11.8 pt at the default size, scaling with it): measured
-    // from the laid-out text, so the last line's capitals centre on the arrow at any size.
+    // How far the centre of the field's last-line capitals sits above the field's bottom edge:
+    // measured from the laid-out text, so the last line's capitals centre on the arrow at any size.
     val bodySize = with(density) { OpenCodeTextStyles.body.fontSize.toPx() }
     val capHeight = remember(bodySize) {
         val bounds = android.graphics.Rect()

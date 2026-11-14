@@ -21,9 +21,9 @@ import ai.opencode.server.OpenCodeServerEvent
 import ai.opencode.server.model.OpenCodeProject
 
 /*
- * Port of iOS `HomeFeature+ServerEvents.swift`: the event stream projected onto Home's list and
- * forwarded to the screens that care. REST snapshots stay authoritative: anything an event can't
- * settle on its own asks for a fresh snapshot (`refreshSnapshot`).
+ * The event stream projected onto Home's list and forwarded to the screens that care. REST
+ * snapshots stay authoritative: anything an event can't settle on its own asks for a fresh snapshot
+ * (`refreshSnapshot`).
  */
 
 

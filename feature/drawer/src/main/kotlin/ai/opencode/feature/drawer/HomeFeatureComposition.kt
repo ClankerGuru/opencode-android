@@ -42,10 +42,9 @@ import ai.opencode.server.OpenCodeLiveContentEvent
 import ai.opencode.server.OpenCodeServerEvent
 import java.util.UUID
 
-// Port of iOS `HomeFeature+Composition.swift`: how Home's reducers stack. Children settle after
-// Home's own coordination (`core`), session screens run as presented and identified children, and a
-// chain of observers follows state Home derives. Fast streaming actions ([isFastStreamAction]) skip
-// the observer chain.
+// How Home's reducers stack. Children settle after Home's own coordination (`core`), session
+// screens run as presented and identified children, and a chain of observers follows state Home
+// derives. Fast streaming actions ([isFastStreamAction]) skip the observer chain.
 
 private object SessionDetailSlot
 private object SettingsSlot
@@ -210,9 +209,9 @@ private fun HomeFeature.homeReducers(): Reducer<State, Action> = combine(
 )
 
 /**
- * `detailSessions`, dropping a gone screen's late actions first (iOS `detailReducer`): a popped
- * subagent's view stays in the page stack for its exit animation, and async UI callbacks or
- * queued forwards can land after its state has left [State.subagentStack].
+ * `detailSessions`, dropping a gone screen's late actions first: a popped subagent's view stays in
+ * the page stack for its exit animation, and async UI callbacks or queued forwards can land after
+ * its state has left [State.subagentStack].
  */
 private fun HomeFeature.detailReducer(): Reducer<State, Action> {
     val chain = detailSessions()
@@ -227,7 +226,7 @@ private fun HomeFeature.detailReducer(): Reducer<State, Action> {
         }
 }
 
-/** Home's own actions, the open session and its pushed subagents (iOS `detailSessionsCore`). */
+/** Home's own actions, the open session and its pushed subagents. */
 private fun HomeFeature.detailSessionsCore(): Reducer<State, Action> {
     val catchUp = CatchUpFeature()
     val notifications = HomeNotificationsFeature()
@@ -289,7 +288,7 @@ private fun HomeFeature.detailSessionsCore(): Reducer<State, Action> {
     )
 }
 
-/** What a pushed subagent's screen leaves behind when it goes (iOS `StackLeftovers`). */
+/** What a pushed subagent's screen leaves behind when it goes. */
 private data class StackLeftovers(val pageID: UUID?, val livePress: Int?) {
     constructor(detail: SessionFeature.State) : this(
         pageID = detail.browser.pageID,
@@ -346,8 +345,8 @@ private fun HomeFeature.detailSessions(): Reducer<State, Action> =
         }
 
 /**
- * Streaming traffic that skips the observer chain (iOS `isFastStreamAction`): it moves neither the
- * list, Catch Up, notices nor navigation.
+ * Streaming traffic that skips the observer chain: it moves neither the list, Catch Up, notices nor
+ * navigation.
  */
 internal fun isFastStreamAction(state: State, action: Action): Boolean = when (action) {
     is Action.ServerEvent -> when (val event = action.event) {
@@ -365,7 +364,6 @@ internal fun isFastStreamAction(state: State, action: Action): Boolean = when (a
     else -> false
 }
 
-/** iOS computed `notifications`. */
 val State.notifications: HomeNotificationsFeature.State
     get() = HomeNotificationsFeature.State(server = server, status = notificationState)
 
@@ -426,11 +424,9 @@ private fun homeAction(action: HomeConnectionFeature.Action): Action = when (act
 }
 
 /**
- * The observers iOS chains on `detailReducer` and `detailChain`: In-App Notices follow Home's live
- * state, a session on screen clears its delivered notifications, an answered request clears its
- * needs-input notifications, the icon's badge counts what Catch Up holds, the share sheet offers
- * what the drawer does, and the system publication follows the list
- * (`HomeFeature+Notifications.swift`, `HomeFeature+System.swift`, `ShareInbox.swift`).
+ * In-App Notices follow Home's live state, a session on screen clears its delivered notifications,
+ * an answered request clears its needs-input notifications, the icon's badge counts what Catch Up
+ * holds, the share sheet offers what the drawer does, and the system publication follows the list.
  */
 private fun Reducer<State, Action>.homeChildrenObservers(feature: HomeFeature): Reducer<State, Action> =
     onChange({ feature.noticeInput(it) }) { old, _, state ->
@@ -508,7 +504,7 @@ private fun Reducer<State, Action>.homeChildrenObservers(feature: HomeFeature): 
             Reduced(state)
         }
 
-/** The part of a call its ongoing notification shows (iOS `VoiceLiveActivity.Call.init(_:)`). */
+/** The part of a call its ongoing notification shows. */
 internal fun liveActivityCall(voice: VoiceFeature.State): VoiceLiveActivity.Call = VoiceLiveActivity.Call(
     phase = when (voice.phase) {
         VoiceFeature.State.Phase.Connecting -> VoiceLiveActivity.CallPhase.Connecting
@@ -525,7 +521,7 @@ internal fun liveActivityCall(voice: VoiceFeature.State): VoiceLiveActivity.Call
     sessionID = voice.target.sessionID ?: "",
 )
 
-/** iOS `DictationLiveActivity.recording(in:)`: only a hands-free recording, outside a call. */
+/** Only a hands-free recording, outside a call. */
 internal fun liveActivityRecording(detail: SessionFeature.State?): DictationLiveActivity.Recording? =
     DictationLiveActivity.recording(
         hasDetail = detail != null,
@@ -536,7 +532,7 @@ internal fun liveActivityRecording(detail: SessionFeature.State?): DictationLive
         serverID = detail?.server?.id ?: "",
     )
 
-/** iOS `discardPage(_:)`: a page no screen shows any more is let go. */
+/** A page no screen shows any more is let go. */
 internal fun discardPage(id: UUID): Effect<Action> {
     val pageReader = dependency(PageReaderClient)
     return Effect.run { pageReader.discard(id) }

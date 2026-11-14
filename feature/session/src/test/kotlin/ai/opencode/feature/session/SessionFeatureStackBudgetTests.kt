@@ -13,15 +13,12 @@ import ai.opencode.server.model.OpenCodeTranscriptPage
 import org.junit.Test
 
 /**
- * Port of iOS `SessionFeatureStackBudgetTests.swift`. iOS paints the unused stack and measures
- * how far a history page through `SessionFeature` wrote (a Swift Debug-build probe of nested
- * `reduceX` helpers, which overflowed the phone's 1 MB main-thread stack). The JVM can't paint
- * its stack, so this keeps the behaviour the probe guards: the same page reduces on a thread
- * whose whole stack is the iOS budget (300 KB), without a `StackOverflowError`.
+ * IOS paints the unused stack and measures how far a history page through `SessionFeature` wrote.
+ * The JVM can't paint its stack, so this keeps the behaviour the probe guards.
  */
 class SessionFeatureStackBudgetTests {
     companion object {
-        /** iOS: Debug simulator: 582 KB with nested helpers, 187 KB run one by one. */
+        /** Debug simulator: 582 KB with nested helpers, 187 KB run one by one. */
         const val BUDGET = 300 * 1024L
     }
 

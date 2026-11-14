@@ -8,8 +8,7 @@ import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.feature.composer.SharedComposerDraft
 import java.time.Instant
 
-// Port of iOS `SessionFeature+StateDictation.swift`: the composer's dictation. `raiseToTalkGrace`
-// stays in `State`'s companion (`SessionFeature.kt`).
+// The composer's dictation. `raiseToTalkGrace` stays in `State`'s companion (`SessionFeature.kt`).
 
 val State.isDictating: Boolean get() = dictation.isDictating
 val State.isPreparingDictation: Boolean get() = dictation.isPreparing
@@ -26,7 +25,7 @@ fun State.showDictation(transcript: String): State {
     val (dictation, text) = dictation.show(transcript)
     val next = copy(dictation = dictation)
     if (text == null || text == draft) return next
-    // The words land at the end: the caret the reader left mid-draft goes (iOS 6b8772f3).
+    // The words land at the end: the caret the reader left mid-draft goes.
     val shown = next.withDraft(text)
     return shown.copy(autocomplete = shown.autocomplete.setCaret(offset = null, draftLength = text.length))
 }

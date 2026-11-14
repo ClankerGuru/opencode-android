@@ -29,13 +29,13 @@ import java.net.URL
  * wraps its root in `DevToolsOverlay` and shows `DevToolsView` as Settings › Developer.
  */
 object DevTools {
-    /** The Tuning Panel's store, shared by the overlay and Settings (iOS `TuningOverlay.shared.store`). Main thread. */
+    /** The Tuning Panel's store, shared by the overlay and Settings. Main thread. */
     val tuningStore: Store<TuningFeature.State, TuningFeature.Action> by lazy { Store(TuningFeature.State(), TuningFeature()) }
 
     /** The Developer screen's store when the overlay opens it (Settings may keep its own). Main thread. */
     val developerStore: Store<DevToolsFeature.State, DevToolsFeature.Action> by lazy { Store(DevToolsFeature.State(), DevToolsFeature()) }
 
-    /** At launch: applies the saved Tuning switch where tuning is available (iOS `TuningOverlay.start`). */
+    /** At launch: applies the saved Tuning switch where tuning is available. */
     fun install() {
         // Made at launch: its journal sets the previous run aside before anything records.
         DiagnosticsRecorder.shared
@@ -89,13 +89,13 @@ object DevTools {
         if (!tuningStore.state.isPanelShown) tuningStore.send(TuningFeature.Action.Summoned)
     }
 
-    /** Settings' Tuning switch (iOS `TuningOverlay.setEnabled`). Call from a reducer: it writes the shared key. */
+    /** Settings' Tuning switch. Call from a reducer: it writes the shared key. */
     fun setTuningEnabled(isOn: Boolean) {
         shared(TuningSharedKeys.tuningEnabled).set(isOn)
         applyTuning(isOn)
     }
 
-    /** Developer Mode changed: outside debug builds, tuning and slow motion leave with it (iOS `TuningOverlay.accessChanged`). */
+    /** Developer Mode changed: outside debug builds, tuning and slow motion leave with it. */
     fun accessChanged() {
         MotionWatch.shared.accessChanged()
         if (!TuningAccess.isAvailable) {

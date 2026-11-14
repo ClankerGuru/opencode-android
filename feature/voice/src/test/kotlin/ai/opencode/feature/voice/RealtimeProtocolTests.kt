@@ -34,7 +34,6 @@ import kotlin.math.sin
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
-/** Port of iOS `RealtimeProtocolTests.swift`. */
 class RealtimeProtocolTests {
     private fun json(text: String): RealtimeJSON = VoiceWireJson.parseToJsonElement(text)
     private fun decode(bytes: ByteArray): RealtimeJSON = VoiceWireJson.parseToJsonElement(bytes.decodeToString())
@@ -55,7 +54,6 @@ class RealtimeProtocolTests {
         assertEquals(RealtimePreflightError.RejectedAPIKey, RealtimePreflightError.response(statusCode = 401, data = ByteArray(0)))
         val quota = """{"error":{"message":"Your project has no remaining quota.","type":"insufficient_quota"}}""".toByteArray()
         assertEquals(RealtimePreflightError.Service("Your project has no remaining quota."), RealtimePreflightError.response(statusCode = 429, data = quota))
-        // iOS `URLError(.notConnectedToInternet)`.
         assertEquals(RealtimePreflightError.NoConnection, RealtimePreflightError.transport(IOException("The Internet connection appears to be offline.")))
     }
 
@@ -481,7 +479,7 @@ class RealtimeProtocolTests {
 
     private fun responseCreates(harness: CoordinatorHarness): Int = harness.commands.count { it == RealtimeCommand.ResponseCreate }
 
-    /** iOS yields 20 times; the coordinator here runs on its own thread, so wait for it to go idle. */
+    /** The coordinator here runs on its own thread, so wait for it to go idle. */
     private suspend fun settle(harness: CoordinatorHarness) {
         repeat(20) { yield() }
         delay(50)

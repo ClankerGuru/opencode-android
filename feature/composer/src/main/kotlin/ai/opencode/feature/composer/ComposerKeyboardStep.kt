@@ -34,9 +34,9 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
- * iOS `DockedKeyboard.unanimatedStep(from:to:over:screenMaxY:)`: what a docked keyboard covers of
- * `window` before, less what it covers after. Null for a floating keyboard, a show or a hide, a
- * window the keyboard doesn't cover, and steps under half a point or over 80.
+ * What a docked keyboard covers of `window` before, less what it covers after. Null for a floating
+ * keyboard, a show or a hide, a window the keyboard doesn't cover, and steps under half a point or
+ * over 80.
  */
 object DockedKeyboard {
     fun unanimatedStep(begin: Rect, end: Rect, window: Rect, screenMaxY: Float): Float? {
@@ -50,19 +50,19 @@ object DockedKeyboard {
     }
 
     /**
-     * iOS `DockedKeyboard.focusAnimation`: the keyboard's own spring
-     * (`Motion.keyboard`, [ComposerMorphTunables.keyboard]) for what moves with it, or null (no animation) under
-     * Reduce Motion or while the card lays out without the keyboard (`excludesKeyboard`).
+     * The keyboard's own spring (`Motion.keyboard`, [ComposerMorphTunables.keyboard]) for what
+     * moves with it, or null (no animation) under Reduce Motion or while the card lays out without
+     * the keyboard (`excludesKeyboard`).
      */
     fun focusAnimation(reduceMotion: Boolean, excludesKeyboard: Boolean): FiniteAnimationSpec<Float>? =
         if (reduceMotion || excludesKeyboard) null else ComposerMorphTunables.keyboard()
 }
 
 /**
- * iOS `ComposerKeyboardStep`: the composer through a docked keyboard's unanimated height change
- * (the suggestion strip hiding, and showing again). The keys snap; the composer keeps its drawn
- * top in that frame, then glides after them on `Motion.layout`, by as
- * much as the keyboard's cover of its window changed. Another change on the way keeps its speed.
+ * The composer through a docked keyboard's unanimated height change (the suggestion strip hiding,
+ * and showing again). The keys snap; the composer keeps its drawn top in that frame, then glides
+ * after them on `Motion.layout`, by as much as the keyboard's cover of its window changed. Another
+ * change on the way keeps its speed.
  */
 @Stable
 class ComposerKeyboardStep {
@@ -93,8 +93,8 @@ class ComposerKeyboardStep {
 }
 
 /**
- * iOS `ComposerKeyboardStepHold`: pads the composer's bottom by [ComposerKeyboardStep.hold] through
- * an unanimated IME height change (no IME animation running). None under Reduce Motion.
+ * Pads the composer's bottom by [ComposerKeyboardStep.hold] through an unanimated IME height change
+ * (no IME animation running). None under Reduce Motion.
  */
 @OptIn(ExperimentalLayoutApi::class)
 fun Modifier.composerKeyboardStepHold(): Modifier = composed {
@@ -120,7 +120,7 @@ fun Modifier.composerKeyboardStepHold(): Modifier = composed {
             val width = view.rootView.width.toFloat()
             if (height <= 0f) return@collect
             val px = density.density
-            // In dp, as iOS's points, so the 80 pt cap holds on every screen.
+            // In dp, so the 80 dp cap holds on every screen.
             val begin = Rect(0f, (height - old) / px, width / px, height / px)
             val end = Rect(0f, (height - bottom) / px, width / px, height / px)
             val window = Rect(0f, 0f, width / px, height / px)

@@ -12,9 +12,9 @@ import kotlinx.serialization.builtins.serializer
 import java.util.Base64
 
 /**
- * A one-time `opencode pair` code: JSON `{"code","urls"}`, the `https://opencode.ai/pair#…`
- * page, an `opencode(-ios)://pair?code=…&url=…` deep link, or one `…/auth/connect/<code>` link.
- * Port of iOS `OpenCodePairingLink`. Never log [code].
+ * A one-time `opencode pair` code: JSON `{"code","urls"}`, the `https://opencode.ai/pair#…` page,
+ * an `opencode(-ios)://pair?code=…&url=…` deep link, or one `…/auth/connect/<code>` link. Never log
+ * [code].
  */
 data class OpenCodePairingLink(
     /** Scheme, host and port only; the first listed address. */
@@ -126,9 +126,8 @@ data class OpenCodePairingLink(
          * lines by a terminal (`opencode pair --remote`'s 88-character link plus its indent passes
          * 80 columns, and the TUI's `/pair` box is 29 wide), inside the command's whole output or a
          * sentence, or with brackets or punctuation around it. Every link in it with the first
-         * one's code becomes one link with all their addresses (the TUI lists one per address).
-         * For pasted, scanned and typed text; opened URLs are exact ([decode]). iOS decodes only
-         * the trimmed text.
+         * one's code becomes one link with all their addresses (the TUI lists one per address). For
+         * pasted, scanned and typed text; opened URLs are exact ([decode]).
          */
         fun decodeCopied(text: String): OpenCodePairingLink? {
             decode(text)?.let { return it }

@@ -42,7 +42,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.min
 
-/** A choice: its mark on the title's baseline, the title 12 dp after it (iOS `RequestOptionRow`). */
+/** A choice: its mark on the title's baseline, the title 12 dp after it. */
 @Composable
 fun RequestOptionRow(
     title: String,
@@ -74,7 +74,7 @@ fun RequestOptionRow(
     }
 }
 
-/** Hairlines start at the titles (iOS `RequestOptionRow.divider`). */
+/** Hairlines start at the titles. */
 @Composable
 fun RequestOptionRowDivider() {
     HorizontalDivider(Modifier.padding(start = SelectionMarkWidth + 12.dp), color = OpenCodeTheme.colors.border)
@@ -128,8 +128,7 @@ fun SelectionMark(selected: Boolean, multiple: Boolean) {
 
 /**
  * One quiet line in the panel's footnote size: “Couldn’t send answer”, with the server's reason
- * after it unless it only says the server couldn't be reached (Retry says as much) (iOS
- * `RequestErrorLine`).
+ * after it unless it only says the server couldn't be reached (Retry says as much).
  */
 @Composable
 fun RequestErrorLine(text: String, modifier: Modifier = Modifier, detail: String? = null) {

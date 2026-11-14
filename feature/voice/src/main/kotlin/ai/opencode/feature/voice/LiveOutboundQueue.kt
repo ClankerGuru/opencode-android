@@ -65,7 +65,7 @@ data class LiveOutboundItem(
 class LiveOutboundQueue(items: List<LiveOutboundItem> = emptyList()) {
     private val _items = items.toMutableList()
 
-    /** A separate queue holding the same items (iOS's queue is a value). */
+    /** A separate queue holding the same items. */
     fun copy() = LiveOutboundQueue(_items)
     val items: List<LiveOutboundItem> get() = _items.toList()
 

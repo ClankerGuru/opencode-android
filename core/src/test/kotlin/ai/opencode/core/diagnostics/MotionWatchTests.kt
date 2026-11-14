@@ -67,7 +67,6 @@ private fun apply(
     isInitial: Boolean = false,
 ) = MotionFrame.Event(name = "apply", inserted = inserted, removed = removed, order = order, isInitial = isInitial)
 
-/** Port of iOS `MotionAuditDetectorTests` (`MotionWatchTests.swift`); the detector lives in `:core`. */
 class MotionAuditDetectorTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -365,11 +364,11 @@ class MotionAuditDetectorTests {
 }
 
 /**
- * Port of iOS `MotionWatchTests`. iOS's `UserDefaults` suite is the shared key under test storage
- * (the watcher reads `developer-motion-watch` when `enabled` isn't given).
+ * IOS's `UserDefaults` suite is the shared key under test storage (the watcher reads
+ * `developer-motion-watch` when `enabled` isn't given).
  * `recordsReplayContextRunningMotionsAndNeverEncodesMessageText` drops its `replayContext` asserts
  * (`PlaygroundReplayContext` belongs to the Mac-driven playgrounds, not on Android) and reads
- * `magnitudePt` from the JSON rather than matching Swift's pretty-printer spacing.
+ * `magnitudePt` from the JSON rather than.
  */
 class MotionWatchTests {
     @get:Rule val isolation = TestIsolationRule()

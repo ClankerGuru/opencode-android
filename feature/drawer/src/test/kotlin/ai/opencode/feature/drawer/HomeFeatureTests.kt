@@ -52,15 +52,9 @@ import ai.opencode.core.testing.TestIsolationRule
 import java.time.Instant
 
 /**
- * Port of iOS `HomeFeatureTests` (`OpenCodeTests/HomeFeatureTests.swift`): notifications and
- * Settings, busy state and priority, the transcript caches, snapshots, prefetch and attention.
- * The drawer's pins, mutes, deletion and read state are in `HomeFeatureTestsDrawer.kt`;
- * navigation and the connection in `HomeFeatureTestsNavigation.kt`.
- *
- * `transcriptSnapshotRoundTripsAndInvalidatesWhenSessionChanges`,
- * `transcriptPersistenceCoalescesAndKeepsProtectedFormat` and
- * `transcriptPersistenceBoundsLargeSnapshotsBeforeItsSingleFinalEncode` use only `:server` types:
- * they are in `server/src/test/.../TranscriptCachePersistenceTests.kt`.
+ * Notifications and Settings, busy state and priority, the transcript caches, snapshots, prefetch
+ * and attention. The drawer's pins, mutes, deletion and read state are in
+ * `HomeFeatureTestsDrawer.kt`; navigation and the connection in `HomeFeatureTestsNavigation.kt`.
  */
 class HomeFeatureTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -490,10 +484,6 @@ class HomeFeatureTests {
         h.skipInFlightEffects()
     }
 
-    /**
-     * iOS also checks Developer Mode, Demo Call Audio and Touch Probe here: on Android those live
-     * in `:devtools`' `DevToolsFeature` (Touch Probe is iOS-only), not `HomeSettingsFeature`.
-     */
     @Test
     fun persistSnapshotSkipsUnchangedWriteAndSettingsActionsUpdateSharedState() = homeTest { h ->
         val session = testSession()

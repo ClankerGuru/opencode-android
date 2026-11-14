@@ -1,12 +1,12 @@
 package ai.opencode.feature.transcript.markdown
 
 /**
- * Heals the end of the block that's still streaming (iOS `MarkdownTailHeal`), so a
- * half-written marker never draws as literal text and then flips into formatting: `**bold`
- * shows as bold, `` `code `` as code, `[label](https://…` as its label, and a trailing `**`
- * with nothing after it yet is hidden. A port of the desktop app's `patchmark` `heal.ts`
- * (itself after Vercel streamdown's `remend`). Only the live tail is healed; completed blocks
- * parse as written. Every decision reads ASCII, so the scan runs over UTF-16 chars as heal.ts does.
+ * Heals the end of the block that's still streaming, so a half-written marker never draws as
+ * literal text and then flips into formatting: `**bold` shows as bold, `` `code `` as code,
+ * `[label](https://…` as its label, and a trailing `**` with nothing after it yet is hidden. A port
+ * of the desktop app's `patchmark` `heal.ts` (itself after Vercel streamdown's `remend`). Only the
+ * live tail is healed; completed blocks parse as written. Every decision reads ASCII, so the scan
+ * runs over UTF-16 chars as heal.ts does.
  */
 object MarkdownTailHeal {
     /** Chars to drop from the right-trimmed end, then text to append. */

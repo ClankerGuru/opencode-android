@@ -26,13 +26,10 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 
-/**
- * How the session title animates while syncing or Auto Renaming (iOS `TitleLoadingStyle`). Only
- * [Breathing] ships; iOS's Developer Mode looks aren't ported.
- */
+/** How the session title animates while syncing or Auto Renaming. Only [Breathing] ships. */
 enum class TitleLoadingStyle { Breathing, Shimmer, Phosphor, Wave }
 
-/** iOS `TitleLoadingTunables`, baked at their shipped defaults (tuning UI not ported). */
+/** Baked at their shipped defaults (tuning UI not ported). */
 object TitleLoadingTunables {
     val STYLE = TitleLoadingStyle.Breathing
     const val MIN_OPACITY = 0.45
@@ -44,10 +41,10 @@ object TitleLoadingTunables {
 internal fun titleBreathNow(): Double = System.nanoTime() / 1e9
 
 /**
- * How a title looks while it loads (iOS `TitleBreath`): its opacity breathes down to 45 % and back,
- * and eases back to full when loading ends. Under Reduce Motion it holds a steady dim. Each change
- * of state starts from the opacity and speed on screen, the difference decaying on a critically
- * damped spring. Times are seconds on any monotonic base ([titleBreathNow] in the app).
+ * How a title looks while it loads: its opacity breathes down to 45 % and back, and eases back to
+ * full when loading ends. Under Reduce Motion it holds a steady dim. Each change of state starts
+ * from the opacity and speed on screen, the difference decaying on a critically damped spring.
+ * Times are seconds on any monotonic base ([titleBreathNow] in the app).
  */
 data class TitleBreath(
     val isActive: Boolean = false,
@@ -99,8 +96,8 @@ data class TitleBreath(
     val restingOpacity: Double get() = if (isActive && reduceMotion) REDUCED_OPACITY else 1.0
 
     /**
-     * iOS `TitleBreath.RenderServerPlan`: how the tuned look drove a render-server animation.
-     * Ported for parity; Android's modifier samples [opacity] per frame instead.
+     * How the tuned look drove a render-server animation. Ported for parity; Android's modifier
+     * samples [opacity] per frame instead.
      */
     data class RenderServerPlan(
         val initialOpacity: Double,
@@ -167,9 +164,8 @@ data class TitleBreath(
 }
 
 /**
- * The plain object that owns a title's breathing motion (iOS `ShippedTitleBreathing`'s `@State`):
- * the current [TitleBreath] curve and the opacity drawn this frame. Frames are sampled only while
- * the opacity moves.
+ * The plain object that owns a title's breathing motion: the current [TitleBreath] curve and the
+ * opacity drawn this frame. Frames are sampled only while the opacity moves.
  */
 @Stable
 class TitleBreathMotion {
@@ -208,11 +204,10 @@ class TitleBreathMotion {
 }
 
 /**
- * The loading look of a title (iOS `.titleBreathing(_:)`, the shipped Breathing look): while
- * [active] its opacity breathes ([TitleBreath]), easing in and out from whatever is on screen.
- * Used while a session resyncs and while the server writes a title. Respects Reduce Motion (a
- * steady dim) and pauses frames while the app isn't resumed. Dims with a layer alpha, so the
- * title's own colour is untouched.
+ * The loading look of a title: while [active] its opacity breathes ([TitleBreath]), easing in and
+ * out from whatever is on screen. Used while a session resyncs and while the server writes a title.
+ * Respects Reduce Motion (a steady dim) and pauses frames while the app isn't resumed. Dims with a
+ * layer alpha, so the title's own colour is untouched.
  *
  * @param active whether the title is loading (syncing or Auto Renaming).
  */
@@ -234,10 +229,9 @@ fun Modifier.titleBreathing(active: Boolean): Modifier = composed {
 }
 
 /**
- * Which title a header shows while titles change under a breath (iOS `TitleHold`): a new title
- * waits while the old one breathes, and until that breath has eased back to full, so the swap
- * never blurs out a dimmed title. Another identity (a session switched in place) shows its own
- * title at once.
+ * Which title a header shows while titles change under a breath: a new title waits while the old
+ * one breathes, and until that breath has eased back to full, so the swap never blurs out a dimmed
+ * title. Another identity (a session switched in place) shows its own title at once.
  */
 data class TitleHold<Identity>(
     val identity: Identity,
@@ -278,7 +272,7 @@ data class TitleHold<Identity>(
 }
 
 /**
- * Shows a title through [TitleHold] (iOS `BreathingTitleHold`).
+ * Shows a title through [TitleHold].
  *
  * @param identity what the title belongs to (the session); a new identity swaps at once.
  * @param title the latest title.

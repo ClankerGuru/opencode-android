@@ -21,7 +21,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 
-/** Developer Mode → Tuning → Transcript → Session Links (iOS `SessionLinkTunables`). */
+/** Developer Mode → Tuning → Transcript → Session Links. */
 object SessionLinkTunables {
     /** The Tuning Panel sections it registers (the key segment after the group), in order. */
     val sectionTitles = listOf("Session Link")
@@ -53,9 +53,8 @@ object SessionLinkTunables {
 }
 
 /**
- * Reports the session IDs a block shows, once per set (iOS `reportsSessionLinks(_:to:)`): the
- * transcript resolves them in one batch, never per row, and hands the targets back through
- * [LocalSessionLinks].
+ * Reports the session IDs a block shows, once per set: the transcript resolves them in one batch,
+ * never per row, and hands the targets back through [LocalSessionLinks].
  */
 @Composable
 fun ReportsSessionLinks(ids: List<String>) {
@@ -64,9 +63,9 @@ fun ReportsSessionLinks(ids: List<String>) {
     LaunchedEffect(ids) { send(TranscriptAction.SessionLinksAppeared(ids)) }
 }
 
-/** Session mentions in a user message's plain text, as chips (iOS `SessionMentionText.chips`/`shown`). */
+/** Session mentions in a user message's plain text, as chips. */
 object SessionMentions {
-    /** The text as shown, titles in place of the tokens (iOS `SessionMentionText.shown`). */
+    /** The text as shown, titles in place of the tokens. */
     fun shown(text: String, context: SessionLinkContext): String {
         val found = SessionLink.mentions(text)
         if (found.isEmpty()) return text
@@ -84,8 +83,8 @@ object SessionMentions {
 }
 
 /**
- * A sent message's body text with its `@session:<id>` mentions (as desktop sends them) drawn
- * as session chips showing their titles (iOS `SessionMentionText`).
+ * A sent message's body text with its `@session:<id>` mentions (as desktop sends them) drawn as
+ * session chips showing their titles.
  */
 @Composable
 fun SessionMentionText(text: String, modifier: Modifier = Modifier) {

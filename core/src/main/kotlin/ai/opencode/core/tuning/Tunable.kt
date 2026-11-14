@@ -28,9 +28,8 @@ import kotlin.math.truncate
 import kotlin.random.Random
 
 /**
- * Port of iOS `Tunable`: a value to dial in live, same keys and defaults as iOS. Keep each
- * declaration on ONE line (`Tunable("key", "label", default = …`) so `scripts/tune.py bake` can
- * rewrite its default.
+ * A value to dial in live, same keys and defaults. Keep each declaration on ONE line
+ * (`Tunable("key", "label", default = …`) so `scripts/tune.py bake` can rewrite its default.
  */
 class Tunable<T> @PublishedApi internal constructor(
     val key: String,
@@ -80,12 +79,12 @@ fun Tunable(key: String, label: String, default: Boolean): Tunable<Boolean> =
 inline fun <reified E> Tunable(key: String, label: String, default: E): Tunable<E> where E : Enum<E>, E : TunableChoice =
     Tunable(key, label, default, null, null, TunableType.choice(enumValues<E>().toList(), E::class.java.simpleName))
 
-/** A string enum a [Tunable] can hold. [rawValue] is iOS's raw value (the wire and storage form). */
+/** A string enum a [Tunable] can hold. [rawValue] is the wire and storage form. */
 interface TunableChoice {
     val rawValue: String
 }
 
-/** What a tunable type is on the wire: Swift's `TunableValue` conformances. */
+/** What a tunable type is on the wire. */
 class TunableType<T> @PublishedApi internal constructor(
     val kind: TuneKind,
     /** The declared type ("Double", "Float", "Dp", "Int", "Boolean", or the enum's name). */
@@ -111,10 +110,7 @@ class TunableType<T> @PublishedApi internal constructor(
     }
 }
 
-/**
- * A spring in SwiftUI's terms (duration and bounce), tuned as two numbers: `<key>.duration` and
- * `<key>.bounce` (iOS `TunableSpring`). Reads as the core [MotionSpring] (exact Compose spring).
- */
+/** `<key>.duration` and `<key>.bounce`. Reads as the core [MotionSpring] (exact Compose spring). */
 class TunableSpring(key: String, label: String, duration: Double, bounce: Double) {
     val duration: Tunable<Double> = Tunable("$key.duration", "$label duration", default = duration, range = 0.05..2.0, step = 0.01)
     val bounce: Tunable<Double> = Tunable("$key.bounce", "$label bounce", default = bounce, range = -0.5..0.9, step = 0.01)
@@ -150,7 +146,7 @@ object TuningTitle {
 data class TuningContext(val id: String, val label: String? = null, val groups: List<String> = listOf(id)) {
     val displayTitle: String get() = label ?: TuningTitle.format(id)
 
-    /** iOS `panelGroups`: its groups, then the global ones every screen lists ([globalGroups]). */
+    /** Its groups, then the global ones every screen lists ([globalGroups]). */
     val panelGroups: List<String>
         get() {
             val result = ArrayList(groups)
@@ -162,8 +158,8 @@ data class TuningContext(val id: String, val label: String? = null, val groups: 
 
     companion object {
         /**
-         * iOS `TuningPanelGroups.globalGroups` (here so `:core` can read it): groups every screen
-         * lists after its own. The motion roles move everything, so they're tunable wherever you are.
+         * Groups every screen lists after its own. The motion roles move everything, so they're
+         * tunable wherever you are.
          */
         val globalGroups = listOf("motion")
 
@@ -220,7 +216,7 @@ enum class TuneKind {
     @SerialName("choice") Choice,
 }
 
-/** A tunable's metadata: what the panel and a remote page show (iOS `TunableDescriptor`). */
+/** A tunable's metadata: what the panel and a remote page show. */
 data class TunableDescriptor(
     val key: String,
     val label: String,
@@ -393,8 +389,8 @@ data class TuningPreset(val name: String, val values: List<TunablePresetValue>) 
 }
 
 /**
- * Variants of a set of tunables, picked by number (iOS `TuningPresets`). Applying one sets every
- * key any of them names, so switching leaves nothing behind.
+ * Variants of a set of tunables, picked by number. Applying one sets every key any of them names,
+ * so switching leaves nothing behind.
  */
 data class TuningPresets(
     /** Its first segment is the panel group it shows in. */
@@ -442,7 +438,7 @@ data class TuningPresets(
     }
 }
 
-/** Swift's `Double.rounded()`: to nearest, halves away from zero. */
+/** To nearest, halves away from zero. */
 internal fun swiftRounded(value: Double): Double {
     if (!value.isFinite()) return value
     // Exact: `value - whole` never rounds, unlike `floor(value + 0.5)` (0.49999999999999994 → 1).

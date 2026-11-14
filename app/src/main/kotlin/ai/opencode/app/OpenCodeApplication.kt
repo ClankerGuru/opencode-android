@@ -27,8 +27,8 @@ import kotlinx.coroutines.launch
 import android.util.Log
 
 /**
- * Process entry (iOS `OpenCodeApp` + `AppDelegate`). Installs the application context as the one
- * process-wide override; no synchronous disk reads beyond what the first frame needs.
+ * Process entry. Installs the application context as the one process-wide override; no synchronous
+ * disk reads beyond what the first frame needs.
  */
 class OpenCodeApplication : Application() {
     private val launchScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -36,8 +36,8 @@ class OpenCodeApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         DependencyValues.installRoot { this[AppContext] = applicationContext }
-        // The batcher prepares streaming Markdown (iOS `EventBatcher.prepareMarkdown`) and records
-        // every event into the agent activity ledger (iOS `AgentActivityLedger.record`).
+        // The batcher prepares streaming Markdown and records every event into the agent activity
+        // ledger.
         DependencyValues.installRoot {
             val markdown = this[EventBatcherHooks].withMarkdownStream()
             this[EventBatcherHooks] = EventBatcherHooks(
@@ -59,10 +59,10 @@ class OpenCodeApplication : Application() {
         AppDependencies.install(this)
         // Open in New Window (tablet multi-instance windows).
         SceneWindows.install()
-        // The haptics diagnostics trace's `dictating=`/`call=` (iOS reads the audio session owner).
+        // The haptics diagnostics trace's `dictating=`/`call=`.
         AudioSessionHaptics.isCallActive = { SceneWindows.all.any { it.isResolved && it.store.state.hasLiveCall } }
         AudioSessionHaptics.isDictating = { SceneWindows.all.any { it.isResolved && it.store.state.home?.dictationActivity != null } }
-        // iOS `OpenCodeApp.init`'s launch line: version, distribution, model, system.
+        // Version, distribution, model, system.
         val device = dependency(DevToolsClient).device()
         AppLog.app.notice { "Launch: ${AppVersion.current.label}, ${device.distribution}, ${device.model}, ${device.system}" }
         // A call, a recording or a followed run never outlives its process: end any ongoing
@@ -77,8 +77,7 @@ class OpenCodeApplication : Application() {
         // thread. Resolved after AppDependencies so the recorder gets the installed uploader.
         val voiceCallLog = dependency(VoiceCallLogClient)
         launchScope.launch(Dispatchers.IO) { voiceCallLog.recoverInterrupted() }
-        // Remembered image shapes are read off the main thread (iOS
-        // `AgentImageSizeCache.live.warm()`).
+        // Remembered image shapes are read off the main thread.
         AgentImageSizeCache.live.warm()
         launchScope.launch {
             AppPhases.phases().collect { phase ->

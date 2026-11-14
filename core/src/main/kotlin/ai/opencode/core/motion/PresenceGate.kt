@@ -32,9 +32,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * Generation-guarded mount/unmount gate (iOS `PresenceGate`): unmounts only when the latest
- * generation's outro completes while still closed, so a quick reopen never unmounts. For custom
- * drivers; `AnimatedVisibility` already does this.
+ * Generation-guarded mount/unmount gate: unmounts only when the latest generation's outro completes
+ * while still closed, so a quick reopen never unmounts. For custom drivers; `AnimatedVisibility`
+ * already does this.
  */
 data class PresenceGate(
     val wantsOpen: Boolean,
@@ -80,8 +80,8 @@ data class PresenceGate(
 }
 
 /**
- * Blur, opacity and optional rise for content entering a morphing surface (iOS `MotionBlurReveal`).
- * Blur runs only for 0.02 < [progress] < 0.98; Reduce Motion is opacity-only.
+ * Blur, opacity and optional rise for content entering a morphing surface. Blur runs only for 0.02
+ * < [progress] < 0.98; Reduce Motion is opacity-only.
  */
 fun Modifier.motionBlurReveal(
     progress: Float,
@@ -100,7 +100,7 @@ fun Modifier.motionBlurReveal(
     }
 }
 
-/** The pure maths behind [motionBlurReveal] (iOS's testable statics). */
+/** The pure maths behind [motionBlurReveal]. */
 object MotionBlurReveal {
     fun blurRadius(progress: Float, maxBlur: Float, reduceMotion: Boolean): Float {
         val clamped = progress.coerceIn(0f, 1f)
@@ -118,8 +118,8 @@ object MotionBlurReveal {
 // Presence
 
 /**
- * iOS `MotionPresence`: mounts [content] through a [PresenceGate] and animates it in and out on
- * [role]. A leaving view takes no touches and is hidden from accessibility.
+ * Mounts [content] through a [PresenceGate] and animates it in and out on [role]. A leaving view
+ * takes no touches and is hidden from accessibility.
  */
 @Composable
 fun MotionPresence(
@@ -136,7 +136,7 @@ fun MotionPresence(
         gate = requested
         var token = requestToken
         if (isOpen && requested.isMounted && !requested.isPresented) {
-            // Just mounted at its entering pose: start the entrance on the next frame (iOS onAppear).
+            // Just mounted at its entering pose: start the entrance on the next frame.
             withFrameNanos { }
             val (begun, beginToken) = gate.beginAnimation(true)
             gate = begun
@@ -168,12 +168,12 @@ fun MotionPresence(
 
 // Transitions
 
-/** iOS `MotionRollDirection`: which way a rolling value moves as it changes. */
+/** Which way a rolling value moves as it changes. */
 enum class MotionRollDirection { Up, Down }
 
 /**
- * iOS `AnyTransition.motionMicro` / `.motionSwap` / `.motionRoll`: role-timed transitions for
- * `AnimatedVisibility` and `AnimatedContent`; reduced cross-fades under Reduce Motion.
+ * Role-timed transitions for `AnimatedVisibility` and `AnimatedContent`; reduced cross-fades under
+ * Reduce Motion.
  */
 data class MotionTransition(val enter: EnterTransition, val exit: ExitTransition) {
     val content: ContentTransform get() = enter togetherWith exit
@@ -199,7 +199,7 @@ data class MotionTransition(val enter: EnterTransition, val exit: ExitTransition
 
         /**
          * Rolls like a counter: in from [MotionTunables.rollDistance] away, out the other way, on
-         * [role] (layout by default; a title roll, iOS `.titleRoll`, passes `Motion.swap`).
+         * [role].
          */
         fun roll(
             direction: MotionRollDirection,
@@ -235,10 +235,7 @@ data class MotionTransition(val enter: EnterTransition, val exit: ExitTransition
     }
 }
 
-/**
- * iOS `MotionSwap`: shows [value] through [content], swapping (or rolling, given [roll]) when
- * it changes.
- */
+/** Shows [value] through [content], swapping (or rolling, given [roll]) when it changes. */
 @Composable
 fun <T> MotionSwap(
     value: T,

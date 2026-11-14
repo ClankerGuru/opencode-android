@@ -33,19 +33,6 @@ import java.net.ConnectException
 import java.time.Instant
 import java.util.UUID
 
-/**
- * Port of iOS `VoiceServerPickerTests.swift` ("Voice Server"): which saved servers can
- * broker a call, and the calls a chosen server brokers while each call's own work stays on
- * its server.
- *
- * Not here (their stores live in other modules): `settingsAsksTheConnectedServerAndTheProviderPageAsksTheOthers`,
- * `theChoiceStaysVisibleAndAStaleOneFallsBackToTheConnectedServer`,
- * `theKeyRowNamesOpenCodeWhenTheBrokerHostsTheCallThroughIt` (`VoiceSettingsFeature`, :feature:settings) and
- * `homeSavesTheChoiceAndAsksTheServerItNames` (`HomeSettingsFeature`). In
- * `everyEntryPointRoutesByTheChosenServersSupport` and `thisIPhoneUsesThePhonesOwnKey`, the
- * `VoiceSettingsFeature.State` and `SessionFeature.State` checks belong to those modules; the
- * `VoiceRoutePreferences` (Home's entry point) checks and the call are ported here.
- */
 class VoiceServerPickerTests {
     private val server = OpenCodeServer(url = "http://127.0.0.1:4096", username = "opencode", password = "secret", name = "My Mac")
     private val studio = OpenCodeServer(url = "http://studio.local:4096", username = "opencode", password = "studio", name = "Studio")
@@ -60,7 +47,7 @@ class VoiceServerPickerTests {
 
     private val presenceID = UUID(0, 0)
 
-    /** iOS resets the process-wide shared values; each test here gets a fresh in-memory store. */
+    /** Each test here gets a fresh in-memory store. */
     private fun resetSharedState(): SpeechTestShared = SpeechTestShared()
 
     /** `servers` saved and `server` the one in use, with `choice` in Voice Server. */
@@ -131,8 +118,7 @@ class VoiceServerPickerTests {
      * without the route (404) offers none; one that doesn't answer, or
      * answers otherwise, says nothing.
      *
-     * iOS answers through a local `WireFixture` server; here an OkHttp interceptor on the
-     * transport answers the same way.
+     * An OkHttp interceptor on the transport answers the same way.
      */
     @Test fun onlyAnAnswerSaysWhichModelsAServerHas() = runBlocking {
         fun ask(reply: Reply): Pair<List<ServerVoiceModel>?, List<String>> {

@@ -6,8 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 
 /**
- * Shows Android's notification permission dialog for [SessionNotifications.requestPermission]
- * (iOS asks through `UNUserNotificationCenter` without a screen; Android needs an activity),
+ * Shows Android's notification permission dialog for [SessionNotifications.requestPermission],
  * reports the answer, and goes.
  */
 class NotificationPermissionActivity : Activity() {

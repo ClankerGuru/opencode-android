@@ -45,17 +45,12 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `NewMessagesTests`' Home tests: the mark on returning to a session, the drawer's
- * prefetch, and holding the stream on leaving. The divider's own placement is
- * `:feature:transcript`'s, the screen's resume `:feature:session`'s.
- */
 class NewMessagesTests {
     @get:Rule val isolation = TestIsolationRule()
 
     private val server = OpenCodeServer(url = "http://127.0.0.1:9", username = "", password = "")
 
-    /** [body] in the test's dependencies, as iOS's `TestStore` runs its expected-state updates. */
+    /** [body] in the test's dependencies. */
     private fun <R> on(body: () -> R): R = DependencyValues.withValues(DependencyValues.testing(), body)
 
     private fun session(id: String) = OpenCodeSession(id = id, serverTitle = id, projectID = "project", directory = "/project", updatedAt = Instant.ofEpochSecond(10))
@@ -119,12 +114,12 @@ class NewMessagesTests {
         assertEquals(listOf(HomeFeature.liveUpdatesAfterLeaving), held.toList())
     }
 
-    // region Ported from iOS f657969b: the read watermarks, Catch Up and the covered screen
+    // region The read watermarks, Catch Up and the covered screen
 
     /** [body] in this test's world. */
     private fun <R> Harness.on(body: () -> R): R = state(body)
 
-    /** An expected-state update run in this test's world, as iOS's `TestStore` runs it with the store's dependencies. */
+    /** An expected-state update run in this test's world. */
     private fun <S> Harness.expect(update: (S) -> S): (S) -> S = { s -> on { update(s) } }
 
     private val liveID = "msg_live-text-0"
@@ -145,7 +140,7 @@ class NewMessagesTests {
     private fun home(vararg sessions: OpenCodeSession): HomeFeature.State =
         HomeFeature.State(server, OpenCodeHomeSnapshot(projects = emptyList(), sessions = sessions.toList(), activeSessionIDs = emptySet()))
 
-    /** iOS `stub`: a server that answers every read a screen makes with [transcript]. */
+    /** A server that answers every read a screen makes with [transcript]. */
     private fun DependencyValues.Builder.stub(transcript: () -> List<OpenCodeTranscriptItem>) {
         this[Clock] = ImmediateClock()
         this[DateClient] = DateClient.constant(Instant.ofEpochSecond(100))

@@ -28,16 +28,10 @@ import java.nio.file.Files
 import java.time.Instant
 import java.util.UUID
 
-// Ports of iOS `ShareHandoffTests.swift`. `ShareInboxFeatureTests` drives `HomeFeature`
-// (`:feature:drawer`). `SharedImageEncoderTests` and the `MimeTypeMap` half of
-// `SharedItemLoaderAndActivationTests` (`SharedItemLoaderAndActivationFrameworkTests`) run under
-// Robolectric (real `ImageDecoder`/`Bitmap`/`ExifInterface` and `MimeTypeMap`).
+// `SharedImageEncoderTests` and the `MimeTypeMap` half of `SharedItemLoaderAndActivationTests`
+// (`SharedItemLoaderAndActivationFrameworkTests`) run under Robolectric (real
+// `ImageDecoder`/`Bitmap`/`ExifInterface` and `MimeTypeMap`).
 
-/**
- * Port of iOS `FileAttachmentTests.swift`'s `ShareHandoffFileTests`: a shared file moves out of its
- * share into the composer's staging directory under its own name. The `SharedComposerDraft` half
- * (the draft's file names) is `:feature:composer`'s.
- */
 class ShareHandoffFileTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -143,14 +137,12 @@ class ShareHandoffStoreTests {
 }
 
 /**
- * Port of the parts of iOS `SharedItemLoaderAndActivationTests` Android has. iOS walks an
- * `NSItemProvider`'s representations (file, file URL, data, item) and checks the extension's
- * `NSExtensionActivationRule`; Android reads a share's one `content://` stream, named from
- * `OpenableColumns.DISPLAY_NAME` or the URI's last segment, and filters shares with the
- * manifest's intent filters. What carries over is the name each JSON share is staged under
- * ([SharedItemLoader.resolvedFileName]); the representation-order, sparse/FIFO-file,
- * cancellation and precedence probes are provider mechanics. The non-JSON `clip.mov` case and the
- * staged copy's type read Android's `MimeTypeMap`: [SharedItemLoaderAndActivationFrameworkTests].
+ * Android reads a share's one `content://` stream, named from `OpenableColumns.DISPLAY_NAME` or the
+ * URI's last segment, and filters shares with the manifest's intent filters. What carries over is
+ * the name each JSON share is staged under ([SharedItemLoader.resolvedFileName]); the
+ * representation-order, sparse/FIFO-file, cancellation and precedence probes are provider
+ * mechanics. The non-JSON `clip.mov` case and the staged copy's type read Android's `MimeTypeMap`:
+ * [SharedItemLoaderAndActivationFrameworkTests].
  */
 class SharedItemLoaderAndActivationTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -226,12 +218,8 @@ class SharedItemLoaderAndActivationFrameworkTests {
 }
 
 /**
- * Port of iOS `SharedImageEncoderTests` under Robolectric (native graphics: real `ImageDecoder`,
- * `Bitmap` and JPEG codecs; `ExifInterface` writes and reads the metadata as `CGImageSource`
- * does). The `ImageAttachmentImporter` comparison of `shareReencodingMatchesTheComposer…` is in
- * `:feature:session` (`SharedImageEncoderFrameworkTests`), the lowest module that sees both the
- * share sheet's and the composer's encoder. API 34: Robolectric 4.16's native `ImageDecoder`
- * shadows its file-descriptor source (`jpeg(file)`) only through API 34.
+ * API 34: Robolectric 4.16's native `ImageDecoder` shadows its file-descriptor source
+ * (`jpeg(file)`) only through API 34.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])

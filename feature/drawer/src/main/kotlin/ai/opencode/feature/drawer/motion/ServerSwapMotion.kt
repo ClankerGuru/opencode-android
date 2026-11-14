@@ -20,12 +20,12 @@ import androidx.compose.runtime.setValue
 import kotlin.math.abs
 
 /**
- * Port of iOS `ServerSwapMotion` (Server Flow), "Title Leads": the drawer's name rolls to the
- * server picked and its rows hang off it like a chain, each springing after the one above. Every
- * spring keeps its velocity, so picking again mid-swap turns round from where it is. A plain motion
- * object stepped by [RunServerSwapMotion]'s frame loop. Positions are in travel units: 0 at rest,
- * ±1 a full travel. Only the chain's lag ([ServerFlowTunables.chainLag]) is its own; the rest run
- * on motion roles (`Reduced` under Reduce Motion).
+ * The drawer's name rolls to the server picked and its rows hang off it like a chain, each
+ * springing after the one above. Every spring keeps its velocity, so picking again mid-swap turns
+ * round from where it is. A plain motion object stepped by [RunServerSwapMotion]'s frame loop.
+ * Positions are in travel units: 0 at rest, ±1 a full travel. Only the chain's lag
+ * ([ServerFlowTunables.chainLag]) is its own; the rest run on motion roles (`Reduced` under Reduce
+ * Motion).
  */
 @Stable
 class ServerSwapMotion {
@@ -47,11 +47,11 @@ class ServerSwapMotion {
     var underlineFill: Float by mutableFloatStateOf(0f)
         private set
 
-    /** Bumped each frame the rows move (iOS `onFrame`). */
+    /** Bumped each frame the rows move. */
     var frame: Long by mutableLongStateOf(0L)
         private set
 
-    /** Bumped to start the frame loop (iOS `link.start()`). */
+    /** Bumped to start the frame loop. */
     internal var wake: Int by mutableIntStateOf(0)
         private set
 
@@ -264,7 +264,7 @@ class ServerSwapMotion {
     }
 }
 
-/** Steps [motion] on frames while it moves (iOS `MotionDisplayLink(surface: "drawer.server-swap")`). */
+/** Steps [motion] on frames while it moves. */
 @Composable
 fun RunServerSwapMotion(motion: ServerSwapMotion) {
     val frameDuration = rememberFrameDurationSeconds()

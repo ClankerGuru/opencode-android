@@ -46,10 +46,9 @@ import kotlin.math.roundToLong
 
 /**
  * One Shape: which stage the floating call settles on and its haptics, and the shape's geometry
- * between the orb, the card and the sheet (iOS `FloatingCallStageTests`).
+ * between the orb, the card and the sheet.
  *
- * iOS uses `CGFloat` (Double) frames; Compose's [Rect] is Float, so frames compare within
- * [FLOAT_SLACK] where iOS compares exactly.
+ * Compose's [Rect] is Float.
  */
 class FloatingCallStageTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -283,7 +282,7 @@ class FloatingCallStageTests {
     @Test fun cornersRoundAsTheOrbThenSquareAtTheSheetsFoot() {
         val orb = geometry.radii(geometry.frame(0.0))
         assertTrue(orb.top == 32.0 && orb.bottom == 32.0)
-        // The design system's sheet radius here; iOS follows the device's corners (36 and 38).
+        // The design system's sheet radius here.
         val card = geometry.radii(geometry.frame(1.0))
         assertTrue(card.top == 16.0 && card.bottom == 16.0)
         val sheet = geometry.radii(geometry.frame(2.0))
@@ -333,7 +332,7 @@ class FloatingCallStageTests {
     }
 }
 
-/** iOS frames are `CGFloat`; Compose rects are Float. */
+/** Compose rects are Float. */
 private const val FLOAT_SLACK = 0.001f
 
 private fun frameOf(x: Number, y: Number, width: Number, height: Number): Rect =
@@ -347,7 +346,10 @@ private fun assertSameRect(expected: Rect, actual: Rect, message: String = "", s
 
 private fun Rect.offsetBy(dy: Float): Rect = translate(0f, dy)
 
-/** Each scene's floating window keeps its own touches and call: another scene closing leaves them alone (iOS `FloatingCallWindowTests`). */
+/**
+ * Each scene's floating window keeps its own touches and call: another scene closing leaves them
+ * alone.
+ */
 class FloatingCallWindowTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -363,13 +365,15 @@ class FloatingCallWindowTests {
         assertFalse(center.hasCall)
     }
 
-    // iOS `eachWindowTakesTouchesOnlyOnItsOwnOrb` is not ported: it hit-tests two UIKit
-    // `FloatingCallWindow`s. Android has one window per activity; `FloatingCallOverlay` passes
-    // touches outside `FloatingCallTouchArea` through by only attaching pointer input to the
-    // shape (and the full screen only while the sheet is up), which needs Compose UI to test.
+    // Android has one window per activity; `FloatingCallOverlay` passes touches outside
+    // `FloatingCallTouchArea` through by only attaching pointer input to the shape (and the full
+    // screen only while the sheet is up), which needs Compose UI to test.
 }
 
-/** Lift and Spin Up: out of the call button into the orb, and the hang-up back into it, frame by frame (iOS `FloatingCallConnectTests`). */
+/**
+ * Lift and Spin Up: out of the call button into the orb, and the hang-up back into it, frame by
+ * frame.
+ */
 class FloatingCallConnectTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -570,8 +574,8 @@ class FloatingCallConnectTests {
 }
 
 /**
- * The transcript composed for real (Android only: iOS has no equivalent crash or hang). It must
- * keep up with captions arriving after a pause, and lay out a word wider than its line.
+ * The transcript composed for real. It must keep up with captions arriving after a pause, and lay
+ * out a word wider than its line.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])

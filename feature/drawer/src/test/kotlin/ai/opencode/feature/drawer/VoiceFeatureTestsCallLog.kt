@@ -51,11 +51,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `VoiceFeatureTests+CallLog`'s Home tests: a live call follows Home's session
- * switches, and replies from sessions off screen are announced. The call log tests are
- * `:feature:voice`'s (`VoiceFeatureTestsCallLog.kt` there).
- */
 class VoiceFeatureTestsCallLog {
     @get:Rule val isolation = TestIsolationRule()
 

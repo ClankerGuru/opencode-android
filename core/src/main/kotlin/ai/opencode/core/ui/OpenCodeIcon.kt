@@ -10,9 +10,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/** Icon sizes. Material Symbols are drawn on a 24 dp grid; iOS symbols scale with their text style. */
+/** Icon sizes. Material Symbols are drawn on a 24 dp grid. */
 object OpenCodeIconSize {
-    /** Inline with caption/footnote text (iOS `.imageScale(.small)`). */
+    /** Inline with caption/footnote text. */
     val small: Dp = 18.dp
     /** Default (body text, toolbar and list icons). */
     val medium: Dp = 24.dp
@@ -23,7 +23,7 @@ object OpenCodeIconSize {
 }
 
 /**
- * Draws an iOS SF Symbol as its Material Symbols Rounded counterpart. [contentDescription] is
+ * Draws an SF Symbol name as its Material Symbols Rounded counterpart. [contentDescription] is
  * `null` when decorative.
  */
 @Composable

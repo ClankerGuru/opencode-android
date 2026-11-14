@@ -31,7 +31,6 @@ private fun read(id: String, path: String, status: OpenCodeToolCall.Status = Ope
 
 private fun str(value: String) = OpenCodeJSONValue.Str(value)
 
-/** Port of iOS `InlineRowsTests.swift`. */
 class InlineRowsTests {
     @Test fun consecutiveReadsMergeIntoOneRow() {
         val rows = InlineToolRow.rows(listOf(

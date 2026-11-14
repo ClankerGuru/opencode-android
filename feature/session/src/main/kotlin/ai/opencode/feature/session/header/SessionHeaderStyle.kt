@@ -10,12 +10,10 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * What sits behind the session header (iOS `SessionHeaderStyle`): a background-coloured wash (and
- * optional tonal surface) under the controls. Where iOS blurs, [SessionHeaderBackdrop] draws a
- * tonal scrim band that fades in as content scrolls under the header; with no system scroll-edge
- * effect, [Environment] defaults to the app-drawn band. Distances are dp relative to the header's
- * bottom edge (the controls row, 52 below the safe area at the default font scale); negative is
- * above it.
+ * What sits behind the session header: a background-coloured wash (and optional tonal surface)
+ * under the controls. With no system scroll-edge effect, [Environment] defaults to the app-drawn
+ * band. Distances are dp relative to the header's bottom edge (the controls row, 52 below the safe
+ * area at the default font scale); negative is above it.
  */
 @Immutable
 data class SessionHeaderStyle(
@@ -28,7 +26,6 @@ data class SessionHeaderStyle(
 ) {
     enum class Curve { Linear, Smoothstep }
 
-    /** iOS materials (`ultraThin`, `thin`, `regular`) → M3 tonal surfaces in [SessionHeaderBackdrop]. */
     enum class Blur { UltraThin, Thin, Regular }
 
     @Immutable
@@ -84,15 +81,14 @@ data class SessionHeaderStyle(
     @Immutable
     data class Environment(
         /**
-         * iOS chooses the blur by OS (system edge from 27). Android has no system edge: kept for
-         * parity with [forceAppBlur] defaulting to true, so the app draws its own band.
+         * Android has no system edge: kept for parity with [forceAppBlur] defaulting to true, so
+         * the app draws its own band.
          */
         val osVersion: String = "27.0",
-        /** iOS Developer Mode's Force App Blur. Always on for Android (see [osVersion]). */
+        /** Developer Mode's Force App Blur. Always on for Android (see [osVersion]). */
         val forceAppBlur: Boolean = true,
-        /** iOS Reduce Transparency. Android has no system setting; hosts pass false. */
+        /** Android has no system setting; hosts pass false. */
         val reduceTransparency: Boolean = false,
-        /** iOS Increase Contrast: `OpenCodeTheme.colors.highContrast`. */
         val increaseContrast: Boolean = false,
         val isDark: Boolean = false,
         /** For diagnostics; font scale reaches the result through [headerHeight]. */
@@ -199,16 +195,16 @@ data class SessionHeaderStyle(
         const val MINIMUM_CONTENT_TOP = 60f
         const val RESTING_GAP = 8f
 
-        /** iOS 27 sizes the soft edge itself; older iOS (and Android, always forced) gets the app's band. */
+        /** Android always gets the app's band. */
         fun usesAppBlur(osVersion: String, forced: Boolean): Boolean =
             forced || (osVersion.split(".").firstOrNull()?.toIntOrNull() ?: 0) < 27
     }
 }
 
-/** iOS `HeaderBlurMode` (a tuning choice): the shipped value is [SystemEdge]. */
+/** The shipped value is [SystemEdge]. */
 enum class HeaderBlurMode { SystemEdge, CustomBlur, Off }
 
-/** iOS `HeaderTextStyle`: the header's title and project text styles. */
+/** The header's title and project text styles. */
 enum class HeaderTextStyle(val textStyle: TextStyle) {
     Headline(OpenCodeTextStyles.headline),
     Body(OpenCodeTextStyles.body),
@@ -219,10 +215,7 @@ enum class HeaderTextStyle(val textStyle: TextStyle) {
     Caption2(OpenCodeTextStyles.caption2),
 }
 
-/**
- * The session header's top band, wash and layout (iOS `HeaderBlurTunables`), at the shipped
- * defaults.
- */
+/** The session header's top band, wash and layout, at the shipped defaults. */
 object HeaderBlurTunables {
     val MODE = HeaderBlurMode.SystemEdge
     const val RADIUS = 4.5f
@@ -240,10 +233,7 @@ object HeaderBlurTunables {
     val titleFont = HeaderTextStyle.Subheadline
     val projectFont = HeaderTextStyle.Footnote
 
-    /**
-     * Resolves the shipped header style with the baked tuning knobs (iOS
-     * `HeaderBlurTunables.resolved(for:in:)` with no overrides: no knob counts as adjusted).
-     */
+    /** Resolves the shipped header style with the baked tuning knobs. */
     fun resolved(environment: SessionHeaderStyle.Environment): SessionHeaderStyle.Resolved {
         val mode = MODE
         val radius = RADIUS

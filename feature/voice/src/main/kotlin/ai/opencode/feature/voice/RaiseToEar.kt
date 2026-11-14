@@ -12,9 +12,10 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
 
-/** Proximity covered while held up. Monitoring owns a proximity-only screen-off
- * lock (not a CPU/screen-on lock), released immediately in monitor's finally, just
- * as UIDevice proximity monitoring dims the iOS screen at the ear. */
+/**
+ * Proximity covered while held up. Monitoring owns a proximity-only screen-off lock (not a
+ * CPU/screen-on lock), released immediately in monitor's finally.
+ */
 class RaiseToEarDetector(
     private val context: Context? = null,
     private val clock: Clock = dependency(Clock),

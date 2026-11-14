@@ -13,10 +13,7 @@ import org.junit.Rule
 import org.junit.Test
 import java.util.UUID
 
-/**
- * Port of iOS `VoiceOpenLinkTests.swift`, its protocol test (MARK: Protocol). The feature
- * tests are in `:feature:voice`, the app tests in `:app`.
- */
+/** Its protocol test (MARK: Protocol). */
 class VoiceOpenLinkTests {
     @get:Rule val isolation = TestIsolationRule()
 

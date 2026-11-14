@@ -15,12 +15,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/**
- * The `SessionFeature` tests of iOS `VoiceLiveTests.swift`, deferred from `:feature:voice`:
- * `theSessionScreenReportsTheNewestFinishedCompactionOnlyDuringACall`, and the session half of
- * `aCallArrivingInASessionKnowsItsLatestCompaction` (its `HomeFeature.makeDetail` half, and
- * `draftAdoptingCreatedSessionDoesNotRetarget…` whose store is `HomeFeature`, belong to the drawer).
- */
 class VoiceLiveTestsSession {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
     private val session = OpenCodeSession(id = "ses_voice", serverTitle = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = distantPast)

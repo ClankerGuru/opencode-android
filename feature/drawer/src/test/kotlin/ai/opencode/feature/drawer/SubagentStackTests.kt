@@ -63,11 +63,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `SubagentStackTests`: opening a subagent pushes it over its parent; going back pops
- * it. `backRulesLetTheEdgeWinAndContentKeepItsClaims` (`BackSwipeRules`/`BackSwipeSpring`) is
- * `:core`'s and `descendantsFollowTheFamilyTree` (`SessionActivity`) `:server`'s.
- */
+/** Opening a subagent pushes it over its parent; going back pops it. */
 class SubagentStackTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -612,7 +608,7 @@ class SubagentStackTests {
         val childID = store.state.subagentStack.last().navigationID
         store.send(Action.SubagentStack(childID, SessionFeature.Action.Task))
         store.send(Action.SubagentStack(childID, SessionFeature.Action.FirstContentFrameRendered))
-        // iOS reduces effect actions as they arrive; here the frame's `.refreshRequested(.open)` waits for a drain.
+        // The frame's `.refreshRequested(.open)` waits for a drain.
         repeat(5) { store.skipReceivedActions() }
         transcriptStarted.await()
 

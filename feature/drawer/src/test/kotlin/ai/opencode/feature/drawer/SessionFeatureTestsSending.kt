@@ -21,10 +21,6 @@ import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
 
-/**
- * Port of iOS `SessionFeatureTests+Sending.swift`'s Home test (it switches sessions with Home's
- * `makeDetail`). The rest are `:feature:session`'s.
- */
 class SessionFeatureTestsSending {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -44,7 +40,6 @@ class SessionFeatureTestsSending {
         var home = h.state { HomeFeature.State(testServer, OpenCodeHomeSnapshot(projects = emptyList(), sessions = listOf(first, second), activeSessionIDs = emptySet())) }
         val tokens = mutableListOf<Set<String>>()
 
-        // iOS `workingRunStore(_:transcript:)`.
         suspend fun run(detail: SessionFeature.State, session: OpenCodeSession): SessionFeature.State {
             val user = OpenCodeTranscriptItem.UserText(id = "msg_user_${session.id}", text = "Check")
             val answered = listOf(user, OpenCodeTranscriptItem.AssistantMarkdown(id = "msg_reply_${session.id}-text-0", text = ""))

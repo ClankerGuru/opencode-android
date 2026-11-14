@@ -41,10 +41,7 @@ import java.io.File
 import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `TraceUploadsFeature` (`TraceUploads.swift`): Developer Mode problem reports. Nothing
- * leaves the phone unless the person presses Send.
- */
+/** Developer Mode problem reports. Nothing leaves the phone unless the person presses Send. */
 class TraceUploadsFeature : Reducer<TraceUploadsFeature.State, TraceUploadsFeature.Action> {
     data class State(
         /** True when the previous run ended unexpectedly in the foreground, so the next report sent includes the previous run's timeline. */
@@ -298,7 +295,7 @@ class TraceUploadsFeature : Reducer<TraceUploadsFeature.State, TraceUploadsFeatu
         val RETRY_POLICY: RetryPolicy = RetryPolicy.send
         val TOAST_DURATION = 2.5.seconds
 
-        /** A debug lab asked for crash reports (launch extra `lab-crash-report`, iOS `-lab-crash-report`). */
+        /** A debug lab asked for crash reports. */
         @Volatile var labCrashReport: Boolean = false
 
         /**
@@ -317,7 +314,7 @@ data class ProblemReportDestination(
     val directory: String? = null,
 )
 
-/** iOS `TraceUploader`: uploads a trace under this phone's Developer Mode owner key. */
+/** Uploads a trace under this phone's Developer Mode owner key. */
 class TraceUploader(
     val isEnabled: () -> Boolean = { false },
     val upload: suspend (ProblemReportBundle) -> Boolean = { false },

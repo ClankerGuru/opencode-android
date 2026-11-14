@@ -9,8 +9,7 @@ import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sqrt
 
-// Port of iOS `Session/AgentActivity/ShellPromptGlyph.swift`, the shell glyph's engine; the tuning
-// lives in `ShellGlyphTuning.glide`.
+// The shell glyph's engine; the tuning lives in `ShellGlyphTuning.glide`.
 //
 // A `>` prompt on the orb's 7-wide LED disc, moving as a body on a 7-cell torus: output chunks fill
 // a push reservoir that drains into its speed, and friction (linear plus a little quadratic,

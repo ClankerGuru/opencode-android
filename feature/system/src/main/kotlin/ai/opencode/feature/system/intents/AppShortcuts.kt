@@ -7,7 +7,6 @@ import ai.opencode.core.ui.SFSymbol
 import ai.opencode.server.model.OpenCodeDelivery
 import androidx.annotation.StringRes
 
-/** Port of iOS `DeliveryOption` (Ask OpenCode's Delivery parameter). */
 enum class DeliveryOption(@StringRes private val titleRes: Int, val symbol: SFSymbol, val delivery: OpenCodeDelivery) {
     Steer(R.string.system_delivery_steer, SFSymbol.ArrowTurnUpRight, OpenCodeDelivery.Steer),
     Queue(R.string.system_delivery_queue, SFSymbol.TextBadgePlus, OpenCodeDelivery.Queue),
@@ -20,7 +19,7 @@ enum class DeliveryOption(@StringRes private val titleRes: Int, val symbol: SFSy
     }
 }
 
-/** Port of iOS `AskOpenCodeIntent`: sends a typed or dictated message to a session without opening the app. */
+/** Sends a typed or dictated message to a session without opening the app. */
 object AskOpenCodeIntent {
     val TITLE: String get() = localized(R.string.system_ask_title)
     val DESCRIPTION: String get() = localized(R.string.system_ask_description)
@@ -31,8 +30,7 @@ object AskOpenCodeIntent {
 }
 
 /**
- * Port of iOS `OpenCodeShortcuts` (App Shortcuts: Siri and Spotlight without setup). Android
- * has no phrase-based shortcut provider; each maps to a door in `res/xml/shortcuts.xml`:
+ * Android has no phrase-based shortcut provider; each maps to a door in `res/xml/shortcuts.xml`.
  *
  * - Ask OpenCode → [AskOpenCodeActivity] (App Action `actions.intent.CREATE_MESSAGE`).
  * - Start Voice Call, Background Call, New Session, Open Session → App Action

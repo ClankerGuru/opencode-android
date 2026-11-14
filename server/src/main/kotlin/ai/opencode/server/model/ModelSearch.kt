@@ -3,10 +3,10 @@ package ai.opencode.server.model
 import java.text.Normalizer
 
 /**
- * Port of iOS `ModelSearch`: each query word, in any order, must match the model's or provider's
- * name or ID. Whole words rank best, then word starts, version parts, then anywhere; three letters
- * or more may skip letters ("snt" for Sonnet). Numbers match only where a number starts. Best match
- * first, then favorites, then the server's order.
+ * Each query word, in any order, must match the model's or provider's name or ID. Whole words rank
+ * best, then word starts, version parts, then anywhere; three letters or more may skip letters
+ * ("snt" for Sonnet). Numbers match only where a number starts. Best match first, then favorites,
+ * then the server's order.
  */
 object ModelSearch {
     private val levelSynonyms: Map<String, String> = mapOf(
@@ -160,7 +160,7 @@ object ModelSearch {
      * 4.5" and "claude-sonnet-4-5" both read "claude sonnet 4.5".
      */
     fun normalize(text: String): String {
-        // iOS folds case, diacritics and width; NFKD + dropping combining marks does the same.
+        // NFKD + dropping combining marks does the same.
         val decomposed = Normalizer.normalize(text, Normalizer.Form.NFKD)
         val characters = decomposed.filter { Character.getType(it) != Character.NON_SPACING_MARK.toInt() }.lowercase()
         val out = StringBuilder()
@@ -214,7 +214,7 @@ object ModelSearch {
 
     private fun words(text: String): List<String> = text.split(' ').filter { it.isNotEmpty() }
 
-    /** Swift's `Character.isNumber`: digits and other numeric characters. */
+    /** Digits and other numeric characters. */
     private fun Char.isNumberLike(): Boolean = isDigit() || Character.getType(this).let {
         it == Character.LETTER_NUMBER.toInt() || it == Character.OTHER_NUMBER.toInt()
     }

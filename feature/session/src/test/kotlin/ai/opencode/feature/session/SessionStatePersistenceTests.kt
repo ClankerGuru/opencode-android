@@ -17,11 +17,7 @@ import org.junit.Test
 import java.time.Instant
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * iOS `SessionStatePersistenceTests.swift`, the session half: arriving requests take back the
- * answers saved for them. The storage half is `:feature:composer`'s and the Home half
- * `:feature:drawer`'s `SessionStatePersistenceTests`.
- */
+/** The session half: arriving requests take back the answers saved for them. */
 class SessionStatePersistenceTests {
     @get:Rule val isolation = TestIsolationRule()
 

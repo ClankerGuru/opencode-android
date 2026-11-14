@@ -3,8 +3,6 @@ package ai.opencode.feature.session
 import ai.opencode.core.dependencies.DependencyKey
 import kotlinx.serialization.Serializable
 
-// Port of iOS `SessionTimers.swift` (split out of `SessionFeature.swift` in 9251ae06).
-
 /**
  * Background timers `SessionFeature` starts on its own. Live sessions run them all; reducer
  * tests opt into the ones they exercise so unrelated tests do not inherit background loops.

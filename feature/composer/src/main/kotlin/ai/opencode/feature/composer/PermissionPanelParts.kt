@@ -45,8 +45,8 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 
 /**
- * A permission in a line or two (iOS `PermissionSummary`): its command flattened onto one
- * line, the file it edits (with `+N −M`), or what it reaches.
+ * A permission in a line or two: its command flattened onto one line, the file it edits (with `+N
+ * −M`), or what it reaches.
  */
 data class PermissionSummary(val text: String, val isCode: Boolean) {
     companion object {
@@ -63,7 +63,7 @@ data class PermissionSummary(val text: String, val isCode: Boolean) {
             return PermissionSummary(flattened(permission.resources.joinToString(" ")), isCode = permission.resources.isNotEmpty())
         }
 
-        /** Swift `split(whereSeparator: \.isWhitespace)`: every Unicode whitespace, newlines included. */
+        /** Every Unicode whitespace, newlines included. */
         fun flattened(text: String): String = buildString {
             var pending = false
             for (char in text) {
@@ -86,10 +86,7 @@ internal fun lastPathComponent(path: String): String {
     return trimmed.substringAfterLast('/')
 }
 
-/**
- * The permission actions' sizes (iOS `RequestTunables`; the Tuning Panel backing isn't
- * ported, these are its defaults).
- */
+/** The permission actions' sizes. */
 object RequestTunables {
     /** `requests.permission.scopeMaxHeight`: the scope list's maximum height (120…400). */
     val scopeMaxHeight = 220.dp
@@ -99,7 +96,10 @@ object RequestTunables {
     val buttonRadius = 8.dp
 }
 
-/** iOS `TranscriptMetrics` fonts and corner the request panel borrows (the transcript module sits beside this one). */
+/**
+ * Transcript fonts and corner the request panel borrows (the transcript module sits beside this
+ * one).
+ */
 internal object RequestTranscriptMetrics {
     /** `TranscriptMetrics.toolFont`: footnote, monospaced. */
     val toolFont: TextStyle get() = OpenCodeTextStyles.footnote.copy(fontFamily = OpenCodeFonts.monospace)
@@ -112,8 +112,7 @@ internal object RequestTranscriptMetrics {
 }
 
 /**
- * A permission action (iOS `requestPermissionButtonShape()` inside the shared button
- * styles): normal height, its corners [RequestTunables.buttonRadius]. Primary is the
+ * A permission action: normal height, its corners [RequestTunables.buttonRadius]. Primary is the
  * accent fill (Always Allow), secondary the desktop's neutral hairline one (Allow Once).
  */
 @Composable
@@ -217,7 +216,7 @@ private fun PermissionBand(text: String) {
             modifier = Modifier
                 .fillMaxWidth()
                 .background(colors.text.copy(alpha = if (colors.isDark) 0.035f else 0.025f))
-                // iOS overlays the hairlines on the band's top and bottom edges (they add no height).
+                // The hairlines overlay the band's top and bottom edges (they add no height).
                 .drawWithContent {
                     drawContent()
                     val px = 1f
@@ -265,7 +264,6 @@ private fun DiffPreview(patch: String, modifier: Modifier = Modifier) {
     }
 }
 
-/** The pure part of iOS `DiffPreview`. */
 internal object DiffPreviewLines {
     enum class Kind { Added, Removed, Context, Hunk }
 

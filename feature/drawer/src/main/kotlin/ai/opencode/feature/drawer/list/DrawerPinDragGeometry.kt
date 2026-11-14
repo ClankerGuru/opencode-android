@@ -8,9 +8,9 @@ import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 
-// Port of iOS `DrawerPinDrag+Geometry.swift`: where the rows and headers are, which slot the finger
-// hovers, how far each item shifts for it, and the springs that carry them there. All in dp, in the
-// list's coordinates (see [DrawerPinDragHost]).
+// Where the rows and headers are, which slot the finger hovers, how far each item shifts for it,
+// and the springs that carry them there. All in dp, in the list's coordinates (see
+// [DrawerPinDragHost]).
 
 internal fun DrawerPinDrag.visibleItems(): List<DrawerPinDragItem> = host?.visibleItems().orEmpty()
 
@@ -315,7 +315,7 @@ internal fun DrawerPinDrag.retargetSprings(keyed: List<DrawerPinDragItem> = visi
         if (spring != null) {
             if (spring.target != target.toDouble()) spring.retarget(target.toDouble())
         } else {
-            // A row the drag scrolled into view starts in its slot (iOS lays it out shifted).
+            // A row the drag scrolled into view starts in its slot.
             cellSprings[item.key] = makeSpring(if (hasAutoScrolled && !hasCommittedDrop) target else base, target)
         }
     }

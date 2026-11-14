@@ -4,10 +4,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RenderEffect
 import androidx.compose.ui.unit.Dp
 
-/**
- * Blurs inside transitions (iOS `BlurFade`, `MotionBlurReveal`, …), switched off here in one place:
- * Material motion never blurs. Callers keep iOS's blur maths so the code still diffs side by side.
- */
+/** Blurs inside transitions, switched off here in one place: Material motion never blurs. */
 object TransitionBlur {
     /** Whether transition blurs draw. Off on Android. */
     const val enabled: Boolean = false

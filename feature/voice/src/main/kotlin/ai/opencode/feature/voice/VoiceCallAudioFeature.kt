@@ -21,10 +21,9 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
 /**
- * Port of iOS `VoiceCallAudioFeature` (Audio in Calls, experimental): an agent plays music or a
- * clip on the live call (`android_voice_play_audio`) and pauses, resumes or stops it
- * (`android_voice_audio_control`); the person does the same from the player row above the
- * composer. The audio itself, and its ducking, live in [CallAudioPlayer]; this holds what the
+ * An agent plays music or a clip on the live call (`android_voice_play_audio`) and pauses, resumes
+ * or stops it (`android_voice_audio_control`); the person does the same from the player row above
+ * the composer. The audio itself, and its ducking, live in [CallAudioPlayer]; this holds what the
  * row shows and answers the tools.
  */
 class VoiceCallAudioFeature : Reducer<VoiceCallAudioFeature.State, VoiceCallAudioFeature.Action> {
@@ -252,7 +251,7 @@ class VoiceCallAudioFeature : Reducer<VoiceCallAudioFeature.State, VoiceCallAudi
         Reduced(state, Effect.merge(this.effect, effect))
 
     companion object {
-        /** iOS `URL(string:)` with an https scheme and a host, else null. */
+        /** A URL with an https scheme and a host, else null. */
         fun httpsURL(raw: String?): URI? {
             if (raw == null) return null
             val url = try {

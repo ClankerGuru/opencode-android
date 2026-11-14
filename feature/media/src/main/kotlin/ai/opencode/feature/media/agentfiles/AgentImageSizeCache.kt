@@ -14,10 +14,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.time.Duration.Companion.seconds
 
-// Port of iOS `AgentImageSizeCache`: shapes of images read before, so a preview opens at its own
-// shape. Keyed by a hash of the server and path, at most [LIMIT] entries, oldest out first, saved
-// at most once a second. The file is read once, off the main thread, when the cache is made; [size]
-// only reads memory.
+// Shapes of images read before, so a preview opens at its own shape. Keyed by a hash of the server
+// and path, at most [LIMIT] entries, oldest out first, saved at most once a second. The file is
+// read once, off the main thread, when the cache is made; [size] only reads memory.
 class AgentImageSizeCache(private val file: File?) {
     @Serializable
     private data class Stored(

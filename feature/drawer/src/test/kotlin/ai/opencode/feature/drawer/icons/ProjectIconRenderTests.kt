@@ -32,12 +32,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * iOS `ProjectIconTests`' tests that decode images (`rasterizesSVGAndClassifiesFullBleedAndTransparentGlyphs`,
- * `composerWrapperRendersItsLayerAndBackground`, `tileLightingIsBrightAtTheTopAndShared`, `embeddedImagesStayLocalAndBounded`,
- * `serverDataURLsCacheLocallyAndRefreshWhenContentChanges`, `loaderCachesOnDiskCoalescesAndRespectsLowDataMode`),
- * apart from `ProjectIconTests.kt` because they need real Android pixels: Robolectric's native graphics.
- */
+/** Robolectric's native graphics. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)

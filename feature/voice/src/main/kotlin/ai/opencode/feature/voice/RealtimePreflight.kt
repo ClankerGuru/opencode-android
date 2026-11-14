@@ -9,11 +9,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Request
 import java.io.IOException
 
-/**
- * Checks a phone key before a call (iOS `RealtimePreflightClient`, `RealtimeClient.swift`
- * lines 1–126; the Realtime transport lives with the rest of that file).
- * `verify` throws [RealtimePreflightError].
- */
+/** Checks a phone key before a call. `verify` throws [RealtimePreflightError]. */
 class RealtimePreflightClient(
     val verify: suspend (apiKey: String, model: String) -> Unit,
 ) {
@@ -59,13 +55,12 @@ class RealtimePreflightClient(
             } catch (error: Exception) {
                 throw RealtimePreflightError.transport(error)
             }
-            // iOS also rejects a non-HTTP response ("<provider> returned an invalid response.");
             // OkHttp only ever returns HTTP responses.
         }
     }
 }
 
-/** Why a key check failed; [message] is the copy the call or Settings shows (iOS `errorDescription`). */
+/** Why a key check failed; [message] is the copy the call or Settings shows. */
 sealed class RealtimePreflightError(override val message: String) : Exception(message) {
     data object RejectedAPIKey : RealtimePreflightError("OpenAI rejected the API key.")
     data object NoConnection : RealtimePreflightError("No connection.")
@@ -79,7 +74,7 @@ sealed class RealtimePreflightError(override val message: String) : Exception(me
             return Service("OpenAI couldn’t verify this key (HTTP $statusCode).")
         }
 
-        /** iOS: a `URLError` is no connection; anything else carries its own description. */
+        /** A `URLError` is no connection; anything else carries its own description. */
         fun transport(error: Throwable): RealtimePreflightError =
             if (error is IOException) NoConnection else Service(error.localizedMessage ?: error.toString())
 

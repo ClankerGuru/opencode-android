@@ -28,9 +28,7 @@ import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
 
-/**
- * Port of iOS `NewSessionDraftTests.swift`, the `AppFeature` part: switching servers from a draft.
- */
+/** The `AppFeature` part: switching servers from a draft. */
 class NewSessionDraftTests {
     @get:Rule val isolation = TestIsolationRule()
 

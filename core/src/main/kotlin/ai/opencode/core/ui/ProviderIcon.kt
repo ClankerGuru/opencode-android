@@ -15,8 +15,8 @@ import coil3.request.ImageRequest
 import coil3.svg.SvgDecoder
 
 /**
- * A provider's logo, tinted like text (iOS `ProviderIcon`). Decorative. [canonical] stands in when
- * its own ID has no icon.
+ * A provider's logo, tinted like text. Decorative. [canonical] stands in when its own ID has no
+ * icon.
  */
 @Composable
 fun ProviderIcon(providerID: String, modifier: Modifier = Modifier, canonical: String? = null, tint: Color = Color.Unspecified) {
@@ -34,7 +34,7 @@ object ProviderIcon {
         return candidates.map { "provider-$it" }.firstOrNull(BrandAssets::exists) ?: "provider-synthetic"
     }
 
-    /** The icons in `assets/provider-icons` (iOS `ProviderIcons.xcassets`, `provider-<id>`). */
+    /** The icons in `assets/provider-icons`. */
     val available: Set<String> = setOf(
         "302ai", "abacus", "aihubmix", "alibaba-cn", "alibaba", "amazon-bedrock", "anthropic", "azure-cognitive-services", "azure",
         "bailing", "baseten", "berget", "cerebras", "chutes", "cloudferro-sherlock", "cloudflare-ai-gateway", "cloudflare-workers-ai",
@@ -51,8 +51,8 @@ object ProviderIcon {
 }
 
 /**
- * The artwork iOS bundles in `ProviderIcons.xcassets`, by its iOS asset name, under
- * `assets/provider-icons` and `assets/mcp-icons`.
+ * Bundled provider and MCP artwork, by asset name, under `assets/provider-icons` and
+ * `assets/mcp-icons`.
  */
 object BrandAssets {
     /** The `mcp-*` marks in `assets/mcp-icons`. */
@@ -63,7 +63,7 @@ object BrandAssets {
 
     fun exists(asset: String): Boolean = path(asset) != null
 
-    /** The `file:///android_asset/…` URI for an iOS asset name, or null when none is bundled. */
+    /** The `file:///android_asset/…` URI for an asset name, or null when none is bundled. */
     fun path(asset: String): String? = when {
         asset.startsWith("provider-") -> asset.removePrefix("provider-").takeIf { it in ProviderIcon.available }
             ?.let { "file:///android_asset/provider-icons/$it.svg" }
@@ -74,8 +74,8 @@ object BrandAssets {
 }
 
 /**
- * A bundled asset drawn as a template image (SwiftUI `Image(name).renderingMode(.template)`,
- * scaled to fit): its shape in [tint], or [LocalContentColor] when unspecified. Decorative.
+ * A bundled asset drawn as a template image: its shape in [tint], or [LocalContentColor] when
+ * unspecified. Decorative.
  */
 @Composable
 fun TemplateAssetImage(asset: String, modifier: Modifier = Modifier, tint: Color = Color.Unspecified) {

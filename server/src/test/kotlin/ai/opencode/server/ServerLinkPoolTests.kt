@@ -39,8 +39,7 @@ import kotlin.time.TimeSource
 
 /**
  * Starting connections over: fresh OkHttp pools, reads hung on a dead socket going again, and what
- * triggers it. Home's triggers are in `ServerLinkResetTriggerTests` (`:feature:drawer`), the call
- * log's path description in `ServerLinkPoolTests` (`:feature:voice`).
+ * triggers it.
  */
 class ServerLinkPoolTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -64,7 +63,6 @@ class ServerLinkPoolTests {
         assertNotSame(before.measuredRequest, after.measuredRequest)
         assertNotSame(before.eventStream, after.eventStream)
         assertNotSame(before.request.connectionPool, after.request.connectionPool)
-        // iOS caps a pool at `RotatingPools.connectionsPerHost`; OkHttp's per-host cap is lifted instead.
         assertEquals(after.request.dispatcher.maxRequests, after.request.dispatcher.maxRequestsPerHost)
     }
 
@@ -136,8 +134,8 @@ class ServerLinkPoolTests {
 
     /**
      * Home's resume can arrive before the app's own activation is observed: the trip away still
-     * counts. iOS posts UIApplication notifications to a test `NotificationCenter`; on Android
-     * [ServerLinkStore.followAppPhases] relays `AppPhases`, so the phases are noted directly.
+     * counts. On Android [ServerLinkStore.followAppPhases] relays `AppPhases`, so the phases are
+     * noted directly.
      */
     @Test fun aReturnCountsEvenBeforeTheAppsActivationArrives() {
         val resets = AtomicInteger(0)

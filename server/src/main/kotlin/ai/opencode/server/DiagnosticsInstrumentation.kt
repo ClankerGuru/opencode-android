@@ -28,15 +28,14 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Feeds the diagnostics timeline (`DiagnosticsRecorder`) from OkHttp, as iOS's transport calls
- * `requestStarted`/`requestEnded`/`networkMetrics` around each `URLSession` task. Records only
- * method, redacted path, status, sizes and timings; never headers, bodies or the host. Inert
- * (one volatile read per call) while recording is off.
+ * Feeds the diagnostics timeline (`DiagnosticsRecorder`) from OkHttp. Records only method, redacted
+ * path, status, sizes and timings; never headers, bodies or the host. Inert (one volatile read per
+ * call) while recording is off.
  */
 internal object DiagnosticsInstrumentation {
     private val inFlight = AtomicInteger(0)
 
-    /** Each measured call's phase evidence, for the failure phase of a transport error (iOS `LabNetworkMetricsRecorder.failurePhase`). */
+    /** Each measured call's phase evidence, for the failure phase of a transport error. */
     private val phasesByCall = ConcurrentHashMap<Call, DiagnosticsNetworkPhases>()
 
     fun OkHttpClient.Builder.recordingDiagnostics(): OkHttpClient.Builder =
@@ -116,7 +115,7 @@ internal object DiagnosticsInstrumentation {
         }
     }
 
-    /** Per-call transport timings (iOS `URLSessionTaskTransactionMetrics`). */
+    /** Per-call transport timings. */
     private class MetricsListener(private val request: Request) : EventListener() {
         private var callStart = 0L
         private var dnsStart = 0L; private var dns = 0L
@@ -129,7 +128,7 @@ internal object DiagnosticsInstrumentation {
         private var protocol: Protocol? = null
         private var reused = true
         private var address: DiagnosticsNetworkAddress? = null
-        /** The latest attempt's phase timestamps (iOS reads the last transaction's metrics). */
+        /** The latest attempt's phase timestamps. */
         private val phases = DiagnosticsNetworkPhases()
 
         private fun phase(update: DiagnosticsNetworkPhases.(Long) -> Unit) {

@@ -88,12 +88,12 @@ import java.time.Duration
 import java.time.Instant
 
 /**
- * Port of iOS `ShellOutputView`: a shell's live output in a bottom sheet. Tails while running,
- * follows the bottom unless the reader scrolls up, and ends with the command's exit status.
- * Polls only while on screen and the app is resumed.
+ * A shell's live output in a bottom sheet. Tails while running, follows the bottom unless the
+ * reader scrolls up, and ends with the command's exit status. Polls only while on screen and the
+ * app is resumed.
  *
  * @param onClose Close (or swipe away): the parent dismisses the presentation (quietly).
- * @param runningGlyph the running shell's glyph (iOS `ShellGlyph(shellIDs:)`).
+ * @param runningGlyph The running shell's glyph.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -105,7 +105,7 @@ fun ShellOutputView(
     val state by store.collectState()
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
     val isActive = lifecycle.isAtLeast(Lifecycle.State.RESUMED)
-    // Polls only while on screen and the app is active (iOS `.task(id: scenePhase == .active)`).
+    // Polls only while on screen and the app is active.
     DisposableEffect(isActive) {
         if (isActive) store.send(ShellOutputFeature.Action.Task)
         onDispose { if (isActive) store.send(ShellOutputFeature.Action.TaskEnded) }
@@ -120,10 +120,9 @@ fun ShellOutputView(
     ) {
         var isFollowing by remember { mutableStateOf(true) }
         var jumpRequest by remember { mutableIntStateOf(0) }
-        // iOS `.medium` keeps the status bar (`safeAreaBar(edge: .bottom)`) at the sheet's visible
-        // foot: the column is as tall as the part of the sheet on screen, not the whole sheet.
-        // The column's top below the sheet's (the drag handle), so the visible part is the window
-        // below the sheet's top less that.
+        // The column is as tall as the part of the sheet on screen, not the whole sheet. The
+        // column's top below the sheet's (the drag handle), so the visible part is the window below
+        // the sheet's top less that.
         var headerInSheet by remember { mutableFloatStateOf(0f) }
         // A drag moves the sheet every frame: only the output box takes the new height. The
         // toolbar, earlier-output bar and status bar keep constant constraints, so they're
@@ -214,8 +213,8 @@ private fun Toolbar(state: ShellOutputFeature.State, onClose: () -> Unit, send: 
             style = OpenCodeIconButtonStyle.Standard,
             modifier = Modifier.testTag("shell-output-close"),
         )
-        // The title is centred on the sheet (iOS `.principal`): the leading side holds one
-        // control and the trailing two, so it gives the difference back.
+        // The title is centred on the sheet: the leading side holds one control and the trailing
+        // two, so it gives the difference back.
         Spacer(Modifier.width(48.dp))
         Text(
             state.shell.title,
@@ -359,9 +358,9 @@ private class OutputLines {
 }
 
 /**
- * Port of iOS `ShellOutputTextView`: monospaced, wrapped, selectable output. Lines are lazy rows
- * keyed by byte offset, so new output appends in place instead of re-laying out the capture.
- * Following: the reader's own scrolling within 32 dp of the bottom follows; anything else stops.
+ * Monospaced, wrapped, selectable output. Lines are lazy rows keyed by byte offset, so new output
+ * appends in place instead of re-laying out the capture. Following: the reader's own scrolling
+ * within 32 dp of the bottom follows; anything else stops.
  */
 @Composable
 private fun ShellOutputTextView(text: String, startCursor: Int, isFollowing: Boolean, jumpRequest: Int, onFollowingChanged: (Boolean) -> Unit) {
@@ -393,14 +392,13 @@ private fun ShellOutputTextView(text: String, startCursor: Int, isFollowing: Boo
             if (userScrolling && it != following) reportFollowing(it)
         }
     }
-    // Every render while following ends at the bottom: new lines, or more of the last one
-    // (iOS `render(text:startCursor:in:)` scrolls after every append).
+    // Every render while following ends at the bottom: new lines, or more of the last one.
     LaunchedEffect(lines, isFollowing) {
         if (isFollowing && lines.isNotEmpty()) listState.scrollToItem(lines.size - 1, Int.MAX_VALUE / 2)
     }
     // A resize (the sheet dragged or settling on a detent) keeps a following reader at the bottom
-    // in the same layout pass (iOS `onResize`): the bottom is asked for before the list measures
-    // at its new height, so its last lines never lag a frame behind the status bar.
+    // in the same layout pass: the bottom is asked for before the list measures at its new height,
+    // so its last lines never lag a frame behind the status bar.
     val lineCount by rememberUpdatedState(lines.size)
     val measuredHeight = remember { intArrayOf(-1) }
     LaunchedEffect(jumpRequest) {
@@ -447,7 +445,6 @@ private fun JumpToLatest(visible: Boolean, modifier: Modifier, onClick: () -> Un
     AnimatedVisibility(
         visible = visible,
         modifier = modifier.padding(16.dp),
-        // iOS `.motionMicroTransition()`.
         enter = MotionTransition.micro(reduceMotion).enter,
         exit = MotionTransition.micro(reduceMotion).exit,
     ) {
@@ -470,7 +467,7 @@ private fun StatusBar(state: ShellOutputFeature.State, runningGlyph: @Composable
     ) {
         ShellStatusLabel(state, runningGlyph, Modifier.weight(1f))
         if (state.isRunning || state.isStopping) {
-            // iOS `.bordered` capsule tinted red: a tonal red fill.
+            // A tonal red fill.
             val red = OpenCodeTheme.colors.destructive
             FilledTonalButton(
                 onClick = { send(ShellOutputFeature.Action.StopTapped) },
@@ -534,7 +531,7 @@ private fun ShellStatusLabel(state: ShellOutputFeature.State, runningGlyph: @Com
     }
 }
 
-/** The elapsed time, ticking each second while [until] is null (iOS `ShellElapsedTime`). */
+/** The elapsed time, ticking each second while [until] is null. */
 @Composable
 private fun ElapsedTime(since: Instant, until: Instant?, style: androidx.compose.ui.text.TextStyle) {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }

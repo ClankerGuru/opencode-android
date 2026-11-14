@@ -10,18 +10,17 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 
 /**
- * Lightweight regex-free tokenizer colouring fenced code blocks and the file viewer (iOS
- * `Media/SyntaxHighlighter.swift`). Not a full grammar: keywords, strings, comments, numbers,
- * and capitalized type names cover the readability win.
+ * Lightweight regex-free tokenizer colouring fenced code blocks and the file viewer. Not a full
+ * grammar: keywords, strings, comments, numbers, and capitalized type names cover the readability
+ * win.
  *
- * Kotlin strings are UTF-16, so token ranges are UTF-16 offsets; every budget (the 128 KB
- * prefix, the 1,000-byte line cap, the safe prefix) is still counted in UTF-8 bytes like iOS.
- * The scanner steps over whole grapheme clusters (a letter keeps its combining marks), as
- * Swift's `Character` does, except that `\r\n` is two characters here: a CRLF file's lines
- * end where they should (iOS treats `"\r\n"` as one Character that never equals `"\n"`).
+ * Kotlin strings are UTF-16, so token ranges are UTF-16 offsets; every budget (the 128 KB prefix,
+ * the 1,000-byte line cap, the safe prefix) is still counted in UTF-8 bytes. The scanner steps over
+ * whole grapheme clusters (a letter keeps its combining marks), except that `\r\n` is two
+ * characters here: a CRLF file's lines end where they should.
  *
- * Tokens are colour-free so cached results stay legible when the theme or appearance changes
- * (iOS uses dynamic colours for the same reason); [annotated] colours them with a [Palette].
+ * Tokens are colour-free so cached results stay legible when the theme or appearance changes;
+ * [annotated] colours them with a [Palette].
  */
 object SyntaxHighlighter {
     /**
@@ -39,7 +38,7 @@ object SyntaxHighlighter {
     @Immutable
     data class Token(val start: Int, val end: Int, val kind: TokenKind)
 
-    /** The theme's syntax colours (iOS `ThemePalette.syntax*`). */
+    /** The theme's syntax colours. */
     @Immutable
     data class Palette(
         val keyword: Color,
@@ -66,9 +65,8 @@ object SyntaxHighlighter {
     }
 
     /**
-     * iOS `SyntaxHighlighter.Result`: the tokens, and the prefix (ending just after a newline
-     * outside any token) that later text can never recolour, so a streaming code block only
-     * rescans what follows it.
+     * The tokens, and the prefix (ending just after a newline outside any token) that later text
+     * can never recolour, so a streaming code block only rescans what follows it.
      */
     @Immutable
     data class Result(
@@ -101,9 +99,8 @@ object SyntaxHighlighter {
     }
 
     /**
-     * Highlights up to [maxUTF8Bytes] of [source] (snapped to a line boundary) in one forward
-     * pass, handing each token to [onToken] without collecting them (iOS
-     * `applyHighlighting(to:source:maxUTF8Bytes:language:)`, used by the file viewer).
+     * Highlights up to [maxUTF8Bytes] of [source] (snapped to a line boundary) in one forward pass,
+     * handing each token to [onToken] without collecting them.
      */
     fun applyHighlighting(
         source: String,
@@ -213,7 +210,7 @@ object SyntaxHighlighter {
             bytes += scalarBytes
             rawEnd += if (scalarBytes == 4) 2 else 1
         }
-        // Everything fits (iOS `utf8.count <= maxUTF8Bytes`).
+        // Everything fits.
         if (!exceeded) return code.length
         var j = rawEnd
         var back = 0
@@ -242,7 +239,7 @@ object SyntaxHighlighter {
 
     // endregion
 
-    // region Characters (Swift `Character` semantics on code points)
+    // region Characters (grapheme clusters on code points)
 
     private fun isGraphemeExtender(cp: Int): Boolean {
         val type = Character.getType(cp)
@@ -401,7 +398,6 @@ object SyntaxHighlighter {
         }
     }
 
-    /** Swift `code.index(index, offsetBy: n, limitedBy: limit) ?? limit`. */
     private fun advance(code: String, index: Int, n: Int, limit: Int): Int {
         var i = index
         repeat(n) {

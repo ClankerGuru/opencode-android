@@ -13,9 +13,8 @@ import ai.opencode.feature.drawer.catchup.CatchUpFeature
 import ai.opencode.server.OpenCodeClient
 
 /*
- * Port of iOS `HomeFeature+CatchUp.swift`: Home's half of Catch Up. `CatchUpFeature` owns the queue
- * and its transient records; Home opens each card as the session on screen, marks read, and hands
- * back to the drawer it was opened from.
+ * Home's half of Catch Up. `CatchUpFeature` owns the queue and its transient records; Home opens
+ * each card as the session on screen, marks read, and hands back to the drawer it was opened from.
  */
 
 

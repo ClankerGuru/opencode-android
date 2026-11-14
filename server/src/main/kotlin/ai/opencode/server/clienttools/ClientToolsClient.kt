@@ -44,9 +44,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Where the phone offers its tools: one server's location (iOS `ClientToolsTarget`), listed to
- * sessions in [directory] as `android_<tool>`. Equal when made of the same parts, so only a real
- * change reconnects.
+ * Where the phone offers its tools: one server's location, listed to sessions in [directory] as
+ * `android_<tool>`. Equal when made of the same parts, so only a real change reconnects.
  */
 class ClientToolsTarget(
     val server: OpenCodeServer,
@@ -77,8 +76,8 @@ class ClientToolsTarget(
 }
 
 /**
- * The tools the phone hosts (iOS `ClientTool`), all for a live call: navigation during a
- * session-delegator call, links and audio, and the opt-in screen.
+ * The tools the phone hosts, all for a live call: navigation during a session-delegator call, links
+ * and audio, and the opt-in screen.
  */
 enum class ClientTool(val rawValue: String) {
     voiceOpenSession("voice_open_session"),
@@ -192,7 +191,7 @@ enum class ClientTool(val rawValue: String) {
     }
 }
 
-/** A JSON-RPC request ID, number or string, echoed in the reply (iOS `JSONRPCID`). */
+/** A JSON-RPC request ID, number or string, echoed in the reply. */
 sealed interface JsonRpcID {
     data class Number(val value: Long) : JsonRpcID
     data class Text(val value: String) : JsonRpcID
@@ -215,7 +214,7 @@ sealed interface JsonRpcID {
     }
 }
 
-/** A tool call from the server, answered on the socket it came in on (iOS `ClientToolCall`). */
+/** A tool call from the server, answered on the socket it came in on. */
 data class ClientToolCall(
     val connection: UUID,
     val id: JsonRpcID,
@@ -240,7 +239,7 @@ data class ClientToolCall(
     }
 }
 
-/** A tool's answer (iOS `ClientToolResult`). */
+/** A tool's answer. */
 data class ClientToolResult(val content: List<Content>, val isError: Boolean = false) {
     sealed interface Content {
         data class Text(val text: String) : Content
@@ -257,7 +256,7 @@ data class ClientToolResult(val content: List<Content>, val isError: Boolean = f
     }
 }
 
-/** What one socket reports (iOS `ClientToolsEvent`). */
+/** What one socket reports. */
 sealed interface ClientToolsEvent {
     /** The server finished its handshake on [connection] and lists the tools. */
     data class Attached(val connection: UUID) : ClientToolsEvent
@@ -276,9 +275,9 @@ sealed interface ClientToolsEvent {
 
 /**
  * Hosts the phone's tools over OpenCode's client MCP socket (`/api/experimental/client-mcp`): the
- * server is the MCP client and the phone answers its JSON-RPC, one message per text frame
- * (iOS `ClientToolsClient`). [connect] runs one socket until it closes (its last event) or the
- * flow is cancelled; reconnecting is the reducer's (`ClientToolsFeature`).
+ * server is the MCP client and the phone answers its JSON-RPC, one message per text frame.
+ * [connect] runs one socket until it closes (its last event) or the flow is cancelled; reconnecting
+ * is the reducer's (`ClientToolsFeature`).
  */
 class ClientToolsClient(
     val connect: (ClientToolsTarget) -> Flow<ClientToolsEvent>,
@@ -293,7 +292,7 @@ class ClientToolsClient(
             val sockets = ClientMcpSockets()
             val transport = dependency(OpenCodeTransport)
             // The event stream's pool (no total deadline); OkHttp pings every 25 s and fails the
-            // socket when a pong doesn't come, as iOS's keep-alive closes it on a failed ping.
+            // socket when a pong doesn't come.
             val client = transport.eventStream.newBuilder()
                 .connectTimeout(60, TimeUnit.SECONDS)
                 .pingInterval(ClientMcpSocket.KEEP_ALIVE_SECONDS, TimeUnit.SECONDS)
@@ -321,8 +320,8 @@ class ClientToolsClient(
 }
 
 /**
- * The JSON-RPC the phone speaks on the socket, kept pure for tests (iOS `ClientMcpProtocol`):
- * `initialize`, `ping` and `tools/list` are answered here; `tools/call` goes to the reducer.
+ * The JSON-RPC the phone speaks on the socket, kept pure for tests: `initialize`, `ping` and
+ * `tools/list` are answered here; `tools/call` goes to the reducer.
  */
 object ClientMcpProtocol {
     const val PROTOCOL_VERSION = "2025-11-25"
@@ -457,9 +456,9 @@ object ClientMcpProtocol {
 }
 
 /**
- * The open sockets and each one's unanswered calls (iOS `ClientMcpSockets`). Every `tools/call`
- * gets exactly one reply: the phone's, or, when its socket closes first, a refusal sent just
- * before it goes. OkHttp's `send` only enqueues, so a lock stands in for iOS's actor.
+ * The open sockets and each one's unanswered calls. Every `tools/call` gets exactly one reply: the
+ * phone's, or, when its socket closes first, a refusal sent just before it goes. OkHttp's `send`
+ * only enqueues.
  */
 class ClientMcpSockets {
     private val lock = Any()
@@ -510,7 +509,7 @@ class ClientMcpSockets {
     }
 }
 
-/** One client MCP socket over OkHttp (iOS `ClientMcpSocket`). */
+/** One client MCP socket over OkHttp. */
 internal object ClientMcpSocket {
     /** Keeps NAT and proxy paths open between the server's own pings. */
     const val KEEP_ALIVE_SECONDS = 25L

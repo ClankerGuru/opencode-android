@@ -31,10 +31,9 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `OnboardingPlaygroundFeatureTests.swift`: every phase, interruptions, the simulated
- * server's failures and Replay, and that nothing in it reaches a server, the saved servers or the
- * keychain. The Close test checks that nothing keeps running (`finish`), since the view's `onClose`
- * dismisses.
+ * Every phase, interruptions, the simulated server's failures and Replay, and that nothing in it
+ * reaches a server, the saved servers or the keychain. The Close test checks that nothing keeps
+ * running (`finish`), since the view's `onClose` dismisses.
  */
 class OnboardingPlaygroundFeatureTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -269,7 +268,7 @@ class OnboardingPlaygroundFeatureTests {
         store.send(Action.ControlTapped(Control.scan)) { it.copy(phase = Phase.waiting) }
         store.send(Action.CloseTapped)
         clock.advance(5.seconds)
-        // Nothing keeps running once closed (iOS also counts one `dismiss`; Android's view dismisses).
+        // Nothing keeps running once closed.
         store.finish()
         assertEquals(listOf("tap", "tap"), escapes.haptics.value)
     }

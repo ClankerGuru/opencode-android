@@ -29,12 +29,7 @@ import java.util.Base64
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Port of iOS `ProjectIconTests.swift`, for what `:feature:drawer` owns and the JVM can run.
- *
  * Other modules:
- * - `derivesDisplayNameAndDisambiguatedInitials`, `decodesProjectIconSchemaAndFollowsDesktopPrecedence`
- *   (`ProjectMark`, `OpenCodeProjectIcon`) and `decodesProjectUpdatedStreamFrame`
- *   (`OpenCodeClient.decodeStreamFrame`): `:server`.
  *
  * Rendering and loader tests that decode images (`rasterizesSVG…`, `composerWrapperRenders…`,
  * `embeddedImagesStayLocalAndBounded`, `serverDataURLsCacheLocally…`, `loaderCachesOnDisk…`)
