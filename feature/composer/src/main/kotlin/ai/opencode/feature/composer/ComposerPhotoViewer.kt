@@ -10,6 +10,7 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.composer.plusmenu.LibraryPhoto
 import ai.opencode.feature.media.CachedImage
+import ai.opencode.feature.media.ImageDrawingAdd
 import ai.opencode.feature.media.MediaFlightAccessory
 import ai.opencode.feature.media.MediaZoomSources
 import ai.opencode.feature.media.TranscriptImagePreview
@@ -183,6 +184,7 @@ object ComposerPhotoViewer {
                 label = attachment.name ?: localized(R.string.composer_photo_viewer_image_label, index + 1, images.size),
                 detail = detail(attachment, image),
                 labelIsPlaceholder = attachment.name == null,
+                isVideo = attachment.videoDuration != null,
             )
         }
         return TranscriptImagePreview(mediaID(selected), pages)
@@ -202,24 +204,29 @@ object ComposerPhotoViewer {
     private fun decode(attachment: OpenCodeOutgoingAttachment): Bitmap? =
         runCatching { CachedImage.decoded(attachment.id, attachment.data, attachment.mediaHash) }.getOrNull()
 
-    /** The viewer's store: the transcript viewer with Remove, which hands the photo back through [remove]. */
+    /**
+     * The viewer's store: the transcript viewer with Remove, which hands the photo back through
+     * [remove], and Draw on Image for [addDrawing]'s prompt.
+     */
     fun store(
         preview: TranscriptImagePreview,
+        addDrawing: ImageDrawingAdd? = null,
         remove: (String) -> Unit,
     ): Store<TranscriptImageViewerFeature.State, TranscriptImageViewerFeature.Action> = Store(
-        TranscriptImageViewerFeature.State(preview, isShowingControls = true, allowsRemove = true),
-        ComposerPhotoViewerFeature(remove),
+        TranscriptImageViewerFeature.State(preview, isShowingControls = true, allowsRemove = true, allowsDrawing = addDrawing != null),
+        ComposerPhotoViewerFeature(addDrawing, remove),
     )
 }
 
 /**
  * The transcript viewer, whose Remove hands the photo back to the composer ([remove], on the main
- * thread).
+ * thread) and whose Draw on Image adds to `addDrawing`'s prompt.
  */
 class ComposerPhotoViewerFeature(
+    addDrawing: ImageDrawingAdd? = null,
     private val remove: (String) -> Unit,
 ) : Reducer<TranscriptImageViewerFeature.State, TranscriptImageViewerFeature.Action> {
-    private val viewer = TranscriptImageViewerFeature()
+    private val viewer = TranscriptImageViewerFeature(addDrawing)
 
     override fun reduce(
         state: TranscriptImageViewerFeature.State,

@@ -869,7 +869,7 @@ private fun presentComposerPhoto(
     val preview = ComposerPhotoViewer.preview(store.state.pendingAttachments, selected = id) ?: return
     val restoresFocus = host?.messageFieldFocused == true
     if (restoresFocus) host?.dismissComposerKeyboard()
-    val viewerStore = ComposerPhotoViewer.store(preview) { removed ->
+    val viewerStore = ComposerPhotoViewer.store(preview, addDrawing = drawingHandler(store)) { removed ->
         val index = store.state.pendingAttachments.indexOfFirst { it.id == removed }
         if (index >= 0) store.send(Action.attachmentRemoved(index))
     }

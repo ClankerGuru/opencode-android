@@ -44,7 +44,7 @@ fun MediaView(
     val presenter = remember(store) {
         MediaPresenter().apply {
             imageViewerIsUp = { store.state.viewer != null }
-            sendImage = { store.send(MediaFeature.Action.PresentImage(it)) }
+            sendImage = { preview, addDrawing -> store.send(MediaFeature.Action.PresentImage(preview, addDrawing)) }
         }
     }
     val viewerID by store.observe { it.viewer?.preview?.id }

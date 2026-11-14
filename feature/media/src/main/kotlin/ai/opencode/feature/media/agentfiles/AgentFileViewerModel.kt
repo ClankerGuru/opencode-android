@@ -6,6 +6,10 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
+import ai.opencode.core.store.Effect
+import ai.opencode.core.store.Reduced
+import ai.opencode.core.store.Reducer
+import ai.opencode.core.store.Store
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.AgentFileReference
 import ai.opencode.core.files.AttachmentFileType
@@ -102,6 +106,14 @@ class AgentFileViewerModel(
     var noAppOpens: Boolean by mutableStateOf(false)
         private set
 
+    /** Draw on Image's editor, while it's up. */
+    var drawing: Store<ImageDrawingFeature.State, ImageDrawingFeature.Action>? by mutableStateOf(null)
+        private set
+
+    /** Add to Prompt landed: the viewer goes once the editor has. */
+    var drawingAdded: Boolean by mutableStateOf(false)
+        private set
+
     private val wrapsLinesShared = shared(SharedKeys.fileViewerWrapsLines)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var streamLoader: StreamingFileLoader? = null
@@ -120,6 +132,23 @@ class AgentFileViewerModel(
         val next = !wrapsLinesShared.value
         if (wrapsLinesShared.value == next) return
         wrapsLinesShared.set(next)
+    }
+
+    /**
+     * Opens the editor on [image] for [add]'s prompt (iOS `draw(_:add:)`). Its dismissal clears
+     * [drawing], as iOS overrides the store's `dismiss`.
+     */
+    fun draw(image: Bitmap, add: ImageDrawingAdd) {
+        drawingAdded = false
+        val feature = ImageDrawingFeature { attachment -> add(attachment).also { if (it) drawingAdded = true } }
+        val dismiss = ImageDrawingFeature.Action.Delegate(ImageDrawingFeature.Action.DelegateAction.Dismiss)
+        drawing = Store(
+            ImageDrawingFeature.State(image),
+            Reducer { state, action ->
+                val reduced = feature.reduce(state, action)
+                if (action != dismiss) reduced else Reduced(reduced.state, Effect.merge(reduced.effect, Effect.run { _ -> drawing = null }))
+            },
+        )
     }
 
     val target: AgentFileReference.Target? get() = reference.target(directory)

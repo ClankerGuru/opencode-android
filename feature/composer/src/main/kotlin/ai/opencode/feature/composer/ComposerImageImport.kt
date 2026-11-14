@@ -2,6 +2,7 @@ package ai.opencode.feature.composer
 
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.feature.media.PromptImageFormat
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import android.content.Context
 import android.graphics.Bitmap
@@ -31,9 +32,9 @@ import kotlin.math.roundToInt
  */
 object SharedImageEncoder {
     const val MAX_SOURCE_BYTES = 20_000_000
-    const val MAX_PIXEL_SIZE = 1568
-    const val COMPRESSION_QUALITY = 0.8
-    const val MIME = "image/jpeg"
+    const val MAX_PIXEL_SIZE = PromptImageFormat.MAX_PIXEL_SIZE
+    const val COMPRESSION_QUALITY = PromptImageFormat.COMPRESSION_QUALITY
+    const val MIME = PromptImageFormat.MIME
 
     fun jpeg(data: ByteArray): ByteArray? {
         if (data.size > MAX_SOURCE_BYTES) return null

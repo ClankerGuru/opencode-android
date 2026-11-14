@@ -592,10 +592,11 @@ object SessionTranscriptView {
             is TranscriptAction.PreviewImage -> {
                 // The keyboard would stay up over the image.
                 host?.dismissComposerKeyboard()
-                presenter?.presentImage(action.preview)
+                presenter?.presentImage(action.preview, drawingHandler(store))
             }
             is TranscriptAction.OpenFile -> {
                 host?.dismissComposerKeyboard()
+                val addDrawing = drawingHandler(store)
                 val file = action.file
                 val server = store.state.server
                 val directory = store.state.session?.directory
@@ -606,6 +607,7 @@ object SessionTranscriptView {
                         directory = directory,
                         onDone = { viewer.dismiss() },
                         isInMediaViewer = true,
+                        addDrawing = addDrawing,
                         onImageShown = { sourceID, image -> viewer.show(sourceID, image) },
                         onZoomChange = { viewer.isZoomed = it },
                         onImageFrame = { sourceID, frame -> viewer.mediaFrames[sourceID] = frame },

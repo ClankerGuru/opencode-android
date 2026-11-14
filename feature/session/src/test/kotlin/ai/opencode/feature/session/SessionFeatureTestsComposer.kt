@@ -16,6 +16,7 @@ import ai.opencode.feature.session.SessionTestSupport.sessionTest
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeDelivery
+import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.OpenCodePendingRequests
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeTranscriptItem
@@ -68,6 +69,40 @@ class SessionFeatureTestsComposer {
         optimisticPromptIDs = setOf(sentID),
         items = listOf(OpenCodeTranscriptItem.UserText(id = sentID, text = text)),
     ).withDraft("")
+
+    // Draw on Image's copy and the composer that opened the viewer (iOS `ImageDrawingFeatureTests`).
+
+    private val drawnCopy = OpenCodeOutgoingAttachment(id = UUID(0, 2).toString(), data = byteArrayOf(0xFF.toByte(), 0xD8.toByte()), mime = "image/jpeg")
+
+    private fun Harness.drawingSession(answering: Boolean = false): State {
+        val state = sessionState()
+            .withDraft("Check this detail")
+            .withPendingAttachments(listOf(OpenCodeOutgoingAttachment(id = UUID(0, 1).toString(), data = byteArrayOf(1), mime = "image/png")))
+        return if (answering) state { state.beginAnswering() } else state
+    }
+
+    @Test fun aDrawingJoinsTheDraftThatOpenedItAndNothingElse() = sessionTest { h ->
+        val state = h.drawingSession()
+        val store = h.store(state)
+        store.send(Action.DrawingAdded(drawnCopy, from = state.taskIdentity)) {
+            it.withPendingAttachments(it.pendingAttachments + drawnCopy)
+        }
+        store.finish()
+    }
+
+    @Test fun aDrawingForAnotherComposerAddsNothing() = sessionTest { h ->
+        val state = h.drawingSession()
+        val elsewhere = state.taskIdentity.copy(visit = state.taskIdentity.visit + 1)
+        val store = h.store(state)
+        store.send(Action.DrawingAdded(drawnCopy, from = elsewhere))
+    }
+
+    @Test fun aDrawingWhileTheComposerAnswersARequestAddsNothing() = sessionTest { h ->
+        val state = h.drawingSession(answering = true)
+        assertFalse(state.takesPasteAttachments)
+        val store = h.store(state)
+        store.send(Action.DrawingAdded(drawnCopy, from = state.taskIdentity))
+    }
 
     @Test fun returnKeySubmitsInsteadOfInsertingNewline() = sessionTest { h ->
         h.state { shared(SharedKeys.returnKeySends) }.set(true)

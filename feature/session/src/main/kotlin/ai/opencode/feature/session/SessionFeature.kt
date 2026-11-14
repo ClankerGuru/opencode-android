@@ -688,6 +688,12 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         /** A send's delivery ended: its claim, if it never moved the work, lapses. */
         data class AutoBackgroundClaimLapsed(val messageID: String, val requestEpoch: Int) : Action
         data class ComposerAttachments(val action: ComposerAttachmentsFeature.Action) : Action
+        /**
+         * Draw on Image's copy, for the composer whose viewer it came from ([from]): dropped once
+         * that composer has gone or answers a request. iOS `composerAttachments(.drawingAdded)`;
+         * here a session action, since [State.TaskIdentity] is this module's, above the composer's.
+         */
+        data class DrawingAdded(val attachment: OpenCodeOutgoingAttachment, val from: State.TaskIdentity) : Action
         /** An upward swipe on the unfocused composer asks for the keyboard. */
         data object ComposerSwipedUp : Action
         /** Send a failed message again, with its ID and delivery. */
