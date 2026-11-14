@@ -1,7 +1,6 @@
 package ai.opencode.feature.media
 
 import ai.opencode.core.dependencies.UuidClient
-import ai.opencode.core.dependencies.withDependencies
 import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
@@ -11,9 +10,7 @@ import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
-import android.os.Looper
 import androidx.compose.ui.geometry.Offset
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -24,8 +21,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
-import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.util.UUID
@@ -187,8 +182,8 @@ class ImageDrawingFeatureTests {
         suspends: Boolean = false,
         offered: Locked<List<OpenCodeOutgoingAttachment>>,
     ) = TestStore(
-        TranscriptImageViewerFeature.State(TranscriptImagePreview(page.id, listOf(page)), isShowingControls = true, allowsDrawing = allowsDrawing),
-        TranscriptImageViewerFeature { attachment ->
+        FullscreenViewerFeature.State(TranscriptImagePreview(page.id, listOf(page)), isShowingControls = true, allowsDrawing = allowsDrawing),
+        FullscreenViewerFeature { attachment ->
             offered.update { it + attachment }
             true
         },
@@ -202,18 +197,18 @@ class ImageDrawingFeatureTests {
     }
 
     private fun drawing(action: ImageDrawingFeature.Action) =
-        TranscriptImageViewerFeature.Action.Drawing(PresentationAction.Presented(action))
+        FullscreenViewerFeature.Action.Drawing(PresentationAction.Presented(action))
 
     @Test fun drawOpensOnlyOnADecodedImageForAPromptThatTakesIt() = runTest {
         val offered = Locked(listOf<OpenCodeOutgoingAttachment>())
-        viewer(allowsDrawing = false, offered = offered).send(TranscriptImageViewerFeature.Action.DrawTapped)
+        viewer(allowsDrawing = false, offered = offered).send(FullscreenViewerFeature.Action.DrawTapped)
         val video = TranscriptImagePreview.Page(id = "img_video", image = image, label = "Video", isVideo = true)
-        viewer(page = video, offered = offered).send(TranscriptImageViewerFeature.Action.DrawTapped)
+        viewer(page = video, offered = offered).send(FullscreenViewerFeature.Action.DrawTapped)
         val loading = TranscriptImagePreview.Page(id = "img_loading", image = null, label = "Image", mediaHash = "abc")
-        viewer(page = loading, offered = offered).send(TranscriptImageViewerFeature.Action.DrawTapped)
+        viewer(page = loading, offered = offered).send(FullscreenViewerFeature.Action.DrawTapped)
 
         val store = viewer(offered = offered)
-        store.send(TranscriptImageViewerFeature.Action.DrawTapped) { it.copy(drawing = ImageDrawingFeature.State(image)) }
+        store.send(FullscreenViewerFeature.Action.DrawTapped) { it.copy(drawing = ImageDrawingFeature.State(image)) }
         store.finish()
         assertTrue(offered.current.isEmpty())
     }
@@ -227,10 +222,10 @@ class ImageDrawingFeatureTests {
         val offered = Locked(listOf<OpenCodeOutgoingAttachment>())
         val page = TranscriptImagePreview.Page(id = "img_thumb", image = null, label = "Image", mediaHash = "abc")
         val store = viewer(page = page, offered = offered)
-        store.send(TranscriptImageViewerFeature.Action.MediaLoaded("img_thumb", MediaReferenceLoadResult.Loaded(byteArrayOf(1, 2, 3)))) {
+        store.send(FullscreenViewerFeature.Action.MediaLoaded("img_thumb", MediaReferenceLoadResult.Loaded(byteArrayOf(1, 2, 3)))) {
             it.copy(preview = it.preview.copy(pages = listOf(page.copy(loadFailed = true))))
         }
-        store.send(TranscriptImageViewerFeature.Action.DrawTapped)
+        store.send(FullscreenViewerFeature.Action.DrawTapped)
         store.finish()
         assertTrue(offered.current.isEmpty())
     }
@@ -238,7 +233,7 @@ class ImageDrawingFeatureTests {
     @Test fun theViewerClosesOnlyOnceAnAddedDrawingsEditorHasGone() = runTest {
         val offered = Locked(listOf<OpenCodeOutgoingAttachment>())
         val store = viewer(offered = offered)
-        store.send(TranscriptImageViewerFeature.Action.DrawTapped) { it.copy(drawing = ImageDrawingFeature.State(image)) }
+        store.send(FullscreenViewerFeature.Action.DrawTapped) { it.copy(drawing = ImageDrawingFeature.State(image)) }
         store.send(drawing(ImageDrawingFeature.Action.StrokeFinished(stroke))) {
             it.copy(drawing = it.drawing!!.copy(drawing = ImageDrawing(strokes = listOf(stroke))))
         }
@@ -255,49 +250,38 @@ class ImageDrawingFeatureTests {
     @Test fun closingTheEditorMidExportAddsNothing() = runTest {
         val offered = Locked(listOf<OpenCodeOutgoingAttachment>())
         val store = viewer(suspends = true, offered = offered)
-        store.send(TranscriptImageViewerFeature.Action.DrawTapped) { it.copy(drawing = ImageDrawingFeature.State(image)) }
+        store.send(FullscreenViewerFeature.Action.DrawTapped) { it.copy(drawing = ImageDrawingFeature.State(image)) }
         store.send(drawing(ImageDrawingFeature.Action.StrokeFinished(stroke))) {
             it.copy(drawing = it.drawing!!.copy(drawing = ImageDrawing(strokes = listOf(stroke))))
         }
         store.send(drawing(ImageDrawingFeature.Action.AddTapped)) { it.copy(drawing = it.drawing!!.copy(isAdding = true)) }
-        store.send(TranscriptImageViewerFeature.Action.Drawing(PresentationAction.Dismiss)) { it.copy(drawing = null) }
+        store.send(FullscreenViewerFeature.Action.Drawing(PresentationAction.Dismiss)) { it.copy(drawing = null) }
         store.finish()
         assertTrue(offered.current.isEmpty())
     }
 
-    @Test fun closingAFileEditorMidExportAddsNothing() {
-        val gate = CompletableDeferred<Unit>()
+    @Test fun leavingAFilePageMidExportAddsNothing() = runTest {
         val offered = Locked(listOf<OpenCodeOutgoingAttachment>())
-        val model = AgentFileViewerModel(
-            reference = AgentFileReference(path = "/fixture/drawer.png"),
-            server = OpenCodeServer(url = "https://fixture.invalid", username = "", password = ""),
-            directory = null,
-            context = RuntimeEnvironment.getApplication(),
-        )
-        withDependencies({
+        val root = AgentFileDestination(AgentFileReference(path = "/fixture/readme.md"), null)
+        val link = AgentFileDestination(AgentFileReference(path = "drawer.png"), "/fixture")
+        val preview = TranscriptImagePreview(root, OpenCodeServer(url = "https://fixture.invalid", username = "", password = ""))
+        val store = TestStore(FullscreenViewerFeature.State(preview, allowsDrawing = true), FullscreenViewerFeature { attachment ->
+            offered.update { it + attachment }
+            true
+        }, this) {
             this[UuidClient] = UuidClient.incrementing()
-            this[ImageDrawingClient] = ImageDrawingClient(flatten = { _, _, id ->
-                gate.await()
-                copy(UUID.fromString(id))
-            })
-        }) {
-            model.draw(image) { attachment ->
-                offered.update { it + attachment }
-                true
-            }
+            this[ImageDrawingClient] = ImageDrawingClient(flatten = { _, _, _ -> awaitCancellation() })
         }
-        // Held here so its export keeps running: the worst case, an editor whose effect outlives
-        // its page (Android: the page's model is released).
-        val editor = model.drawing!!
-        editor.send(ImageDrawingFeature.Action.StrokeFinished(stroke))
-        editor.send(ImageDrawingFeature.Action.AddTapped)
-        assertTrue(editor.state.isAdding)
-        model.release()
-        gate.complete(Unit)
-        shadowOf(Looper.getMainLooper()).idle()
-        assertEquals("The export landed and was turned away", ImageDrawingFeature.Failure.Prompt, editor.state.failure)
+        val page = TranscriptImagePreview.Page(link)
+        store.send(FullscreenViewerFeature.Action.OpenFile(link)) { it.copy(filePath = listOf(page), selectedID = page.id) }
+        store.send(FullscreenViewerFeature.Action.FileImageLoaded(link, image)) { it.copy(filePath = listOf(page.copy(image = image))) }
+        store.send(FullscreenViewerFeature.Action.DrawTapped) { it.copy(drawing = ImageDrawingFeature.State(image)) }
+        store.send(drawing(ImageDrawingFeature.Action.StrokeFinished(stroke))) {
+            it.copy(drawing = it.drawing!!.copy(drawing = ImageDrawing(strokes = listOf(stroke))))
+        }
+        store.send(drawing(ImageDrawingFeature.Action.AddTapped)) { it.copy(drawing = it.drawing!!.copy(isAdding = true)) }
+        store.send(FullscreenViewerFeature.Action.BackTapped) { it.copy(filePath = emptyList(), selectedID = preview.id, drawing = null) }
+        store.finish()
         assertTrue(offered.current.isEmpty())
-        assertFalse(model.drawingAdded)
-        editor.close()
     }
 }

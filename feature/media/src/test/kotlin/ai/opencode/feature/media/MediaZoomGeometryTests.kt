@@ -124,21 +124,21 @@ class MediaZoomGeometryTests {
     }
 }
 
-class TranscriptImageViewerFeatureTests {
+class FullscreenViewerFeatureTests {
     @get:Rule val isolation = TestIsolationRule()
 
     @Test
     fun controlsStartHiddenAndToggleOnTap() = runTest {
         val preview = TranscriptImagePreview(id = "img-1", image = stubBitmap(), label = "Tool image 1 of 1")
         val haptics = Locked(listOf<Haptic>())
-        val store = TestStore(TranscriptImageViewerFeature.State(preview), TranscriptImageViewerFeature(), this) {
+        val store = TestStore(FullscreenViewerFeature.State(preview), FullscreenViewerFeature(), this) {
             this[HapticsClient] = HapticsClient(play = { haptic -> haptics.update { it + haptic } })
         }
 
         assertFalse(store.state.isShowingControls)
-        store.send(TranscriptImageViewerFeature.Action.ImageTapped) { it.copy(isShowingControls = true) }
-        store.send(TranscriptImageViewerFeature.Action.ImageTapped) { it.copy(isShowingControls = false) }
-        store.send(TranscriptImageViewerFeature.Action.CloseTapped) { it.copy(isDismissed = true) }
+        store.send(FullscreenViewerFeature.Action.ImageTapped) { it.copy(isShowingControls = true) }
+        store.send(FullscreenViewerFeature.Action.ImageTapped) { it.copy(isShowingControls = false) }
+        store.send(FullscreenViewerFeature.Action.CloseTapped) { it.copy(isDismissed = true) }
         store.finish()
         assertTrue(haptics.current.isEmpty())
     }
@@ -159,7 +159,7 @@ class TranscriptImageViewerFeatureTests {
         val haptics = Locked(listOf<Haptic>())
         val shouldFail = Locked(false)
 
-        val store = TestStore(TranscriptImageViewerFeature.State(preview), TranscriptImageViewerFeature(), this) {
+        val store = TestStore(FullscreenViewerFeature.State(preview), FullscreenViewerFeature(), this) {
             this[HapticsClient] = HapticsClient(play = { haptic -> haptics.update { it + haptic } })
             this[PhotoSaveClient] = PhotoSaveClient(saveImage = { image ->
                 if (shouldFail.current) throw PhotoSaveClientError.Denied
@@ -169,22 +169,22 @@ class TranscriptImageViewerFeatureTests {
         }
 
         assertEquals(null, store.state.selectedPage?.displayTitle)
-        store.send(TranscriptImageViewerFeature.Action.PageSelected("img-2")) { it.copy(selectedID = "img-2") }
+        store.send(FullscreenViewerFeature.Action.PageSelected("img-2")) { it.copy(selectedID = "img-2") }
         assertEquals("lab-iso.png", TranscriptImagePreview.Page(id = "file-1", image = first, label = "lab-iso.png").displayTitle)
         assertEquals(null, TranscriptImagePreview.Page(id = "diag-1", image = first, label = "Diagram, Flowchart").displayTitle)
 
-        store.send(TranscriptImageViewerFeature.Action.SaveTapped) { it.copy(isSaving = true) }
-        store.receive(TranscriptImageViewerFeature.Action.SaveFinished(true)) { it.copy(isSaving = false) }
+        store.send(FullscreenViewerFeature.Action.SaveTapped) { it.copy(isSaving = true) }
+        store.receive(FullscreenViewerFeature.Action.SaveFinished(true)) { it.copy(isSaving = false) }
         assertEquals(1, savedImages.current.size)
         assertTrue(savedImages.current.first() === second)
         assertEquals(listOf(Haptic.success), haptics.current)
 
         shouldFail.set(true)
-        store.send(TranscriptImageViewerFeature.Action.SaveTapped) { it.copy(isSaving = true) }
-        store.receive(TranscriptImageViewerFeature.Action.SaveFinished(false)) { it.copy(isSaving = false) }
+        store.send(FullscreenViewerFeature.Action.SaveTapped) { it.copy(isSaving = true) }
+        store.receive(FullscreenViewerFeature.Action.SaveFinished(false)) { it.copy(isSaving = false) }
         assertEquals(listOf(Haptic.success, Haptic.error), haptics.current)
 
-        store.send(TranscriptImageViewerFeature.Action.ShareTapped)
+        store.send(FullscreenViewerFeature.Action.ShareTapped())
         store.finish()
         assertEquals(listOf("Tool image 2 of 2"), sharedLabels.current)
     }

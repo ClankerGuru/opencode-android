@@ -6,6 +6,7 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.strings.localized
 import ai.opencode.core.tuning.Tunable
 import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.model.AgentFileReference
 import ai.opencode.server.model.OpenCodeImageAttachment
 import android.content.ComponentCallbacks2
 import android.content.res.Configuration
@@ -77,11 +78,24 @@ data class TranscriptImagePreview(val id: String, val pages: List<Page>, val ser
         val loadFailed: Boolean = false,
         /** The app wrote [label] itself ("Image 1 of 3"), so it isn't a name worth showing as a title. */
         val labelIsPlaceholder: Boolean = false,
+        val file: AgentFileDestination? = null,
+        val showsSource: Boolean = false,
     ) {
+        constructor(file: AgentFileDestination) : this(
+            id = file.reference.zoomSourceID,
+            image = null,
+            label = file.reference.name,
+            name = file.reference.name,
+            isVideo = file.reference.kind == AgentFileReference.Kind.Video,
+            file = file,
+        )
+
         // iOS `Page: Equatable`: every field, and the image by identity or by its pixels.
         override fun equals(other: Any?): Boolean =
             other is Page &&
                 other.id == id &&
+                other.file == file &&
+                other.showsSource == showsSource &&
                 other.label == label &&
                 other.detail == detail &&
                 other.mediaHash == mediaHash &&
@@ -94,6 +108,8 @@ data class TranscriptImagePreview(val id: String, val pages: List<Page>, val ser
 
         override fun hashCode(): Int = id.hashCode() * 31 + label.hashCode()
     }
+
+    constructor(file: AgentFileDestination, server: OpenCodeServer) : this(file.reference.zoomSourceID, listOf(Page(file)), server)
 
     constructor(id: String, image: Bitmap, label: String, server: OpenCodeServer? = null, labelIsPlaceholder: Boolean = false) :
         this(id, listOf(Page(id, image, label, labelIsPlaceholder = labelIsPlaceholder)), server)
