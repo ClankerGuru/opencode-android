@@ -170,6 +170,30 @@ class SessionFeatureTestsAgentSelection {
         assertEquals("Listed once for the folder", 1, asked.value)
     }
 
+    /** A change to the server's agents lists them again, even for a folder already listed. */
+    @Test fun anAgentsChangeListsAgentsAgain() = sessionTest { h ->
+        val asked = LockIsolated(0)
+        val first = agents.take(1)
+        val all = agents
+        val store = h.store(h.makeState(session = agentSession())) {
+            this[Clock] = ImmediateClock()
+            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.agentSelection))
+            this[OpenCodeClient] = this[OpenCodeClient].copy(
+                primaryAgents = { _, _ -> if (asked.increment() == 1) first else all },
+            )
+        }
+        store.send(Action.AgentsRequested)
+        store.receive({ it is Action.AgentsResponse && it.result.isSuccess }, "agentsResponse.success") {
+            it.withPrimaryAgents(first).listed()
+        }
+        store.send(Action.AgentsChanged) { it.copy(agentSelection = it.agentSelection.copy(listedDirectory = null)) }
+        store.receive(Action.AgentsRequested)
+        store.receive({ it is Action.AgentsResponse && it.result.isSuccess }, "agentsResponse.success") {
+            it.withPrimaryAgents(all).listed()
+        }
+        assertEquals(2, asked.value)
+    }
+
     /** After the last try the failure is reported once, not retried forever. */
     @Test fun agentsRequestGivesUpAfterTheLastTry() = sessionTest { h ->
         val tries = LockIsolated(0)

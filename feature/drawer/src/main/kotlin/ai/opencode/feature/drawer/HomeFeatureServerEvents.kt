@@ -337,6 +337,10 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
                 .updatingSubagents { screen -> screen.copy(projects = screen.projects.upserting(project)) }
             return Reduced(s)
         }
+
+        OpenCodeServerEvent.ModelsChanged -> return Reduced(state, forwardToScreens(state, SessionFeature.Action.ModelsChanged))
+
+        OpenCodeServerEvent.AgentsChanged -> return Reduced(state, forwardToScreens(state, SessionFeature.Action.AgentsChanged))
     }
 }
 

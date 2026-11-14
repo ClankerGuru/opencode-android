@@ -40,6 +40,8 @@ internal fun SessionFeature.reduceModelsAndFamily(state: State, action: Action):
     Action.ModelButtonTapped ->
         reloadModels(state.copy(activePicker = State.ActivePicker.model, modelFilter = "", showsAllModels = false))
 
+    Action.ModelsChanged -> reloadModels(state)
+
     is Action.ModelsResponse -> {
         val catalog = action.result.getOrNull()
         if (catalog != null) {
@@ -195,7 +197,7 @@ internal fun SessionFeature.reduceModelsAndFamily(state: State, action: Action):
 
     is Action.Delegate -> Reduced(state)
 
-    Action.AgentsRequested, is Action.AgentsResponse, is Action.AgentPicked, is Action.AgentApplied -> reduceAgents(state, action)
+    Action.AgentsRequested, Action.AgentsChanged, is Action.AgentsResponse, is Action.AgentPicked, is Action.AgentApplied -> reduceAgents(state, action)
 
     else -> null
 }

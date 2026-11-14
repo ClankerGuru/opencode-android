@@ -57,6 +57,12 @@ sealed interface OpenCodeServerEvent {
     /** A project's name, repository, or icon metadata changed on the server. */
     data class ProjectUpdated(val project: OpenCodeProject) : OpenCodeServerEvent
 
+    /** `model.updated` or `provider.updated`: the server's model catalog changed (plugins loaded, config, a login). */
+    data object ModelsChanged : OpenCodeServerEvent
+
+    /** `agent.updated`: the server's agents changed. */
+    data object AgentsChanged : OpenCodeServerEvent
+
     /** The single session this event is scoped to, when its ordering depends only on that session's pending deltas. */
     val targetSessionID: String?
         get() = when (this) {
@@ -74,7 +80,7 @@ sealed interface OpenCodeServerEvent {
             is MessageInvalidated -> sessionID
             is RevertChanged -> sessionID
             is ShellStarted -> shell.sessionID
-            Connected, is SessionCreated, is AttentionChanged, is ShellEnded, is ProjectUpdated -> null
+            Connected, is SessionCreated, is AttentionChanged, is ShellEnded, is ProjectUpdated, ModelsChanged, AgentsChanged -> null
         }
 }
 

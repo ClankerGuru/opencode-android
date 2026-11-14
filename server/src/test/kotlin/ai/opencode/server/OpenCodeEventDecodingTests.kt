@@ -237,14 +237,17 @@ class OpenCodeEventDecodingTests {
                 decodeStreamFrame("""{"type":"$type","data":{"sessionID":"ses_compact"}}"""),
             )
         }
-        for (ignored in listOf(
-            """{"type":"session.compaction.delta","data":{"sessionID":"ses_compact","text":"Summary"}}""",
-            """{"type":"provider.updated","data":{"providers":[1,2,3]}}""",
-            """{"type":"model.updated","data":{"models":[1,2,3]}}""",
-        )) {
-            assertNull(decodeStreamFrame(ignored))
-        }
+        assertNull(decodeStreamFrame("""{"type":"session.compaction.delta","data":{"sessionID":"ses_compact","text":"Summary"}}"""))
         assertFalse(OpenCodeLiveContentEvent.ReasoningEnded("m", 0, "thinking").isDurableBoundary)
         assertTrue(TextEnded("m", 0, "hello").isDurableBoundary)
+    }
+
+    @Test
+    fun catalogUpdatesDecodeAsCatalogChanges() {
+        val location = ""","location":{"directory":"/tmp/demo"}"""
+        assertEquals(OpenCodeServerEvent.ModelsChanged, decodeStreamFrame("""{"type":"model.updated"$location,"data":{}}"""))
+        assertEquals(OpenCodeServerEvent.ModelsChanged, decodeStreamFrame("""{"type":"provider.updated","data":{"providers":[1,2,3]}}"""))
+        assertEquals(OpenCodeServerEvent.AgentsChanged, decodeStreamFrame("""{"type":"agent.updated"$location,"data":{}}"""))
+        assertEquals(OpenCodeServerEvent.ModelsChanged, decodeStreamFrame("""{"type":"model.updated"}"""))
     }
 }

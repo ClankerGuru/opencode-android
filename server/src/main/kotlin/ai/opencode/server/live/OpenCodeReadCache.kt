@@ -49,6 +49,10 @@ internal class OpenCodeReadCache {
         }
     }
 
+    fun forgetModelCatalogs(server: String) {
+        synchronized(lock) { modelCatalogs.keys.removeAll { it.startsWith("$server|") } }
+    }
+
     private val sessionParents = HashMap<String, HashMap<String, String?>>()
     private val missingSessions = HashMap<String, HashMap<String, Duration>>()
 
