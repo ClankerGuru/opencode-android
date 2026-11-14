@@ -66,6 +66,8 @@ data class LibraryPhoto(
     val videoDuration: Double? = null,
 ) {
     val isVideo: Boolean get() = videoDuration != null
+    /** MediaStore originals can be played directly; lab swatches only have a poster. */
+    val localVideoURI: String? get() = id.takeIf { isVideo && it.startsWith("content://") }
     val formattedDuration: String? get() = videoDuration?.let(::formatDuration)
 
     companion object {

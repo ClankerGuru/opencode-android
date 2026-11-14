@@ -49,6 +49,7 @@ data class PersistedComposerState(
         val hasPastedText: Boolean,
         val pasted: PastedTextSummary? = null,
         val videoDuration: Double? = null,
+        val localVideoURI: String? = null,
     ) {
         constructor(attachment: OpenCodeOutgoingAttachment) : this(
             id = attachmentUUID(attachment.id),
@@ -59,6 +60,7 @@ data class PersistedComposerState(
             hasPastedText = attachment.pastedText != null,
             pasted = attachment.pasted,
             videoDuration = attachment.videoDuration,
+            localVideoURI = attachment.localVideoURI,
         )
     }
 

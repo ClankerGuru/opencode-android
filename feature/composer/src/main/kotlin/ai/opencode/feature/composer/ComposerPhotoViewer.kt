@@ -16,6 +16,15 @@ import ai.opencode.feature.media.MediaZoomSources
 import ai.opencode.feature.media.TranscriptImagePreview
 import ai.opencode.feature.media.FullscreenViewerFeature
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
+import ai.opencode.feature.media.AgentFileDestination
+import ai.opencode.feature.media.MediaReferenceResolver
+import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.model.AgentFileReference
+import android.graphics.BitmapFactory
+import android.net.Uri
+import java.io.File
+import java.nio.file.Files
+import java.util.IdentityHashMap
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -169,25 +178,65 @@ object ComposerPhotoViewer {
         return runCatching { UUID.fromString(id) }.getOrNull()?.let { id }
     }
 
-    /** Every decodable pending photo, opened on [selected]. */
+    fun isVisualFile(file: ComposerFileAttachment): Boolean =
+        file.mime.startsWith("video/", ignoreCase = true) || AgentFileReference(file.name).kind == AgentFileReference.Kind.Video
+
+    /** Only the tapped photo is decoded. Other pages hold their original (or immutable blob address). */
     fun preview(
         attachments: List<OpenCodeOutgoingAttachment>,
         selected: String,
+        files: List<ComposerFileAttachment> = emptyList(),
+        server: OpenCodeServer? = null,
+        directory: String? = null,
         decode: (OpenCodeOutgoingAttachment) -> Bitmap? = ::decode,
     ): TranscriptImagePreview? {
-        val images = attachments.filter { it.isImage }.mapNotNull { attachment -> decode(attachment)?.let { attachment to it } }
-        if (images.none { it.first.id == selected }) return null
-        val pages = images.mapIndexed { index, (attachment, image) ->
+        val images = attachments.filter { it.isImage && (it.data.isNotEmpty() || it.mediaHash != null) }
+        val pages = images.mapIndexed { index, attachment ->
+            val original = attachment.data.takeIf { it.isNotEmpty() } ?: MediaReferenceResolver.cachedData(attachment.mediaHash)
+            val image = if (attachment.id == selected) decode(attachment) else null
+            val detail = if (image != null) detail(attachment, image) else original?.let {
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeByteArray(it, 0, it.size, bounds)
+                if (bounds.outWidth > 0 && bounds.outHeight > 0) detail(attachment, bounds.outWidth, bounds.outHeight) else null
+            }
             TranscriptImagePreview.Page(
-                id = mediaID(attachment.id),
-                image = image,
-                label = attachment.name ?: localized(R.string.composer_photo_viewer_image_label, index + 1, images.size),
-                detail = detail(attachment, image),
+                mediaID(attachment.id), image, attachment.name ?: localized(R.string.composer_photo_viewer_image_label, index + 1, images.size),
+                detail = detail, mediaHash = attachment.mediaHash, original = original,
                 labelIsPlaceholder = attachment.name == null,
-                isVideo = attachment.videoDuration != null,
+                isVideo = attachment.videoDuration != null || attachment.localVideoURI != null,
+                hasDecodedOriginal = image != null,
+                videoURL = attachment.localVideoURI?.let(Uri::parse),
             )
+        }.toMutableList()
+        val leases = mutableListOf<File>()
+        for (file in files.filter(::isVisualFile)) {
+            val destination = file.reference?.let { AgentFileDestination(AgentFileReference(it.path), directory) }
+            // Upload completion unlinks the staging file. Lease a second name for its inode
+            // in the staging root, outside its per-upload folder; never copy the movie.
+            val lease = if (destination == null) leaseMovie(File(file.localPath)) ?: continue else null
+            lease?.let(leases::add)
+            pages += TranscriptImagePreview.Page(mediaID(file.id.toString()), null, file.name, name = file.name,
+                file = destination, isVideo = true, videoURL = lease?.let(Uri::fromFile))
         }
-        return TranscriptImagePreview(mediaID(selected), pages)
+        val id = mediaID(selected)
+        if (pages.none { it.id == id }) {
+            leases.forEach { it.delete() }
+            return null
+        }
+        return TranscriptImagePreview(id, pages, server).also { if (leases.isNotEmpty()) movieLinks[it] = leases }
+    }
+
+    private fun leaseMovie(staged: File): File? {
+        val root = staged.parentFile?.parentFile ?: return null
+        val link = File(root, ".viewer-${UUID.randomUUID()}.${staged.extension}")
+        return runCatching { Files.createLink(link.toPath(), staged.toPath()); link }.getOrNull()
+    }
+
+    private val movieLinks = IdentityHashMap<TranscriptImagePreview, List<File>>()
+
+    /** Called for the opening snapshot on dismissal (and when presentation was rejected). */
+    fun release(preview: TranscriptImagePreview) {
+        movieLinks.remove(preview)?.forEach { it.delete() }
     }
 
     /** “JPEG · 1568 × 1176 · 412 KB”. */

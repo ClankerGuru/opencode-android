@@ -6,6 +6,7 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.appFormattingLocale
+import ai.opencode.feature.media.mediaZoomSource
 import ai.opencode.feature.media.FileAttachmentCard
 import ai.opencode.feature.media.FileAttachmentDetail
 import androidx.compose.foundation.background
@@ -71,10 +72,13 @@ fun ComposerFileChip(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
     cornerRadius: Dp = ComposerFileChip.cornerRadius,
+    onOpen: (() -> Unit)? = null,
 ) {
     val retries = file.isFailed && canRetry
     val retryDescription = stringResource(R.string.composer_file_retry_description, file.name)
     val fileDescription = stringResource(R.string.composer_file_attachment_description, file.name)
+    val open = onOpen?.takeIf { ComposerPhotoViewer.isVisualFile(file) }
+    val action = if (retries) onRetry else open
     FileAttachmentCard(
         name = file.name,
         symbolName = AttachmentFileType.symbolName(file.name, file.mime),
@@ -82,16 +86,17 @@ fun ComposerFileChip(
         height = ComposerFileChip.height,
         detailLines = if (file.isFailed) 2 else 1,
         modifier = modifier
+            .then(if (open != null) Modifier.mediaZoomSource(ComposerPhotoViewer.mediaID(file.id.toString()), cornerRadius) else Modifier)
             .clip(RoundedCornerShape(cornerRadius))
             .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-            .then(if (retries) Modifier.clickable(role = Role.Button, onClick = onRetry) else Modifier)
+            .then(if (action != null) Modifier.clickable(role = Role.Button, onClick = action) else Modifier)
             .clearAndSetSemantics {
                 contentDescription = if (retries) retryDescription else fileDescription
                 stateDescription = ComposerFileChip.statusDescription(file)
                 testTag = "pending-file-${file.name}"
-                if (retries) {
+                if (action != null) {
                     role = Role.Button
-                    onClick { onRetry(); true }
+                    onClick { action(); true }
                 }
             },
     ) {

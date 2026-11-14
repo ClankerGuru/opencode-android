@@ -1,8 +1,12 @@
 package ai.opencode.feature.media
 
 import ai.opencode.core.testing.TestIsolationRule
+import ai.opencode.server.model.AgentFileReference
+import ai.opencode.server.model.OpenCodeTranscriptFile
+import ai.opencode.server.testing.WireFixture
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.retry.ServerContact
+import androidx.media3.datasource.DataSpec
 import kotlinx.coroutines.test.runTest
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
@@ -21,6 +25,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.io.File
 
 /**
@@ -51,6 +58,62 @@ class AgentFileLoadingTests {
         val builder = Response.Builder().request(request).protocol(Protocol.HTTP_1_1).code(status).message("")
         headers.forEach { (name, value) -> builder.header(name, value) }
         return builder.body(body.toResponseBody(headers["Content-Type"]?.toMediaType())).build()
+    }
+
+    @Test
+    fun hashOriginalIsNeverAWorkspacePath() = runTest {
+        val hash = "a".repeat(64)
+        val tag = "\"$hash\""
+        val movie = OpenCodeTranscriptFile(id = "m", name = "clip.mp4", mime = "video/mp4", mediaHash = hash)
+        val reference = requireNotNull(movie.mediaViewerReference)
+        val cache = temporaryDirectory("blob-original")
+        try {
+            WireFixture { request ->
+                if (request.header("If-None-Match") == tag) WireFixture.Reply.status(304)
+                else WireFixture.Reply.Json(200, "movie bytes", mapOf("ETag" to tag, "Content-Type" to "application/octet-stream"))
+            }.use { wire ->
+                val server = wire.server
+                val blob = requireNotNull(AgentFileLoader.original(server, reference, "/work"))
+                val workspace = requireNotNull(AgentFileLoader.original(server, AgentFileReference("clip.mp4"), "/work"))
+                assertEquals("/work/clip.mp4", workspace.cacheKey)
+                assertEquals("media:$hash", blob.cacheKey)
+                assertNull(MediaReferenceResolver.originalRequest(server, "../fs/read"))
+                assertNull(AgentFileLoader.original(server, reference.copy(media = reference.media!!.copy(hash = "invalid")), "/work"))
+                // Current media.get ignores Range. Only a real 206 can select the player’s streaming source.
+                val probe = AgentFileLoader.probe(blob.request, server)
+                assertFalse(probe.supportsRanges)
+                assertEquals(11L, probe.size)
+                val file = AgentFileLoader.cacheURL(server, blob.cacheKey, reference.name, cache)
+                repeat(2) {
+                    AgentFileLoader.download(blob.request, file, server, maxBytes = 11) { _, _ -> }
+                    assertEquals("movie bytes", file.readText())
+                }
+                assertEquals(listOf("bytes=0-1", null, null), wire.requests.map { it.header("Range") })
+                assertEquals(listOf(null, null, tag), wire.requests.map { it.header("If-None-Match") })
+                assertTrue(wire.requests.all { it.path == "/api/experimental/media/$hash" && it.header("Authorization") == server.basicAuthorization })
+            }
+        } finally {
+            cache.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun oversizedChunkedOriginalDoesNotReplaceCachedFile() = runTest {
+        val directory = temporaryDirectory("bounded-original").apply { mkdirs() }
+        val file = File(directory, "original").apply { writeText("prior") }
+        try {
+            val request = Request.Builder().url("https://box/file").build()
+            val error = runCatching {
+                AgentFileLoader.download(request, file, maxBytes = 4, client = client {
+                    answered(it, 200, emptyMap()).newBuilder().body(Buffer().writeUtf8("oversize").asResponseBody(null, -1)).build()
+                }) { _, _ -> }
+            }.exceptionOrNull()
+            assertEquals(AgentFileLoader.overLimit, error)
+            assertEquals("prior", file.readText())
+            assertEquals(listOf(file), directory.listFiles()?.toList())
+        } finally {
+            directory.deleteRecursively()
+        }
     }
 
     @Test
@@ -403,6 +466,49 @@ class AgentFileLoadingTests {
             assertNull("leaked custom header to $foreign", request.header("CF-Access-Client-Id"))
             assertNull("leaked custom header to $foreign", request.header("CF-Access-Client-Secret"))
             assertFalse(contact.hasAnsweredHTTPOrigin(url))
+        }
+    }
+}
+
+/** Exercise the same Media3 DataSource that the remote gallery player reads after a seek. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
+class AgentMovieRangeTests {
+    @get:Rule val isolation = TestIsolationRule()
+
+    @Test
+    fun rangePlaybackSeeksTheAuthenticatedOriginal() = runTest {
+        val hash = "e".repeat(64)
+        val file = OpenCodeTranscriptFile(id = "movie", name = "clip", mime = "video/mp4", mediaHash = hash)
+        WireFixture { request ->
+            val (range, body) = when (request.header("Range")) {
+                "bytes=0-1" -> "0-1" to "ab"
+                "bytes=4-6" -> "4-6" to "efg"
+                else -> error("Unexpected range")
+            }
+            WireFixture.Reply.Json(206, body, mapOf("Content-Range" to "bytes $range/10", "Content-Type" to "application/octet-stream"))
+        }.use { wire ->
+            val server = wire.server
+            val original = requireNotNull(AgentFileLoader.original(server, requireNotNull(file.mediaViewerReference), null))
+            val probe = AgentFileLoader.probe(original.request, server)
+            assertTrue(probe.supportsRanges)
+            assertEquals(10L, probe.size)
+            val loader = StreamingFileLoader(original.request, server, file.mime, file.name)
+            val source = loader.dataSourceFactory.createDataSource()
+            try {
+                val item = loader.makeMediaItem().localConfiguration!!
+                assertEquals("video/mp4", item.mimeType)
+                val spec = DataSpec.Builder().setUri(item.uri).setPosition(4).setLength(3).build()
+                assertEquals(3L, source.open(spec))
+                val bytes = ByteArray(3)
+                assertEquals(3, source.read(bytes, 0, bytes.size))
+                assertEquals("efg", bytes.decodeToString())
+            } finally {
+                source.close()
+                loader.invalidate()
+            }
+            assertEquals(2, wire.requests.size)
+            assertTrue(wire.requests.all { it.path == "/api/experimental/media/$hash" && it.header("Authorization") == server.basicAuthorization })
         }
     }
 }

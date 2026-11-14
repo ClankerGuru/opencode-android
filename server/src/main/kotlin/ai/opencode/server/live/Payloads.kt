@@ -578,7 +578,7 @@ internal data class ToolContentPayload(
                 "text" -> ToolContentPayload(type, text = c.opt("text") { it.str() })
                 "file" -> {
                     val mime = c.opt("mime") { it.str() }
-                    if (mime?.lowercase()?.startsWith("image/") == true) {
+                    if (mime != null && (mime.startsWith("image/", ignoreCase = true) || mime.startsWith("video/", ignoreCase = true))) {
                         ToolContentPayload(
                             type,
                             mime = mime,

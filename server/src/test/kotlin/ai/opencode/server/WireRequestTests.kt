@@ -170,7 +170,10 @@ class WireRequestTests {
     fun composerPromptPostsFilesAndExplicitDelivery() = runTest {
         for (delivery in listOf(OpenCodeDelivery.Steer, OpenCodeDelivery.Queue)) {
             withFixture(WireFixture { Reply.Json(200, "{}") }) { fixture ->
-                val image = OpenCodeOutgoingAttachment(data = byteArrayOf(1, 2), mime = "image/png")
+                val image = OpenCodeOutgoingAttachment(
+                    data = byteArrayOf(1, 2), mime = "image/png", videoDuration = 4.0,
+                    localVideoURI = "content://media/example/movie",
+                )
 
                 OpenCodeClient.liveValue.sendPrompt(fixture.server, "ses_1", "hello", listOf(image), emptyList(), "msg_1", delivery)
 

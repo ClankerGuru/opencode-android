@@ -155,6 +155,17 @@ data class OpenCodeTranscriptFile(
     /** A `media:<hash>` reference whose bytes the server no longer has. */
     val isUnavailable: Boolean = false,
 ) {
+    val mediaViewerReference: AgentFileReference?
+        get() {
+            val hash = mediaHash?.takeIf(OpenCodeMediaReference::isValidHash) ?: return null
+            val normalizedMime = mime.lowercase()
+            if (isUnavailable || PastedText.isText(mime) || normalizedMime.startsWith("image/")) return null
+            return AgentFileReference(
+                path = OpenCodeMediaReference.uri(hash),
+                media = MediaFileOriginal(hash, AttachmentFileType.sanitizedName(name), normalizedMime, byteCount),
+            )
+        }
+
     val typeLabel: String get() = if (isUnavailable) localized(R.string.server_media_unavailable) else AttachmentFileType.label(name, mime)
     val symbolName: String get() = if (isUnavailable) "exclamationmark.triangle" else AttachmentFileType.symbolName(name, mime)
 }

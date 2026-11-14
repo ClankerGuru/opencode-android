@@ -155,32 +155,35 @@ class AgentFileViewerModel(
         scope.cancel()
     }
 
+    private val original: AgentFileLoader.Original?
+        get() = AgentFileLoader.original(server, reference, directory)
+
     private suspend fun run(confirmed: Boolean) {
-        val target = target
-        val request = target?.let { server.fileReadRequest(it) }
-        if (target == null || request == null) {
+        val original = original
+        if (original == null) {
             phase = Phase.Failed(AgentFileError.Unreadable)
             return
         }
         try {
             if (!confirmed || probe == null) {
                 phase = Phase.Opening
-                probe = AgentFileLoader.probe(request, server)
+                probe = AgentFileLoader.probe(original.request, server)
             }
             val probe = probe ?: return
             if (!scope.isActive) return
             if (reference.kind.isTimeBased && probe.supportsRanges) {
-                startStreaming(request, probe.mime)
+                startStreaming(original.request, reference.media?.mime ?: probe.mime)
                 return
             }
-            val size = probe.size
+            val size = downloadSize(probe)
             if (!confirmed && size != null && size > AgentFileLoader.confirmationBytes) {
                 phase = Phase.ConfirmLarge(size)
                 return
             }
-            phase = Phase.Downloading(0, probe.size)
-            val destination = AgentFileLoader.cacheURL(server, target.absolutePath, reference.name, context.cacheDir)
-            val file = AgentFileLoader.download(request, destination, server) { received, expected ->
+            phase = Phase.Downloading(0, size)
+            val destination = AgentFileLoader.cacheURL(server, original.cacheKey, reference.name, context.cacheDir)
+            val limit = if (confirmed) maxOf(size ?: 0, AgentFileLoader.confirmationBytes) else AgentFileLoader.confirmationBytes
+            val file = AgentFileLoader.download(original.request, destination, server, maxBytes = limit) { received, expected ->
                 scope.launch { downloaded(received, expected) }
             }
             present(file)
@@ -199,12 +202,12 @@ class AgentFileViewerModel(
         val ready = phase as? Phase.Ready ?: return null
         ready.localFile?.let { return it }
         if (shareProgress != null) return null
-        val target = target ?: return null
-        val request = server.fileReadRequest(target) ?: return null
+        val original = original ?: return null
+        if ((downloadSize(probe) ?: 0L) > AgentFileLoader.confirmationBytes) throw AgentFileLoader.overLimit
         shareProgress = ShareProgress(0, probe?.size)
         try {
-            val destination = AgentFileLoader.cacheURL(server, target.absolutePath, reference.name, context.cacheDir)
-            val file = AgentFileLoader.download(request, destination, server) { received, expected ->
+            val destination = AgentFileLoader.cacheURL(server, original.cacheKey, reference.name, context.cacheDir)
+            val file = AgentFileLoader.download(original.request, destination, server, maxBytes = AgentFileLoader.confirmationBytes) { received, expected ->
                 scope.launch { shareDownloaded(received, expected) }
             }
             if (phase !== ready || !scope.isActive) return null
@@ -213,6 +216,11 @@ class AgentFileViewerModel(
         } finally {
             shareProgress = null
         }
+    }
+
+    private fun downloadSize(probe: AgentFileProbe?): Long? {
+        val media = reference.media ?: return probe?.size
+        return media.downloadSize(probe?.size) ?: throw AgentFileError.Network("The server didn’t report the attachment size.")
     }
 
     private fun shareDownloaded(received: Long, expected: Long?) {

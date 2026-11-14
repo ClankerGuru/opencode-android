@@ -51,6 +51,30 @@ class MediaReferenceTests {
     private fun List<OpenCodeTranscriptItem>.toolImages() = filterIsInstance<OpenCodeTranscriptItem.Tool>().mapNotNull { it.call.images }.first()
 
     @Test
+    fun videoBlobToolResultDoesNotMasqueradeAsAMosaicImage() {
+        val payload = """
+            {"data":[{"id":"msg","type":"assistant","content":[{"id":"demo","type":"tool","name":"render","state":{"content":[
+              {"type":"text","text":"Done"},
+              {"type":"file","mime":"video/mp4","uri":"media:invalid"},
+              {"type":"file","mime":"Video/QuickTime","uri":"media:$hashA","bytes":9876},
+              {"type":"file","mime":"video/mp4","uri":"data:video/mp4;base64,AQID"}
+            ]}}]}, {"id":"prompt","type":"user","files":[
+              {"name":"clip.mov","mime":"video/quicktime","uri":"media:$hashA","source":{"type":"inline"}}
+            ]}]}
+        """.trimIndent().toByteArray()
+        val items = decodeTranscript(payload)
+        val call = items.filterIsInstance<OpenCodeTranscriptItem.Tool>().single().call
+        assertTrue(call.imageAttachments.isEmpty())
+        assertEquals(listOf("Done"), call.output)
+        val video = requireNotNull(call.videos).single()
+        assertEquals("msg-tool-demo-video-2", video.id)
+        assertEquals("Video", video.name)
+        assertEquals(9876L, video.byteCount)
+        assertEquals(hashA, video.mediaViewerReference?.media?.hash)
+        assertEquals(video.mediaViewerReference?.id, items.userFiles().single().mediaViewerReference?.id)
+    }
+
+    @Test
     fun capabilityHeaderIsAlwaysSent() = runTest {
         withFixture(WireFixture { Reply.Json(200, """{"data":[]}""") }) { fixture ->
             OpenCodeClient.liveValue.transcript(fixture.server, "ses_1", 30)

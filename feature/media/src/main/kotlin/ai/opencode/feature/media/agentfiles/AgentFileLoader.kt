@@ -6,6 +6,7 @@ import ai.opencode.core.strings.localized
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.OpenCodeTransport
+import ai.opencode.server.model.OpenCodeMediaReference
 import ai.opencode.server.model.AgentFileReference
 import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.server.retry.ServerContact
@@ -28,7 +29,8 @@ import okhttp3.Callback
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
-import org.json.JSONObject
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -142,6 +144,19 @@ object AgentFileLoader {
     /** Text above this opens as a document rather than the lazy text viewer. */
     const val maxTextBytes = 16 * 1024 * 1024
 
+    internal data class Original(val request: Request, val cacheKey: String)
+
+    internal fun original(server: OpenCodeServer, reference: AgentFileReference, directory: String?): Original? {
+        reference.media?.let { media ->
+            val request = MediaReferenceResolver.originalRequest(server, media.hash) ?: return null
+            return Original(request, OpenCodeMediaReference.uri(media.hash))
+        }
+        val target = reference.target(directory) ?: return null
+        return Original(server.fileReadRequest(target) ?: return null, target.absolutePath)
+    }
+
+    internal val overLimit get() = AgentFileError.Network("The file exceeds the download size limit.")
+
     /** Adds the server's credentials to a request for one of its origins. */
     fun authorizedRequest(request: Request, server: OpenCodeServer?): Request {
         if (server == null || !server.matchesOrigin(request.url)) return request
@@ -159,6 +174,8 @@ object AgentFileLoader {
      */
     internal fun client(transport: OpenCodeTransport = dependency(OpenCodeTransport)): OkHttpClient =
         transport.request.newBuilder()
+            // A redirected original could forward custom server credentials to another host.
+            .followRedirects(false)
             .connectTimeout(60, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             .build()
@@ -190,11 +207,11 @@ object AgentFileLoader {
         }
     }
 
-    private data class Validators(val entityTag: String?, val lastModified: String?)
+    @Serializable
+    private data class Validators(val entityTag: String? = null, val lastModified: String? = null)
 
     private fun readValidators(sidecar: File): Validators? = runCatching {
-        val json = JSONObject(sidecar.readText())
-        Validators(json.optString("entityTag").ifEmpty { null }, json.optString("lastModified").ifEmpty { null })
+        Json.decodeFromString(Validators.serializer(), sidecar.readText())
     }.getOrNull()
 
     /** `<cache>/AgentFiles/<hash of server + path>/<name>`. */
@@ -215,6 +232,7 @@ object AgentFileLoader {
         contact: ServerContact = ServerContact.shared,
         client: OkHttpClient = client(),
         temporaryDirectory: File = destination.parentFile ?: File("."),
+        maxBytes: Long = Long.MAX_VALUE,
         progress: (received: Long, expected: Long?) -> Unit,
     ): File = withContext(Dispatchers.IO) {
         val sidecar = File(destination.path + ".validators")
@@ -237,13 +255,18 @@ object AgentFileLoader {
                 throw AgentFileError.network(error)
             }
             response.use {
-                if (response.code == 304 && destination.exists()) {
+                if (response.code == 304) {
+                    if (!destination.isFile || (authorized.header("If-None-Match") == null && authorized.header("If-Modified-Since") == null)) {
+                        throw AgentFileError.unexpectedResponse
+                    }
+                    if (destination.length() > maxBytes) throw overLimit
                     noteContact(contact, server, authorized, response)
                     return@withContext destination
                 }
                 AgentFileError.from(response.code)?.let { throw it }
                 try {
-                    transfer(response, temporary, progress)
+                    if (response.code == 206) throw AgentFileError.unexpectedResponse
+                    transfer(response, temporary, maxBytes, progress)
                 } catch (error: CancellationException) {
                     throw error
                 } catch (error: IOException) {
@@ -252,6 +275,7 @@ object AgentFileLoader {
                 }
                 noteContact(contact, server, authorized, response)
                 destination.parentFile?.mkdirs()
+                sidecar.delete() // Never associate stale validators with the replacement.
                 destination.delete()
                 if (!temporary.renameTo(destination)) {
                     temporary.copyTo(destination, overwrite = true)
@@ -259,15 +283,8 @@ object AgentFileLoader {
                 val probe = AgentFileProbe.of(response)
                 if (probe.entityTag != null || probe.lastModified != null) {
                     runCatching {
-                        sidecar.writeText(
-                            JSONObject().apply {
-                                probe.entityTag?.let { put("entityTag", it) }
-                                probe.lastModified?.let { put("lastModified", it) }
-                            }.toString(),
-                        )
+                        sidecar.writeText(Json.encodeToString(Validators.serializer(), Validators(probe.entityTag, probe.lastModified)))
                     }
-                } else {
-                    sidecar.delete()
                 }
                 destination
             }
@@ -278,9 +295,10 @@ object AgentFileLoader {
     }
 
     /** Writes the body, reporting progress at most every 0.5 % (at least every 128 KB) and at the end. */
-    private suspend fun transfer(response: Response, file: File, progress: (Long, Long?) -> Unit) {
+    private suspend fun transfer(response: Response, file: File, maxBytes: Long, progress: (Long, Long?) -> Unit) {
         val body = response.body
         val expected = body.contentLength().takeIf { it > 0 }
+        if (expected != null && expected > maxBytes) throw overLimit
         val step = maxOf((expected ?: 0) / 200, 128L * 1024)
         var written = 0L
         var lastReported = -1L
@@ -292,6 +310,7 @@ object AgentFileLoader {
                     coroutineContext.ensureActive()
                     val read = input.read(buffer)
                     if (read < 0) break
+                    if (read > maxBytes - written) throw overLimit
                     output.write(buffer, 0, read)
                     written += read
                     if (written == expected || written - lastReported >= step) {

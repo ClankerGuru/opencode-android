@@ -1,5 +1,7 @@
 package ai.opencode.feature.transcript.markdown.ui
 
+import ai.opencode.feature.media.LocalAgentImageOccurrence
+import ai.opencode.feature.media.LocalAgentImageSiblings
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import ai.opencode.server.model.AgentFileReference
 import androidx.compose.foundation.layout.Column
@@ -29,7 +31,7 @@ fun MarkdownBlocksView(
     rowID: String? = null,
     isGrowing: Boolean = false,
     revealItem: String? = rowID,
-    @Suppress("UNUSED_PARAMETER") imageScope: AgentImageScope? = null,
+    imageScope: AgentImageScope? = null,
     selectionItemID: String? = null,
 ) {
     val style = currentMarkdownStyle()
@@ -40,7 +42,12 @@ fun MarkdownBlocksView(
     if (revealItem != null && !isGrowing) reveal.settle(revealItem)
     // Image Link Previews (experimental): thumbnails under prose blocks with direct-image links.
     val imageLinks = ai.opencode.feature.transcript.links.rememberImageLinkPlan(blocks, isGrowing)
-    androidx.compose.runtime.CompositionLocalProvider(LocalTranscriptTextReveal provides reveal) {
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalTranscriptTextReveal provides reveal,
+        LocalAgentImageOccurrence provides (imageScope?.occurrence ?: rowID ?: LocalAgentImageOccurrence.current),
+        LocalAgentImageSiblings provides (imageScope?.siblings ?: remember(blocks) { namedImages(blocks) }),
+        LocalLinkPreviewRow provides (rowID ?: LocalLinkPreviewRow.current),
+    ) {
         Column(modifier) {
             for ((index, block) in blocks.withIndex()) {
                 key(block.id) {

@@ -491,7 +491,11 @@ class SessionPhotoSheetState internal constructor(private val scope: CoroutineSc
         flights.reserve(picks.map { it.attachment }, batch, holdingRow = holdsRow)
         if (flies) flights.launch(picks, batch, restingComposer = rest)
         val library = library
-        startImageImport(picks.map { pick -> ComposerImageSource.Loader(pick.attachment) { library.imageData(pick.photo) } }, batch)
+        val sources = picks.map { pick ->
+            val movie = library.photo(pick.photo)?.takeIf { it.isVideo }
+            ComposerImageSource.Loader(pick.attachment, movie?.videoDuration, movie?.localVideoURI) { library.imageData(pick.photo) }
+        }
+        startImageImport(sources, batch)
     }
 
     /** The flight bookkeeping around the screen's importer. */

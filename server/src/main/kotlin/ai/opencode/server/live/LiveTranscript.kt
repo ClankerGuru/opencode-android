@@ -249,6 +249,7 @@ internal fun transcriptItems(message: MessagePayload): List<OpenCodeTranscriptIt
                                 if (meta.values.any { it.needsBounding(20_000, 100) }) meta.mapValues { it.value.bounded() } else meta
                             } ?: emptyMap(),
                             images = toolImages(state?.content, partID),
+                            videos = toolVideos(state?.content, partID),
                             startedAt = (part.time?.ran ?: part.time?.created)?.let(::instantFromMillis),
                             completedAt = part.time?.completed?.let(::instantFromMillis),
                         ),
@@ -320,6 +321,14 @@ internal fun transcriptItems(message: MessagePayload): List<OpenCodeTranscriptIt
 
     else -> emptyList()
 }
+
+private fun toolVideos(content: List<ToolContentPayload>?, idPrefix: String): List<OpenCodeTranscriptFile>? =
+    content?.mapIndexedNotNull { index, part ->
+        val mime = part.mime ?: return@mapIndexedNotNull null
+        if (part.type != "file" || !mime.startsWith("video/", ignoreCase = true)) return@mapIndexedNotNull null
+        val hash = OpenCodeMediaReference.hash(part.uri) ?: return@mapIndexedNotNull null
+        OpenCodeTranscriptFile(id = "$idPrefix-video-$index", name = part.name ?: "Video", mime = mime, mediaHash = hash, byteCount = part.bytes)
+    }?.ifEmpty { null }
 
 /**
  * Tool results encode screenshots as `file` blocks with data-URI sources, decoded at the
