@@ -73,9 +73,9 @@ class MediaDismissDragTests {
         assertFalse(controlsAreVisible(isShowingControls = true, voiceOver = true, chromeHidden = true))
 
         val preview = TranscriptImagePreview(id = "img-1", image = stubBitmap(), label = "shot.png")
-        val store = TestStore(TranscriptImageViewerFeature.State(preview), TranscriptImageViewerFeature(), this)
-        store.send(TranscriptImageViewerFeature.Action.ImageTapped) { it.copy(isShowingControls = true) }
-        store.send(TranscriptImageViewerFeature.Action.CloseTapped) { it.copy(isDismissed = true) }
+        val store = TestStore(FullscreenViewerFeature.State(preview), FullscreenViewerFeature(), this)
+        store.send(FullscreenViewerFeature.Action.ImageTapped) { it.copy(isShowingControls = true) }
+        store.send(FullscreenViewerFeature.Action.CloseTapped) { it.copy(isDismissed = true) }
         store.finish()
     }
 }
