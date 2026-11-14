@@ -148,7 +148,7 @@ internal class AgentFilePictureInPicture(private val activity: ComponentActivity
 
     private fun playPauseAction(): RemoteAction {
         val playing = !Util.shouldShowPlayButton(player)
-        val title = if (playing) "Pause" else "Play"
+        val title = if (playing) activity.getString(R.string.media_player_pause) else activity.getString(R.string.media_player_play)
         val icon = Icon.createWithResource(activity, if (playing) ai.opencode.core.R.drawable.ms_pause_fill else ai.opencode.core.R.drawable.ms_play_arrow_fill)
         val intent = PendingIntent.getBroadcast(
             activity,

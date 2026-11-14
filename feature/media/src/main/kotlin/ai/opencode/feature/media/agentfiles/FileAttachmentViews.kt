@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -125,6 +126,7 @@ fun AgentFileCards(files: List<AgentFileReference>, onOpen: (AgentFileReference)
         horizontalArrangement = Arrangement.spacedBy(TranscriptMetrics.clustered),
     ) {
         items(files, key = { it.path }) { file ->
+            val openDescription = stringResource(R.string.media_file_card_open_description, file.name)
             FileAttachmentCard(
                 name = file.name,
                 symbolName = file.symbolName,
@@ -141,7 +143,7 @@ fun AgentFileCards(files: List<AgentFileReference>, onOpen: (AgentFileReference)
                     .clickable(role = Role.Button) { onOpen(file) }
                     .clearAndSetSemantics {
                         role = Role.Button
-                        contentDescription = "Open ${file.name}"
+                        contentDescription = openDescription
                         stateDescription = file.typeLabel
                         testTag = "agent-file-card"
                         onClick { onOpen(file); true }

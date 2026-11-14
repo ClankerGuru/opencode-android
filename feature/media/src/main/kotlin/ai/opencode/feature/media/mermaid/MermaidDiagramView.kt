@@ -1,5 +1,6 @@
 package ai.opencode.feature.media
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.dependencies.PasteboardClient
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
@@ -55,6 +56,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -141,6 +143,12 @@ fun MermaidDiagramCard(
     val naturalSize: Size? = natural?.takeIf { it.first == diagramKey }?.second
         ?: renderer.naturalSize(source, theme)
     val hasFailed = failed == diagramKey || renderer.cachedFailure(source, theme)
+    val previewLabel = stringResource(R.string.media_mermaid_preview_label, diagramType)
+    val viewerScreenName = stringResource(R.string.media_mermaid_viewer_screen_title)
+    val retryLabel = stringResource(CoreR.string.common_retry)
+    val diagramDescription = stringResource(R.string.media_mermaid_diagram_description)
+    val loadingState = stringResource(R.string.media_mermaid_loading_state, diagramType)
+    val viewSourceLabel = stringResource(R.string.media_mermaid_view_source)
 
     fun retry() {
         row.revised()
@@ -154,13 +162,13 @@ fun MermaidDiagramCard(
             val full = runCatching {
                 renderer.viewerImage(source, theme, density, configuration.screenWidthDp.toFloat(), configuration.screenHeightDp.toFloat())
             }.getOrNull() ?: return@launch
-            onPreview(TranscriptImagePreview(mediaID, full, "Diagram, $diagramType"))
+            onPreview(TranscriptImagePreview(mediaID, full, previewLabel))
         }
     }
 
     fun showSource() {
         focusManager.clearFocus()
-        presenter?.present(sourceID = mediaID, isMedia = false, reducesMotion = reduceMotion, screenName = "Diagram Viewer") { viewer ->
+        presenter?.present(sourceID = mediaID, isMedia = false, reducesMotion = reduceMotion, screenName = viewerScreenName) { viewer ->
             MermaidSourceView(source, viewer)
         }
     }
@@ -171,7 +179,7 @@ fun MermaidDiagramCard(
             source,
             modifier
                 .clickable(onClick = ::retry)
-                .semantics { customActions = listOf(CustomAccessibilityAction("Retry") { retry(); true }) },
+                .semantics { customActions = listOf(CustomAccessibilityAction(retryLabel) { retry(); true }) },
         )
         else -> BoxWithConstraints(modifier.fillMaxWidth()) {
             val width = maxWidth.value
@@ -200,11 +208,11 @@ fun MermaidDiagramCard(
                         },
                     )
                     .clearAndSetSemantics {
-                        contentDescription = "Diagram"
-                        stateDescription = if (!isRendered) "$diagramType, loading" else diagramType
+                        contentDescription = diagramDescription
+                        stateDescription = if (!isRendered) loadingState else diagramType
                         role = Role.Button
                         onClick { open(); true }
-                        customActions = listOf(CustomAccessibilityAction("View Source") { showSource(); true })
+                        customActions = listOf(CustomAccessibilityAction(viewSourceLabel) { showSource(); true })
                     }
                     .testTag("mermaid-diagram"),
                 contentAlignment = Alignment.Center,
@@ -223,7 +231,7 @@ fun MermaidDiagramCard(
                 }
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }, properties = ai.opencode.feature.media.liftMenuProperties()) {
                     DropdownMenuItem(
-                        text = { Text("View Source") },
+                        text = { Text(viewSourceLabel) },
                         leadingIcon = { OpenCodeIcon("chevron.left.forwardslash.chevron.right", contentDescription = null) },
                         onClick = {
                             menuOpen = false
@@ -312,16 +320,16 @@ private fun MermaidSourceView(source: String, viewer: MediaViewerState) {
                     scope.launch { pasteboard.setString(source) }
                 }) {
                     OpenCodeIcon("doc.on.doc", contentDescription = null, size = 18.dp)
-                    Text("Copy", Modifier.padding(start = 6.dp))
+                    Text(stringResource(CoreR.string.common_copy), Modifier.padding(start = 6.dp))
                 }
                 Text(
-                    "Diagram Source",
+                    stringResource(R.string.media_mermaid_source_title),
                     style = OpenCodeTextStyles.headline,
                     modifier = Modifier.weight(1f).semantics { },
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     fontWeight = FontWeight.SemiBold,
                 )
-                TextButton(onClick = { viewer.dismiss() }) { Text("Done") }
+                TextButton(onClick = { viewer.dismiss() }) { Text(stringResource(CoreR.string.common_done)) }
             }
             Box(
                 Modifier
