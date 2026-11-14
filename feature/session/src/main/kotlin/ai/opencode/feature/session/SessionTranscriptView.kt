@@ -605,9 +605,10 @@ object SessionTranscriptView {
                 val server = store.state.server
                 val directory = store.state.session?.directory
                 val target = AgentFileDestination(file, directory)
-                val preview = SessionVisualMedia.preview(target, store.state.items, server, directory, theme)
-                    ?: TranscriptImagePreview(target, server)
-                presenter?.presentPreview(preview, addDrawing)
+                val items = store.state.items
+                val gallery = { destination: AgentFileDestination -> SessionVisualMedia.preview(destination, items, server, directory, theme) }
+                val preview = gallery(target) ?: TranscriptImagePreview(target, server)
+                presenter?.presentPreview(preview, addDrawing, gallery)
             }
             is TranscriptAction.OpenPastedText -> {
                 host?.dismissComposerKeyboard()
