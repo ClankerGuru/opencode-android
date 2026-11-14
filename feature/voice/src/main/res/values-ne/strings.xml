@@ -18,8 +18,8 @@
     <!-- Floating call stage -->
     <string name="voice_stage_talking_in">कुराकानी हुँदै</string>
     <string name="voice_stage_minimize_description">सानो बनाउनुहोस्</string>
-    <string name="voice_mute">सूचना बन्द गर्नुहोस्</string>
-    <string name="voice_unmute">सूचना खोल्नुहोस्</string>
+    <string name="voice_mute">म्यूट गर्नुहोस्</string>
+    <string name="voice_unmute">अनम्यूट गर्नुहोस्</string>
     <string name="voice_stage_pause">रोक्नुहोस्</string>
     <string name="voice_stage_camera">क्यामेरा</string>
     <string name="voice_transcript_empty">आफ्नो सत्रमा केही भन्नुहोस्।</string>
@@ -35,7 +35,7 @@
     <!-- Call rows: open link -->
     <string name="voice_open_link_spoken">तपाईंको इनपुट चाहिन्छ। %1$s</string>
     <string name="voice_open_link_spoken_with_host">तपाईंको इनपुट चाहिन्छ। %1$s %2$s</string>
-    <string name="voice_open_link_open">खुला</string>
+    <string name="voice_open_link_open">खोल्नुहोस्</string>
 
     <!-- Call rows: audio on the call -->
     <string name="voice_audio_paused">रोकिएको</string>
@@ -75,7 +75,7 @@
     <string name="voice_status_needs_input">तपाईंको इनपुट चाहिन्छ</string>
     <string name="voice_status_working">काम हुँदै छ</string>
     <string name="voice_status_speaking">बोल्दै छ</string>
-    <string name="voice_status_muted">सूचना बन्द गरिएका</string>
+    <string name="voice_status_muted">म्यूट गरिएको</string>
     <string name="voice_status_listening">सुन्दै छ</string>
     <string name="voice_status_ending">अन्त्य गर्दै…</string>
     <string name="voice_status_ended">सकियो</string>

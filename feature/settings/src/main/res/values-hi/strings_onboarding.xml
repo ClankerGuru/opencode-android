@@ -36,7 +36,7 @@
     <string name="settings_onboarding_desktop_composer_placeholder">कुछ भी पूछें, कमांड के लिए /, कॉन्टेक्स्ट के लिए @…</string>
     <string name="settings_onboarding_desktop_composer_follow_up_placeholder">आगे कुछ कहें, कमांड के लिए /, कॉन्टेक्स्ट के लिए @…</string>
     <string name="settings_onboarding_desktop_back_to_app">ऐप पर वापस जाएँ</string>
-    <string name="settings_onboarding_desktop_pairing_title">पेयर हो रहा है</string>
+    <string name="settings_onboarding_desktop_pairing_title">पेयरिंग</string>
     <string name="settings_onboarding_desktop_pairing_subtitle">दूसरे डिवाइस को इस कंप्यूटर के OpenCode सर्वर से कनेक्ट करें।</string>
     <string name="settings_onboarding_desktop_pair_device">डिवाइस पेयर करें</string>
     <string name="settings_onboarding_desktop_pair_device_message">दूसरे डिवाइस पर OpenCode ऐप से कोड स्कैन करें या लिंक कॉपी करें।</string>
@@ -61,7 +61,7 @@
     <string name="settings_onboarding_headline">OpenCode\nकहीं भी।</string>
     <string name="settings_onboarding_headline_spoken">OpenCode कहीं भी।</string>
     <string name="settings_onboarding_subhead">अपनी डेस्क से दूर रहकर भी काम शुरू करें, सवालों के जवाब दें और बदलावों की समीक्षा करें।</string>
-    <string name="settings_onboarding_instruction">अपने कंप्यूटर पर OpenCode खोलें और सेटिंग्स → पेयर हो रहा है पर जाएँ।</string>
+    <string name="settings_onboarding_instruction">अपने कंप्यूटर पर OpenCode खोलें और सेटिंग्स → पेयरिंग पर जाएँ।</string>
 
     <!-- Onboarding: WelcomeStory, the mock conversation (the reply's backticks mark code) -->
     <string name="settings_onboarding_story_prompt">Android का डाउनलोड बटन जोड़कर मुझे दिखाओ</string>

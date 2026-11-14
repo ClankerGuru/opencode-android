@@ -115,7 +115,7 @@
     <string name="session_header_idle_description">Đang rảnh</string>
     <string name="session_header_syncing_description">Đang đồng bộ</string>
     <string name="session_header_last_known_description">Trạng thái gần nhất</string>
-    <string name="session_menu_more_description">Thêm</string>
+    <string name="session_menu_more_description">Nhiều lựa chọn hơn</string>
     <string name="session_unpin">Bỏ ghim</string>
     <string name="session_copy_session_id">Sao chép ID phiên</string>
     <string name="session_mark_as_read">Đánh dấu đã đọc</string>
@@ -141,7 +141,7 @@
     <string name="session_shell_showing_last_output">Đang hiển thị 4 MB cuối</string>
     <string name="session_shell_load_earlier">Tải phần trước</string>
     <string name="session_shell_output_unavailable_title">Không có kết quả</string>
-    <string name="session_shell_output_unavailable_message">Máy chủ không còn lưu kết quả của vỏ bọc này.</string>
+    <string name="session_shell_output_unavailable_message">Máy chủ không còn lưu đầu ra của vỏ bọc này.</string>
     <string name="session_shell_no_output_yet_title">Chưa có kết quả</string>
     <string name="session_shell_no_output_title">Không có kết quả</string>
     <string name="session_shell_no_output_yet_message">Kết quả sẽ hiện ở đây khi lệnh xuất ra.</string>

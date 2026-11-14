@@ -7,19 +7,19 @@
     <string name="server_notice_heading_failed">%1$s: neuspješno</string>
     <string name="server_notice_heading_interrupted">%1$s: prekinuto</string>
     <plurals name="server_notice_count_shell_finished">
-        <item quantity="one">%1$d dovršena ljuska</item>
-        <item quantity="few">%1$d dovršene ljuske</item>
-        <item quantity="other">%1$d dovršenih ljuski</item>
+        <item quantity="one">%1$d ljuska dovršena</item>
+        <item quantity="few">%1$d ljuske dovršene</item>
+        <item quantity="other">%1$d ljuski dovršeno</item>
     </plurals>
     <plurals name="server_notice_count_shell_failed">
-        <item quantity="one">%1$d neuspješna ljuska</item>
-        <item quantity="few">%1$d neuspješne ljuske</item>
-        <item quantity="other">%1$d neuspješnih ljuski</item>
+        <item quantity="one">%1$d ljuska nije uspjela</item>
+        <item quantity="few">%1$d ljuske nisu uspjele</item>
+        <item quantity="other">%1$d ljuski nije uspjelo</item>
     </plurals>
     <plurals name="server_notice_count_shell_interrupted">
-        <item quantity="one">%1$d prekinuta ljuska</item>
-        <item quantity="few">%1$d prekinute ljuske</item>
-        <item quantity="other">%1$d prekinutih ljuski</item>
+        <item quantity="one">%1$d ljuska prekinuta</item>
+        <item quantity="few">%1$d ljuske prekinute</item>
+        <item quantity="other">%1$d ljuski prekinuto</item>
     </plurals>
     <plurals name="server_notice_count_subagent_finished">
         <item quantity="one">%1$d dovršen subagent</item>

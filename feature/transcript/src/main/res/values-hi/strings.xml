@@ -35,7 +35,7 @@
     <string name="transcript_image_open_description">छवि खोलें</string>
     <string name="transcript_image_load_failed">छवि लोड नहीं हो सकी</string>
     <string name="transcript_image_retry_click_label">फिर से कोशिश करें</string>
-    <string name="transcript_image_open">खुला</string>
+    <string name="transcript_image_open">खोलें</string>
 
     <!-- Math -->
     <string name="transcript_equation_description">समीकरण</string>

@@ -39,7 +39,7 @@
 
     <!-- Pasted text -->
     <string name="composer_pasted_text_open_action">Opna tekstin</string>
-    <string name="composer_pasted_text_unwrap_description">Ikki umbróta linjur</string>
+    <string name="composer_pasted_text_unwrap_description">Umbrót ikki linjur</string>
     <string name="composer_pasted_text_wrap_description">Umbrót linjur</string>
 
     <!-- Permission request -->

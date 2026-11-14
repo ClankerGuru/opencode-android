@@ -45,7 +45,7 @@
 
     <!-- Live Updates: voice call -->
     <string name="system_call_muted">Vaigistatud</string>
-    <string name="system_call_unmute">Luba märguanded</string>
+    <string name="system_call_unmute">Tühista vaigistus</string>
     <string name="system_call_mute">Vaigista</string>
     <string name="system_call_end">Lõpeta kõne</string>
     <string name="system_call_connecting">Ühendamine…</string>

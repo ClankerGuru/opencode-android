@@ -782,7 +782,7 @@
 
     <!-- 2026-11-01-03-open-links-from-calls -->
     <string name="settings_whatsnew_entry_open_links_from_calls_title">कलबाट लिङ्क खोल्ने</string>
-    <string name="settings_whatsnew_entry_open_links_from_calls_summary">सेटिङहरू › प्रयोगात्मक › कलहरूमा कलबाट लिङ्क खोल्ने चालु गरेपछि एजेन्टले कलमा Uber यात्राजस्ता लिङ्क दिन सक्छ: सम्बन्धित एपमा खोल्न खुला ट्याप गर्नुहोस्, वा अहिले होइन छान्नुहोस्।</string>
+    <string name="settings_whatsnew_entry_open_links_from_calls_summary">सेटिङहरू › प्रयोगात्मक › कलहरूमा कलबाट लिङ्क खोल्ने चालु गरेपछि एजेन्टले कलमा Uber यात्राजस्ता लिङ्क दिन सक्छ: सम्बन्धित एपमा खोल्न खोल्नुहोस् ट्याप गर्नुहोस्, वा अहिले होइन छान्नुहोस्।</string>
 
     <!-- 2026-11-02-01-fold-questions -->
     <string name="settings_whatsnew_entry_fold_questions_title">प्रश्न खुम्च्याएर छेउमा</string>
@@ -819,13 +819,13 @@
     <string name="settings_whatsnew_entry_orb_divider_image_links_summary">जीवन्त गोला, नयाँ विभाजक र छवि लिङ्कको पूर्वावलोकन अब स्विचबिना सबैका लागि चालु छन्।</string>
     <string name="settings_whatsnew_entry_orb_divider_image_links_detail_1">हरेक कल जीवन्त गोलामा तैरिन्छ; पुरानो कल पट्टी हटाइएको छ।</string>
     <string name="settings_whatsnew_entry_orb_divider_image_links_detail_2">सत्रमा फर्कँदा, तपाईं नहुँदा आएका सन्देशहरू स्क्रिनमा नअटेमा नयाँ विभाजकले तिनको सुरुवात देखाउँछ।</string>
-    <string name="settings_whatsnew_entry_orb_divider_image_links_detail_3">सीधै छविमा जाने लिङ्कले सन्देशमुनि त्यो छवि देखाउँछन्।</string>
+    <string name="settings_whatsnew_entry_orb_divider_image_links_detail_3">सीधै छविमा जाने लिङ्कहरूले सन्देशमुनि त्यो छवि देखाउँछन्।</string>
     <string name="settings_whatsnew_entry_orb_divider_image_links_example">सन्देश लेखनबाट कल सुरु गर्नुहोस् र गोलामा तैरिएको हेर्नुहोस्</string>
 
     <!-- 2026-11-04-01-call-links-and-audio -->
     <string name="settings_whatsnew_entry_call_links_and_audio_title">कलमा लिङ्क र अडियो</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_summary">कलबाट लिङ्क खोल्ने र कलमा अडियो बजाउने सुविधा अब स्विचबिना सबैका लागि चालु छन्।</string>
-    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">कलमा एजेन्टले Uber सवारी जस्ता लिङ्क दिन सक्छ: सम्बन्धित एपमा खोल्न खुला ट्याप गर्नुहोस्, वा अहिले होइन रोज्नुहोस्।</string>
+    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">कलमा एजेन्टले Uber सवारी जस्ता लिङ्क दिन सक्छ: सम्बन्धित एपमा खोल्न खोल्नुहोस् ट्याप गर्नुहोस्, वा अहिले होइन रोज्नुहोस्।</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_detail_2">एजेन्टले कलमा सङ्गीत वा क्लिप बजाउन सक्छ। तपाईं वा एजेन्ट बोल्दा आवाज कम हुन्छ; सन्देश लेखनको माथिबाट पज वा बन्द गर्नुहोस्।</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_example">कलमा एजेन्टलाई सङ्गीत बजाउन भन्नुहोस्</string>
 

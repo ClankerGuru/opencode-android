@@ -53,7 +53,7 @@
     <plurals name="composer_queued_images">
         <item quantity="other">%1$d gambar</item>
     </plurals>
-    <string name="composer_queued_position">Pesan antrean %1$d dari %2$d</string>
+    <string name="composer_queued_position">Pesan dalam antrean %1$d dari %2$d</string>
     <string name="composer_queued_send_now">Kirim sekarang</string>
     <string name="composer_queued_cancel_message">Batalkan pesan</string>
     <string name="composer_queued_show_less">Tampilkan lebih sedikit</string>

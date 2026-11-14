@@ -891,7 +891,7 @@
     <string name="settings_whatsnew_entry_one_picker_detail_2">Rrëshqit një rresht ose mbaje shtypur për ta shtuar te të preferuarat ose për ta hequr.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_3">Kërkimi është poshtë. Shkruaj një nivel pas emrit, si “opus high”, dhe shtyp Return për t’i zgjedhur të dyja.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_4">Tërhiq dorezën lart për një listë më të gjatë, ose poshtë për ta mbyllur.</string>
-    <string name="settings_whatsnew_entry_one_picker_detail_5">Zgjedhësi i ri zëvendëson panelin e vjetër të modelit dhe çelësi i zgjedhësit të unifikuar është hequr nga Cilësimet › Eksperimentale.</string>
+    <string name="settings_whatsnew_entry_one_picker_detail_5">Përzgjedhësi i ri zëvendëson panelin e vjetër të modelit dhe çelësi i Përzgjedhësit të vetëm është hequr nga Cilësimet › Eksperimentale.</string>
     <string name="settings_whatsnew_entry_one_picker_example">Prek modelin në kutinë e mesazhit, pastaj rrëshqit një rresht për ta shtuar te të preferuarat</string>
 
     <!-- 2026-11-08-01-connecting-caption-glass -->

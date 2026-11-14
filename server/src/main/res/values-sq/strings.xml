@@ -51,7 +51,7 @@
     <string name="server_run_error_unsupported_operation">Ky model nuk mund ta bëjë këtë</string>
     <string name="server_run_error_tool_execution">Një mjet dështoi dhe ekzekutimi u ndal</string>
     <string name="server_run_error_other">Ekzekutimi u ndal me një gabim</string>
-    <string name="server_run_retry_in_seconds">%1$s · do të provojë përsëri pas %2$d s</string>
+    <string name="server_run_retry_in_seconds">%1$s · duke u përpjekur përsëri pas %2$d s</string>
     <string name="server_run_retry_now">%1$s · duke u përpjekur përsëri</string>
 
     <!-- OpenCodeClientError.kt -->

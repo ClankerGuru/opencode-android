@@ -160,7 +160,7 @@
 
     <!-- 2026-10-12-05-run-error-line -->
     <string name="settings_whatsnew_entry_run_error_line_title">Þegar keyrsla mistekst</string>
-    <string name="settings_whatsnew_entry_run_error_line_summary">Ef keyrsla stöðvast of snemma birtist ástæðan á einföldu máli og ein leið áfram: „Breyta“, „Þjappa“, „Skipta um líkan“ eða „Reyndu aftur“.</string>
+    <string name="settings_whatsnew_entry_run_error_line_summary">Ef keyrsla stöðvast of snemma birtist ástæðan á einföldu máli og ein leið áfram: „Breyta“, „Fyrirferðarlítill“, „Skipta um líkan“ eða „Reyndu aftur“.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_1">„Breyta“ afturkallar skilaboðin þín og setur þau aftur í skilaboðareitinn svo þú getir umorðað þau.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_2">Haltu línunni inni til að sjá alla villuna og afrita hana.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_3">Þegar fulltrúinn reynir sjálfkrafa aftur sýnir „Að vinna“ niðurtalningu að næstu tilraun.</string>
@@ -225,7 +225,7 @@
     <string name="settings_whatsnew_entry_grouped_steering_detail_1">Skilaboðablöðrur í röð liggja þétt saman og horn þeirra tengjast þar sem þær mætast.</string>
     <string name="settings_whatsnew_entry_grouped_steering_detail_2">Ljósmyndir og skrár halda eigin ávölu lögun innan blokkarinnar.</string>
     <string name="settings_whatsnew_entry_grouped_steering_detail_3">Þegar fulltrúinn tekur við skilaboðum færast þau upp á sinn stað í einni hreyfingu.</string>
-    <string name="settings_whatsnew_entry_grouped_steering_example">Sendu þrjú skilaboð í snatri meðan fulltrúinn vinnur, ein með ljósmynd</string>
+    <string name="settings_whatsnew_entry_grouped_steering_example">Sendu þrjú skilaboð í snatri meðan fulltrúinn vinnur, eitt með ljósmynd</string>
 
     <!-- 2026-10-13-03-inline-tool-rows -->
     <string name="settings_whatsnew_entry_inline_tool_rows_title">Látlausar verkfæra- og spurningalínur</string>
@@ -472,16 +472,16 @@
     <string name="settings_whatsnew_entry_smooth_link_preview_arrival_summary">Forskoðanir tengla birtast smám saman þegar þær hlaðast og línurnar fyrir neðan færast mjúklega þegar hæð titils breytist.</string>
 
     <!-- 2026-10-20-10-subagent-capsule-press -->
-    <string name="settings_whatsnew_entry_subagent_capsule_press_title">Ávöl virknistikan</string>
+    <string name="settings_whatsnew_entry_subagent_capsule_press_title">Ávöl virknistika</string>
     <string name="settings_whatsnew_entry_subagent_capsule_press_summary">Stika undirfulltrúa og skeljar heldur ávölum endum sínum þegar þú ýtir á hana.</string>
 
     <!-- 2026-10-20-11-advanced-settings-open -->
     <string name="settings_whatsnew_entry_advanced_settings_open_title">Einfaldari ítarlegar stillingar</string>
-    <string name="settings_whatsnew_entry_advanced_settings_open_summary">Tilraunir í Stillingar › Tilraunakennt eru allar í opnum hópum, líkanavalar eru sameinaðir í einn valkost og þú getur pikkað hvar sem er í röð valkosts til að breyta honum.</string>
+    <string name="settings_whatsnew_entry_advanced_settings_open_summary">Tilraunir í Stillingar › Tilraunakennt eru allar í opnum hópum, líkanavölin eru sameinuð í einn valkost og þú getur pikkað hvar sem er í röð valkosts til að breyta honum.</string>
 
     <!-- 2026-10-20-12-revert-to-here -->
     <string name="settings_whatsnew_entry_revert_to_here_title">Afturkalla að skilaboðum</string>
-    <string name="settings_whatsnew_entry_revert_to_here_summary">Haltu inni einum af skilaboðunum þínum og veldu Afturkalla að skilaboðum til að fara aftur þangað og breyta þeim.</string>
+    <string name="settings_whatsnew_entry_revert_to_here_summary">Haltu inni einu af skilaboðunum þínum og veldu Afturkalla að skilaboðum til að fara aftur þangað og breyta þeim.</string>
     <string name="settings_whatsnew_entry_revert_to_here_detail_1">Texti, ljósmyndir og skrár skilaboðanna fara aftur í skilaboðareitinn.</string>
     <string name="settings_whatsnew_entry_revert_to_here_detail_2">Afturkalla endurheimtir samskiptin og skráabreytingar þeirra þar til þú sendir ný skilaboð.</string>
     <string name="settings_whatsnew_entry_revert_to_here_detail_3">Þetta er í boði þegar fulltrúinn er ekki að vinna.</string>
@@ -536,16 +536,16 @@
     <string name="settings_whatsnew_entry_calm_wireframe_launch_summary">Setur í skyndiminni opnast strax. Ef hleðsla tekur smástund birtast púlsandi skilaboðablöðrur sem víkja mjúklega fyrir skilaboðunum þínum.</string>
 
     <!-- 2026-10-21-05-request-dictation-last-line -->
-    <string name="settings_whatsnew_entry_request_dictation_last_line_title">Endi upplestrar sést</string>
-    <string name="settings_whatsnew_entry_request_dictation_last_line_summary">Á iOS 26 sjást síðustu línurnar þegar löngum upplestri í svarreit beiðni sem bíður er lokið, í stað texta úr miðjunni.</string>
+    <string name="settings_whatsnew_entry_request_dictation_last_line_title">Endi raddinnsláttar sést</string>
+    <string name="settings_whatsnew_entry_request_dictation_last_line_summary">Á iOS 26 sjást síðustu línurnar þegar löngum raddinnslætti í svarreit beiðni sem bíður er lokið, í stað texta úr miðjunni.</string>
 
     <!-- 2026-10-21-06-first-run-pairing-fixes -->
     <string name="settings_whatsnew_entry_first_run_pairing_fixes_title">Skýrari fyrsta pörun</string>
-    <string name="settings_whatsnew_entry_first_run_pairing_fixes_summary">Ef þú reynir að líma af tómum klippispjaldi birtist tilkynning við Líma og uppsetningin lofar ekki lengur fjaraðgangi á hálfri mínútu.</string>
+    <string name="settings_whatsnew_entry_first_run_pairing_fixes_summary">Ef þú reynir að líma af tómu klippispjaldi birtist tilkynning við Líma og uppsetningin lofar ekki lengur fjaraðgangi á hálfri mínútu.</string>
 
     <!-- 2026-10-21-07-welcome-pairing-copy -->
     <string name="settings_whatsnew_entry_welcome_pairing_copy_title">Para úr OpenCode-forritinu</string>
-    <string name="settings_whatsnew_entry_welcome_pairing_copy_summary">Upphafsskjárinn vísar á Stillingar → Parar í OpenCode á tölvunni þinni eða /pair í skelinni og sýnir uppsetningarskipun fyrir þau sem eru ekki enn með OpenCode.</string>
+    <string name="settings_whatsnew_entry_welcome_pairing_copy_summary">Upphafsskjárinn vísar á Stillingar → Pörun í OpenCode á tölvunni þinni eða /pair í skelinni og sýnir uppsetningarskipun fyrir þau sem eru ekki enn með OpenCode.</string>
 
     <!-- 2026-10-21-08-session-id-links -->
     <string name="settings_whatsnew_entry_session_id_links_title">Tenglar á setur</string>

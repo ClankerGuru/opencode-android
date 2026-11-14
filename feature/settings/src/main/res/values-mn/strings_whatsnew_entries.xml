@@ -441,7 +441,7 @@
 
     <!-- 2026-10-20-01-call-tray-docks-in-drawer -->
     <string name="settings_whatsnew_entry_call_tray_docks_in_drawer_title">Хажуугийн цэс дэх дуудлагын самбар</string>
-    <string name="settings_whatsnew_entry_call_tray_docks_in_drawer_summary">«Дуудлагын самбар» туршилтыг асаасан үед дуудлагын үеэр хажуугийн цэс нээвэл самбар «Шинэ сесс»-ийн доор шилжинэ. Дууны түвшин, «Мэдэгдлийг хаах», «Дуусгах» товчнууд хамт шилжиж, цэсийг хаахад буцаж ирнэ.</string>
+    <string name="settings_whatsnew_entry_call_tray_docks_in_drawer_summary">«Дуудлагын самбар» туршилтыг асаасан үед дуудлагын үеэр хажуугийн цэс нээвэл самбар «Шинэ сесс»-ийн доор шилжинэ. Дууны түвшин, «Дуу хаах», «Дуусгах» товчнууд хамт шилжиж, цэсийг хаахад буцаж ирнэ.</string>
 
     <!-- 2026-10-20-02-markdown-streams-smoothly -->
     <string name="settings_whatsnew_entry_markdown_streams_smoothly_title">Хариулт илүү жигд гарна</string>
@@ -671,7 +671,7 @@
     <string name="settings_whatsnew_entry_session_title_first_prompt_summary">Гарчиггүй сессүүдийг сервер нэрлэх хүртэл эхний промптыг нь нэг мөрөөр харуулна.</string>
 
     <!-- 2026-10-26-01-settings-sessions-page -->
-    <string name="settings_whatsnew_entry_settings_sessions_page_title">Сессийн тохиргоо</string>
+    <string name="settings_whatsnew_entry_settings_sessions_page_title">Хурлын тохиргоо</string>
     <string name="settings_whatsnew_entry_settings_sessions_page_summary">Тохиргоонд Хурал хуудас нэмэгдлээ. Тэнд Шинэ мессежийн зааг нь Enter товчоор илгээхийн дээр байрлана. Нарийвчилсан хэсэг одоо Туршилтын болон Хөгжүүлэгч гэсэн хоёр мөртэй боллоо.</string>
 
     <!-- 2026-10-26-02-project-icons-default -->
@@ -708,7 +708,7 @@
 
     <!-- 2026-10-28-01-first-pairing-ready-session -->
     <string name="settings_whatsnew_entry_first_pairing_ready_session_title">Эхний сесс бэлэн</string>
-    <string name="settings_whatsnew_entry_first_pairing_ready_session_summary">Анхны компьютероo хослуулахад сүүлд ашигласан төсөлд нь шинэ сесс нээгдэж, туршиж асуух хэдэн асуулт гарна. Нэг товшоод холбогдсоноо баталгаажуулна. Шинээр суулгахад Шинэ зүйлсийг мөн уншсан гэж тэмдэглэнэ.</string>
+    <string name="settings_whatsnew_entry_first_pairing_ready_session_summary">Анхны компьютерээ хослуулахад сүүлд ашигласан төсөлд нь шинэ сесс нээгдэж, туршиж асуух хэдэн асуулт гарна. Нэг товшоод холбогдсоноо баталгаажуулна. Шинээр суулгахад Шинэ зүйлсийг мөн уншсан гэж тэмдэглэнэ.</string>
 
     <!-- 2026-10-28-02-welcome-preview -->
     <string name="settings_whatsnew_entry_welcome_preview_title">Угтах дэлгэцийг урьдчилан үзэх</string>
@@ -801,7 +801,7 @@
     <string name="settings_whatsnew_entry_all_experiments_summary">Тохиргоо › Туршилтын хэсгийн дээд талын нэг унтраалга бүх туршилтыг, цаашид нэмэгдэх шинэ туршилтуудыг ч асаана.</string>
     <string name="settings_whatsnew_entry_all_experiments_detail_1">Ашиглахгүй туршилтаа унтрааж болно. Дараагийн удаа ч унтраалттай хэвээр байна.</string>
     <string name="settings_whatsnew_entry_all_experiments_detail_2">Бүх туршилтыг унтраавал өмнөх тохиргоонууд сэргэнэ.</string>
-    <string name="settings_whatsnew_entry_all_experiments_detail_3">Зөвшөөрөл шаарддаг туршилтуудыг тусад нь сонгосон хэвээр байна.</string>
+    <string name="settings_whatsnew_entry_all_experiments_detail_3">Зөвшөөрөл шаарддаг туршилтууд тусдаа сонголт хэвээр үлдэнэ.</string>
     <string name="settings_whatsnew_entry_all_experiments_detail_4">Автоматаар гүйцээх, нэмэх цэсийн зураг сонгох самбар, шинэ сервер сэлгэгч, төслийн дүрс одоо бүгдэд идэвхтэй.</string>
     <string name="settings_whatsnew_entry_all_experiments_detail_5">Нэгдсэн сонгогч, Амьд бөмбөлөг нь энгийн унтраалгатай болж, Дуудлагын самбарыг хаслаа.</string>
     <string name="settings_whatsnew_entry_all_experiments_example">Тохиргоо › Туршилтын хэсгийг нээгээд Бүх туршилтыг асаана уу</string>

@@ -44,9 +44,9 @@
     <string name="system_ask_send_failed">Ба OpenCode фиристода нашуд. %1$s</string>
 
     <!-- Live Updates: voice call -->
-    <string name="system_call_muted">Бе огоҳӣ</string>
-    <string name="system_call_unmute">Огоҳиҳоро фаъол кунед</string>
-    <string name="system_call_mute">Огоҳиҳоро хомӯш кунед</string>
+    <string name="system_call_muted">Садо хомӯш</string>
+    <string name="system_call_unmute">Садоро фаъол кунед</string>
+    <string name="system_call_mute">Садоро хомӯш кунед</string>
     <string name="system_call_end">Зангро анҷом диҳед</string>
     <string name="system_call_connecting">Пайваст шуда истодааст…</string>
     <string name="system_call_reconnecting">Аз нав пайваст шуда истодааст…</string>

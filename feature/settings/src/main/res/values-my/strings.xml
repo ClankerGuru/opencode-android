@@ -86,7 +86,7 @@
     <string name="settings_delegator_target_footer">အလိုအလျောက်ဆိုလျှင် ဤဆာဗာရှိ “Voice” စက်ရှင်ကို သုံးသည်။ ကြည့်နေသော စက်ရှင်ဆိုလျှင် မျက်နှာပြင်ပေါ်ရှိ စက်ရှင်ကို သုံးသည်။</string>
     <string name="settings_delegator_automatic">အလိုအလျောက်</string>
     <string name="settings_delegator_viewed_session">ကြည့်နေသော စက်ရှင်</string>
-    <string name="settings_delegator_search_placeholder">စက်ရှင်များကို ရှာဖွေပါ</string>
+    <string name="settings_delegator_search_placeholder">ရှာဖွေမှုကဏ္ဍများ</string>
     <string name="settings_delegator_sessions_header">စက်ရှင်ကို ရွေးပါ</string>
     <string name="settings_delegator_sessions_footer">ရွေးထားသော စက်ရှင်၏ မော်ဒယ်ကို မပြောင်းပါ။</string>
     <string name="settings_delegator_no_sessions">ဤဆာဗာတွင် စက်ရှင် မရှိပါ</string>

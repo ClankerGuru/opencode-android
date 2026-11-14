@@ -125,7 +125,7 @@
     <string name="settings_voice_title">Suara</string>
     <string name="settings_voice_call_setup_header">Persediaan panggilan</string>
     <string name="settings_voice_calls_header">Panggilan</string>
-    <string name="settings_voice_raise_to_talk_hint">Togol untuk memulakan panggilan melalui cuping telinga apabila anda mengangkat telefon ke telinga semasa dalam sesi</string>
+    <string name="settings_voice_raise_to_talk_hint">Togol untuk memulakan panggilan melalui pembesar suara telinga apabila anda mengangkat telefon ke telinga semasa dalam sesi</string>
     <string name="settings_voice_enable">Dayakan suara</string>
     <string name="settings_voice_model">Model</string>
     <string name="settings_voice_model_description">Model suara</string>

@@ -114,7 +114,7 @@
     <string name="drawer_server_menu_unreachable">I paarritshëm</string>
 
     <!-- Row selection menu -->
-    <string name="drawer_archive">Arkivo</string>
+    <string name="drawer_archive">Arkivi</string>
     <string name="drawer_unarchive">Hiq nga arkivi</string>
     <string name="drawer_open_in_new_window">Hap në dritare të re</string>
 

@@ -19,7 +19,7 @@
     <string name="voice_stage_talking_in">Saruna sesijā</string>
     <string name="voice_stage_minimize_description">Minimizēt</string>
     <string name="voice_mute">Apklusināt</string>
-    <string name="voice_unmute">Ieslēgt paziņojumus</string>
+    <string name="voice_unmute">Noņemt apklusināšanu</string>
     <string name="voice_stage_pause">Pauzēt</string>
     <string name="voice_stage_camera">Kamera</string>
     <string name="voice_transcript_empty">Pasaki kaut ko savai sesijai.</string>
@@ -75,7 +75,7 @@
     <string name="voice_status_needs_input">Vajadzīga tava atbilde</string>
     <string name="voice_status_working">Darbojas</string>
     <string name="voice_status_speaking">Runā</string>
-    <string name="voice_status_muted">Apklusināta</string>
+    <string name="voice_status_muted">Apklusināts</string>
     <string name="voice_status_listening">Klausās</string>
     <string name="voice_status_ending">Beidz zvanu…</string>
     <string name="voice_status_ended">Beidzies</string>

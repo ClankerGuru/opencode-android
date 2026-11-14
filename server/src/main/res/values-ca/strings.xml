@@ -7,9 +7,9 @@
     <string name="server_notice_heading_failed">%1$s ha fallat</string>
     <string name="server_notice_heading_interrupted">S\'ha interromput %1$s</string>
     <plurals name="server_notice_count_shell_finished">
-        <item quantity="one">%1$d intèrpret d\'ordres finalitzat</item>
-        <item quantity="many">%1$d intèrprets d\'ordres finalitzats</item>
-        <item quantity="other">%1$d intèrprets d\'ordres finalitzats</item>
+        <item quantity="one">%1$d intèrpret d\'ordres ha acabat</item>
+        <item quantity="many">%1$d intèrprets d\'ordres han acabat</item>
+        <item quantity="other">%1$d intèrprets d\'ordres han acabat</item>
     </plurals>
     <plurals name="server_notice_count_shell_failed">
         <item quantity="one">%1$d intèrpret d\'ordres ha fallat</item>

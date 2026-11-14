@@ -81,7 +81,7 @@
     <string name="drawer_notice_open_session_action">စက်ရှင်ကို ဖွင့်ပါ</string>
 
     <!-- Search pill -->
-    <string name="drawer_search_description">စက်ရှင်များကို ရှာဖွေပါ</string>
+    <string name="drawer_search_description">ရှာဖွေမှုကဏ္ဍများ</string>
     <string name="drawer_search_cancel_description">ရှာဖွေမှုကို မလုပ်တော့</string>
 
     <!-- Pin drop zone -->

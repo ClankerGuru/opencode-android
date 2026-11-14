@@ -441,7 +441,7 @@
 
     <!-- 2026-10-20-01-call-tray-docks-in-drawer -->
     <string name="settings_whatsnew_entry_call_tray_docks_in_drawer_title">Khay cuộc gọi trong ngăn điều hướng</string>
-    <string name="settings_whatsnew_entry_call_tray_docks_in_drawer_summary">Khi bật thử nghiệm Khay cuộc gọi, mở ngăn điều hướng lúc đang gọi sẽ đưa khay xuống dưới Phiên mới, cùng mức âm thanh, Tắt thông báo và Kết thúc. Đóng ngăn sẽ đưa khay về chỗ cũ.</string>
+    <string name="settings_whatsnew_entry_call_tray_docks_in_drawer_summary">Khi bật thử nghiệm Khay cuộc gọi, mở ngăn điều hướng lúc đang gọi sẽ đưa khay xuống dưới Phiên mới, cùng mức âm thanh, Tắt tiếng và Kết thúc. Đóng ngăn sẽ đưa khay về chỗ cũ.</string>
 
     <!-- 2026-10-20-02-markdown-streams-smoothly -->
     <string name="settings_whatsnew_entry_markdown_streams_smoothly_title">Phản hồi hiển thị mượt hơn</string>
@@ -712,7 +712,7 @@
 
     <!-- 2026-10-28-02-welcome-preview -->
     <string name="settings_whatsnew_entry_welcome_preview_title">Xem trước màn chào mừng</string>
-    <string name="settings_whatsnew_entry_welcome_preview_summary">Màn chào mừng mới khi mở lần đầu cho thấy OpenCode làm việc trên máy tính xách tay và được điều khiển bằng điện thoại, rồi ghép cặp chỉ trong một bước. Bật Xem trước màn chào mừng trong Cài đặt › Thực nghiệm › Ngăn điều hướng rồi chạm Hiện màn chào mừng để xem; đóng lại sẽ đưa bạn về màn trước.</string>
+    <string name="settings_whatsnew_entry_welcome_preview_summary">Màn chào mừng mới khi mở lần đầu cho thấy OpenCode làm việc trên máy tính xách tay và được điều hướng bằng điện thoại, rồi ghép cặp chỉ trong một bước. Bật Xem trước màn chào mừng trong Cài đặt › Thực nghiệm › Ngăn điều hướng rồi chạm Hiện màn chào mừng để xem; đóng lại sẽ đưa bạn về màn trước.</string>
 
     <!-- 2026-10-29-01-composer-text-selection -->
     <string name="settings_whatsnew_entry_composer_text_selection_title">Chọn văn bản trong ô soạn thảo</string>
@@ -887,7 +887,7 @@
     <!-- 2026-11-07-03-one-picker -->
     <string name="settings_whatsnew_entry_one_picker_title">Bộ chọn mô hình mới</string>
     <string name="settings_whatsnew_entry_one_picker_summary">Chạm vào mô hình trong ô tin nhắn để mở rộng danh sách ngay tại đó, với Yêu thích và Gần đây ở trên cùng, mọi nhà cung cấp ở bên dưới.</string>
-    <string name="settings_whatsnew_entry_one_picker_detail_1">Chạm vào mức độ suy luận trên dòng mô hình, như “cao”, để đổi ngay trong danh sách.</string>
+    <string name="settings_whatsnew_entry_one_picker_detail_1">Chạm vào mức độ suy nghĩ trên dòng mô hình, như “cao”, để đổi ngay trong danh sách.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_2">Vuốt hoặc nhấn giữ một dòng để thêm vào hoặc bỏ khỏi mục Yêu thích.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_3">Ô tìm kiếm ở dưới cùng. Nhập mức độ sau tên, như “opus high”, rồi nhấn Enter để chọn cả hai.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_4">Kéo thanh kéo lên để mở rộng danh sách, hoặc xuống để đóng.</string>
@@ -900,5 +900,5 @@
 
     <!-- 2026-11-08-02-default-model -->
     <string name="settings_whatsnew_entry_default_model_title">Phiên mới dùng mô hình mặc định của bạn</string>
-    <string name="settings_whatsnew_entry_default_model_summary">Phiên mới dùng mô hình mặc định bạn đã đặt trong OpenCode, với mức độ suy luận bạn chọn gần nhất cho mô hình đó, thay vì mô hình của phiên trước.</string>
+    <string name="settings_whatsnew_entry_default_model_summary">Phiên mới dùng mô hình mặc định bạn đã đặt trong OpenCode, với mức độ suy nghĩ bạn chọn gần nhất cho mô hình đó, thay vì mô hình của phiên trước.</string>
 </resources>

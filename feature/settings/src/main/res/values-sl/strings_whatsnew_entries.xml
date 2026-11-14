@@ -244,7 +244,7 @@
     <string name="settings_whatsnew_entry_mac_motion_playgrounds_detail_4">Vnaprej pripravljeni scenariji predvajajo isto vzorčno sejo, da lahko primerjaš gibanje med različicami aplikacije.</string>
     <string name="settings_whatsnew_entry_mac_motion_playgrounds_detail_5">Ponovna predvajanja se začnejo od začetka ter dostavijo sporočila za usmerjanje in sporočila v čakalni vrsti, namesto da bi jih pustila čakati.</string>
     <string name="settings_whatsnew_entry_mac_motion_playgrounds_detail_6">Predvajalnik za pregled na Macu omogoča pregled zajete geometrije po korakih, označevanje sličic in pošiljanje povratnih informacij o animaciji.</string>
-    <string name="settings_whatsnew_entry_mac_motion_playgrounds_example">Odpri Nastavitve → Za razvijalce, se seznani s stranjo za prilagajanje na Macu in preizkusi Prepis → Pretočni odgovor pri 0,25×</string>
+    <string name="settings_whatsnew_entry_mac_motion_playgrounds_example">Odpri Nastavitve → Za razvijalce, poveži se s stranjo za prilagajanje na Macu in preizkusi Prepis → Pretočni odgovor pri 0,25×</string>
 
     <!-- 2026-10-13-05-catch-up-flicks -->
     <string name="settings_whatsnew_entry_catch_up_flicks_title">Lažji potegi v pregledu novosti</string>
@@ -390,7 +390,7 @@
 
     <!-- 2026-10-19-02-optical-insets -->
     <string name="settings_whatsnew_entry_optical_insets_title">Enakomerno odmaknjeni gumbi</string>
-    <string name="settings_whatsnew_entry_optical_insets_summary">Znak + in mikrofon v urejevalniku sporočil, ikone oznak za delo v ozadju in čakalno vrsto ter simbol Nova seja v stranski vrstici so zdaj optično poravnani na sredino zaobljenih koncev steklene podlage. Ikona lupine je zdaj okrogla kot kroglica subagenta, brez utripajočega kazalca. Ko delujeta oba, sta prikazani druga ob drugi.</string>
+    <string name="settings_whatsnew_entry_optical_insets_summary">Znak + in mikrofon v urejevalniku sporočil, ikone oznak za delo v ozadju in čakalno vrsto ter simbol Nova seja v stranski vrstici so zdaj optično poravnani na sredino zaobljenih koncev steklene podlage. Ikona lupine je zdaj okrogla kot kroglica subagenta, brez utripajočega kazalca. Ko delujeta obe, sta prikazani druga ob drugi.</string>
 
     <!-- 2026-10-19-03-smart-dictation-audio -->
     <string name="settings_whatsnew_entry_smart_dictation_audio_title">Bolj tekoče narekovanje ob glasbi</string>
@@ -782,7 +782,7 @@
 
     <!-- 2026-11-01-03-open-links-from-calls -->
     <string name="settings_whatsnew_entry_open_links_from_calls_title">Odpiranje povezav iz klicev</string>
-    <string name="settings_whatsnew_entry_open_links_from_calls_summary">V Nastavitve › Eksperimentalno › Klici vklopi Odpiranje povezav iz klicev. Med klicem lahko agent ponudi povezavo, na primer za vožnjo z Uber: tapni Odprto, da jo odpreš v ustrezni aplikaciji, ali Ne zdaj.</string>
+    <string name="settings_whatsnew_entry_open_links_from_calls_summary">V Nastavitve › Eksperimentalno › Klici vklopi Odpiranje povezav iz klicev. Med klicem lahko agent ponudi povezavo, na primer za vožnjo z Uber: tapni Odpri, da jo odpreš v ustrezni aplikaciji, ali Ne zdaj.</string>
 
     <!-- 2026-11-02-01-fold-questions -->
     <string name="settings_whatsnew_entry_fold_questions_title">Umakni vprašanja</string>

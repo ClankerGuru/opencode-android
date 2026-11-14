@@ -364,7 +364,7 @@
     <string name="settings_whatsnew_entry_themes_title">Teme</string>
     <string name="settings_whatsnew_entry_themes_summary">Odaberi temu za sesije, poput Tokyo Night, Catppuccin, Dracula, Rosé Pine ili GitHub, uz pregled uživo tijekom odabira.</string>
     <string name="settings_whatsnew_entry_themes_detail_1">Teme boje transkript, tvoje poruke, kod, sintaksu, diff prikaze i veze.</string>
-    <string name="settings_whatsnew_entry_themes_detail_2">Opcija Način rada u postavkama izgleda omogućuje odabir svijetlog, tamnog ili sistemskog načina.</string>
+    <string name="settings_whatsnew_entry_themes_detail_2">Opcija Način rada u Izgledu omogućuje odabir svijetlog, tamnog ili sustavnog načina.</string>
     <string name="settings_whatsnew_entry_themes_detail_3">Kontrole zadržavaju izvorni izgled Liquid Glass u svakoj temi.</string>
     <string name="settings_whatsnew_entry_themes_example">Otvori Postavke → Izgled → Tema i isprobaj Tokyo Night.</string>
 
@@ -382,7 +382,7 @@
 
     <!-- 2026-10-18-05-drag-to-pin -->
     <string name="settings_whatsnew_entry_drag_to_pin_title">Povuci sesiju za prikvačivanje</string>
-    <string name="settings_whatsnew_entry_drag_to_pin_summary">Zadrži i povuci sesiju gore u Prikvačeno da je prikvačiš na to mjesto ili povuci prikvačenu sesiju dolje u Nedavni da je otkvačiš.</string>
+    <string name="settings_whatsnew_entry_drag_to_pin_summary">Zadrži i povuci sesiju gore u Prikvačeno da je prikvačiš na to mjesto ili povuci prikvačenu sesiju dolje u Nedavno da je otkvačiš.</string>
 
     <!-- 2026-10-19-01-call-tray-colour-blend -->
     <string name="settings_whatsnew_entry_call_tray_colour_blend_title">Glatkiji prijelaz gumba za poziv</string>
@@ -449,7 +449,7 @@
 
     <!-- 2026-10-20-04-return-newline-default -->
     <string name="settings_whatsnew_entry_return_newline_default_title">Return dodaje novi redak</string>
-    <string name="settings_whatsnew_entry_return_newline_default_summary">Return sada zadano dodaje novi redak. Uključi Slanje tipkom Return u Postavke › Sesije za slanje tipkom Return ili koristi Ctrl+Enter na fizičkoj tipkovnici.</string>
+    <string name="settings_whatsnew_entry_return_newline_default_summary">Return sada zadano dodaje novi redak. Uključi Slanje tipkom Return u Postavke › Sjednice za slanje tipkom Return ili koristi Ctrl+Enter na fizičkoj tipkovnici.</string>
 
     <!-- 2026-10-20-05-drawer-session-alignment -->
     <string name="settings_whatsnew_entry_drawer_session_alignment_title">Poravnate kontrole bočnog izbornika</string>
@@ -782,7 +782,7 @@
 
     <!-- 2026-11-01-03-open-links-from-calls -->
     <string name="settings_whatsnew_entry_open_links_from_calls_title">Otvaranje veza iz poziva</string>
-    <string name="settings_whatsnew_entry_open_links_from_calls_summary">Uključite Otvaranje veza iz poziva u Postavke › Eksperimentalno › Pozivi i agent tijekom poziva može ponuditi vezu, primjerice za vožnju Uberom: dodirnite Otvoreno za otvaranje u pripadajućoj aplikaciji ili Ne sada.</string>
+    <string name="settings_whatsnew_entry_open_links_from_calls_summary">Uključite Otvaranje veza iz poziva u Postavke › Eksperimentalno › Pozivi i agent tijekom poziva može ponuditi vezu, primjerice za vožnju Uberom: dodirnite Otvoriti za otvaranje u pripadajućoj aplikaciji ili Ne sada.</string>
 
     <!-- 2026-11-02-01-fold-questions -->
     <string name="settings_whatsnew_entry_fold_questions_title">Sažmite pitanja da ne smetaju</string>
@@ -825,7 +825,7 @@
     <!-- 2026-11-04-01-call-links-and-audio -->
     <string name="settings_whatsnew_entry_call_links_and_audio_title">Veze i zvuk u pozivima</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_summary">Otvaranje veza iz poziva i zvuk u pozivima sada su uključeni svima, bez prekidača.</string>
-    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">Tijekom poziva agent može ponuditi vezu, primjerice za vožnju Uberom: dodirnite Otvoreno za otvaranje u pripadajućoj aplikaciji ili Ne sada.</string>
+    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">Tijekom poziva agent može ponuditi vezu, primjerice za vožnju Uberom: dodirnite Otvoriti za otvaranje u pripadajućoj aplikaciji ili Ne sada.</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_detail_2">Agent može pustiti glazbu ili snimku u pozivu. Zvuk se stišava dok netko od vas govori; pauzirajte ili zaustavite reprodukciju iznad unosa poruke.</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_example">Tijekom poziva zamolite agenta da pusti glazbu</string>
 
@@ -891,7 +891,7 @@
     <string name="settings_whatsnew_entry_one_picker_detail_2">Prijeđite prstom preko retka ili ga dugo pritisnite da biste model dodali u omiljene ili ga uklonili.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_3">Pretraživanje je na dnu. Upišete li razinu nakon naziva, npr. „opus high”, pritiskom na Enter odabirete oboje.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_4">Povucite ručicu prema gore za veći popis ili prema dolje za zatvaranje.</string>
-    <string name="settings_whatsnew_entry_one_picker_detail_5">Novi odabir zamjenjuje staru ploču Model, a prekidač One Picker uklonjen je iz Postavke › Eksperimentalno.</string>
+    <string name="settings_whatsnew_entry_one_picker_detail_5">Novi odabir zamjenjuje staru ploču Model, a prekidač Jedinstveni odabir uklonjen je iz Postavke › Eksperimentalno.</string>
     <string name="settings_whatsnew_entry_one_picker_example">Dodirnite model u polju za poruku, zatim prijeđite prstom preko retka da biste ga dodali u omiljene</string>
 
     <!-- 2026-11-08-01-connecting-caption-glass -->

@@ -112,7 +112,7 @@
     <string name="settings_whatsnew_entry_ride_out_drops_title">Veikia ir esant silpnam ryšiui</string>
     <string name="settings_whatsnew_entry_ride_out_drops_summary">Kelioms sekundėms dingus ryšiui, niekas nebenutrūksta. Siuntimas, sesijos ir skambučiai palaukia ryšio ir tęsiami.</string>
     <string name="settings_whatsnew_entry_ride_out_drops_detail_1">Mygtukas „Siųsti“ visada veikia, o žinutės išsiunčiamos ta pačia tvarka, kuria jas siuntėte.</string>
-    <string name="settings_whatsnew_entry_ride_out_drops_detail_2">Neišsiųsta žinutė lieka vietoje su mygtuku „Bandyti dar kartą“. Bandant vėl, ji neišsiunčiama dukart.</string>
+    <string name="settings_whatsnew_entry_ride_out_drops_detail_2">Neišsiųsta žinutė lieka vietoje su mygtuku „Bandyti dar kartą“. Bandant iš naujo, ji neišsiunčiama dukart.</string>
     <string name="settings_whatsnew_entry_ride_out_drops_detail_3">Kai serveris nepasiekiamas, jo pavadinimas šoniniame skydelyje pritemsta. Bakstelėję rasite „Bandyti dar kartą“.</string>
     <string name="settings_whatsnew_entry_ride_out_drops_example">Atidarykite seansą traukiniui įvažiuojant į tunelį</string>
 
@@ -160,7 +160,7 @@
 
     <!-- 2026-10-12-05-run-error-line -->
     <string name="settings_whatsnew_entry_run_error_line_title">Kai vykdymas nepavyksta</string>
-    <string name="settings_whatsnew_entry_run_error_line_summary">Vykdymui nutrūkus, priežastis paaiškinama paprastai ir siūlomas vienas veiksmas: „Redaguoti“, „Glaudinti seansą“, „Keisti modelį“ arba „Bandyti dar kartą“.</string>
+    <string name="settings_whatsnew_entry_run_error_line_summary">Vykdymui nutrūkus, priežastis paaiškinama paprastai ir siūlomas vienas veiksmas: „Redaguoti“, „Kompaktiškas“, „Keisti modelį“ arba „Bandyti dar kartą“.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_1">„Redaguoti“ anuliuoja žinutę ir grąžina ją į žinutės lauką, kad galėtumėte pakeisti tekstą.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_2">Palaikykite nuspaudę eilutę, kad pamatytumėte visą klaidą ir ją nukopijuotumėte.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_3">Kai agentas bandys dar kartą pats, prie būsenos „Darbas“ rodomas likęs laikas iki kito bandymo.</string>
@@ -398,7 +398,7 @@
 
     <!-- 2026-10-19-04-interrupted-hand -->
     <string name="settings_whatsnew_entry_interrupted_hand_title">Rankos ženklas pertraukus</string>
-    <string name="settings_whatsnew_entry_interrupted_hand_summary">Pertraukus vykdymą ar apvalkalą, dabar rodoma pakelta ranka, o sustabdžius apvalkalą rašoma „Pertraukta“, ne „Sustabdyta“.</string>
+    <string name="settings_whatsnew_entry_interrupted_hand_summary">Pertraukus vykdymą ar apvalkalą, dabar rodoma pakelta ranka, o sustabdžius apvalkalą rašoma „Pertraukė“, ne „Sustabdyta“.</string>
 
     <!-- 2026-10-19-05-autocomplete-fast-scroll -->
     <string name="settings_whatsnew_entry_autocomplete_fast_scroll_title">Spartesnis automatinis užbaigimas</string>
@@ -782,7 +782,7 @@
 
     <!-- 2026-11-01-03-open-links-from-calls -->
     <string name="settings_whatsnew_entry_open_links_from_calls_title">Nuorodų atidarymas iš skambučių</string>
-    <string name="settings_whatsnew_entry_open_links_from_calls_summary">Nustatymuose › Eksperimentinis › Skambučiai įjunkite „Nuorodų atidarymas iš skambučių“, ir agentas skambučio metu galės pasiūlyti nuorodą, pavyzdžiui, į Uber kelionę. Palieskite „Atvira“, kad atidarytumėte ją atitinkamoje programoje, arba „Ne dabar“.</string>
+    <string name="settings_whatsnew_entry_open_links_from_calls_summary">Nustatymuose › Eksperimentinis › Skambučiai įjunkite „Nuorodų atidarymas iš skambučių“, ir agentas skambučio metu galės pasiūlyti nuorodą, pavyzdžiui, į Uber kelionę. Palieskite „Atidaryti“, kad atidarytumėte ją atitinkamoje programoje, arba „Ne dabar“.</string>
 
     <!-- 2026-11-02-01-fold-questions -->
     <string name="settings_whatsnew_entry_fold_questions_title">Sutraukite klausimus, kad netrukdytų</string>
@@ -825,7 +825,7 @@
     <!-- 2026-11-04-01-call-links-and-audio -->
     <string name="settings_whatsnew_entry_call_links_and_audio_title">Nuorodos ir garsas skambučiuose</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_summary">Nuorodų atidarymas ir garsas skambučiuose dabar įjungti visiems, be jungiklio.</string>
-    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">Per skambutį agentas gali pasiūlyti nuorodą, pavyzdžiui, į Uber kelionę: palieskite „Atvira“, kad atidarytumėte ją atitinkamoje programoje, arba „Ne dabar“.</string>
+    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">Per skambutį agentas gali pasiūlyti nuorodą, pavyzdžiui, į Uber kelionę: palieskite „Atidaryti“, kad atidarytumėte ją atitinkamoje programoje, arba „Ne dabar“.</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_detail_2">Per skambutį agentas gali paleisti muziką ar įrašą. Kai kuris nors iš jūsų kalba, garsas pritildomas; pristabdyti ar stabdyti galite virš rašymo lauko.</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_example">Per skambutį paprašykite agento paleisti muzikos</string>
 

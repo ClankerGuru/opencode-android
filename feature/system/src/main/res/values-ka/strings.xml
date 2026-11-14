@@ -70,7 +70,7 @@
     <string name="system_session_step_replying">პასუხობს</string>
     <string name="system_session_needs_input">თქვენს პასუხს ელოდება</string>
     <string name="system_session_input">შეყვანა</string>
-    <string name="system_session_done">დასრულება</string>
+    <string name="system_session_done">დასრულდა</string>
     <string name="system_session_failed">ვერ შედგა</string>
 
     <!-- Session notifications -->

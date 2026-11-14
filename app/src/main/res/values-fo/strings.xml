@@ -62,7 +62,7 @@
     <string name="app_server_form_headers_detail">Verða sendir við hvørjari umbøn til ein millumambætara framman fyri ambætaran, t.d. Cloudflare Access.</string>
 
     <!-- Server form state (AppFeature) -->
-    <string name="app_server_form_header_invalid_name">“%1$s” er ikki eitt gyldigt hausnavn</string>
+    <string name="app_server_form_header_invalid_name">“%1$s” er ikki eitt gyldugt hausnavn</string>
     <string name="app_server_form_header_invalid_value">Virðið í %1$s kann ikki hava linjuskift</string>
     <string name="app_server_form_name_placeholder">Valfrítt</string>
     <string name="app_connection_progress_pairing">Parar</string>

@@ -9,8 +9,8 @@
     <string name="drawer_catch_up_undo">འབད་བཤོལ་འབད།</string>
     <string name="drawer_catch_up_title">དུས་མཐུན་བལྟ།</string>
     <string name="drawer_catch_up_all_caught_up">ཆ་མཉམ་བལྟ་ཚར་ཡོད།</string>
-    <string name="drawer_catch_up_swipe_mark_read">རྟགས་བཀལ།\nལྷག་ཡོདཔ།</string>
-    <string name="drawer_catch_up_swipe_keep_unread">བཞག\nམ་ལྷགཔ་སྦེ།</string>
+    <string name="drawer_catch_up_swipe_mark_read">ལྷག་ཡོདཔ་སྦེ་\nརྟགས་བཀལ།</string>
+    <string name="drawer_catch_up_swipe_keep_unread">མ་ལྷགཔ་སྦེ་\nབཞག</string>
 
     <!-- Drawer container -->
     <string name="drawer_close_description">ལཱ་ཡུན་གྱི་ཐོ་ཁ་བསྡམས།</string>
@@ -19,7 +19,7 @@
     <string name="drawer_delete_session_title">“%1$s” བཏོན་གཏང་ནི་ཨིན་ན?</string>
     <string name="drawer_delete_session_message">འདི་གིས་ལག་ལེན་པ་ཆ་མཉམ་གྱི་དོན་ལུ་ ལཱ་ཡུན་འདི་སར་བར་ལས་བཏོན་གཏངམ་ཨིན།</string>
     <string name="drawer_new_session">ལཱ་ཡུན་གསརཔ།</string>
-    <string name="drawer_start_voice_call_description">སྐད་ཀྱི་བོད་བརྡ་འགོ་བཙུགས།</string>
+    <string name="drawer_start_voice_call_description">སྐད་ཀྱི་འབོད་བརྡ་འགོ་བཙུགས།</string>
 
     <!-- Archived page -->
     <string name="drawer_archived">གཏན་མཛོད་ནང་བཞག་ཡོདཔ།</string>
@@ -122,7 +122,7 @@
     <string name="drawer_row_unread_state">མ་ལྷགཔ།</string>
 
     <!-- Errors -->
-    <string name="drawer_notifications_request_error">གནང་བ་ཞུ་མ་ཚུགས། བསྐྱར་དུ་ཚོད་ལྟ་</string>
+    <string name="drawer_notifications_request_error">གནང་བ་ཞུ་མ་ཚུགས། བསྐྱར་དུ་ཚོད་ལྟ་འབད།</string>
     <string name="drawer_notifications_open_settings_error">སྒྲིག་སྟངས་ཁ་ཕྱེ་མ་ཚུགས། Android གི་སྒྲིག་སྟངས་ཁ་ཕྱེ་སྟེ་ བརྡ་བསྐུལ་ཚུ་ → OpenCode གདམ།</string>
     <string name="drawer_delete_session_error">“%1$s” བཏོན་གཏང་མ་ཚུགས། %2$s</string>
     <string name="drawer_archive_error">“%1$s” གཏན་མཛོད་ནང་བཙུགས་མ་ཚུགས། %2$s</string>

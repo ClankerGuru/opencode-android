@@ -782,7 +782,7 @@
 
     <!-- 2026-11-01-03-open-links-from-calls -->
     <string name="settings_whatsnew_entry_open_links_from_calls_title">Deschide linkuri din apeluri</string>
-    <string name="settings_whatsnew_entry_open_links_from_calls_summary">Activează Deschide linkuri din apeluri în Setări › Experimental › Apeluri, iar în timpul unui apel un agent îți poate oferi un link, de exemplu pentru o cursă Uber: atinge Deschis pentru a-l deschide în aplicația sa sau Nu acum.</string>
+    <string name="settings_whatsnew_entry_open_links_from_calls_summary">Activează Deschide linkuri din apeluri în Setări › Experimental › Apeluri, iar în timpul unui apel un agent îți poate oferi un link, de exemplu pentru o cursă Uber: atinge Deschide pentru a-l deschide în aplicația sa sau Nu acum.</string>
 
     <!-- 2026-11-02-01-fold-questions -->
     <string name="settings_whatsnew_entry_fold_questions_title">Restrânge întrebările ca să nu te încurce</string>
@@ -887,7 +887,7 @@
     <!-- 2026-11-07-03-one-picker -->
     <string name="settings_whatsnew_entry_one_picker_title">Selector nou de modele</string>
     <string name="settings_whatsnew_entry_one_picker_summary">Atinge modelul din caseta de mesaj și lista se extinde de acolo, cu Favorite și Recente sus și toți furnizorii dedesubt.</string>
-    <string name="settings_whatsnew_entry_one_picker_detail_1">Atinge nivelul de efort de pe rândul unui model, de exemplu „ridicat”, ca să-l schimbi fără să părăsești lista.</string>
+    <string name="settings_whatsnew_entry_one_picker_detail_1">Atinge nivelul de gândire de pe rândul unui model, de exemplu „ridicat”, ca să-l schimbi fără să părăsești lista.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_2">Glisează un rând sau ține-l apăsat ca să adaugi modelul la favorite ori să-l elimini.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_3">Căutarea e jos. Scrie un nivel după nume, de exemplu „opus high”, apoi apasă Enter ca să le selectezi pe ambele.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_4">Trage mânerul în sus ca să extinzi lista sau în jos ca să o închizi.</string>
@@ -900,5 +900,5 @@
 
     <!-- 2026-11-08-02-default-model -->
     <string name="settings_whatsnew_entry_default_model_title">Sesiunile noi folosesc modelul tău implicit</string>
-    <string name="settings_whatsnew_entry_default_model_summary">Sesiunile noi pornesc cu modelul implicit setat în OpenCode și cu ultimul nivel de efort ales pentru el, nu cu modelul ultimei sesiuni.</string>
+    <string name="settings_whatsnew_entry_default_model_summary">Sesiunile noi pornesc cu modelul implicit setat în OpenCode și cu ultimul nivel de gândire ales pentru el, nu cu modelul ultimei sesiuni.</string>
 </resources>

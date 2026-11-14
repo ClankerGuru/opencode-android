@@ -45,7 +45,7 @@
 
     <!-- Live Updates: voice call -->
     <string name="system_call_muted">Silenziata</string>
-    <string name="system_call_unmute">Riattiva notifiche</string>
+    <string name="system_call_unmute">Riattiva</string>
     <string name="system_call_mute">Silenzia</string>
     <string name="system_call_end">Termina chiamata</string>
     <string name="system_call_connecting">Connessione in corso…</string>
@@ -123,7 +123,7 @@
     <string name="system_share_no_server_title">Prima connettiti a un server</string>
     <string name="system_share_no_server_message">Apri OpenCode e connettiti al tuo computer, poi condividi di nuovo.</string>
     <string name="system_share_send_later">Invia più tardi</string>
-    <string name="system_share_saved_continue">Salvata. Apri OpenCode per continuare</string>
+    <string name="system_share_saved_continue">Salvato. Apri OpenCode per continuare</string>
     <string name="system_share_loading_description">Caricamento degli elementi condivisi</string>
     <string name="system_share_image_description">Immagine</string>
     <string name="system_share_image_position_description">Immagine %1$d di %2$d</string>
@@ -135,7 +135,7 @@
     <string name="system_share_sending_description">Invio</string>
     <string name="system_share_sent_description">Inviato</string>
     <string name="system_share_sessions_title">Sessioni</string>
-    <string name="system_share_pinned_header">Fissata</string>
+    <string name="system_share_pinned_header">Fissate</string>
     <string name="system_share_recents_header">Recenti</string>
 
     <!-- Widget configuration -->

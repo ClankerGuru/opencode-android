@@ -50,7 +50,7 @@
     <string name="settings_onboarding_phone_message_placeholder">Мессеж</string>
 
     <!-- What’s New -->
-    <string name="settings_whatsnew_developer_updates">Хөгжүүлэгчийн мэдээ</string>
+    <string name="settings_whatsnew_developer_updates">Хөгжүүлэгчийн шинэчлэлтүүд</string>
     <string name="settings_whatsnew_smaller_changes">Жижиг өөрчлөлтүүд</string>
     <string name="settings_whatsnew_title">Шинэ зүйлс</string>
     <string name="settings_whatsnew_options_description">Шинэ зүйлсийн сонголтууд</string>

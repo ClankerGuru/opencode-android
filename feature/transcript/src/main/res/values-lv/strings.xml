@@ -48,7 +48,7 @@
     <string name="transcript_reply_copy_description">Kopēt atbildi</string>
 
     <!-- Run errors and undo -->
-    <string name="transcript_run_error_copy">Kopēt kļūdu</string>
+    <string name="transcript_run_error_copy">Kļūda kopējot</string>
     <string name="transcript_undone_undo_hint">Vari atsaukt, līdz nosūti jaunu ziņu</string>
     <string name="transcript_undone_title">Izmaiņas atceltas no šīs vietas</string>
     <string name="transcript_undone_undo_click_label">Atjaunot atceltās ziņas un failus, kamēr nav nosūtīta jauna ziņa</string>
@@ -130,7 +130,7 @@
     <string name="transcript_tool_search_quoted">meklēt „%1$s“</string>
     <string name="transcript_tool_group_updates">Atjauninājumi</string>
     <plurals name="transcript_tool_group_used">
-        <item quantity="zero">Izmantoti %1$d instrumentu</item>
+        <item quantity="zero">Izmantots %1$d instrumentu</item>
         <item quantity="one">Izmantots %1$d instruments</item>
         <item quantity="other">Izmantoti %1$d instrumenti</item>
     </plurals>

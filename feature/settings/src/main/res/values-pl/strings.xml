@@ -12,7 +12,7 @@
     <string name="settings_themes_preview_reply">Udało mi się znaleźć problem z układem w %1$s. Transkrypcja i pole wiadomości dzielą dostępną wysokość, więc klawiatura dobrze sprawdza ich zachowanie w ciasnym widoku.</string>
 
     <!-- Experimental -->
-    <string name="settings_experimental_title">Eksperymentalne</string>
+    <string name="settings_experimental_title">Eksperymentalny</string>
     <string name="settings_experimental_all_footer">Włącza też nowe eksperymenty, oprócz tych, które widzą ekran lub nasłuchują w tle.</string>
     <string name="settings_experimental_all">Wszystkie eksperymenty</string>
     <string name="settings_experimental_all_on">Wszystkie włączone</string>
@@ -116,7 +116,7 @@
     <string name="settings_voice_provider_set_up">Skonfiguruj</string>
     <plurals name="settings_voice_provider_not_available_count">
         <item quantity="one">%d niedostępny dostawca</item>
-        <item quantity="few">%d niedostępnych dostawców</item>
+        <item quantity="few">%d niedostępni dostawcy</item>
         <item quantity="many">%d niedostępnych dostawców</item>
         <item quantity="other">%d niedostępnego dostawcy</item>
     </plurals>

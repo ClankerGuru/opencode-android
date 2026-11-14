@@ -16,7 +16,7 @@
     <string name="core_experiment_voice_session_delegator_title">OpenCode seansų delegavimas</string>
     <string name="core_experiment_share_screen_with_agents_title">Bendrinti ekraną su agentais</string>
     <string name="core_experiment_inbox_sidebar_title">Gautųjų šoninė juosta</string>
-    <string name="core_experiment_session_live_activity_title">Seanso naujienos realiuoju laiku</string>
+    <string name="core_experiment_session_live_activity_title">Seanso atnaujinimai realiuoju laiku</string>
     <string name="core_experiment_sound_effects_title">Garso efektai</string>
     <string name="core_experiment_in_app_browser_title">Naršyklė programoje</string>
     <string name="core_experiment_welcome_preview_title">Pasveikinimo peržiūra</string>

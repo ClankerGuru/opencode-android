@@ -782,7 +782,7 @@
 
     <!-- 2026-11-01-03-open-links-from-calls -->
     <string name="settings_whatsnew_entry_open_links_from_calls_title">Отвори врски од повици</string>
-    <string name="settings_whatsnew_entry_open_links_from_calls_summary">Вклучи Отвори врски од повици во Поставки › Експериментален › Повици и агентот ќе може да понуди врска за време на повик, на пример за возење со Uber: допри Отворено за да ја отвориш во соодветната апликација или Не сега.</string>
+    <string name="settings_whatsnew_entry_open_links_from_calls_summary">Вклучи Отвори врски од повици во Поставки › Експериментален › Повици и агентот ќе може да понуди врска за време на повик, на пример за возење со Uber: допри Отвори за да ја отвориш во соодветната апликација или Не сега.</string>
 
     <!-- 2026-11-02-01-fold-questions -->
     <string name="settings_whatsnew_entry_fold_questions_title">Собери ги прашањата настрана</string>
@@ -825,8 +825,8 @@
     <!-- 2026-11-04-01-call-links-and-audio -->
     <string name="settings_whatsnew_entry_call_links_and_audio_title">Врски и аудио во повици</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_summary">„Отворање врски од повици“ и „Аудио во повици“ сега се вклучени за сите, без прекинувач.</string>
-    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">За време на повик, агентот може да понуди врска, на пример за возење со Uber: допри „Отворено“ за да ја отвориш во соодветната апликација или „Не сега“.</string>
-    <string name="settings_whatsnew_entry_call_links_and_audio_detail_2">Агентот може да пушти музика или снимка во повикот. Звукот се намалува кога некој од вас зборува; паузирај или запре го над полето за пораки.</string>
+    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">За време на повик, агентот може да понуди врска, на пример за возење со Uber: допри „Отвори“ за да ја отвориш во соодветната апликација или „Не сега“.</string>
+    <string name="settings_whatsnew_entry_call_links_and_audio_detail_2">Агентот може да пушти музика или снимка во повикот. Звукот се намалува кога некој од вас зборува; паузирај или запри го над полето за пораки.</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_example">За време на повик, побарај од агентот да пушти музика</string>
 
     <!-- 2026-11-04-01-composer-editing-caret -->
@@ -891,7 +891,7 @@
     <string name="settings_whatsnew_entry_one_picker_detail_2">Повлечете или задржете на ред за да го додадете во Омилени или да го отстраните оттаму.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_3">Пребарувањето е долу. Ако по името внесете ниво, на пример „opus high“, со притискање на Return ги избирате и двете.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_4">Повлечете ја рачката нагоре за подолг список или надолу за да го затворите.</string>
-    <string name="settings_whatsnew_entry_one_picker_detail_5">Новиот избирач го заменува стариот панел за модел, а прекинувачот One Picker е отстранет од Поставки › Експериментален.</string>
+    <string name="settings_whatsnew_entry_one_picker_detail_5">Новиот избирач го заменува стариот панел за модел, а прекинувачот „Единствен избирач“ е отстранет од Поставки › Експериментален.</string>
     <string name="settings_whatsnew_entry_one_picker_example">Допрете го моделот во полето за порака, па повлечете ред за да го додадете во омилени</string>
 
     <!-- 2026-11-08-01-connecting-caption-glass -->

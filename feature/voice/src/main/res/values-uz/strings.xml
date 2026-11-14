@@ -18,8 +18,8 @@
     <!-- Floating call stage -->
     <string name="voice_stage_talking_in">Suhbat sessiyasi</string>
     <string name="voice_stage_minimize_description">Kichraytirish</string>
-    <string name="voice_mute">Bildirishnomalarni o‘chirish</string>
-    <string name="voice_unmute">Bildirishnomalarni yoqish</string>
+    <string name="voice_mute">Ovozni o‘chirish</string>
+    <string name="voice_unmute">Ovozni yoqish</string>
     <string name="voice_stage_pause">Pauza</string>
     <string name="voice_stage_camera">Kamera</string>
     <string name="voice_transcript_empty">Sessiyangizga biror narsa ayting.</string>
@@ -75,7 +75,7 @@
     <string name="voice_status_needs_input">Javobingiz kerak</string>
     <string name="voice_status_working">Bajarilmoqda</string>
     <string name="voice_status_speaking">Gapirmoqda</string>
-    <string name="voice_status_muted">Bildirishnomalar o‘chirilgan</string>
+    <string name="voice_status_muted">Ovoz o‘chirilgan</string>
     <string name="voice_status_listening">Tinglamoqda</string>
     <string name="voice_status_ending">Tugatilmoqda…</string>
     <string name="voice_status_ended">Tugadi</string>

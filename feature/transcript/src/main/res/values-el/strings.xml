@@ -27,7 +27,7 @@
     <string name="transcript_code_copy_description">Αντιγραφή κώδικα</string>
 
     <!-- Markdown task lists -->
-    <string name="transcript_task_done_description">Τέλος</string>
+    <string name="transcript_task_done_description">Ολοκληρώθηκε</string>
     <string name="transcript_task_not_done_description">Δεν ολοκληρώθηκε</string>
 
     <!-- Markdown images -->

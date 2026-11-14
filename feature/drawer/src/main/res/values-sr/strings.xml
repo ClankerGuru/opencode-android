@@ -123,7 +123,7 @@
     <string name="drawer_open_in_new_window">Отвори у новом прозору</string>
 
     <!-- Session row state for TalkBack -->
-    <string name="drawer_row_pinned_state">Закачене</string>
+    <string name="drawer_row_pinned_state">Закачено</string>
     <string name="drawer_row_muted_state">Утишано</string>
     <string name="drawer_row_needs_input_state">Потребан је ваш унос</string>
     <string name="drawer_row_working_state">У току</string>

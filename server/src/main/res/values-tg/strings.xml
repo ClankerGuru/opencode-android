@@ -67,7 +67,7 @@
 
     <!-- OpenCodeToolCall.kt, LiveTranscript.kt -->
     <string name="server_tool_shell">Shell</string>
-    <string name="server_tool_shell_killed">shell маҷбуран қатъ шуд</string>
+    <string name="server_tool_shell_killed">Shell маҷбуран қатъ шуд</string>
     <string name="server_tool_shell_exit_code">Фармон бо рамзи %1$d анҷом ёфт</string>
     <string name="server_notice_session_update">Навсозии сессия</string>
 

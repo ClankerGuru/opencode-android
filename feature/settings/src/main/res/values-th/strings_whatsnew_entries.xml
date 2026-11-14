@@ -51,7 +51,7 @@
 
     <!-- 2026-10-09-01-working-orb -->
     <string name="settings_whatsnew_entry_working_orb_title">ลูกแก้วสถานะ</string>
-    <string name="settings_whatsnew_entry_working_orb_summary">ลูกแก้วข้างกำลังทำงานและบนการ์ดตัวแทนย่อยแสดงว่าเอเจนต์กำลังทำอะไร และเปลี่ยนเป็นปุ่มคัดลอกเมื่อเสร็จ</string>
+    <string name="settings_whatsnew_entry_working_orb_summary">ลูกแก้วข้างการทำงานและบนการ์ดตัวแทนย่อยแสดงว่าเอเจนต์กำลังทำอะไร และเปลี่ยนเป็นปุ่มคัดลอกเมื่อเสร็จ</string>
 
     <!-- 2026-10-09-02-shell-glyph -->
     <string name="settings_whatsnew_entry_shell_glyph_title">การทำงานของเชลล์</string>
@@ -160,10 +160,10 @@
 
     <!-- 2026-10-12-05-run-error-line -->
     <string name="settings_whatsnew_entry_run_error_line_title">เมื่อการทำงานล้มเหลว</string>
-    <string name="settings_whatsnew_entry_run_error_line_summary">เมื่อการทำงานหยุดก่อนเสร็จ จะแจ้งเหตุผลด้วยภาษาง่ายๆ พร้อมทางแก้หนึ่งอย่าง: แก้ไข บีบอัด เปลี่ยนโมเดล หรือลองอีกครั้ง</string>
+    <string name="settings_whatsnew_entry_run_error_line_summary">เมื่อการทำงานหยุดก่อนเสร็จ จะแจ้งเหตุผลด้วยภาษาง่ายๆ พร้อมทางแก้หนึ่งอย่าง: แก้ไข กะทัดรัด เปลี่ยนโมเดล หรือลองอีกครั้ง</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_1">ปุ่มแก้ไขจะเลิกทำข้อความที่ส่ง แล้วนำกลับมาไว้ในช่องข้อความให้ปรับคำ</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_2">แตะบรรทัดค้างไว้เพื่อดูข้อผิดพลาดทั้งหมดและคัดลอก</string>
-    <string name="settings_whatsnew_entry_run_error_line_detail_3">เมื่อเอเจนต์จะลองใหม่เอง สถานะกำลังทำงานจะแสดงเวลานับถอยหลังก่อนลองครั้งถัดไป</string>
+    <string name="settings_whatsnew_entry_run_error_line_detail_3">เมื่อเอเจนต์จะลองใหม่เอง การทำงานจะแสดงเวลานับถอยหลังก่อนลองครั้งถัดไป</string>
     <string name="settings_whatsnew_entry_run_error_line_example">เมื่อคำตอบถูกบล็อก ให้แตะแก้ไข ปรับข้อความ แล้วส่งอีกครั้ง</string>
 
     <!-- 2026-10-12-06-transcript-keyboard-space -->
@@ -807,8 +807,8 @@
     <string name="settings_whatsnew_entry_all_experiments_example">เปิดการตั้งค่า › การทดลอง แล้วเปิดการทดลองทั้งหมด</string>
 
     <!-- 2026-11-03-01-search-all-sessions -->
-    <string name="settings_whatsnew_entry_search_all_sessions_title">ค้นหาเซสชันเก่า</string>
-    <string name="settings_whatsnew_entry_search_all_sessions_summary">การค้นหาในแถบด้านข้างจะค้นทุกเซสชันแล้ว ไม่ใช่แค่เซสชันล่าสุด และเลื่อนลงล่างสุดเพื่อโหลดเซสชันเก่าได้</string>
+    <string name="settings_whatsnew_entry_search_all_sessions_title">ค้นหาเซสชันก่อนหน้านี้</string>
+    <string name="settings_whatsnew_entry_search_all_sessions_summary">การค้นหาในแถบด้านข้างจะค้นทุกเซสชันแล้ว ไม่ใช่แค่เซสชันล่าสุด และเลื่อนลงล่างสุดเพื่อโหลดเซสชันก่อนหน้านี้ได้</string>
 
     <!-- 2026-11-03-01-voice-open-session -->
     <string name="settings_whatsnew_entry_voice_open_session_title">สลับเซสชันด้วยเสียง</string>
@@ -891,7 +891,7 @@
     <string name="settings_whatsnew_entry_one_picker_detail_2">ปัดหรือแตะแถวค้างไว้เพื่อเพิ่มในรายการโปรดหรือเอาออก</string>
     <string name="settings_whatsnew_entry_one_picker_detail_3">ช่องค้นหาอยู่ด้านล่าง พิมพ์ระดับต่อท้ายชื่อ เช่น “opus high” แล้วกด Return เพื่อเลือกทั้งสองอย่าง</string>
     <string name="settings_whatsnew_entry_one_picker_detail_4">ลากแถบลากขึ้นเพื่อขยายรายการให้สูงขึ้น หรือลากลงเพื่อปิด</string>
-    <string name="settings_whatsnew_entry_one_picker_detail_5">ตัวเลือกใหม่นี้มาแทนแผงโมเดลเดิม และนำสวิตช์ One Picker ออกจากการตั้งค่า › การทดลองแล้ว</string>
+    <string name="settings_whatsnew_entry_one_picker_detail_5">ตัวเลือกใหม่นี้มาแทนแผงโมเดลเดิม และนำสวิตช์ตัวเลือกรวมออกจากการตั้งค่า › การทดลองแล้ว</string>
     <string name="settings_whatsnew_entry_one_picker_example">แตะโมเดลในช่องข้อความ แล้วปัดแถวเพื่อเพิ่มในรายการโปรด</string>
 
     <!-- 2026-11-08-01-connecting-caption-glass -->

@@ -10,7 +10,7 @@
     <string name="settings_whatsnew_entry_attachment_menu_hold_title">+ ile ekle</string>
     <string name="settings_whatsnew_entry_attachment_menu_hold_summary">+ menüsü mesaj kutusundan açılır; Kamera, Fotoğraflar ve Dosyalar seçeneklerini sunar. Tek harekette seçmek için + düğmesini basılı tutup kaydırın.</string>
     <string name="settings_whatsnew_entry_attachment_menu_hold_detail_1">Fotoğraflar, mesaj kutusunun hemen üstünde açılır; eklemek istediğiniz fotoğraflara dokunun.</string>
-    <string name="settings_whatsnew_entry_attachment_menu_hold_detail_2">Kamerada lens düğmeleri, parmaklarla yakınlaştırma, dokunarak odaklama ve flaş bulunur.</string>
+    <string name="settings_whatsnew_entry_attachment_menu_hold_detail_2">Kamerada lens düğmeleri, sıkıştırarak yakınlaştırma, dokunarak odaklama ve flaş bulunur.</string>
     <string name="settings_whatsnew_entry_attachment_menu_hold_example">+ düğmesini basılı tutun, yukarıdaki Fotoğraflar seçeneğine kaydırıp bırakın</string>
 
     <!-- 2026-10-08-01-voice-webrtc-weak-connection -->
@@ -81,7 +81,7 @@
 
     <!-- 2026-10-10-01-share-opened-files -->
     <string name="settings_whatsnew_entry_share_opened_files_title">Fotoğraflar gibi görseller</string>
-    <string name="settings_whatsnew_entry_share_opened_files_summary">Görseller oturumda tam görünür ve Fotoğraflar gibi açılır: parmaklarınızla yakınlaştırın, aralarında kaydırın ve kapatmak için aşağı sürükleyin.</string>
+    <string name="settings_whatsnew_entry_share_opened_files_summary">Görseller oturumda tam görünür ve Fotoğraflar gibi açılır: sıkıştırarak yakınlaştırın, aralarında kaydırın ve kapatmak için aşağı sürükleyin.</string>
     <string name="settings_whatsnew_entry_share_opened_files_detail_1">Ajanın adını verdiği her dosya uygulamada açılır.</string>
     <string name="settings_whatsnew_entry_share_opened_files_detail_2">Paylaş ile açtığınız her şeyi, video ve ses dahil, Fotoğraflar\'a veya Dosyalar\'a kaydedebilirsiniz.</string>
     <string name="settings_whatsnew_entry_share_opened_files_example">Ajandan birkaç ekran görüntüsünü okumasını isteyin, ardından birine dokunup aşağı sürükleyin</string>
@@ -807,8 +807,8 @@
     <string name="settings_whatsnew_entry_all_experiments_example">Ayarlar › Deneysel bölümünü açıp Tüm deneyleri etkinleştirin</string>
 
     <!-- 2026-11-03-01-search-all-sessions -->
-    <string name="settings_whatsnew_entry_search_all_sessions_title">Eski oturumları bulun</string>
-    <string name="settings_whatsnew_entry_search_all_sessions_summary">Yan paneldeki arama artık yalnızca son oturumları değil, tüm oturumları tarar. En alta kaydırınca eski oturumlar yüklenir.</string>
+    <string name="settings_whatsnew_entry_search_all_sessions_title">Daha eski oturumları bulun</string>
+    <string name="settings_whatsnew_entry_search_all_sessions_summary">Yan paneldeki arama artık yalnızca son oturumları değil, tüm oturumları tarar. En alta kaydırınca daha eski oturumlar yüklenir.</string>
 
     <!-- 2026-11-03-01-voice-open-session -->
     <string name="settings_whatsnew_entry_voice_open_session_title">Sesle oturum değiştirin</string>

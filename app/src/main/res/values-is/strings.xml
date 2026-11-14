@@ -92,7 +92,7 @@
     <string name="app_paste_clipboard_empty">Klemmuspjaldið er tómt</string>
     <string name="app_paste_not_a_pairing_link">Þetta er ekki pörunartengill</string>
     <string name="app_server_no_longer_saved">Þessi netþjónn er ekki lengur vistaður á þessu tæki (%1$s). Tengstu honum aftur til að opna setuna.</string>
-    <string name="app_session_no_longer_available">Henni gæti hafa verið eytt eða netþjónninn er ekki tiltækur.</string>
+    <string name="app_session_no_longer_available">Henni kann að hafa verið eytt eða netþjónninn er ekki tiltækur.</string>
 
     <!-- Pairing (AppFeaturePairing) -->
     <string name="app_pairing_connected_announcement">Tengt við %1$s</string>

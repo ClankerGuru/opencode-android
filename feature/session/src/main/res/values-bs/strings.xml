@@ -46,7 +46,7 @@
     <string name="session_rename_title">Preimenuj sesiju</string>
     <string name="session_untitled_title">Sesija</string>
     <string name="session_pin">Prikači</string>
-    <string name="session_pinned">Prikačene</string>
+    <string name="session_pinned">Prikačeno</string>
     <string name="session_unread">Nepročitano</string>
     <string name="session_mute">Utišaj</string>
     <string name="session_muted">Utišano</string>

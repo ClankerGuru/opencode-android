@@ -72,7 +72,7 @@
     <!-- Pairing confirmation (AppFeature.PendingPairing) -->
     <string name="app_pairing_confirm_title">Susieti su %1$s?</string>
     <string name="app_pairing_confirm_try_one">OpenCode išbandys %1$s ir prisijungs prie pirmo atsakiusio adreso.</string>
-    <string name="app_pairing_confirm_pair_one">OpenCode susies su %1$s ir prie jo prisijungs.</string>
+    <string name="app_pairing_confirm_pair_one">OpenCode susisies su %1$s ir prie jo prisijungs.</string>
     <string name="app_pairing_confirm_try_two">OpenCode išbandys %1$s ir %2$s ir prisijungs prie pirmo atsakiusio adreso.</string>
     <string name="app_pairing_confirm_try_many">OpenCode išbandys %1$s ir %2$s ir prisijungs prie pirmo atsakiusio adreso.</string>
     <string name="app_pairing_confirm_replaces">%1$s Gali būti pakeisti išsaugoti %2$s prisijungimo duomenys.</string>

@@ -740,7 +740,7 @@
 
     <!-- 2026-10-31-03-notification-plugin-setup -->
     <string name="settings_whatsnew_entry_notification_plugin_setup_title">Bildirishnomalarni OpenCode bilan sozlash</string>
-    <string name="settings_whatsnew_entry_notification_plugin_setup_summary">Sozlamalar → Bildirishnomalar ichida OpenCode bilan sozlashni bosing. Yetishmayotgan bildirishnoma plaginini o‘rnatadigan tezkor matnini ko‘rib chiqasiz.</string>
+    <string name="settings_whatsnew_entry_notification_plugin_setup_summary">Sozlamalar → Bildirishnomalar ichida OpenCode bilan sozlashni bosing. Yetishmayotgan bildirishnoma plaginini o‘rnatadigan tezkor matnni ko‘rib chiqasiz.</string>
 
     <!-- 2026-11-01-01-call-card-takes-over -->
     <string name="settings_whatsnew_entry_call_card_takes_over_title">Qo‘ng‘iroq kartasi pastki qismni egallaydi</string>
@@ -752,7 +752,7 @@
     <string name="settings_whatsnew_entry_screenshot_shutter_detail_1">Chaqnash tasvir olingandan keyin bo‘ladi, shuning uchun rasmga tushmaydi.</string>
     <string name="settings_whatsnew_entry_screenshot_shutter_detail_2">Harakatni kamaytirish uni mayin xiralashishga almashtiradi, Chaqnashlarni xiralashtirish esa o‘chiradi.</string>
     <string name="settings_whatsnew_entry_screenshot_shutter_detail_3">Qo‘ng‘iroq paytida chertish tovushi qo‘ng‘iroq ovozi orqali yangraydi, shuning uchun agent uni eshitmaydi.</string>
-    <string name="settings_whatsnew_entry_screenshot_shutter_example">Ovozli qo‘ng‘iroqda “bunga qara” deng</string>
+    <string name="settings_whatsnew_entry_screenshot_shutter_example">Ovozli qo‘ng‘iroqda “bunga qarang” deng</string>
 
     <!-- 2026-11-01-01-voice-says-whats-running -->
     <string name="settings_whatsnew_entry_voice_says_whats_running_title">Qo‘ng‘iroqda davom etayotgan ish aytiladi</string>

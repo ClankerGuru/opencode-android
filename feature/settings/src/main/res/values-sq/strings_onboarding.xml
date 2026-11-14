@@ -36,7 +36,7 @@
     <string name="settings_onboarding_desktop_composer_placeholder">Pyet çfarë të duash, / për komanda, @ për kontekst…</string>
     <string name="settings_onboarding_desktop_composer_follow_up_placeholder">Shto një kërkesë tjetër, / për komanda, @ për kontekst…</string>
     <string name="settings_onboarding_desktop_back_to_app">Kthehu te aplikacioni</string>
-    <string name="settings_onboarding_desktop_pairing_title">Po çiftohet</string>
+    <string name="settings_onboarding_desktop_pairing_title">Çiftimi</string>
     <string name="settings_onboarding_desktop_pairing_subtitle">Lidh një pajisje tjetër me serverin OpenCode të këtij kompjuteri.</string>
     <string name="settings_onboarding_desktop_pair_device">Çifto një pajisje</string>
     <string name="settings_onboarding_desktop_pair_device_message">Skano kodin me aplikacionin OpenCode në një pajisje tjetër ose kopjo lidhjen.</string>
@@ -61,7 +61,7 @@
     <string name="settings_onboarding_headline">OpenCode\nkudo.</string>
     <string name="settings_onboarding_headline_spoken">OpenCode kudo.</string>
     <string name="settings_onboarding_subhead">Nis detyra, përgjigju pyetjeve dhe rishiko ndryshimet larg tryezës së punës.</string>
-    <string name="settings_onboarding_instruction">Në kompjuter, hap OpenCode dhe shko te Cilësimet → Po çiftohet.</string>
+    <string name="settings_onboarding_instruction">Në kompjuter, hap OpenCode dhe shko te Cilësimet → Çiftimi.</string>
 
     <!-- Onboarding: WelcomeStory, the mock conversation (the reply's backticks mark code) -->
     <string name="settings_onboarding_story_prompt">Shto një buton shkarkimi për Android dhe ma trego</string>

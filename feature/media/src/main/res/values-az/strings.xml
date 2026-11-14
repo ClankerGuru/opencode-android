@@ -43,7 +43,7 @@
     <string name="media_file_error_open_failed_title">Fayl açıla bilmədi</string>
     <string name="media_file_error_unreadable">Bu yol serverdən oxuna bilmir.</string>
     <string name="media_file_error_not_found">Köçürülmüş və ya silinmiş ola bilər.</string>
-    <string name="media_file_error_unauthorized">Server bu cihazın şifrəsini qəbul etmədi.</string>
+    <string name="media_file_error_unauthorized">Server bu cihazın parolunu qəbul etmədi.</string>
     <!-- %1$d is the HTTP status code -->
     <string name="media_file_error_server">Server bunu oxuya bilmədi (HTTP %1$d). Qovluq ola bilər.</string>
     <string name="media_file_error_timed_out">Sorğunun vaxtı bitdi.</string>

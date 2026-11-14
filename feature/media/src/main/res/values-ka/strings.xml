@@ -35,7 +35,7 @@
     <string name="media_file_confirm_large_message">ფაილის ზომაა %1$s. ჩამოვტვირთოთ ამ მოწყობილობაზე სანახავად?</string>
     <string name="media_file_download">ჩამოტვირთვა</string>
     <string name="media_file_open_in_another_app">სხვა აპში გახსნა</string>
-    <string name="media_file_no_app_message">ამ მოწყობილობაზე ვერცერთი აპი ვერ ხსნის ამ ფაილს. გასაზიარებლად აირჩიეთ გაზიარება, რომ შეინახოთ ან სხვაგან გაგზავნოთ.</string>
+    <string name="media_file_no_app_message">ამ მოწყობილობაზე ვერცერთი აპი ვერ ხსნის ამ ფაილს. გააზიარეთ, რომ შეინახოთ ან სხვაგან გაგზავნოთ.</string>
     <string name="media_file_pdf_page_description">გვერდი %1$d, სულ %2$d</string>
 
     <!-- File viewer: why a file couldn’t open -->

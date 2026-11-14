@@ -139,7 +139,7 @@
     <string name="media_mermaid_viewer_screen_title">Преглед на диаграми</string>
     <string name="media_mermaid_diagram_description">Диаграма</string>
     <string name="media_mermaid_loading_state">%1$s, зарежда се</string>
-    <string name="media_mermaid_view_source">Показване на изходния код</string>
+    <string name="media_mermaid_view_source">Преглед на изходния код</string>
     <string name="media_mermaid_source_title">Изходен код на диаграмата</string>
 
     <!-- Mermaid diagram kinds, read by TalkBack as “Diagram, Flowchart” -->

@@ -211,5 +211,5 @@
     <string name="settings_pairing_nothing_to_paste_message">ཁྱོད་ཀྱི་འཛིན་པང་ནང་ཆ་སྒྲིག་འབྲེལ་མཐུད་མེད། opencode pair གིས་སྟོན་པའི་འབྲེལ་མཐུད་འདྲ་བཤུས་འབད་དེ་ ལོག་ཚོད་ལྟ་འབད།</string>
     <string name="settings_pairing_point_camera">པར་ཆས་ QR གསང་གྲངས་ལུ་གཏད།</string>
     <string name="settings_pairing_paste_link">ཆ་སྒྲིག་འབྲེལ་མཐུད་སྦྱར།</string>
-    <string name="settings_pairing_computer_hint">ཁྱོད་ཀྱི་གློག་རིག་གུ་ OpenCode གི་སྒྲིག་སྟངས་ཚུ། → ཆ་སྒྲིག་འབད་དོ། ཁ་ཕྱེ། ཡང་ན་ ཊར་མི་ནཱལ་ནང་ %1$s གཡོག་བཀོལ།</string>
+    <string name="settings_pairing_computer_hint">ཁྱོད་ཀྱི་གློག་རིག་གུ་ OpenCode གི་སྒྲིག་སྟངས་ → ཆ་སྒྲིག་ ཁ་ཕྱེ། ཡང་ན་ ཊར་མི་ནཱལ་ནང་ %1$s གཡོག་བཀོལ།</string>
 </resources>

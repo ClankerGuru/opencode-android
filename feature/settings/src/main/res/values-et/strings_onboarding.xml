@@ -50,7 +50,7 @@
     <string name="settings_onboarding_phone_message_placeholder">Sõnum</string>
 
     <!-- What’s New -->
-    <string name="settings_whatsnew_developer_updates">Arendaja uudised</string>
+    <string name="settings_whatsnew_developer_updates">Arendaja uuendused</string>
     <string name="settings_whatsnew_smaller_changes">Väiksemad muudatused</string>
     <string name="settings_whatsnew_title">Mis on uut</string>
     <string name="settings_whatsnew_options_description">Jaotise „Mis on uut” valikud</string>

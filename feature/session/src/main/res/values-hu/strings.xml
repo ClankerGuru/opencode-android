@@ -33,7 +33,7 @@
     <string name="session_folder_select">Kijelölés</string>
     <string name="session_folder_open_failed_title">Nem sikerült megnyitni a mappát</string>
     <string name="session_folder_empty_title">Nincsenek mappák</string>
-    <string name="session_folder_search_empty_title">Nincs találat erre: „%1$s”</string>
+    <string name="session_folder_search_empty_title">Nincs találat a következőre: „%1$s”</string>
     <string name="session_folder_search_empty_message">Ellenőrizze a helyesírást, vagy keressen másra.</string>
     <!-- Server connection pill -->
     <string name="session_server_edit">Szerver szerkesztése…</string>

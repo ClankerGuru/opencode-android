@@ -32,7 +32,7 @@
     <string name="settings_onboarding_tool_browser">Brauzer</string>
     <string name="settings_onboarding_tool_edit">Tahrirlash</string>
     <string name="settings_onboarding_tool_screenshot">Ekran tasviri</string>
-    <string name="settings_onboarding_tool_running_commands">Ishlaydigan buyruqlar</string>
+    <string name="settings_onboarding_tool_running_commands">Buyruqlarni ishga tushirish</string>
     <string name="settings_onboarding_desktop_composer_placeholder">Istalgan savolni bering, buyruqlar uchun /, kontekst uchun @…</string>
     <string name="settings_onboarding_desktop_composer_follow_up_placeholder">Qo‘shimcha yozing, buyruqlar uchun /, kontekst uchun @…</string>
     <string name="settings_onboarding_desktop_back_to_app">Ilovaga qaytish</string>
@@ -87,6 +87,6 @@
     <string name="settings_whatsnew_action_start_call">Qo‘ng‘iroqni boshlash</string>
     <string name="settings_whatsnew_action_set_up_voice">Ovozni sozlash</string>
     <string name="settings_whatsnew_action_manage_servers">Serverlarni boshqarish</string>
-    <string name="settings_whatsnew_action_open_page">%1$s faylini ochish</string>
+    <string name="settings_whatsnew_action_open_page">%1$s sahifasini ochish</string>
     <string name="settings_whatsnew_page_servers">Serverlar</string>
 </resources>

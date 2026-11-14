@@ -106,7 +106,7 @@
     <string name="composer_location_current_coordinates">Joriy koordinatalar</string>
 
     <!-- Model picker -->
-    <string name="composer_model_no_results_title">“%1$s” uchun natija topilmadi</string>
+    <string name="composer_model_no_results_title">“%1$s” uchun hech qanday natija topilmadi</string>
     <string name="composer_model_no_results_message">Imloni tekshiring yoki boshqacha qidiring.</string>
     <string name="composer_model_load_failed_title">Modellarni yuklab bo\'lmadi</string>
     <string name="composer_model_empty_title">Modellar yo\'q</string>

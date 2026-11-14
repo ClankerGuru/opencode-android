@@ -136,7 +136,7 @@
     <string name="voice_error_start_voice_http">無法啟動語音（HTTP %1$d）。</string>
     <string name="voice_error_openai_rejected_key">OpenAI 拒絕了此 API 金鑰。</string>
     <string name="voice_error_openai_verify_http">OpenAI 無法驗證此金鑰（HTTP %1$d）。</string>
-    <string name="voice_error_no_connection">尚未連線。</string>
+    <string name="voice_error_no_connection">無連線。</string>
     <string name="voice_error_model_address_invalid">語音模型位址無效。</string>
     <string name="voice_error_xai_rejected_key">xAI 拒絕了此 API 金鑰。</string>
     <string name="voice_error_xai_verify_http">xAI 無法驗證此金鑰（HTTP %1$d）。</string>
@@ -182,10 +182,10 @@
     <string name="voice_call_log_duration_seconds">%1$d 秒</string>
     <string name="voice_call_log_duration_minutes">%1$d 分 %2$d 秒</string>
     <string name="voice_replay_to_delegator">→ 委派者</string>
-    <string name="voice_replay_to_voice">→ 音色</string>
+    <string name="voice_replay_to_voice">→ 語音</string>
     <string name="voice_replay_audio">音訊</string>
     <string name="voice_replay_track_user">你</string>
-    <string name="voice_replay_track_voice">音色</string>
+    <string name="voice_replay_track_voice">語音</string>
     <string name="voice_replay_track_delegator">委派者</string>
     <string name="voice_replay_track_tools">工具</string>
 </resources>

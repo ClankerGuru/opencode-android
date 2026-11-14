@@ -337,7 +337,7 @@
     <string name="settings_whatsnew_entry_image_previews_prompt">Mostra\'m les captures de pantalla d\'aquest projecte.</string>
 
     <!-- 2026-10-16-07-connection-error-details -->
-    <string name="settings_whatsnew_entry_connection_error_details_title">Errors de connexió més clars</string>
+    <string name="settings_whatsnew_entry_connection_error_details_title">Els errors de connexió indiquen què ha fallat</string>
     <string name="settings_whatsnew_entry_connection_error_details_summary">Els errors de connexió mostren el codi d\'error, l\'adreça provada i el resultat DNS, amb ajuda quan un nom de la xarxa tailnet es resol fora de Tailscale.</string>
 
     <!-- 2026-10-16-08-outage-reconnect-delay -->
@@ -579,7 +579,7 @@
 
     <!-- 2026-10-22-01-whats-new-actions -->
     <string name="settings_whatsnew_entry_whats_new_actions_title">Obre i prova des de Novetats</string>
-    <string name="settings_whatsnew_entry_whats_new_actions_summary">La pàgina de cada novetat té un botó que obre la configuració corresponent, com ara Temes, o inicia una sessió amb una indicació ja escrita perquè la provis.</string>
+    <string name="settings_whatsnew_entry_whats_new_actions_summary">La pàgina de cada novetat té un botó que obre la configuració corresponent, com ara Temes, o inicia una nova sessió amb una indicació ja escrita perquè la provis.</string>
 
     <!-- 2026-10-22-02-project-icons-current-discovery -->
     <string name="settings_whatsnew_entry_project_icons_current_discovery_title">Correccions a les icones de projecte</string>
@@ -736,7 +736,7 @@
 
     <!-- 2026-10-31-02-move-session-folder-gone -->
     <string name="settings_whatsnew_entry_move_session_folder_gone_title">Les sessions sobreviuen a la carpeta</string>
-    <string name="settings_whatsnew_entry_move_session_folder_gone_summary">Si la carpeta d\'una sessió ja no existeix, com ara un espai de treball suprimit, quan falla un enviament s\'ofereix moure la sessió a la carpeta del projecte i tornar-lo a enviar.</string>
+    <string name="settings_whatsnew_entry_move_session_folder_gone_summary">Si la carpeta d\'una sessió ja no existeix, com ara un espai de treball eliminat, quan falla un enviament s\'ofereix moure la sessió a la carpeta del projecte i tornar-lo a enviar.</string>
 
     <!-- 2026-10-31-03-notification-plugin-setup -->
     <string name="settings_whatsnew_entry_notification_plugin_setup_title">Configura les notificacions amb OpenCode</string>

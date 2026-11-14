@@ -18,8 +18,8 @@
     <!-- Floating call stage -->
     <string name="voice_stage_talking_in">កំពុងនិយាយក្នុង</string>
     <string name="voice_stage_minimize_description">បង្រួម</string>
-    <string name="voice_mute">បិទការជូនដំណឹង</string>
-    <string name="voice_unmute">បើកការជូនដំណឹង</string>
+    <string name="voice_mute">បិទសំឡេង</string>
+    <string name="voice_unmute">បើកសំឡេង</string>
     <string name="voice_stage_pause">ផ្អាក</string>
     <string name="voice_stage_camera">កាមេរ៉ា</string>
     <string name="voice_transcript_empty">និយាយអ្វីមួយទៅកាន់សម័យរបស់អ្នក។</string>
@@ -75,7 +75,7 @@
     <string name="voice_status_needs_input">ត្រូវការចម្លើយរបស់អ្នក</string>
     <string name="voice_status_working">ធ្វើការ</string>
     <string name="voice_status_speaking">កំពុងនិយាយ</string>
-    <string name="voice_status_muted">បានបិទការជូនដំណឹង</string>
+    <string name="voice_status_muted">បានបិទសំឡេង</string>
     <string name="voice_status_listening">កំពុងស្ដាប់</string>
     <string name="voice_status_ending">កំពុងបញ្ចប់…</string>
     <string name="voice_status_ended">បានបញ្ចប់</string>
@@ -157,7 +157,7 @@
     <string name="voice_accent_north_american_english">អង់គ្លេសបែបអាមេរិកខាងជើង</string>
     <string name="voice_accent_brazilian_portuguese">ព័រទុយហ្គាល់បែបប្រេស៊ីល</string>
     <string name="voice_accent_filipino_english">អង់គ្លេសបែបហ្វីលីពីន</string>
-    <string name="voice_accent_southern_us_english">អង់គ្លេសបែបអាមេរិកខាងត្បូង</string>
+    <string name="voice_accent_southern_us_english">អង់គ្លេសបែបសហរដ្ឋអាមេរិកភាគខាងត្បូង</string>
     <string name="voice_accent_indian_english">អង់គ្លេសបែបឥណ្ឌា</string>
     <string name="voice_preview_error">មិនអាចចាក់សំឡេងសាកល្បងបាន</string>
 

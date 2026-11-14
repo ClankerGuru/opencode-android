@@ -160,7 +160,7 @@
 
     <!-- 2026-10-12-05-run-error-line -->
     <string name="settings_whatsnew_entry_run_error_line_title">Ja izpilde neizdodas</string>
-    <string name="settings_whatsnew_entry_run_error_line_summary">Ja izpilde apstājas priekšlaikus, iemesls tiek pateikts vienkārši un piedāvāta darbība: “Rediģēt”, “Saspiest”, “Mainīt modeli” vai “Mēģināt vēlreiz”.</string>
+    <string name="settings_whatsnew_entry_run_error_line_summary">Ja izpilde apstājas priekšlaikus, iemesls tiek pateikts vienkārši un piedāvāta darbība: “Rediģēt”, “Kompakts”, “Mainīt modeli” vai “Mēģināt vēlreiz”.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_1">“Rediģēt” atsauc ziņu un ievieto to atpakaļ ziņas laukā, lai vari to pārformulēt.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_2">Turi nospiestu rindu, lai skatītu un kopētu pilnu kļūdas tekstu.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_3">Ja aģents mēģinās vēlreiz pats, pie “Darbojas” redzams laiks līdz nākamajam mēģinājumam.</string>
@@ -417,7 +417,7 @@
     <string name="settings_whatsnew_entry_problem_reports_reach_session_summary">“Ziņot par problēmu” tagad nosūta tavu piezīmi arī uz sesiju, no kuras ziņoji, pievienojot pilnu ziņojumu, ko aģents var izlasīt.</string>
     <string name="settings_whatsnew_entry_problem_reports_reach_session_detail_1">Ziņas sākumā ir norāde par problēmas ziņojumu, tava piezīme, ziņojuma ID un saite uz augšupielādēto izsekošanas ierakstu.</string>
     <string name="settings_whatsnew_entry_problem_reports_reach_session_detail_2">Informācija par ierīci, būvējumu un ekrānu, laika skala un lietotnes žurnāls nonāk pievienotā failā — gluži kā fails, ko pievieno pats.</string>
-    <string name="settings_whatsnew_entry_problem_reports_reach_session_detail_3">Ziņojot no sākuma ekrāna, tas nonāk tavā pēdējā sesijā.</string>
+    <string name="settings_whatsnew_entry_problem_reports_reach_session_detail_3">No Sākuma tas nonāk tavā pēdējā sesijā.</string>
     <string name="settings_whatsnew_entry_problem_reports_reach_session_detail_4">Ja augšupielāde neizdodas, piezīme un kopsavilkums tik un tā nonāk sesijā ar norādi par kļūmi. “Mēģināt vēlreiz” pēc tam nosūta tikai saiti uz izsekošanas ierakstu.</string>
     <string name="settings_whatsnew_entry_problem_reports_reach_session_detail_5">Kad ziņa nonāk sesijā, parādās apstiprinājums “Nosūtīts uz sesiju”.</string>
     <string name="settings_whatsnew_entry_problem_reports_reach_session_example">Atver sesijas izvēlni, izvēlies “Ziņot par problēmu”, pievieno piezīmi un pieskaries “Sūtīt”</string>
@@ -480,12 +480,12 @@
     <string name="settings_whatsnew_entry_advanced_settings_open_summary">Sadaļā Iestatījumi › Eksperimentāls visas grupas ir izvērstas, modeļu atlasītāji apvienoti vienā izvēlē, un iestatījumu var mainīt, pieskaroties jebkur tā rindā.</string>
 
     <!-- 2026-10-20-12-revert-to-here -->
-    <string name="settings_whatsnew_entry_revert_to_here_title">Atjaunot ziņu</string>
-    <string name="settings_whatsnew_entry_revert_to_here_summary">Paturi nospiestu kādu savu ziņu un izvēlies “Atjaunot ziņu”, lai atgrieztos tajā brīdī un to rediģētu.</string>
+    <string name="settings_whatsnew_entry_revert_to_here_title">Atgriezties šeit</string>
+    <string name="settings_whatsnew_entry_revert_to_here_summary">Paturi nospiestu kādu savu ziņu un izvēlies “Atgriezties šeit”, lai atgrieztos tajā brīdī un to rediģētu.</string>
     <string name="settings_whatsnew_entry_revert_to_here_detail_1">Ziņas teksts, fotoattēli un faili atgriežas ziņas ievades laukā.</string>
     <string name="settings_whatsnew_entry_revert_to_here_detail_2">Ar “Atsaukt” var atjaunot sarunu un tās failu izmaiņas, līdz nosūti jaunu ziņu.</string>
     <string name="settings_whatsnew_entry_revert_to_here_detail_3">Šī iespēja ir pieejama, kamēr aģents nedarbojas.</string>
-    <string name="settings_whatsnew_entry_revert_to_here_example">Paturi nospiestu agrāk nosūtītu ziņu un izvēlies “Atjaunot ziņu”.</string>
+    <string name="settings_whatsnew_entry_revert_to_here_example">Paturi nospiestu agrāk nosūtītu ziņu un izvēlies “Atgriezties šeit”.</string>
 
     <!-- 2026-10-20-13-drag-from-transcript -->
     <string name="settings_whatsnew_entry_drag_from_transcript_title">Vilkšana no sesijas</string>
@@ -891,7 +891,7 @@
     <string name="settings_whatsnew_entry_one_picker_detail_2">Pavelc rindu vai turi to nospiestu, lai pievienotu izlasei vai noņemtu no tās.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_3">Meklēšana ir apakšā. Ieraksti līmeni aiz nosaukuma, piemēram, “opus high”, un nospied ievades taustiņu, lai izvēlētos abus.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_4">Velc rokturi augšup, lai palielinātu sarakstu, vai lejup, lai to aizvērtu.</string>
-    <string name="settings_whatsnew_entry_one_picker_detail_5">Jaunā izvēlne aizstāj veco modeļu paneli, un slēdzis “Vienotā izvēlne” ir noņemts no sadaļas Iestatījumi › Eksperimentāls.</string>
+    <string name="settings_whatsnew_entry_one_picker_detail_5">Jaunais atlasītājs aizstāj veco modeļu paneli, un slēdzis “Vienotais atlasītājs” ir noņemts no sadaļas Iestatījumi › Eksperimentāls.</string>
     <string name="settings_whatsnew_entry_one_picker_example">Pieskaries modelim ziņas laukā, tad pavelc rindu, lai pievienotu izlasei</string>
 
     <!-- 2026-11-08-01-connecting-caption-glass -->

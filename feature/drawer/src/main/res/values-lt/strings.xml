@@ -127,11 +127,11 @@
     <string name="drawer_open_in_new_window">Atidaryti naujame lange</string>
 
     <!-- Session row state for TalkBack -->
-    <string name="drawer_row_pinned_state">Prisegti</string>
+    <string name="drawer_row_pinned_state">Prisegtas</string>
     <string name="drawer_row_muted_state">Nutildytas</string>
     <string name="drawer_row_needs_input_state">Reikia jūsų atsakymo</string>
     <string name="drawer_row_working_state">Darbas</string>
-    <string name="drawer_row_unread_state">Neperskaityti</string>
+    <string name="drawer_row_unread_state">Neperskaitytas</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Nepavyko paprašyti leidimo. Bandykite dar kartą.</string>

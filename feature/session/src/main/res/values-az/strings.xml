@@ -50,7 +50,7 @@
     <string name="session_unread">Oxunmamış</string>
     <string name="session_mute">Səssizə al</string>
     <string name="session_muted">Səssizə alınmış</string>
-    <string name="session_compact">Yığcam</string>
+    <string name="session_compact">Sıxlaşdır</string>
     <string name="session_fork">Fork et</string>
     <string name="session_toggle_on_description">Aktivdir</string>
     <string name="session_toggle_off_description">Söndürülüb</string>

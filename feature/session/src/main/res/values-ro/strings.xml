@@ -24,7 +24,7 @@
     <string name="session_draft_project_choose_label">Alege unde începe sesiunea</string>
     <string name="session_project_choose_folder">Alege folderul…</string>
     <string name="session_project_all_projects">Toate proiectele</string>
-    <string name="session_project_selected_description">Selectată</string>
+    <string name="session_project_selected_description">Selectat</string>
     <string name="session_project_picker_title">Proiect</string>
     <!-- Folder browser -->
     <string name="session_folder_select_description">Selectează folder</string>

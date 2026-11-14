@@ -47,7 +47,7 @@
     <string name="transcript_reply_copy_description">Cavabı kopyala</string>
 
     <!-- Run errors and undo -->
-    <string name="transcript_run_error_copy">Xətanı kopyala</string>
+    <string name="transcript_run_error_copy">Kopyalama xətası</string>
     <string name="transcript_undone_undo_hint">Yeni mesaj göndərənədək bu əməliyyatı geri ala bilərsiniz</string>
     <string name="transcript_undone_title">Buradan etibarən geri alındı</string>
     <string name="transcript_undone_undo_click_label">Yeni mesaj göndərənədək geri alınmış mesaj və faylları bərpa edin</string>

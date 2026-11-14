@@ -127,7 +127,7 @@
     <string name="system_share_loading_description">Учитавање дељених ставки</string>
     <string name="system_share_image_description">Слика</string>
     <string name="system_share_image_position_description">Слика %1$d од %2$d</string>
-    <string name="system_share_search_sessions_description">Претражи сесије</string>
+    <string name="system_share_search_sessions_description">Сесије претраге</string>
     <string name="system_share_new_session_in_project_description">Нова сесија у %1$s</string>
     <string name="system_share_choose_project_description">Изаберите пројекат за сесију</string>
     <string name="system_share_message_placeholder">Порука</string>

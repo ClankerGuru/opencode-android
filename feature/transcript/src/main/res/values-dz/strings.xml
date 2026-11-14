@@ -101,7 +101,7 @@
     <string name="transcript_show_more">མང་སུ་སྟོན།</string>
 
     <!-- Voice messages -->
-    <string name="transcript_voice_call_log_attached">བོད་བརྡའི་དྲན་དེབ་མཉམ་སྦྲགས་འབད་ཡོདཔ།</string>
+    <string name="transcript_voice_call_log_attached">འབོད་བརྡའི་དྲན་དེབ་མཉམ་སྦྲགས་འབད་ཡོདཔ།</string>
     <string name="transcript_voice_copy_full_message">འཕྲིན་དོན་ཆ་ཚང་འདྲ་བཤུས།</string>
     <string name="transcript_voice_message_description">སྐད་ཀྱི་འཕྲིན་དོན།</string>
     <string name="transcript_voice_label">སྐད།</string>

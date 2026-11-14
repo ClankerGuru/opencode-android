@@ -104,7 +104,7 @@
     <string name="drawer_server_timed_out_detail">%1$s tidak memberi respons dalam %2$s s</string>
     <string name="drawer_server_unreachable_detail">Tidak dapat menyambung ke %1$s</string>
     <string name="drawer_server_sign_in_failed_detail">Tidak dapat log masuk ke %1$s</string>
-    <string name="drawer_server_pair_again">Berpasangan semula</string>
+    <string name="drawer_server_pair_again">Gandingkan semula</string>
     <string name="drawer_server_menu_connected">Disambungkan</string>
     <string name="drawer_server_menu_connecting">Menyambung…</string>
     <string name="drawer_server_menu_unreachable">Tidak dapat dicapai</string>

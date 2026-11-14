@@ -46,8 +46,8 @@
     <string name="session_rename_title">Riemërto sesionin</string>
     <string name="session_untitled_title">Sesioni</string>
     <string name="session_pin">Fikso</string>
-    <string name="session_pinned">Të fiksuara</string>
-    <string name="session_unread">Të palexuara</string>
+    <string name="session_pinned">I fiksuar</string>
+    <string name="session_unread">I palexuar</string>
     <string name="session_mute">Hesht</string>
     <string name="session_muted">Pa zë</string>
     <string name="session_compact">Kompakt</string>
@@ -248,7 +248,7 @@
 
     <!-- Session sheet errors -->
     <string name="session_sheet_rename_failed_title">Sesioni nuk u riemërtua dot</string>
-    <string name="session_sheet_compact_failed_title">Sesioni nuk u ngjesh dot</string>
+    <string name="session_sheet_compact_failed_title">Sesioni nuk u kompaktua dot</string>
     <string name="session_sheet_fork_failed_title">Sesioni nuk u degëzua dot</string>
     <string name="session_sheet_save_export_failed">Eksporti nuk u ruajt dot</string>
     <string name="session_sheet_export_failed_title">Sesioni nuk u eksportua dot</string>

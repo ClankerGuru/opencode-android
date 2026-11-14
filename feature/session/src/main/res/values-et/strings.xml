@@ -121,7 +121,7 @@
     <string name="session_unpin">Eemalda kinnitus</string>
     <string name="session_copy_session_id">Kopeeri seansi ID</string>
     <string name="session_mark_as_read">Märgi loetuks</string>
-    <string name="session_mark_as_unread">Märgi lugemata</string>
+    <string name="session_mark_as_unread">Märgi lugematuks</string>
     <string name="session_unmute">Luba märguanded</string>
     <string name="session_menu_export_expanded_description">Laiendatud</string>
     <string name="session_menu_export_collapsed_description">Ahendatud</string>

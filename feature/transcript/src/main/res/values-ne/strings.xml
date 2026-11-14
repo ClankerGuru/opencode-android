@@ -35,7 +35,7 @@
     <string name="transcript_image_open_description">छवि खोल्नुहोस्</string>
     <string name="transcript_image_load_failed">छवि लोड गर्न सकिएन</string>
     <string name="transcript_image_retry_click_label">फेरि प्रयास गर्नुहोस्</string>
-    <string name="transcript_image_open">खुला</string>
+    <string name="transcript_image_open">खोल्नुहोस्</string>
 
     <!-- Math -->
     <string name="transcript_equation_description">समीकरण</string>
@@ -67,8 +67,8 @@
     <string name="transcript_tool_denied">अस्वीकृत</string>
     <string name="transcript_show_less">कम देखाउनुहोस्</string>
     <plurals name="transcript_tool_output_show_all">
-        <item quantity="one">सबै %1$d लाइन देखाउनुहोस्</item>
-        <item quantity="other">सबै %1$d लाइनहरू देखाउनुहोस्</item>
+        <item quantity="one">सबै %1$d रेखा देखाउनुहोस्</item>
+        <item quantity="other">सबै %1$d रेखाहरू देखाउनुहोस्</item>
     </plurals>
     <string name="transcript_question_hide_click_label">प्रश्न लुकाउनुहोस्</string>
     <string name="transcript_question_show_click_label">प्रश्न र तपाईंको उत्तर देखाउनुहोस्</string>

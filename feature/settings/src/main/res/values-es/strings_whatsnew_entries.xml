@@ -10,7 +10,7 @@
     <string name="settings_whatsnew_entry_attachment_menu_hold_title">Adjuntar con +</string>
     <string name="settings_whatsnew_entry_attachment_menu_hold_summary">El menú + se despliega desde el cuadro de mensaje con Cámara, Fotos y Archivos. Mantén pulsado + y desliza para elegir en un solo gesto.</string>
     <string name="settings_whatsnew_entry_attachment_menu_hold_detail_1">Fotos se abre justo encima del cuadro de mensaje; toca las fotos para adjuntarlas.</string>
-    <string name="settings_whatsnew_entry_attachment_menu_hold_detail_2">La cámara tiene botones de lente, zoom con dos dedos, enfoque al tocar y flash.</string>
+    <string name="settings_whatsnew_entry_attachment_menu_hold_detail_2">La cámara tiene botones de lente, pellizcar para ampliar, enfoque al tocar y flash.</string>
     <string name="settings_whatsnew_entry_attachment_menu_hold_example">Mantén pulsado +, desliza hacia arriba hasta Fotos y suelta</string>
 
     <!-- 2026-10-08-01-voice-webrtc-weak-connection -->
@@ -160,7 +160,7 @@
 
     <!-- 2026-10-12-05-run-error-line -->
     <string name="settings_whatsnew_entry_run_error_line_title">Cuando falla una ejecución</string>
-    <string name="settings_whatsnew_entry_run_error_line_summary">Si una ejecución se detiene antes de terminar, explica el motivo con palabras sencillas y ofrece una opción para seguir: Editar, Compactar, Cambiar de modelo o Volver a intentar.</string>
+    <string name="settings_whatsnew_entry_run_error_line_summary">Si una ejecución se detiene antes de terminar, explica el motivo con palabras sencillas y ofrece una opción para seguir: Editar, Compacto, Cambiar de modelo o Volver a intentar.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_1">Editar deshace tu mensaje y lo devuelve al cuadro de mensaje para que lo reformules.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_2">Mantén pulsada la línea para ver el error completo y copiarlo.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_3">Si el agente va a reintentarlo por su cuenta, Trabajando muestra la cuenta atrás hasta el próximo intento.</string>

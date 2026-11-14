@@ -35,7 +35,7 @@
     <!-- Call rows: open link -->
     <string name="voice_open_link_spoken">確認が必要です。%1$s</string>
     <string name="voice_open_link_spoken_with_host">確認が必要です。%1$s %2$s</string>
-    <string name="voice_open_link_open">オープン</string>
+    <string name="voice_open_link_open">開く</string>
 
     <!-- Call rows: audio on the call -->
     <string name="voice_audio_paused">一時停止中</string>

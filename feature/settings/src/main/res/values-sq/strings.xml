@@ -214,5 +214,5 @@
     <string name="settings_pairing_nothing_to_paste_message">Nuk ke lidhje çiftimi në kujtesën e fragmenteve. Kopjo lidhjen që shfaq opencode pair, pastaj provo sërish.</string>
     <string name="settings_pairing_point_camera">Drejto kamerën nga kodi QR</string>
     <string name="settings_pairing_paste_link">Ngjit lidhjen e çiftimit</string>
-    <string name="settings_pairing_computer_hint">Në kompjuterin tënd, hap Cilësimet → Po çiftohet në OpenCode, ose ekzekuto %1$s në një terminal.</string>
+    <string name="settings_pairing_computer_hint">Në kompjuterin tënd, hap Cilësimet → Çiftimi në OpenCode, ose ekzekuto %1$s në një terminal.</string>
 </resources>

@@ -34,7 +34,7 @@
     <string name="transcript_image_open_description">ပုံကို ဖွင့်ပါ</string>
     <string name="transcript_image_load_failed">ပုံကို မဖွင့်နိုင်ပါ</string>
     <string name="transcript_image_retry_click_label">ပြန်ကြိုးစားပါ</string>
-    <string name="transcript_image_open">ဖွင့်ထားသည်</string>
+    <string name="transcript_image_open">ဖွင့်ပါ။</string>
 
     <!-- Math -->
     <string name="transcript_equation_description">ညီမျှခြင်း</string>

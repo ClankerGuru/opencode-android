@@ -575,7 +575,7 @@
 
     <!-- 2026-10-21-13-smoother-session-list -->
     <string name="settings_whatsnew_entry_smoother_session_list_title">სესიების უფრო გლუვი სია</string>
-    <string name="settings_whatsnew_entry_smoother_session_list_summary">გვერდით პანელში სესიების სია მუშაობის დროსაც შეუფერხებლად ი scrollება, ხოლო სესიაზე ხანგრძლივი შეხება მის მენიუს ხსნის ისე, რომ მწკრივის ზომა არ იცვლება.</string>
+    <string name="settings_whatsnew_entry_smoother_session_list_summary">გვერდით პანელში სესიების სია მუშაობის დროსაც შეუფერხებლად გადაიხვევა, ხოლო სესიაზე ხანგრძლივი შეხება მის მენიუს ხსნის ისე, რომ მწკრივის ზომა არ იცვლება.</string>
 
     <!-- 2026-10-22-01-whats-new-actions -->
     <string name="settings_whatsnew_entry_whats_new_actions_title">გახსენით და სცადეთ სიახლეებიდან</string>
@@ -782,7 +782,7 @@
 
     <!-- 2026-11-01-03-open-links-from-calls -->
     <string name="settings_whatsnew_entry_open_links_from_calls_title">ბმულების გახსნა ზარებიდან</string>
-    <string name="settings_whatsnew_entry_open_links_from_calls_summary">ჩართეთ „ბმულების გახსნა ზარებიდან“ აქ: პარამეტრები › ექსპერიმენტული › ზარები. ზარისას აგენტი ბმულს შემოგთავაზებთ, მაგალითად, Uber-ით მგზავრობისთვის: შესაბამის აპში გასახსნელად შეეხეთ „ღიას“, უარისთვის კი — „ახლა არა“.</string>
+    <string name="settings_whatsnew_entry_open_links_from_calls_summary">ჩართეთ „ბმულების გახსნა ზარებიდან“ აქ: პარამეტრები › ექსპერიმენტული › ზარები. ზარისას აგენტი ბმულს შემოგთავაზებთ, მაგალითად, Uber-ით მგზავრობისთვის: შესაბამის აპში გასახსნელად შეეხეთ „გახსნას“, უარისთვის კი — „ახლა არა“.</string>
 
     <!-- 2026-11-02-01-fold-questions -->
     <string name="settings_whatsnew_entry_fold_questions_title">კითხვების ჩაკეცვა</string>
@@ -825,7 +825,7 @@
     <!-- 2026-11-04-01-call-links-and-audio -->
     <string name="settings_whatsnew_entry_call_links_and_audio_title">ბმულები და აუდიო ზარებში</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_summary">ზარებიდან ბმულების გახსნა და ზარებში აუდიო ახლა ყველასთვის ჩართულია, ჩამრთველის გარეშე.</string>
-    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">ზარისას აგენტმა შეიძლება ბმული შემოგთავაზოთ, მაგალითად, Uber-ით მგზავრობისთვის: შეეხეთ „ღია“-ს შესაბამის აპში გასახსნელად ან აირჩიეთ „ახლა არა“.</string>
+    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">ზარისას აგენტმა შეიძლება ბმული შემოგთავაზოთ, მაგალითად, Uber-ით მგზავრობისთვის: შეეხეთ „გახსნა“-ს შესაბამის აპში გასახსნელად ან აირჩიეთ „ახლა არა“.</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_detail_2">აგენტს ზარისას მუსიკის ან კლიპის დაკვრა შეუძლია. ხმა იწევს, როცა რომელიმე თქვენგანი საუბრობს; დაკვრა შეგიძლიათ შეაჩეროთ ან დააპაუზოთ შეტყობინების რედაქტორის ზემოთ.</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_example">ზარისას სთხოვეთ აგენტს მუსიკის დაკვრა</string>
 

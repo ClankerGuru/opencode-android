@@ -19,7 +19,7 @@
     <string name="voice_stage_talking_in">Vestlus seansis</string>
     <string name="voice_stage_minimize_description">Minimeeri</string>
     <string name="voice_mute">Vaigista</string>
-    <string name="voice_unmute">Luba märguanded</string>
+    <string name="voice_unmute">Tühista vaigistus</string>
     <string name="voice_stage_pause">Peata</string>
     <string name="voice_stage_camera">Kaamera</string>
     <string name="voice_transcript_empty">Ütle oma seansile midagi.</string>

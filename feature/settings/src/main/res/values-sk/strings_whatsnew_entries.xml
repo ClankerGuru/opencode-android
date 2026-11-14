@@ -160,7 +160,7 @@
 
     <!-- 2026-10-12-05-run-error-line -->
     <string name="settings_whatsnew_entry_run_error_line_title">Keď spracovanie zlyhá</string>
-    <string name="settings_whatsnew_entry_run_error_line_summary">Ak sa spracovanie predčasne zastaví, zobrazí sa jasný dôvod a možnosť pokračovať: Upraviť, Zhutniť, Prepnúť model alebo Skúsiť znova.</string>
+    <string name="settings_whatsnew_entry_run_error_line_summary">Ak sa spracovanie predčasne zastaví, zobrazí sa jasný dôvod a možnosť pokračovať: Upraviť, Kompaktný, Prepnúť model alebo Skúsiť znova.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_1">Možnosť Upraviť vráti odoslanú správu späť do poľa správy, kde ju môžete preformulovať.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_2">Podržaním riadka zobrazíte celú chybu a môžete ju skopírovať.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_3">Keď agent skúsi pokračovať sám, stav Pracuje odpočítava čas do ďalšieho pokusu.</string>
@@ -825,7 +825,7 @@
     <!-- 2026-11-04-01-call-links-and-audio -->
     <string name="settings_whatsnew_entry_call_links_and_audio_title">Odkazy a zvuk v hovoroch</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_summary">Otváranie odkazov z hovorov a Zvuk v hovoroch sú už zapnuté pre všetkých, bez prepínača.</string>
-    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">Počas hovoru môže agent ponúknuť odkaz, napríklad na jazdu cez Uber. Ťuknutím na Otvorené ho otvoríte v príslušnej aplikácii, alebo vyberte Teraz nie.</string>
+    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">Počas hovoru môže agent ponúknuť odkaz, napríklad na jazdu cez Uber. Ťuknutím na Otvoriť ho otvoríte v príslušnej aplikácii, alebo vyberte Teraz nie.</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_detail_2">Agent môže počas hovoru prehrať hudbu či klip. Keď niekto z vás hovorí, zvuk sa stíši. Nad editorom správ ho môžete pozastaviť alebo zastaviť.</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_example">Počas hovoru požiadajte agenta, aby pustil hudbu</string>
 

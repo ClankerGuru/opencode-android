@@ -44,9 +44,9 @@
     <string name="system_ask_send_failed">OpenCode-a iberip bolmady. %1$s</string>
 
     <!-- Live Updates: voice call -->
-    <string name="system_call_muted">Bildirişleri öçürilen</string>
-    <string name="system_call_unmute">Duýduryşlary aç</string>
-    <string name="system_call_mute">Duýduryşlary öçür</string>
+    <string name="system_call_muted">Sesi öçürilen</string>
+    <string name="system_call_unmute">Sesi aç</string>
+    <string name="system_call_mute">Sesi öçür</string>
     <string name="system_call_end">Jaňy tamamla</string>
     <string name="system_call_connecting">Birikdirilýär…</string>
     <string name="system_call_reconnecting">Täzeden birikdirilýär…</string>

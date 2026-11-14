@@ -7,16 +7,16 @@
     <string name="server_notice_heading_failed">%1$s uğursuz oldu</string>
     <string name="server_notice_heading_interrupted">%1$s kəsildi</string>
     <plurals name="server_notice_count_shell_finished">
-        <item quantity="one">%1$d shell tamamlandı</item>
-        <item quantity="other">%1$d shell tamamlandı</item>
+        <item quantity="one">%1$d Shell tamamlandı</item>
+        <item quantity="other">%1$d Shell tamamlandı</item>
     </plurals>
     <plurals name="server_notice_count_shell_failed">
-        <item quantity="one">%1$d shell uğursuz oldu</item>
-        <item quantity="other">%1$d shell uğursuz oldu</item>
+        <item quantity="one">%1$d Shell uğursuz oldu</item>
+        <item quantity="other">%1$d Shell uğursuz oldu</item>
     </plurals>
     <plurals name="server_notice_count_shell_interrupted">
-        <item quantity="one">%1$d shell kəsildi</item>
-        <item quantity="other">%1$d shell kəsildi</item>
+        <item quantity="one">%1$d Shell kəsildi</item>
+        <item quantity="other">%1$d Shell kəsildi</item>
     </plurals>
     <plurals name="server_notice_count_subagent_finished">
         <item quantity="one">%1$d alt-agent tamamlandı</item>

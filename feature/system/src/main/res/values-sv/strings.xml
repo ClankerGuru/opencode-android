@@ -45,7 +45,7 @@
 
     <!-- Live Updates: voice call -->
     <string name="system_call_muted">Tystad</string>
-    <string name="system_call_unmute">Slå på aviseringar</string>
+    <string name="system_call_unmute">Slå på ljudet</string>
     <string name="system_call_mute">Tysta</string>
     <string name="system_call_end">Avsluta samtal</string>
     <string name="system_call_connecting">Ansluter…</string>

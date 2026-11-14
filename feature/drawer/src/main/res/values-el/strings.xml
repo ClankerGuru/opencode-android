@@ -119,11 +119,11 @@
     <string name="drawer_open_in_new_window">Άνοιγμα σε νέο παράθυρο</string>
 
     <!-- Session row state for TalkBack -->
-    <string name="drawer_row_pinned_state">Καρφιτσωμένες</string>
+    <string name="drawer_row_pinned_state">Καρφιτσωμένη</string>
     <string name="drawer_row_muted_state">Σε σίγαση</string>
     <string name="drawer_row_needs_input_state">Χρειάζεται η συμβολή σας</string>
     <string name="drawer_row_working_state">Εργασία</string>
-    <string name="drawer_row_unread_state">Αδιάβαστες</string>
+    <string name="drawer_row_unread_state">Αδιάβαστη</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Αδυναμία αιτήματος άδειας. Δοκιμάστε ξανά.</string>

@@ -23,7 +23,7 @@
     <string name="system_intent_new_session_description">Започва нова сесия в OpenCode.</string>
     <string name="system_intent_start_voice_call_title">Започване на гласово обаждане</string>
     <string name="system_intent_start_voice_call_description">Започва гласово обаждане с OpenCode в сесия. Ако няма избрана сесия, използва последната прегледана.</string>
-    <string name="system_intent_background_call_title">Гласово обаждане на заден план</string>
+    <string name="system_intent_background_call_title">Започване на гласово обаждане на заден план</string>
     <string name="system_intent_background_call_description">Започва гласово обаждане с OpenCode, без да отваря приложението. Обаждането се показва в лентата на състоянието и на заключения екран.</string>
     <string name="system_delivery_type_name">Изпращане</string>
     <string name="system_delivery_steer">Насочи</string>
@@ -44,7 +44,7 @@
     <string name="system_ask_send_failed">Неуспешно изпращане до OpenCode. %1$s</string>
 
     <!-- Live Updates: voice call -->
-    <string name="system_call_muted">Заглушени</string>
+    <string name="system_call_muted">Заглушено</string>
     <string name="system_call_unmute">Отмяна на заглушаването</string>
     <string name="system_call_mute">Заглушаване</string>
     <string name="system_call_end">Край на обаждането</string>

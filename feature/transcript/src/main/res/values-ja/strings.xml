@@ -34,7 +34,7 @@
     <string name="transcript_image_open_description">画像を開く</string>
     <string name="transcript_image_load_failed">画像を読み込めませんでした</string>
     <string name="transcript_image_retry_click_label">もう一度試す</string>
-    <string name="transcript_image_open">オープン</string>
+    <string name="transcript_image_open">開く</string>
 
     <!-- Math -->
     <string name="transcript_equation_description">数式</string>

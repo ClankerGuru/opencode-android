@@ -3,7 +3,7 @@
     <!-- Agent activity glyph -->
     <string name="session_activity_running_description">Í gangi</string>
     <!-- Background work panel -->
-    <string name="session_background_work_show_label">Sýna undirfulltrúa og skeljar í gangi</string>
+    <string name="session_background_work_show_label">Sýna virka undirfulltrúa og skeljar</string>
     <string name="session_background_work_collapsed_description">Samandregið</string>
     <string name="session_background_work_subagents_title">Undirfulltrúar</string>
     <string name="session_background_work_open_subagent_label">Opna setu undirfulltrúans</string>
@@ -24,7 +24,7 @@
     <string name="session_draft_project_choose_label">Veldu hvar setan hefst</string>
     <string name="session_project_choose_folder">Veldu möppu…</string>
     <string name="session_project_all_projects">Öll verkefni</string>
-    <string name="session_project_selected_description">Valin</string>
+    <string name="session_project_selected_description">Valið</string>
     <string name="session_project_picker_title">Verkefni</string>
     <!-- Folder browser -->
     <string name="session_folder_select_description">Veldu möppu</string>
@@ -46,7 +46,7 @@
     <string name="session_rename_title">Endurnefna setu</string>
     <string name="session_untitled_title">Seta</string>
     <string name="session_pin">Festa</string>
-    <string name="session_pinned">Festar</string>
+    <string name="session_pinned">Fest</string>
     <string name="session_unread">Ólesið</string>
     <string name="session_mute">Þagga</string>
     <string name="session_muted">Þögguð</string>
@@ -60,7 +60,7 @@
     <string name="session_sheet_model">Líkan</string>
     <string name="session_sheet_context">Samhengi</string>
     <string name="session_sheet_unknown_description">Óþekkt</string>
-    <string name="session_sheet_context_tokens">%1$s tókar</string>
+    <string name="session_sheet_context_tokens">%1$s tákn</string>
     <string name="session_sheet_cost">Kostnaður</string>
     <string name="session_always_notify">Alltaf tilkynna</string>
     <string name="session_always_notify_message_phone">Tilkynna í þessum síma þegar svar er tilbúið, jafnvel við skilaboðum sem þú sendir annars staðar.</string>
@@ -143,7 +143,7 @@
     <string name="session_shell_showing_last_output">Sýni síðustu 4 MB</string>
     <string name="session_shell_load_earlier">Hlaða eldra</string>
     <string name="session_shell_output_unavailable_title">Úttak ekki tiltækt</string>
-    <string name="session_shell_output_unavailable_message">Netþjónninn hefur ekki lengur úttak þessarar skeljar.</string>
+    <string name="session_shell_output_unavailable_message">Úttak þessarar skeljar er ekki lengur á netþjóninum.</string>
     <string name="session_shell_no_output_yet_title">Ekkert úttak enn</string>
     <string name="session_shell_no_output_title">Ekkert úttak</string>
     <string name="session_shell_no_output_yet_message">Úttak birtist hér þegar skipunin skrifar það.</string>

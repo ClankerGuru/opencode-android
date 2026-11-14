@@ -127,7 +127,7 @@
     <string name="drawer_open_in_new_window">Odpri v novem oknu</string>
 
     <!-- Session row state for TalkBack -->
-    <string name="drawer_row_pinned_state">Pripete</string>
+    <string name="drawer_row_pinned_state">Pripeta</string>
     <string name="drawer_row_muted_state">Utišano</string>
     <string name="drawer_row_needs_input_state">Potreben je tvoj vnos</string>
     <string name="drawer_row_working_state">Deluje</string>

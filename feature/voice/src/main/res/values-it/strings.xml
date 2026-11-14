@@ -19,7 +19,7 @@
     <string name="voice_stage_talking_in">Conversazione in</string>
     <string name="voice_stage_minimize_description">Riduci</string>
     <string name="voice_mute">Silenzia</string>
-    <string name="voice_unmute">Riattiva notifiche</string>
+    <string name="voice_unmute">Riattiva</string>
     <string name="voice_stage_pause">Pausa</string>
     <string name="voice_stage_camera">Fotocamera</string>
     <string name="voice_transcript_empty">Di\' qualcosa alla tua sessione.</string>

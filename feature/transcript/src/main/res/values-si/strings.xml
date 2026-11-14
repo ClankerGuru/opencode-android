@@ -35,7 +35,7 @@
     <string name="transcript_image_open_description">රූපය විවෘත කරන්න</string>
     <string name="transcript_image_load_failed">රූපය පූරණය කිරීමට නොහැකි විය</string>
     <string name="transcript_image_retry_click_label">නැවත උත්සාහ කරන්න</string>
-    <string name="transcript_image_open">විවෘතයි</string>
+    <string name="transcript_image_open">විවෘත කරන්න</string>
 
     <!-- Math -->
     <string name="transcript_equation_description">සමීකරණය</string>

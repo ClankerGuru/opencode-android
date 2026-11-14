@@ -44,15 +44,15 @@
     <string name="system_ask_send_failed">មិនអាចផ្ញើទៅ OpenCode បានទេ។ %1$s</string>
 
     <!-- Live Updates: voice call -->
-    <string name="system_call_muted">បានបិទការជូនដំណឹង</string>
-    <string name="system_call_unmute">បើកការជូនដំណឹង</string>
-    <string name="system_call_mute">បិទការជូនដំណឹង</string>
+    <string name="system_call_muted">បានបិទសំឡេង</string>
+    <string name="system_call_unmute">បើកសំឡេង</string>
+    <string name="system_call_mute">បិទសំឡេង</string>
     <string name="system_call_end">បញ្ចប់ការហៅ</string>
     <string name="system_call_connecting">កំពុងភ្ជាប់…</string>
     <string name="system_call_reconnecting">កំពុងភ្ជាប់ឡើងវិញ…</string>
     <string name="system_call_ended">ការហៅបានបញ្ចប់</string>
     <string name="system_call_end_title">បញ្ចប់ការហៅ</string>
-    <string name="system_call_toggle_mute_title">បិទ ឬបើកការជូនដំណឹងការហៅ</string>
+    <string name="system_call_toggle_mute_title">បិទ ឬបើកសំឡេងការហៅ</string>
 
     <!-- Live Updates: hands-free recording -->
     <string name="system_recording_active">កំពុងថតសំឡេង</string>

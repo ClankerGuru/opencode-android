@@ -128,7 +128,7 @@
     <!-- Call errors -->
     <string name="voice_error_microphone_denied">Izinkan akses mikrofon di pengaturan untuk berbicara dengan sesi Anda.</string>
     <string name="voice_error_audio_format_unavailable">Format perangkat keras audio tidak didukung.</string>
-    <string name="voice_error_audio_engine_rejected">Gagal memulai audio panggilan. Coba lagi sebentar.</string>
+    <string name="voice_error_audio_engine_rejected">Gagal memulai audio panggilan. Coba lagi beberapa saat lagi.</string>
     <string name="voice_error_server_unsupported">Server ini memerlukan OpenCode versi lebih baru untuk panggilan suara</string>
     <string name="voice_error_invalid_server_url">Gagal memulai suara: Masukkan URL server HTTP atau HTTPS yang valid.</string>
     <string name="voice_error_invalid_response">Gagal memulai suara: Server mengirim respons yang tidak valid.</string>

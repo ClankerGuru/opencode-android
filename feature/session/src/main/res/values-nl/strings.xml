@@ -63,8 +63,8 @@
     <string name="session_sheet_context_tokens">%1$s tokens</string>
     <string name="session_sheet_cost">Kosten</string>
     <string name="session_always_notify">Altijd melden</string>
-    <string name="session_always_notify_message_phone">Meld op deze telefoon wanneer een antwoord klaar is, ook als je het bericht niet vanaf hier hebt verstuurd.</string>
-    <string name="session_always_notify_message_tablet">Meld op deze tablet wanneer een antwoord klaar is, ook als je het bericht niet vanaf hier hebt verstuurd.</string>
+    <string name="session_always_notify_message_phone">Stuur een melding naar deze telefoon wanneer een antwoord klaar is, ook als je het bericht niet vanaf hier hebt verstuurd.</string>
+    <string name="session_always_notify_message_tablet">Stuur een melding naar deze tablet wanneer een antwoord klaar is, ook als je het bericht niet vanaf hier hebt verstuurd.</string>
     <string name="session_delete_session">Sessie verwijderen</string>
     <string name="session_rename_placeholder">Titel</string>
     <string name="session_auto_rename">Automatisch hernoemen</string>
@@ -189,7 +189,7 @@
     <!-- Background work panel -->
     <plurals name="session_background_work_subagent_count">
         <item quantity="one">%1$d subagent</item>
-        <item quantity="other">%1$d subagents</item>
+        <item quantity="other">%1$d subagenten</item>
     </plurals>
     <plurals name="session_background_work_shell_count">
         <item quantity="one">%1$d shell</item>

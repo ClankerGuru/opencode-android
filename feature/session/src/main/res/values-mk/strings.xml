@@ -24,7 +24,7 @@
     <string name="session_draft_project_choose_label">Избери каде да започне сесијата</string>
     <string name="session_project_choose_folder">Изберете папка…</string>
     <string name="session_project_all_projects">Сите проекти</string>
-    <string name="session_project_selected_description">Избрана</string>
+    <string name="session_project_selected_description">Избрано</string>
     <string name="session_project_picker_title">Проект</string>
     <!-- Folder browser -->
     <string name="session_folder_select_description">Изберете папка</string>
@@ -46,8 +46,8 @@
     <string name="session_rename_title">Преименувај сесија</string>
     <string name="session_untitled_title">Сесија</string>
     <string name="session_pin">Закачи</string>
-    <string name="session_pinned">Закачени</string>
-    <string name="session_unread">Непрочитани</string>
+    <string name="session_pinned">Закачена</string>
+    <string name="session_unread">Непрочитана</string>
     <string name="session_mute">Исклучи известувања</string>
     <string name="session_muted">Без известувања</string>
     <string name="session_compact">Компактен</string>
@@ -143,7 +143,7 @@
     <string name="session_shell_showing_last_output">Се прикажуваат последните 4 MB</string>
     <string name="session_shell_load_earlier">Вчитај претходен излез</string>
     <string name="session_shell_output_unavailable_title">Излезот е недостапен</string>
-    <string name="session_shell_output_unavailable_message">Серверот веќе го нема излезот од оваа школка.</string>
+    <string name="session_shell_output_unavailable_message">Серверот повеќе го нема излезот од оваа школка.</string>
     <string name="session_shell_no_output_yet_title">Сè уште нема излез</string>
     <string name="session_shell_no_output_title">Нема излез</string>
     <string name="session_shell_no_output_yet_message">Излезот се прикажува тука додека наредбата го испишува.</string>

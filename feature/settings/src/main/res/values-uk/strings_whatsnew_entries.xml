@@ -4,7 +4,7 @@
 
     <!-- 2026-10-06-01-voice-messages -->
     <string name="settings_whatsnew_entry_voice_messages_title">Голосові повідомлення</string>
-    <string name="settings_whatsnew_entry_voice_messages_summary">Запити, які Голос надсилає в сесію від вашого імені, позначаються звуковою хвилею.</string>
+    <string name="settings_whatsnew_entry_voice_messages_summary">Запити, які Голос надсилає в сесію від вашого імені, відображаються як голосові повідомлення, позначені звуковою хвилею.</string>
 
     <!-- 2026-10-07-01-attachment-menu-hold -->
     <string name="settings_whatsnew_entry_attachment_menu_hold_title">Вкладення через +</string>
@@ -160,7 +160,7 @@
 
     <!-- 2026-10-12-05-run-error-line -->
     <string name="settings_whatsnew_entry_run_error_line_title">Якщо виконання не вдалося</string>
-    <string name="settings_whatsnew_entry_run_error_line_summary">Якщо виконання зупиниться завчасно, ви побачите просте пояснення й наступну дію: «Редагувати», «Стиснути», «Змінити модель» або «Спробувати ще раз».</string>
+    <string name="settings_whatsnew_entry_run_error_line_summary">Якщо виконання зупиниться завчасно, ви побачите просте пояснення й наступну дію: «Редагувати», «Компактний», «Змінити модель» або «Спробувати ще раз».</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_1">Кнопка «Редагувати» скасовує ваше повідомлення й повертає його в поле введення, щоб змінити текст.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_2">Утримуйте рядок, щоб побачити повний текст помилки й скопіювати його.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_3">Якщо агент повторить спробу автоматично, індикатор «Працює» відлічує час до неї.</string>
@@ -232,7 +232,7 @@
     <string name="settings_whatsnew_entry_inline_tool_rows_summary">Групи інструментів і запитання з відповідями розгортаються в смугу на всю ширину, як код, а послідовні читання об’єднуються в один рядок.</string>
     <string name="settings_whatsnew_entry_inline_tool_rows_detail_1">Згорнуті групи мають напис «Використано N інструментів», а невдалі виклики інструментів позначено червоним.</string>
     <string name="settings_whatsnew_entry_inline_tool_rows_detail_2">Рядки «Виконання» показують назви інструментів, які викликав скрипт, а рядки «Навичка» — назву навички.</string>
-    <string name="settings_whatsnew_entry_inline_tool_rows_detail_3">Запитання з відповідями показують текст і всі запропоновані варіанти, а ваш вибір позначено галочкою.</string>
+    <string name="settings_whatsnew_entry_inline_tool_rows_detail_3">Запитання з відповідями показують запит і всі запропоновані варіанти, а ваш вибір позначено галочкою.</string>
     <string name="settings_whatsnew_entry_inline_tool_rows_example">Натисніть рядок «Використано N інструментів» у сесії, щоб розгорнути його</string>
 
     <!-- 2026-10-13-04-mac-motion-playgrounds -->
@@ -252,7 +252,7 @@
 
     <!-- 2026-10-14-01-settings-grouped-by-purpose -->
     <string name="settings_whatsnew_entry_settings_grouped_by_purpose_title">Зрозуміліші налаштування</string>
-    <string name="settings_whatsnew_entry_settings_grouped_by_purpose_summary">Експериментальні функції й інструменти розробника шукайте в «Налаштування» → «Експериментальні», повідомлення застосунку — у «Сповіщеннях», а історію дзвінків — у розділі «Голос».</string>
+    <string name="settings_whatsnew_entry_settings_grouped_by_purpose_summary">Експериментальні функції й інструменти розробника шукайте в «Налаштування» → «Експериментальний», повідомлення застосунку — у «Сповіщеннях», а історію дзвінків — у розділі «Голос».</string>
 
     <!-- 2026-10-14-02-send-ats-recovery -->
     <string name="settings_whatsnew_entry_send_ats_recovery_title">Надійне надсилання</string>
@@ -317,7 +317,7 @@
 
     <!-- 2026-10-16-03-project-pick-haptic -->
     <string name="settings_whatsnew_entry_project_pick_haptic_title">Вібровідгук при виборі проєкту</string>
-    <string name="settings_whatsnew_entry_project_pick_haptic_summary">Вибір іншого проєкту для нової сесії — над полем повідомлення або в розділі «Усі проєкти» — супроводжується легким вібровідгуком.</string>
+    <string name="settings_whatsnew_entry_project_pick_haptic_summary">Вибір іншого проєкту для нової сесії — над полем повідомлення або в розділі «Всі проекти» — супроводжується легким вібровідгуком.</string>
 
     <!-- 2026-10-16-04-fork-opens-copy -->
     <string name="settings_whatsnew_entry_fork_opens_copy_title">Відгалуження відкриває копію</string>
@@ -406,11 +406,11 @@
 
     <!-- 2026-10-19-06-experimental-groups -->
     <string name="settings_whatsnew_entry_experimental_groups_title">Експерименти за групами</string>
-    <string name="settings_whatsnew_entry_experimental_groups_summary">Експерименти в розділі «Налаштування → Експериментальні» згруповано, а вигляд дзвінків задається одним параметром «Стиль дзвінка».</string>
+    <string name="settings_whatsnew_entry_experimental_groups_summary">Експерименти в розділі «Налаштування → Експериментальний» згруповано, а вигляд дзвінків задається одним параметром «Стиль дзвінка».</string>
 
     <!-- 2026-10-19-07-model-picker-standard-sheet -->
     <string name="settings_whatsnew_entry_model_picker_standard_sheet_title">Вибір моделі у стандартній панелі</string>
-    <string name="settings_whatsnew_entry_model_picker_standard_sheet_summary">Якщо ввімкнено експеримент «Новий вибір моделі», натискання моделі в полі повідомлення відкриває стандартну панель, де кожна модель має власне меню рівня міркування. Попередній варіант тепер називається «Власна панель вибору моделі» в розділі «Налаштування › Експериментальні».</string>
+    <string name="settings_whatsnew_entry_model_picker_standard_sheet_summary">Якщо ввімкнено експеримент «Новий вибір моделі», натискання моделі в полі повідомлення відкриває стандартну панель, де кожна модель має власне меню рівня міркування. Попередній варіант тепер називається «Власна панель вибору моделі» в розділі «Налаштування › Експериментальний».</string>
 
     <!-- 2026-10-19-08-problem-reports-reach-session -->
     <string name="settings_whatsnew_entry_problem_reports_reach_session_title">Звіти надходять у сесію</string>
@@ -465,7 +465,7 @@
 
     <!-- 2026-10-20-08-inline-image-links -->
     <string name="settings_whatsnew_entry_inline_image_links_title">Перегляд зображень за посиланнями</string>
-    <string name="settings_whatsnew_entry_inline_image_links_summary">Увімкніть «Перегляд зображень за посиланнями» в розділі «Налаштування › Експериментальні › Розшифровка», щоб бачити зображення з посилань у відповідях. Торкніться мініатюри, щоб відкрити її на весь екран і збільшити.</string>
+    <string name="settings_whatsnew_entry_inline_image_links_summary">Увімкніть «Перегляд зображень за посиланнями» в розділі «Налаштування › Експериментальний › Розшифровка», щоб бачити зображення з посилань у відповідях. Торкніться мініатюри, щоб відкрити її на весь екран і збільшити.</string>
 
     <!-- 2026-10-20-09-smooth-link-preview-arrival -->
     <string name="settings_whatsnew_entry_smooth_link_preview_arrival_title">Плавніший перегляд посилань</string>
@@ -699,7 +699,7 @@
     <string name="settings_whatsnew_entry_steadier_round_trip_summary">Число мс на картці підключення тепер показує середнє за кілька останніх перевірок, тож одна повільна відповідь лише трохи змінює його, а не спричиняє стрибок.</string>
 
     <!-- 2026-10-27-02-drawer-drag-follows-finger -->
-    <string name="settings_whatsnew_entry_drawer_drag_follows_finger_title">Бічна панель слідує за пальцем</string>
+    <string name="settings_whatsnew_entry_drawer_drag_follows_finger_title">Перетягування в бічній панелі рухається за пальцем</string>
     <string name="settings_whatsnew_entry_drawer_drag_follows_finger_summary">Сесія, яку ви перетягуєте в бічній панелі, тепер залишається під пальцем, рухається поверх заголовка, прокручує список біля країв і пружно стає на місце, коли ви її відпускаєте.</string>
 
     <!-- 2026-10-27-03-inbox-sidebar-experiment -->
@@ -891,7 +891,7 @@
     <string name="settings_whatsnew_entry_one_picker_detail_2">Проведіть по рядку або натисніть і утримуйте його, щоб додати модель до обраного чи вилучити з нього.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_3">Пошук унизу. Введіть рівень після назви, наприклад «opus high», і натисніть Return, щоб вибрати модель і рівень одразу.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_4">Потягніть маркер угору, щоб збільшити список, або вниз, щоб закрити його.</string>
-    <string name="settings_whatsnew_entry_one_picker_detail_5">Новий список вибору замінює стару панель «Модель», а перемикача «Єдиний список моделей» більше немає в розділі «Налаштування › Експериментальні функції».</string>
+    <string name="settings_whatsnew_entry_one_picker_detail_5">Новий список вибору замінює стару панель «Модель», а перемикача «Єдиний список вибору» більше немає в розділі «Налаштування › Експериментальний».</string>
     <string name="settings_whatsnew_entry_one_picker_example">Торкніться моделі в полі повідомлення, а потім проведіть по рядку, щоб додати її до обраного</string>
 
     <!-- 2026-11-08-01-connecting-caption-glass -->

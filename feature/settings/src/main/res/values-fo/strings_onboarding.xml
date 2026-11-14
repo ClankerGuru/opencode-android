@@ -36,7 +36,7 @@
     <string name="settings_onboarding_desktop_composer_placeholder">Spyr um hvat sum helst, / fyri skipanir, @ fyri samanhang…</string>
     <string name="settings_onboarding_desktop_composer_follow_up_placeholder">Legg afturat, / fyri skipanir, @ fyri samanhang…</string>
     <string name="settings_onboarding_desktop_back_to_app">Aftur til forritið</string>
-    <string name="settings_onboarding_desktop_pairing_title">Parar</string>
+    <string name="settings_onboarding_desktop_pairing_title">Paring</string>
     <string name="settings_onboarding_desktop_pairing_subtitle">Knýt annað tól at OpenCode-ambætaranum á hesi telduni.</string>
     <string name="settings_onboarding_desktop_pair_device">Para eitt tól</string>
     <string name="settings_onboarding_desktop_pair_device_message">Skanna kotuna við OpenCode-forritinum á einum øðrum tóli, ella avrita leinkjuna.</string>
@@ -61,7 +61,7 @@
     <string name="settings_onboarding_headline">OpenCode\nallastaðni.</string>
     <string name="settings_onboarding_headline_spoken">OpenCode allastaðni.</string>
     <string name="settings_onboarding_subhead">Byrja uppgávur, svara spurningum og kanna broytingar, tá tú ikki ert við skriviborðið.</string>
-    <string name="settings_onboarding_instruction">Opna OpenCode á telduni og far til Innstillingar → Parar.</string>
+    <string name="settings_onboarding_instruction">Opna OpenCode á telduni og far til Innstillingar → Paring.</string>
 
     <!-- Onboarding: WelcomeStory, the mock conversation (the reply's backticks mark code) -->
     <string name="settings_onboarding_story_prompt">Legg ein knøtt at taka niður til Android afturat og vís mær</string>

@@ -83,8 +83,8 @@
     <string name="server_connection_route_internet">Internet</string>
 
     <!-- OpenCodePairingLink.kt: each one completes the sentence “Couldn’t use “<address>” from this pairing code: it …” -->
-    <string name="server_pairing_origin_not_web_address">inte är en webbadress</string>
-    <string name="server_pairing_origin_bad_scheme">inte börjar med http:// eller https://</string>
+    <string name="server_pairing_origin_not_web_address">är inte en webbadress</string>
+    <string name="server_pairing_origin_bad_scheme">börjar inte med http:// eller https://</string>
     <string name="server_pairing_origin_no_host">saknar värdnamn</string>
     <string name="server_pairing_origin_credentials">innehåller ett användarnamn eller lösenord</string>
     <string name="server_pairing_origin_query">innehåller en frågesträng eller ett fragment</string>

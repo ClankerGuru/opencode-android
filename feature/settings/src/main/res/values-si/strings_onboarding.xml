@@ -36,7 +36,7 @@
     <string name="settings_onboarding_desktop_composer_placeholder">ඕනෑම දෙයක් අසන්න, විධාන සඳහා /, සන්දර්භය සඳහා @…</string>
     <string name="settings_onboarding_desktop_composer_follow_up_placeholder">වැඩිදුර උපදෙස් දෙන්න, විධාන සඳහා /, සන්දර්භය සඳහා @…</string>
     <string name="settings_onboarding_desktop_back_to_app">යෙදුමට ආපසු යන්න</string>
-    <string name="settings_onboarding_desktop_pairing_title">යුගල කරමින්</string>
+    <string name="settings_onboarding_desktop_pairing_title">යුගල කිරීම</string>
     <string name="settings_onboarding_desktop_pairing_subtitle">මෙම පරිගණකයේ OpenCode සේවාදායකයට වෙනත් උපාංගයක් සම්බන්ධ කරන්න.</string>
     <string name="settings_onboarding_desktop_pair_device">උපාංගයක් යුගල කරන්න</string>
     <string name="settings_onboarding_desktop_pair_device_message">වෙනත් උපාංගයක OpenCode යෙදුමෙන් කේතය පරිලෝකනය කරන්න, නැතිනම් සබැඳිය පිටපත් කරන්න.</string>
@@ -61,7 +61,7 @@
     <string name="settings_onboarding_headline">OpenCode\nඕනෑම තැනක.</string>
     <string name="settings_onboarding_headline_spoken">OpenCode ඕනෑම තැනක.</string>
     <string name="settings_onboarding_subhead">ඔබේ මේසයෙන් බැහැරව සිටියත් කාර්යයන් අරඹන්න, ප්‍රශ්නවලට පිළිතුරු දෙන්න, වෙනස්කම් සමාලෝචනය කරන්න.</string>
-    <string name="settings_onboarding_instruction">ඔබේ පරිගණකයේ OpenCode විවෘත කර සැකසීම් → යුගල කරමින් වෙත යන්න.</string>
+    <string name="settings_onboarding_instruction">ඔබේ පරිගණකයේ OpenCode විවෘත කර සැකසීම් → යුගල කිරීම වෙත යන්න.</string>
 
     <!-- Onboarding: WelcomeStory, the mock conversation (the reply's backticks mark code) -->
     <string name="settings_onboarding_story_prompt">Android සඳහා බාගැනීමේ බොත්තමක් එකතු කර මට පෙන්වන්න</string>

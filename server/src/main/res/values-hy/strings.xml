@@ -7,16 +7,16 @@
     <string name="server_notice_heading_failed">%1$s ձախողվել է</string>
     <string name="server_notice_heading_interrupted">%1$s ընդհատվել է</string>
     <plurals name="server_notice_count_shell_finished">
-        <item quantity="one">Ավարտվել է %1$d Shell</item>
-        <item quantity="other">Ավարտվել է %1$d Shell</item>
+        <item quantity="one">%1$d Shell ավարտվել է</item>
+        <item quantity="other">%1$d Shell ավարտվել է</item>
     </plurals>
     <plurals name="server_notice_count_shell_failed">
-        <item quantity="one">Ձախողվել է %1$d Shell</item>
-        <item quantity="other">Ձախողվել է %1$d Shell</item>
+        <item quantity="one">%1$d Shell ձախողվել է</item>
+        <item quantity="other">%1$d Shell ձախողվել է</item>
     </plurals>
     <plurals name="server_notice_count_shell_interrupted">
-        <item quantity="one">Ընդհատվել է %1$d Shell</item>
-        <item quantity="other">Ընդհատվել է %1$d Shell</item>
+        <item quantity="one">%1$d Shell ընդհատվել է</item>
+        <item quantity="other">%1$d Shell ընդհատվել է</item>
     </plurals>
     <plurals name="server_notice_count_subagent_finished">
         <item quantity="one">%1$d ենթագործակալ ավարտել է</item>
@@ -52,7 +52,7 @@
     <string name="server_run_error_tool_execution">Գործիքը ձախողվել է, և աշխատանքը դադարել է</string>
     <string name="server_run_error_other">Աշխատանքը դադարել է սխալի պատճառով</string>
     <string name="server_run_retry_in_seconds">%1$s · կրկին փորձում է %2$d վ անց</string>
-    <string name="server_run_retry_now">%1$s · կրկին փորձում է</string>
+    <string name="server_run_retry_now">%1$s · կրկին փորձում</string>
 
     <!-- OpenCodeClientError.kt -->
     <string name="server_error_unreachable">Չհաջողվեց կապվել OpenCode սերվերին</string>

@@ -3,7 +3,7 @@
     <!-- Agent activity glyph -->
     <string name="session_activity_running_description">실행 중</string>
     <!-- Background work panel -->
-    <string name="session_background_work_show_label">실행 중인 하위 에이전트와 셸 보기</string>
+    <string name="session_background_work_show_label">실행 중인 하위 에이전트와 셸 표시</string>
     <string name="session_background_work_collapsed_description">접힘</string>
     <string name="session_background_work_subagents_title">하위 에이전트</string>
     <string name="session_background_work_open_subagent_label">하위 에이전트의 세션 열기</string>

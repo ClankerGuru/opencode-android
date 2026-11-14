@@ -45,7 +45,7 @@
 
     <!-- Live Updates: voice call -->
     <string name="system_call_muted">Լռեցված</string>
-    <string name="system_call_unmute">Միացնել ծանուցումները</string>
+    <string name="system_call_unmute">Միացնել ձայնը</string>
     <string name="system_call_mute">Լռեցնել</string>
     <string name="system_call_end">Ավարտել զանգը</string>
     <string name="system_call_connecting">Կապ է հաստատվում…</string>

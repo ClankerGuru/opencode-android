@@ -8,7 +8,7 @@
     <string name="widget_new_session_description">Opnar nýja OpenCode-setu.</string>
 
     <!-- Shared across screens -->
-    <string name="system_selected_description">Valin</string>
+    <string name="system_selected_description">Valið</string>
     <string name="system_last_viewed_session">Síðast skoðuð seta</string>
 
     <!-- Quick actions (launcher shortcuts) -->
@@ -44,7 +44,7 @@
     <string name="system_ask_send_failed">Ekki tókst að senda til OpenCode. %1$s</string>
 
     <!-- Live Updates: voice call -->
-    <string name="system_call_muted">Þögguð</string>
+    <string name="system_call_muted">Þaggað</string>
     <string name="system_call_unmute">Hætta að þagga</string>
     <string name="system_call_mute">Þagga</string>
     <string name="system_call_end">Ljúka símtali</string>
@@ -79,8 +79,8 @@
     <!-- Notification channels -->
     <string name="system_channel_voice_calls">Raddsímtöl</string>
     <string name="system_channel_recording">Upptaka</string>
-    <string name="system_channel_session_runs">Keyrslur seta</string>
-    <string name="system_channel_session_updates">Uppfærslur seta</string>
+    <string name="system_channel_session_runs">Keyrslur setna</string>
+    <string name="system_channel_session_updates">Uppfærslur setna</string>
     <string name="system_channel_shared_items">Deilt efni</string>
 
     <!-- Share sheet: notifications -->

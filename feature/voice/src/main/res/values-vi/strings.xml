@@ -18,8 +18,8 @@
     <!-- Floating call stage -->
     <string name="voice_stage_talking_in">Đang trò chuyện trong</string>
     <string name="voice_stage_minimize_description">Thu nhỏ</string>
-    <string name="voice_mute">Tắt thông báo</string>
-    <string name="voice_unmute">Bật thông báo</string>
+    <string name="voice_mute">Tắt tiếng</string>
+    <string name="voice_unmute">Bật tiếng</string>
     <string name="voice_stage_pause">Tạm dừng</string>
     <string name="voice_stage_camera">Camera</string>
     <string name="voice_transcript_empty">Hãy nói gì đó với phiên của bạn.</string>
@@ -75,7 +75,7 @@
     <string name="voice_status_needs_input">Cần bạn phản hồi</string>
     <string name="voice_status_working">Đang làm việc</string>
     <string name="voice_status_speaking">Đang nói</string>
-    <string name="voice_status_muted">Đã tắt thông báo</string>
+    <string name="voice_status_muted">Đã tắt tiếng</string>
     <string name="voice_status_listening">Đang nghe</string>
     <string name="voice_status_ending">Đang kết thúc…</string>
     <string name="voice_status_ended">Đã kết thúc</string>

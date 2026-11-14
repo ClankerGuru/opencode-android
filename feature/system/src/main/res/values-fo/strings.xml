@@ -44,15 +44,15 @@
     <string name="system_ask_send_failed">Kundi ikki senda til OpenCode. %1$s</string>
 
     <!-- Live Updates: voice call -->
-    <string name="system_call_muted">Fráboðanir sløktar</string>
-    <string name="system_call_unmute">Tendra fráboðanir</string>
-    <string name="system_call_mute">Sløkk fráboðanir</string>
+    <string name="system_call_muted">Doyvt</string>
+    <string name="system_call_unmute">Ódoyv</string>
+    <string name="system_call_mute">Doyv</string>
     <string name="system_call_end">Enda samrøðu</string>
     <string name="system_call_connecting">Fær samband…</string>
     <string name="system_call_reconnecting">Fær samband aftur…</string>
     <string name="system_call_ended">Samrøðan er endað</string>
     <string name="system_call_end_title">Enda samrøðu</string>
-    <string name="system_call_toggle_mute_title">Sløkk ella tendra fráboðanir fyri samrøðuna</string>
+    <string name="system_call_toggle_mute_title">Doyv ella ódoyv samrøðu</string>
 
     <!-- Live Updates: hands-free recording -->
     <string name="system_recording_active">Tekur upp</string>

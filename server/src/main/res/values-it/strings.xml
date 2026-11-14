@@ -38,7 +38,7 @@
     </plurals>
 
     <!-- RunNotices.kt: a run that ended early -->
-    <string name="server_run_error_action_compact">Compatta</string>
+    <string name="server_run_error_action_compact">Compatto</string>
     <string name="server_run_error_action_switch_model">Cambia modello</string>
     <string name="server_run_error_aborted">Interrotto</string>
     <string name="server_run_error_permission_rejected">Interrotto dopo una richiesta negata</string>

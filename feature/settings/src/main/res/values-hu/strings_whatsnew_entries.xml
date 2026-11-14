@@ -370,7 +370,7 @@
 
     <!-- 2026-10-18-02-return-key-sends -->
     <string name="settings_whatsnew_entry_return_key_sends_title">A Return billentyű beállítása</string>
-    <string name="settings_whatsnew_entry_return_key_sends_summary">Kapcsolja ki a Küldés Return billentyűvel beállítást, ha a Return billentyűvel új sort szeretne kezdeni, vagy használja a Command-Return és Shift-Return kombinációkat fizikai billentyűzeten.</string>
+    <string name="settings_whatsnew_entry_return_key_sends_summary">Kapcsolja ki a Küldés Return billentyűvel beállítást a Beállításokban, ha a Return billentyűvel új sort szeretne kezdeni, vagy használja a Command-Return és Shift-Return kombinációkat fizikai billentyűzeten.</string>
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Válaszok idézése</string>
@@ -699,7 +699,7 @@
     <string name="settings_whatsnew_entry_steadier_round_trip_summary">A kapcsolatkártyán látható ms-érték most az utóbbi néhány mérés mozgóátlaga, így egyetlen lassú válasz csak kicsit módosítja, nem ugrasztja meg.</string>
 
     <!-- 2026-10-27-02-drawer-drag-follows-finger -->
-    <string name="settings_whatsnew_entry_drawer_drag_follows_finger_title">Az oldalsávban húzáskor követi az ujját</string>
+    <string name="settings_whatsnew_entry_drawer_drag_follows_finger_title">Az oldalsávban a húzás követi az ujját</string>
     <string name="settings_whatsnew_entry_drawer_drag_follows_finger_summary">Az oldalsávban húzott munkamenet most végig az ujja alatt marad, a fejléc fölött mozog, a lista szélén görget, elengedéskor pedig a helyére ugrik.</string>
 
     <!-- 2026-10-27-03-inbox-sidebar-experiment -->
@@ -856,7 +856,7 @@
     <!-- 2026-11-05-04-reply-text-selection -->
     <string name="settings_whatsnew_entry_reply_text_selection_title">Kijelölés a teljes válaszban</string>
     <string name="settings_whatsnew_entry_reply_text_selection_summary">Tartson nyomva egy szót a válaszban, vagy koppintson rá duplán, majd húzza a kijelölőfogantyúkat bekezdéseken, listákon, kódon és táblázatokon át.</string>
-    <string name="settings_whatsnew_entry_reply_text_selection_detail_1">Tartsa a fogantyút közvetlenül a fejléc alatt vagy az üzenetszerkesztő felett: a válasz görgetni kezd, a szélhez közelebb egyre gyorsabban.</string>
+    <string name="settings_whatsnew_entry_reply_text_selection_detail_1">Tartsa a fogantyút közvetlenül a fejléc alatt vagy az üzenetszerkesztő felett: a válasz görgetődni kezd, a szélhez közelebb egyre gyorsabban.</string>
     <string name="settings_whatsnew_entry_reply_text_selection_detail_2">A Másolás megőrzi a listajeleket és számozást, valamint a táblázatok sorait és oszlopait. Az Idézés a kijelölést az üzenetszerkesztőbe teszi, a kódblokkok jelölését is megtartva.</string>
     <string name="settings_whatsnew_entry_reply_text_selection_example">Tartson nyomva egy szót egy hosszú válasz elején, majd húzza a kijelölés végét az üzenetszerkesztőig, és tartsa ott</string>
 
@@ -891,7 +891,7 @@
     <string name="settings_whatsnew_entry_one_picker_detail_2">Csúsztassa el vagy tartsa nyomva a sort a kedvencekhez adáshoz vagy az eltávolításhoz.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_3">A kereső alul található. Ha a név után szintet is ír, például „opus high”, az Enter megnyomásával mindkettőt kiválasztja.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_4">Húzza felfelé a fogantyút a lista növeléséhez, vagy lefelé a bezárásához.</string>
-    <string name="settings_whatsnew_entry_one_picker_detail_5">Az új választó felváltja a régi Modell panelt, a One Picker kapcsoló pedig kikerült a Beállítások › Kísérleti menüből.</string>
+    <string name="settings_whatsnew_entry_one_picker_detail_5">Az új választó felváltja a régi Modell panelt, az Egységes választó kapcsoló pedig kikerült a Beállítások › Kísérleti menüből.</string>
     <string name="settings_whatsnew_entry_one_picker_example">Koppintson a modellre az üzenetmezőben, majd csúsztasson el egy sort a kedvencekhez adáshoz</string>
 
     <!-- 2026-11-08-01-connecting-caption-glass -->

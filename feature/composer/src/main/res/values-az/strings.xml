@@ -18,8 +18,8 @@
 
     <!-- Plus button -->
     <string name="composer_plus_cancel_dictation_description">Diktəni ləğv et</string>
-    <string name="composer_plus_adding_attachment_description">Əlavə artırılır</string>
-    <string name="composer_plus_add_attachment_description">Əlavə artır</string>
+    <string name="composer_plus_adding_attachment_description">Əlavə əlavə edilir</string>
+    <string name="composer_plus_add_attachment_description">Əlavə əlavə et</string>
 
     <!-- Autocomplete -->
     <string name="composer_autocomplete_suggestions_description">Avtomatik tamamlama təklifləri</string>

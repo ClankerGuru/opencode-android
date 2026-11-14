@@ -18,8 +18,8 @@
     <!-- Floating call stage -->
     <string name="voice_stage_talking_in">Tosar í</string>
     <string name="voice_stage_minimize_description">Minka</string>
-    <string name="voice_mute">Sløkk fráboðanir</string>
-    <string name="voice_unmute">Tendra fráboðanir</string>
+    <string name="voice_mute">Doyv</string>
+    <string name="voice_unmute">Tendra</string>
     <string name="voice_stage_pause">Steðga fyribils</string>
     <string name="voice_stage_camera">Myndatól</string>
     <string name="voice_transcript_empty">Sig okkurt við tína setu.</string>
@@ -58,7 +58,7 @@
     <string name="voice_replay_pause">Steðga fyribils</string>
     <string name="voice_replay_play">Spæl</string>
     <string name="voice_replay_position_description">Stað í upptøkuni</string>
-    <string name="voice_replay_speed_description">Spæli ferð</string>
+    <string name="voice_replay_speed_description">Spæliferð</string>
     <string name="voice_replay_empty">Trýst á spæl fyri at hoyra samrøðuna aftur.</string>
 
     <!-- Call notification -->
@@ -75,7 +75,7 @@
     <string name="voice_status_needs_input">Bíðar eftir tær</string>
     <string name="voice_status_working">Arbeiða</string>
     <string name="voice_status_speaking">Tosar</string>
-    <string name="voice_status_muted">Fráboðanir sløktar</string>
+    <string name="voice_status_muted">Doyvt</string>
     <string name="voice_status_listening">Lurtar</string>
     <string name="voice_status_ending">Endar…</string>
     <string name="voice_status_ended">Endað</string>

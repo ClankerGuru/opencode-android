@@ -7,7 +7,7 @@
     <string name="settings_onboarding_other_ways_terminal_header">Futtassa ezt egy terminálban</string>
     <string name="settings_onboarding_other_ways_terminal_footer">Beolvasható kódot vagy beilleszthető linket ad, és bármilyen hálózatról működik.</string>
     <string name="settings_onboarding_other_ways_paste_link">Párosítási link beillesztése</string>
-    <string name="settings_onboarding_other_ways_enter_address">Kiszolgáló címének megadása</string>
+    <string name="settings_onboarding_other_ways_enter_address">Szerver címének megadása</string>
     <string name="settings_onboarding_other_ways_install_header">Még nincs OpenCode?</string>
     <string name="settings_onboarding_other_ways_install">Más telepítési módok</string>
     <string name="settings_onboarding_command_copy_description">Másolás: %1$s</string>
@@ -50,7 +50,7 @@
     <string name="settings_onboarding_phone_message_placeholder">Üzenet</string>
 
     <!-- What’s New -->
-    <string name="settings_whatsnew_developer_updates">Fejlesztői hírek</string>
+    <string name="settings_whatsnew_developer_updates">Fejlesztői frissítések</string>
     <string name="settings_whatsnew_smaller_changes">Kisebb változások</string>
     <string name="settings_whatsnew_title">Újdonságok</string>
     <string name="settings_whatsnew_options_description">Újdonságok beállításai</string>

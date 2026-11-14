@@ -29,7 +29,7 @@
     <string name="app_servers_connecting_description">Birikdirilýär</string>
     <string name="app_servers_edit_description">%1$s redaktirläň</string>
     <string name="app_servers_remove_description">%1$s aýyr</string>
-    <string name="app_servers_remove_confirm_title">%1$s aýryl synmy?</string>
+    <string name="app_servers_remove_confirm_title">%1$s aýrylsynmy?</string>
     <string name="app_servers_remove_confirm_message">Bu %1$s enjamynda saklanan salgy we parol aýrylar. Serwerdäki sessiýalara täsir etmez.</string>
     <string name="app_servers_remove_confirm">Serweri aýyr</string>
 
@@ -71,7 +71,7 @@
 
     <!-- Pairing confirmation (AppFeature.PendingPairing) -->
     <string name="app_pairing_confirm_title">%1$s bilen jübütleşdirmelimi?</string>
-    <string name="app_pairing_confirm_try_one">OpenCode %1$s salgylaryny barlap, ilkinji jogap beren salga geçer.</string>
+    <string name="app_pairing_confirm_try_one">OpenCode %1$s salgysyny barlap, ilkinji jogap beren salga geçer.</string>
     <string name="app_pairing_confirm_pair_one">OpenCode %1$s bilen jübütleşip, oňa geçer.</string>
     <string name="app_pairing_confirm_try_two">OpenCode %1$s we %2$s salgylaryny barlap, ilkinji jogap beren salga geçer.</string>
     <string name="app_pairing_confirm_try_many">OpenCode %1$s we %2$s salgylaryny barlap, ilkinji jogap beren salga geçer.</string>

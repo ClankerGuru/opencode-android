@@ -13,16 +13,16 @@
         <item quantity="other">%1$d apvalkalų baigė darbą</item>
     </plurals>
     <plurals name="server_notice_count_shell_failed">
-        <item quantity="one">Nepavyko %1$d apvalkalo darbas</item>
-        <item quantity="few">Nepavyko %1$d apvalkalų darbas</item>
-        <item quantity="many">Nepavyko %1$d apvalkalo darbas</item>
-        <item quantity="other">Nepavyko %1$d apvalkalų darbas</item>
+        <item quantity="one">%1$d apvalkalo vykdymas nepavyko</item>
+        <item quantity="few">%1$d apvalkalų vykdymas nepavyko</item>
+        <item quantity="many">%1$d apvalkalo vykdymas nepavyko</item>
+        <item quantity="other">%1$d apvalkalų vykdymas nepavyko</item>
     </plurals>
     <plurals name="server_notice_count_shell_interrupted">
-        <item quantity="one">Pertrauktas %1$d apvalkalo darbas</item>
-        <item quantity="few">Pertrauktas %1$d apvalkalų darbas</item>
-        <item quantity="many">Pertrauktas %1$d apvalkalo darbas</item>
-        <item quantity="other">Pertrauktas %1$d apvalkalų darbas</item>
+        <item quantity="one">Pertrauktas %1$d apvalkalas</item>
+        <item quantity="few">Pertraukti %1$d apvalkalai</item>
+        <item quantity="many">Pertraukta %1$d apvalkalo</item>
+        <item quantity="other">Pertraukta %1$d apvalkalų</item>
     </plurals>
     <plurals name="server_notice_count_subagent_finished">
         <item quantity="one">%1$d subagentas baigė darbą</item>
@@ -46,7 +46,7 @@
     <!-- RunNotices.kt: a run that ended early -->
     <string name="server_run_error_action_compact">Glaudinti seansą</string>
     <string name="server_run_error_action_switch_model">Keisti modelį</string>
-    <string name="server_run_error_aborted">Pertraukta</string>
+    <string name="server_run_error_aborted">Pertraukė</string>
     <string name="server_run_error_permission_rejected">Pertraukta atmetus prašymą</string>
     <string name="server_run_error_content_filter">Saugos filtras užblokavo atsakymą</string>
     <string name="server_run_error_rate_limit">Pasiektas užklausų dažnio limitas</string>

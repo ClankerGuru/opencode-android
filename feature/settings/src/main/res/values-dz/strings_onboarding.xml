@@ -84,7 +84,7 @@
     <string name="settings_whatsnew_action_try_it">ཚོད་ལྟ་འབད།</string>
     <string name="settings_whatsnew_action_try_it_hint">འདི་འཕྲོ་ལས་བྲིས་བཙུགས་ཡོད་པའི་ལཱ་ཡུན་གསརཔ་ཁ་ཕྱེ།</string>
     <string name="settings_whatsnew_action_choose_model">དཔེ་ཚད་གདམ་ཁ་རྐྱབས།</string>
-    <string name="settings_whatsnew_action_start_call">བོད་བརྡ་འགོ་བཙུགས།</string>
+    <string name="settings_whatsnew_action_start_call">འབོད་བརྡ་འགོ་བཙུགས།</string>
     <string name="settings_whatsnew_action_set_up_voice">སྐད་ཀྱི་གཞི་སྒྲིག་འབད།</string>
     <string name="settings_whatsnew_action_manage_servers">སར་བར་ཚུ་འཛིན་སྐྱོང་འཐབ།</string>
     <string name="settings_whatsnew_action_open_page">%1$s ཁ་ཕྱེ།</string>

@@ -10,7 +10,7 @@
     <string name="settings_whatsnew_entry_attachment_menu_hold_title">Załączaj przez +</string>
     <string name="settings_whatsnew_entry_attachment_menu_hold_summary">Menu + rozwija się z pola wiadomości i zawiera opcje Aparat, Zdjęcia i Pliki. Przytrzymaj + i przesuń palec, by wybrać jednym ruchem.</string>
     <string name="settings_whatsnew_entry_attachment_menu_hold_detail_1">Zdjęcia otwierają się tuż nad polem wiadomości. Dotknij zdjęć, aby je załączyć.</string>
-    <string name="settings_whatsnew_entry_attachment_menu_hold_detail_2">Aparat ma przyciski obiektywów, zoom gestem szczypania, ustawianie ostrości dotknięciem i lampę błyskową.</string>
+    <string name="settings_whatsnew_entry_attachment_menu_hold_detail_2">Aparat ma przyciski obiektywów, powiększanie gestem szczypania, ustawianie ostrości dotknięciem i lampę błyskową.</string>
     <string name="settings_whatsnew_entry_attachment_menu_hold_example">Przytrzymaj +, przesuń palec w górę do opcji Zdjęcia i puść</string>
 
     <!-- 2026-10-08-01-voice-webrtc-weak-connection -->
@@ -152,7 +152,7 @@
 
     <!-- 2026-10-12-04-model-list-and-level-meter -->
     <string name="settings_whatsnew_entry_model_list_and_level_meter_title">Nowy wybór modelu</string>
-    <string name="settings_whatsnew_entry_model_list_and_level_meter_summary">Wybierz model i poziom myślenia w panelu „Model”, z ulubionymi u góry. Aby wypróbować listę rozwijaną z pola wiadomości, włącz „Nowy wybór modelu” w Ustawienia → Eksperymentalne.</string>
+    <string name="settings_whatsnew_entry_model_list_and_level_meter_summary">Wybierz model i poziom myślenia w panelu „Model”, z ulubionymi u góry. Aby wypróbować listę rozwijaną z pola wiadomości, włącz „Nowy wybór modelu” w Ustawienia → Eksperymentalny.</string>
     <string name="settings_whatsnew_entry_model_list_and_level_meter_detail_1">Użyj menu „Myślenie” w panelu „Model”, jeśli model oferuje poziomy.</string>
     <string name="settings_whatsnew_entry_model_list_and_level_meter_detail_2">Przesuń model palcem, aby dodać go do ulubionych.</string>
     <string name="settings_whatsnew_entry_model_list_and_level_meter_detail_3">Subtelna linia w sesji oznacza miejsce zmiany modelu lub poziomu.</string>
@@ -160,7 +160,7 @@
 
     <!-- 2026-10-12-05-run-error-line -->
     <string name="settings_whatsnew_entry_run_error_line_title">Gdy wykonanie się nie powiedzie</string>
-    <string name="settings_whatsnew_entry_run_error_line_summary">Gdy wykonanie kończy się przedwcześnie, zobaczysz prosty opis przyczyny i jeden sposób działania: „Edycja”, „Kompaktuj”, „Zmień model” lub „Spróbuj ponownie”.</string>
+    <string name="settings_whatsnew_entry_run_error_line_summary">Gdy wykonanie kończy się przedwcześnie, zobaczysz prosty opis przyczyny i jeden sposób działania: „Edycja”, „Kompaktowy”, „Zmień model” lub „Spróbuj ponownie”.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_1">Opcja „Edycja” cofa wiadomość i przywraca ją w polu wiadomości, aby można było zmienić jej treść.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_2">Przytrzymaj wiersz, aby zobaczyć pełny błąd i go skopiować.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_3">Gdy agent ma sam ponowić próbę, status „Pracuje” odlicza czas do kolejnej próby.</string>
@@ -838,7 +838,7 @@
     <string name="settings_whatsnew_entry_loading_touch_recovery_summary">Powrót do aplikacji podczas ładowania od razu przywraca przewijanie transkrypcji.</string>
 
     <!-- 2026-11-05-01-composer-keyboard-width -->
-    <string name="settings_whatsnew_entry_composer_keyboard_width_title">Szersze pole wiadomości</string>
+    <string name="settings_whatsnew_entry_composer_keyboard_width_title">Szersze pole wiadomości podczas pisania</string>
     <string name="settings_whatsnew_entry_composer_keyboard_width_summary">Przy otwartej klawiaturze pole wiadomości poszerza się, zostawiając mały, równy margines. Długie szkice rzadziej przechodzą do nowego wiersza.</string>
 
     <!-- 2026-11-05-02-plus-menu-touch-release -->
@@ -891,7 +891,7 @@
     <string name="settings_whatsnew_entry_one_picker_detail_2">Przesuń lub przytrzymaj wiersz, aby dodać model do ulubionych lub go stamtąd usunąć.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_3">Wyszukiwarka jest na dole. Wpisz poziom po nazwie, np. „opus high”, i naciśnij Enter, aby wybrać oba.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_4">Przeciągnij uchwyt w górę, aby powiększyć listę, lub w dół, aby ją zamknąć.</string>
-    <string name="settings_whatsnew_entry_one_picker_detail_5">Nowy panel wyboru zastępuje stary panel modelu, a przełącznik „Jeden panel wyboru” znika z Ustawienia › Eksperymentalne.</string>
+    <string name="settings_whatsnew_entry_one_picker_detail_5">Nowy panel wyboru zastępuje stary panel modelu, a przełącznik „Jeden panel wyboru” znika z Ustawienia › Eksperymentalny.</string>
     <string name="settings_whatsnew_entry_one_picker_example">Dotknij modelu w polu wiadomości, a potem przesuń wiersz, aby dodać go do ulubionych</string>
 
     <!-- 2026-11-08-01-connecting-caption-glass -->

@@ -3,12 +3,12 @@
     <!-- Agent activity glyph -->
     <string name="session_activity_running_description">运行中</string>
     <!-- Background work panel -->
-    <string name="session_background_work_show_label">显示运行中的子代理和壳牌</string>
+    <string name="session_background_work_show_label">显示运行中的子代理和 Shell</string>
     <string name="session_background_work_collapsed_description">已折叠</string>
     <string name="session_background_work_subagents_title">子代理</string>
     <string name="session_background_work_open_subagent_label">打开子代理的会话</string>
-    <string name="session_background_work_shells_title">壳牌</string>
-    <string name="session_background_work_show_shell_label">显示壳牌输出</string>
+    <string name="session_background_work_shells_title">Shell</string>
+    <string name="session_background_work_show_shell_label">显示 Shell 输出</string>
     <!-- Jump to latest -->
     <string name="session_scroll_to_latest_description">跳转到最新</string>
     <!-- Dictation bar -->
@@ -50,7 +50,7 @@
     <string name="session_unread">未读</string>
     <string name="session_mute">静音</string>
     <string name="session_muted">已静音</string>
-    <string name="session_compact">紧凑型</string>
+    <string name="session_compact">压缩会话</string>
     <string name="session_fork">创建分支会话</string>
     <string name="session_toggle_on_description">开启</string>
     <string name="session_toggle_off_description">关闭</string>
@@ -132,16 +132,16 @@
     <string name="session_photo_sheet_full_description">全屏</string>
     <string name="session_photo_sheet_half_description">半屏</string>
     <!-- Shell output -->
-    <string name="session_shell_stop_confirm_title">停止此壳牌？</string>
+    <string name="session_shell_stop_confirm_title">停止此 Shell？</string>
     <string name="session_shell_stop_confirm_message">命令将立即结束。此处的输出会保留，直到你关闭它。</string>
-    <string name="session_shell_stop">停止壳牌</string>
+    <string name="session_shell_stop">停止 Shell</string>
     <string name="session_shell_copy_output">复制输出</string>
     <string name="session_shell_share_output">分享输出</string>
     <string name="session_shell_earlier_output_hidden">较早的输出已隐藏</string>
     <string name="session_shell_showing_last_output">正在显示最后 4 MB 的输出</string>
     <string name="session_shell_load_earlier">加载更早的输出</string>
     <string name="session_shell_output_unavailable_title">输出不可用</string>
-    <string name="session_shell_output_unavailable_message">服务器已不再保留此壳牌的输出。</string>
+    <string name="session_shell_output_unavailable_message">服务器上已无此 Shell 的输出。</string>
     <string name="session_shell_no_output_yet_title">暂无输出</string>
     <string name="session_shell_no_output_title">无输出</string>
     <string name="session_shell_no_output_yet_message">命令的输出会实时显示在这里。</string>
@@ -186,7 +186,7 @@
         <item quantity="other">%1$d 个子代理</item>
     </plurals>
     <plurals name="session_background_work_shell_count">
-        <item quantity="other">%1$d 个壳牌</item>
+        <item quantity="other">%1$d 个 Shell</item>
     </plurals>
     <string name="session_background_work_summary">%1$s · %2$s</string>
 

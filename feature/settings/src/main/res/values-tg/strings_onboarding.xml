@@ -36,7 +36,7 @@
     <string name="settings_onboarding_desktop_composer_placeholder">Ҳар чӣ хоҳед, пурсед, / барои фармонҳо, @ барои контекст…</string>
     <string name="settings_onboarding_desktop_composer_follow_up_placeholder">Паёми дигар илова кунед, / барои фармонҳо, @ барои контекст…</string>
     <string name="settings_onboarding_desktop_back_to_app">Бозгашт ба барнома</string>
-    <string name="settings_onboarding_desktop_pairing_title">Ҷуфт шуда истодааст</string>
+    <string name="settings_onboarding_desktop_pairing_title">Ҷуфткунӣ</string>
     <string name="settings_onboarding_desktop_pairing_subtitle">Дастгоҳи дигарро ба сервери OpenCode-и ин компютер пайваст кунед.</string>
     <string name="settings_onboarding_desktop_pair_device">Дастгоҳро ҷуфт кунед</string>
     <string name="settings_onboarding_desktop_pair_device_message">Рамзро бо барномаи OpenCode дар дастгоҳи дигар скан кунед ё истинодро нусхабардорӣ кунед.</string>
@@ -61,7 +61,7 @@
     <string name="settings_onboarding_headline">OpenCode\nдар ҳама ҷо.</string>
     <string name="settings_onboarding_headline_spoken">OpenCode дар ҳама ҷо.</string>
     <string name="settings_onboarding_subhead">Дур аз мизи корӣ вазифаҳоро оғоз кунед, ба саволҳо ҷавоб диҳед ва тағйиротро баррасӣ кунед.</string>
-    <string name="settings_onboarding_instruction">Дар компютер OpenCode-ро кушоед ва ба Танзимотҳо → Ҷуфт шуда истодааст гузаред.</string>
+    <string name="settings_onboarding_instruction">Дар компютер OpenCode-ро кушоед ва ба Танзимотҳо → Ҷуфткунӣ гузаред.</string>
 
     <!-- Onboarding: WelcomeStory, the mock conversation (the reply's backticks mark code) -->
     <string name="settings_onboarding_story_prompt">Тугмаи боргирӣ барои Android илова карда, ба ман нишон деҳ</string>

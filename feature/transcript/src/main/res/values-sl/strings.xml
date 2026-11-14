@@ -37,7 +37,7 @@
     <string name="transcript_image_open_description">Odpri sliko</string>
     <string name="transcript_image_load_failed">Slike ni bilo mogoče naložiti</string>
     <string name="transcript_image_retry_click_label">Poskusi znova</string>
-    <string name="transcript_image_open">Odprto</string>
+    <string name="transcript_image_open">Odpri</string>
 
     <!-- Math -->
     <string name="transcript_equation_description">Enačba</string>

@@ -1,28 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- RunNotices.kt: background shell and subagent notices -->
-    <string name="server_notice_source_shell">Škrupina</string>
+    <string name="server_notice_source_shell">Shell</string>
     <string name="server_notice_source_subagent">Subagent</string>
     <string name="server_notice_heading_finished">%1$s: dokončené</string>
     <string name="server_notice_heading_failed">%1$s: zlyhalo</string>
     <string name="server_notice_heading_interrupted">%1$s: prerušené</string>
     <plurals name="server_notice_count_shell_finished">
-        <item quantity="one">%1$d škrupina skončila</item>
-        <item quantity="few">%1$d škrupiny skončili</item>
-        <item quantity="many">%1$d škrupiny skončilo</item>
-        <item quantity="other">%1$d škrupín skončilo</item>
+        <item quantity="one">%1$d shell skončil</item>
+        <item quantity="few">%1$d shelly skončili</item>
+        <item quantity="many">%1$d shellu skončilo</item>
+        <item quantity="other">%1$d shellov skončilo</item>
     </plurals>
     <plurals name="server_notice_count_shell_failed">
-        <item quantity="one">%1$d škrupina zlyhala</item>
-        <item quantity="few">%1$d škrupiny zlyhali</item>
-        <item quantity="many">%1$d škrupiny zlyhalo</item>
-        <item quantity="other">%1$d škrupín zlyhalo</item>
+        <item quantity="one">%1$d shell zlyhal</item>
+        <item quantity="few">%1$d shelly zlyhali</item>
+        <item quantity="many">%1$d shellu zlyhalo</item>
+        <item quantity="other">%1$d shellov zlyhalo</item>
     </plurals>
     <plurals name="server_notice_count_shell_interrupted">
-        <item quantity="one">%1$d škrupina bola prerušená</item>
-        <item quantity="few">%1$d škrupiny boli prerušené</item>
-        <item quantity="many">%1$d škrupiny bolo prerušených</item>
-        <item quantity="other">%1$d škrupín bolo prerušených</item>
+        <item quantity="one">%1$d shell bol prerušený</item>
+        <item quantity="few">%1$d shelly boli prerušené</item>
+        <item quantity="many">%1$d shellu bolo prerušených</item>
+        <item quantity="other">%1$d shellov bolo prerušených</item>
     </plurals>
     <plurals name="server_notice_count_subagent_finished">
         <item quantity="one">%1$d subagent skončil</item>
@@ -78,8 +78,8 @@
     <string name="server_session_title_untitled">Relácia bez názvu</string>
 
     <!-- OpenCodeToolCall.kt, LiveTranscript.kt -->
-    <string name="server_tool_shell">Škrupina</string>
-    <string name="server_tool_shell_killed">Škrupina bola násilne ukončená</string>
+    <string name="server_tool_shell">Shell</string>
+    <string name="server_tool_shell_killed">Shell bol násilne ukončený</string>
     <string name="server_tool_shell_exit_code">Príkaz skončil s kódom %1$d</string>
     <string name="server_notice_session_update">Aktualizácia relácie</string>
 

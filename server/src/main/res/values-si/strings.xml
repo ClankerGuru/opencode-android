@@ -15,8 +15,8 @@
         <item quantity="other">ෂෙල් %1$dක් අසාර්ථකයි</item>
     </plurals>
     <plurals name="server_notice_count_shell_interrupted">
-        <item quantity="one">ෂෙල් %1$dකට බාධා කළා</item>
-        <item quantity="other">ෂෙල් %1$dකට බාධා කළා</item>
+        <item quantity="one">ෂෙල් %1$dක් බාධා කළා</item>
+        <item quantity="other">ෂෙල් %1$dක් බාධා කළා</item>
     </plurals>
     <plurals name="server_notice_count_subagent_finished">
         <item quantity="one">උප නියෝජිත %1$dකගේ වැඩ අවසන්</item>

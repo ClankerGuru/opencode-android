@@ -139,7 +139,7 @@
     <string name="media_mermaid_viewer_screen_title">Skýringarmyndaskoðari</string>
     <string name="media_mermaid_diagram_description">Skýringarmynd</string>
     <string name="media_mermaid_loading_state">%1$s, hleður</string>
-    <string name="media_mermaid_view_source">Sýna frumkóða</string>
+    <string name="media_mermaid_view_source">Skoða frumkóða</string>
     <string name="media_mermaid_source_title">Frumkóði skýringarmyndar</string>
 
     <!-- Mermaid diagram kinds, read by TalkBack as “Diagram, Flowchart” -->

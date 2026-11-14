@@ -33,7 +33,7 @@
     <string name="session_folder_select">चयन गर्नुहोस्</string>
     <string name="session_folder_open_failed_title">फोल्डर खोल्न सकिएन</string>
     <string name="session_folder_empty_title">कुनै फोल्डर छैन</string>
-    <string name="session_folder_search_empty_title">“%1$s” का लागि कुनै परिणाम छैन</string>
+    <string name="session_folder_search_empty_title">“%1$s” को लागि कुनै परिणाम छैन</string>
     <string name="session_folder_search_empty_message">हिज्जे जाँच्नुहोस् वा अर्को खोज गर्नुहोस्।</string>
     <!-- Server connection pill -->
     <string name="session_server_edit">सर्भर सम्पादन गर्नुहोस्…</string>

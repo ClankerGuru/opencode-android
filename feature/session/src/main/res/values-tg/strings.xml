@@ -33,7 +33,7 @@
     <string name="session_folder_select">Интихоб кунед</string>
     <string name="session_folder_open_failed_title">Папка кушода нашуд</string>
     <string name="session_folder_empty_title">Папкаҳо нестанд</string>
-    <string name="session_folder_search_empty_title">Барои «%1$s» натиҷае нест</string>
+    <string name="session_folder_search_empty_title">Ягон натиҷа барои «%1$s»</string>
     <string name="session_folder_search_empty_message">Имлоро санҷед ё аз нав ҷустуҷӯ кунед.</string>
     <!-- Server connection pill -->
     <string name="session_server_edit">Серверро таҳрир кунед…</string>
@@ -143,7 +143,7 @@
     <string name="session_shell_showing_last_output">4 МБ-и охирин нишон дода мешавад</string>
     <string name="session_shell_load_earlier">Натиҷаи қаблиро бор кунед</string>
     <string name="session_shell_output_unavailable_title">Натиҷа дастрас нест</string>
-    <string name="session_shell_output_unavailable_message">Натиҷаи ин Shell дигар дар сервер нест.</string>
+    <string name="session_shell_output_unavailable_message">Натиҷаи ин shell дигар дар сервер нест.</string>
     <string name="session_shell_no_output_yet_title">Ҳанӯз натиҷа нест</string>
     <string name="session_shell_no_output_title">Натиҷа нест</string>
     <string name="session_shell_no_output_yet_message">Натиҷаи фармон ҳангоми иҷро дар ин ҷо пайдо мешавад.</string>
@@ -192,8 +192,8 @@
         <item quantity="other">%1$d зер-агент</item>
     </plurals>
     <plurals name="session_background_work_shell_count">
-        <item quantity="one">%1$d Shell</item>
-        <item quantity="other">%1$d Shell-ҳо</item>
+        <item quantity="one">%1$d shell</item>
+        <item quantity="other">%1$d shell</item>
     </plurals>
     <string name="session_background_work_summary">%1$s · %2$s</string>
 

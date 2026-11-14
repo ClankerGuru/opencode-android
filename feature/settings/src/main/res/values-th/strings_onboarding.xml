@@ -7,7 +7,7 @@
     <string name="settings_onboarding_other_ways_terminal_header">เรียกใช้คำสั่งนี้ในเทอร์มินัล</string>
     <string name="settings_onboarding_other_ways_terminal_footer">จะแสดงรหัสให้สแกนหรือลิงก์ให้คัดลอกไปวาง ใช้ได้จากทุกเครือข่าย</string>
     <string name="settings_onboarding_other_ways_paste_link">วางลิงก์จับคู่</string>
-    <string name="settings_onboarding_other_ways_enter_address">ป้อนที่อยู่เซิร์ฟเวอร์</string>
+    <string name="settings_onboarding_other_ways_enter_address">ป้อน URL เซิร์ฟเวอร์</string>
     <string name="settings_onboarding_other_ways_install_header">ยังไม่มี OpenCode?</string>
     <string name="settings_onboarding_other_ways_install">วิธีติดตั้งอื่นๆ</string>
     <string name="settings_onboarding_command_copy_description">คัดลอก %1$s</string>

@@ -545,7 +545,7 @@
 
     <!-- 2026-10-21-07-welcome-pairing-copy -->
     <string name="settings_whatsnew_entry_welcome_pairing_copy_title">Par fra OpenCode-appen</string>
-    <string name="settings_whatsnew_entry_welcome_pairing_copy_summary">Velkomstskærmen henviser til Indstillinger → Parrer i OpenCode på din computer eller /pair i terminalen og viser installationskommandoen, hvis du ikke har OpenCode endnu.</string>
+    <string name="settings_whatsnew_entry_welcome_pairing_copy_summary">Velkomstskærmen henviser til Indstillinger → Parring i OpenCode på din computer eller /pair i terminalen og viser installationskommandoen, hvis du ikke har OpenCode endnu.</string>
 
     <!-- 2026-10-21-08-session-id-links -->
     <string name="settings_whatsnew_entry_session_id_links_title">Sessionslinks</string>
@@ -782,7 +782,7 @@
 
     <!-- 2026-11-01-03-open-links-from-calls -->
     <string name="settings_whatsnew_entry_open_links_from_calls_title">Åbn links fra opkald</string>
-    <string name="settings_whatsnew_entry_open_links_from_calls_summary">Slå Åbn links fra opkald til i Indstillinger › Eksperimentel › Opkald, så en agent kan tilbyde et link under et opkald, f.eks. til en Uber-tur: Tryk på Åben for at åbne det i den tilhørende app eller på Ikke nu.</string>
+    <string name="settings_whatsnew_entry_open_links_from_calls_summary">Slå Åbn links fra opkald til i Indstillinger › Eksperimentel › Opkald, så en agent kan tilbyde et link under et opkald, f.eks. til en Uber-tur: Tryk på Åbn for at åbne det i den tilhørende app eller på Ikke nu.</string>
 
     <!-- 2026-11-02-01-fold-questions -->
     <string name="settings_whatsnew_entry_fold_questions_title">Fold spørgsmål væk</string>

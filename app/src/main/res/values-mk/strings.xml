@@ -91,14 +91,14 @@
     <!-- App messages (AppFeature) -->
     <string name="app_paste_clipboard_empty">Таблата со исечоци е празна</string>
     <string name="app_paste_not_a_pairing_link">Тоа не е врска за спарување</string>
-    <string name="app_server_no_longer_saved">Овој сервер повеќе не е зачуван на %1$s. Поврзи се повторно со него за да ја отвориш сесијата.</string>
+    <string name="app_server_no_longer_saved">Овој сервер повеќе не е зачуван на овој %1$s. Поврзи се повторно со него за да ја отвориш сесијата.</string>
     <string name="app_session_no_longer_available">Можеби е избришана или серверот не е достапен.</string>
 
     <!-- Pairing (AppFeaturePairing) -->
     <string name="app_pairing_connected_announcement">Поврзано со %1$s</string>
     <string name="app_pairing_invalid_code">Тоа не е код за спарување со OpenCode. Изврши opencode pair --remote на компјутерот, па скенирај го QR кодот или залепи ја прикажаната врска.</string>
     <string name="app_pairing_unusable_address">Не може да се користи „%1$s“ од овој код за спарување: %2$s.</string>
-    <string name="app_pairing_loopback">Тој сервер слуша само на localhost, па не е достапен од %1$s. Наместо тоа, изврши opencode pair --remote на компјутерот за пристап од која било мрежа.</string>
+    <string name="app_pairing_loopback">Тој сервер слуша само на localhost, па не е достапен од овој %1$s. Наместо тоа, изврши opencode pair --remote на компјутерот, што работи од секоја мрежа.</string>
 
     <!-- Shares (AppFeatureShares) -->
     <string name="app_share_server_no_longer_saved">Серверот на кој сподели повеќе не е зачуван на овој уред. Поврзи се повторно со него, па сподели повторно.</string>

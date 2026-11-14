@@ -158,7 +158,7 @@
 
     <!-- Connection card -->
     <string name="settings_connection_show_server_label">Прикажи го серверот</string>
-    <string name="settings_connection_milliseconds">%1$d ms</string>
+    <string name="settings_connection_milliseconds">%1$d мс</string>
     <string name="settings_connection_card_value_description">%1$s, %2$s, %3$s</string>
     <string name="settings_connection_status_connected">Поврзано</string>
     <string name="settings_connection_status_slow">Бавно</string>

@@ -11,8 +11,8 @@
         <item quantity="other">%1$d shell befejeződött</item>
     </plurals>
     <plurals name="server_notice_count_shell_failed">
-        <item quantity="one">%1$d shell sikertelen</item>
-        <item quantity="other">%1$d shell sikertelen</item>
+        <item quantity="one">%1$d shell futtatása sikertelen</item>
+        <item quantity="other">%1$d shell futtatása sikertelen</item>
     </plurals>
     <plurals name="server_notice_count_shell_interrupted">
         <item quantity="one">%1$d shell megszakítva</item>

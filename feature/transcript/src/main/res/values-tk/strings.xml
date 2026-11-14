@@ -35,7 +35,7 @@
     <string name="transcript_image_open_description">Suraty açyň</string>
     <string name="transcript_image_load_failed">Suraty ýükläp bolmady</string>
     <string name="transcript_image_retry_click_label">Täzeden synanyş</string>
-    <string name="transcript_image_open">Açyk</string>
+    <string name="transcript_image_open">Açyň</string>
 
     <!-- Math -->
     <string name="transcript_equation_description">Deňleme</string>
@@ -76,7 +76,7 @@
 
     <!-- Compaction -->
     <string name="transcript_compaction_running">Kontekst gysylýar</string>
-    <string name="transcript_compaction_provider">Ü üpjün ediji tarapyndan gysmak</string>
+    <string name="transcript_compaction_provider">Üpjün ediji tarapyndan gysmak</string>
     <string name="transcript_compaction_completed">Kontekst gysyldy</string>
     <string name="transcript_compaction_cancelled">Gysmak ýatyryldy</string>
     <string name="transcript_compaction_failed">Gysmak şowsuz boldy</string>

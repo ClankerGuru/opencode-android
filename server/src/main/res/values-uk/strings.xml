@@ -13,10 +13,10 @@
         <item quantity="other">Завершено %1$d команди</item>
     </plurals>
     <plurals name="server_notice_count_shell_failed">
-        <item quantity="one">Помилка в %1$d команді</item>
-        <item quantity="few">Помилка в %1$d командах</item>
-        <item quantity="many">Помилка в %1$d командах</item>
-        <item quantity="other">Помилка в %1$d команди</item>
+        <item quantity="one">З помилкою: %1$d команда</item>
+        <item quantity="few">З помилкою: %1$d команди</item>
+        <item quantity="many">З помилкою: %1$d команд</item>
+        <item quantity="other">З помилкою: %1$d команди</item>
     </plurals>
     <plurals name="server_notice_count_shell_interrupted">
         <item quantity="one">Перервано %1$d команду</item>

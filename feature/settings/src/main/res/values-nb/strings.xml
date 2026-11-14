@@ -206,7 +206,7 @@
 
     <!-- Pairing scanner -->
     <string name="settings_pairing_paste">Lim inn</string>
-    <string name="settings_pairing_no_camera_title">Ingen kamera tilgjengelig</string>
+    <string name="settings_pairing_no_camera_title">Ikke noe kamera tilgjengelig</string>
     <string name="settings_pairing_no_camera_message">Kopier lenken som `opencode pair` skriver ut på datamaskinen, og lim den inn her.</string>
     <string name="settings_pairing_camera_off_title">Kameratilgang er av</string>
     <string name="settings_pairing_camera_off_message">Tillat kameratilgang i Innstillinger for å skanne QR-koden, eller lim inn lenken som `opencode pair` skriver ut.</string>

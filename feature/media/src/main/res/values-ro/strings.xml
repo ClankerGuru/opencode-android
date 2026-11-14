@@ -140,7 +140,7 @@
     <string name="media_mermaid_viewer_screen_title">Vizualizator de diagrame</string>
     <string name="media_mermaid_diagram_description">Diagramă</string>
     <string name="media_mermaid_loading_state">%1$s, se încarcă</string>
-    <string name="media_mermaid_view_source">Arată sursa</string>
+    <string name="media_mermaid_view_source">Vizualizare sursă</string>
     <string name="media_mermaid_source_title">Sursa diagramei</string>
 
     <!-- Mermaid diagram kinds, read by TalkBack as “Diagram, Flowchart” -->

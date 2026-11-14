@@ -28,7 +28,7 @@
     <string name="media_file_show_source_description">顯示原始內容</string>
     <string name="media_file_unwrap_lines_description">不自動換行</string>
     <string name="media_file_wrap_lines_description">自動換行</string>
-    <string name="media_file_start_pip_description">啟動畫中畫</string>
+    <string name="media_file_start_pip_description">啟動子母畫面</string>
     <string name="media_file_opening">正在開啟…</string>
     <string name="media_file_share_failed_title">無法分享檔案</string>
     <string name="media_file_share_downloading_description">正在下載以供分享</string>

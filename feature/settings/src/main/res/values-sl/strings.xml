@@ -89,7 +89,7 @@
     <string name="settings_delegator_target_footer">Samodejno uporabi sejo »Voice« na tem strežniku. Prikazana seja uporabi sejo na zaslonu.</string>
     <string name="settings_delegator_automatic">Samodejno</string>
     <string name="settings_delegator_viewed_session">Prikazana seja</string>
-    <string name="settings_delegator_search_placeholder">Išči seje</string>
+    <string name="settings_delegator_search_placeholder">Seje iskanja</string>
     <string name="settings_delegator_sessions_header">Izberite sejo</string>
     <string name="settings_delegator_sessions_footer">Izbrana seja ohrani svoj model.</string>
     <string name="settings_delegator_no_sessions">Na tem strežniku ni sej</string>
@@ -197,8 +197,8 @@
     <string name="settings_servers_header">Strežniki</string>
     <string name="settings_servers_edit_server">Uredi %1$s…</string>
     <string name="settings_servers_rename_message">Ime velja le za ta %1$s. Pusti prazno za ime računalnika.</string>
-    <string name="settings_servers_remove_title">Odstranim %1$s?</string>
-    <string name="settings_servers_remove_message">S tem se na tej napravi (%1$s) izbrišeta naslov in geslo. Seje na strežniku ostanejo nespremenjene.</string>
+    <string name="settings_servers_remove_title">Odstrani %1$s?</string>
+    <string name="settings_servers_remove_message">S tem se na tem %1$s izbrišeta naslov in geslo. Seje na strežniku ostanejo nespremenjene.</string>
     <string name="settings_servers_remove_server">Odstrani strežnik</string>
     <string name="settings_servers_current_server_state">Trenutni strežnik, %1$s</string>
     <string name="settings_servers_switch_label">Preklopi na ta strežnik</string>

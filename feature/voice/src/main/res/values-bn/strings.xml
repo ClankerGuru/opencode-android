@@ -150,7 +150,7 @@
     <string name="voice_error_connection_setup">ভয়েস সংযোগ স্থাপন করা যায়নি।</string>
     <string name="voice_error_safety_filter">নিরাপত্তা ফিল্টার ভয়েস কলটি শেষ করেছে।</string>
     <string name="voice_error_audio_reset">সিস্টেম অডিও রিসেট করেছে। আবার কল শুরু করুন।</string>
-    <string name="voice_error_missing_phone_key">কণ্ঠস্বর ব্যবহার করতে সেটিংসে আপনার %1$s API কী যোগ করুন।</string>
+    <string name="voice_error_missing_phone_key">ভয়েস ব্যবহার করতে সেটিংসে আপনার %1$s API কী যোগ করুন।</string>
 
     <!-- Voice accents -->
     <string name="voice_accent_australian_english">অস্ট্রেলীয় ইংরেজি</string>

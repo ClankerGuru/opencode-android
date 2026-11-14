@@ -73,7 +73,7 @@
     <string name="voice_status_weak_connection">การเชื่อมต่อไม่เสถียร</string>
     <string name="voice_status_paused">หยุดชั่วคราวแล้ว</string>
     <string name="voice_status_needs_input">รอการตอบกลับจากคุณ</string>
-    <string name="voice_status_working">กำลังทำงาน</string>
+    <string name="voice_status_working">การทำงาน</string>
     <string name="voice_status_speaking">กำลังพูด</string>
     <string name="voice_status_muted">ปิดเสียงแล้ว</string>
     <string name="voice_status_listening">กำลังฟัง</string>

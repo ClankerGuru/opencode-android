@@ -145,9 +145,9 @@
     <string name="voice_error_xai_key_disabled">Bu xAI API açarı deaktivdir.</string>
     <string name="voice_error_xai_key_blocked">Bu xAI API açarı bloklanıb.</string>
     <string name="voice_error_service_address_invalid">Səs xidmətinin ünvanı yanlışdır.</string>
-    <string name="voice_error_connection_lost">Səs bağlantısı kəsildi.</string>
-    <string name="voice_error_connection_closed">Səs bağlantısı bağlıdır.</string>
-    <string name="voice_error_connection_setup">Səs bağlantısını qurmaq mümkün olmadı.</string>
+    <string name="voice_error_connection_lost">Səs əlaqəsi kəsildi.</string>
+    <string name="voice_error_connection_closed">Səs əlaqəsi bağlıdır.</string>
+    <string name="voice_error_connection_setup">Səs əlaqəsini qurmaq mümkün olmadı.</string>
     <string name="voice_error_safety_filter">Təhlükəsizlik filtri səsli zəngi bitirdi.</string>
     <string name="voice_error_audio_reset">Səs sistem tərəfindən sıfırlandı. Zəngi yenidən başladın.</string>
     <string name="voice_error_missing_phone_key">Səsdən istifadə etmək üçün Tənzimləmələrdə %1$s API açarınızı əlavə edin.</string>

@@ -36,7 +36,7 @@
     <string name="settings_onboarding_desktop_composer_placeholder">იკითხეთ რამე, / ბრძანებებისთვის, @ კონტექსტისთვის…</string>
     <string name="settings_onboarding_desktop_composer_follow_up_placeholder">დაამატეთ მოთხოვნა, / ბრძანებებისთვის, @ კონტექსტისთვის…</string>
     <string name="settings_onboarding_desktop_back_to_app">აპში დაბრუნება</string>
-    <string name="settings_onboarding_desktop_pairing_title">მიმდინარეობს დაწყვილება</string>
+    <string name="settings_onboarding_desktop_pairing_title">დაწყვილება</string>
     <string name="settings_onboarding_desktop_pairing_subtitle">დააკავშირეთ სხვა მოწყობილობა ამ კომპიუტერის OpenCode სერვერთან.</string>
     <string name="settings_onboarding_desktop_pair_device">მოწყობილობის დაწყვილება</string>
     <string name="settings_onboarding_desktop_pair_device_message">დაასკანერეთ კოდი სხვა მოწყობილობის OpenCode აპით ან დააკოპირეთ ბმული.</string>
@@ -61,7 +61,7 @@
     <string name="settings_onboarding_headline">OpenCode\nყველგან.</string>
     <string name="settings_onboarding_headline_spoken">OpenCode ყველგან.</string>
     <string name="settings_onboarding_subhead">დაიწყეთ ამოცანები, უპასუხეთ კითხვებს და გადახედეთ ცვლილებებს კომპიუტერთან მიუჯდომლად.</string>
-    <string name="settings_onboarding_instruction">კომპიუტერზე გახსენით OpenCode და გადადით: პარამეტრები → მიმდინარეობს დაწყვილება.</string>
+    <string name="settings_onboarding_instruction">კომპიუტერზე გახსენით OpenCode და გადადით: პარამეტრები → დაწყვილება.</string>
 
     <!-- Onboarding: WelcomeStory, the mock conversation (the reply's backticks mark code) -->
     <string name="settings_onboarding_story_prompt">დაამატე Android-ის ჩამოტვირთვის ღილაკი და მაჩვენე</string>

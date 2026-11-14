@@ -87,6 +87,6 @@
     <string name="settings_whatsnew_action_start_call">Zəng başlat</string>
     <string name="settings_whatsnew_action_set_up_voice">Səsi quraşdır</string>
     <string name="settings_whatsnew_action_manage_servers">Serverləri idarə et</string>
-    <string name="settings_whatsnew_action_open_page">%1$s faylını aç</string>
+    <string name="settings_whatsnew_action_open_page">%1$s aç</string>
     <string name="settings_whatsnew_page_servers">Serverlər</string>
 </resources>

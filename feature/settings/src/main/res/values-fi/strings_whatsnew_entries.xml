@@ -102,7 +102,7 @@
     <string name="settings_whatsnew_entry_drawer_one_edge_summary">Rivit alkavat samasta reunasta, tilapisteet ovat rivien lopussa ja hakupainike on ylhäällä.</string>
 
     <!-- 2026-10-11-01-paste-as-a-card -->
-    <string name="settings_whatsnew_entry_paste_as_a_card_title">Pitkät liitokset kortteina</string>
+    <string name="settings_whatsnew_entry_paste_as_a_card_title">Pitkät liitetyt tekstit kortteina</string>
     <string name="settings_whatsnew_entry_paste_as_a_card_summary">Pitkä liitetty teksti näkyy Liitetty teksti -korttina kuvien vieressä. Agentti lukee silti kaiken.</string>
     <string name="settings_whatsnew_entry_paste_as_a_card_detail_1">Napauta korttia lukeaksesi koko tekstin. Käytettävissä ovat myös Kopioi ja Jaa.</string>
     <string name="settings_whatsnew_entry_paste_as_a_card_detail_2">Pitkät viestit kutistuvat muutamalle riville. Näytä lisää avaa ne kokonaan.</string>
@@ -160,7 +160,7 @@
 
     <!-- 2026-10-12-05-run-error-line -->
     <string name="settings_whatsnew_entry_run_error_line_title">Kun suoritus epäonnistuu</string>
-    <string name="settings_whatsnew_entry_run_error_line_summary">Keskeytynyt suoritus kertoo syyn selkeästi ja tarjoaa yhden tavan jatkaa: Muokkaa, Tiivistä, Vaihda mallia tai Yritä uudelleen.</string>
+    <string name="settings_whatsnew_entry_run_error_line_summary">Keskeytynyt suoritus kertoo syyn selkeästi ja tarjoaa yhden tavan jatkaa: Muokkaa, Tiivis, Vaihda mallia tai Yritä uudelleen.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_1">Muokkaa kumoaa viestisi ja palauttaa sen viestikenttään muotoiltavaksi uudelleen.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_2">Paina riviä pitkään nähdäksesi koko virheen ja kopioidaksesi sen.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_3">Kun agentti yrittää uudelleen automaattisesti, Työskennellään näyttää ajan seuraavaan yritykseen.</string>
@@ -370,7 +370,7 @@
 
     <!-- 2026-10-18-02-return-key-sends -->
     <string name="settings_whatsnew_entry_return_key_sends_title">Enter-näppäimen asetus</string>
-    <string name="settings_whatsnew_entry_return_key_sends_summary">Poista Enter lähettää -asetus käytöstä, jos haluat Enterin lisäävän rivinvaihdon. Fyysisellä näppäimistöllä voit käyttää myös Command-Enter- ja Shift-Enter-yhdistelmiä.</string>
+    <string name="settings_whatsnew_entry_return_key_sends_summary">Poista Enter lähettää -asetus käytöstä Asetuksissa, jos haluat Enterin lisäävän rivinvaihdon. Fyysisellä näppäimistöllä voit käyttää myös Command-Enter- ja Shift-Enter-yhdistelmiä.</string>
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Vastausten lainaaminen</string>
@@ -480,12 +480,12 @@
     <string name="settings_whatsnew_entry_advanced_settings_open_summary">Osion Asetukset › Kokeellinen kokeiluryhmät ovat kaikki avattuina, mallinvalitsimet on yhdistetty yhdeksi Mallinvalitsin-valinnaksi, ja valintaa voi vaihtaa napauttamalla sen riviä mistä tahansa.</string>
 
     <!-- 2026-10-20-12-revert-to-here -->
-    <string name="settings_whatsnew_entry_revert_to_here_title">Palauta viesti</string>
-    <string name="settings_whatsnew_entry_revert_to_here_summary">Paina omaa viestiäsi pitkään ja valitse Palauta viesti, niin voit palata siihen kohtaan ja muokata viestiä.</string>
+    <string name="settings_whatsnew_entry_revert_to_here_title">Palauta tähän</string>
+    <string name="settings_whatsnew_entry_revert_to_here_summary">Paina omaa viestiäsi pitkään ja valitse Palauta tähän, niin voit palata siihen kohtaan ja muokata viestiä.</string>
     <string name="settings_whatsnew_entry_revert_to_here_detail_1">Viestin teksti, valokuvat ja tiedostot palaavat viestikenttään.</string>
     <string name="settings_whatsnew_entry_revert_to_here_detail_2">Kumoa palauttaa keskusteluvuorot ja niiden tiedostomuutokset, kunnes lähetät uuden viestin.</string>
     <string name="settings_whatsnew_entry_revert_to_here_detail_3">Toiminto on käytettävissä, kun agentti ei työskentele.</string>
-    <string name="settings_whatsnew_entry_revert_to_here_example">Paina aiemmin lähettämääsi viestiä pitkään ja valitse Palauta viesti.</string>
+    <string name="settings_whatsnew_entry_revert_to_here_example">Paina aiemmin lähettämääsi viestiä pitkään ja valitse Palauta tähän.</string>
 
     <!-- 2026-10-20-13-drag-from-transcript -->
     <string name="settings_whatsnew_entry_drag_from_transcript_title">Vedä istunnosta</string>
@@ -855,7 +855,7 @@
 
     <!-- 2026-11-05-04-reply-text-selection -->
     <string name="settings_whatsnew_entry_reply_text_selection_title">Valitse tekstiä koko vastauksesta</string>
-    <string name="settings_whatsnew_entry_reply_text_selection_summary">Paina pitkään tai kaksoisnapauta vastaussanaa ja vedä valintakahvoja kappaleiden, luetteloiden, koodin ja taulukoiden yli.</string>
+    <string name="settings_whatsnew_entry_reply_text_selection_summary">Paina pitkään tai kaksoisnapauta sanaa vastauksessa ja vedä valintakahvoja kappaleiden, luetteloiden, koodin ja taulukoiden yli.</string>
     <string name="settings_whatsnew_entry_reply_text_selection_detail_1">Pidä valintakahvaa otsakkeen alapuolella tai viestikentän yläpuolella, niin vastaus vierii. Mitä lähempänä reunaa olet, sitä nopeammin se vierii.</string>
     <string name="settings_whatsnew_entry_reply_text_selection_detail_2">Kopiointi säilyttää luetteloiden merkit ja numerot sekä taulukoiden rivit ja sarakkeet. Lainaa lisää valinnan viestikenttään ja säilyttää koodilohkot.</string>
     <string name="settings_whatsnew_entry_reply_text_selection_example">Paina pitkään sanaa pitkän vastauksen alussa. Vedä sitten valinnan loppukahva viestikentän kohdalle ja pidä sitä siinä</string>
@@ -887,7 +887,7 @@
     <!-- 2026-11-07-03-one-picker -->
     <string name="settings_whatsnew_entry_one_picker_title">Uusi mallinvalitsin</string>
     <string name="settings_whatsnew_entry_one_picker_summary">Napauta mallia viestikentässä, niin luettelo avautuu siitä. Suosikit ja Viimeaikaiset näkyvät ylimpänä ja kaikki palveluntarjoajat niiden alla.</string>
-    <string name="settings_whatsnew_entry_one_picker_detail_1">Vaihda päättelyn tasoa poistumatta luettelosta napauttamalla sitä mallin rivillä, esimerkiksi ”high”.</string>
+    <string name="settings_whatsnew_entry_one_picker_detail_1">Vaihda pohdinnan tasoa poistumatta luettelosta napauttamalla sitä mallin rivillä, esimerkiksi ”high”.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_2">Lisää malli suosikkeihin tai poista se niistä pyyhkäisemällä riviä tai painamalla sitä pitkään.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_3">Haku on alareunassa. Kirjoita nimen perään taso, esimerkiksi ”opus high”, ja valitse molemmat Enter-näppäimellä.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_4">Vedä vetokahvaa ylös suurentaaksesi luetteloa tai alas sulkeaksesi sen.</string>
@@ -900,5 +900,5 @@
 
     <!-- 2026-11-08-02-default-model -->
     <string name="settings_whatsnew_entry_default_model_title">Uudet istunnot käyttävät oletusmalliasi</string>
-    <string name="settings_whatsnew_entry_default_model_summary">Uudet istunnot alkavat OpenCode-oletusmallillasi ja sille viimeksi valitsemallasi päättelyn tasolla, eivät edellisen istunnon mallilla.</string>
+    <string name="settings_whatsnew_entry_default_model_summary">Uudet istunnot alkavat OpenCode-oletusmallillasi ja sille viimeksi valitsemallasi pohdinnan tasolla, eivät edellisen istunnon mallilla.</string>
 </resources>

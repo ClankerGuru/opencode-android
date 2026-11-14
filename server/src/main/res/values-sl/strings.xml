@@ -7,22 +7,22 @@
     <string name="server_notice_heading_failed">%1$s: ni uspelo</string>
     <string name="server_notice_heading_interrupted">%1$s: prekinjeno</string>
     <plurals name="server_notice_count_shell_finished">
-        <item quantity="one">%1$d lupina se je končala</item>
-        <item quantity="two">%1$d lupini sta se končali</item>
-        <item quantity="few">%1$d lupine so se končale</item>
-        <item quantity="other">%1$d lupin se je končalo</item>
+        <item quantity="one">%1$d končana lupina</item>
+        <item quantity="two">%1$d končani lupini</item>
+        <item quantity="few">%1$d končane lupine</item>
+        <item quantity="other">%1$d končanih lupin</item>
     </plurals>
     <plurals name="server_notice_count_shell_failed">
-        <item quantity="one">%1$d lupina ni uspela</item>
-        <item quantity="two">%1$d lupini nista uspeli</item>
-        <item quantity="few">%1$d lupine niso uspele</item>
-        <item quantity="other">%1$d lupin ni uspelo</item>
+        <item quantity="one">%1$d neuspela lupina</item>
+        <item quantity="two">%1$d neuspeli lupini</item>
+        <item quantity="few">%1$d neuspele lupine</item>
+        <item quantity="other">%1$d neuspelih lupin</item>
     </plurals>
     <plurals name="server_notice_count_shell_interrupted">
-        <item quantity="one">%1$d lupina je bila prekinjena</item>
-        <item quantity="two">%1$d lupini sta bili prekinjeni</item>
-        <item quantity="few">%1$d lupine so bile prekinjene</item>
-        <item quantity="other">%1$d lupin je bilo prekinjenih</item>
+        <item quantity="one">%1$d prekinjena lupina</item>
+        <item quantity="two">%1$d prekinjeni lupini</item>
+        <item quantity="few">%1$d prekinjene lupine</item>
+        <item quantity="other">%1$d prekinjenih lupin</item>
     </plurals>
     <plurals name="server_notice_count_subagent_finished">
         <item quantity="one">%1$d subagent je končal</item>

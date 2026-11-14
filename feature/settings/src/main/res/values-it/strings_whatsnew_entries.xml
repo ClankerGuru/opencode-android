@@ -10,7 +10,7 @@
     <string name="settings_whatsnew_entry_attachment_menu_hold_title">Allega con +</string>
     <string name="settings_whatsnew_entry_attachment_menu_hold_summary">Il menu + si espande dal campo del messaggio con Fotocamera, Foto e File. Tieni premuto + e scorri per scegliere con un solo gesto.</string>
     <string name="settings_whatsnew_entry_attachment_menu_hold_detail_1">Foto si apre sopra il campo del messaggio; tocca le foto per allegarle.</string>
-    <string name="settings_whatsnew_entry_attachment_menu_hold_detail_2">La fotocamera ha pulsanti per gli obiettivi, zoom con due dita, messa a fuoco con un tocco e flash.</string>
+    <string name="settings_whatsnew_entry_attachment_menu_hold_detail_2">La fotocamera ha pulsanti per gli obiettivi, pizzica per ingrandire, messa a fuoco con un tocco e flash.</string>
     <string name="settings_whatsnew_entry_attachment_menu_hold_example">Tieni premuto +, scorri verso l\'alto fino a Foto e rilascia</string>
 
     <!-- 2026-10-08-01-voice-webrtc-weak-connection -->
@@ -184,7 +184,7 @@
     <string name="settings_whatsnew_entry_app_icon_badge_summary">L\'icona dell\'app mostra quante sessioni sono da leggere o in attesa di te, come in Mettiti in pari.</string>
     <string name="settings_whatsnew_entry_app_icon_badge_detail_1">Le sessioni silenziate non contano.</string>
     <string name="settings_whatsnew_entry_app_icon_badge_detail_2">Le notifiche devono essere attive.</string>
-    <string name="settings_whatsnew_entry_app_icon_badge_example">Lascia una sessione in attesa di una risposta, poi vai alla schermata Home</string>
+    <string name="settings_whatsnew_entry_app_icon_badge_example">Lascia una sessione in attesa di una domanda, poi vai alla schermata Home</string>
 
     <!-- 2026-10-12-09-drawer-keeps-keyboard -->
     <string name="settings_whatsnew_entry_drawer_keeps_keyboard_title">La tastiera scorre con il pannello laterale</string>
@@ -545,7 +545,7 @@
 
     <!-- 2026-10-21-07-welcome-pairing-copy -->
     <string name="settings_whatsnew_entry_welcome_pairing_copy_title">Associa dall\'app OpenCode</string>
-    <string name="settings_whatsnew_entry_welcome_pairing_copy_summary">La schermata di benvenuto ti indica Impostazioni → Associazione in corso in OpenCode sul computer, oppure /pair nel terminale, e mostra il comando di installazione se non hai ancora OpenCode.</string>
+    <string name="settings_whatsnew_entry_welcome_pairing_copy_summary">La schermata di benvenuto ti indica Impostazioni → Associazione in OpenCode sul computer, oppure /pair nel terminale, e mostra il comando di installazione se non hai ancora OpenCode.</string>
 
     <!-- 2026-10-21-08-session-id-links -->
     <string name="settings_whatsnew_entry_session_id_links_title">Collegamenti alle sessioni</string>
@@ -715,7 +715,7 @@
     <string name="settings_whatsnew_entry_welcome_preview_summary">Il nuovo benvenuto al primo avvio mostra OpenCode al lavoro su un portatile, guidato da un telefono, poi permette l\'associazione in un passaggio. Attiva Anteprima di benvenuto in Impostazioni › Sperimentale › Pannello laterale e tocca Mostra benvenuto per vederlo; chiudilo per tornare indietro.</string>
 
     <!-- 2026-10-29-01-composer-text-selection -->
-    <string name="settings_whatsnew_entry_composer_text_selection_title">Seleziona il testo da inviare</string>
+    <string name="settings_whatsnew_entry_composer_text_selection_title">Seleziona il testo nell\'area di composizione</string>
     <string name="settings_whatsnew_entry_composer_text_selection_summary">Trascinare i cursori di selezione o la lente in una bozza non nasconde più la tastiera e non sposta più l\'area di composizione su o giù.</string>
 
     <!-- 2026-10-30-01-voice-waits-for-you -->
@@ -873,7 +873,7 @@
 
     <!-- 2026-11-07-01-server-voice -->
     <string name="settings_whatsnew_entry_server_voice_title">Chiamate con le chiavi del server</string>
-    <string name="settings_whatsnew_entry_server_voice_summary">Voce sul server è ora attivo per tutti, senza interruttori. Le chiamate possono usare le chiavi del server OpenCode, quindi questo telefono non ha bisogno di una propria chiave OpenAI.</string>
+    <string name="settings_whatsnew_entry_server_voice_summary">Voce sul server è ora attiva per tutti, senza interruttori. Le chiamate possono usare le chiavi del server OpenCode, quindi questo telefono non ha bisogno di una propria chiave OpenAI.</string>
     <string name="settings_whatsnew_entry_server_voice_detail_1">Con Scegli automaticamente attivo, le chiamate usano il server a cui sei connesso, poi la chiave OpenAI su questo telefono, infine un altro server salvato e pronto.</string>
     <string name="settings_whatsnew_entry_server_voice_detail_2">Se sia il telefono sia il server hanno una chiave OpenAI, ora le chiamate usano quella del server. Per continuare a usare la tua, apri Il tuo account OpenAI in Provider vocale e tocca Usa per le chiamate.</string>
     <string name="settings_whatsnew_entry_server_voice_detail_3">Anche Gemini Live è ora disponibile come provider sui server con una chiave per Gemini.</string>

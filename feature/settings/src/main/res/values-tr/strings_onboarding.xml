@@ -7,7 +7,7 @@
     <string name="settings_onboarding_other_ways_terminal_header">Terminalde bunu çalıştır</string>
     <string name="settings_onboarding_other_ways_terminal_footer">Tarayabileceğiniz bir kod veya yapıştırabileceğiniz bir bağlantı gösterir ve her ağda çalışır.</string>
     <string name="settings_onboarding_other_ways_paste_link">Eşleştirme bağlantısı yapıştır</string>
-    <string name="settings_onboarding_other_ways_enter_address">Sunucu adresi gir</string>
+    <string name="settings_onboarding_other_ways_enter_address">Sunucu URL\'si gir</string>
     <string name="settings_onboarding_other_ways_install_header">Henüz OpenCode yok mu?</string>
     <string name="settings_onboarding_other_ways_install">Diğer kurulum yolları</string>
     <string name="settings_onboarding_command_copy_description">%1$s komutunu kopyala</string>
@@ -36,7 +36,7 @@
     <string name="settings_onboarding_desktop_composer_placeholder">İstediğinizi sorun, komutlar için /, bağlam için @…</string>
     <string name="settings_onboarding_desktop_composer_follow_up_placeholder">Devam mesajı ekleyin, komutlar için /, bağlam için @…</string>
     <string name="settings_onboarding_desktop_back_to_app">Uygulamaya dön</string>
-    <string name="settings_onboarding_desktop_pairing_title">Eşleştiriliyor</string>
+    <string name="settings_onboarding_desktop_pairing_title">Eşleştirme</string>
     <string name="settings_onboarding_desktop_pairing_subtitle">Başka bir cihazı bu bilgisayarın OpenCode sunucusuna bağlayın.</string>
     <string name="settings_onboarding_desktop_pair_device">Cihaz eşleştir</string>
     <string name="settings_onboarding_desktop_pair_device_message">Kodu başka bir cihazdaki OpenCode uygulamasıyla tarayın veya bağlantıyı kopyalayın.</string>
@@ -61,7 +61,7 @@
     <string name="settings_onboarding_headline">OpenCode\nher yerde.</string>
     <string name="settings_onboarding_headline_spoken">OpenCode her yerde.</string>
     <string name="settings_onboarding_subhead">Masanızdan uzaktayken görev başlatın, soruları yanıtlayın ve değişiklikleri inceleyin.</string>
-    <string name="settings_onboarding_instruction">Bilgisayarınızda OpenCode\'u açıp Ayarlar → Eşleştiriliyor bölümüne gidin.</string>
+    <string name="settings_onboarding_instruction">Bilgisayarınızda OpenCode\'u açıp Ayarlar → Eşleştirme bölümüne gidin.</string>
 
     <!-- Onboarding: WelcomeStory, the mock conversation (the reply's backticks mark code) -->
     <string name="settings_onboarding_story_prompt">Android için indirme düğmesi ekle ve bana göster</string>

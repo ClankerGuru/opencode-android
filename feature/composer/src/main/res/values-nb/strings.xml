@@ -43,7 +43,7 @@
     <string name="composer_pasted_text_wrap_description">Bryt linjer</string>
 
     <!-- Permission request -->
-    <string name="composer_request_scope_title">Spør ikke igjen for</string>
+    <string name="composer_request_scope_title">Spør ikke igjen om</string>
     <string name="composer_request_always_allow">Tillat alltid</string>
 
     <!-- Queued messages -->
@@ -223,7 +223,7 @@
     <string name="composer_request_failed">Forespørselen mislyktes</string>
     <!-- Location -->
     <string name="composer_location_denied">Stedstilgang er av for OpenCode. Slå den på i innstillingene.</string>
-    <string name="composer_location_unavailable">Kunne ikke finne beliggenheten din.</string>
+    <string name="composer_location_unavailable">Kunne ikke finne posisjonen din.</string>
     <string name="composer_request_yes">Ja</string>
     <string name="composer_request_no">Nei</string>
     <!-- Model picker -->

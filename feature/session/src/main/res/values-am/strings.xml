@@ -112,7 +112,7 @@
     <string name="session_message_placeholder">መልእክት</string>
     <!-- Session header -->
     <string name="session_back_to_main_description">ወደ ዋናው ክፍለ ጊዜ ተመለስ</string>
-    <string name="session_header_open_from_catch_up_label">ክፍለ ጊዜውን ክፈትና ከያመለጠዎትን ይዩ ውጣ</string>
+    <string name="session_header_open_from_catch_up_label">ክፍለ ጊዜውን ክፈትና ከ Catch Up ውጣ</string>
     <string name="session_header_show_details_label">የክፍለ ጊዜውን ዝርዝሮች አሳይ</string>
     <string name="session_header_idle_description">በመጠባበቅ ላይ</string>
     <string name="session_header_syncing_description">በማመሳሰል ላይ</string>

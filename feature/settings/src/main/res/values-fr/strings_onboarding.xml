@@ -36,7 +36,7 @@
     <string name="settings_onboarding_desktop_composer_placeholder">Demandez ce que vous voulez, / pour les commandes, @ pour le contexte…</string>
     <string name="settings_onboarding_desktop_composer_follow_up_placeholder">Ajoutez une précision, / pour les commandes, @ pour le contexte…</string>
     <string name="settings_onboarding_desktop_back_to_app">Retour à l’application</string>
-    <string name="settings_onboarding_desktop_pairing_title">Couplage en cours</string>
+    <string name="settings_onboarding_desktop_pairing_title">Couplage</string>
     <string name="settings_onboarding_desktop_pairing_subtitle">Connectez un autre appareil au serveur OpenCode de cet ordinateur.</string>
     <string name="settings_onboarding_desktop_pair_device">Coupler un appareil</string>
     <string name="settings_onboarding_desktop_pair_device_message">Scannez le code avec l’application OpenCode sur un autre appareil, ou copiez le lien.</string>
@@ -61,7 +61,7 @@
     <string name="settings_onboarding_headline">OpenCode\npartout.</string>
     <string name="settings_onboarding_headline_spoken">OpenCode partout.</string>
     <string name="settings_onboarding_subhead">Lancez des tâches, répondez aux questions et passez les modifications en revue, loin de votre bureau.</string>
-    <string name="settings_onboarding_instruction">Sur votre ordinateur, ouvrez OpenCode et allez dans Paramètres → Couplage en cours.</string>
+    <string name="settings_onboarding_instruction">Sur votre ordinateur, ouvrez OpenCode et allez dans Paramètres → Couplage.</string>
 
     <!-- Onboarding: WelcomeStory, the mock conversation (the reply's backticks mark code) -->
     <string name="settings_onboarding_story_prompt">Ajoute un bouton de téléchargement pour Android et montre-moi</string>

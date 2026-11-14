@@ -36,7 +36,7 @@
     <string name="settings_onboarding_desktop_composer_placeholder">Fråga vad som helst, / för kommandon, @ för kontext…</string>
     <string name="settings_onboarding_desktop_composer_follow_up_placeholder">Följ upp, / för kommandon, @ för kontext…</string>
     <string name="settings_onboarding_desktop_back_to_app">Tillbaka till appen</string>
-    <string name="settings_onboarding_desktop_pairing_title">Parar ihop</string>
+    <string name="settings_onboarding_desktop_pairing_title">Parkoppling</string>
     <string name="settings_onboarding_desktop_pairing_subtitle">Anslut en annan enhet till den här datorns OpenCode-server.</string>
     <string name="settings_onboarding_desktop_pair_device">Para ihop en enhet</string>
     <string name="settings_onboarding_desktop_pair_device_message">Skanna koden med OpenCode-appen på en annan enhet eller kopiera länken.</string>
@@ -61,7 +61,7 @@
     <string name="settings_onboarding_headline">OpenCode\növerallt.</string>
     <string name="settings_onboarding_headline_spoken">OpenCode överallt.</string>
     <string name="settings_onboarding_subhead">Starta uppgifter, svara på frågor och granska ändringar när du är borta från datorn.</string>
-    <string name="settings_onboarding_instruction">Öppna OpenCode på datorn och gå till Inställningar → Parar ihop.</string>
+    <string name="settings_onboarding_instruction">Öppna OpenCode på datorn och gå till Inställningar → Parkoppling.</string>
 
     <!-- Onboarding: WelcomeStory, the mock conversation (the reply's backticks mark code) -->
     <string name="settings_onboarding_story_prompt">Lägg till en knapp för att ladda ner Android-appen och visa mig</string>

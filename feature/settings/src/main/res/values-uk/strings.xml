@@ -12,7 +12,7 @@
     <string name="settings_themes_preview_reply">Знайшов проблему з компонуванням у %1$s. Розшифровка й редактор повідомлень ділять доступну висоту, тож клавіатура добре допомагає перевірити компонування.</string>
 
     <!-- Experimental -->
-    <string name="settings_experimental_title">Експериментальні функції</string>
+    <string name="settings_experimental_title">Експериментальний</string>
     <string name="settings_experimental_all_footer">Також вмикає нові функції, крім тих, що бачать ваш екран або слухають у фоні.</string>
     <string name="settings_experimental_all">Усі експерименти</string>
     <string name="settings_experimental_all_on">Усе ввімкнено</string>
@@ -118,7 +118,7 @@
         <item quantity="one">%d недоступний</item>
         <item quantity="few">%d недоступні</item>
         <item quantity="many">%d недоступних</item>
-        <item quantity="other">%d недоступного</item>
+        <item quantity="other">%d недоступних</item>
     </plurals>
 
     <!-- Voice › API Key -->

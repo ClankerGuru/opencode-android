@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Onboarding: Welcome -->
-    <string name="settings_onboarding_get_started">Начало</string>
+    <string name="settings_onboarding_get_started">Започнете</string>
     <string name="settings_onboarding_scan_pairing_code">Сканиране на код за сдвояване</string>
     <string name="settings_onboarding_other_ways_title">Други начини за свързване</string>
     <string name="settings_onboarding_other_ways_terminal_header">Изпълнете това в терминал</string>
@@ -50,7 +50,7 @@
     <string name="settings_onboarding_phone_message_placeholder">Съобщение</string>
 
     <!-- What’s New -->
-    <string name="settings_whatsnew_developer_updates">Новости за разработчици</string>
+    <string name="settings_whatsnew_developer_updates">Актуализации за разработчици</string>
     <string name="settings_whatsnew_smaller_changes">По-малки промени</string>
     <string name="settings_whatsnew_title">Какво ново</string>
     <string name="settings_whatsnew_options_description">Опции за „Какво ново“</string>

@@ -143,7 +143,7 @@
     <string name="session_shell_showing_last_output">শেষ 4 MB দেখানো হচ্ছে</string>
     <string name="session_shell_load_earlier">আগের আউটপুট লোড করুন</string>
     <string name="session_shell_output_unavailable_title">আউটপুট পাওয়া যাচ্ছে না</string>
-    <string name="session_shell_output_unavailable_message">এই শেলের আউটপুট আর সার্ভারে নেই।</string>
+    <string name="session_shell_output_unavailable_message">এই শেলের আউটপুট সার্ভারে আর নেই।</string>
     <string name="session_shell_no_output_yet_title">এখনও আউটপুট নেই</string>
     <string name="session_shell_no_output_title">আউটপুট নেই</string>
     <string name="session_shell_no_output_yet_message">কমান্ড আউটপুট লিখলে তা এখানে দেখা যাবে।</string>

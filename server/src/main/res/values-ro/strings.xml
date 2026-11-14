@@ -13,8 +13,8 @@
     </plurals>
     <plurals name="server_notice_count_shell_failed">
         <item quantity="one">%1$d shell cu eroare</item>
-        <item quantity="few">%1$d shell-uri cu erori</item>
-        <item quantity="other">%1$d de shell-uri cu erori</item>
+        <item quantity="few">%1$d shell-uri cu eroare</item>
+        <item quantity="other">%1$d de shell-uri cu eroare</item>
     </plurals>
     <plurals name="server_notice_count_shell_interrupted">
         <item quantity="one">%1$d shell întrerupt</item>
@@ -78,7 +78,7 @@
     <string name="server_notice_session_update">Actualizare sesiune</string>
 
     <!-- ConnectionFailureDetail.kt -->
-    <string name="server_connection_failed">Conectarea a eșuat</string>
+    <string name="server_connection_failed">Conexiunea a eșuat</string>
     <string name="server_connection_resolved_address_unknown">Adresă rezolvată: necunoscută</string>
     <string name="server_connection_resolved_address">Adresă rezolvată (căutare după eșec): %1$s</string>
     <string name="server_connection_tailnet_dns_mismatch">Acest nume tailnet a fost rezolvat la o adresă din afara intervalului Tailscale, deci este posibil ca DNS-ul Tailscale să nu fie folosit. În aplicația Tailscale, activează Folosește setările DNS Tailscale și dezactivează DNS privat sau orice profil VPN care modifică DNS-ul.</string>

@@ -128,7 +128,7 @@
     <string name="transcript_tool_search_quoted">otsi „%1$s“</string>
     <string name="transcript_tool_group_updates">Uuendused</string>
     <plurals name="transcript_tool_group_used">
-        <item quantity="one">Kasutatud %1$d tööriista</item>
+        <item quantity="one">Kasutatud %1$d tööriist</item>
         <item quantity="other">Kasutatud %1$d tööriista</item>
     </plurals>
 

@@ -398,7 +398,7 @@
 
     <!-- 2026-10-19-04-interrupted-hand -->
     <string name="settings_whatsnew_entry_interrupted_hand_title">Arakesdi üçin el nyşany</string>
-    <string name="settings_whatsnew_entry_interrupted_hand_summary">Arakesen iş we shell indi galdyrylan el nyşany bilen görkezilýär. Özüňiz durzan shell-de bolsa Durzuldy ýerine Arakesdi ýazylýar.</string>
+    <string name="settings_whatsnew_entry_interrupted_hand_summary">Arakesilen iş we shell indi galdyrylan el nyşany bilen görkezilýär. Özüňiz duruzan shell-de bolsa Durzuldy ýerine Arakesdi ýazylýar.</string>
 
     <!-- 2026-10-19-05-autocomplete-fast-scroll -->
     <string name="settings_whatsnew_entry_autocomplete_fast_scroll_title">Has çalt awtodoldurma</string>
@@ -782,7 +782,7 @@
 
     <!-- 2026-11-01-03-open-links-from-calls -->
     <string name="settings_whatsnew_entry_open_links_from_calls_title">Jaňlardan baglanyşyk açmak</string>
-    <string name="settings_whatsnew_entry_open_links_from_calls_summary">Sazlamalar › Synag › Jaňlar bölüminde Jaňlardan baglanyşyk açmagy açyň. Jaň wagty agent, mysal üçin, Uber saparyna baglanyşyk hödürläp biler: degişli programmada açmak üçin Açyk ýa-da Häzir däl düwmesine basyň.</string>
+    <string name="settings_whatsnew_entry_open_links_from_calls_summary">Sazlamalar › Synag › Jaňlar bölüminde Jaňlardan baglanyşyk açmagy açyň. Jaň wagty agent, mysal üçin, Uber saparyna baglanyşyk hödürläp biler: degişli programmada açmak üçin Açyň ýa-da Häzir däl düwmesine basyň.</string>
 
     <!-- 2026-11-02-01-fold-questions -->
     <string name="settings_whatsnew_entry_fold_questions_title">Soraglary ýygnap goýuň</string>
@@ -825,7 +825,7 @@
     <!-- 2026-11-04-01-call-links-and-audio -->
     <string name="settings_whatsnew_entry_call_links_and_audio_title">Jaňlarda baglanyşyklar we ses</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_summary">Jaňlardan baglanyşyk açmak we Jaňlarda ses indi hemmeler üçin işledilen, aýratyn düwmesi ýok.</string>
-    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">Jaň wagty agent, mysal üçin, Uber saparyna baglanyşyk hödürläp biler: öz programmasynda açmak üçin Açyk ýa-da Häzir däl düwmesine basyň.</string>
+    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">Jaň wagty agent, mysal üçin, Uber saparyna baglanyşyk hödürläp biler: öz programmasynda açmak üçin Açyň ýa-da Häzir däl düwmesine basyň.</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_detail_2">Agent jaňda saz ýa-da gysga ýazgy aýtdyryp biler. Siziň biriňiz geplände sesi peselýär; habar ýazmak meýdanynyň ýokarsynda sägindiriň ýa-da duruzyň.</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_example">Jaň wagty agentden saz aýtdyrmagy soraň</string>
 

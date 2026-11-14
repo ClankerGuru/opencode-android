@@ -36,7 +36,7 @@
     <string name="settings_onboarding_desktop_composer_placeholder">Klauskite bet ko, / — komandos, @ — kontekstas…</string>
     <string name="settings_onboarding_desktop_composer_follow_up_placeholder">Papildykite, / — komandos, @ — kontekstas…</string>
     <string name="settings_onboarding_desktop_back_to_app">Grįžti į programą</string>
-    <string name="settings_onboarding_desktop_pairing_title">Susiejama</string>
+    <string name="settings_onboarding_desktop_pairing_title">Susiejimas</string>
     <string name="settings_onboarding_desktop_pairing_subtitle">Prijunkite kitą įrenginį prie šio kompiuterio OpenCode serverio.</string>
     <string name="settings_onboarding_desktop_pair_device">Susieti įrenginį</string>
     <string name="settings_onboarding_desktop_pair_device_message">Nuskaitykite kodą OpenCode programa kitame įrenginyje arba nukopijuokite nuorodą.</string>
@@ -50,7 +50,7 @@
     <string name="settings_onboarding_phone_message_placeholder">Žinutė</string>
 
     <!-- What’s New -->
-    <string name="settings_whatsnew_developer_updates">Naujienos kūrėjams</string>
+    <string name="settings_whatsnew_developer_updates">Atnaujinimai kūrėjams</string>
     <string name="settings_whatsnew_smaller_changes">Smulkesni pakeitimai</string>
     <string name="settings_whatsnew_title">Kas naujo</string>
     <string name="settings_whatsnew_options_description">Skilties „Kas naujo“ parinktys</string>
@@ -61,7 +61,7 @@
     <string name="settings_onboarding_headline">OpenCode\nbet kur.</string>
     <string name="settings_onboarding_headline_spoken">OpenCode bet kur.</string>
     <string name="settings_onboarding_subhead">Pradėkite užduotis, atsakykite į klausimus ir peržiūrėkite pakeitimus nebūdami prie kompiuterio.</string>
-    <string name="settings_onboarding_instruction">Kompiuteryje atidarykite OpenCode ir eikite į Nustatymai → Susiejama.</string>
+    <string name="settings_onboarding_instruction">Kompiuteryje atidarykite OpenCode ir eikite į Nustatymai → Susiejimas.</string>
 
     <!-- Onboarding: WelcomeStory, the mock conversation (the reply's backticks mark code) -->
     <string name="settings_onboarding_story_prompt">Pridėk Android versijos atsisiuntimo mygtuką ir parodyk</string>

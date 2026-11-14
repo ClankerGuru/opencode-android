@@ -143,7 +143,7 @@
     <string name="session_shell_showing_last_output">අවසන් 4 MB පෙන්වයි</string>
     <string name="session_shell_load_earlier">පෙර දේ පූරණය කරන්න</string>
     <string name="session_shell_output_unavailable_title">ප්‍රතිදානය නොමැත</string>
-    <string name="session_shell_output_unavailable_message">මෙම ෂෙල් එකේ ප්‍රතිදානය තවදුරටත් සේවාදායකයේ නැත.</string>
+    <string name="session_shell_output_unavailable_message">මෙම ෂෙල් ප්‍රතිදානය තවදුරටත් සේවාදායකයේ නැත.</string>
     <string name="session_shell_no_output_yet_title">තවම ප්‍රතිදානයක් නැත</string>
     <string name="session_shell_no_output_title">ප්‍රතිදානයක් නැත</string>
     <string name="session_shell_no_output_yet_message">විධානයෙන් ප්‍රතිදානය ලැබෙන විට මෙහි පෙන්වයි.</string>

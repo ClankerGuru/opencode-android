@@ -70,7 +70,7 @@
     <string name="app_connection_progress_loading_sessions">S\'estan carregant les sessions</string>
 
     <!-- Pairing confirmation (AppFeature.PendingPairing) -->
-    <string name="app_pairing_confirm_title">Vols aparellar amb %1$s?</string>
+    <string name="app_pairing_confirm_title">Vols aparellar-te amb %1$s?</string>
     <string name="app_pairing_confirm_try_one">OpenCode provarà %1$s i es connectarà a la primera adreça que respongui.</string>
     <string name="app_pairing_confirm_pair_one">OpenCode s\'aparellarà amb %1$s i s\'hi connectarà.</string>
     <string name="app_pairing_confirm_try_two">OpenCode provarà %1$s i %2$s i es connectarà a la primera adreça que respongui.</string>

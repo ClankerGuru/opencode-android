@@ -18,8 +18,8 @@
 
     <!-- Plus button -->
     <string name="composer_plus_cancel_dictation_description">Annuller diktering</string>
-    <string name="composer_plus_adding_attachment_description">Tilføjer vedhæftet fil</string>
-    <string name="composer_plus_add_attachment_description">Tilføj vedhæftet fil</string>
+    <string name="composer_plus_adding_attachment_description">Tilføjer vedhæftning</string>
+    <string name="composer_plus_add_attachment_description">Tilføj vedhæftning</string>
 
     <!-- Autocomplete -->
     <string name="composer_autocomplete_suggestions_description">Forslag til autofuldførelse</string>

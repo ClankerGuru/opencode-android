@@ -44,9 +44,9 @@
     <string name="system_ask_send_failed">OpenCode’ga yuborib bo‘lmadi. %1$s</string>
 
     <!-- Live Updates: voice call -->
-    <string name="system_call_muted">Bildirishnomalar o‘chirilgan</string>
-    <string name="system_call_unmute">Bildirishnomalarni yoqish</string>
-    <string name="system_call_mute">Bildirishnomalarni o‘chirish</string>
+    <string name="system_call_muted">Ovozi o‘chirilgan</string>
+    <string name="system_call_unmute">Ovozni yoqish</string>
+    <string name="system_call_mute">Ovozni o‘chirish</string>
     <string name="system_call_end">Qo‘ng‘iroqni tugatish</string>
     <string name="system_call_connecting">Ulanmoqda…</string>
     <string name="system_call_reconnecting">Qayta ulanmoqda…</string>

@@ -36,7 +36,7 @@
     <string name="settings_onboarding_desktop_composer_placeholder">Hỏi bất cứ điều gì, / để dùng lệnh, @ để thêm ngữ cảnh…</string>
     <string name="settings_onboarding_desktop_composer_follow_up_placeholder">Thêm yêu cầu tiếp, / để dùng lệnh, @ để thêm ngữ cảnh…</string>
     <string name="settings_onboarding_desktop_back_to_app">Quay lại ứng dụng</string>
-    <string name="settings_onboarding_desktop_pairing_title">Đang ghép cặp</string>
+    <string name="settings_onboarding_desktop_pairing_title">Ghép cặp</string>
     <string name="settings_onboarding_desktop_pairing_subtitle">Kết nối thiết bị khác với máy chủ OpenCode trên máy này.</string>
     <string name="settings_onboarding_desktop_pair_device">Ghép cặp thiết bị</string>
     <string name="settings_onboarding_desktop_pair_device_message">Quét mã bằng ứng dụng OpenCode trên thiết bị khác hoặc sao chép liên kết.</string>
@@ -61,7 +61,7 @@
     <string name="settings_onboarding_headline">OpenCode\nở mọi nơi.</string>
     <string name="settings_onboarding_headline_spoken">OpenCode ở mọi nơi.</string>
     <string name="settings_onboarding_subhead">Bắt đầu nhiệm vụ, trả lời câu hỏi và xem lại thay đổi ngay cả khi không ngồi ở bàn.</string>
-    <string name="settings_onboarding_instruction">Trên máy tính, mở OpenCode rồi vào Cài đặt → Đang ghép cặp.</string>
+    <string name="settings_onboarding_instruction">Trên máy tính, mở OpenCode rồi vào Cài đặt → Ghép cặp.</string>
 
     <!-- Onboarding: WelcomeStory, the mock conversation (the reply's backticks mark code) -->
     <string name="settings_onboarding_story_prompt">Thêm nút tải xuống cho Android rồi cho tôi xem</string>

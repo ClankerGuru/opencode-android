@@ -17,7 +17,7 @@
     <string name="session_dictation_stop_recording_hint">Unesi izgovoreno u poruku</string>
     <string name="session_sending_message_description">Slanje poruke</string>
     <string name="session_delivery_steer_label">Usmjeri u sljedećem koraku</string>
-    <string name="session_delivery_queue_label">Stavi u red nakon ovog odgovora</string>
+    <string name="session_delivery_queue_label">Stavi u red čekanja nakon ovog odgovora</string>
     <string name="session_delivery_steer">Usmjeri</string>
     <string name="session_delivery_queue">Stavi u red čekanja</string>
     <!-- Draft project picker -->
@@ -259,7 +259,7 @@
     <string name="session_sheet_rename_failed_title">Nije moguće preimenovati sesiju</string>
     <string name="session_sheet_compact_failed_title">Nije moguće sažeti sesiju</string>
     <string name="session_sheet_fork_failed_title">Nije moguće odvojiti u novu sesiju</string>
-    <string name="session_sheet_save_export_failed">Nije moguće uštedjeti izvoz</string>
+    <string name="session_sheet_save_export_failed">Nije moguće spremiti izvoz</string>
     <string name="session_sheet_export_failed_title">Nije moguće izvesti sesiju</string>
     <string name="session_sheet_notifications_off_message">Najprije uključite obavijesti u postavkama.</string>
     <string name="session_sheet_always_notify_on_failed_title">Nije moguće uključiti „Uvijek obavijesti”</string>
@@ -282,7 +282,7 @@
     <plurals name="session_large_upload_message_many">
         <item quantity="one">%1$d datoteka je velika. Poruka će se poslati kad završi prijenos na vaš poslužitelj.</item>
         <item quantity="few">%1$d datoteke su velike. Poruka će se poslati kad završi prijenos na vaš poslužitelj.</item>
-        <item quantity="other">%1$d datoteka je veliko. Poruka će se poslati kad završi prijenos na vaš poslužitelj.</item>
+        <item quantity="other">%1$d datoteka je velikih. Poruka će se poslati kad završi prijenos na vaš poslužitelj.</item>
     </plurals>
 
     <!-- Header and screens -->

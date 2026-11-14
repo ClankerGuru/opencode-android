@@ -46,8 +46,8 @@
     <string name="session_rename_title">Nimeä istunto uudelleen</string>
     <string name="session_untitled_title">Istunto</string>
     <string name="session_pin">Kiinnitä</string>
-    <string name="session_pinned">Kiinnitetyt</string>
-    <string name="session_unread">Lukemattomat</string>
+    <string name="session_pinned">Kiinnitetty</string>
+    <string name="session_unread">Lukematon</string>
     <string name="session_mute">Mykistä</string>
     <string name="session_muted">Mykistetty</string>
     <string name="session_compact">Tiivistä</string>
@@ -143,7 +143,7 @@
     <string name="session_shell_showing_last_output">Näytetään viimeiset 4 Mt</string>
     <string name="session_shell_load_earlier">Lataa aiemmat</string>
     <string name="session_shell_output_unavailable_title">Tuloste ei ole saatavilla</string>
-    <string name="session_shell_output_unavailable_message">Tämän komentotulkin tulostetta ei enää ole palvelimella.</string>
+    <string name="session_shell_output_unavailable_message">Palvelimella ei enää ole tämän komentotulkin tulostetta.</string>
     <string name="session_shell_no_output_yet_title">Ei vielä tulostetta</string>
     <string name="session_shell_no_output_title">Ei tulostetta</string>
     <string name="session_shell_no_output_yet_message">Tuloste näkyy tässä sitä mukaa kuin komento tuottaa sitä.</string>

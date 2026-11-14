@@ -563,7 +563,7 @@
     <string name="settings_whatsnew_entry_ipad_multiple_windows_detail_2">Každé okno má vlastní relaci, postranní panel a pole zprávy.</string>
     <string name="settings_whatsnew_entry_ipad_multiple_windows_detail_3">Připnuté položky, stav přečtení relací a servery jsou ve všech oknech stejné.</string>
     <string name="settings_whatsnew_entry_ipad_multiple_windows_detail_4">Okna se znovu otevřou se stejnou relací.</string>
-    <string name="settings_whatsnew_entry_ipad_multiple_windows_example">Podržte relaci v postranním panelu, zvolte Otevřít v novém okně a umístěte ho vedle prvního.</string>
+    <string name="settings_whatsnew_entry_ipad_multiple_windows_example">Podržte relaci v postranním panelu, zvolte Otevřít v novém okně a umístěte je vedle prvního.</string>
 
     <!-- 2026-10-21-11-plain-launch -->
     <string name="settings_whatsnew_entry_plain_launch_title">Jednoduché spuštění</string>
@@ -825,7 +825,7 @@
     <!-- 2026-11-04-01-call-links-and-audio -->
     <string name="settings_whatsnew_entry_call_links_and_audio_title">Odkazy a zvuk v hovorech</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_summary">Otevírání odkazů z hovorů a zvuk v hovorech jsou teď zapnuté pro všechny, bez přepínače.</string>
-    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">Agent může během hovoru nabídnout odkaz, třeba na jízdu přes Uber. Klepnutím na Otevřeno ho otevřete v příslušné aplikaci, nebo zvolte Teď ne.</string>
+    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">Agent může během hovoru nabídnout odkaz, třeba na jízdu přes Uber. Klepnutím na Otevřít ho otevřete v příslušné aplikaci, nebo zvolte Teď ne.</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_detail_2">Agent může během hovoru přehrát hudbu nebo klip. Zvuk se ztlumí, když někdo z vás mluví. Nad editorem zpráv ho můžete pozastavit nebo zastavit.</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_example">Během hovoru požádejte agenta, ať přehraje nějakou hudbu</string>
 

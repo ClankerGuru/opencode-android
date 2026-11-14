@@ -159,7 +159,7 @@
     <string name="voice_accent_north_american_english">Észak-amerikai angol</string>
     <string name="voice_accent_brazilian_portuguese">Brazil portugál</string>
     <string name="voice_accent_filipino_english">Fülöp-szigeteki angol</string>
-    <string name="voice_accent_southern_us_english">Dél-amerikai angol (USA)</string>
+    <string name="voice_accent_southern_us_english">Amerikai déli angol</string>
     <string name="voice_accent_indian_english">Indiai angol</string>
     <string name="voice_preview_error">Nem sikerült lejátszani a hangmintát</string>
 

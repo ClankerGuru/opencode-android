@@ -44,9 +44,9 @@
     <string name="system_ask_send_failed">OpenCode သို့ မပို့နိုင်ပါ။ %1$s</string>
 
     <!-- Live Updates: voice call -->
-    <string name="system_call_muted">အကြောင်းကြားချက် ပိတ်ထားသည်</string>
-    <string name="system_call_unmute">အသိပေးချက် ပြန်ဖွင့်ပါ</string>
-    <string name="system_call_mute">အသိပေးချက် ပိတ်ပါ</string>
+    <string name="system_call_muted">အသံပိတ်ထားသည်</string>
+    <string name="system_call_unmute">အသံပြန်ဖွင့်ပါ</string>
+    <string name="system_call_mute">အသံပိတ်ပါ</string>
     <string name="system_call_end">ဖုန်းချပါ</string>
     <string name="system_call_connecting">ချိတ်ဆက်နေသည်…</string>
     <string name="system_call_reconnecting">ပြန်ချိတ်ဆက်နေသည်…</string>

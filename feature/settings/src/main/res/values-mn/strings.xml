@@ -214,5 +214,5 @@
     <string name="settings_pairing_nothing_to_paste_message">Түр санах ойд хослуулах холбоос алга. opencode pair ажиллуулахад гарсан холбоосыг хуулаад дахин оролдоно уу.</string>
     <string name="settings_pairing_point_camera">Камераа QR код руу чиглүүлнэ үү</string>
     <string name="settings_pairing_paste_link">Хослуулах холбоосыг буулгах</string>
-    <string name="settings_pairing_computer_hint">Компьютер дээрээ OpenCode-ийн Тохиргоо → Хослуулж байна хэсгийг нээх эсвэл терминалд %1$s ажиллуулна уу.</string>
+    <string name="settings_pairing_computer_hint">Компьютер дээрээ OpenCode-ийн Тохиргоо → Хослуулах хэсгийг нээх эсвэл терминалд %1$s ажиллуулна уу.</string>
 </resources>

@@ -153,7 +153,7 @@
     <string name="voice_error_connection_closed">Голосовое соединение закрыто.</string>
     <string name="voice_error_connection_setup">Не удалось установить голосовое соединение.</string>
     <string name="voice_error_safety_filter">Фильтр безопасности завершил голосовой звонок.</string>
-    <string name="voice_error_audio_reset">Система сбросила настройки аудио. Начните звонок заново.</string>
+    <string name="voice_error_audio_reset">Аудио было сброшено системой. Начните звонок заново.</string>
     <string name="voice_error_missing_phone_key">Добавьте свой ключ API %1$s в настройках, чтобы использовать голосовой режим.</string>
 
     <!-- Voice accents -->

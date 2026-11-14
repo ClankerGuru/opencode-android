@@ -213,7 +213,7 @@
     <string name="composer_request_answer_failed">အဖြေ မပို့နိုင်ပါ</string>
     <string name="composer_request_reply_failed">ပြန်စာ မပို့နိုင်ပါ</string>
     <string name="composer_request_deny">ငြင်းဆို</string>
-    <string name="composer_request_decline_placeholder">အစား ဘာလုပ်ရမလဲ ပြောပါ</string>
+    <string name="composer_request_decline_placeholder">၎င်းအစား ဘာလုပ်ရမလဲ ပြောပါ</string>
     <string name="composer_request_reason_description">အကြောင်းရင်း</string>
     <string name="composer_request_failed">တောင်းဆိုမှု မအောင်မြင်ပါ။</string>
     <!-- Location -->

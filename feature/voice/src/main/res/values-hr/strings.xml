@@ -35,7 +35,7 @@
     <!-- Call rows: open link -->
     <string name="voice_open_link_spoken">Potreban je vaš unos. %1$s</string>
     <string name="voice_open_link_spoken_with_host">Potreban je vaš unos. %1$s %2$s</string>
-    <string name="voice_open_link_open">Otvoreno</string>
+    <string name="voice_open_link_open">Otvoriti</string>
 
     <!-- Call rows: audio on the call -->
     <string name="voice_audio_paused">Pauzirano</string>

@@ -720,7 +720,7 @@
 
     <!-- 2026-10-30-01-voice-waits-for-you -->
     <string name="settings_whatsnew_entry_voice_waits_for_you_title">ጥሪዎች ንግግርዎን እስኪጨርሱ ይጠብቃሉ</string>
-    <string name="settings_whatsnew_entry_voice_waits_for_you_summary">የድምፅ ወኪሉ ከእንግዲህ ንግግርዎን አይቋረጥም፤ የሁኔታ መረጃ ለመስጠት ንግግርዎን እስኪጨርሱ ይጠብቃል፣ እሱ ሲናገር ከተናገሩም ያቆማል።</string>
+    <string name="settings_whatsnew_entry_voice_waits_for_you_summary">የድምፅ ወኪሉ ከእንግዲህ ንግግርዎን አያቋርጥም፤ የሁኔታ መረጃ ለመስጠት ንግግርዎን እስኪጨርሱ ይጠብቃል፣ እሱ ሲናገር ከተናገሩም ያቆማል።</string>
 
     <!-- 2026-10-30-02-wisp-call-sounds -->
     <string name="settings_whatsnew_entry_wisp_call_sounds_title">የድምፅ ጥሪዎች የWisp ድምጾችን ይጠቀማሉ</string>

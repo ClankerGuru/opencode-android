@@ -49,7 +49,7 @@
     <string name="session_pinned">ปักหมุดแล้ว</string>
     <string name="session_unread">ยังไม่อ่าน</string>
     <string name="session_mute">ปิดการแจ้งเตือน</string>
-    <string name="session_muted">ปิดเสียงแล้ว</string>
+    <string name="session_muted">ปิดการแจ้งเตือนแล้ว</string>
     <string name="session_compact">บีบอัด</string>
     <string name="session_fork">แตกแขนง</string>
     <string name="session_toggle_on_description">เปิด</string>
@@ -186,7 +186,7 @@
         <item quantity="other">ตัวแทนย่อย %1$d ตัว</item>
     </plurals>
     <plurals name="session_background_work_shell_count">
-        <item quantity="other">เชลล์ %1$d รายการ</item>
+        <item quantity="other">%1$d เชลล์</item>
     </plurals>
     <string name="session_background_work_summary">%1$s · %2$s</string>
 

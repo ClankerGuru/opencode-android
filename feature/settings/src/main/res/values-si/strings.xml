@@ -214,5 +214,5 @@
     <string name="settings_pairing_nothing_to_paste_message">පසුරු පුවරුවේ යුගල කිරීමේ සබැඳියක් නැත. opencode pair පෙන්වන සබැඳිය පිටපත් කර නැවත උත්සාහ කරන්න.</string>
     <string name="settings_pairing_point_camera">කැමරාව QR කේතය වෙත යොමු කරන්න</string>
     <string name="settings_pairing_paste_link">යුගල කිරීමේ සබැඳිය අලවන්න</string>
-    <string name="settings_pairing_computer_hint">ඔබේ පරිගණකයේ OpenCode හි සැකසීම් → යුගල කරමින් විවෘත කරන්න, නැතහොත් පර්යන්තයක %1$s ධාවනය කරන්න.</string>
+    <string name="settings_pairing_computer_hint">ඔබේ පරිගණකයේ OpenCode හි සැකසීම් → යුගල කිරීම විවෘත කරන්න, නැතහොත් පර්යන්තයක %1$s ධාවනය කරන්න.</string>
 </resources>

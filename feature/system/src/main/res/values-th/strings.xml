@@ -62,7 +62,7 @@
     <string name="system_recording_new_session">เซสชันใหม่</string>
 
     <!-- Live Updates: session run -->
-    <string name="system_session_working">กำลังทำงาน</string>
+    <string name="system_session_working">การทำงาน</string>
     <string name="system_session_last_seen_working">สถานะล่าสุด: กำลังทำงาน</string>
     <!-- Where the run is (Working), then its current step (a tool name, Thinking or Replying). -->
     <string name="system_session_status_with_step">%1$s · %2$s</string>

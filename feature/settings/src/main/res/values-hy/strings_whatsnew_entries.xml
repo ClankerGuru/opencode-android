@@ -394,7 +394,7 @@
 
     <!-- 2026-10-19-03-smart-dictation-audio -->
     <string name="settings_whatsnew_entry_smart_dictation_audio_title">Սահուն թելադրանք՝ երաժշտությամբ</string>
-    <string name="settings_whatsnew_entry_smart_dictation_audio_summary">Երաժշտության ընթացքում թելադրելիս AirPods-ում ձայնը մնում է ստերեո՝ առանց մեկ րոպե անց ընդհատվելու, իսկ միայն հեռախոսն օգտագործելիս շարունակում է հնչել բարձրախոսից, ոչ թե ականջակալային խոսափողից։</string>
+    <string name="settings_whatsnew_entry_smart_dictation_audio_summary">Երաժշտության ընթացքում թելադրելիս AirPods-ում ձայնը մնում է ստերեո՝ առանց մեկ րոպե անց ընդհատվելու, իսկ միայն հեռախոսն օգտագործելիս շարունակում է հնչել բարձրախոսից, ոչ թե լսափողից։</string>
 
     <!-- 2026-10-19-04-interrupted-hand -->
     <string name="settings_whatsnew_entry_interrupted_hand_title">Ձեռքի նշան՝ ընդհատման համար</string>
@@ -782,7 +782,7 @@
 
     <!-- 2026-11-01-03-open-links-from-calls -->
     <string name="settings_whatsnew_entry_open_links_from_calls_title">Բացել հղումներ զանգերից</string>
-    <string name="settings_whatsnew_entry_open_links_from_calls_summary">Միացրեք «Բացել հղումներ զանգերից» Կարգավորումներ › Փորձարարական › Զանգեր բաժնում, և զանգի ընթացքում գործակալը կկարողանա հղում առաջարկել, օրինակ՝ Uber ուղևորության։ Հպեք «Բաց»՝ համապատասխան հավելվածում բացելու համար, կամ «Ոչ հիմա»։</string>
+    <string name="settings_whatsnew_entry_open_links_from_calls_summary">Միացրեք «Բացել հղումներ զանգերից» Կարգավորումներ › Փորձարարական › Զանգեր բաժնում, և զանգի ընթացքում գործակալը կկարողանա հղում առաջարկել, օրինակ՝ Uber ուղևորության։ Հպեք «Բացել»՝ համապատասխան հավելվածում բացելու համար, կամ «Ոչ հիմա»։</string>
 
     <!-- 2026-11-02-01-fold-questions -->
     <string name="settings_whatsnew_entry_fold_questions_title">Ծալեք հարցերը, որ չխանգարեն</string>
@@ -825,7 +825,7 @@
     <!-- 2026-11-04-01-call-links-and-audio -->
     <string name="settings_whatsnew_entry_call_links_and_audio_title">Հղումներ և ձայն զանգերում</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_summary">«Բացել հղումներ զանգերից» և «Ձայն զանգերում» գործառույթներն այժմ միացված են բոլորի համար՝ առանց անջատիչի։</string>
-    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">Զանգի ընթացքում գործակալը կարող է հղում առաջարկել, օրինակ՝ Uber ուղևորության․ հպեք «Բաց»՝ համապատասխան հավելվածում բացելու համար, կամ «Ոչ հիմա»։</string>
+    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">Զանգի ընթացքում գործակալը կարող է հղում առաջարկել, օրինակ՝ Uber ուղևորության․ հպեք «Բացել»՝ համապատասխան հավելվածում բացելու համար, կամ «Ոչ հիմա»։</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_detail_2">Գործակալը կարող է զանգի ընթացքում երաժշտություն կամ հոլովակ նվագարկել։ Ձայնը ցածրանում է, երբ ձեզնից մեկը խոսում է․ դադարեցրեք կամ կանգնեցրեք այն խմբագրիչի վերևում։</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_example">Զանգի ընթացքում խնդրեք գործակալին երաժշտություն նվագարկել</string>
 

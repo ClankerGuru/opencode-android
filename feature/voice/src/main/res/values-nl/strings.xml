@@ -35,7 +35,7 @@
     <!-- Call rows: open link -->
     <string name="voice_open_link_spoken">Je invoer is nodig. %1$s</string>
     <string name="voice_open_link_spoken_with_host">Je invoer is nodig. %1$s %2$s</string>
-    <string name="voice_open_link_open">Open</string>
+    <string name="voice_open_link_open">Openen</string>
 
     <!-- Call rows: audio on the call -->
     <string name="voice_audio_paused">Gepauzeerd</string>

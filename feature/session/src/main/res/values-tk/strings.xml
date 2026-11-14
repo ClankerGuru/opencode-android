@@ -3,7 +3,7 @@
     <!-- Agent activity glyph -->
     <string name="session_activity_running_description">Işleýär</string>
     <!-- Background work panel -->
-    <string name="session_background_work_show_label">Işleýän kiçi agentleri we shell-leri görkez</string>
+    <string name="session_background_work_show_label">Işleýän kiçi agentleri we Shell-leri görkez</string>
     <string name="session_background_work_collapsed_description">Ýygnalan</string>
     <string name="session_background_work_subagents_title">Kiçi agentler</string>
     <string name="session_background_work_open_subagent_label">Kiçi agentiň sessiýasyny açyň</string>
@@ -143,7 +143,7 @@
     <string name="session_shell_showing_last_output">Soňky 4 MB görkezilýär</string>
     <string name="session_shell_load_earlier">Öňkileri ýükle</string>
     <string name="session_shell_output_unavailable_title">Netije elýeterli däl</string>
-    <string name="session_shell_output_unavailable_message">Bu Shell-iň netijesi serwerde indi ýok.</string>
+    <string name="session_shell_output_unavailable_message">Bu Shell-iň netijesi indi serwerde ýok.</string>
     <string name="session_shell_no_output_yet_title">Entek netije ýok</string>
     <string name="session_shell_no_output_title">Netije ýok</string>
     <string name="session_shell_no_output_yet_message">Buýruk netije çykaranda, ol şu ýerde görünýär.</string>
@@ -249,7 +249,7 @@
     <!-- Session sheet errors -->
     <string name="session_sheet_rename_failed_title">Sessiýanyň adyny üýtgedip bolmady</string>
     <string name="session_sheet_compact_failed_title">Sessiýany gysyp bolmady</string>
-    <string name="session_sheet_fork_failed_title">Sessiýany şah aldyryp bolmady</string>
+    <string name="session_sheet_fork_failed_title">Sessiýany şahalandyryp bolmady</string>
     <string name="session_sheet_save_export_failed">Eksporty saklap bolmady</string>
     <string name="session_sheet_export_failed_title">Sessiýany eksport edip bolmady</string>
     <string name="session_sheet_notifications_off_message">Ilki Sazlamalarda bildirişleri açyň.</string>

@@ -18,8 +18,8 @@
     <!-- Floating call stage -->
     <string name="voice_stage_talking_in">Gürleşilýän sessiýa</string>
     <string name="voice_stage_minimize_description">Kiçelt</string>
-    <string name="voice_mute">Duýduryşlary öçür</string>
-    <string name="voice_unmute">Duýduryşlary aç</string>
+    <string name="voice_mute">Sesi öçür</string>
+    <string name="voice_unmute">Sesi aç</string>
     <string name="voice_stage_pause">Sägin</string>
     <string name="voice_stage_camera">Kamera</string>
     <string name="voice_transcript_empty">Sessiýaňyza bir zat aýdyň.</string>
@@ -35,7 +35,7 @@
     <!-- Call rows: open link -->
     <string name="voice_open_link_spoken">Jogabyňyz gerek. %1$s</string>
     <string name="voice_open_link_spoken_with_host">Jogabyňyz gerek. %1$s %2$s</string>
-    <string name="voice_open_link_open">Açyk</string>
+    <string name="voice_open_link_open">Açyň</string>
 
     <!-- Call rows: audio on the call -->
     <string name="voice_audio_paused">Säginildi</string>
@@ -75,7 +75,7 @@
     <string name="voice_status_needs_input">Jogabyňyz gerek</string>
     <string name="voice_status_working">Işleýär</string>
     <string name="voice_status_speaking">Gepleýär</string>
-    <string name="voice_status_muted">Bildirişleri öçürilen</string>
+    <string name="voice_status_muted">Sesi öçürilen</string>
     <string name="voice_status_listening">Diňleýär</string>
     <string name="voice_status_ending">Tamamlanýar…</string>
     <string name="voice_status_ended">Tamamlandy</string>
@@ -98,7 +98,7 @@
     <string name="voice_provider_state_ready">Taýýar</string>
     <string name="voice_provider_state_no_key">Açar ýok</string>
     <string name="voice_provider_state_needs_update">OpenCode-y täzeläň</string>
-    <string name="voice_provider_state_offline">Oflayn</string>
+    <string name="voice_provider_state_offline">Oflaýn</string>
     <string name="voice_provider_place_phone">Bu telefon</string>
     <string name="voice_provider_brand_openai_account">OpenAI hasabyňyz</string>
     <string name="voice_provider_name">%2$s-daky %1$s</string>
@@ -114,7 +114,7 @@
 
     <!-- Call failure fixes and diagnosis -->
     <string name="voice_fix_set_up_on_phone">Bu telefonda sazla</string>
-    <string name="voice_fix_choose_provider">Ü üpjün edijini saýlaň</string>
+    <string name="voice_fix_choose_provider">Üpjün edijini saýlaň</string>
     <string name="voice_fix_update_opencode">OpenCode-y täzeläň</string>
     <string name="voice_diagnosis_needs_update">%1$s üçin sesli jaňlara OpenCode-yň has täze wersiýasy gerek.</string>
     <string name="voice_diagnosis_your_server_needs_update">Serweriňize sesli jaňlar üçin OpenCode-yň has täze wersiýasy gerek.</string>
@@ -149,7 +149,7 @@
     <string name="voice_error_connection_closed">Ses baglanyşygy ýapyldy.</string>
     <string name="voice_error_connection_setup">Ses baglanyşygyny gurup bolmady.</string>
     <string name="voice_error_safety_filter">Howpsuzlyk süzgüji sesli jaňy tamamlady.</string>
-    <string name="voice_error_audio_reset">Ulgam ses sazlamalaryny täzeden düzdi. Jaňy täzeden başladyň.</string>
+    <string name="voice_error_audio_reset">Ulgam ses sazlamalaryny täzeden düzdi. Jaňy täzeden başlaň.</string>
     <string name="voice_error_missing_phone_key">Sesi ulanmak üçin Sazlamalarda %1$s API açaryňyzy goşuň.</string>
 
     <!-- Voice accents -->

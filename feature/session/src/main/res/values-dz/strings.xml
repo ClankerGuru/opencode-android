@@ -3,7 +3,7 @@
     <!-- Agent activity glyph -->
     <string name="session_activity_running_description">གཡོག་བཀོལ་དོ།</string>
     <!-- Background work panel -->
-    <string name="session_background_work_show_label">གཡོག་བཀོལ་བའི་ཡན་ལག་ལས་ཚབ་དང་ཤལ་ཚུ་སྟོན།</string>
+    <string name="session_background_work_show_label">གཡོག་བཀོལ་མི་ཡན་ལག་ལས་ཚབ་དང་ཤལ་ཚུ་སྟོན།</string>
     <string name="session_background_work_collapsed_description">བརྡིབས་ཡོདཔ།</string>
     <string name="session_background_work_subagents_title">ཡན་ལག་ལས་ཚབ་ཚུ།</string>
     <string name="session_background_work_open_subagent_label">ཡན་ལག་ལས་ཚབ་ཀྱི་ལཱ་ཡུན་ཁ་ཕྱེ།</string>
@@ -141,7 +141,7 @@
     <string name="session_shell_showing_last_output">མཇུག་གི་ 4 MB སྟོན་དོ།</string>
     <string name="session_shell_load_earlier">ཧེ་མའི་ཚུ་མངོན་གསལ་འབད།</string>
     <string name="session_shell_output_unavailable_title">ཐོན་འབྲས་མི་འཐོབ་པས།</string>
-    <string name="session_shell_output_unavailable_message">སར་བར་ནང་ཤལ་འདི་གི་ཐོན་འབྲས་ད་མེད།</string>
+    <string name="session_shell_output_unavailable_message">སར་བར་ནང་ཤལ་འདིའི་ཐོན་འབྲས་ད་མེད།</string>
     <string name="session_shell_no_output_yet_title">ད་ལྟོ་ཐོན་འབྲས་མེད།</string>
     <string name="session_shell_no_output_title">ཐོན་འབྲས་མེད།</string>
     <string name="session_shell_no_output_yet_message">བརྡ་བཀོད་ཀྱིས་ཐོན་འབྲས་འབྲིཝ་ད་ ནཱ་ལུ་འཆར་འོང་།</string>
@@ -193,7 +193,7 @@
     <!-- Composer buttons -->
     <string name="session_send_message_description">འཕྲིན་དོན་གཏང་།</string>
     <string name="session_stop_description">བཀག་པ</string>
-    <string name="session_start_voice_call_description">སྐད་ཀྱི་བོད་བརྡ་འགོ་བཙུགས།</string>
+    <string name="session_start_voice_call_description">སྐད་ཀྱི་འབོད་བརྡ་འགོ་བཙུགས།</string>
     <string name="session_model_level_default">འཐུས་ཤོར</string>
 
     <!-- In-app notice -->

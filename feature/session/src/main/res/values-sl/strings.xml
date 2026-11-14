@@ -3,7 +3,7 @@
     <!-- Agent activity glyph -->
     <string name="session_activity_running_description">V teku</string>
     <!-- Background work panel -->
-    <string name="session_background_work_show_label">Pokaži delujoče subagente in lupine</string>
+    <string name="session_background_work_show_label">Pokaži subagente in lupine v teku</string>
     <string name="session_background_work_collapsed_description">Strnjeno</string>
     <string name="session_background_work_subagents_title">Subagenti</string>
     <string name="session_background_work_open_subagent_label">Odpri sejo subagenta</string>
@@ -46,7 +46,7 @@
     <string name="session_rename_title">Preimenuj sejo</string>
     <string name="session_untitled_title">Seja</string>
     <string name="session_pin">Pripni</string>
-    <string name="session_pinned">Pripete</string>
+    <string name="session_pinned">Pripeto</string>
     <string name="session_unread">Neprebrano</string>
     <string name="session_mute">Utišaj</string>
     <string name="session_muted">Utišano</string>

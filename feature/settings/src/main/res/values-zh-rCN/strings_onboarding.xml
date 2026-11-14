@@ -7,7 +7,7 @@
     <string name="settings_onboarding_other_ways_terminal_header">在终端中运行此命令</string>
     <string name="settings_onboarding_other_ways_terminal_footer">运行后会显示可扫描的配对码或可粘贴的链接，任何网络都能连接。</string>
     <string name="settings_onboarding_other_ways_paste_link">粘贴配对链接</string>
-    <string name="settings_onboarding_other_ways_enter_address">输入服务器地址</string>
+    <string name="settings_onboarding_other_ways_enter_address">输入服务器 URL</string>
     <string name="settings_onboarding_other_ways_install_header">还没有 OpenCode？</string>
     <string name="settings_onboarding_other_ways_install">其他安装方式</string>
     <string name="settings_onboarding_command_copy_description">复制 %1$s</string>

@@ -48,7 +48,7 @@
     <string name="transcript_reply_copy_description">Copiază răspunsul</string>
 
     <!-- Run errors and undo -->
-    <string name="transcript_run_error_copy">Copiază eroarea</string>
+    <string name="transcript_run_error_copy">Eroare la copiere</string>
     <string name="transcript_undone_undo_hint">Poți anula până trimiți un mesaj nou</string>
     <string name="transcript_undone_title">Modificări anulate de aici</string>
     <string name="transcript_undone_undo_click_label">Restaurează mesajele și fișierele anulate înainte de a trimite un mesaj nou</string>

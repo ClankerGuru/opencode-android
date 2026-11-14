@@ -252,7 +252,7 @@
 
     <!-- 2026-10-14-01-settings-grouped-by-purpose -->
     <string name="settings_whatsnew_entry_settings_grouped_by_purpose_title">Понятные настройки</string>
-    <string name="settings_whatsnew_entry_settings_grouped_by_purpose_summary">Экспериментальные функции и инструменты разработчика — в «Настройки → Экспериментальные», уведомления приложения — в «Уведомлениях», история звонков — в разделе «Голос».</string>
+    <string name="settings_whatsnew_entry_settings_grouped_by_purpose_summary">Экспериментальные функции и инструменты разработчика — в «Настройки → Экспериментальный», уведомления приложения — в «Уведомлениях», история звонков — в разделе «Голос».</string>
 
     <!-- 2026-10-14-02-send-ats-recovery -->
     <string name="settings_whatsnew_entry_send_ats_recovery_title">Надёжная отправка</string>
@@ -341,7 +341,7 @@
     <string name="settings_whatsnew_entry_connection_error_details_summary">При ошибке подключения видны код ошибки, адрес подключения и результат DNS-запроса. Если имя в сети Tailscale указывает на адрес вне Tailscale, появится подсказка.</string>
 
     <!-- 2026-10-16-08-outage-reconnect-delay -->
-    <string name="settings_whatsnew_entry_outage_reconnect_delay_title">Быстрее переподключение</string>
+    <string name="settings_whatsnew_entry_outage_reconnect_delay_title">Более быстрое переподключение</string>
     <string name="settings_whatsnew_entry_outage_reconnect_delay_summary">Сессии быстрее обновляются, когда сервер снова доступен после сбоя.</string>
 
     <!-- 2026-10-17-01-every-running-subagent -->
@@ -406,11 +406,11 @@
 
     <!-- 2026-10-19-06-experimental-groups -->
     <string name="settings_whatsnew_entry_experimental_groups_title">Группы экспериментальных функций</string>
-    <string name="settings_whatsnew_entry_experimental_groups_summary">Функции в разделе «Настройки → Экспериментальные функции» сгруппированы, а для звонков оставлен один параметр «Стиль звонка».</string>
+    <string name="settings_whatsnew_entry_experimental_groups_summary">Функции в разделе «Настройки → Экспериментальный» сгруппированы, а для звонков оставлен один параметр «Стиль звонка».</string>
 
     <!-- 2026-10-19-07-model-picker-standard-sheet -->
     <string name="settings_whatsnew_entry_model_picker_standard_sheet_title">Стандартная панель выбора модели</string>
-    <string name="settings_whatsnew_entry_model_picker_standard_sheet_summary">С экспериментальным новым выбором модели нажатие на модель в поле ввода открывает стандартную панель с отдельным меню уровня размышления для каждой модели. Прежний вариант теперь называется «Пользовательский выбор модели» в разделе «Настройки › Экспериментальные функции».</string>
+    <string name="settings_whatsnew_entry_model_picker_standard_sheet_summary">С экспериментальным новым выбором модели нажатие на модель в поле ввода открывает стандартную панель с отдельным меню уровня размышления для каждой модели. Прежний вариант теперь называется «Пользовательский выбор модели» в разделе «Настройки › Экспериментальный».</string>
 
     <!-- 2026-10-19-08-problem-reports-reach-session -->
     <string name="settings_whatsnew_entry_problem_reports_reach_session_title">Отчёты попадают в сессию</string>
@@ -465,7 +465,7 @@
 
     <!-- 2026-10-20-08-inline-image-links -->
     <string name="settings_whatsnew_entry_inline_image_links_title">Предпросмотр изображений по ссылкам</string>
-    <string name="settings_whatsnew_entry_inline_image_links_summary">Включите «Предпросмотр изображений по ссылкам» в разделе «Настройки › Экспериментальные функции › Переписка», чтобы видеть изображения из ссылок в ответах. Нажмите на миниатюру, чтобы открыть её на весь экран и увеличить.</string>
+    <string name="settings_whatsnew_entry_inline_image_links_summary">Включите «Предпросмотр изображений по ссылкам» в разделе «Настройки › Экспериментальный › Переписка», чтобы видеть изображения из ссылок в ответах. Нажмите на миниатюру, чтобы открыть её на весь экран и увеличить.</string>
 
     <!-- 2026-10-20-09-smooth-link-preview-arrival -->
     <string name="settings_whatsnew_entry_smooth_link_preview_arrival_title">Плавный предпросмотр ссылок</string>
@@ -688,7 +688,7 @@
 
     <!-- 2026-10-26-05-living-orb-presets -->
     <string name="settings_whatsnew_entry_living_orb_presets_title">Наборы настроек сферы</string>
-    <string name="settings_whatsnew_entry_living_orb_presets_summary">Пункт «Сфера» под пунктом «Стиль звонка» в разделе «Настройки › Экспериментальные функции › Звонки» теперь открывается на стиле «Эффектный», с увеличенным предпросмотром и рядом готовых настроек. Сохраняйте свои наборы, переименовывайте, копируйте и вставляйте их, чтобы делиться.</string>
+    <string name="settings_whatsnew_entry_living_orb_presets_summary">Пункт «Сфера» под пунктом «Стиль звонка» в разделе «Настройки › Экспериментальный › Звонки» теперь открывается на стиле «Эффектный», с увеличенным предпросмотром и рядом готовых настроек. Сохраняйте свои наборы, переименовывайте, копируйте и вставляйте их, чтобы делиться.</string>
 
     <!-- 2026-10-26-06-send-after-a-pause -->
     <string name="settings_whatsnew_entry_send_after_a_pause_title">Плавная отправка после паузы</string>
@@ -704,7 +704,7 @@
 
     <!-- 2026-10-27-03-inbox-sidebar-experiment -->
     <string name="settings_whatsnew_entry_inbox_sidebar_experiment_title">Входящие в боковой панели</string>
-    <string name="settings_whatsnew_entry_inbox_sidebar_experiment_summary">Включите «Входящие в боковой панели» в разделе «Настройки › Экспериментальные функции › Боковая панель». Сначала будут сессии, где нужен ваш ответ, затем непрочитанные — с проектом и последним ответом в каждой. Смахните сессию, чтобы отметить её прочитанной или архивировать.</string>
+    <string name="settings_whatsnew_entry_inbox_sidebar_experiment_summary">Включите «Входящие в боковой панели» в разделе «Настройки › Экспериментальный › Боковая панель». Сначала будут сессии, где нужен ваш ответ, затем непрочитанные — с проектом и последним ответом в каждой. Смахните сессию, чтобы отметить её прочитанной или архивировать.</string>
 
     <!-- 2026-10-28-01-first-pairing-ready-session -->
     <string name="settings_whatsnew_entry_first_pairing_ready_session_title">Первая сессия уже готова</string>
@@ -712,7 +712,7 @@
 
     <!-- 2026-10-28-02-welcome-preview -->
     <string name="settings_whatsnew_entry_welcome_preview_title">Просмотр приветствия</string>
-    <string name="settings_whatsnew_entry_welcome_preview_summary">Новое приветствие при первом запуске показывает, как OpenCode работает на ноутбуке под управлением телефона, а затем предлагает сопряжение в один шаг. Включите «Просмотр приветствия» в разделе «Настройки › Экспериментальные функции › Боковая панель» и нажмите «Показать приветствие». Закрыв его, вы вернётесь назад.</string>
+    <string name="settings_whatsnew_entry_welcome_preview_summary">Новое приветствие при первом запуске показывает, как OpenCode работает на ноутбуке под управлением телефона, а затем предлагает сопряжение в один шаг. Включите «Просмотр приветствия» в разделе «Настройки › Экспериментальный › Боковая панель» и нажмите «Показать приветствие». Закрыв его, вы вернётесь назад.</string>
 
     <!-- 2026-10-29-01-composer-text-selection -->
     <string name="settings_whatsnew_entry_composer_text_selection_title">Выделение текста в поле ввода</string>
@@ -765,7 +765,7 @@
     <string name="settings_whatsnew_entry_living_orb_default_detail_2">Перетащите сферу куда угодно: она останется на месте при смене сессий и открытии настроек.</string>
     <string name="settings_whatsnew_entry_living_orb_default_detail_3">Начать звонок можно и из списка сессий — кнопкой рядом с настройками.</string>
     <string name="settings_whatsnew_entry_living_orb_default_detail_4">Панель звонков удалена: если вы ей пользовались, теперь звонки тоже будут в плавающей сфере.</string>
-    <string name="settings_whatsnew_entry_living_orb_default_detail_5">Отключить можно в разделе «Настройки › Экспериментальные функции › Звонки › Живая сфера».</string>
+    <string name="settings_whatsnew_entry_living_orb_default_detail_5">Отключить можно в разделе «Настройки › Экспериментальный › Звонки › Живая сфера».</string>
     <string name="settings_whatsnew_entry_living_orb_default_example">Начните звонок и откройте список сессий: сфера останется с вами</string>
 
     <!-- 2026-11-01-02-quicker-send -->
@@ -774,15 +774,15 @@
 
     <!-- 2026-11-01-02-share-screen-with-agents -->
     <string name="settings_whatsnew_entry_share_screen_with_agents_title">Доступ к экрану для агентов</string>
-    <string name="settings_whatsnew_entry_share_screen_with_agents_summary">Включите «Доступ к экрану для агентов» в разделе «Настройки › Экспериментальные функции › Звонки». Во время звонка агент сможет попросить показать приложение. Нажмите «Поделиться», чтобы отправить снимок, или «Не сейчас».</string>
+    <string name="settings_whatsnew_entry_share_screen_with_agents_summary">Включите «Доступ к экрану для агентов» в разделе «Настройки › Экспериментальный › Звонки». Во время звонка агент сможет попросить показать приложение. Нажмите «Поделиться», чтобы отправить снимок, или «Не сейчас».</string>
 
     <!-- 2026-11-01-03-audio-in-calls -->
     <string name="settings_whatsnew_entry_audio_in_calls_title">Аудио в звонках</string>
-    <string name="settings_whatsnew_entry_audio_in_calls_summary">Включите «Аудио в звонках» в разделе «Настройки › Экспериментальные функции › Звонки», и агент сможет включать музыку или записи во время звонка. Звук приглушается, когда кто-то из вас говорит. Приостановить или остановить воспроизведение можно над полем ввода.</string>
+    <string name="settings_whatsnew_entry_audio_in_calls_summary">Включите «Аудио в звонках» в разделе «Настройки › Экспериментальный › Звонки», и агент сможет включать музыку или записи во время звонка. Звук приглушается, когда кто-то из вас говорит. Приостановить или остановить воспроизведение можно над полем ввода.</string>
 
     <!-- 2026-11-01-03-open-links-from-calls -->
     <string name="settings_whatsnew_entry_open_links_from_calls_title">Открытие ссылок из звонков</string>
-    <string name="settings_whatsnew_entry_open_links_from_calls_summary">Включите «Открытие ссылок из звонков» в разделе «Настройки › Экспериментальные функции › Звонки». Во время звонка агент сможет предложить ссылку, например на поездку в Uber. Нажмите «Открыть», чтобы перейти в нужное приложение, или «Не сейчас».</string>
+    <string name="settings_whatsnew_entry_open_links_from_calls_summary">Включите «Открытие ссылок из звонков» в разделе «Настройки › Экспериментальный › Звонки». Во время звонка агент сможет предложить ссылку, например на поездку в Uber. Нажмите «Открыть», чтобы перейти в нужное приложение, или «Не сейчас».</string>
 
     <!-- 2026-11-02-01-fold-questions -->
     <string name="settings_whatsnew_entry_fold_questions_title">Сворачивайте вопросы</string>
@@ -891,7 +891,7 @@
     <string name="settings_whatsnew_entry_one_picker_detail_2">Смахните строку или нажмите и удерживайте её, чтобы добавить модель в избранное или убрать оттуда.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_3">Поиск находится внизу. Введите уровень после названия, например «opus high», и нажмите «Ввод», чтобы выбрать и модель, и уровень.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_4">Потяните ручку панели вверх, чтобы увеличить список, или вниз, чтобы закрыть его.</string>
-    <string name="settings_whatsnew_entry_one_picker_detail_5">Новый список заменил прежнюю панель «Модель», а переключатель One Picker убран из раздела «Настройки › Экспериментальные функции».</string>
+    <string name="settings_whatsnew_entry_one_picker_detail_5">Новый список заменил прежнюю панель «Модель», а переключатель «Единый выбор» убран из раздела «Настройки › Экспериментальный».</string>
     <string name="settings_whatsnew_entry_one_picker_example">Нажмите на модель в поле сообщения, затем смахните строку, чтобы добавить её в избранное</string>
 
     <!-- 2026-11-08-01-connecting-caption-glass -->

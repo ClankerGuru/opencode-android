@@ -3,7 +3,7 @@
     <!-- Agent activity glyph -->
     <string name="session_activity_running_description">Kjører</string>
     <!-- Background work panel -->
-    <string name="session_background_work_show_label">Vis aktive underagenter og skall</string>
+    <string name="session_background_work_show_label">Vis kjørende underagenter og skall</string>
     <string name="session_background_work_collapsed_description">Sammenfoldet</string>
     <string name="session_background_work_subagents_title">Underagenter</string>
     <string name="session_background_work_open_subagent_label">Åpne underagentens sesjon</string>
@@ -46,7 +46,7 @@
     <string name="session_rename_title">Gi sesjonen nytt navn</string>
     <string name="session_untitled_title">Sesjon</string>
     <string name="session_pin">Fest</string>
-    <string name="session_pinned">Festede</string>
+    <string name="session_pinned">Festet</string>
     <string name="session_unread">Ulest</string>
     <string name="session_mute">Demp</string>
     <string name="session_muted">Dempet</string>
@@ -143,7 +143,7 @@
     <string name="session_shell_showing_last_output">Viser de siste 4 MB</string>
     <string name="session_shell_load_earlier">Last inn tidligere</string>
     <string name="session_shell_output_unavailable_title">Utdata er utilgjengelige</string>
-    <string name="session_shell_output_unavailable_message">Serveren har ikke lenger utdataene fra dette skallet.</string>
+    <string name="session_shell_output_unavailable_message">Serveren har ikke lenger utdata fra dette skallet.</string>
     <string name="session_shell_no_output_yet_title">Ingen utdata ennå</string>
     <string name="session_shell_no_output_title">Ingen utdata</string>
     <string name="session_shell_no_output_yet_message">Utdata vises her etter hvert som kommandoen skriver dem.</string>

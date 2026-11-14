@@ -545,7 +545,7 @@
 
     <!-- 2026-10-21-07-welcome-pairing-copy -->
     <string name="settings_whatsnew_entry_welcome_pairing_copy_title">OpenCode অ্যাপ থেকে পেয়ার করুন</string>
-    <string name="settings_whatsnew_entry_welcome_pairing_copy_summary">স্বাগত পর্দা আপনাকে কম্পিউটারের OpenCode-এ সেটিংস → পেয়ার করা হচ্ছে, অথবা টার্মিনালে /pair ব্যবহার করতে বলে। যাঁদের OpenCode নেই, তাঁদের জন্য ইনস্টল করার কমান্ডও দেখায়।</string>
+    <string name="settings_whatsnew_entry_welcome_pairing_copy_summary">স্বাগত পর্দা আপনাকে কম্পিউটারের OpenCode-এ সেটিংস → পেয়ারিং, অথবা টার্মিনালে /pair ব্যবহার করতে বলে। যাঁদের OpenCode নেই, তাঁদের জন্য ইনস্টল করার কমান্ডও দেখায়।</string>
 
     <!-- 2026-10-21-08-session-id-links -->
     <string name="settings_whatsnew_entry_session_id_links_title">সেশনের লিঙ্ক</string>
@@ -620,7 +620,7 @@
     <string name="settings_whatsnew_entry_new_messages_divider_on_detail_2">আপনি দেখার সময় আসতে থাকা জবাবে কখনো এই চিহ্ন দেখায় না।</string>
     <string name="settings_whatsnew_entry_new_messages_divider_on_detail_3">শেষ পর্যন্ত পড়লে বিভাজক সরে যায়।</string>
     <string name="settings_whatsnew_entry_new_messages_divider_on_detail_4">সেটিংস › সেশন থেকে এটি বন্ধ করুন।</string>
-    <string name="settings_whatsnew_entry_new_messages_divider_on_example">লম্বা জবাব চাইুন, শেষ না হওয়া পর্যন্ত অন্য অ্যাপে থাকুন, তারপর ফিরে আসুন।</string>
+    <string name="settings_whatsnew_entry_new_messages_divider_on_example">লম্বা জবাব চান, শেষ না হওয়া পর্যন্ত অন্য অ্যাপে থাকুন, তারপর ফিরে আসুন।</string>
 
     <!-- 2026-10-24-03-composer-keyboard-morph -->
     <string name="settings_whatsnew_entry_composer_keyboard_morph_title">কিবোর্ডের সঙ্গে চলে কম্পোজার</string>

@@ -35,9 +35,9 @@
     <string name="drawer_pin">Kinnita</string>
     <string name="drawer_unpin">Eemalda kinnitus</string>
     <string name="drawer_mark_as_read">Märgi loetuks</string>
-    <string name="drawer_mark_as_unread">Märgi lugemata</string>
+    <string name="drawer_mark_as_unread">Märgi lugematuks</string>
     <string name="drawer_mute">Vaigista</string>
-    <string name="drawer_unmute">Luba märguanded</string>
+    <string name="drawer_unmute">Tühista vaigistus</string>
     <string name="drawer_move_up">Liiguta üles</string>
     <string name="drawer_move_down">Liiguta alla</string>
 

@@ -59,7 +59,7 @@
     <string name="transcript_subagent_open_click_label">開啟子代理的工作階段</string>
     <string name="transcript_tool_group_failed_count">%1$d 個失敗</string>
     <string name="transcript_expanded">已展開</string>
-    <string name="transcript_collapsed">已摺疊</string>
+    <string name="transcript_collapsed">已收合</string>
     <string name="transcript_tool_image">工具圖片</string>
     <string name="transcript_tool_hide_click_label">隱藏工具的輸入與輸出</string>
     <string name="transcript_tool_show_click_label">顯示工具的輸入與輸出</string>

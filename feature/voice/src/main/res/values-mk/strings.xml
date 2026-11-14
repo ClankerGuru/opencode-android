@@ -125,7 +125,7 @@
     <string name="voice_diagnosis_failed">%1$s не успеа да го започне повикот.</string>
     <string name="voice_diagnosis_your_server_failed">Твојот сервер не успеа да го започне повикот.</string>
     <string name="voice_diagnosis_key_rejected">OpenAI не го прифати клучот на овој телефон.</string>
-    <string name="voice_diagnosis_missing_phone_key">Додадете го твојот клуч API за %1$s за повици од овој телефон.</string>
+    <string name="voice_diagnosis_missing_phone_key">Додади го твојот клуч API за %1$s за повици од овој телефон.</string>
 
     <!-- Call errors -->
     <string name="voice_error_microphone_denied">Дозволи пристап до микрофонот во Поставки за да разговараш со твојата сесија.</string>
@@ -150,7 +150,7 @@
     <string name="voice_error_connection_setup">Не успеа воспоставувањето на гласовната врска.</string>
     <string name="voice_error_safety_filter">Безбедносен филтер го заврши гласовниот повик.</string>
     <string name="voice_error_audio_reset">Системот го ресетираше аудиото. Започни го повикот повторно.</string>
-    <string name="voice_error_missing_phone_key">Додадете го твојот клуч API за %1$s во Поставки за да користиш глас.</string>
+    <string name="voice_error_missing_phone_key">Додади го твојот клуч API за %1$s во Поставки за да користиш глас.</string>
 
     <!-- Voice accents -->
     <string name="voice_accent_australian_english">Австралиски англиски</string>
@@ -159,7 +159,7 @@
     <string name="voice_accent_north_american_english">Северноамерикански англиски</string>
     <string name="voice_accent_brazilian_portuguese">Бразилски португалски</string>
     <string name="voice_accent_filipino_english">Филипински англиски</string>
-    <string name="voice_accent_southern_us_english">Јужноамерикански англиски (САД)</string>
+    <string name="voice_accent_southern_us_english">Јужен американски англиски</string>
     <string name="voice_accent_indian_english">Индиски англиски</string>
     <string name="voice_preview_error">Не успеа преслушувањето</string>
 

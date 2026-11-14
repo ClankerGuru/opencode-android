@@ -516,12 +516,12 @@
     <string name="settings_whatsnew_entry_voice_route_consistency_summary">ཁྱོད་ཀྱི་སར་བར་གྱིས་བོད་བརྡ་ཚུ་གཡོག་བཀོལཝ་ད་ Grok གིས་ཁྱོད་ཀྱི་ xAI ལྡེ་མིག་ར་ལག་ལེན་འཐབ་ཨིན། Gemini གིས་ཡང་རང་གི་ངོ་སྤྲོད་འཛོལ་བ་མེད་པར་འབདཝ་ཨིན།</string>
 
     <!-- 2026-10-20-18-call-tray-edge-continuity -->
-    <string name="settings_whatsnew_entry_call_tray_edge_continuity_title">བོད་བརྡའི་ཐོད་ཀྱི་འགུལ་བ།</string>
-    <string name="settings_whatsnew_entry_call_tray_edge_continuity_summary">བོད་བརྡའི་ཐོད་ཁ་ཕྱེ་སྟེ་ ཟུར་ཐོ་ནང་འཛུལ་ནི་དང་ཕྱིར་ཐོན་ནིའི་སྐབས་ དེའི་སྒྲའི་རླབས་རིས་དེ་མཐའ་སྒོར་སྒོརམ་བདའ་སྟེ་འགུལཝ་ཨིན།</string>
+    <string name="settings_whatsnew_entry_call_tray_edge_continuity_title">བོད་བརྡའི་ཐོ་སྡེར་གྱི་འགུལ་བ།</string>
+    <string name="settings_whatsnew_entry_call_tray_edge_continuity_summary">བོད་བརྡའི་ཐོ་སྡེར་ཁ་ཕྱེ་སྟེ་ ཟུར་ཐོ་ནང་འཛུལ་ནི་དང་ཕྱིར་ཐོན་ནིའི་སྐབས་ དེའི་སྒྲའི་རླབས་རིས་དེ་མཐའ་སྒོར་སྒོརམ་བདའ་སྟེ་འགུལཝ་ཨིན།</string>
 
     <!-- 2026-10-21-01-call-tray-keyboard-return -->
-    <string name="settings_whatsnew_entry_call_tray_keyboard_return_title">བོད་བརྡའི་ཐོད་ལོག་འོང་ནི།</string>
-    <string name="settings_whatsnew_entry_call_tray_keyboard_return_summary">ཟུར་ཐོ་ཁ་བསྡམས་ཏེ་ལྡེ་སྒྲོམ་ལོག་འོངམ་ད་ བོད་བརྡའི་ཐོད་མཐོངམ་སྦེ་ར་སྡོདཔ་ཨིན།</string>
+    <string name="settings_whatsnew_entry_call_tray_keyboard_return_title">བོད་བརྡའི་ཐོ་སྡེར་ལོག་འོང་ནི།</string>
+    <string name="settings_whatsnew_entry_call_tray_keyboard_return_summary">ཟུར་ཐོ་ཁ་བསྡམས་ཏེ་ལྡེ་སྒྲོམ་ལོག་འོངམ་ད་ བོད་བརྡའི་ཐོ་སྡེར་མཐོངམ་སྦེ་ར་སྡོདཔ་ཨིན།</string>
 
     <!-- 2026-10-21-02-drawer-title-fade -->
     <string name="settings_whatsnew_entry_drawer_title_fade_title">ལཱ་ཡུན་མགོ་མིང་ཆ་ཚང་སུ།</string>

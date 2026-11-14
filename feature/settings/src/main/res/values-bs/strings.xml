@@ -80,7 +80,7 @@
 
     <!-- Voice › Delegator -->
     <string name="settings_delegator_title">Delegator</string>
-    <string name="settings_delegator_other_server_note">„%1$s“ je na drugom serveru. Odaberi nekoga na ovom serveru ili promijeni server.</string>
+    <string name="settings_delegator_other_server_note">„%1$s“ je na drugom serveru. Odaberi jednu na ovom serveru ili promijeni server.</string>
     <string name="settings_delegator_mode_footer">Ugrađeni radi putem OpenAI, bez sesije. OpenCode sesija radi u sesiji na tvom serveru.</string>
     <string name="settings_delegator_built_in">Ugrađeni</string>
     <string name="settings_delegator_opencode_session">OpenCode sesija</string>

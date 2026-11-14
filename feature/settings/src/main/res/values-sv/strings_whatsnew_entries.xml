@@ -545,7 +545,7 @@
 
     <!-- 2026-10-21-07-welcome-pairing-copy -->
     <string name="settings_whatsnew_entry_welcome_pairing_copy_title">Para ihop från OpenCode-appen</string>
-    <string name="settings_whatsnew_entry_welcome_pairing_copy_summary">Välkomstskärmen hänvisar till Inställningar → Parar ihop i OpenCode på datorn eller /pair i terminalen, med installationskommandot för den som inte har OpenCode än.</string>
+    <string name="settings_whatsnew_entry_welcome_pairing_copy_summary">Välkomstskärmen hänvisar till Inställningar → Parkoppling i OpenCode på datorn eller /pair i terminalen, med installationskommandot för den som inte har OpenCode än.</string>
 
     <!-- 2026-10-21-08-session-id-links -->
     <string name="settings_whatsnew_entry_session_id_links_title">Sessionslänkar</string>
@@ -720,7 +720,7 @@
 
     <!-- 2026-10-30-01-voice-waits-for-you -->
     <string name="settings_whatsnew_entry_voice_waits_for_you_title">Samtalet väntar tills du pratat klart</string>
-    <string name="settings_whatsnew_entry_voice_waits_for_you_summary">Röستagenten pratar inte längre i mun på dig: uppdateringar väntar tills du pratat klart, och om du avbryter tystnar den.</string>
+    <string name="settings_whatsnew_entry_voice_waits_for_you_summary">Röstagenten pratar inte längre i mun på dig: uppdateringar väntar tills du pratat klart, och om du avbryter tystnar den.</string>
 
     <!-- 2026-10-30-02-wisp-call-sounds -->
     <string name="settings_whatsnew_entry_wisp_call_sounds_title">Röstsamtal använder Wisps ljud</string>
@@ -803,7 +803,7 @@
     <string name="settings_whatsnew_entry_all_experiments_detail_2">Om du stänger av Alla experiment återställs dina tidigare inställningar.</string>
     <string name="settings_whatsnew_entry_all_experiments_detail_3">Experiment som kräver behörighet väljer du fortfarande separat.</string>
     <string name="settings_whatsnew_entry_all_experiments_detail_4">Automatisk komplettering, plusmenyns fotoväljare, den nya serverväxlaren och projektikoner är nu på för alla.</string>
-    <string name="settings_whatsnew_entry_all_experiments_detail_5">En väljare och Levande kula har vanliga reglage, och Samtalspanel har tagits bort.</string>
+    <string name="settings_whatsnew_entry_all_experiments_detail_5">One Picker och Levande kula är vanliga reglage, och Samtalspanel har tagits bort.</string>
     <string name="settings_whatsnew_entry_all_experiments_example">Öppna Inställningar › Experimentell och slå på Alla experiment</string>
 
     <!-- 2026-11-03-01-search-all-sessions -->

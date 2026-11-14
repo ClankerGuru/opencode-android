@@ -35,7 +35,7 @@
     <string name="transcript_image_open_description">Afbeelding openen</string>
     <string name="transcript_image_load_failed">Afbeelding laden mislukt</string>
     <string name="transcript_image_retry_click_label">Opnieuw proberen</string>
-    <string name="transcript_image_open">Open</string>
+    <string name="transcript_image_open">Openen</string>
 
     <!-- Math -->
     <string name="transcript_equation_description">Vergelijking</string>

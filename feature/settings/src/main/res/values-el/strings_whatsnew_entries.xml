@@ -782,7 +782,7 @@
 
     <!-- 2026-11-01-03-open-links-from-calls -->
     <string name="settings_whatsnew_entry_open_links_from_calls_title">Άνοιγμα συνδέσμων από κλήσεις</string>
-    <string name="settings_whatsnew_entry_open_links_from_calls_summary">Ενεργοποιήστε το Άνοιγμα συνδέσμων από κλήσεις στις Ρυθμίσεις › Πειραματικό › Κλήσεις. Κατά την κλήση, ένας πράκτορας μπορεί να προτείνει έναν σύνδεσμο, π.χ. για διαδρομή με Uber: πατήστε Ανοιχτό για να ανοίξει στην εφαρμογή του ή Όχι τώρα.</string>
+    <string name="settings_whatsnew_entry_open_links_from_calls_summary">Ενεργοποιήστε το Άνοιγμα συνδέσμων από κλήσεις στις Ρυθμίσεις › Πειραματικό › Κλήσεις. Κατά την κλήση, ένας πράκτορας μπορεί να προτείνει έναν σύνδεσμο, π.χ. για διαδρομή με Uber: πατήστε Άνοιγμα για να ανοίξει στην εφαρμογή του ή Όχι τώρα.</string>
 
     <!-- 2026-11-02-01-fold-questions -->
     <string name="settings_whatsnew_entry_fold_questions_title">Σύμπτυξη ερωτήσεων για περισσότερο χώρο</string>

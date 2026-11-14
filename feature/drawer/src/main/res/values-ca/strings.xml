@@ -34,7 +34,7 @@
     <string name="drawer_row_not_selected">No seleccionada</string>
     <string name="drawer_row_select_action">Selecciona</string>
     <string name="drawer_pin">Fixa</string>
-    <string name="drawer_unpin">Des fixa</string>
+    <string name="drawer_unpin">Desfixa</string>
     <string name="drawer_mark_as_read">Marca com a llegida</string>
     <string name="drawer_mark_as_unread">Marca com a no llegida</string>
     <string name="drawer_mute">Silencia</string>
@@ -123,7 +123,7 @@
     <string name="drawer_open_in_new_window">Obre en una finestra nova</string>
 
     <!-- Session row state for TalkBack -->
-    <string name="drawer_row_pinned_state">Fixades</string>
+    <string name="drawer_row_pinned_state">Fixada</string>
     <string name="drawer_row_muted_state">Silenciada</string>
     <string name="drawer_row_needs_input_state">Cal la teva resposta</string>
     <string name="drawer_row_working_state">Treballant</string>

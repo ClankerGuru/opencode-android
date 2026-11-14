@@ -3,7 +3,7 @@
     <!-- Agent activity glyph -->
     <string name="session_activity_running_description">Körs</string>
     <!-- Background work panel -->
-    <string name="session_background_work_show_label">Visa aktiva underagenter och skal</string>
+    <string name="session_background_work_show_label">Visa underagenter och skal som körs</string>
     <string name="session_background_work_collapsed_description">Hopfälld</string>
     <string name="session_background_work_subagents_title">Underagenter</string>
     <string name="session_background_work_open_subagent_label">Öppna underagentens session</string>
@@ -46,8 +46,8 @@
     <string name="session_rename_title">Byt namn på sessionen</string>
     <string name="session_untitled_title">Session</string>
     <string name="session_pin">Fäst</string>
-    <string name="session_pinned">Fästa</string>
-    <string name="session_unread">Olästa</string>
+    <string name="session_pinned">Fäst</string>
+    <string name="session_unread">Oläst</string>
     <string name="session_mute">Tysta</string>
     <string name="session_muted">Tystad</string>
     <string name="session_compact">Kompakt</string>

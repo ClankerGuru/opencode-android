@@ -104,7 +104,7 @@
     <string name="drawer_server_offer_try_again_hint">Предложение за повторен опит</string>
 
     <!-- Server flow: switch-back note and server menu status -->
-    <string name="drawer_server_switched_back_title">Обратно към %1$s</string>
+    <string name="drawer_server_switched_back_title">Превключено обратно към %1$s</string>
     <string name="drawer_server_timed_out_detail">%1$s не отговори за %2$s сек.</string>
     <string name="drawer_server_unreachable_detail">Неуспешно свързване с %1$s</string>
     <string name="drawer_server_sign_in_failed_detail">Неуспешно влизане в %1$s</string>
@@ -119,11 +119,11 @@
     <string name="drawer_open_in_new_window">Отворете в нов прозорец</string>
 
     <!-- Session row state for TalkBack -->
-    <string name="drawer_row_pinned_state">Закачени</string>
-    <string name="drawer_row_muted_state">Заглушени</string>
+    <string name="drawer_row_pinned_state">Закачена</string>
+    <string name="drawer_row_muted_state">Заглушена</string>
     <string name="drawer_row_needs_input_state">Изисква се отговор</string>
     <string name="drawer_row_working_state">Работи</string>
-    <string name="drawer_row_unread_state">Непрочетени</string>
+    <string name="drawer_row_unread_state">Непрочетена</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Неуспешно искане на разрешение. Опитайте отново.</string>

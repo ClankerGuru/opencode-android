@@ -42,7 +42,7 @@
     <string name="media_file_error_not_found_title">Fail tidak ditemui</string>
     <string name="media_file_error_open_failed_title">Tidak dapat membuka fail</string>
     <string name="media_file_error_unreadable">Laluan ini tidak dapat dibaca daripada pelayan.</string>
-    <string name="media_file_error_not_found">Fail ini mungkin telah dialihkan atau dipadam.</string>
+    <string name="media_file_error_not_found">Fail ini mungkin telah dialihkan atau dihapus.</string>
     <string name="media_file_error_unauthorized">Pelayan tidak menerima kata laluan peranti ini.</string>
     <!-- %1$d is the HTTP status code -->
     <string name="media_file_error_server">Pelayan tidak dapat membacanya (HTTP %1$d). Ia mungkin folder.</string>
@@ -112,7 +112,7 @@
     <string name="media_link_text_on_host_description">%1$s di %2$s</string>
     <!-- A link's host, then its place among the text's links, as “example.net link 3” -->
     <string name="media_link_host_numbered_description">%1$s pautan %2$d</string>
-    <string name="media_link_more_links_description">Lagi pautan</string>
+    <string name="media_link_more_links_description">Lebih banyak pautan</string>
 
     <!-- Link previews -->
     <string name="media_link_preview_video">Video</string>

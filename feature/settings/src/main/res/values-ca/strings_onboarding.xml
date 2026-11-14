@@ -36,7 +36,7 @@
     <string name="settings_onboarding_desktop_composer_placeholder">Pregunta el que vulguis, / per a ordres, @ per al context…</string>
     <string name="settings_onboarding_desktop_composer_follow_up_placeholder">Afegeix un missatge, / per a ordres, @ per al context…</string>
     <string name="settings_onboarding_desktop_back_to_app">Torna a l\'aplicació</string>
-    <string name="settings_onboarding_desktop_pairing_title">S\'està aparellant</string>
+    <string name="settings_onboarding_desktop_pairing_title">Aparellament</string>
     <string name="settings_onboarding_desktop_pairing_subtitle">Connecta un altre dispositiu al servidor d\'OpenCode d\'aquest ordinador.</string>
     <string name="settings_onboarding_desktop_pair_device">Aparella un dispositiu</string>
     <string name="settings_onboarding_desktop_pair_device_message">Escaneja el codi amb l\'aplicació OpenCode en un altre dispositiu o copia l\'enllaç.</string>
@@ -61,7 +61,7 @@
     <string name="settings_onboarding_headline">OpenCode\narreu.</string>
     <string name="settings_onboarding_headline_spoken">OpenCode arreu.</string>
     <string name="settings_onboarding_subhead">Inicia tasques, respon preguntes i revisa canvis lluny de l\'escriptori.</string>
-    <string name="settings_onboarding_instruction">A l\'ordinador, obre OpenCode i ves a Configuració → S\'està aparellant.</string>
+    <string name="settings_onboarding_instruction">A l\'ordinador, obre OpenCode i ves a Configuració → Aparellament.</string>
 
     <!-- Onboarding: WelcomeStory, the mock conversation (the reply's backticks mark code) -->
     <string name="settings_onboarding_story_prompt">Afegeix un botó de descàrrega per a Android i ensenya-me\'l</string>

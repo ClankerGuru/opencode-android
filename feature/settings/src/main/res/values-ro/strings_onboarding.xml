@@ -36,7 +36,7 @@
     <string name="settings_onboarding_desktop_composer_placeholder">Întreabă orice, / pentru comenzi, @ pentru context…</string>
     <string name="settings_onboarding_desktop_composer_follow_up_placeholder">Adaugă detalii, / pentru comenzi, @ pentru context…</string>
     <string name="settings_onboarding_desktop_back_to_app">Înapoi la aplicație</string>
-    <string name="settings_onboarding_desktop_pairing_title">Se asociază</string>
+    <string name="settings_onboarding_desktop_pairing_title">Asociere</string>
     <string name="settings_onboarding_desktop_pairing_subtitle">Conectează alt dispozitiv la serverul OpenCode de pe acest computer.</string>
     <string name="settings_onboarding_desktop_pair_device">Asociază un dispozitiv</string>
     <string name="settings_onboarding_desktop_pair_device_message">Scanează codul cu aplicația OpenCode de pe alt dispozitiv sau copiază linkul.</string>
@@ -50,7 +50,7 @@
     <string name="settings_onboarding_phone_message_placeholder">Mesaj</string>
 
     <!-- What’s New -->
-    <string name="settings_whatsnew_developer_updates">Noutăți pentru dezvoltatori</string>
+    <string name="settings_whatsnew_developer_updates">Actualizări pentru dezvoltatori</string>
     <string name="settings_whatsnew_smaller_changes">Modificări minore</string>
     <string name="settings_whatsnew_title">Noutăți</string>
     <string name="settings_whatsnew_options_description">Opțiuni pentru noutăți</string>
@@ -61,7 +61,7 @@
     <string name="settings_onboarding_headline">OpenCode\noriunde.</string>
     <string name="settings_onboarding_headline_spoken">OpenCode oriunde.</string>
     <string name="settings_onboarding_subhead">Pornește sarcini, răspunde la întrebări și revizuiește modificări fără să stai la birou.</string>
-    <string name="settings_onboarding_instruction">Pe computer, deschide OpenCode și mergi la Setări → Se asociază.</string>
+    <string name="settings_onboarding_instruction">Pe computer, deschide OpenCode și mergi la Setări → Asociere.</string>
 
     <!-- Onboarding: WelcomeStory, the mock conversation (the reply's backticks mark code) -->
     <string name="settings_onboarding_story_prompt">Adaugă un buton de descărcare pentru Android și arată-mi</string>

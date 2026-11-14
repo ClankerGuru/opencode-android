@@ -123,7 +123,7 @@
     <string name="composer_model_show_all">Näytä kaikki mallit</string>
     <plurals name="composer_model_hidden_count">
         <item quantity="one">%1$d piilotettu</item>
-        <item quantity="other">%1$d piilotettu</item>
+        <item quantity="other">%1$d piilotettua</item>
     </plurals>
     <string name="composer_sheet_grabber_description">Paneelin vetokahva</string>
     <string name="composer_model_grabber_compact_action">Pienennä valitsin</string>

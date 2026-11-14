@@ -3,7 +3,7 @@
     <!-- Agent activity glyph -->
     <string name="session_activity_running_description">Koyrir</string>
     <!-- Background work panel -->
-    <string name="session_background_work_show_label">Vís undirumboð og shellar, sum koyra</string>
+    <string name="session_background_work_show_label">Vís koyrandi undirumboð og shellar</string>
     <string name="session_background_work_collapsed_description">Samanlagt</string>
     <string name="session_background_work_subagents_title">Undirumboð</string>
     <string name="session_background_work_open_subagent_label">Opna setuna hjá undirumboðinum</string>
@@ -46,7 +46,7 @@
     <string name="session_rename_title">Umnevna setu</string>
     <string name="session_untitled_title">Seta</string>
     <string name="session_pin">Fest</string>
-    <string name="session_pinned">Festar</string>
+    <string name="session_pinned">Fest</string>
     <string name="session_unread">Ólisið</string>
     <string name="session_mute">Sløkk fráboðanir</string>
     <string name="session_muted">Fráboðanir sløktar</string>
@@ -143,7 +143,7 @@
     <string name="session_shell_showing_last_output">Vísir seinastu 4 MB</string>
     <string name="session_shell_load_earlier">Heinta eldra</string>
     <string name="session_shell_output_unavailable_title">Úttak er ikki tøkt</string>
-    <string name="session_shell_output_unavailable_message">Ambætarin hevur ikki longur úttakið frá hesum shelli.</string>
+    <string name="session_shell_output_unavailable_message">Ambætarin hevur ikki longur úttakið frá hesum shellinum.</string>
     <string name="session_shell_no_output_yet_title">Einki úttak enn</string>
     <string name="session_shell_no_output_title">Einki úttak</string>
     <string name="session_shell_no_output_yet_message">Úttakið sæst her, so hvørt sum skipanin skrivar tað.</string>
@@ -288,6 +288,6 @@
 
     <!-- Shell output -->
     <string name="session_shell_refresh_failed">Kundi ikki dagføra úttakið</string>
-    <string name="session_shell_load_earlier_failed">Kundi ikki heinta eldra úttak</string>
+    <string name="session_shell_load_earlier_failed">Kundi ikki heinta eldri úttak</string>
     <string name="session_shell_stop_failed">Kundi ikki steðga shelli</string>
 </resources>

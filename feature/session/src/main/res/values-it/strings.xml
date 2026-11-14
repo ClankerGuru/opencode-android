@@ -145,7 +145,7 @@
     <string name="session_shell_showing_last_output">Ultimi 4 MB visualizzati</string>
     <string name="session_shell_load_earlier">Carica precedenti</string>
     <string name="session_shell_output_unavailable_title">Output non disponibile</string>
-    <string name="session_shell_output_unavailable_message">Il server non dispone più dell\'output di questa shell.</string>
+    <string name="session_shell_output_unavailable_message">Il server non ha più l\'output di questa shell.</string>
     <string name="session_shell_no_output_yet_title">Ancora nessun output</string>
     <string name="session_shell_no_output_title">Nessun output</string>
     <string name="session_shell_no_output_yet_message">L\'output appare qui man mano che il comando lo genera.</string>

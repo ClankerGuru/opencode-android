@@ -112,7 +112,7 @@
     <string name="settings_whatsnew_entry_ride_out_drops_title">Berfungsi walau isyarat lemah</string>
     <string name="settings_whatsnew_entry_ride_out_drops_summary">Kehilangan isyarat selama beberapa saat tidak lagi menyebabkan kegagalan. Penghantaran, sesi dan panggilan menunggu sambungan lalu diteruskan.</string>
     <string name="settings_whatsnew_entry_ride_out_drops_detail_1">Hantar sentiasa tersedia, dan mesej dihantar mengikut urutan anda menghantarnya.</string>
-    <string name="settings_whatsnew_entry_ride_out_drops_detail_2">Mesej yang gagal dihantar kekal di tempatnya dengan pilihan Cuba semula, tanpa risiko dihantar dua kali.</string>
+    <string name="settings_whatsnew_entry_ride_out_drops_detail_2">Mesej yang gagal dihantar kekal di tempatnya dengan pilihan Cuba semula, dan cuba semula tidak akan menghantarnya dua kali.</string>
     <string name="settings_whatsnew_entry_ride_out_drops_detail_3">Apabila pelayan anda luar talian, namanya dalam panel sisi menjadi malap. Ketik untuk pilihan Cuba lagi.</string>
     <string name="settings_whatsnew_entry_ride_out_drops_example">Buka sesi semasa kereta api anda memasuki terowong</string>
 
@@ -394,7 +394,7 @@
 
     <!-- 2026-10-19-03-smart-dictation-audio -->
     <string name="settings_whatsnew_entry_smart_dictation_audio_title">Imlak lebih lancar dengan muzik</string>
-    <string name="settings_whatsnew_entry_smart_dictation_audio_summary">Semasa mengimlak sambil mendengar muzik, muzik kekal stereo pada AirPods tanpa terputus seminit kemudian. Jika hanya menggunakan telefon, muzik kekal pada pembesar suara dan bukannya cuping telinga.</string>
+    <string name="settings_whatsnew_entry_smart_dictation_audio_summary">Semasa mengimlak sambil mendengar muzik, muzik kekal stereo pada AirPods tanpa terputus seminit kemudian. Jika hanya menggunakan telefon, muzik kekal pada pembesar suara dan bukannya pembesar suara telinga.</string>
 
     <!-- 2026-10-19-04-interrupted-hand -->
     <string name="settings_whatsnew_entry_interrupted_hand_title">Ikon tangan untuk Terganggu</string>
@@ -480,12 +480,12 @@
     <string name="settings_whatsnew_entry_advanced_settings_open_summary">Semua eksperimen dalam Tetapan › Eksperimen kini dalam kumpulan terbuka, pemilih model digabungkan dalam satu pilihan Pemilih model, dan anda boleh mengetik di mana-mana pada baris pilihan untuk mengubahnya.</string>
 
     <!-- 2026-10-20-12-revert-to-here -->
-    <string name="settings_whatsnew_entry_revert_to_here_title">Kembalikan mesej</string>
-    <string name="settings_whatsnew_entry_revert_to_here_summary">Tekan lama salah satu mesej anda dan pilih Kembalikan mesej untuk kembali ke titik itu dan menyuntingnya.</string>
+    <string name="settings_whatsnew_entry_revert_to_here_title">Kembalikan ke Sini</string>
+    <string name="settings_whatsnew_entry_revert_to_here_summary">Tekan lama salah satu mesej anda dan pilih Kembalikan ke Sini untuk kembali ke titik itu dan menyuntingnya.</string>
     <string name="settings_whatsnew_entry_revert_to_here_detail_1">Teks, foto dan fail mesej itu dikembalikan ke kotak mesej.</string>
     <string name="settings_whatsnew_entry_revert_to_here_detail_2">Undur memulihkan giliran perbualan dan perubahan failnya selagi anda belum menghantar mesej baharu.</string>
     <string name="settings_whatsnew_entry_revert_to_here_detail_3">Pilihan ini tersedia semasa ejen tidak bekerja.</string>
-    <string name="settings_whatsnew_entry_revert_to_here_example">Tekan lama mesej yang anda hantar sebelum ini dan pilih Kembalikan mesej.</string>
+    <string name="settings_whatsnew_entry_revert_to_here_example">Tekan lama mesej yang anda hantar sebelum ini dan pilih Kembalikan ke Sini.</string>
 
     <!-- 2026-10-20-13-drag-from-transcript -->
     <string name="settings_whatsnew_entry_drag_from_transcript_title">Seret dari sesi</string>
@@ -536,8 +536,8 @@
     <string name="settings_whatsnew_entry_calm_wireframe_launch_summary">Sesi dalam cache terus dibuka; sesi yang mengambil masa untuk dimuatkan memaparkan gelembung mesej berdenyut yang beransur diganti dengan mesej anda.</string>
 
     <!-- 2026-10-21-05-request-dictation-last-line -->
-    <string name="settings_whatsnew_entry_request_dictation_last_line_title">Bahagian akhir rencana dipaparkan</string>
-    <string name="settings_whatsnew_entry_request_dictation_last_line_summary">Pada iOS 26, apabila rencana panjang dihentikan dalam kotak balasan permintaan tertunda, baris terakhirnya dipaparkan, bukan teks di bahagian tengah.</string>
+    <string name="settings_whatsnew_entry_request_dictation_last_line_title">Bahagian akhir imlak dipaparkan</string>
+    <string name="settings_whatsnew_entry_request_dictation_last_line_summary">Pada iOS 26, apabila imlak panjang dihentikan dalam kotak balasan permintaan tertunda, baris terakhirnya dipaparkan, bukan teks di bahagian tengah.</string>
 
     <!-- 2026-10-21-06-first-run-pairing-fixes -->
     <string name="settings_whatsnew_entry_first_run_pairing_fixes_title">Pemasangan pertama lebih jelas</string>
@@ -712,7 +712,7 @@
 
     <!-- 2026-10-28-02-welcome-preview -->
     <string name="settings_whatsnew_entry_welcome_preview_title">Pratonton alu-aluan</string>
-    <string name="settings_whatsnew_entry_welcome_preview_summary">Skrin alu-aluan baharu pada pelancaran pertama menunjukkan OpenCode bekerja pada komputer riba sambil dikawal melalui telefon, kemudian memasangkan peranti dalam satu langkah. Hidupkan Pratonton alu-aluan dalam Tetapan › Eksperimen › Panel sisi dan ketik Tunjukkan alu-aluan untuk melihatnya; tutup untuk kembali.</string>
+    <string name="settings_whatsnew_entry_welcome_preview_summary">Skrin alu-aluan baharu pada pelancaran pertama menunjukkan OpenCode bekerja pada komputer riba sambil telefon menghalakannya, kemudian memasangkan peranti dalam satu langkah. Hidupkan Pratonton alu-aluan dalam Tetapan › Eksperimen › Panel sisi dan ketik Tunjukkan alu-aluan untuk melihatnya; tutup untuk kembali.</string>
 
     <!-- 2026-10-29-01-composer-text-selection -->
     <string name="settings_whatsnew_entry_composer_text_selection_title">Pilih teks dalam ruang karang</string>

@@ -136,7 +136,7 @@
     <string name="system_share_sent_description">Poslano</string>
     <string name="system_share_sessions_title">Sesije</string>
     <string name="system_share_pinned_header">Prikačene</string>
-    <string name="system_share_recents_header">Nedavni</string>
+    <string name="system_share_recents_header">Nedavne</string>
 
     <!-- Widget configuration -->
     <string name="system_widget_choose_session_title">Odaberi sesiju</string>

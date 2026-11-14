@@ -7,16 +7,16 @@
     <string name="server_notice_heading_failed">%1$s muvaffaqiyatsiz tugadi</string>
     <string name="server_notice_heading_interrupted">%1$s uzildi</string>
     <plurals name="server_notice_count_shell_finished">
-        <item quantity="one">%1$d ta shell ishini tugatdi</item>
-        <item quantity="other">%1$d ta shell ishini tugatdi</item>
+        <item quantity="one">%1$d ta Shell ishini tugatdi</item>
+        <item quantity="other">%1$d ta Shell ishini tugatdi</item>
     </plurals>
     <plurals name="server_notice_count_shell_failed">
-        <item quantity="one">%1$d ta shell muvaffaqiyatsiz tugadi</item>
-        <item quantity="other">%1$d ta shell muvaffaqiyatsiz tugadi</item>
+        <item quantity="one">%1$d ta Shell muvaffaqiyatsiz tugadi</item>
+        <item quantity="other">%1$d ta Shell muvaffaqiyatsiz tugadi</item>
     </plurals>
     <plurals name="server_notice_count_shell_interrupted">
-        <item quantity="one">%1$d ta shell uzildi</item>
-        <item quantity="other">%1$d ta shell uzildi</item>
+        <item quantity="one">%1$d ta Shell uzildi</item>
+        <item quantity="other">%1$d ta Shell uzildi</item>
     </plurals>
     <plurals name="server_notice_count_subagent_finished">
         <item quantity="one">%1$d ta subagent ishini tugatdi</item>

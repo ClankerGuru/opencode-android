@@ -441,7 +441,7 @@
 
     <!-- 2026-10-20-01-call-tray-docks-in-drawer -->
     <string name="settings_whatsnew_entry_call_tray_docks_in_drawer_title">ផ្ទាំងការហៅក្នុងផ្ទាំងចំហៀង</string>
-    <string name="settings_whatsnew_entry_call_tray_docks_in_drawer_summary">ពេលបើកមុខងារសាកល្បងផ្ទាំងការហៅ ការបើកផ្ទាំងចំហៀងពេលកំពុងហៅនឹងផ្លាស់ផ្ទាំងការហៅទៅក្រោម សម័យថ្មី ដោយមានកម្រិតសំឡេង បិទការជូនដំណឹង និងបញ្ចប់។ ពេលបិទផ្ទាំងចំហៀង វានឹងត្រឡប់មកវិញ។</string>
+    <string name="settings_whatsnew_entry_call_tray_docks_in_drawer_summary">ពេលបើកមុខងារសាកល្បងផ្ទាំងការហៅ ការបើកផ្ទាំងចំហៀងពេលកំពុងហៅនឹងផ្លាស់ផ្ទាំងការហៅទៅក្រោម សម័យថ្មី ដោយមានកម្រិតសំឡេង បិទសំឡេង និងបញ្ចប់។ ពេលបិទផ្ទាំងចំហៀង វានឹងត្រឡប់មកវិញ។</string>
 
     <!-- 2026-10-20-02-markdown-streams-smoothly -->
     <string name="settings_whatsnew_entry_markdown_streams_smoothly_title">ការឆ្លើយតបបង្ហាញរលូនជាងមុន</string>

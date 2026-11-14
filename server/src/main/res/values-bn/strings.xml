@@ -7,8 +7,8 @@
     <string name="server_notice_heading_failed">%1$s ব্যর্থ হয়েছে</string>
     <string name="server_notice_heading_interrupted">%1$s বাধাপ্রাপ্ত হয়েছে</string>
     <plurals name="server_notice_count_shell_finished">
-        <item quantity="one">%1$dটি শেলের কাজ শেষ হয়েছে</item>
-        <item quantity="other">%1$dটি শেলের কাজ শেষ হয়েছে</item>
+        <item quantity="one">%1$dটি শেল শেষ হয়েছে</item>
+        <item quantity="other">%1$dটি শেল শেষ হয়েছে</item>
     </plurals>
     <plurals name="server_notice_count_shell_failed">
         <item quantity="one">%1$dটি শেল ব্যর্থ হয়েছে</item>
@@ -57,7 +57,7 @@
     <!-- OpenCodeClientError.kt -->
     <string name="server_error_unreachable">OpenCode সার্ভারে সংযোগ করা যায়নি</string>
     <string name="server_error_folder_gone">ফোল্ডারটি আর নেই</string>
-    <string name="server_error_uploads_unsupported">এই সার্ভারে ফাইল সংযুক্ত করা যায় না। কম্পিউটারে OpenCode আপডেট করুন।</string>
+    <string name="server_error_uploads_unsupported">এই সার্ভার ফাইল সংযুক্তি সমর্থন করে না। কম্পিউটারে OpenCode আপডেট করুন।</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode-এর আপনার স্থানীয় নেটওয়ার্কের ডিভাইসে সংযোগ করার অনুমতি নেই। সেটিংসে OpenCode-এর জন্য কাছাকাছি ডিভাইসের অনুমতি চালু করে আবার চেষ্টা করুন।</string>

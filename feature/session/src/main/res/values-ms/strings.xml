@@ -117,7 +117,7 @@
     <string name="session_header_last_known_description">Terakhir diketahui</string>
     <string name="session_menu_more_description">Lagi</string>
     <string name="session_unpin">Nyahsemat</string>
-    <string name="session_copy_session_id">Salin ID sesi</string>
+    <string name="session_copy_session_id">Salin ID Sesi</string>
     <string name="session_mark_as_read">Tandakan sebagai sudah dibaca</string>
     <string name="session_mark_as_unread">Tandakan sebagai belum dibaca</string>
     <string name="session_unmute">Nyahsenyap</string>
@@ -209,9 +209,9 @@
     <string name="session_server_reconnecting">Menyambung semula ke %1$s…</string>
     <string name="session_server_connect_failed">Tidak dapat menyambung ke %1$s</string>
     <string name="session_server_sign_in_failed">Tidak dapat log masuk ke %1$s</string>
-    <string name="session_server_pair_again">Berpasangan semula</string>
+    <string name="session_server_pair_again">Gandingkan semula</string>
     <string name="session_server_try_again_click_label">cuba lagi</string>
-    <string name="session_server_pair_again_click_label">berpasangan semula</string>
+    <string name="session_server_pair_again_click_label">gandingkan semula</string>
 
     <!-- Export -->
     <string name="session_export_folder_failed">Tidak dapat mencipta folder eksport</string>

@@ -21,7 +21,7 @@
     <string name="voice_mute">Mettre en sourdine</string>
     <string name="voice_unmute">Réactiver le micro</string>
     <string name="voice_stage_pause">Pause</string>
-    <string name="voice_stage_camera">Appareil photo</string>
+    <string name="voice_stage_camera">Caméra</string>
     <string name="voice_transcript_empty">Dites quelque chose à votre session.</string>
     <string name="voice_transcript_you">Vous</string>
     <string name="voice_transcript_user_line_description">Vous : %1$s</string>

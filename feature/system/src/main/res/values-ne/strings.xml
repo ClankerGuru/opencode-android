@@ -44,9 +44,9 @@
     <string name="system_ask_send_failed">OpenCode मा पठाउन सकिएन। %1$s</string>
 
     <!-- Live Updates: voice call -->
-    <string name="system_call_muted">सूचना बन्द गरिएका</string>
-    <string name="system_call_unmute">सूचना खोल्नुहोस्</string>
-    <string name="system_call_mute">सूचना बन्द गर्नुहोस्</string>
+    <string name="system_call_muted">आवाज बन्द गरिएको</string>
+    <string name="system_call_unmute">आवाज खोल्नुहोस्</string>
+    <string name="system_call_mute">आवाज बन्द गर्नुहोस्</string>
     <string name="system_call_end">कल अन्त्य गर्नुहोस्</string>
     <string name="system_call_connecting">जडान गर्दै…</string>
     <string name="system_call_reconnecting">फेरि जडान गर्दै…</string>

@@ -3,7 +3,7 @@
     <!-- Agent activity glyph -->
     <string name="session_activity_running_description">Pracuje</string>
     <!-- Background work panel -->
-    <string name="session_background_work_show_label">Pokaż aktywnych podagentów i terminale</string>
+    <string name="session_background_work_show_label">Pokaż pracujących podagentów i terminale</string>
     <string name="session_background_work_collapsed_description">Zwinięte</string>
     <string name="session_background_work_subagents_title">Podagenci</string>
     <string name="session_background_work_open_subagent_label">Otwórz sesję podagenta</string>
@@ -24,7 +24,7 @@
     <string name="session_draft_project_choose_label">Wybierz, gdzie rozpocząć sesję</string>
     <string name="session_project_choose_folder">Wybierz folder…</string>
     <string name="session_project_all_projects">Wszystkie projekty</string>
-    <string name="session_project_selected_description">Wybrana</string>
+    <string name="session_project_selected_description">Wybrany</string>
     <string name="session_project_picker_title">Projekt</string>
     <!-- Folder browser -->
     <string name="session_folder_select_description">Wybierz folder</string>

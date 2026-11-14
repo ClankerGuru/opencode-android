@@ -78,7 +78,7 @@
 
     <!-- Notification channels -->
     <string name="system_channel_voice_calls">Panggilan suara</string>
-    <string name="system_channel_recording">Merakam</string>
+    <string name="system_channel_recording">Rakaman</string>
     <string name="system_channel_session_runs">Pelaksanaan sesi</string>
     <string name="system_channel_session_updates">Kemas kini sesi</string>
     <string name="system_channel_shared_items">Item dikongsi</string>

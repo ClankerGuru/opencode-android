@@ -449,7 +449,7 @@
 
     <!-- 2026-10-20-04-return-newline-default -->
     <string name="settings_whatsnew_entry_return_newline_default_title">Entrée ajoute une nouvelle ligne</string>
-    <string name="settings_whatsnew_entry_return_newline_default_summary">Entrée ajoute désormais une nouvelle ligne par défaut. Activez Envoyer avec la touche Entrée dans Paramètres › Sessions pour envoyer avec Entrée, ou utilisez Ctrl+Enter sur un clavier physique.</string>
+    <string name="settings_whatsnew_entry_return_newline_default_summary">Entrée ajoute désormais une nouvelle ligne par défaut. Activez Envoyer avec la touche Entrée dans Paramètres › Sessions pour envoyer avec Entrée, ou utilisez Ctrl+Entrée sur un clavier physique.</string>
 
     <!-- 2026-10-20-05-drawer-session-alignment -->
     <string name="settings_whatsnew_entry_drawer_session_alignment_title">Commandes du volet alignées</string>

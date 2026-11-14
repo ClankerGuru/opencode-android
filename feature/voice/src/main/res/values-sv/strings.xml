@@ -19,7 +19,7 @@
     <string name="voice_stage_talking_in">Pratar i</string>
     <string name="voice_stage_minimize_description">Minimera</string>
     <string name="voice_mute">Tysta</string>
-    <string name="voice_unmute">Slå på aviseringar</string>
+    <string name="voice_unmute">Slå på ljudet</string>
     <string name="voice_stage_pause">Pausa</string>
     <string name="voice_stage_camera">Kamera</string>
     <string name="voice_transcript_empty">Säg något till din session.</string>

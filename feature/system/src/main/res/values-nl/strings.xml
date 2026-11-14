@@ -23,7 +23,7 @@
     <string name="system_intent_new_session_description">Start een nieuwe sessie in OpenCode.</string>
     <string name="system_intent_start_voice_call_title">Spraakoproep starten</string>
     <string name="system_intent_start_voice_call_description">Start een spraakoproep met OpenCode in een sessie. Zonder gekozen sessie start de oproep in de laatst bekeken sessie.</string>
-    <string name="system_intent_background_call_title">Spraakoproep op achtergrond starten</string>
+    <string name="system_intent_background_call_title">Spraakoproep op de achtergrond starten</string>
     <string name="system_intent_background_call_description">Start een spraakoproep met OpenCode zonder de app te openen. De oproep verschijnt in de statusbalk en op het vergrendelscherm.</string>
     <string name="system_delivery_type_name">Verzendwijze</string>
     <string name="system_delivery_steer">Bijsturen</string>
@@ -78,7 +78,7 @@
 
     <!-- Notification channels -->
     <string name="system_channel_voice_calls">Spraakoproepen</string>
-    <string name="system_channel_recording">Opname bezig</string>
+    <string name="system_channel_recording">Opname</string>
     <string name="system_channel_session_runs">Sessie-uitvoeringen</string>
     <string name="system_channel_session_updates">Sessie-updates</string>
     <string name="system_channel_shared_items">Gedeelde items</string>

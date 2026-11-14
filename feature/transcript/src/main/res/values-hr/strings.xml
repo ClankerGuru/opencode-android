@@ -36,7 +36,7 @@
     <string name="transcript_image_open_description">Otvori sliku</string>
     <string name="transcript_image_load_failed">Nije moguće učitati sliku</string>
     <string name="transcript_image_retry_click_label">Pokušaj ponovno</string>
-    <string name="transcript_image_open">Otvoreno</string>
+    <string name="transcript_image_open">Otvoriti</string>
 
     <!-- Math -->
     <string name="transcript_equation_description">Jednadžba</string>

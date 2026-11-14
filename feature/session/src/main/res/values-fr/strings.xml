@@ -24,7 +24,7 @@
     <string name="session_draft_project_choose_label">Choisir où démarrer la session</string>
     <string name="session_project_choose_folder">Choisir un dossier…</string>
     <string name="session_project_all_projects">Tous les projets</string>
-    <string name="session_project_selected_description">Sélectionnée</string>
+    <string name="session_project_selected_description">Sélectionné</string>
     <string name="session_project_picker_title">Projet</string>
     <!-- Folder browser -->
     <string name="session_folder_select_description">Sélectionner le dossier</string>

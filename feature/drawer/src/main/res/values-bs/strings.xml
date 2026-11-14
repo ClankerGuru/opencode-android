@@ -44,7 +44,7 @@
 
     <!-- Section headers, shortcut rows and list footer -->
     <string name="drawer_section_pinned">Prikačene</string>
-    <string name="drawer_section_recents">Nedavni</string>
+    <string name="drawer_section_recents">Nedavne</string>
     <plurals name="drawer_catch_up_session_count">
         <item quantity="one">%1$d sesija</item>
         <item quantity="few">%1$d sesije</item>
@@ -66,7 +66,7 @@
     <plurals name="drawer_selection_count">
         <item quantity="one">%1$d odabrana</item>
         <item quantity="few">%1$d odabrane</item>
-        <item quantity="other">%1$d odabrano</item>
+        <item quantity="other">%1$d odabranih</item>
     </plurals>
     <string name="drawer_selection_more_options_description">Više opcija</string>
     <plurals name="drawer_delete_sessions_title">
@@ -123,7 +123,7 @@
     <string name="drawer_open_in_new_window">Otvori u novom prozoru</string>
 
     <!-- Session row state for TalkBack -->
-    <string name="drawer_row_pinned_state">Prikačene</string>
+    <string name="drawer_row_pinned_state">Prikačeno</string>
     <string name="drawer_row_muted_state">Utišano</string>
     <string name="drawer_row_needs_input_state">Potreban je tvoj unos</string>
     <string name="drawer_row_working_state">U tijeku</string>

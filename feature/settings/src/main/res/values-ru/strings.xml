@@ -12,7 +12,7 @@
     <string name="settings_themes_preview_reply">Проблема с вёрсткой нашлась в %1$s. Переписка и поле ввода делят доступную высоту, поэтому клавиатура помогает проверить вёрстку под нагрузкой.</string>
 
     <!-- Experimental -->
-    <string name="settings_experimental_title">Экспериментальные функции</string>
+    <string name="settings_experimental_title">Экспериментальный</string>
     <string name="settings_experimental_all_footer">Также включает новые функции, кроме тех, что видят экран или слушают в фоне.</string>
     <string name="settings_experimental_all">Все эксперименты</string>
     <string name="settings_experimental_all_on">Все включены</string>

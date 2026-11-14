@@ -35,7 +35,7 @@
     <!-- Call rows: open link -->
     <string name="voice_open_link_spoken">Нужна е вашата намеса. %1$s</string>
     <string name="voice_open_link_spoken_with_host">Нужна е вашата намеса. %1$s %2$s</string>
-    <string name="voice_open_link_open">Отворено</string>
+    <string name="voice_open_link_open">Отворете</string>
 
     <!-- Call rows: audio on the call -->
     <string name="voice_audio_paused">На пауза</string>
@@ -75,7 +75,7 @@
     <string name="voice_status_needs_input">Нужна е вашата намеса</string>
     <string name="voice_status_working">Работи</string>
     <string name="voice_status_speaking">Говори</string>
-    <string name="voice_status_muted">Заглушени</string>
+    <string name="voice_status_muted">Заглушен</string>
     <string name="voice_status_listening">Слуша</string>
     <string name="voice_status_ending">Приключване…</string>
     <string name="voice_status_ended">Приключи</string>

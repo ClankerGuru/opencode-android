@@ -88,7 +88,7 @@
     <string name="settings_delegator_target_footer">Аутоматски користи сесију „Глас“ на овом серверу. Приказана сесија користи ону на екрану.</string>
     <string name="settings_delegator_automatic">Аутоматски</string>
     <string name="settings_delegator_viewed_session">Приказана сесија</string>
-    <string name="settings_delegator_search_placeholder">Претражи сесије</string>
+    <string name="settings_delegator_search_placeholder">Сесије претраге</string>
     <string name="settings_delegator_sessions_header">Изаберите сесију</string>
     <string name="settings_delegator_sessions_footer">Изабрана сесија задржава свој модел.</string>
     <string name="settings_delegator_no_sessions">Нема сесија на овом серверу</string>

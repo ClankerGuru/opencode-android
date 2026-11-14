@@ -143,7 +143,7 @@
     <string name="session_shell_showing_last_output">Die letzten 4 MB werden angezeigt</string>
     <string name="session_shell_load_earlier">Frühere Ausgabe laden</string>
     <string name="session_shell_output_unavailable_title">Ausgabe nicht verfügbar</string>
-    <string name="session_shell_output_unavailable_message">Der Server hat die Ausgabe dieser Shell nicht mehr.</string>
+    <string name="session_shell_output_unavailable_message">Die Ausgabe dieser Shell ist auf dem Server nicht mehr verfügbar.</string>
     <string name="session_shell_no_output_yet_title">Noch keine Ausgabe</string>
     <string name="session_shell_no_output_title">Keine Ausgabe</string>
     <string name="session_shell_no_output_yet_message">Die Ausgabe erscheint hier, sobald der Befehl sie erzeugt.</string>

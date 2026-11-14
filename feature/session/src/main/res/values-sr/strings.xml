@@ -3,12 +3,12 @@
     <!-- Agent activity glyph -->
     <string name="session_activity_running_description">У току</string>
     <!-- Background work panel -->
-    <string name="session_background_work_show_label">Прикажи активне субагенте и схеллове</string>
+    <string name="session_background_work_show_label">Прикажи активне субагенте и shell-ове</string>
     <string name="session_background_work_collapsed_description">Скупљено</string>
     <string name="session_background_work_subagents_title">Субагенти</string>
     <string name="session_background_work_open_subagent_label">Отвори сесију субагента</string>
-    <string name="session_background_work_shells_title">Схеллови</string>
-    <string name="session_background_work_show_shell_label">Прикажи излаз схелла</string>
+    <string name="session_background_work_shells_title">Shell-ови</string>
+    <string name="session_background_work_show_shell_label">Прикажи излаз shell-а</string>
     <!-- Jump to latest -->
     <string name="session_scroll_to_latest_description">Скочи на најновије</string>
     <!-- Dictation bar -->
@@ -17,7 +17,7 @@
     <string name="session_dictation_stop_recording_hint">Унеси изговорене речи у поруку</string>
     <string name="session_sending_message_description">Слање поруке</string>
     <string name="session_delivery_steer_label">Усмери у следећем кораку</string>
-    <string name="session_delivery_queue_label">Стави у ред после овог одговора</string>
+    <string name="session_delivery_queue_label">Стави у ред чекања после овог одговора</string>
     <string name="session_delivery_steer">Усмери</string>
     <string name="session_delivery_queue">Стави у ред чекања</string>
     <!-- Draft project picker -->
@@ -46,7 +46,7 @@
     <string name="session_rename_title">Преименуј сесију</string>
     <string name="session_untitled_title">Сесија</string>
     <string name="session_pin">Закачи</string>
-    <string name="session_pinned">Закачене</string>
+    <string name="session_pinned">Закачено</string>
     <string name="session_unread">Непрочитано</string>
     <string name="session_mute">Утишај</string>
     <string name="session_muted">Утишано</string>
@@ -136,16 +136,16 @@
     <string name="session_photo_sheet_full_description">Цео екран</string>
     <string name="session_photo_sheet_half_description">Пола екрана</string>
     <!-- Shell output -->
-    <string name="session_shell_stop_confirm_title">Зауставити овај схелл?</string>
+    <string name="session_shell_stop_confirm_title">Зауставити овај shell?</string>
     <string name="session_shell_stop_confirm_message">Команда се одмах завршава. Приказани излаз остаје док га не затворите.</string>
-    <string name="session_shell_stop">Заустави схелл</string>
+    <string name="session_shell_stop">Заустави shell</string>
     <string name="session_shell_copy_output">Копирај излаз</string>
     <string name="session_shell_share_output">Подели излаз</string>
     <string name="session_shell_earlier_output_hidden">Ранији излаз је скривен</string>
     <string name="session_shell_showing_last_output">Приказују се последња 4 MB</string>
     <string name="session_shell_load_earlier">Учитај раније</string>
     <string name="session_shell_output_unavailable_title">Излаз није доступан</string>
-    <string name="session_shell_output_unavailable_message">Сервер више нема излаз овог схелла.</string>
+    <string name="session_shell_output_unavailable_message">Сервер више нема излаз овог shell-а.</string>
     <string name="session_shell_no_output_yet_title">Још нема излаза</string>
     <string name="session_shell_no_output_title">Нема излаза</string>
     <string name="session_shell_no_output_yet_message">Излаз се појављује овде док га команда исписује.</string>
@@ -198,9 +198,9 @@
         <item quantity="other">%1$d субагената</item>
     </plurals>
     <plurals name="session_background_work_shell_count">
-        <item quantity="one">%1$d схелл</item>
-        <item quantity="few">%1$d схелла</item>
-        <item quantity="other">%1$d схеллова</item>
+        <item quantity="one">%1$d shell</item>
+        <item quantity="few">%1$d shell-а</item>
+        <item quantity="other">%1$d shell-ова</item>
     </plurals>
     <string name="session_background_work_summary">%1$s · %2$s</string>
 
@@ -300,5 +300,5 @@
     <!-- Shell output -->
     <string name="session_shell_refresh_failed">Освежавање излаза није успело</string>
     <string name="session_shell_load_earlier_failed">Учитавање ранијег излаза није успело</string>
-    <string name="session_shell_stop_failed">Заустављање схелла није успело</string>
+    <string name="session_shell_stop_failed">Заустављање shell-а није успело</string>
 </resources>

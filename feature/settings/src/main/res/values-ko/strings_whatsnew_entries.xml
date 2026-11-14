@@ -232,7 +232,7 @@
     <string name="settings_whatsnew_entry_inline_tool_rows_summary">도구 그룹과 답변한 질문을 펼치면 코드처럼 전체 너비 영역에 표시돼요. 연속된 읽기 작업은 한 행으로 묶여요.</string>
     <string name="settings_whatsnew_entry_inline_tool_rows_detail_1">접힌 그룹에는 ‘도구 N개 사용’이 표시되고, 실패한 도구 호출은 빨간색으로 표시돼요.</string>
     <string name="settings_whatsnew_entry_inline_tool_rows_detail_2">실행 행에는 스크립트가 호출한 도구 이름이, 스킬 행에는 스킬 이름이 표시돼요.</string>
-    <string name="settings_whatsnew_entry_inline_tool_rows_detail_3">답변한 질문에는 질문과 모든 선택지가 표시되고, 선택한 답에 체크가 표시돼요.</string>
+    <string name="settings_whatsnew_entry_inline_tool_rows_detail_3">답변한 질문에는 프롬프트와 모든 선택지가 표시되고, 선택한 답에 체크가 표시돼요.</string>
     <string name="settings_whatsnew_entry_inline_tool_rows_example">세션에서 ‘도구 N개 사용’ 행을 눌러 펼쳐 보세요</string>
 
     <!-- 2026-10-13-04-mac-motion-playgrounds -->
@@ -252,7 +252,7 @@
 
     <!-- 2026-10-14-01-settings-grouped-by-purpose -->
     <string name="settings_whatsnew_entry_settings_grouped_by_purpose_title">더 알기 쉬운 설정</string>
-    <string name="settings_whatsnew_entry_settings_grouped_by_purpose_summary">실험적 기능과 개발자 도구는 설정 → 실험적에서, 앱 내 알림은 알림에서, 통화 기록은 목소리에서 찾을 수 있어요.</string>
+    <string name="settings_whatsnew_entry_settings_grouped_by_purpose_summary">실험적 기능과 개발자 도구는 설정 → 실험적에서, 앱 내 공지사항은 알림에서, 통화 기록은 음성에서 찾을 수 있어요.</string>
 
     <!-- 2026-10-14-02-send-ats-recovery -->
     <string name="settings_whatsnew_entry_send_ats_recovery_title">안정적인 전송</string>
@@ -337,7 +337,7 @@
     <string name="settings_whatsnew_entry_image_previews_prompt">이 프로젝트의 스크린샷을 보여줘.</string>
 
     <!-- 2026-10-16-07-connection-error-details -->
-    <string name="settings_whatsnew_entry_connection_error_details_title">연결 실패 원인을 자세히</string>
+    <string name="settings_whatsnew_entry_connection_error_details_title">연결 오류에 실패 원인 표시</string>
     <string name="settings_whatsnew_entry_connection_error_details_summary">연결 오류에 오류 코드, 연결을 시도한 주소, DNS 결과가 표시돼요. 테일넷 이름이 Tailscale 외부 주소로 해석되면 도움말도 제공해요.</string>
 
     <!-- 2026-10-16-08-outage-reconnect-delay -->
@@ -441,7 +441,7 @@
 
     <!-- 2026-10-20-01-call-tray-docks-in-drawer -->
     <string name="settings_whatsnew_entry_call_tray_docks_in_drawer_title">탐색 패널 속 통화 트레이</string>
-    <string name="settings_whatsnew_entry_call_tray_docks_in_drawer_summary">통화 트레이 실험 기능을 켜면 통화 중 탐색 패널을 열 때 트레이가 새 세션 아래로 이동해요. 음량 표시, 알림 끄기와 종료 버튼도 함께 이동하며, 패널을 닫으면 원래 자리로 돌아와요.</string>
+    <string name="settings_whatsnew_entry_call_tray_docks_in_drawer_summary">통화 트레이 실험 기능을 켜면 통화 중 탐색 패널을 열 때 트레이가 새 세션 아래로 이동해요. 음량 표시, 음소거와 종료 버튼도 함께 이동하며, 패널을 닫으면 원래 자리로 돌아와요.</string>
 
     <!-- 2026-10-20-02-markdown-streams-smoothly -->
     <string name="settings_whatsnew_entry_markdown_streams_smoothly_title">더 부드러운 실시간 응답</string>
@@ -586,8 +586,8 @@
     <string name="settings_whatsnew_entry_project_icons_current_discovery_summary">프로젝트 아이콘을 켜면 서버가 Icon Composer 번들에서 찾은 아이콘도 사이드바에 표시돼요.</string>
 
     <!-- 2026-10-22-03-new-divider-off-page -->
-    <string name="settings_whatsnew_entry_new_divider_off_page_title">필요할 때만 새 소식 표시</string>
-    <string name="settings_whatsnew_entry_new_divider_off_page_summary">새 메시지 구분선 실험 기능을 켜면 새로 온 내용이 한 화면을 넘을 때만 새 소식 표시가 나타나요.</string>
+    <string name="settings_whatsnew_entry_new_divider_off_page_title">필요할 때만 새 메시지 표시</string>
+    <string name="settings_whatsnew_entry_new_divider_off_page_summary">새 메시지 구분선 실험 기능을 켜면 새로 온 내용이 한 화면을 넘을 때만 새 메시지 표시가 나타나요.</string>
 
     <!-- 2026-10-22-04-catch-up-all-caught-up-row -->
     <string name="settings_whatsnew_entry_catch_up_all_caught_up_row_title">모두 확인했어요</string>
@@ -615,7 +615,7 @@
 
     <!-- 2026-10-24-02-new-messages-divider-on -->
     <string name="settings_whatsnew_entry_new_messages_divider_on_title">새 메시지 구분선</string>
-    <string name="settings_whatsnew_entry_new_messages_divider_on_summary">자리를 비운 사이 도착한 응답이 한 화면보다 길면, 세션을 열 때 응답 시작 부분에 새 소식 구분선이 표시돼요.</string>
+    <string name="settings_whatsnew_entry_new_messages_divider_on_summary">자리를 비운 사이 도착한 응답이 한 화면보다 길면, 세션을 열 때 응답 시작 부분에 새 메시지 구분선이 표시돼요.</string>
     <string name="settings_whatsnew_entry_new_messages_divider_on_detail_1">한 화면에 들어오는 응답은 구분선 없이 끝부분이 보여요.</string>
     <string name="settings_whatsnew_entry_new_messages_divider_on_detail_2">보고 있는 동안 실시간으로 도착하는 응답에는 표시하지 않아요.</string>
     <string name="settings_whatsnew_entry_new_messages_divider_on_detail_3">끝까지 내려서 읽으면 구분선이 사라져요.</string>
@@ -878,7 +878,7 @@
     <string name="settings_whatsnew_entry_server_voice_detail_2">휴대폰과 서버에 모두 OpenAI 키가 있으면 이제 서버의 키로 통화해요. 휴대폰의 키를 계속 쓰려면 음성 공급자에서 내 OpenAI 계정을 열고 통화에 사용을 누르세요.</string>
     <string name="settings_whatsnew_entry_server_voice_detail_3">Gemini 키가 있는 서버에서는 이제 Gemini Live도 공급자로 사용할 수 있어요.</string>
     <string name="settings_whatsnew_entry_server_voice_detail_4">통화를 시작할 수 없으면 이유와 함께 해결에 필요한 버튼이 표시돼요.</string>
-    <string name="settings_whatsnew_entry_server_voice_example">설정 › 목소리에서 음성 공급자를 누르세요</string>
+    <string name="settings_whatsnew_entry_server_voice_example">설정 › 음성에서 음성 공급자를 누르세요</string>
 
     <!-- 2026-11-07-02-rename-clear-button -->
     <string name="settings_whatsnew_entry_rename_clear_button_title">한 번에 제목 지우기</string>
@@ -891,7 +891,7 @@
     <string name="settings_whatsnew_entry_one_picker_detail_2">행을 옆으로 밀거나 길게 눌러 즐겨찾기에 추가하거나 해제하세요.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_3">검색은 하단에 있어요. “opus high”처럼 이름 뒤에 수준을 입력하고 엔터를 누르면 둘 다 선택돼요.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_4">조절 핸들을 위로 끌면 목록이 길어지고, 아래로 끌면 닫혀요.</string>
-    <string name="settings_whatsnew_entry_one_picker_detail_5">새 선택 화면이 기존 모델 시트를 대체하며, 설정 › 실험적에서 One Picker 스위치가 사라졌어요.</string>
+    <string name="settings_whatsnew_entry_one_picker_detail_5">새 선택 화면이 기존 모델 시트를 대체하며, 설정 › 실험적에서 통합 선택기 스위치가 사라졌어요.</string>
     <string name="settings_whatsnew_entry_one_picker_example">메시지 입력란의 모델을 누른 다음, 행을 옆으로 밀어 즐겨찾기에 추가하세요</string>
 
     <!-- 2026-11-08-01-connecting-caption-glass -->

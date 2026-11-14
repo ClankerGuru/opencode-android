@@ -688,7 +688,7 @@
 
     <!-- 2026-10-26-05-living-orb-presets -->
     <string name="settings_whatsnew_entry_living_orb_presets_title">Kera eelseaded ja uhke stiil</string>
-    <string name="settings_whatsnew_entry_living_orb_presets_summary">Jaotises Seaded › Eksperimentaalne › Kõned kõnestiili all olev Kera avaneb nüüd uhkes stiilis, suurema reaalajas eelvaate ja eelseadete reaga. Salvesta ja nimeta oma eelseadeid ning kopeeri või kleebi seadistus selle jagamiseks.</string>
+    <string name="settings_whatsnew_entry_living_orb_presets_summary">Jaotises Seaded › Eksperimentaalne › Kõned kõnestiili all olev Kera avaneb nüüd uhkes stiilis, suurema reaalajas eelvaate ja eelseadete reaga. Salvesta ja nimeta ümber oma eelseadeid ning kopeeri või kleebi seadistus selle jagamiseks.</string>
 
     <!-- 2026-10-26-06-send-after-a-pause -->
     <string name="settings_whatsnew_entry_send_after_a_pause_title">Sujuvam saatmine pärast pausi</string>

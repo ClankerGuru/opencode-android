@@ -3,12 +3,12 @@
     <!-- Agent activity glyph -->
     <string name="session_activity_running_description">လုပ်ဆောင်နေသည်</string>
     <!-- Background work panel -->
-    <string name="session_background_work_show_label">လုပ်ဆောင်နေသော အေးဂျင့်ခွဲများနှင့် ဘူးခွံများကို ပြပါ</string>
+    <string name="session_background_work_show_label">လုပ်ဆောင်နေသည့် အေးဂျင့်ခွဲများနှင့် shell များကို ပြပါ</string>
     <string name="session_background_work_collapsed_description">ခေါက်သိမ်းထားသည်</string>
     <string name="session_background_work_subagents_title">အေးဂျင့်ခွဲများ</string>
     <string name="session_background_work_open_subagent_label">အေးဂျင့်ခွဲ၏ စက်ရှင်ကို ဖွင့်ပါ</string>
-    <string name="session_background_work_shells_title">ဘူးခွံများ</string>
-    <string name="session_background_work_show_shell_label">ဘူးခွံ၏ ရလဒ်ကို ပြပါ</string>
+    <string name="session_background_work_shells_title">shell များ</string>
+    <string name="session_background_work_show_shell_label">shell ၏ ရလဒ်ကို ပြပါ</string>
     <!-- Jump to latest -->
     <string name="session_scroll_to_latest_description">နောက်ဆုံးသို့ ရွှေ့ပါ</string>
     <!-- Dictation bar -->
@@ -132,16 +132,16 @@
     <string name="session_photo_sheet_full_description">အပြည့်</string>
     <string name="session_photo_sheet_half_description">တစ်ဝက်</string>
     <!-- Shell output -->
-    <string name="session_shell_stop_confirm_title">ဤဘူးခွံကို ရပ်မလား?</string>
+    <string name="session_shell_stop_confirm_title">ဤ shell ကို ရပ်မလား?</string>
     <string name="session_shell_stop_confirm_message">အမိန့်ကို ယခု ရပ်တန့်ပါမည်။ ဤနေရာရှိ ရလဒ်ကို သင်မပိတ်မချင်း ဆက်ပြထားပါမည်။</string>
-    <string name="session_shell_stop">ဘူးခွံကို ရပ်ပါ</string>
+    <string name="session_shell_stop">shell ကို ရပ်ပါ</string>
     <string name="session_shell_copy_output">ရလဒ်ကို ကူးယူပါ</string>
     <string name="session_shell_share_output">ရလဒ်ကို မျှဝေပါ</string>
     <string name="session_shell_earlier_output_hidden">အစောပိုင်း ရလဒ်များကို ဖျောက်ထားသည်</string>
     <string name="session_shell_showing_last_output">နောက်ဆုံး 4 MB ကို ပြထားသည်</string>
     <string name="session_shell_load_earlier">အစောပိုင်း ရလဒ်များကို ဖွင့်ပါ</string>
     <string name="session_shell_output_unavailable_title">ရလဒ် မရနိုင်ပါ</string>
-    <string name="session_shell_output_unavailable_message">ဆာဗာတွင် ဤဘူးခွံ၏ ရလဒ် မရှိတော့ပါ။</string>
+    <string name="session_shell_output_unavailable_message">ဆာဗာတွင် ဤ shell ၏ ရလဒ် မရှိတော့ပါ။</string>
     <string name="session_shell_no_output_yet_title">ရလဒ် မရှိသေးပါ</string>
     <string name="session_shell_no_output_title">ရလဒ် မရှိပါ</string>
     <string name="session_shell_no_output_yet_message">အမိန့်မှ ထုတ်ပေးသည့် ရလဒ်များ ဤနေရာတွင် ပေါ်လာမည်။</string>
@@ -186,7 +186,7 @@
         <item quantity="other">အေးဂျင့်ခွဲ %1$d ခု</item>
     </plurals>
     <plurals name="session_background_work_shell_count">
-        <item quantity="other">ဘူးခွံ %1$d ခု</item>
+        <item quantity="other">shell %1$d ခု</item>
     </plurals>
     <string name="session_background_work_summary">%1$s · %2$s</string>
 

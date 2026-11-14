@@ -70,7 +70,7 @@
     <string name="voice_notification_end">Avslutt</string>
     <!-- Call status caption -->
     <string name="voice_status_connecting_via">Kobler til via %1$s…</string>
-    <string name="voice_status_weak_connection">Svak forbindelse</string>
+    <string name="voice_status_weak_connection">Svak tilkobling</string>
     <string name="voice_status_paused">Satt på pause</string>
     <string name="voice_status_needs_input">Trenger svar fra deg</string>
     <string name="voice_status_working">Arbeider</string>

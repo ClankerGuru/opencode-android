@@ -160,7 +160,7 @@
 
     <!-- 2026-10-12-05-run-error-line -->
     <string name="settings_whatsnew_entry_run_error_line_title">Når en kjøring mislykkes</string>
-    <string name="settings_whatsnew_entry_run_error_line_summary">En kjøring som stopper for tidlig, forklarer hvorfor med enkle ord og gir én vei videre: Rediger, Komprimer, Bytt modell eller Prøv igjen.</string>
+    <string name="settings_whatsnew_entry_run_error_line_summary">En kjøring som stopper for tidlig, forklarer hvorfor med enkle ord og gir én vei videre: Rediger, Kompakt, Bytt modell eller Prøv igjen.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_1">Rediger angrer meldingen din og legger den tilbake i meldingsfeltet, så du kan omformulere den.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_2">Trykk og hold på linjen for å se hele feilen og kopiere den.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_3">Når agenten prøver igjen automatisk, viser Arbeider en nedtelling til neste forsøk.</string>
@@ -292,7 +292,7 @@
     <string name="settings_whatsnew_entry_session_list_sidebar_grey_summary">Sesjonslisten har større tittel og større, grå overskrifter for Festede og Nylige, med mer luft over. Åpne sidepanelet for å se.</string>
 
     <!-- 2026-10-15-03-voice-varied-acknowledgements -->
-    <string name="settings_whatsnew_entry_voice_varied_acknowledgements_title">Mindre «Sjekker» i samtaler</string>
+    <string name="settings_whatsnew_entry_voice_varied_acknowledgements_title">Færre «Sjekker» i samtaler</string>
     <string name="settings_whatsnew_entry_voice_varied_acknowledgements_summary">I samtaler reagerer stemmen på det du sier i stedet for å svare «Sjekker» på alt. En forespørsel sendes heller ikke to ganger når du fortsetter å snakke.</string>
 
     <!-- 2026-10-15-04-smoother-streaming -->
@@ -628,7 +628,7 @@
 
     <!-- 2026-10-24-04-composer-photo-viewer -->
     <string name="settings_whatsnew_entry_composer_photo_viewer_title">Bilder fra skrivefeltet i fullskjerm</string>
-    <string name="settings_whatsnew_entry_composer_photo_viewer_summary">Trykk på et bilde i skrivefeltet for å se det i fullskjerm, sveip mellom bilder og fjern bilder før du sender.</string>
+    <string name="settings_whatsnew_entry_composer_photo_viewer_summary">Trykk på et bilde i skrivefeltet for å se det i fullskjerm, sveip mellom bilder og fjern et før du sender.</string>
 
     <!-- 2026-10-24-05-plus-menu-photo-picker -->
     <string name="settings_whatsnew_entry_plus_menu_photo_picker_title">Ny bildevelger</string>
@@ -699,7 +699,7 @@
     <string name="settings_whatsnew_entry_steadier_round_trip_summary">Tallet i ms på tilkoblingskortet er nå et løpende gjennomsnitt av de siste målingene. Ett tregt svar gir dermed en liten endring i stedet for et stort hopp.</string>
 
     <!-- 2026-10-27-02-drawer-drag-follows-finger -->
-    <string name="settings_whatsnew_entry_drawer_drag_follows_finger_title">Sidepanelet følger fingeren din</string>
+    <string name="settings_whatsnew_entry_drawer_drag_follows_finger_title">Draing i sidepanelet følger fingeren din</string>
     <string name="settings_whatsnew_entry_drawer_drag_follows_finger_summary">En sesjon du drar i sidepanelet, holder seg nå rett under fingeren, vises over toppteksten, ruller listen ved kantene og spretter på plass når du slipper.</string>
 
     <!-- 2026-10-27-03-inbox-sidebar-experiment -->
@@ -736,7 +736,7 @@
 
     <!-- 2026-10-31-02-move-session-folder-gone -->
     <string name="settings_whatsnew_entry_move_session_folder_gone_title">Sesjoner lever videre uten mappen</string>
-    <string name="settings_whatsnew_entry_move_session_folder_gone_summary">Hvis sesjonens mappe er borte, for eksempel et slettet arbeidsområde, får du ved mislykket sending tilbud om å flytte sesjonen til prosjektmappen og sende på nytt.</string>
+    <string name="settings_whatsnew_entry_move_session_folder_gone_summary">Hvis sesjonens mappe er borte, for eksempel et fjernet arbeidsområde, får du ved mislykket sending tilbud om å flytte sesjonen til prosjektmappen og sende på nytt.</string>
 
     <!-- 2026-10-31-03-notification-plugin-setup -->
     <string name="settings_whatsnew_entry_notification_plugin_setup_title">Sett opp varsler med OpenCode</string>

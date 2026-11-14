@@ -3,7 +3,7 @@
     <!-- App alerts -->
     <string name="app_alert_share_failed_title">Jaettujen kohteiden lisäys epäonnistui</string>
     <string name="app_alert_open_session_failed_title">Istunnon avaaminen epäonnistui</string>
-    <string name="app_alert_pairing_failed_title">Laiteparin muodostus epäonnistui</string>
+    <string name="app_alert_pairing_failed_title">Laiteparin muodostus palvelimen kanssa epäonnistui</string>
     <string name="app_pairing_confirm">Muodosta laitepari</string>
 
     <!-- Connection screen -->

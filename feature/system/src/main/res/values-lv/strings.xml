@@ -44,8 +44,8 @@
     <string name="system_ask_send_failed">Neizdevās nosūtīt uz OpenCode. %1$s</string>
 
     <!-- Live Updates: voice call -->
-    <string name="system_call_muted">Apklusināta</string>
-    <string name="system_call_unmute">Ieslēgt paziņojumus</string>
+    <string name="system_call_muted">Apklusināts</string>
+    <string name="system_call_unmute">Atcelt apklusināšanu</string>
     <string name="system_call_mute">Apklusināt</string>
     <string name="system_call_end">Beigt zvanu</string>
     <string name="system_call_connecting">Veido savienojumu…</string>

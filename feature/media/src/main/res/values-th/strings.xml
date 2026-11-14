@@ -84,7 +84,7 @@
     <string name="media_browser_scroll_to_top_label">เลื่อนไปด้านบนของหน้า</string>
     <string name="media_browser_ask_placeholder">ถามเกี่ยวกับหน้านี้</string>
     <string name="media_browser_reply_needs_input">ต้องการคำตอบจากคุณ</string>
-    <string name="media_browser_reply_working">กำลังทำงาน</string>
+    <string name="media_browser_reply_working">การทำงาน</string>
     <string name="media_browser_go_back_to_session_label">กลับไปที่เซสชัน</string>
     <!-- Shown side by side on one line, in this order: “Reply ready · Back to read it” -->
     <string name="media_browser_reply_ready">คำตอบพร้อมแล้ว</string>

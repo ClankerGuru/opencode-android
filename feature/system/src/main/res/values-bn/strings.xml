@@ -119,7 +119,7 @@
     <string name="system_share_no_server_title">আগে একটি সার্ভারে সংযোগ করুন</string>
     <string name="system_share_no_server_message">OpenCode খুলে আপনার কম্পিউটারে সংযোগ করুন, তারপর আবার শেয়ার করুন।</string>
     <string name="system_share_send_later">পরে পাঠান</string>
-    <string name="system_share_saved_continue">সেভ করা হয়েছে। চালিয়ে যেতে OpenCode খুলুন</string>
+    <string name="system_share_saved_continue">সংরক্ষণ করা হয়েছে। চালিয়ে যেতে OpenCode খুলুন</string>
     <string name="system_share_loading_description">শেয়ার করা আইটেম লোড হচ্ছে</string>
     <string name="system_share_image_description">ছবি</string>
     <string name="system_share_image_position_description">%2$dটি ছবির মধ্যে %1$d নম্বর ছবি</string>

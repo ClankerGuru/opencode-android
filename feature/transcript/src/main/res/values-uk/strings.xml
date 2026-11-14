@@ -37,7 +37,7 @@
     <string name="transcript_image_open_description">Відкрити зображення</string>
     <string name="transcript_image_load_failed">Не вдалося завантажити зображення</string>
     <string name="transcript_image_retry_click_label">Спробувати ще раз</string>
-    <string name="transcript_image_open">Відкрито</string>
+    <string name="transcript_image_open">Відкрити</string>
 
     <!-- Math -->
     <string name="transcript_equation_description">Рівняння</string>

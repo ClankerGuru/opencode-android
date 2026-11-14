@@ -35,7 +35,7 @@
     <string name="transcript_image_open_description">Բացել պատկերը</string>
     <string name="transcript_image_load_failed">Չհաջողվեց բեռնել պատկերը</string>
     <string name="transcript_image_retry_click_label">Կրկին փորձել</string>
-    <string name="transcript_image_open">Բաց</string>
+    <string name="transcript_image_open">Բացել</string>
 
     <!-- Math -->
     <string name="transcript_equation_description">Հավասարում</string>

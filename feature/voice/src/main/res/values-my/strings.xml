@@ -18,8 +18,8 @@
     <!-- Floating call stage -->
     <string name="voice_stage_talking_in">စကားပြောနေသည့် စက်ရှင်</string>
     <string name="voice_stage_minimize_description">ချုံ့ပါ</string>
-    <string name="voice_mute">အသိပေးချက် ပိတ်ပါ</string>
-    <string name="voice_unmute">အသိပေးချက် ပြန်ဖွင့်ပါ</string>
+    <string name="voice_mute">အသံပိတ်ပါ</string>
+    <string name="voice_unmute">အသံဖွင့်ပါ</string>
     <string name="voice_stage_pause">ခဏရပ်ပါ</string>
     <string name="voice_stage_camera">ကင်မရာ</string>
     <string name="voice_transcript_empty">သင့်စက်ရှင်ကို တစ်ခုခု ပြောပါ။</string>
@@ -35,7 +35,7 @@
     <!-- Call rows: open link -->
     <string name="voice_open_link_spoken">သင့်တုံ့ပြန်မှု လိုအပ်သည်။ %1$s</string>
     <string name="voice_open_link_spoken_with_host">သင့်တုံ့ပြန်မှု လိုအပ်သည်။ %1$s %2$s</string>
-    <string name="voice_open_link_open">ဖွင့်ထားသည်</string>
+    <string name="voice_open_link_open">ဖွင့်ပါ။</string>
 
     <!-- Call rows: audio on the call -->
     <string name="voice_audio_paused">ခဏရပ်ထားသည်</string>
@@ -75,7 +75,7 @@
     <string name="voice_status_needs_input">သင့်တုံ့ပြန်မှု လိုအပ်သည်</string>
     <string name="voice_status_working">အလုပ်လုပ်တယ်။</string>
     <string name="voice_status_speaking">စကားပြောနေသည်</string>
-    <string name="voice_status_muted">အကြောင်းကြားချက် ပိတ်ထားသည်</string>
+    <string name="voice_status_muted">အသံပိတ်ထားသည်</string>
     <string name="voice_status_listening">နားထောင်နေသည်</string>
     <string name="voice_status_ending">အဆုံးသတ်နေသည်…</string>
     <string name="voice_status_ended">ပြီးဆုံးပါပြီ</string>
@@ -174,7 +174,7 @@
     <string name="voice_open_link_card_title">%1$s ကို ဖွင့်မလား?</string>
 
     <!-- Delegator choice -->
-    <string name="voice_delegator_session_fallback">စက်ရှင်</string>
+    <string name="voice_delegator_session_fallback">အပိုင်း</string>
     <string name="voice_delegator_unavailable_gemini">Gemini Live က မျက်နှာပြင်ပေါ်ရှိ စက်ရှင်သို့ တိုက်ရိုက် အလုပ်လွှဲပေးသည်။ OpenCode စက်ရှင်ကို သုံးရန် OpenAI အသံဝန်ဆောင်မှုပေးသူကို ရွေးပါ။</string>
     <string name="voice_delegator_unavailable_engine">%1$s က မျက်နှာပြင်ပေါ်ရှိ စက်ရှင်သို့ တိုက်ရိုက် အလုပ်လွှဲပေးသည်။ OpenCode စက်ရှင်ကို သုံးရန် အသံမော်ဒယ်ကို GPT-Live သို့ ပြောင်းပါ။</string>
 

@@ -136,7 +136,7 @@
     <!-- Photo sheet -->
     <string name="session_photo_sheet_grabber_description">Ручка панели</string>
     <string name="session_photo_sheet_full_description">На весь экран</string>
-    <string name="session_photo_sheet_half_description">На полэкрана</string>
+    <string name="session_photo_sheet_half_description">На пол-экрана</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Остановить эту оболочку?</string>
     <string name="session_shell_stop_confirm_message">Выполнение команды прекратится. Вывод останется здесь, пока вы его не закроете.</string>
@@ -249,7 +249,7 @@
     <string name="session_something_went_wrong">Что-то пошло не так</string>
     <string name="session_something_went_wrong_sentence">Что-то пошло не так.</string>
     <string name="session_load_earlier_failed">Не удалось загрузить предыдущие сообщения</string>
-    <string name="session_move_to_background_failed">Не удалось перейти на задний план: %1$s</string>
+    <string name="session_move_to_background_failed">Не удалось перевести в фоновый режим: %1$s</string>
     <string name="session_move_failed_reason">Не удалось переместить сессию</string>
     <string name="session_delivery_waiting_to_send">Ожидание отправки</string>
     <string name="session_create_failed">Не удалось создать сессию.</string>

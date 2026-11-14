@@ -139,7 +139,7 @@
     <string name="media_mermaid_viewer_screen_title">ডায়াগ্রাম ভিউয়ার</string>
     <string name="media_mermaid_diagram_description">ডায়াগ্রাম</string>
     <string name="media_mermaid_loading_state">%1$s, লোড হচ্ছে</string>
-    <string name="media_mermaid_view_source">সোর্স দেখান</string>
+    <string name="media_mermaid_view_source">সোর্স দেখুন</string>
     <string name="media_mermaid_source_title">ডায়াগ্রামের সোর্স</string>
 
     <!-- Mermaid diagram kinds, read by TalkBack as “Diagram, Flowchart” -->

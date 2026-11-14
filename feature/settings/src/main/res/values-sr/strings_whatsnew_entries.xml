@@ -54,8 +54,8 @@
     <string name="settings_whatsnew_entry_working_orb_summary">Кугла поред ознаке „У току“ и на картицама субагената показује шта агент ради, а кад заврши, постаје дугме за копирање.</string>
 
     <!-- 2026-10-09-02-shell-glyph -->
-    <string name="settings_whatsnew_entry_shell_glyph_title">Активност схелла</string>
-    <string name="settings_whatsnew_entry_shell_glyph_summary">Ознака &gt;_ покренутог схелла се анимира док стиже излаз.</string>
+    <string name="settings_whatsnew_entry_shell_glyph_title">Активност shell-а</string>
+    <string name="settings_whatsnew_entry_shell_glyph_summary">Ознака &gt;_ покренутог shell-а се анимира док стиже излаз.</string>
 
     <!-- 2026-10-09-03-math-and-diagrams -->
     <string name="settings_whatsnew_entry_math_and_diagrams_title">Математика и дијаграми</string>
@@ -390,7 +390,7 @@
 
     <!-- 2026-10-19-02-optical-insets -->
     <string name="settings_whatsnew_entry_optical_insets_title">Равномерно постављене контроле</string>
-    <string name="settings_whatsnew_entry_optical_insets_summary">Знак + и микрофон у пољу за унос, иконе ознака рада у позадини и реда чекања, као и симбол „Нова сесија“ у бочном панелу сада изгледају центрирано у заобљеним крајевима стакластих контрола. Икона схелла је сада круг попут кугле субагента, без трепћућег курсора, а обе се приказују једна поред друге када су активне.</string>
+    <string name="settings_whatsnew_entry_optical_insets_summary">Знак + и микрофон у пољу за унос, иконе ознака рада у позадини и реда чекања, као и симбол „Нова сесија“ у бочном панелу сада изгледају центрирано у заобљеним крајевима стакластих контрола. Икона shell-а је сада круг попут кугле субагента, без трепћућег курсора, а обе се приказују једна поред друге када су активне.</string>
 
     <!-- 2026-10-19-03-smart-dictation-audio -->
     <string name="settings_whatsnew_entry_smart_dictation_audio_title">Диктирање уз музику без прекида</string>
@@ -398,7 +398,7 @@
 
     <!-- 2026-10-19-04-interrupted-hand -->
     <string name="settings_whatsnew_entry_interrupted_hand_title">Подигнута рука за прекид</string>
-    <string name="settings_whatsnew_entry_interrupted_hand_summary">Прекинут рад агента и прекинут схелл сада приказују подигнуту руку, а схелл који зауставиш има ознаку „Прекинут“ уместо „Заустављен“.</string>
+    <string name="settings_whatsnew_entry_interrupted_hand_summary">Прекинут рад агента и прекинут shell сада приказују подигнуту руку, а shell који зауставиш има ознаку „Прекинут“ уместо „Заустављен“.</string>
 
     <!-- 2026-10-19-05-autocomplete-fast-scroll -->
     <string name="settings_whatsnew_entry_autocomplete_fast_scroll_title">Брже аутоматско довршавање</string>
@@ -473,7 +473,7 @@
 
     <!-- 2026-10-20-10-subagent-capsule-press -->
     <string name="settings_whatsnew_entry_subagent_capsule_press_title">Заобљена ознака активности</string>
-    <string name="settings_whatsnew_entry_subagent_capsule_press_summary">Ознака субагента и схелла задржава заобљене крајеве док је притискаш.</string>
+    <string name="settings_whatsnew_entry_subagent_capsule_press_summary">Ознака субагента и shell-а задржава заобљене крајеве док је притискаш.</string>
 
     <!-- 2026-10-20-11-advanced-settings-open -->
     <string name="settings_whatsnew_entry_advanced_settings_open_title">Једноставнија напредна подешавања</string>
@@ -891,7 +891,7 @@
     <string name="settings_whatsnew_entry_one_picker_detail_2">Превуци или задржи прст на реду да додаш модел у омиљене или га уклониш.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_3">Претрага је на дну. Унеси ниво после назива, нпр. „opus high“, па притисни Return да изабереш оба.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_4">Превуци ручицу нагоре да прошириш листу или надоле да је затвориш.</string>
-    <string name="settings_whatsnew_entry_one_picker_detail_5">Нови бирач замењује стари панел „Модел“, а прекидач „One Picker“ је уклоњен из одељка Подешавања › Експериментално.</string>
+    <string name="settings_whatsnew_entry_one_picker_detail_5">Нови бирач замењује стари панел „Модел“, а прекидач „Јединствени бирач“ је уклоњен из одељка Подешавања › Експериментално.</string>
     <string name="settings_whatsnew_entry_one_picker_example">Додирни модел у пољу за поруку, па превуци ред да га додаш у омиљене</string>
 
     <!-- 2026-11-08-01-connecting-caption-glass -->

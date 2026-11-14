@@ -46,7 +46,7 @@
     <string name="session_rename_title">Oturumu yeniden adlandır</string>
     <string name="session_untitled_title">Oturum</string>
     <string name="session_pin">Sabitle</string>
-    <string name="session_pinned">Sabitlenenler</string>
+    <string name="session_pinned">Sabitlendi</string>
     <string name="session_unread">Okunmamış</string>
     <string name="session_mute">Sessize al</string>
     <string name="session_muted">Sessize alındı</string>

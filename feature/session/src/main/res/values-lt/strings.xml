@@ -46,8 +46,8 @@
     <string name="session_rename_title">Pervardyti seansą</string>
     <string name="session_untitled_title">Seansas</string>
     <string name="session_pin">Prisegti</string>
-    <string name="session_pinned">Prisegti</string>
-    <string name="session_unread">Neperskaityti</string>
+    <string name="session_pinned">Prisegtas</string>
+    <string name="session_unread">Neperskaitytas</string>
     <string name="session_mute">Nutildyti</string>
     <string name="session_muted">Nutildytas</string>
     <string name="session_compact">Glaudinti seansą</string>
@@ -153,7 +153,7 @@
     <string name="session_shell_no_output_yet_message">Čia rodoma komandos kuriama išvestis.</string>
     <string name="session_shell_status_stopping">Stabdoma…</string>
     <string name="session_shell_status_unavailable">Nepasiekiama</string>
-    <string name="session_shell_status_interrupted">Pertraukta</string>
+    <string name="session_shell_status_interrupted">Pertraukė</string>
     <string name="session_shell_status_timed_out">Baigėsi skirtas laikas</string>
     <string name="session_shell_status_exited_with_code">Baigta su kodu %1$d</string>
     <string name="session_shell_status_exited">Baigta</string>

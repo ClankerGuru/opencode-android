@@ -36,7 +36,7 @@
     <string name="settings_onboarding_desktop_composer_placeholder">Прашај што било, / за наредби, @ за контекст…</string>
     <string name="settings_onboarding_desktop_composer_follow_up_placeholder">Додај дополнување, / за наредби, @ за контекст…</string>
     <string name="settings_onboarding_desktop_back_to_app">Назад кон апликацијата</string>
-    <string name="settings_onboarding_desktop_pairing_title">Се спарува</string>
+    <string name="settings_onboarding_desktop_pairing_title">Спарување</string>
     <string name="settings_onboarding_desktop_pairing_subtitle">Поврзи друг уред со OpenCode серверот на овој компјутер.</string>
     <string name="settings_onboarding_desktop_pair_device">Спари уред</string>
     <string name="settings_onboarding_desktop_pair_device_message">Скенирај го кодот со апликацијата OpenCode на друг уред или копирај ја врската.</string>
@@ -61,7 +61,7 @@
     <string name="settings_onboarding_headline">OpenCode\nнасекаде.</string>
     <string name="settings_onboarding_headline_spoken">OpenCode насекаде.</string>
     <string name="settings_onboarding_subhead">Започнувај задачи, одговарај на прашања и прегледувај промени и кога не си пред компјутер.</string>
-    <string name="settings_onboarding_instruction">На компјутерот, отвори OpenCode и оди во Поставки → Се спарува.</string>
+    <string name="settings_onboarding_instruction">На компјутерот, отвори OpenCode и оди во Поставки → Спарување.</string>
 
     <!-- Onboarding: WelcomeStory, the mock conversation (the reply's backticks mark code) -->
     <string name="settings_onboarding_story_prompt">Додај копче за преземање за Android и покажи ми</string>

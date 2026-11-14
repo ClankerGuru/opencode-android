@@ -21,7 +21,7 @@
     <string name="app_setup_other_ways_to_install">Роҳҳои дигари насб</string>
     <string name="app_setup_terminal_title">Ё инро дар терминал иҷро кунед</string>
     <string name="app_setup_terminal_detail">Аз ҳар шабака кор мекунад.</string>
-    <string name="app_setup_paste_prompt">Ё истиноди нишондиҳандаро нусхабардорӣ карда, сипас</string>
+    <string name="app_setup_paste_prompt">Ё истиноди нишон додаашро нусхабардорӣ карда, сипас</string>
     <string name="app_setup_paste">Часбонед</string>
     <string name="app_setup_copy_command_description">%1$s-ро нусхабардорӣ кунед</string>
 

@@ -33,7 +33,7 @@
     <string name="session_folder_select">Tanlash</string>
     <string name="session_folder_open_failed_title">Jildni ochib bo‘lmadi</string>
     <string name="session_folder_empty_title">Jildlar yo‘q</string>
-    <string name="session_folder_search_empty_title">“%1$s” uchun natija topilmadi</string>
+    <string name="session_folder_search_empty_title">“%1$s” uchun hech qanday natija topilmadi</string>
     <string name="session_folder_search_empty_message">Yozilishini tekshiring yoki boshqa so‘z bilan qidiring.</string>
     <!-- Server connection pill -->
     <string name="session_server_edit">Serverni tahrirlash…</string>
@@ -143,7 +143,7 @@
     <string name="session_shell_showing_last_output">Oxirgi 4 MB ko‘rsatilmoqda</string>
     <string name="session_shell_load_earlier">Oldingilarini yuklash</string>
     <string name="session_shell_output_unavailable_title">Natija mavjud emas</string>
-    <string name="session_shell_output_unavailable_message">Serverda bu Shell natijasi endi yo‘q.</string>
+    <string name="session_shell_output_unavailable_message">Bu shellning natijasi endi serverda yo‘q.</string>
     <string name="session_shell_no_output_yet_title">Hali natija yo‘q</string>
     <string name="session_shell_no_output_title">Natija yo‘q</string>
     <string name="session_shell_no_output_yet_message">Buyruq natijasi shu yerda ko‘rinadi.</string>
@@ -192,8 +192,8 @@
         <item quantity="other">%1$d subagent</item>
     </plurals>
     <plurals name="session_background_work_shell_count">
-        <item quantity="one">%1$d Shell</item>
-        <item quantity="other">%1$d Shell</item>
+        <item quantity="one">%1$d ta shell</item>
+        <item quantity="other">%1$d ta shell</item>
     </plurals>
     <string name="session_background_work_summary">%1$s · %2$s</string>
 
@@ -277,9 +277,9 @@
     <!-- Header and screens -->
     <string name="session_new_session_title">Yangi sessiya</string>
     <string name="session_pasted_text_screen_title">Joylangan matn</string>
-    <string name="session_pasted_text_viewer_screen_title">Joylangan matn ko‘ruvchi</string>
+    <string name="session_pasted_text_viewer_screen_title">Joylangan matnni ko‘rish</string>
     <string name="session_context_summary">%2$s dan %1$d%%</string>
-    <string name="session_context_accessibility_value">%2$s tokenning %1$d%% ishlatilgan</string>
+    <string name="session_context_accessibility_value">%2$s tokendan %1$d%% ishlatilgan</string>
 
     <!-- Starter prompts (shown, then sent as the person’s message) -->
     <string name="session_starter_project_purpose">Bu loyiha nima qiladi?</string>

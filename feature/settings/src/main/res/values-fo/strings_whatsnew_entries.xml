@@ -76,7 +76,7 @@
     <string name="settings_whatsnew_entry_server_switcher_title">Skift ambætara</string>
     <string name="settings_whatsnew_entry_server_switcher_summary">Ambætarin, tú ert á, er heitið á síðukarminum. Trýst á tað fyri at skifta ambætara ella leggja ein afturat.</string>
     <string name="settings_whatsnew_entry_server_switcher_detail_1">Innstillingar vísa sambandið sum ein livandi hjartaslátt, við svartíðini við síðuna av ambætaranavninum.</string>
-    <string name="settings_whatsnew_entry_server_switcher_detail_2">Umnevna ein ambætara. Navnið verður bara brúkt á hesi telefonini.</string>
+    <string name="settings_whatsnew_entry_server_switcher_detail_2">Umnevn ein ambætara. Navnið verður bara brúkt á hesi telefonini.</string>
     <string name="settings_whatsnew_entry_server_switcher_example">Opna síðukarmin, trýst á ambætaranavnið og legg hina telduna afturat</string>
 
     <!-- 2026-10-10-01-share-opened-files -->
@@ -137,8 +137,8 @@
 
     <!-- 2026-10-12-02-answer-from-the-bar -->
     <string name="settings_whatsnew_entry_answer_from_the_bar_title">Svara úr boðteiginum</string>
-    <string name="settings_whatsnew_entry_answer_from_the_bar_summary">Spurningar og loyvisumbønir koma fram úr boðteiginum, og tú svarar har: trýst á eitt val, ella skriva ella les inn títt egna svar.</string>
-    <string name="settings_whatsnew_entry_answer_from_the_bar_detail_1">Loyvisumbønir vísa skipanina ella rættingina, áðrenn tú loyvir henni.</string>
+    <string name="settings_whatsnew_entry_answer_from_the_bar_summary">Spurningar og loyvi koma fram úr boðteiginum, og tú svarar har: trýst á eitt val, ella skriva ella les inn títt egna svar.</string>
+    <string name="settings_whatsnew_entry_answer_from_the_bar_detail_1">Loyvi vísa skipanina ella rættingina, áðrenn tú loyvir henni.</string>
     <string name="settings_whatsnew_entry_answer_from_the_bar_detail_2">Neita brúkar tað, tú skrivaði, sum boð um, hvat skal gerast í staðin, so agenturin heldur fram.</string>
     <string name="settings_whatsnew_entry_answer_from_the_bar_detail_3">Uppkastið kemur aftur, tá ið tú hevur svarað.</string>
     <string name="settings_whatsnew_entry_answer_from_the_bar_example">Tá ið agenturin spyr, halt mikrofonknøttin inni og sig svarið</string>
@@ -241,7 +241,7 @@
     <string name="settings_whatsnew_entry_mac_motion_playgrounds_detail_1">Stýrisíðan á Mac hevur val av royndarøki, forstillingar og endurspæling; telefonin vísir bert royndarøkið.</string>
     <string name="settings_whatsnew_entry_mac_motion_playgrounds_detail_2">Smá kort vísa, hvørji stýritól eru á skíggjanum, við navngivnum forstillingum fyri rørslu og frástøðu og Upprunaligt til at endurstilla upprunaliga sniðið; hvør forstilling setur øll síni virði í eini dagføring.</string>
     <string name="settings_whatsnew_entry_mac_motion_playgrounds_detail_3">Flótandi tillagingarspjaldið verður fjalt, tá Mac fær samband; fá tað fram við tillagingarrørsluni og vel Far úr royndarøki fyri at fara úr tí.</string>
-    <string name="settings_whatsnew_entry_mac_motion_playgrounds_detail_4">Royndardømi við føstum byrjanarvirðum endurspæla somu dømisssetu, so tú kanst samanbera rørslur millum útgávur.</string>
+    <string name="settings_whatsnew_entry_mac_motion_playgrounds_detail_4">Royndardømi við føstum byrjanarvirðum endurspæla somu dømissetu, so tú kanst samanbera rørslur millum útgávur.</string>
     <string name="settings_whatsnew_entry_mac_motion_playgrounds_detail_5">Endurspælingar byrja av nýggjum og lata stýringarboð og boð í bíðirøð koma fram heldur enn at lata tey bíða.</string>
     <string name="settings_whatsnew_entry_mac_motion_playgrounds_detail_6">Ummælisspælarin á Mac letur teg fara stigvíst gjøgnum upptikna rúmfrøði, merkja eina myndarammu og senda afturboðan um rørslur.</string>
     <string name="settings_whatsnew_entry_mac_motion_playgrounds_example">Opna Innstillingar → Mennari, para við tillagingarsíðuna á Mac og royn so Samrøðutekstur → Stroyma svar við 0.25×</string>
@@ -338,7 +338,7 @@
 
     <!-- 2026-10-16-07-connection-error-details -->
     <string name="settings_whatsnew_entry_connection_error_details_title">Sambandsfeilir siga, hvat miseydnaðist</string>
-    <string name="settings_whatsnew_entry_connection_error_details_summary">Sambandsfeilir vísa feilskotu, royndu adressuna og DNS-úrslitið, við hjálp tá eitt tailnet-navn verður umsett til eina adressu uttan fyri Tailscale.</string>
+    <string name="settings_whatsnew_entry_connection_error_details_summary">Sambandsfeilir vísa feilkotu, royndu adressuna og DNS-úrslitið, við hjálp tá eitt tailnet-navn verður umsett til eina adressu uttan fyri Tailscale.</string>
 
     <!-- 2026-10-16-08-outage-reconnect-delay -->
     <string name="settings_whatsnew_entry_outage_reconnect_delay_title">Skjótari samband aftur</string>
@@ -434,14 +434,14 @@
     <!-- 2026-10-19-10-scrawl-faster-start -->
     <string name="settings_whatsnew_entry_scrawl_faster_start_title">Scrawl byrjar skjótari</string>
     <string name="settings_whatsnew_entry_scrawl_faster_start_summary">Knøttarnir í Scrawl koma fram, meðan mikrofonin og upptakarin byrja.</string>
-    <string name="settings_whatsnew_entry_scrawl_faster_start_detail_1">Trýst á Tekna, Send og Banna verða goymd, meðan upptøkan verður klár.</string>
+    <string name="settings_whatsnew_entry_scrawl_faster_start_detail_1">Trýst á Tekna, Send og Kasta burtur verða goymd, meðan upptøkan verður klár.</string>
     <string name="settings_whatsnew_entry_scrawl_faster_start_detail_2">Halt tríggjar fingrar inni fyri at gera yvirlagið klárt uttan at tendra mikrofonina ov tíðliga.</string>
     <string name="settings_whatsnew_entry_scrawl_faster_start_detail_3">Rættað eitt brek, sum fekk Scrawl at steðga óvæntað, tá ið mikrofonin endurbyrjaði undir skifti av ljóðleið.</string>
     <string name="settings_whatsnew_entry_scrawl_faster_start_example">Halt tríggjar fingrar inni á einum paraðum tóli fyri at byrja eina upptøku</string>
 
     <!-- 2026-10-20-01-call-tray-docks-in-drawer -->
     <string name="settings_whatsnew_entry_call_tray_docks_in_drawer_title">Samrøðubakki í síðukarminum</string>
-    <string name="settings_whatsnew_entry_call_tray_docks_in_drawer_summary">Við royndini Samrøðubakki virknari flytur bakkin undir Nýggj setan, tá ið tú opnar síðukarmin undir einari samrøðu, við ljóðstigi, Sløkk fráboðanir og Enda. Hann flytur aftur, tá ið tú letur síðukarmin aftur.</string>
+    <string name="settings_whatsnew_entry_call_tray_docks_in_drawer_summary">Við royndini Samrøðubakki virknari flytur bakkin undir Nýggj setan, tá ið tú opnar síðukarmin undir einari samrøðu, við ljóðstigi, Doyv og Enda. Hann flytur aftur, tá ið tú letur síðukarmin aftur.</string>
 
     <!-- 2026-10-20-02-markdown-streams-smoothly -->
     <string name="settings_whatsnew_entry_markdown_streams_smoothly_title">Javnari streyming av svørum</string>
@@ -480,12 +480,12 @@
     <string name="settings_whatsnew_entry_advanced_settings_open_summary">Royndir í Innstillingar › Royndar eru nú í opnum bólkum, modellveljararnir eru savnaðir undir einum vali, og tú kanst trýsta hvar sum helst á regluna fyri at broyta valið.</string>
 
     <!-- 2026-10-20-12-revert-to-here -->
-    <string name="settings_whatsnew_entry_revert_to_here_title">Send boðum aftur</string>
-    <string name="settings_whatsnew_entry_revert_to_here_summary">Halt á einum av tínum boðum og vel Send boðum aftur fyri at fara aftur hagar og rætta tey.</string>
+    <string name="settings_whatsnew_entry_revert_to_here_title">Far aftur higar</string>
+    <string name="settings_whatsnew_entry_revert_to_here_summary">Halt á einum av tínum boðum og vel Far aftur higar fyri at fara aftur hagar og rætta tey.</string>
     <string name="settings_whatsnew_entry_revert_to_here_detail_1">Tekstur, myndir og fílur úr boðunum koma aftur í boðteigin.</string>
     <string name="settings_whatsnew_entry_revert_to_here_detail_2">Angra endursetur boðaskiftini og skráarbroytingar teirra, til tú sendir nýggj boð.</string>
     <string name="settings_whatsnew_entry_revert_to_here_detail_3">Hetta ber til, meðan agenturin ikki arbeiðir.</string>
-    <string name="settings_whatsnew_entry_revert_to_here_example">Halt á boðum, tú hevur sent fyrr, og vel Send boðum aftur.</string>
+    <string name="settings_whatsnew_entry_revert_to_here_example">Halt á boðum, tú hevur sent fyrr, og vel Far aftur higar.</string>
 
     <!-- 2026-10-20-13-drag-from-transcript -->
     <string name="settings_whatsnew_entry_drag_from_transcript_title">Drag úr setuni</string>
@@ -529,7 +529,7 @@
 
     <!-- 2026-10-21-03-call-sounds-from-the-tap -->
     <string name="settings_whatsnew_entry_call_sounds_from_the_tap_title">Skjótari samrøðuljóð</string>
-    <string name="settings_whatsnew_entry_call_sounds_from_the_tap_summary">Sambandsljóðini byrja við fyrstu rørsluni í staðin fyri nakrar sekund eftir, at tú trýstir.</string>
+    <string name="settings_whatsnew_entry_call_sounds_from_the_tap_summary">Sambandsljóðini byrja við fyrstu rørsluni í staðin fyri nøkur sekund eftir, at tú trýstir.</string>
 
     <!-- 2026-10-21-04-calm-wireframe-launch -->
     <string name="settings_whatsnew_entry_calm_wireframe_launch_title">Róligari innlesing</string>
@@ -545,7 +545,7 @@
 
     <!-- 2026-10-21-07-welcome-pairing-copy -->
     <string name="settings_whatsnew_entry_welcome_pairing_copy_title">Para úr OpenCode-forritinum</string>
-    <string name="settings_whatsnew_entry_welcome_pairing_copy_summary">Vælkomstskíggin vísir tær á Innstillingar → Parar í OpenCode á telduni ella /pair í farstøðini og vísir innleggingarskipanina til tey, sum ikki hava OpenCode enn.</string>
+    <string name="settings_whatsnew_entry_welcome_pairing_copy_summary">Vælkomstskíggin vísir tær á Innstillingar → Paring í OpenCode á telduni ella /pair í farstøðini og vísir innleggingarskipanina til tey, sum ikki hava OpenCode enn.</string>
 
     <!-- 2026-10-21-08-session-id-links -->
     <string name="settings_whatsnew_entry_session_id_links_title">Setuleinkjur</string>

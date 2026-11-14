@@ -127,11 +127,11 @@
     <string name="drawer_open_in_new_window">Відкрити в новому вікні</string>
 
     <!-- Session row state for TalkBack -->
-    <string name="drawer_row_pinned_state">Закріплені</string>
+    <string name="drawer_row_pinned_state">Закріплена</string>
     <string name="drawer_row_muted_state">Сповіщення вимкнено</string>
     <string name="drawer_row_needs_input_state">Потрібна ваша відповідь</string>
     <string name="drawer_row_working_state">Працює</string>
-    <string name="drawer_row_unread_state">Непрочитані</string>
+    <string name="drawer_row_unread_state">Непрочитана</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Не вдалося запитати дозвіл. Спробуйте ще раз.</string>

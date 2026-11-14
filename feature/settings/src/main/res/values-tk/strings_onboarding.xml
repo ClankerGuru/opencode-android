@@ -76,7 +76,7 @@
     <string name="settings_onboarding_desktop_nav_shortcuts">Salgylanmalar</string>
     <string name="settings_onboarding_desktop_nav_projects">Taslamalar</string>
     <string name="settings_onboarding_desktop_nav_worktrees">Workspace-lar</string>
-    <string name="settings_onboarding_desktop_nav_providers">Ü üpjün edijiler</string>
+    <string name="settings_onboarding_desktop_nav_providers">Üpjün edijiler</string>
     <string name="settings_onboarding_desktop_nav_models">Modeller</string>
 
     <!-- What’s New: WhatsNewActions -->

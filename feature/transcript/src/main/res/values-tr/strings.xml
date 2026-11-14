@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Shared -->
-    <string name="transcript_open_named">%1$s sayfasını aç</string>
+    <string name="transcript_open_named">%1$s aç</string>
 
     <!-- Link previews -->
     <string name="transcript_link_preview_show_fewer">Daha az bağlantı göster</string>

@@ -10,7 +10,7 @@
     <string name="settings_whatsnew_entry_attachment_menu_hold_title">Bijvoegen met +</string>
     <string name="settings_whatsnew_entry_attachment_menu_hold_summary">Het +-menu klapt uit vanuit het berichtvak met Camera, Foto\'s en Bestanden. Houd + ingedrukt en schuif om in één beweging te kiezen.</string>
     <string name="settings_whatsnew_entry_attachment_menu_hold_detail_1">Foto\'s opent direct boven het berichtvak; tik op foto\'s om ze bij te voegen.</string>
-    <string name="settings_whatsnew_entry_attachment_menu_hold_detail_2">De camera heeft lensknoppen, zoomen door te knijpen, scherpstellen door te tikken en een flitser.</string>
+    <string name="settings_whatsnew_entry_attachment_menu_hold_detail_2">De camera heeft lensknoppen, knijp om te zoomen, scherpstellen door te tikken en een flitser.</string>
     <string name="settings_whatsnew_entry_attachment_menu_hold_example">Houd + ingedrukt, schuif omhoog naar Foto\'s en laat los</string>
 
     <!-- 2026-10-08-01-voice-webrtc-weak-connection -->
@@ -782,7 +782,7 @@
 
     <!-- 2026-11-01-03-open-links-from-calls -->
     <string name="settings_whatsnew_entry_open_links_from_calls_title">Links openen vanuit oproepen</string>
-    <string name="settings_whatsnew_entry_open_links_from_calls_summary">Zet Links openen vanuit oproepen aan via Instellingen › Experimenteel › Oproepen. Tijdens een oproep kan een agent dan een link aanbieden, bijvoorbeeld voor een Uber-rit. Tik op Open om de link in de bijbehorende app te openen, of op Niet nu.</string>
+    <string name="settings_whatsnew_entry_open_links_from_calls_summary">Zet Links openen vanuit oproepen aan via Instellingen › Experimenteel › Oproepen. Tijdens een oproep kan een agent dan een link aanbieden, bijvoorbeeld voor een Uber-rit. Tik op Openen om de link in de bijbehorende app te openen, of op Niet nu.</string>
 
     <!-- 2026-11-02-01-fold-questions -->
     <string name="settings_whatsnew_entry_fold_questions_title">Vragen uit de weg vouwen</string>
@@ -825,7 +825,7 @@
     <!-- 2026-11-04-01-call-links-and-audio -->
     <string name="settings_whatsnew_entry_call_links_and_audio_title">Links en audio tijdens oproepen</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_summary">Links openen vanuit oproepen en Audio tijdens oproepen staan nu voor iedereen aan, zonder schakelaar.</string>
-    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">Tijdens een oproep kan een agent een link aanbieden, bijvoorbeeld voor een Uber-rit: tik op Open om die in de bijbehorende app te openen, of op Niet nu.</string>
+    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">Tijdens een oproep kan een agent een link aanbieden, bijvoorbeeld voor een Uber-rit: tik op Openen om die in de bijbehorende app te openen, of op Niet nu.</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_detail_2">Een agent kan tijdens de oproep muziek of een fragment afspelen. Het geluid wordt zachter als een van jullie praat; pauzeer of stop het boven de berichtinvoer.</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_example">Vraag de agent tijdens een oproep om muziek af te spelen</string>
 

@@ -10,7 +10,7 @@
     <string name="settings_whatsnew_entry_attachment_menu_hold_title">+ සමඟ අමුණන්න</string>
     <string name="settings_whatsnew_entry_attachment_menu_hold_summary">කැමරාව, ඡායාරූප සහ ගොනු සහිත + මෙනුව පණිවිඩ කොටුවෙන් විහිදේ. එකවර තෝරාගන්න + ඔබාගෙන ඇඟිල්ල ලිස්සා යවන්න.</string>
     <string name="settings_whatsnew_entry_attachment_menu_hold_detail_1">ඡායාරූප පණිවිඩ කොටුවට ඉහළින් විවෘත වේ; ඇමිණීමට ඡායාරූප මත තට්ටු කරන්න.</string>
-    <string name="settings_whatsnew_entry_attachment_menu_hold_detail_2">කැමරාවේ කාච බොත්තම්, ඇඟිලි දෙකෙන් විශාලනය, තට්ටු කර නාභිගත කිරීම සහ ෆ්ලෑෂ් ඇත.</string>
+    <string name="settings_whatsnew_entry_attachment_menu_hold_detail_2">කැමරාවේ කාච බොත්තම්, විශාලනය කිරීමට පින්ච් කරන්න, තට්ටු කර නාභිගත කිරීම සහ ෆ්ලෑෂ් ඇත.</string>
     <string name="settings_whatsnew_entry_attachment_menu_hold_example">+ ඔබාගෙන, ඡායාරූප වෙත ඉහළට ලිස්සා ගොස් අතහරින්න</string>
 
     <!-- 2026-10-08-01-voice-webrtc-weak-connection -->
@@ -81,7 +81,7 @@
 
     <!-- 2026-10-10-01-share-opened-files -->
     <string name="settings_whatsnew_entry_share_opened_files_title">ඡායාරූප මෙන් රූප</string>
-    <string name="settings_whatsnew_entry_share_opened_files_summary">රූප සැසිය තුළ සම්පූර්ණයෙන් පෙන්වන අතර ඡායාරූප මෙන් විවෘත වේ: විශාල කිරීමට ඇඟිලි දෙකෙන් අදින්න, මාරු වීමට ස්වයිප් කරන්න, වැසීමට පහළට අදින්න.</string>
+    <string name="settings_whatsnew_entry_share_opened_files_summary">රූප සැසිය තුළ සම්පූර්ණයෙන් පෙන්වන අතර ඡායාරූප මෙන් විවෘත වේ: විශාලනය කිරීමට පින්ච් කරන්න, මාරු වීමට ස්වයිප් කරන්න, වැසීමට පහළට අදින්න.</string>
     <string name="settings_whatsnew_entry_share_opened_files_detail_1">නියෝජිතයා සඳහන් කරන සෑම ගොනුවක්ම යෙදුම තුළ විවෘත වේ.</string>
     <string name="settings_whatsnew_entry_share_opened_files_detail_2">බෙදාගන්න හරහා වීඩියෝ සහ ශ්‍රව්‍ය ඇතුළු ඔබ විවෘත කරන ඕනෑම දෙයක් ඡායාරූප හෝ ගොනු වෙත සුරැකිය හැක.</string>
     <string name="settings_whatsnew_entry_share_opened_files_example">තිර රූ කිහිපයක් කියවන්නැයි නියෝජිතයාගෙන් ඉල්ලන්න. ඉන්පසු එකක් තට්ටු කර පහළට අදින්න</string>
@@ -153,7 +153,7 @@
     <!-- 2026-10-12-04-model-list-and-level-meter -->
     <string name="settings_whatsnew_entry_model_list_and_level_meter_title">නව ආකෘති තේරීම</string>
     <string name="settings_whatsnew_entry_model_list_and_level_meter_summary">ආකෘතිය පැනලයෙන් ආකෘතියක් සහ එහි සිතීමේ මට්ටම තෝරන්න. ප්‍රියතමයන් ඉහළින් පෙනේ. පණිවිඩ කොටුවෙන් දිග හැරෙන ලැයිස්තුව අත්හදා බැලීමට, සැකසීම් → පර්යේෂණාත්මක තුළ නව ආකෘති තේරීම සක්‍රිය කරන්න.</string>
-    <string name="settings_whatsnew_entry_model_list_and_level_meter_detail_1">ආකෘතියට සිතීමේ මට්ටම් තිබේ නම්, ආකෘතිය පැනලයේ කල්පනා කරනවා මෙනුව භාවිත කරන්න.</string>
+    <string name="settings_whatsnew_entry_model_list_and_level_meter_detail_1">ආකෘතියට සිතීමේ මට්ටම් තිබේ නම්, ආකෘතිය පැනලයේ සිතීම මෙනුව භාවිත කරන්න.</string>
     <string name="settings_whatsnew_entry_model_list_and_level_meter_detail_2">ආකෘතියක් ප්‍රියතමයන්ට එකතු කිරීමට එය ස්වයිප් කරන්න.</string>
     <string name="settings_whatsnew_entry_model_list_and_level_meter_detail_3">ආකෘතිය හෝ මට්ටම මාරු කළ තැන සැසියේ සරල රේඛාවකින් සලකුණු වේ.</string>
     <string name="settings_whatsnew_entry_model_list_and_level_meter_example">පණිවිඩ කොටුවේ ආකෘතිය තට්ටු කර සිතීමේ මට්ටමක් තෝරන්න</string>
@@ -221,7 +221,7 @@
 
     <!-- 2026-10-13-02-grouped-steering -->
     <string name="settings_whatsnew_entry_grouped_steering_title">එකට ගොනු කළ පණිවිඩ</string>
-    <string name="settings_whatsnew_entry_grouped_steering_summary">ඔබ එක දිගට යවන පණිවිඩ එකම කොටසක් ලෙස පෙන්වයි. නියෝජිතයා බලා සිටින මඟ පෙන්වීමේ පණිවිඩවලට එකම “මඟ පෙන්වීම” ලේබලය පෙන්වයි.</string>
+    <string name="settings_whatsnew_entry_grouped_steering_summary">ඔබ එක දිගට යවන පණිවිඩ එකම කොටසක් ලෙස පෙන්වයි. නියෝජිතයා වෙනුවෙන් රැඳී සිටින මඟ පෙන්වීමේ පණිවිඩවලට එකම “මඟ පෙන්වීම” ලේබලය පෙන්වයි.</string>
     <string name="settings_whatsnew_entry_grouped_steering_detail_1">එක දිගට ඇති පණිවිඩ බුබුළු ළඟින් පිහිටා, හමුවන තැන්වල කොන් එකට සම්බන්ධ වේ.</string>
     <string name="settings_whatsnew_entry_grouped_steering_detail_2">කොටස තුළ ඡායාරූප සහ ගොනු තමන්ගේ වටකුරු හැඩය රඳවා ගනී.</string>
     <string name="settings_whatsnew_entry_grouped_steering_detail_3">නියෝජිතයා එක් එක් පණිවිඩය භාරගන්නා විට එය එක් චලනයකින් ඉහළට ගොස් නියමිත තැනට පැමිණේ.</string>
@@ -277,7 +277,7 @@
     <!-- 2026-10-14-07-control-center-sessions -->
     <string name="settings_whatsnew_entry_control_center_sessions_title">සැසියකට ටයිල්</string>
     <string name="settings_whatsnew_entry_control_center_sessions_summary">එක් තට්ටු කිරීමකින් සැසියක් විවෘත කිරීමට හෝ එහි ඇමතුමක් ඇරඹීමට ඉක්මන් සැකසීම් ටයිල් එකක් එක් කරන්න.</string>
-    <string name="settings_whatsnew_entry_control_center_sessions_detail_1">නව සැසිය විවෘත කරන්න ටයිල් එක ඔබ තෝරන සැසිය විවෘත කරයි.</string>
+    <string name="settings_whatsnew_entry_control_center_sessions_detail_1">නව “සැසිය විවෘත කරන්න” ටයිල් එක ඔබ තෝරන සැසිය විවෘත කරයි.</string>
     <string name="settings_whatsnew_entry_control_center_sessions_detail_2">ඇමතුම අරඹන්න මඟින් තෝරාගත් සැසියකට හෝ නව සැසියකට ඇමතිය හැකියි. ඔබ එය වෙනස් නොකළොත්, අවසන් වරට බැලූ සැසියට අමතයි.</string>
     <string name="settings_whatsnew_entry_control_center_sessions_detail_3">ඉහළ රඳවා ඇති සහ මෑත සැසි අතරින් තෝරන්න. ටයිල් එකේ සැසියේ වත්මන් මාතෘකාව පෙනේ.</string>
     <string name="settings_whatsnew_entry_control_center_sessions_detail_4">ටයිල් යෙදුම විවෘත කරනවා පමණයි. ඔබ කතා කරන තුරු හෝ ටයිප් කරන තුරු කිසිවක් යවන්නේ නැත.</string>
@@ -337,7 +337,7 @@
     <string name="settings_whatsnew_entry_image_previews_prompt">මේ ව්යාපෘතියේ තිර රූ මට පෙන්වන්න.</string>
 
     <!-- 2026-10-16-07-connection-error-details -->
-    <string name="settings_whatsnew_entry_connection_error_details_title">සම්බන්ධතාවයේ අසාර්ථක වූ දේ පෙන්වයි</string>
+    <string name="settings_whatsnew_entry_connection_error_details_title">සම්බන්ධතා දෝෂවල අසාර්ථක වූ දේ පෙන්වයි</string>
     <string name="settings_whatsnew_entry_connection_error_details_summary">සම්බන්ධතා දෝෂවල දෝෂ කේතය, උත්සාහ කළ ලිපිනය සහ DNS ප්‍රතිඵලය පෙනේ. tailnet නමක් Tailscale වෙතින් පිටත ලිපිනයකට යොමු වන විට උදව්ද ලැබේ.</string>
 
     <!-- 2026-10-16-08-outage-reconnect-delay -->
@@ -782,7 +782,7 @@
 
     <!-- 2026-11-01-03-open-links-from-calls -->
     <string name="settings_whatsnew_entry_open_links_from_calls_title">ඇමතුම්වලින් සබැඳි විවෘත කරන්න</string>
-    <string name="settings_whatsnew_entry_open_links_from_calls_summary">සැකසීම් › පර්යේෂණාත්මක › ඇමතුම් හි ඇමතුම්වලින් සබැඳි විවෘත කරන්න සක්‍රිය කරන්න. එවිට ඇමතුමකදී නියෝජිතයෙකුට Uber ගමනක් වැනි සබැඳියක් යෝජනා කළ හැක. අදාළ යෙදුමේ එය විවෘත කිරීමට විවෘතයි තට්ටු කරන්න, නැත්නම් දැන් එපා තෝරන්න.</string>
+    <string name="settings_whatsnew_entry_open_links_from_calls_summary">සැකසීම් › පර්යේෂණාත්මක › ඇමතුම් හි ඇමතුම්වලින් සබැඳි විවෘත කරන්න සක්‍රිය කරන්න. එවිට ඇමතුමකදී නියෝජිතයෙකුට Uber ගමනක් වැනි සබැඳියක් යෝජනා කළ හැක. අදාළ යෙදුමේ එය විවෘත කිරීමට විවෘත කරන්න තට්ටු කරන්න, නැත්නම් දැන් එපා තෝරන්න.</string>
 
     <!-- 2026-11-02-01-fold-questions -->
     <string name="settings_whatsnew_entry_fold_questions_title">ප්රශ්න හකුළා ඉඩ ලබාගන්න</string>
@@ -825,7 +825,7 @@
     <!-- 2026-11-04-01-call-links-and-audio -->
     <string name="settings_whatsnew_entry_call_links_and_audio_title">ඇමතුම්වල සබැඳි සහ ශ්‍රව්‍ය</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_summary">ඇමතුම්වලින් සබැඳි විවෘත කිරීම සහ ඇමතුම්වල ශ්‍රව්‍ය දැන් ස්විචයක් නැතිව සැමට සක්‍රියයි.</string>
-    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">ඇමතුමකදී නියෝජිතයාට Uber ගමනක් වැනි සබැඳියක් ලබා දිය හැක. අදාළ යෙදුමේ එය විවෘත කිරීමට විවෘතයි තට්ටු කරන්න, නැතිනම් දැන් එපා තෝරන්න.</string>
+    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">ඇමතුමකදී නියෝජිතයාට Uber ගමනක් වැනි සබැඳියක් ලබා දිය හැක. අදාළ යෙදුමේ එය විවෘත කිරීමට විවෘත කරන්න තට්ටු කරන්න, නැතිනම් දැන් එපා තෝරන්න.</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_detail_2">නියෝජිතයාට ඇමතුමේදී සංගීතය හෝ ශ්‍රව්‍ය කොටසක් වාදනය කළ හැක. ඔබ දෙදෙනාගෙන් කෙනෙකු කතා කරන විට හඬ අඩු වේ; පණිවිඩ සකසනයට ඉහළින් එය විරාම කරන්න හෝ නවත්වන්න.</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_example">ඇමතුමකදී සංගීතය වාදනය කරන්නැයි නියෝජිතයාගෙන් ඉල්ලන්න</string>
 

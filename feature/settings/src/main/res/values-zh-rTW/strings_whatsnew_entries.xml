@@ -160,7 +160,7 @@
 
     <!-- 2026-10-12-05-run-error-line -->
     <string name="settings_whatsnew_entry_run_error_line_title">執行失敗時</string>
-    <string name="settings_whatsnew_entry_run_error_line_summary">執行提前中止時，會用簡單的文字說明原因，並提供下一步操作：編輯、精簡、切換模型或再試一次。</string>
+    <string name="settings_whatsnew_entry_run_error_line_summary">執行提前中止時，會用簡單的文字說明原因，並提供下一步操作：編輯、緊湊型、切換模型或再試一次。</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_1">「編輯」會復原你的訊息，放回訊息框，讓你修改措辭。</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_2">長按該行即可查看並複製完整錯誤。</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_3">代理程式將自動重試時，「工作中」會顯示下次重試的倒數計時。</string>
@@ -252,7 +252,7 @@
 
     <!-- 2026-10-14-01-settings-grouped-by-purpose -->
     <string name="settings_whatsnew_entry_settings_grouped_by_purpose_title">更清楚的設定分類</string>
-    <string name="settings_whatsnew_entry_settings_grouped_by_purpose_summary">實驗性功能與開發者工具位於「設定 → 實驗性」，應用程式內通知位於「通知」，通話紀錄則位於「音色」。</string>
+    <string name="settings_whatsnew_entry_settings_grouped_by_purpose_summary">實驗性功能與開發者工具位於「設定 → 實驗性」，應用程式內通知位於「通知」，通話紀錄則位於「語音」。</string>
 
     <!-- 2026-10-14-02-send-ats-recovery -->
     <string name="settings_whatsnew_entry_send_ats_recovery_title">傳送更可靠</string>
@@ -878,7 +878,7 @@
     <string name="settings_whatsnew_entry_server_voice_detail_2">若手機和伺服器都有 OpenAI 金鑰，通話現在會使用伺服器的金鑰。若要繼續使用手機上的金鑰，請在「語音提供者」中開啟「你的 OpenAI 帳戶」，再點一下「用於通話」。</string>
     <string name="settings_whatsnew_entry_server_voice_detail_3">設有 Gemini 金鑰的伺服器，現在也能選用 Gemini Live 作為提供者。</string>
     <string name="settings_whatsnew_entry_server_voice_detail_4">無法開始通話時，會說明原因並顯示可解決問題的按鈕。</string>
-    <string name="settings_whatsnew_entry_server_voice_example">開啟「設定 › 音色」，再點一下「語音提供者」</string>
+    <string name="settings_whatsnew_entry_server_voice_example">開啟「設定 › 語音」，再點一下「語音提供者」</string>
 
     <!-- 2026-11-07-02-rename-clear-button -->
     <string name="settings_whatsnew_entry_rename_clear_button_title">一鍵清除標題</string>

@@ -182,10 +182,10 @@
     <string name="voice_call_log_duration_seconds">%1$d秒</string>
     <string name="voice_call_log_duration_minutes">%1$d分 %2$d秒</string>
     <string name="voice_replay_to_delegator">→ 委派器</string>
-    <string name="voice_replay_to_voice">→ 音色</string>
+    <string name="voice_replay_to_voice">→ 语音</string>
     <string name="voice_replay_audio">音频</string>
     <string name="voice_replay_track_user">你</string>
-    <string name="voice_replay_track_voice">音色</string>
+    <string name="voice_replay_track_voice">语音</string>
     <string name="voice_replay_track_delegator">委派器</string>
     <string name="voice_replay_track_tools">工具</string>
 </resources>

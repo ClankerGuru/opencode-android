@@ -135,7 +135,7 @@
     <string name="system_share_sending_description">Envoi en cours</string>
     <string name="system_share_sent_description">Envoyé</string>
     <string name="system_share_sessions_title">Sessions</string>
-    <string name="system_share_pinned_header">Épinglée</string>
+    <string name="system_share_pinned_header">Épinglés</string>
     <string name="system_share_recents_header">Récents</string>
 
     <!-- Widget configuration -->

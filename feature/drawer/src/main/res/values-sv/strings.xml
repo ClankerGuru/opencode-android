@@ -119,11 +119,11 @@
     <string name="drawer_open_in_new_window">Öppna i nytt fönster</string>
 
     <!-- Session row state for TalkBack -->
-    <string name="drawer_row_pinned_state">Fästa</string>
+    <string name="drawer_row_pinned_state">Fäst</string>
     <string name="drawer_row_muted_state">Tystad</string>
     <string name="drawer_row_needs_input_state">Behöver ditt svar</string>
     <string name="drawer_row_working_state">Arbetar</string>
-    <string name="drawer_row_unread_state">Olästa</string>
+    <string name="drawer_row_unread_state">Oläst</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Kunde inte begära behörighet. Försök igen.</string>

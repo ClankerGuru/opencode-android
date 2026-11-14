@@ -143,7 +143,7 @@
     <string name="session_shell_showing_last_output">Ցուցադրվում է վերջին 4 ՄԲ-ը</string>
     <string name="session_shell_load_earlier">Բեռնել նախորդը</string>
     <string name="session_shell_output_unavailable_title">Արտածումն անհասանելի է</string>
-    <string name="session_shell_output_unavailable_message">Սերվերն այլևս չունի այս Shell-ի արտածումը։</string>
+    <string name="session_shell_output_unavailable_message">Սերվերում այլևս չկա այս Shell-ի արտածումը։</string>
     <string name="session_shell_no_output_yet_title">Դեռ արտածում չկա</string>
     <string name="session_shell_no_output_title">Արտածում չկա</string>
     <string name="session_shell_no_output_yet_message">Արտածումն այստեղ հայտնվում է հրամանի աշխատանքի ընթացքում։</string>

@@ -75,7 +75,7 @@
     <string name="voice_status_needs_input">Čeká na vás</string>
     <string name="voice_status_working">Pracuje</string>
     <string name="voice_status_speaking">Mluví</string>
-    <string name="voice_status_muted">Ztlumené</string>
+    <string name="voice_status_muted">Ztlumeno</string>
     <string name="voice_status_listening">Naslouchá</string>
     <string name="voice_status_ending">Ukončování…</string>
     <string name="voice_status_ended">Ukončeno</string>

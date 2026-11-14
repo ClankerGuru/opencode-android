@@ -119,7 +119,7 @@
     <string name="drawer_open_in_new_window">Opna í nýggjum vindeyga</string>
 
     <!-- Session row state for TalkBack -->
-    <string name="drawer_row_pinned_state">Festar</string>
+    <string name="drawer_row_pinned_state">Fest</string>
     <string name="drawer_row_muted_state">Fráboðanir sløktar</string>
     <string name="drawer_row_needs_input_state">Tín luttøka krevst</string>
     <string name="drawer_row_working_state">Arbeiða</string>

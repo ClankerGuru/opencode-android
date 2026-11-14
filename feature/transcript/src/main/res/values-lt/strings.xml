@@ -37,7 +37,7 @@
     <string name="transcript_image_open_description">Atidaryti vaizdą</string>
     <string name="transcript_image_load_failed">Nepavyko įkelti vaizdo</string>
     <string name="transcript_image_retry_click_label">Bandyti dar kartą</string>
-    <string name="transcript_image_open">Atvira</string>
+    <string name="transcript_image_open">Atidaryti</string>
 
     <!-- Math -->
     <string name="transcript_equation_description">Lygtis</string>

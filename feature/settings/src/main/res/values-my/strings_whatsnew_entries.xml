@@ -607,7 +607,7 @@
 
     <!-- 2026-10-23-04-voice-server-picker -->
     <string name="settings_whatsnew_entry_voice_server_picker_title">အသံဆာဗာကို ရွေးပါ</string>
-    <string name="settings_whatsnew_entry_voice_server_picker_summary">ဆက်တင်များ › အသံ › အသံ ဝန်ဆောင်မှုပေးသူ တွင် ခေါ်ဆိုမှုများအတွက် သိမ်းထားသည့် ဆာဗာတစ်ခု သို့မဟုတ် ဤဖုန်းရှိ သင့်ကိုယ်ပိုင် OpenAI အကောင့်ကို ရွေးပါ။</string>
+    <string name="settings_whatsnew_entry_voice_server_picker_summary">ဆက်တင်များ › အသံ › အသံ ပံ့ပိုးပေးသူ တွင် ခေါ်ဆိုမှုများအတွက် သိမ်းထားသည့် ဆာဗာတစ်ခု သို့မဟုတ် ဤဖုန်းရှိ သင့်ကိုယ်ပိုင် OpenAI အကောင့်ကို ရွေးပါ။</string>
 
     <!-- 2026-10-24-01-living-orb-floats -->
     <string name="settings_whatsnew_entry_living_orb_floats_title">သက်ဝင်စက်လုံး နေရာတိုင်းမှာ ပေါ်နေမည်</string>
@@ -671,7 +671,7 @@
     <string name="settings_whatsnew_entry_session_title_first_prompt_summary">ခေါင်းစဉ်မရှိသေးသည့် စက်ရှင်များတွင် ဆာဗာက အမည်မပေးမချင်း ပထမအချက်ပြစာကို တစ်ကြောင်းတည်း ပြပေးပါမည်။</string>
 
     <!-- 2026-10-26-01-settings-sessions-page -->
-    <string name="settings_whatsnew_entry_settings_sessions_page_title">ဆက်ရှင်များ ဆက်တင်</string>
+    <string name="settings_whatsnew_entry_settings_sessions_page_title">ဆက်ရှင်များ ဆက်တင်များ</string>
     <string name="settings_whatsnew_entry_settings_sessions_page_summary">ဆက်တင်များတွင် ဆက်ရှင်များ စာမျက်နှာအသစ် ပါလာပါပြီ။ ထိုနေရာတွင် မက်ဆေ့ဂျ်အသစ် ခွဲမျဉ်း ကို Return ခလုတ်ဖြင့် ပို့ရန် အပေါ်တွင် ထားထားပြီး အဆင့်မြင့် ကိုလည်း သမ္ဘာ နှင့် ဆော့ဖ်ဝဲရေးသားသူ ဟူ၍ နှစ်တန်း ခွဲထားပါသည်။</string>
 
     <!-- 2026-10-26-02-project-icons-default -->
@@ -782,7 +782,7 @@
 
     <!-- 2026-11-01-03-open-links-from-calls -->
     <string name="settings_whatsnew_entry_open_links_from_calls_title">ခေါ်ဆိုမှုမှ လင့်ခ်များ ဖွင့်ပါ</string>
-    <string name="settings_whatsnew_entry_open_links_from_calls_summary">ဆက်တင်များ › သမ္ဘာ › ခေါ်ဆိုမှုများ တွင် ခေါ်ဆိုမှုမှ လင့်ခ်များ ဖွင့်ပါကို ဖွင့်ထားလျှင် ခေါ်ဆိုနေစဉ် အေးဂျင့်က Uber ခရီးစဉ်ကဲ့သို့ လင့်ခ်တစ်ခု ပေးနိုင်ပါသည်။ သက်ဆိုင်ရာအက်ပ်တွင် ဖွင့်ရန် ဖွင့်ထားသည်ကို နှိပ်ပါ၊ သို့မဟုတ် အခု မလုပ်သေးပါကို နှိပ်ပါ။</string>
+    <string name="settings_whatsnew_entry_open_links_from_calls_summary">ဆက်တင်များ › သမ္ဘာ › ခေါ်ဆိုမှုများ တွင် ခေါ်ဆိုမှုမှ လင့်ခ်များ ဖွင့်ပါကို ဖွင့်ထားလျှင် ခေါ်ဆိုနေစဉ် အေးဂျင့်က Uber ခရီးစဉ်ကဲ့သို့ လင့်ခ်တစ်ခု ပေးနိုင်ပါသည်။ သက်ဆိုင်ရာအက်ပ်တွင် ဖွင့်ရန် ဖွင့်ပါကို နှိပ်ပါ၊ သို့မဟုတ် အခု မလုပ်သေးပါကို နှိပ်ပါ။</string>
 
     <!-- 2026-11-02-01-fold-questions -->
     <string name="settings_whatsnew_entry_fold_questions_title">မေးခွန်းများကို ခေါက်သိမ်းထားပါ</string>
@@ -825,7 +825,7 @@
     <!-- 2026-11-04-01-call-links-and-audio -->
     <string name="settings_whatsnew_entry_call_links_and_audio_title">ခေါ်ဆိုမှုထဲက လင့်ခ်များနှင့် အသံ</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_summary">ခေါ်ဆိုမှုမှ လင့်ခ်ဖွင့်ခြင်းနှင့် ခေါ်ဆိုမှုအတွင်း အသံဖွင့်ခြင်းတို့ကို ယခု အားလုံးအတွက် ဖွင့်ပေးထားပြီး အဖွင့်အပိတ်ခလုတ် မရှိတော့ပါ။</string>
-    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">ခေါ်ဆိုနေစဉ် အေးဂျင့်က Uber ခရီးစဉ်ကဲ့သို့ လင့်ခ်တစ်ခု ပေးနိုင်သည်။ သက်ဆိုင်ရာအက်ပ်တွင် ဖွင့်ရန် ဖွင့်ထားသည် ကို နှိပ်ပါ၊ သို့မဟုတ် အခု မလုပ်သေးပါ ကို နှိပ်ပါ။</string>
+    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">ခေါ်ဆိုနေစဉ် အေးဂျင့်က Uber ခရီးစဉ်ကဲ့သို့ လင့်ခ်တစ်ခု ပေးနိုင်သည်။ သက်ဆိုင်ရာအက်ပ်တွင် ဖွင့်ရန် ဖွင့်ပါ ကို နှိပ်ပါ၊ သို့မဟုတ် အခု မလုပ်သေးပါ ကို နှိပ်ပါ။</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_detail_2">အေးဂျင့်က ခေါ်ဆိုမှုအတွင်း သီချင်း သို့မဟုတ် အသံဖိုင်တို ဖွင့်ပေးနိုင်သည်။ တစ်ဦးဦး စကားပြောလျှင် အသံတိုးပေးပြီး စာရေးကွက်အပေါ်တွင် ခဏရပ် သို့မဟုတ် ရပ်နိုင်သည်။</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_example">ခေါ်ဆိုနေစဉ် အေးဂျင့်ကို သီချင်းဖွင့်ခိုင်းကြည့်ပါ</string>
 

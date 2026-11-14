@@ -125,7 +125,7 @@
 
     <!-- 2026-10-11-04-stop-runs-your-steer -->
     <string name="settings_whatsnew_entry_stop_runs_your_steer_title">Насочвайте, докато работи</string>
-    <string name="settings_whatsnew_entry_stop_runs_your_steer_summary">Пишете, докато агентът работи, и той ще прочете съобщението при следващата си стъпка, като първо премести продължителните команди на заден план.</string>
+    <string name="settings_whatsnew_entry_stop_runs_your_steer_summary">Изпратете, докато агентът работи, и той ще прочете съобщението при следващата си стъпка, като първо премести продължителните команди на заден план.</string>
     <string name="settings_whatsnew_entry_stop_runs_your_steer_detail_1">Задръжте „Изпрати“, за да изберете „Насочи“ или „Постави на опашка“ за едно съобщение.</string>
     <string name="settings_whatsnew_entry_stop_runs_your_steer_detail_2">Задръжте чакащо съобщение, за да го преместите в опашката или да го изтриете.</string>
     <string name="settings_whatsnew_entry_stop_runs_your_steer_detail_3">„Спрете“ веднага става „Спиране…“, а изпратеното съобщение за насочване се изпълнява след това.</string>
@@ -477,7 +477,7 @@
 
     <!-- 2026-10-20-11-advanced-settings-open -->
     <string name="settings_whatsnew_entry_advanced_settings_open_title">По-лесни разширени настройки</string>
-    <string name="settings_whatsnew_entry_advanced_settings_open_summary">Експериментите в Настройки › Експериментални са в разгънати групи, изборът на модел е обединен в една настройка и можете да докоснете навсякъде по реда на опция, за да я промените.</string>
+    <string name="settings_whatsnew_entry_advanced_settings_open_summary">Експериментите в Настройки › Експериментален са в разгънати групи, изборът на модел е обединен в една настройка и можете да докоснете навсякъде по реда на опция, за да я промените.</string>
 
     <!-- 2026-10-20-12-revert-to-here -->
     <string name="settings_whatsnew_entry_revert_to_here_title">Възстановяване на съобщението</string>
@@ -782,7 +782,7 @@
 
     <!-- 2026-11-01-03-open-links-from-calls -->
     <string name="settings_whatsnew_entry_open_links_from_calls_title">Отваряне на връзки от обаждания</string>
-    <string name="settings_whatsnew_entry_open_links_from_calls_summary">Включете „Отваряне на връзки от обаждания“ в Настройки › Експериментален › Обаждания и по време на обаждане агентът може да предложи връзка, например за пътуване с Uber. Докоснете „Отворено“, за да я отворите в съответното приложение, или „Не сега“.</string>
+    <string name="settings_whatsnew_entry_open_links_from_calls_summary">Включете „Отваряне на връзки от обаждания“ в Настройки › Експериментален › Обаждания и по време на обаждане агентът може да предложи връзка, например за пътуване с Uber. Докоснете „Отворете“, за да я отворите в съответното приложение, или „Не сега“.</string>
 
     <!-- 2026-11-02-01-fold-questions -->
     <string name="settings_whatsnew_entry_fold_questions_title">Свиване на въпросите настрана</string>
@@ -825,7 +825,7 @@
     <!-- 2026-11-04-01-call-links-and-audio -->
     <string name="settings_whatsnew_entry_call_links_and_audio_title">Връзки и аудио в обаждания</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_summary">Отварянето на връзки и аудиото в обаждания вече са включени за всички, без превключвател.</string>
-    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">По време на обаждане агентът може да предложи връзка, например за пътуване с Uber. Докоснете „Отворено“, за да я отворите в съответното приложение, или „Не сега“.</string>
+    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">По време на обаждане агентът може да предложи връзка, например за пътуване с Uber. Докоснете „Отворете“, за да я отворите в съответното приложение, или „Не сега“.</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_detail_2">Агентът може да пуска музика или клип по време на обаждането. Звукът се намалява, когато някой от вас говори. Можете да го поставите на пауза или да го спрете над редактора на съобщения.</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_example">По време на обаждане помолете агента да пусне музика</string>
 
@@ -891,7 +891,7 @@
     <string name="settings_whatsnew_entry_one_picker_detail_2">Плъзнете или задръжте ред, за да добавите модела в любими или да го премахнете оттам.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_3">Търсенето е долу. Въведете ниво след името, например „opus high“, и натиснете Return, за да изберете и двете.</string>
     <string name="settings_whatsnew_entry_one_picker_detail_4">Издърпайте дръжката нагоре за по-дълъг списък или надолу, за да го затворите.</string>
-    <string name="settings_whatsnew_entry_one_picker_detail_5">Новият панел за избор заменя стария панел „Модел“, а превключвателят One Picker е премахнат от Настройки › Експериментален.</string>
+    <string name="settings_whatsnew_entry_one_picker_detail_5">Новият панел за избор заменя стария панел „Модел“, а превключвателят „Единен избор“ е премахнат от Настройки › Експериментален.</string>
     <string name="settings_whatsnew_entry_one_picker_example">Докоснете модела в полето за съобщение, после плъзнете реда му, за да го добавите в любими</string>
 
     <!-- 2026-11-08-01-connecting-caption-glass -->

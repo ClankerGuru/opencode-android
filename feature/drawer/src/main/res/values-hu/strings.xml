@@ -54,7 +54,7 @@
     <string name="drawer_whats_new_hide">Elrejtés</string>
     <string name="drawer_empty_title">Nincsenek munkamenetek</string>
     <string name="drawer_empty_message">Kezdéshez válassza az Új munkamenet gombot.</string>
-    <string name="drawer_search_no_results_title">Nincs találat erre: „%1$s”</string>
+    <string name="drawer_search_no_results_title">Nincs találat a következőre: „%1$s”</string>
     <string name="drawer_search_no_results_message">Ellenőrizze a helyesírást, vagy keressen másra.</string>
     <string name="drawer_load_more_description">További munkamenetek betöltése</string>
     <string name="drawer_load_more_failed">Nem sikerült további munkameneteket betölteni</string>

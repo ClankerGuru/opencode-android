@@ -67,7 +67,7 @@
     <string name="transcript_tool_denied">ተከልክሏል</string>
     <string name="transcript_show_less">ያነሰ አሳይ</string>
     <plurals name="transcript_tool_output_show_all">
-        <item quantity="one">%1$d መስመር አሳይ</item>
+        <item quantity="one">ሁሉንም %1$d መስመር አሳይ</item>
         <item quantity="other">ሁሉንም %1$d መስመሮች አሳይ</item>
     </plurals>
     <string name="transcript_question_hide_click_label">ጥያቄውን ደብቅ</string>

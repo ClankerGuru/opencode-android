@@ -131,7 +131,7 @@
     <string name="system_share_loading_description">Nalaganje deljenih elementov</string>
     <string name="system_share_image_description">Slika</string>
     <string name="system_share_image_position_description">Slika %1$d od %2$d</string>
-    <string name="system_share_search_sessions_description">Išči seje</string>
+    <string name="system_share_search_sessions_description">Seje iskanja</string>
     <string name="system_share_new_session_in_project_description">Nova seja v %1$s</string>
     <string name="system_share_choose_project_description">Izberite projekt zanjo</string>
     <string name="system_share_message_placeholder">Sporočilo</string>

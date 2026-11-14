@@ -24,7 +24,7 @@
     <string name="session_draft_project_choose_label">Izvēlies, kur sākt sesiju</string>
     <string name="session_project_choose_folder">Izvēlēties mapi…</string>
     <string name="session_project_all_projects">Visi projekti</string>
-    <string name="session_project_selected_description">Atlasīta</string>
+    <string name="session_project_selected_description">Atlasīts</string>
     <string name="session_project_picker_title">Projekts</string>
     <!-- Folder browser -->
     <string name="session_folder_select_description">Izvēlieties mapi</string>
@@ -46,8 +46,8 @@
     <string name="session_rename_title">Pārdēvēt sesiju</string>
     <string name="session_untitled_title">Sesija</string>
     <string name="session_pin">Piespraust</string>
-    <string name="session_pinned">Piespraustās</string>
-    <string name="session_unread">Nelasītās</string>
+    <string name="session_pinned">Piesprausta</string>
+    <string name="session_unread">Nelasīta</string>
     <string name="session_mute">Apklusināt</string>
     <string name="session_muted">Apklusināta</string>
     <string name="session_compact">Saspiest</string>

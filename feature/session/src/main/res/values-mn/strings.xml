@@ -3,7 +3,7 @@
     <!-- Agent activity glyph -->
     <string name="session_activity_running_description">Ажиллаж байна</string>
     <!-- Background work panel -->
-    <string name="session_background_work_show_label">Ажиллаж буй дэд агентууд болон shell-үүдийг харуулах</string>
+    <string name="session_background_work_show_label">Ажиллаж буй дэд агентууд болон Shell-үүдийг харуулах</string>
     <string name="session_background_work_collapsed_description">Хураасан</string>
     <string name="session_background_work_subagents_title">Дэд агентууд</string>
     <string name="session_background_work_open_subagent_label">Дэд агентийн сессийг нээх</string>
@@ -143,7 +143,7 @@
     <string name="session_shell_showing_last_output">Сүүлийн 4 МБ-ыг харуулж байна</string>
     <string name="session_shell_load_earlier">Өмнөхийг ачаалах</string>
     <string name="session_shell_output_unavailable_title">Гаралт боломжгүй байна</string>
-    <string name="session_shell_output_unavailable_message">Энэ Shell-ийн гаралт серверт байхгүй болсон.</string>
+    <string name="session_shell_output_unavailable_message">Энэ Shell-ийн гаралт сервер дээр байхгүй болсон.</string>
     <string name="session_shell_no_output_yet_title">Одоогоор гаралт алга</string>
     <string name="session_shell_no_output_title">Гаралт алга</string>
     <string name="session_shell_no_output_yet_message">Тушаалын гаралт энд гарна.</string>
@@ -277,7 +277,7 @@
     <!-- Header and screens -->
     <string name="session_new_session_title">Шинэ сесс</string>
     <string name="session_pasted_text_screen_title">Буулгасан текст</string>
-    <string name="session_pasted_text_viewer_screen_title">Буулгасан текст үзэгч</string>
+    <string name="session_pasted_text_viewer_screen_title">Буулгасан текст харагч</string>
     <string name="session_context_summary">%2$s-ийн %1$d%%</string>
     <string name="session_context_accessibility_value">%2$s токены %1$d%%-ийг ашигласан</string>
 

@@ -44,15 +44,15 @@
     <string name="system_ask_send_failed">OpenCode에 보내지 못했습니다. %1$s</string>
 
     <!-- Live Updates: voice call -->
-    <string name="system_call_muted">알림 꺼짐</string>
-    <string name="system_call_unmute">알림 켜기</string>
-    <string name="system_call_mute">알림 끄기</string>
+    <string name="system_call_muted">음소거됨</string>
+    <string name="system_call_unmute">음소거 해제</string>
+    <string name="system_call_mute">음소거</string>
     <string name="system_call_end">통화 종료</string>
     <string name="system_call_connecting">연결 중…</string>
     <string name="system_call_reconnecting">다시 연결 중…</string>
     <string name="system_call_ended">통화 종료됨</string>
     <string name="system_call_end_title">통화 종료</string>
-    <string name="system_call_toggle_mute_title">통화 알림 끄기 또는 켜기</string>
+    <string name="system_call_toggle_mute_title">통화 음소거 또는 음소거 해제</string>
 
     <!-- Live Updates: hands-free recording -->
     <string name="system_recording_active">녹음 중</string>

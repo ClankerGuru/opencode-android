@@ -252,7 +252,7 @@
 
     <!-- 2026-10-14-01-settings-grouped-by-purpose -->
     <string name="settings_whatsnew_entry_settings_grouped_by_purpose_title">更清晰的设置</string>
-    <string name="settings_whatsnew_entry_settings_grouped_by_purpose_summary">实验功能和开发者工具移至“设置 → 实验”，应用内通知位于“通知”，通话记录位于“音色”。</string>
+    <string name="settings_whatsnew_entry_settings_grouped_by_purpose_summary">实验功能和开发者工具移至“设置 → 实验”，应用内通知位于“通知”，通话记录位于“语音”。</string>
 
     <!-- 2026-10-14-02-send-ats-recovery -->
     <string name="settings_whatsnew_entry_send_ats_recovery_title">发送更可靠</string>
@@ -878,7 +878,7 @@
     <string name="settings_whatsnew_entry_server_voice_detail_2">如果手机和服务器都配置了 OpenAI 密钥，通话现在会使用服务器的密钥。如需继续使用手机上的密钥，请在“语音提供商”中打开“你的 OpenAI 账户”，点击“用于通话”。</string>
     <string name="settings_whatsnew_entry_server_voice_detail_3">配置了 Gemini 密钥的服务器，现在也可以使用 Gemini Live 作为提供商。</string>
     <string name="settings_whatsnew_entry_server_voice_detail_4">无法发起通话时，会说明原因，并提供相应的解决按钮。</string>
-    <string name="settings_whatsnew_entry_server_voice_example">打开“设置 › 音色”，点击“语音提供商”</string>
+    <string name="settings_whatsnew_entry_server_voice_example">打开“设置 › 语音”，点击“语音提供商”</string>
 
     <!-- 2026-11-07-02-rename-clear-button -->
     <string name="settings_whatsnew_entry_rename_clear_button_title">一键清空标题</string>

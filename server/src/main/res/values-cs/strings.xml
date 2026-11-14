@@ -7,22 +7,22 @@
     <string name="server_notice_heading_failed">%1$s: chyba</string>
     <string name="server_notice_heading_interrupted">%1$s: přerušeno</string>
     <plurals name="server_notice_count_shell_finished">
-        <item quantity="one">Skončil %1$d shell</item>
-        <item quantity="few">Skončily %1$d shelly</item>
-        <item quantity="many">Skončilo %1$d shellu</item>
-        <item quantity="other">Skončilo %1$d shellů</item>
+        <item quantity="one">%1$d shell dokončen</item>
+        <item quantity="few">%1$d shelly dokončeny</item>
+        <item quantity="many">%1$d shellu dokončeno</item>
+        <item quantity="other">%1$d shellů dokončeno</item>
     </plurals>
     <plurals name="server_notice_count_shell_failed">
-        <item quantity="one">Selhal %1$d shell</item>
-        <item quantity="few">Selhaly %1$d shelly</item>
-        <item quantity="many">Selhalo %1$d shellu</item>
-        <item quantity="other">Selhalo %1$d shellů</item>
+        <item quantity="one">%1$d shell selhal</item>
+        <item quantity="few">%1$d shelly selhaly</item>
+        <item quantity="many">%1$d shellu selhalo</item>
+        <item quantity="other">%1$d shellů selhalo</item>
     </plurals>
     <plurals name="server_notice_count_shell_interrupted">
-        <item quantity="one">Přerušen %1$d shell</item>
-        <item quantity="few">Přerušeny %1$d shelly</item>
-        <item quantity="many">Přerušeno %1$d shellu</item>
-        <item quantity="other">Přerušeno %1$d shellů</item>
+        <item quantity="one">%1$d shell přerušen</item>
+        <item quantity="few">%1$d shelly přerušeny</item>
+        <item quantity="many">%1$d shellu přerušeno</item>
+        <item quantity="other">%1$d shellů přerušeno</item>
     </plurals>
     <plurals name="server_notice_count_subagent_finished">
         <item quantity="one">Skončil %1$d subagent</item>

@@ -18,8 +18,8 @@
     <!-- Floating call stage -->
     <string name="voice_stage_talking_in">대화 중인 세션</string>
     <string name="voice_stage_minimize_description">최소화</string>
-    <string name="voice_mute">알림 끄기</string>
-    <string name="voice_unmute">알림 켜기</string>
+    <string name="voice_mute">음소거</string>
+    <string name="voice_unmute">음소거 해제</string>
     <string name="voice_stage_pause">일시 정지</string>
     <string name="voice_stage_camera">카메라</string>
     <string name="voice_transcript_empty">세션에 말을 걸어 보세요.</string>
@@ -75,7 +75,7 @@
     <string name="voice_status_needs_input">입력이 필요해요</string>
     <string name="voice_status_working">일하고 있는</string>
     <string name="voice_status_speaking">말하는 중</string>
-    <string name="voice_status_muted">알림 꺼짐</string>
+    <string name="voice_status_muted">음소거됨</string>
     <string name="voice_status_listening">듣는 중</string>
     <string name="voice_status_ending">종료 중…</string>
     <string name="voice_status_ended">종료됨</string>

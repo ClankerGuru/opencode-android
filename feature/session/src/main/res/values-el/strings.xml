@@ -24,7 +24,7 @@
     <string name="session_draft_project_choose_label">Επιλέξτε πού ξεκινά η συνεδρία</string>
     <string name="session_project_choose_folder">Επιλογή φακέλου…</string>
     <string name="session_project_all_projects">Όλα τα έργα</string>
-    <string name="session_project_selected_description">Επιλεγμένη</string>
+    <string name="session_project_selected_description">Επιλεγμένο</string>
     <string name="session_project_picker_title">Έργο</string>
     <!-- Folder browser -->
     <string name="session_folder_select_description">Επιλογή φακέλου</string>
@@ -46,8 +46,8 @@
     <string name="session_rename_title">Μετονομασία συνεδρίας</string>
     <string name="session_untitled_title">Συνεδρία</string>
     <string name="session_pin">Καρφίτσωμα</string>
-    <string name="session_pinned">Καρφιτσωμένες</string>
-    <string name="session_unread">Αδιάβαστες</string>
+    <string name="session_pinned">Καρφιτσωμένη</string>
+    <string name="session_unread">Αδιάβαστη</string>
     <string name="session_mute">Σίγαση</string>
     <string name="session_muted">Σε σίγαση</string>
     <string name="session_compact">Συμπαγές</string>

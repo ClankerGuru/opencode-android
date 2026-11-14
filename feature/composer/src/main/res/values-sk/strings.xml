@@ -190,7 +190,7 @@
     <string name="composer_attachment_menu_camera">Fotoaparát</string>
     <string name="composer_attachment_menu_photos">Fotografie</string>
     <string name="composer_attachment_menu_files">Súbory</string>
-    <string name="composer_attachment_menu_location">Poloha</string>
+    <string name="composer_attachment_menu_location">Umiestnenie</string>
     <string name="composer_attachment_menu_paste">Prilepiť</string>
     <!-- Autocomplete items (AutocompleteModels) -->
     <string name="composer_autocomplete_new_session">Nová relácia</string>

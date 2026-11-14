@@ -139,7 +139,7 @@
     <string name="media_mermaid_viewer_screen_title">Shikuesi i diagrameve</string>
     <string name="media_mermaid_diagram_description">Diagram</string>
     <string name="media_mermaid_loading_state">%1$s, po ngarkohet</string>
-    <string name="media_mermaid_view_source">Trego kodin burimor</string>
+    <string name="media_mermaid_view_source">Shiko kodin burimor</string>
     <string name="media_mermaid_source_title">Kodi burimor i diagramit</string>
 
     <!-- Mermaid diagram kinds, read by TalkBack as “Diagram, Flowchart” -->

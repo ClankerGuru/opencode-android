@@ -7,7 +7,7 @@
     <string name="settings_onboarding_other_ways_terminal_header">在終端機執行此命令</string>
     <string name="settings_onboarding_other_ways_terminal_footer">會顯示可掃描的配對碼或可貼上的連結，任何網路都能使用。</string>
     <string name="settings_onboarding_other_ways_paste_link">貼上配對連結</string>
-    <string name="settings_onboarding_other_ways_enter_address">輸入伺服器位址</string>
+    <string name="settings_onboarding_other_ways_enter_address">輸入伺服器 URL</string>
     <string name="settings_onboarding_other_ways_install_header">還沒有 OpenCode？</string>
     <string name="settings_onboarding_other_ways_install">其他安裝方式</string>
     <string name="settings_onboarding_command_copy_description">複製 %1$s</string>

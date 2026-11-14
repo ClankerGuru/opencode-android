@@ -36,7 +36,7 @@
     <string name="settings_onboarding_desktop_composer_placeholder">Spyrðu að hverju sem er, / fyrir skipanir, @ fyrir samhengi…</string>
     <string name="settings_onboarding_desktop_composer_follow_up_placeholder">Bættu við, / fyrir skipanir, @ fyrir samhengi…</string>
     <string name="settings_onboarding_desktop_back_to_app">Til baka í forritið</string>
-    <string name="settings_onboarding_desktop_pairing_title">Parar</string>
+    <string name="settings_onboarding_desktop_pairing_title">Pörun</string>
     <string name="settings_onboarding_desktop_pairing_subtitle">Tengdu annað tæki við OpenCode-netþjón þessarar tölvu.</string>
     <string name="settings_onboarding_desktop_pair_device">Para tæki</string>
     <string name="settings_onboarding_desktop_pair_device_message">Skannaðu kóðann með OpenCode-forritinu í öðru tæki eða afritaðu tengilinn.</string>
@@ -61,7 +61,7 @@
     <string name="settings_onboarding_headline">OpenCode\nhvar sem er.</string>
     <string name="settings_onboarding_headline_spoken">OpenCode hvar sem er.</string>
     <string name="settings_onboarding_subhead">Byrjaðu á verkefnum, svaraðu spurningum og farðu yfir breytingar þótt þú sért ekki við tölvuna.</string>
-    <string name="settings_onboarding_instruction">Opnaðu OpenCode í tölvunni og farðu í Stillingar → Parar.</string>
+    <string name="settings_onboarding_instruction">Opnaðu OpenCode í tölvunni og farðu í Stillingar → Pörun.</string>
 
     <!-- Onboarding: WelcomeStory, the mock conversation (the reply's backticks mark code) -->
     <string name="settings_onboarding_story_prompt">Bættu við hnappi til að sækja fyrir Android og sýndu mér</string>

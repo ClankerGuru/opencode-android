@@ -44,9 +44,9 @@
     <string name="system_ask_send_failed">OpenCode руу илгээж чадсангүй. %1$s</string>
 
     <!-- Live Updates: voice call -->
-    <string name="system_call_muted">Мэдэгдлийг хаасан</string>
-    <string name="system_call_unmute">Мэдэгдлийг нээх</string>
-    <string name="system_call_mute">Мэдэгдлийг хаах</string>
+    <string name="system_call_muted">Дууг хаасан</string>
+    <string name="system_call_unmute">Дууг нээх</string>
+    <string name="system_call_mute">Дууг хаах</string>
     <string name="system_call_end">Дуудлага дуусгах</string>
     <string name="system_call_connecting">Холбож байна…</string>
     <string name="system_call_reconnecting">Дахин холбож байна…</string>

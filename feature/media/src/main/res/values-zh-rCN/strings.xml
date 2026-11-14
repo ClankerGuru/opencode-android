@@ -126,7 +126,7 @@
     <string name="media_github_kind_commit">提交</string>
 
     <!-- GitHub link previews: an issue’s or pull request’s state -->
-    <string name="media_github_state_open">开放中</string>
+    <string name="media_github_state_open">打开</string>
     <string name="media_github_state_closed">已关闭</string>
     <string name="media_github_state_merged">已合并</string>
     <string name="media_github_state_draft">草稿</string>

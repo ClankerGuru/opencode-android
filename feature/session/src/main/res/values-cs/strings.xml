@@ -177,7 +177,7 @@
     </plurals>
 
     <!-- Agent activity (glyph labels and titles) -->
-    <string name="session_activity_idle">Nečinná</string>
+    <string name="session_activity_idle">Nečinnost</string>
     <string name="session_activity_starting_up">Spouštění</string>
     <string name="session_activity_thinking">Myšlení</string>
     <string name="session_activity_long_work">Delší práce</string>

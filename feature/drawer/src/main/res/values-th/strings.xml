@@ -70,7 +70,7 @@
 
     <!-- Inbox Sidebar -->
     <string name="drawer_inbox_needs_input">ต้องการคำตอบจากคุณ</string>
-    <string name="drawer_inbox_working">กำลังทำงาน</string>
+    <string name="drawer_inbox_working">การทำงาน</string>
     <string name="drawer_inbox_unread">ยังไม่อ่าน</string>
 
     <!-- Drawer button -->
@@ -118,7 +118,7 @@
     <string name="drawer_row_pinned_state">ปักหมุดแล้ว</string>
     <string name="drawer_row_muted_state">ปิดเสียงแล้ว</string>
     <string name="drawer_row_needs_input_state">ต้องการคำตอบจากคุณ</string>
-    <string name="drawer_row_working_state">กำลังทำงาน</string>
+    <string name="drawer_row_working_state">การทำงาน</string>
     <string name="drawer_row_unread_state">ยังไม่อ่าน</string>
 
     <!-- Errors -->
@@ -134,7 +134,7 @@
     <!-- Inbox ages and row dates -->
     <string name="drawer_age_now">ตอนนี้</string>
     <plurals name="drawer_age_minutes">
-        <item quantity="other">%1$d น.</item>
+        <item quantity="other">%1$d นาที</item>
     </plurals>
     <plurals name="drawer_age_hours">
         <item quantity="other">%1$d ชม.</item>

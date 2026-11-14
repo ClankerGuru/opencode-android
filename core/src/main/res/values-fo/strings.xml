@@ -45,8 +45,8 @@
     <string name="core_attachment_subtitle">%1$s · %2$s</string>
     <string name="core_byte_count_zero">Null KB</string>
     <plurals name="core_byte_count_bytes">
-        <item quantity="one">%1$s být</item>
-        <item quantity="other">%1$s být</item>
+        <item quantity="one">%1$s byte</item>
+        <item quantity="other">%1$s byte</item>
     </plurals>
     <string name="core_byte_count_kilobytes">%1$s KB</string>
     <string name="core_byte_count_megabytes">%1$s MB</string>

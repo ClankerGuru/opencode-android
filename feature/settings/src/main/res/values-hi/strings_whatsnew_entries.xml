@@ -599,7 +599,7 @@
 
     <!-- 2026-10-23-02-gpt-live-own-key -->
     <string name="settings_whatsnew_entry_gpt_live_own_key_title">GPT-Live कुंजियाँ</string>
-    <string name="settings_whatsnew_entry_gpt_live_own_key_summary">GPT-Live कॉल के लिए अपनी OpenAI कुंजी, अपने सर्वर की OpenAI कुंजी या उसके OpenCode Console कनेक्शन का उपयोग कर सकते हैं।</string>
+    <string name="settings_whatsnew_entry_gpt_live_own_key_summary">GPT-Live कॉल के लिए अपनी OpenAI कुंजी, अपने सर्वर की OpenAI कुंजी या उसके OpenCode Console संबंध का उपयोग कर सकते हैं।</string>
 
     <!-- 2026-10-23-03-pair-opens-drawer -->
     <string name="settings_whatsnew_entry_pair_opens_drawer_title">जहाँ छोड़ा था, वहीं से शुरू करें</string>
@@ -825,7 +825,7 @@
     <!-- 2026-11-04-01-call-links-and-audio -->
     <string name="settings_whatsnew_entry_call_links_and_audio_title">कॉल में लिंक और ऑडियो</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_summary">कॉल से लिंक खोलना और कॉल में ऑडियो अब सभी के लिए चालू हैं, बिना किसी स्विच के।</string>
-    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">कॉल के दौरान एजेंट कोई लिंक दे सकता है, जैसे Uber राइड का: उसे उसके ऐप में खोलने के लिए खुला पर टैप करें, या अभी नहीं चुनें।</string>
+    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">कॉल के दौरान एजेंट कोई लिंक दे सकता है, जैसे Uber राइड का: उसे उसके ऐप में खोलने के लिए खोलें पर टैप करें, या अभी नहीं चुनें।</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_detail_2">एजेंट कॉल पर संगीत या क्लिप चला सकता है। आप दोनों में से किसी के बोलने पर उसकी आवाज़ धीमी हो जाती है; संदेश लेखन के ऊपर से उसे रोक सकते हैं या बंद कर सकते हैं।</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_example">कॉल पर एजेंट से कुछ संगीत चलाने को कहें</string>
 

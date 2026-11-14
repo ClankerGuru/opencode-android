@@ -24,7 +24,7 @@
     <string name="session_draft_project_choose_label">Изберете къде да започне сесията</string>
     <string name="session_project_choose_folder">Изберете папка…</string>
     <string name="session_project_all_projects">Всички проекти</string>
-    <string name="session_project_selected_description">Избрана</string>
+    <string name="session_project_selected_description">Избран</string>
     <string name="session_project_picker_title">Проект</string>
     <!-- Folder browser -->
     <string name="session_folder_select_description">Изберете папка</string>
@@ -46,10 +46,10 @@
     <string name="session_rename_title">Преименуване на сесия</string>
     <string name="session_untitled_title">Сесия</string>
     <string name="session_pin">Закачане</string>
-    <string name="session_pinned">Закачени</string>
-    <string name="session_unread">Непрочетени</string>
+    <string name="session_pinned">Закачена</string>
+    <string name="session_unread">Непрочетена</string>
     <string name="session_mute">Заглушаване</string>
-    <string name="session_muted">Заглушени</string>
+    <string name="session_muted">Заглушена</string>
     <string name="session_compact">Компактен</string>
     <string name="session_fork">Разклоняване</string>
     <string name="session_toggle_on_description">Включено</string>
@@ -143,7 +143,7 @@
     <string name="session_shell_showing_last_output">Показват се последните 4 MB</string>
     <string name="session_shell_load_earlier">Зареждане на по-ранния изход</string>
     <string name="session_shell_output_unavailable_title">Изходът е недостъпен</string>
-    <string name="session_shell_output_unavailable_message">Сървърът вече не пази изхода на тази черупка.</string>
+    <string name="session_shell_output_unavailable_message">Сървърът вече не разполага с изхода на тази черупка.</string>
     <string name="session_shell_no_output_yet_title">Все още няма изход</string>
     <string name="session_shell_no_output_title">Няма изход</string>
     <string name="session_shell_no_output_yet_message">Изходът се показва тук, докато командата го извежда.</string>
@@ -189,7 +189,7 @@
     <!-- Background work panel -->
     <plurals name="session_background_work_subagent_count">
         <item quantity="one">%1$d субагент</item>
-        <item quantity="other">%1$d субагента</item>
+        <item quantity="other">%1$d субагенти</item>
     </plurals>
     <plurals name="session_background_work_shell_count">
         <item quantity="one">%1$d черупка</item>
@@ -248,7 +248,7 @@
 
     <!-- Session sheet errors -->
     <string name="session_sheet_rename_failed_title">Неуспешно преименуване на сесията</string>
-    <string name="session_sheet_compact_failed_title">Неуспешно уплътняване на сесията</string>
+    <string name="session_sheet_compact_failed_title">Неуспешно компактиране на сесията</string>
     <string name="session_sheet_fork_failed_title">Неуспешно разклоняване на сесията</string>
     <string name="session_sheet_save_export_failed">Неуспешно запазване на експортирания файл</string>
     <string name="session_sheet_export_failed_title">Неуспешно експортиране на сесията</string>

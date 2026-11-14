@@ -5,7 +5,7 @@
         <item quantity="one">%1$d ቀርቷል</item>
         <item quantity="other">%1$d ቀርተዋል</item>
     </plurals>
-    <string name="drawer_catch_up_leave_description">ከያመለጠዎትን ይዩ ውጣ</string>
+    <string name="drawer_catch_up_leave_description">ከ«ያመለጠዎትን ይዩ» ውጣ</string>
     <string name="drawer_catch_up_keep_unread">ሳይነበብ አቆይ</string>
     <string name="drawer_catch_up_undo">ቀልብስ</string>
     <string name="drawer_catch_up_title">ያመለጠዎትን ይዩ</string>

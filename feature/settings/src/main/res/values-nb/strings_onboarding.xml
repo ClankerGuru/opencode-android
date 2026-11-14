@@ -7,7 +7,7 @@
     <string name="settings_onboarding_other_ways_terminal_header">Kjør dette i en terminal</string>
     <string name="settings_onboarding_other_ways_terminal_footer">Den viser en kode du kan skanne eller en lenke du kan lime inn, og fungerer fra alle nettverk.</string>
     <string name="settings_onboarding_other_ways_paste_link">Lim inn en sammenkoblingslenke</string>
-    <string name="settings_onboarding_other_ways_enter_address">Skriv inn en serveradresse</string>
+    <string name="settings_onboarding_other_ways_enter_address">Skriv inn en server-URL</string>
     <string name="settings_onboarding_other_ways_install_header">Har du ikke OpenCode ennå?</string>
     <string name="settings_onboarding_other_ways_install">Andre måter å installere på</string>
     <string name="settings_onboarding_command_copy_description">Kopier %1$s</string>
@@ -36,7 +36,7 @@
     <string name="settings_onboarding_desktop_composer_placeholder">Spør om hva som helst, / for kommandoer, @ for kontekst…</string>
     <string name="settings_onboarding_desktop_composer_follow_up_placeholder">Følg opp, / for kommandoer, @ for kontekst…</string>
     <string name="settings_onboarding_desktop_back_to_app">Tilbake til appen</string>
-    <string name="settings_onboarding_desktop_pairing_title">Kobler sammen</string>
+    <string name="settings_onboarding_desktop_pairing_title">Sammenkobling</string>
     <string name="settings_onboarding_desktop_pairing_subtitle">Koble en annen enhet til OpenCode-serveren på denne maskinen.</string>
     <string name="settings_onboarding_desktop_pair_device">Koble sammen med en enhet</string>
     <string name="settings_onboarding_desktop_pair_device_message">Skann koden med OpenCode-appen på en annen enhet, eller kopier lenken.</string>
@@ -61,7 +61,7 @@
     <string name="settings_onboarding_headline">OpenCode\noveralt.</string>
     <string name="settings_onboarding_headline_spoken">OpenCode overalt.</string>
     <string name="settings_onboarding_subhead">Start oppgaver, svar på spørsmål og se gjennom endringer når du er borte fra skrivebordet.</string>
-    <string name="settings_onboarding_instruction">Åpne OpenCode på datamaskinen og gå til Innstillinger → Kobler sammen.</string>
+    <string name="settings_onboarding_instruction">Åpne OpenCode på datamaskinen og gå til Innstillinger → Sammenkobling.</string>
 
     <!-- Onboarding: WelcomeStory, the mock conversation (the reply's backticks mark code) -->
     <string name="settings_onboarding_story_prompt">Legg til en nedlastingsknapp for Android og vis meg</string>

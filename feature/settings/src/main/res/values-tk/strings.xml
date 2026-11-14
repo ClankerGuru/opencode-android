@@ -27,7 +27,7 @@
     <string name="settings_models_mode_only_show">Diňe görkez</string>
     <string name="settings_models_mode_hide_footer">Ulanmaýan modelleriňizi öçüriň.</string>
     <string name="settings_models_mode_only_show_footer">Diňe ulanýan modelleriňizi işlediň.</string>
-    <string name="settings_models_providers_header">Ü üpjün edijiler</string>
+    <string name="settings_models_providers_header">Üpjün edijiler</string>
     <string name="settings_models_stale_header">Indi hödürlenmeýär</string>
     <string name="settings_models_forget_unavailable">Elýeterli däl modelleri unut</string>
     <string name="settings_models_show_every_model">Ähli modelleri görkez</string>
@@ -164,7 +164,7 @@
     <string name="settings_connection_status_slow">Haýal</string>
     <string name="settings_connection_status_unstable">Durnuksyz</string>
     <string name="settings_connection_status_reconnecting">Täzeden birikdirilýär</string>
-    <string name="settings_connection_status_offline">Oflayn</string>
+    <string name="settings_connection_status_offline">Oflaýn</string>
     <string name="settings_connection_status_sign_in_failed">Giriş başa barmady</string>
     <string name="settings_connection_status_switching">Çalşylýar</string>
     <string name="settings_connection_status_switching_to">%1$s serwerine geçilýär</string>
@@ -191,7 +191,7 @@
     <string name="settings_servers_header">Serwerler</string>
     <string name="settings_servers_edit_server">%1$s redaktirläň…</string>
     <string name="settings_servers_rename_message">Bu ady diňe şu %1$s ulanýar. Kompýuteriň adyny ulanmak üçin boş goýuň.</string>
-    <string name="settings_servers_remove_title">%1$s aýryl synmy?</string>
+    <string name="settings_servers_remove_title">%1$s aýrylsynmy?</string>
     <string name="settings_servers_remove_message">Bu %1$s üçin saklanan salgy we parol pozular. Serwerdäki sessiýalara täsir etmez.</string>
     <string name="settings_servers_remove_server">Serweri aýyr</string>
     <string name="settings_servers_current_server_state">Häzirki serwer, %1$s</string>

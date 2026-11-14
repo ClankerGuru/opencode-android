@@ -7,22 +7,22 @@
     <string name="server_notice_heading_failed">%1$s — błąd</string>
     <string name="server_notice_heading_interrupted">%1$s — przerwano</string>
     <plurals name="server_notice_count_shell_finished">
-        <item quantity="one">%1$d terminal zakończył pracę</item>
-        <item quantity="few">%1$d terminale zakończyły pracę</item>
-        <item quantity="many">%1$d terminali zakończyło pracę</item>
-        <item quantity="other">%1$d terminala zakończyło pracę</item>
+        <item quantity="one">%1$d terminal — zakończono</item>
+        <item quantity="few">%1$d terminale — zakończono</item>
+        <item quantity="many">%1$d terminali — zakończono</item>
+        <item quantity="other">%1$d terminala — zakończono</item>
     </plurals>
     <plurals name="server_notice_count_shell_failed">
-        <item quantity="one">%1$d terminal zakończył się błędem</item>
-        <item quantity="few">%1$d terminale zakończyły się błędem</item>
-        <item quantity="many">%1$d terminali zakończyło się błędem</item>
-        <item quantity="other">%1$d terminala zakończyło się błędem</item>
+        <item quantity="one">%1$d terminal — błąd</item>
+        <item quantity="few">%1$d terminale — błąd</item>
+        <item quantity="many">%1$d terminali — błąd</item>
+        <item quantity="other">%1$d terminala — błąd</item>
     </plurals>
     <plurals name="server_notice_count_shell_interrupted">
-        <item quantity="one">Przerwano %1$d terminal</item>
-        <item quantity="few">Przerwano %1$d terminale</item>
-        <item quantity="many">Przerwano %1$d terminali</item>
-        <item quantity="other">Przerwano %1$d terminala</item>
+        <item quantity="one">%1$d terminal — przerwano</item>
+        <item quantity="few">%1$d terminale — przerwano</item>
+        <item quantity="many">%1$d terminali — przerwano</item>
+        <item quantity="other">%1$d terminala — przerwano</item>
     </plurals>
     <plurals name="server_notice_count_subagent_finished">
         <item quantity="one">%1$d podagent zakończył pracę</item>

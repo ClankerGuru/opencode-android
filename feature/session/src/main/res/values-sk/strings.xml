@@ -3,12 +3,12 @@
     <!-- Agent activity glyph -->
     <string name="session_activity_running_description">Prebieha</string>
     <!-- Background work panel -->
-    <string name="session_background_work_show_label">Zobraziť spustené subagenty a škrupiny</string>
+    <string name="session_background_work_show_label">Zobraziť spustené subagenty a shelly</string>
     <string name="session_background_work_collapsed_description">Zbalené</string>
     <string name="session_background_work_subagents_title">Subagenty</string>
     <string name="session_background_work_open_subagent_label">Otvoriť reláciu subagenta</string>
-    <string name="session_background_work_shells_title">Škrupiny</string>
-    <string name="session_background_work_show_shell_label">Zobraziť výstup škrupiny</string>
+    <string name="session_background_work_shells_title">Shelly</string>
+    <string name="session_background_work_show_shell_label">Zobraziť výstup shellu</string>
     <!-- Jump to latest -->
     <string name="session_scroll_to_latest_description">Prejsť na najnovšie</string>
     <!-- Dictation bar -->
@@ -138,16 +138,16 @@
     <string name="session_photo_sheet_full_description">Celá obrazovka</string>
     <string name="session_photo_sheet_half_description">Polovica obrazovky</string>
     <!-- Shell output -->
-    <string name="session_shell_stop_confirm_title">Zastaviť túto škrupinu?</string>
+    <string name="session_shell_stop_confirm_title">Zastaviť tento shell?</string>
     <string name="session_shell_stop_confirm_message">Príkaz sa hneď ukončí. Zobrazený výstup tu zostane, kým ho nezavriete.</string>
-    <string name="session_shell_stop">Zastaviť škrupinu</string>
+    <string name="session_shell_stop">Zastaviť shell</string>
     <string name="session_shell_copy_output">Kopírovať výstup</string>
     <string name="session_shell_share_output">Zdieľať výstup</string>
     <string name="session_shell_earlier_output_hidden">Starší výstup je skrytý</string>
     <string name="session_shell_showing_last_output">Zobrazujú sa posledné 4 MB</string>
     <string name="session_shell_load_earlier">Načítať starší výstup</string>
     <string name="session_shell_output_unavailable_title">Výstup nie je dostupný</string>
-    <string name="session_shell_output_unavailable_message">Server už nemá výstup tejto škrupiny.</string>
+    <string name="session_shell_output_unavailable_message">Server už nemá výstup tohto shellu.</string>
     <string name="session_shell_no_output_yet_title">Zatiaľ žiadny výstup</string>
     <string name="session_shell_no_output_title">Žiadny výstup</string>
     <string name="session_shell_no_output_yet_message">Výstup sa tu zobrazuje priebežne počas behu príkazu.</string>
@@ -177,7 +177,7 @@
     </plurals>
 
     <!-- Agent activity (glyph labels and titles) -->
-    <string name="session_activity_idle">Nečinná</string>
+    <string name="session_activity_idle">Nečinný</string>
     <string name="session_activity_starting_up">Spúšťanie</string>
     <string name="session_activity_thinking">Premýšľanie</string>
     <string name="session_activity_long_work">Dlhšia práca</string>
@@ -204,10 +204,10 @@
         <item quantity="other">%1$d subagentov</item>
     </plurals>
     <plurals name="session_background_work_shell_count">
-        <item quantity="one">%1$d škrupina</item>
-        <item quantity="few">%1$d škrupiny</item>
-        <item quantity="many">%1$d škrupiny</item>
-        <item quantity="other">%1$d škrupín</item>
+        <item quantity="one">%1$d shell</item>
+        <item quantity="few">%1$d shelly</item>
+        <item quantity="many">%1$d shellu</item>
+        <item quantity="other">%1$d shellov</item>
     </plurals>
     <string name="session_background_work_summary">%1$s · %2$s</string>
 

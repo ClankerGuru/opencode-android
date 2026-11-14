@@ -214,5 +214,5 @@
     <string name="settings_pairing_nothing_to_paste_message">क्लिपबोर्ड में पेयरिंग लिंक नहीं है। opencode pair से दिखने वाला लिंक कॉपी करें, फिर से कोशिश करें।</string>
     <string name="settings_pairing_point_camera">कैमरा QR कोड की ओर करें</string>
     <string name="settings_pairing_paste_link">पेयरिंग लिंक पेस्ट करें</string>
-    <string name="settings_pairing_computer_hint">कंप्यूटर पर OpenCode की सेटिंग्स → पेयर हो रहा है खोलें, या टर्मिनल में %1$s चलाएँ।</string>
+    <string name="settings_pairing_computer_hint">कंप्यूटर पर OpenCode की सेटिंग्स → पेयरिंग खोलें, या टर्मिनल में %1$s चलाएँ।</string>
 </resources>

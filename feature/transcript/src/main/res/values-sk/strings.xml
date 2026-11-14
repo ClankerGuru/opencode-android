@@ -49,7 +49,7 @@
     <string name="transcript_reply_copy_description">Kopírovať odpoveď</string>
 
     <!-- Run errors and undo -->
-    <string name="transcript_run_error_copy">Kopírovať chybu</string>
+    <string name="transcript_run_error_copy">Chyba kopírovania</string>
     <string name="transcript_undone_undo_hint">Akciu môžete vziať späť, kým neodošlete novú správu</string>
     <string name="transcript_undone_title">Zmeny odtiaľto boli vrátené</string>
     <string name="transcript_undone_undo_click_label">Obnoviť vrátené správy a súbory, kým neodošlete novú správu</string>

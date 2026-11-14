@@ -82,7 +82,7 @@
     <string name="composer_request_summary_hide_action">विवरण लुकाउनुहोस्</string>
     <string name="composer_request_summary_show_command_action">पूरा आदेश देखाउनुहोस्</string>
     <string name="composer_request_summary_show_details_action">पूरा विवरण देखाउनुहोस्</string>
-    <string name="composer_request_show_scope_action">केका लागि फेरि सोधिने छैन हेर्नुहोस्</string>
+    <string name="composer_request_show_scope_action">केका लागि फेरि सोधिने छैन देखाउनुहोस्</string>
     <string name="composer_request_allow_once">एक पटक अनुमति दिनुहोस्</string>
     <string name="composer_request_sending_description">पठाउँदै</string>
 

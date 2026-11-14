@@ -252,7 +252,7 @@
 
     <!-- 2026-10-14-01-settings-grouped-by-purpose -->
     <string name="settings_whatsnew_entry_settings_grouped_by_purpose_title">設定をわかりやすく</string>
-    <string name="settings_whatsnew_entry_settings_grouped_by_purpose_summary">実験的な機能や開発者ツールは「設定 → 実験的」に、アプリ内のお知らせは「通知」に、通話履歴は「声」にまとまりました。</string>
+    <string name="settings_whatsnew_entry_settings_grouped_by_purpose_summary">実験的な機能や開発者ツールは「設定 → 実験的」に、アプリ内のお知らせは「通知」に、通話履歴は「音声」にまとまりました。</string>
 
     <!-- 2026-10-14-02-send-ats-recovery -->
     <string name="settings_whatsnew_entry_send_ats_recovery_title">送信の信頼性を向上</string>
@@ -461,7 +461,7 @@
 
     <!-- 2026-10-20-07-voice-delegation-visible-on-admission -->
     <string name="settings_whatsnew_entry_voice_delegation_visible_on_admission_title">音声メッセージをすぐに表示</string>
-    <string name="settings_whatsnew_entry_voice_delegation_visible_on_admission_summary">「声」がセッションに送ったメッセージは、セッションの更新が遅れていても、サーバーが受け付けるとすぐに表示されます。</string>
+    <string name="settings_whatsnew_entry_voice_delegation_visible_on_admission_summary">Voiceがセッションに送ったメッセージは、セッションの更新が遅れていても、サーバーが受け付けるとすぐに表示されます。</string>
 
     <!-- 2026-10-20-08-inline-image-links -->
     <string name="settings_whatsnew_entry_inline_image_links_title">画像リンクのプレビュー</string>
@@ -782,7 +782,7 @@
 
     <!-- 2026-11-01-03-open-links-from-calls -->
     <string name="settings_whatsnew_entry_open_links_from_calls_title">通話からリンクを開く</string>
-    <string name="settings_whatsnew_entry_open_links_from_calls_summary">設定 › 実験的 › 通話で「通話からリンクを開く」をオンにすると、通話中にエージェントがUberの配車などのリンクを提案できます。「オープン」で対応するアプリを開くか、「今はしない」を選べます。</string>
+    <string name="settings_whatsnew_entry_open_links_from_calls_summary">設定 › 実験的 › 通話で「通話からリンクを開く」をオンにすると、通話中にエージェントがUberの配車などのリンクを提案できます。「開く」で対応するアプリを開くか、「今はしない」を選べます。</string>
 
     <!-- 2026-11-02-01-fold-questions -->
     <string name="settings_whatsnew_entry_fold_questions_title">質問を折りたたんですっきり</string>
@@ -825,7 +825,7 @@
     <!-- 2026-11-04-01-call-links-and-audio -->
     <string name="settings_whatsnew_entry_call_links_and_audio_title">通話中のリンクと音声</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_summary">通話からリンクを開く機能と通話中の音声再生が、全員に有効になりました。切り替えスイッチはありません。</string>
-    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">通話中にエージェントがUberの配車などのリンクを提案できます。「オープン」で対応アプリを開くか、「今はしない」を選べます。</string>
+    <string name="settings_whatsnew_entry_call_links_and_audio_detail_1">通話中にエージェントがUberの配車などのリンクを提案できます。「開く」で対応アプリを開くか、「今はしない」を選べます。</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_detail_2">通話中にエージェントが音楽やクリップを再生できます。どちらかが話すと音量が下がります。入力欄の上で一時停止や停止ができます。</string>
     <string name="settings_whatsnew_entry_call_links_and_audio_example">通話中に、エージェントに音楽をかけてと頼んでみよう</string>
 
@@ -878,7 +878,7 @@
     <string name="settings_whatsnew_entry_server_voice_detail_2">スマホとサーバーの両方にOpenAIキーがある場合、サーバーのキーを使うようになりました。スマホのキーを使い続けるには、「音声プロバイダー」で「自分のOpenAIアカウント」を開き、「通話に使用」をタップしてください。</string>
     <string name="settings_whatsnew_entry_server_voice_detail_3">Geminiのキーがあるサーバーでは、Gemini Liveもプロバイダーとして使えるようになりました。</string>
     <string name="settings_whatsnew_entry_server_voice_detail_4">通話を開始できない場合は、理由と解決用のボタンを表示します。</string>
-    <string name="settings_whatsnew_entry_server_voice_example">「設定 › 声」を開き、「音声プロバイダー」をタップしてみよう</string>
+    <string name="settings_whatsnew_entry_server_voice_example">「設定 › 音声」を開き、「音声プロバイダー」をタップしてみよう</string>
 
     <!-- 2026-11-07-02-rename-clear-button -->
     <string name="settings_whatsnew_entry_rename_clear_button_title">ワンタップでタイトルを消去</string>

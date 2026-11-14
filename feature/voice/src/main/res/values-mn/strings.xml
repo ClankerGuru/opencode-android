@@ -18,8 +18,8 @@
     <!-- Floating call stage -->
     <string name="voice_stage_talking_in">Ярилцаж буй сесс</string>
     <string name="voice_stage_minimize_description">Багасгах</string>
-    <string name="voice_mute">Мэдэгдлийг хаах</string>
-    <string name="voice_unmute">Мэдэгдлийг нээх</string>
+    <string name="voice_mute">Дууг хаах</string>
+    <string name="voice_unmute">Дууг нээх</string>
     <string name="voice_stage_pause">Түр зогсоох</string>
     <string name="voice_stage_camera">Камер</string>
     <string name="voice_transcript_empty">Сессдээ ямар нэг зүйл хэлээрэй.</string>
@@ -75,7 +75,7 @@
     <string name="voice_status_needs_input">Таны хариу хэрэгтэй</string>
     <string name="voice_status_working">Ажиллаж байна</string>
     <string name="voice_status_speaking">Ярьж байна</string>
-    <string name="voice_status_muted">Мэдэгдлийг хаасан</string>
+    <string name="voice_status_muted">Дууг хаасан</string>
     <string name="voice_status_listening">Сонсож байна</string>
     <string name="voice_status_ending">Дуусгаж байна…</string>
     <string name="voice_status_ended">Дууссан</string>

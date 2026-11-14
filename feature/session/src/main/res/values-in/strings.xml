@@ -3,12 +3,12 @@
     <!-- Agent activity glyph -->
     <string name="session_activity_running_description">Berjalan</string>
     <!-- Background work panel -->
-    <string name="session_background_work_show_label">Tampilkan subagen dan kerang yang berjalan</string>
+    <string name="session_background_work_show_label">Tampilkan subagen dan shell yang berjalan</string>
     <string name="session_background_work_collapsed_description">Diciutkan</string>
     <string name="session_background_work_subagents_title">Subagen</string>
     <string name="session_background_work_open_subagent_label">Buka sesi subagen</string>
-    <string name="session_background_work_shells_title">Kerang</string>
-    <string name="session_background_work_show_shell_label">Tampilkan keluaran kerang</string>
+    <string name="session_background_work_shells_title">Shell</string>
+    <string name="session_background_work_show_shell_label">Tampilkan keluaran shell</string>
     <!-- Jump to latest -->
     <string name="session_scroll_to_latest_description">Gulir ke pesan terbaru</string>
     <!-- Dictation bar -->
@@ -132,16 +132,16 @@
     <string name="session_photo_sheet_full_description">Penuh</string>
     <string name="session_photo_sheet_half_description">Setengah</string>
     <!-- Shell output -->
-    <string name="session_shell_stop_confirm_title">Hentikan kerang ini?</string>
+    <string name="session_shell_stop_confirm_title">Hentikan shell ini?</string>
     <string name="session_shell_stop_confirm_message">Perintah akan langsung dihentikan. Keluaran di sini tetap ada hingga Anda menutupnya.</string>
-    <string name="session_shell_stop">Hentikan kerang</string>
+    <string name="session_shell_stop">Hentikan shell</string>
     <string name="session_shell_copy_output">Salin keluaran</string>
     <string name="session_shell_share_output">Bagikan keluaran</string>
     <string name="session_shell_earlier_output_hidden">Keluaran sebelumnya disembunyikan</string>
     <string name="session_shell_showing_last_output">Menampilkan 4 MB terakhir</string>
     <string name="session_shell_load_earlier">Muat sebelumnya</string>
     <string name="session_shell_output_unavailable_title">Keluaran tidak tersedia</string>
-    <string name="session_shell_output_unavailable_message">Server tidak lagi menyimpan keluaran kerang ini.</string>
+    <string name="session_shell_output_unavailable_message">Server tidak lagi menyimpan keluaran shell ini.</string>
     <string name="session_shell_no_output_yet_title">Belum ada keluaran</string>
     <string name="session_shell_no_output_title">Tidak ada keluaran</string>
     <string name="session_shell_no_output_yet_message">Keluaran muncul di sini saat dihasilkan oleh perintah.</string>
@@ -186,7 +186,7 @@
         <item quantity="other">%1$d subagen</item>
     </plurals>
     <plurals name="session_background_work_shell_count">
-        <item quantity="other">%1$d kerang</item>
+        <item quantity="other">%1$d shell</item>
     </plurals>
     <string name="session_background_work_summary">%1$s · %2$s</string>
 

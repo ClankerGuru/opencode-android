@@ -97,7 +97,7 @@
     <string name="drawer_server_manage">Serwerleri dolandyryň…</string>
     <string name="drawer_server_reconnecting_state">Täzeden birikdirilýär</string>
     <string name="drawer_server_sign_in_failed">Giriş başa barmady</string>
-    <string name="drawer_server_offline">Oflayn</string>
+    <string name="drawer_server_offline">Oflaýn</string>
     <string name="drawer_server_connecting_to_state">%1$s bilen birikdirilýär</string>
     <string name="drawer_server_show_servers_hint">Serwerleriňizi görkez</string>
     <string name="drawer_server_offer_edit_hint">Serweri redaktirlemegi teklip et</string>

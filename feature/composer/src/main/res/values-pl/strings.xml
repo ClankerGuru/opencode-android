@@ -6,7 +6,7 @@
     <string name="composer_agent_section_title">Agent</string>
     <string name="composer_agent_server_default">Domyślny serwera</string>
     <string name="composer_agent_default_title">Domyślny agent</string>
-    <string name="composer_agent_default_footer">Nowe sesje zaczynają z tym agentem. Każda sesja zapamiętuje twój wybór.</string>
+    <string name="composer_agent_default_footer">Nowe sesje zaczynają się z tym agentem. Każda sesja zapamiętuje twój wybór.</string>
 
     <!-- Camera -->
     <string name="composer_camera_viewfinder_description">Wizjer</string>

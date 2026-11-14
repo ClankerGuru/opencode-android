@@ -89,7 +89,7 @@
 
     <!-- New messages rule -->
     <string name="transcript_new_messages_description">Nowe wiadomości</string>
-    <string name="transcript_new_messages_label">Nowość</string>
+    <string name="transcript_new_messages_label">Nowe</string>
 
     <!-- Media tiles -->
     <string name="transcript_attached_image_open_description">Otwórz załączony obraz</string>

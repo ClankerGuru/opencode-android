@@ -9,7 +9,7 @@
     <string name="drawer_catch_up_undo">Urungkan</string>
     <string name="drawer_catch_up_title">Tinjau pembaruan</string>
     <string name="drawer_catch_up_all_caught_up">Semua sudah ditinjau</string>
-    <string name="drawer_catch_up_swipe_mark_read">Tandai sudah\n dibaca</string>
+    <string name="drawer_catch_up_swipe_mark_read">Tandai sudah\ndibaca</string>
     <string name="drawer_catch_up_swipe_keep_unread">Tetap\nbelum dibaca</string>
 
     <!-- Drawer container -->

@@ -36,7 +36,7 @@
     <string name="settings_onboarding_desktop_composer_placeholder">Pregunta lo que quieras, / para comandos, @ para contexto…</string>
     <string name="settings_onboarding_desktop_composer_follow_up_placeholder">Añade algo más, / para comandos, @ para contexto…</string>
     <string name="settings_onboarding_desktop_back_to_app">Volver a la aplicación</string>
-    <string name="settings_onboarding_desktop_pairing_title">Emparejando</string>
+    <string name="settings_onboarding_desktop_pairing_title">Emparejamiento</string>
     <string name="settings_onboarding_desktop_pairing_subtitle">Conecta otro dispositivo al servidor de OpenCode de este equipo.</string>
     <string name="settings_onboarding_desktop_pair_device">Emparejar un dispositivo</string>
     <string name="settings_onboarding_desktop_pair_device_message">Escanea el código con la aplicación OpenCode en otro dispositivo o copia el enlace.</string>
@@ -61,7 +61,7 @@
     <string name="settings_onboarding_headline">OpenCode\ndonde quieras.</string>
     <string name="settings_onboarding_headline_spoken">OpenCode donde quieras.</string>
     <string name="settings_onboarding_subhead">Inicia tareas, responde preguntas y revisa cambios sin estar en tu escritorio.</string>
-    <string name="settings_onboarding_instruction">En tu ordenador, abre OpenCode y ve a Ajustes → Emparejando.</string>
+    <string name="settings_onboarding_instruction">En tu ordenador, abre OpenCode y ve a Ajustes → Emparejamiento.</string>
 
     <!-- Onboarding: WelcomeStory, the mock conversation (the reply's backticks mark code) -->
     <string name="settings_onboarding_story_prompt">Añade un botón de descarga para Android y enséñamelo</string>

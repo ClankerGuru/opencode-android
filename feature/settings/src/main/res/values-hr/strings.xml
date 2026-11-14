@@ -62,7 +62,7 @@
     <string name="settings_notifications_in_app_notices">Obavijesti u aplikaciji</string>
 
     <!-- Sessions -->
-    <string name="settings_sessions_title">Sesije</string>
+    <string name="settings_sessions_title">Sjednice</string>
     <string name="settings_sessions_composer_header">Unos poruke</string>
     <string name="settings_sessions_return_key_sends">Tipka Enter šalje poruku</string>
     <string name="settings_sessions_new_sessions_header">Nove sesije</string>

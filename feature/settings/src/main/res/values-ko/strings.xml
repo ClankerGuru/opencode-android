@@ -57,7 +57,7 @@
     <string name="settings_notifications_set_up">OpenCode로 설정</string>
     <string name="settings_notifications_check_again">다시 확인</string>
     <string name="settings_notifications_in_app_footer">탐색 패널 버튼에 표시돼요.</string>
-    <string name="settings_notifications_in_app_notices">앱 내 알림</string>
+    <string name="settings_notifications_in_app_notices">앱 내 공지사항</string>
 
     <!-- Sessions -->
     <string name="settings_sessions_title">세션</string>

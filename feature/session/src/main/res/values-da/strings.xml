@@ -46,7 +46,7 @@
     <string name="session_rename_title">Omdøb session</string>
     <string name="session_untitled_title">Session</string>
     <string name="session_pin">Fastgør</string>
-    <string name="session_pinned">Fastgjorte</string>
+    <string name="session_pinned">Fastgjort</string>
     <string name="session_unread">Ulæst</string>
     <string name="session_mute">Slå notifikationer fra</string>
     <string name="session_muted">Lydløs</string>
@@ -143,7 +143,7 @@
     <string name="session_shell_showing_last_output">Viser de sidste 4 MB</string>
     <string name="session_shell_load_earlier">Indlæs tidligere</string>
     <string name="session_shell_output_unavailable_title">Output er ikke tilgængeligt</string>
-    <string name="session_shell_output_unavailable_message">Serveren har ikke længere output fra denne shell.</string>
+    <string name="session_shell_output_unavailable_message">Serveren har ikke længere denne shells output.</string>
     <string name="session_shell_no_output_yet_title">Intet output endnu</string>
     <string name="session_shell_no_output_title">Intet output</string>
     <string name="session_shell_no_output_yet_message">Output vises her, efterhånden som kommandoen skriver det.</string>

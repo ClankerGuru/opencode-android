@@ -119,7 +119,7 @@
     <string name="drawer_open_in_new_window">Åpne i nytt vindu</string>
 
     <!-- Session row state for TalkBack -->
-    <string name="drawer_row_pinned_state">Festede</string>
+    <string name="drawer_row_pinned_state">Festet</string>
     <string name="drawer_row_muted_state">Dempet</string>
     <string name="drawer_row_needs_input_state">Trenger svar fra deg</string>
     <string name="drawer_row_working_state">Arbeider</string>

@@ -45,7 +45,7 @@
 
     <!-- Live Updates: voice call -->
     <string name="system_call_muted">Silenciada</string>
-    <string name="system_call_unmute">Reativar notificações</string>
+    <string name="system_call_unmute">Reativar som</string>
     <string name="system_call_mute">Silenciar</string>
     <string name="system_call_end">Encerrar chamada</string>
     <string name="system_call_connecting">Conectando…</string>

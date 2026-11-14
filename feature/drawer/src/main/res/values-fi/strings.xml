@@ -119,11 +119,11 @@
     <string name="drawer_open_in_new_window">Avaa uudessa ikkunassa</string>
 
     <!-- Session row state for TalkBack -->
-    <string name="drawer_row_pinned_state">Kiinnitetyt</string>
+    <string name="drawer_row_pinned_state">Kiinnitetty</string>
     <string name="drawer_row_muted_state">Mykistetty</string>
     <string name="drawer_row_needs_input_state">Sinua tarvitaan</string>
     <string name="drawer_row_working_state">Työskennellään</string>
-    <string name="drawer_row_unread_state">Lukemattomat</string>
+    <string name="drawer_row_unread_state">Lukematon</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Luvan pyytäminen epäonnistui. Yritä uudelleen.</string>

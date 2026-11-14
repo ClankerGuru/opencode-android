@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- RunNotices.kt: background shell and subagent notices -->
-    <string name="server_notice_source_shell">ཤལ།</string>
+    <string name="server_notice_source_shell">Shell</string>
     <string name="server_notice_source_subagent">ཡན་ལག་ལས་ཚབ།</string>
     <string name="server_notice_heading_finished">%1$s མཇུག་བསྡུ་ཡོདཔ།</string>
     <string name="server_notice_heading_failed">%1$s མཐར་མ་འཁྱོལ་བ།</string>
@@ -13,7 +13,7 @@
         <item quantity="other">ཤལ་ %1$d མཐར་མ་འཁྱོལ་བ།</item>
     </plurals>
     <plurals name="server_notice_count_shell_interrupted">
-        <item quantity="other">ཤལ་ %1$d ལུ་བར་ཆད་བྱུང་ཡོདཔ།</item>
+        <item quantity="other">ཤལ་ %1$d བར་ཆད་བྱུང་ཡོདཔ།</item>
     </plurals>
     <plurals name="server_notice_count_subagent_finished">
         <item quantity="other">ཡན་ལག་ལས་ཚབ་ %1$d མཇུག་བསྡུ་ཡོདཔ།</item>
@@ -60,8 +60,8 @@
     <string name="server_session_title_untitled">མགོ་མིང་མེད་པའི་ལཱ་ཡུན།</string>
 
     <!-- OpenCodeToolCall.kt, LiveTranscript.kt -->
-    <string name="server_tool_shell">ཤལ།</string>
-    <string name="server_tool_shell_killed">ཤལ་བཙན་ཤེད་ཀྱིས་བཀག་ཡོདཔ།</string>
+    <string name="server_tool_shell">Shell</string>
+    <string name="server_tool_shell_killed">Shell བཙན་ཤེད་ཀྱིས་བཀག་ཡོདཔ།</string>
     <string name="server_tool_shell_exit_code">བརྡ་བཀོད་འདི་ཕྱིར་ཐོན་ཨང་ %1$d དང་བཅས་མཇུག་བསྡུ་ཡོདཔ།</string>
     <string name="server_notice_session_update">ལཱ་ཡུན་གྱི་དུས་མཐུན།</string>
 
@@ -172,7 +172,7 @@
     <plurals name="server_form_max_items">
         <item quantity="other">%1$d ལས་ལྷག་སྟེ་མ་གདམ།</item>
     </plurals>
-    <string name="server_form_invalid_value">བེ་ལུ་ནུས་མེད།</string>
+    <string name="server_form_invalid_value">གནས་གོང་ནུས་མེད།</string>
 
     <!-- ModelVisibility.kt -->
     <string name="server_model_visibility_hide">སེལ་འཐུ་འབད་མི་ཚུ་སྦ་བཞག</string>

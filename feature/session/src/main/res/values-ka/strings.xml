@@ -3,7 +3,7 @@
     <!-- Agent activity glyph -->
     <string name="session_activity_running_description">მიმდინარეობს</string>
     <!-- Background work panel -->
-    <string name="session_background_work_show_label">მომუშავე ქვეაგენტებისა და გარსების ჩვენება</string>
+    <string name="session_background_work_show_label">მოქმედი ქვეაგენტებისა და გარსების ჩვენება</string>
     <string name="session_background_work_collapsed_description">ჩაკეცილი</string>
     <string name="session_background_work_subagents_title">ქვეაგენტები</string>
     <string name="session_background_work_open_subagent_label">ქვეაგენტის სესიის გახსნა</string>

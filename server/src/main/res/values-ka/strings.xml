@@ -11,12 +11,12 @@
         <item quantity="other">%1$d გარსი დასრულდა</item>
     </plurals>
     <plurals name="server_notice_count_shell_failed">
-        <item quantity="one">%1$d გარსი შეცდომით დასრულდა</item>
-        <item quantity="other">%1$d გარსი შეცდომით დასრულდა</item>
+        <item quantity="one">%1$d გარსის მუშაობა ვერ შედგა</item>
+        <item quantity="other">%1$d გარსის მუშაობა ვერ შედგა</item>
     </plurals>
     <plurals name="server_notice_count_shell_interrupted">
-        <item quantity="one">%1$d გარსი შეწყდა</item>
-        <item quantity="other">%1$d გარსი შეწყდა</item>
+        <item quantity="one">%1$d გარსი შეწყვეტილია</item>
+        <item quantity="other">%1$d გარსი შეწყვეტილია</item>
     </plurals>
     <plurals name="server_notice_count_subagent_finished">
         <item quantity="one">%1$d ქვეაგენტმა მუშაობა დაასრულა</item>
@@ -46,7 +46,7 @@
     <string name="server_run_error_internal">პროვაიდერთან პრობლემა შეიქმნა</string>
     <string name="server_run_error_transport">მოდელთან კავშირი გაწყდა</string>
     <string name="server_run_error_timeout">მოდელის პასუხის ლოდინის დრო ამოიწურა</string>
-    <string name="server_run_error_invalid_output">მოდელის პასუხი ვერ წაიკითხა</string>
+    <string name="server_run_error_invalid_output">მოდელის პასუხის წაკითხვა ვერ მოხერხდა</string>
     <string name="server_run_error_unavailable">ეს მოდელი მიუწვდომელია</string>
     <string name="server_run_error_unsupported_operation">ამ მოდელს ეს არ შეუძლია</string>
     <string name="server_run_error_tool_execution">ხელსაწყოს შეცდომის გამო მუშაობა შეწყდა</string>

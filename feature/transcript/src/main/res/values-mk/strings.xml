@@ -35,7 +35,7 @@
     <string name="transcript_image_open_description">Отвори слика</string>
     <string name="transcript_image_load_failed">Сликата не се вчита</string>
     <string name="transcript_image_retry_click_label">Обиди се повторно</string>
-    <string name="transcript_image_open">Отворено</string>
+    <string name="transcript_image_open">Отвори</string>
 
     <!-- Math -->
     <string name="transcript_equation_description">Равенка</string>
@@ -77,7 +77,7 @@
     <!-- Compaction -->
     <string name="transcript_compaction_running">Се компактира контекстот</string>
     <string name="transcript_compaction_provider">Компактирање од провајдерот</string>
-    <string name="transcript_compaction_completed">Контекстот е набиен</string>
+    <string name="transcript_compaction_completed">Контекстот е компактиран</string>
     <string name="transcript_compaction_cancelled">Компактирањето е откажано</string>
     <string name="transcript_compaction_failed">Компактирањето не успеа</string>
     <string name="transcript_compaction_usage">%1$s влез · %2$s излез</string>

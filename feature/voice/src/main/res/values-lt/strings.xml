@@ -2,7 +2,7 @@
 <resources>
     <!-- Call ended and failure cards -->
     <string name="voice_call_ended_title">Skambutis baigtas</string>
-    <string name="voice_call_ended_rejoin">Prisijungti vėl</string>
+    <string name="voice_call_ended_rejoin">Prisijungti iš naujo</string>
     <string name="voice_failure_title">Nepavyko prijungti balso</string>
     <string name="voice_failure_check_api_key">Patikrinti API raktą</string>
     <string name="voice_failure_start_title">Nepavyko pradėti skambučio</string>

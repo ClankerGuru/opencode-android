@@ -7,7 +7,7 @@
     <string name="settings_onboarding_other_ways_terminal_header">Pokreni ovo u terminalu</string>
     <string name="settings_onboarding_other_ways_terminal_footer">Prikazuje kod za skeniranje ili link za lijepljenje i radi s bilo koje mreže.</string>
     <string name="settings_onboarding_other_ways_paste_link">Zalijepi link za uparivanje</string>
-    <string name="settings_onboarding_other_ways_enter_address">Unesi adresu servera</string>
+    <string name="settings_onboarding_other_ways_enter_address">Unesi URL servera</string>
     <string name="settings_onboarding_other_ways_install_header">Još nemaš OpenCode?</string>
     <string name="settings_onboarding_other_ways_install">Drugi načini instalacije</string>
     <string name="settings_onboarding_command_copy_description">Kopiraj %1$s</string>

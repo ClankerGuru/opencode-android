@@ -45,7 +45,7 @@
     <string name="app_server_form_name">ስም</string>
     <string name="app_server_form_address">የአገልጋይ አድራሻ</string>
     <string name="app_server_form_username">የተጠቃሚ ስም</string>
-    <string name="app_server_form_password">የይለፍ ቃል</string>
+    <string name="app_server_form_password">የይለፍ ቃል (አማራጭ)</string>
     <string name="app_server_form_hide_password_description">የይለፍ ቃል ደብቅ</string>
     <string name="app_server_form_show_password_description">የይለፍ ቃል አሳይ</string>
     <string name="app_server_form_connect">አገናኝ</string>

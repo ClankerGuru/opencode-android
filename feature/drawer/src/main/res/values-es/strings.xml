@@ -123,7 +123,7 @@
     <string name="drawer_open_in_new_window">Abrir en una ventana nueva</string>
 
     <!-- Session row state for TalkBack -->
-    <string name="drawer_row_pinned_state">Fijadas</string>
+    <string name="drawer_row_pinned_state">Fijada</string>
     <string name="drawer_row_muted_state">Silenciada</string>
     <string name="drawer_row_needs_input_state">Necesita tu respuesta</string>
     <string name="drawer_row_working_state">Trabajando</string>

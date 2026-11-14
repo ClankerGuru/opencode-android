@@ -135,7 +135,7 @@
     <string name="system_share_sending_description">Se trimite</string>
     <string name="system_share_sent_description">Trimis</string>
     <string name="system_share_sessions_title">Sesiuni</string>
-    <string name="system_share_pinned_header">Fixată</string>
+    <string name="system_share_pinned_header">Fixate</string>
     <string name="system_share_recents_header">Recente</string>
 
     <!-- Widget configuration -->

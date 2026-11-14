@@ -160,7 +160,7 @@
 
     <!-- 2026-10-12-05-run-error-line -->
     <string name="settings_whatsnew_entry_run_error_line_title">Quando uma execução falha</string>
-    <string name="settings_whatsnew_entry_run_error_line_summary">Se uma execução parar antes de terminar, o motivo aparece em palavras simples, com uma opção para continuar: Editar, Compactar, Trocar modelo ou Tentar novamente.</string>
+    <string name="settings_whatsnew_entry_run_error_line_summary">Se uma execução parar antes de terminar, o motivo aparece em palavras simples, com uma opção para continuar: Editar, Compacto, Trocar modelo ou Tentar novamente.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_1">Editar desfaz o envio da mensagem e a coloca de volta no campo para você reformular.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_2">Mantenha a linha pressionada para ver o erro completo e copiá-lo.</string>
     <string name="settings_whatsnew_entry_run_error_line_detail_3">Quando o agente vai tentar novamente sozinho, Trabalhando mostra a contagem regressiva para a próxima tentativa.</string>
@@ -184,7 +184,7 @@
     <string name="settings_whatsnew_entry_app_icon_badge_summary">O ícone do app mostra quantas sessões estão não lidas ou aguardando você, a mesma contagem de Fique em dia.</string>
     <string name="settings_whatsnew_entry_app_icon_badge_detail_1">Sessões silenciadas não entram na contagem.</string>
     <string name="settings_whatsnew_entry_app_icon_badge_detail_2">As notificações precisam estar ativadas.</string>
-    <string name="settings_whatsnew_entry_app_icon_badge_example">Deixe uma sessão aguardando uma resposta e vá para a tela inicial</string>
+    <string name="settings_whatsnew_entry_app_icon_badge_example">Deixe uma sessão aguardando uma pergunta e vá para a tela inicial</string>
 
     <!-- 2026-10-12-09-drawer-keeps-keyboard -->
     <string name="settings_whatsnew_entry_drawer_keeps_keyboard_title">O teclado desliza com o painel lateral</string>
@@ -579,7 +579,7 @@
 
     <!-- 2026-10-22-01-whats-new-actions -->
     <string name="settings_whatsnew_entry_whats_new_actions_title">Abra e experimente pelas Novidades</string>
-    <string name="settings_whatsnew_entry_whats_new_actions_summary">Cada item em Novidades tem um botão que abre sua configuração, como Temas, ou inicia uma sessão com um pedido já preenchido para você experimentar.</string>
+    <string name="settings_whatsnew_entry_whats_new_actions_summary">Cada item em Novidades tem um botão que abre sua configuração, como Temas, ou inicia uma nova sessão com um pedido já preenchido para você experimentar.</string>
 
     <!-- 2026-10-22-02-project-icons-current-discovery -->
     <string name="settings_whatsnew_entry_project_icons_current_discovery_title">Correções nos ícones dos projetos</string>
@@ -807,7 +807,7 @@
     <string name="settings_whatsnew_entry_all_experiments_example">Abra Configurações › Experimental e ative Todos os experimentos</string>
 
     <!-- 2026-11-03-01-search-all-sessions -->
-    <string name="settings_whatsnew_entry_search_all_sessions_title">Localizar sessões antigas</string>
+    <string name="settings_whatsnew_entry_search_all_sessions_title">Localizar sessões mais antigas</string>
     <string name="settings_whatsnew_entry_search_all_sessions_summary">A busca no painel lateral agora procura em todas as sessões, não só nas recentes, e rolar até o fim carrega sessões mais antigas.</string>
 
     <!-- 2026-11-03-01-voice-open-session -->

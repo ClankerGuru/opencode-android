@@ -19,7 +19,7 @@
     <string name="voice_stage_talking_in">Խոսում եք՝</string>
     <string name="voice_stage_minimize_description">Փոքրացնել</string>
     <string name="voice_mute">Լռեցնել</string>
-    <string name="voice_unmute">Միացնել ծանուցումները</string>
+    <string name="voice_unmute">Միացնել ձայնը</string>
     <string name="voice_stage_pause">Դադարեցնել</string>
     <string name="voice_stage_camera">Տեսախցիկ</string>
     <string name="voice_transcript_empty">Ինչ-որ բան ասեք ձեր նիստին։</string>
@@ -35,7 +35,7 @@
     <!-- Call rows: open link -->
     <string name="voice_open_link_spoken">Ձեր արձագանքն է պետք։ %1$s</string>
     <string name="voice_open_link_spoken_with_host">Ձեր արձագանքն է պետք։ %1$s %2$s</string>
-    <string name="voice_open_link_open">Բաց</string>
+    <string name="voice_open_link_open">Բացել</string>
 
     <!-- Call rows: audio on the call -->
     <string name="voice_audio_paused">Դադարեցված է</string>
@@ -172,8 +172,8 @@
     <string name="voice_sound_pack_silent">Անձայն</string>
 
     <!-- Open link card -->
-    <string name="voice_open_link_card_title_untitled">Բացե՞լ հղումը։</string>
-    <string name="voice_open_link_card_title">Բացե՞լ %1$s։</string>
+    <string name="voice_open_link_card_title_untitled">Բացե՞լ հղումը</string>
+    <string name="voice_open_link_card_title">Բացե՞լ %1$s</string>
 
     <!-- Delegator choice -->
     <string name="voice_delegator_session_fallback">Նիստ</string>

@@ -3,12 +3,12 @@
     <!-- Agent activity glyph -->
     <string name="session_activity_running_description">ກຳລັງເຮັດວຽກ</string>
     <!-- Background work panel -->
-    <string name="session_background_work_show_label">ສະແດງຕົວແທນຍ່ອຍ ແລະແກະທີ່ກຳລັງເຮັດວຽກ</string>
+    <string name="session_background_work_show_label">ສະແດງຕົວແທນຍ່ອຍ ແລະ shell ທີ່ກຳລັງເຮັດວຽກ</string>
     <string name="session_background_work_collapsed_description">ຫຍໍ້ແລ້ວ</string>
     <string name="session_background_work_subagents_title">ຕົວແທນຍ່ອຍ</string>
     <string name="session_background_work_open_subagent_label">ເປີດເຊດຊັນຂອງຕົວແທນຍ່ອຍ</string>
-    <string name="session_background_work_shells_title">ແກະ</string>
-    <string name="session_background_work_show_shell_label">ສະແດງຜົນຈາກແກະ</string>
+    <string name="session_background_work_shells_title">shell</string>
+    <string name="session_background_work_show_shell_label">ສະແດງຜົນລັບຂອງ shell</string>
     <!-- Jump to latest -->
     <string name="session_scroll_to_latest_description">ເລື່ອນໄປຫາຫຼ້າສຸດ</string>
     <!-- Dictation bar -->
@@ -132,16 +132,16 @@
     <string name="session_photo_sheet_full_description">ເຕັມຈໍ</string>
     <string name="session_photo_sheet_half_description">ເຄິ່ງຈໍ</string>
     <!-- Shell output -->
-    <string name="session_shell_stop_confirm_title">ຢຸດແກະນີ້ບໍ?</string>
+    <string name="session_shell_stop_confirm_title">ຢຸດ shell ນີ້ບໍ?</string>
     <string name="session_shell_stop_confirm_message">ຄຳສັ່ງຈະຢຸດດຽວນີ້. ຜົນລັບທີ່ສະແດງຢູ່ນີ້ຈະຍັງຢູ່ຈົນກວ່າເຈົ້າຈະປິດ.</string>
-    <string name="session_shell_stop">ຢຸດແກະ</string>
+    <string name="session_shell_stop">ຢຸດ shell</string>
     <string name="session_shell_copy_output">ສຳເນົາຜົນລັບ</string>
     <string name="session_shell_share_output">ແບ່ງປັນຜົນລັບ</string>
     <string name="session_shell_earlier_output_hidden">ຜົນລັບກ່ອນໜ້າຖືກເຊື່ອງໄວ້</string>
     <string name="session_shell_showing_last_output">ສະແດງ 4 MB ສຸດທ້າຍ</string>
     <string name="session_shell_load_earlier">ໂຫຼດກ່ອນໜ້າ</string>
     <string name="session_shell_output_unavailable_title">ບໍ່ມີຜົນລັບ</string>
-    <string name="session_shell_output_unavailable_message">ເຊີບເວີບໍ່ມີຜົນລັບຂອງແກະນີ້ແລ້ວ.</string>
+    <string name="session_shell_output_unavailable_message">ເຊີບເວີບໍ່ມີຜົນລັບຂອງ shell ນີ້ແລ້ວ.</string>
     <string name="session_shell_no_output_yet_title">ຍັງບໍ່ມີຜົນລັບ</string>
     <string name="session_shell_no_output_title">ບໍ່ມີຜົນລັບ</string>
     <string name="session_shell_no_output_yet_message">ຜົນລັບຈະປາກົດຢູ່ນີ້ເມື່ອຄຳສັ່ງສົ່ງອອກມາ.</string>
@@ -186,7 +186,7 @@
         <item quantity="other">%1$d ຕົວແທນຍ່ອຍ</item>
     </plurals>
     <plurals name="session_background_work_shell_count">
-        <item quantity="other">%1$d ແກະ</item>
+        <item quantity="other">%1$d shell</item>
     </plurals>
     <string name="session_background_work_summary">%1$s · %2$s</string>
 

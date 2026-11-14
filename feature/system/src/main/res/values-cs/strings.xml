@@ -44,7 +44,7 @@
     <string name="system_ask_send_failed">Odeslání do OpenCode se nezdařilo. %1$s</string>
 
     <!-- Live Updates: voice call -->
-    <string name="system_call_muted">Ztlumené</string>
+    <string name="system_call_muted">Ztlumeno</string>
     <string name="system_call_unmute">Zrušit ztlumení</string>
     <string name="system_call_mute">Ztlumit</string>
     <string name="system_call_end">Ukončit hovor</string>

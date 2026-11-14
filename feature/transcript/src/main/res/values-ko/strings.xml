@@ -34,7 +34,7 @@
     <string name="transcript_image_open_description">이미지 열기</string>
     <string name="transcript_image_load_failed">이미지를 불러올 수 없어요</string>
     <string name="transcript_image_retry_click_label">다시 시도</string>
-    <string name="transcript_image_open">열림</string>
+    <string name="transcript_image_open">열기</string>
 
     <!-- Math -->
     <string name="transcript_equation_description">수식</string>
@@ -83,7 +83,7 @@
 
     <!-- New messages rule -->
     <string name="transcript_new_messages_description">새 메시지</string>
-    <string name="transcript_new_messages_label">새 소식</string>
+    <string name="transcript_new_messages_label">새 메시지</string>
 
     <!-- Media tiles -->
     <string name="transcript_attached_image_open_description">첨부 이미지 열기</string>
@@ -104,7 +104,7 @@
     <string name="transcript_voice_call_log_attached">통화 기록 첨부됨</string>
     <string name="transcript_voice_copy_full_message">전체 메시지 복사</string>
     <string name="transcript_voice_message_description">음성 메시지</string>
-    <string name="transcript_voice_label">목소리</string>
+    <string name="transcript_voice_label">음성</string>
 
     <!-- Attachments -->
     <string name="transcript_file_open_click_label">파일 열기</string>

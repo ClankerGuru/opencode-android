@@ -85,7 +85,7 @@
 
     <!-- New messages rule -->
     <string name="transcript_new_messages_description">Mesazhe të reja</string>
-    <string name="transcript_new_messages_label">E re</string>
+    <string name="transcript_new_messages_label">Të reja</string>
 
     <!-- Media tiles -->
     <string name="transcript_attached_image_open_description">Hap imazhin e bashkëngjitur</string>

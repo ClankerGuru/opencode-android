@@ -34,7 +34,7 @@
     <string name="transcript_image_open_description">Buka gambar</string>
     <string name="transcript_image_load_failed">Gagal memuat gambar</string>
     <string name="transcript_image_retry_click_label">Coba lagi</string>
-    <string name="transcript_image_open">Terbuka</string>
+    <string name="transcript_image_open">Buka</string>
 
     <!-- Math -->
     <string name="transcript_equation_description">Persamaan</string>

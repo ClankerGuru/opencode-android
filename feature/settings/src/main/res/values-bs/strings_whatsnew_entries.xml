@@ -132,7 +132,7 @@
     <string name="settings_whatsnew_entry_stop_runs_your_steer_example">Dok se izvršava dugotrajna komanda, pošalji poruku i gledaj kako komanda prelazi u pozadinu</string>
 
     <!-- 2026-10-12-01-browser-push-in -->
-    <string name="settings_whatsnew_entry_browser_push_in_title">Stranice unutar aplikacije</string>
+    <string name="settings_whatsnew_entry_browser_push_in_title">Stranice preglednika u aplikaciji</string>
     <string name="settings_whatsnew_entry_browser_push_in_summary">Uz uključen eksperiment Preglednik u aplikaciji, link otvara stranicu preko sesije. Prevuci od ruba za povratak.</string>
 
     <!-- 2026-10-12-02-answer-from-the-bar -->
@@ -252,7 +252,7 @@
 
     <!-- 2026-10-14-01-settings-grouped-by-purpose -->
     <string name="settings_whatsnew_entry_settings_grouped_by_purpose_title">Preglednije postavke</string>
-    <string name="settings_whatsnew_entry_settings_grouped_by_purpose_summary">Eksperimentalne funkcije i alate za programere pronađi u Postavke → Eksperimentalno, obavještenja u aplikaciji pod Obavještenja, a historiju poziva pod Glas.</string>
+    <string name="settings_whatsnew_entry_settings_grouped_by_purpose_summary">Eksperimentalne funkcije i alate za programere pronađi u Postavke → Eksperimentalno, napomene u aplikaciji pod Obavještenja, a historiju poziva pod Glas.</string>
 
     <!-- 2026-10-14-02-send-ats-recovery -->
     <string name="settings_whatsnew_entry_send_ats_recovery_title">Pouzdano slanje</string>
