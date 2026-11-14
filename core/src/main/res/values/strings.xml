@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- The language this file is written in, as a language code: en, de, ja, pt-BR. Dates and
+         numbers are written in it, so they match the text around them. -->
+    <string name="core_language_tag">en</string>
+
     <!-- Alert text fields -->
     <string name="core_alert_text_field_clear_description">Clear text</string>
 
