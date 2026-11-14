@@ -14,7 +14,7 @@ import kotlin.time.Duration.Companion.seconds
 class VoiceProgressLineTests {
     private companion object {
         val timing = VoiceProgressLine.Timing(firstAfter = 5.seconds, quiet = 3.seconds, again = 20.seconds)
-        const val subagent = "a subagent on “Buy Blood domains”"
+        const val subagent = "working on “Buy Blood domains”"
     }
 
     private data class Line(val delegationID: String?, val content: String)
@@ -242,6 +242,8 @@ class VoiceProgressLineTests {
 
     @Test fun activitySaysWhatIsRunning() {
         assertEquals(subagent, VoiceProgressLine.activity(caption = "Starting subagent · Buy Blood domains"))
+        // Dan's call: "asking a subagent to check that one".
+        assertNull(VoiceProgressLine.activity(caption = "Starting subagent"))
         assertEquals("running a command", VoiceProgressLine.activity(caption = "Running shell"))
         assertEquals("reading files", VoiceProgressLine.activity(caption = "Reading VoiceFeature.swift"))
         assertEquals("searching the code", VoiceProgressLine.activity(caption = "Searching files"))

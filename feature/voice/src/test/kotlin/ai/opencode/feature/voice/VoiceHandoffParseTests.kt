@@ -246,7 +246,9 @@ class VoiceSteeringInstructionsTests {
                 )
                 // Victor (Oct 23): a rambled request needs its acknowledgement to say
                 // what was understood, as a statement, not a permission question.
-                assertTrue("$engine", text.contains("Name the specific thing you understood them to want, in your own words, so they hear how you read it; this matters most when they rambled or circled. Say it as asking, not as done: \"On it, asking for the check-in\", never \"I'm checking you in now\" or \"Done\". Only a result decides what happened. Never use the same stock word or phrase twice in a row"))
+                assertTrue("$engine", text.contains("Name the specific thing you understood them to want, in your own words, so they hear how you read it; this matters most when they rambled or circled. Say it in the first person as work you're starting, not as done and not as asking, sending, or handing it to anyone, unless the user asked for exactly that; never \"Done\". Only a result decides what happened. Never use the same stock word or phrase twice in a row"))
+                // Dan's call: "I'll ask it to check now", as if handing it to someone else.
+                assertFalse("$engine", text.contains("asking for the check-in"))
                 // Nov 1 call: "Done… added those rules" before any tool ran; an invented deadline.
                 assertTrue("$engine", text.contains("A result's own words set the claim. \"Asked\", \"started\" or \"will\" stays that; never upgrade it to \"done\", and never add a date, deadline or urgency the result didn't say."))
                 assertFalse("$engine", text.contains("It can mention the thing itself."))
