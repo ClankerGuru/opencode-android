@@ -16,6 +16,7 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.appFormattingLocale
 import ai.opencode.core.ui.sfSymbol
+import ai.opencode.feature.settings.R
 import ai.opencode.feature.settings.SettingsDivider
 import ai.opencode.feature.settings.SettingsFeature
 import ai.opencode.feature.settings.SettingsPage
@@ -77,6 +78,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.onClick
@@ -124,11 +126,13 @@ fun WhatsNewListPage(store: SettingsStore) {
     val developerMode by remember { shared(SharedKeys.developerMode).flow }.collectAsState()
     val days = remember(whatsNew.entries) { WhatsNewDay.group(whatsNew.features) }
     val push = { page: SettingsPage -> store.send(SettingsFeature.Action.PagePushed(page)) }
+    val developerUpdatesHeader = stringResource(R.string.settings_whatsnew_developer_updates)
+    val smallerChangesTitle = stringResource(R.string.settings_whatsnew_smaller_changes)
 
     LaunchedEffect(Unit) { store.send(SettingsFeature.Action.WhatsNew(WhatsNewFeature.Action.Viewed)) }
 
     SettingsPageScaffold(
-        title = "What’s New",
+        title = stringResource(R.string.settings_whatsnew_title),
         store = store,
         actions = {
             // In Settings only; from the drawer's row the page is the root and has no menu.
@@ -150,7 +154,7 @@ fun WhatsNewListPage(store: SettingsStore) {
             }
         }
         if (developerMode && whatsNew.developerFeatures.isNotEmpty()) {
-            settingsSection(key = "developer", header = "Developer Updates") {
+            settingsSection(key = "developer", header = developerUpdatesHeader) {
                 whatsNew.developerFeatures.forEachIndexed { index, entry ->
                     if (index > 0) SettingsDivider(inset = true)
                     WhatsNewFeatureRow(entry, isNew = whatsNew.isNew(entry, seenIDs)) {
@@ -162,7 +166,7 @@ fun WhatsNewListPage(store: SettingsStore) {
         if (whatsNew.smallerChanges.isNotEmpty()) {
             settingsSection(key = "smaller") {
                 SettingsRow(
-                    "Smaller Changes",
+                    smallerChangesTitle,
                     symbol = null,
                     value = NumberFormat.getIntegerInstance(appFormattingLocale()).format(whatsNew.smallerChanges.size),
                 ) { push(SettingsPage.WhatsNewSmallerChanges) }
@@ -175,16 +179,17 @@ fun WhatsNewListPage(store: SettingsStore) {
 @Composable
 private fun WhatsNewOptionsMenu(isButtonEnabled: Boolean, onEnabledChange: (Boolean) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
+    val optionsDescription = stringResource(R.string.settings_whatsnew_options_description)
     Box {
         IconButton(
             onClick = { expanded = true },
-            modifier = Modifier.semantics { contentDescription = "What’s New options" },
+            modifier = Modifier.semantics { contentDescription = optionsDescription },
         ) {
             OpenCodeIcon(SFSymbol.Ellipsis, contentDescription = null)
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
-                text = { Text("Show in Drawer") },
+                text = { Text(stringResource(R.string.settings_whatsnew_show_in_drawer)) },
                 trailingIcon = { OpenCodeSwitch(checked = isButtonEnabled, onCheckedChange = null) },
                 onClick = { onEnabledChange(!isButtonEnabled) },
                 modifier = Modifier.semantics { toggleableState = ToggleableState(isButtonEnabled) },
@@ -224,9 +229,10 @@ private val WhatsNewEntry.Tint.settingsTint: SettingsTint
 @Composable
 private fun WhatsNewFeatureRow(entry: WhatsNewEntry, isNew: Boolean, onClick: () -> Unit) {
     val accessibilitySize = isAccessibilitySize()
+    val newState = stringResource(R.string.settings_whatsnew_new_state)
     SettingsRowFrame(
         Modifier
-            .semantics { if (isNew) stateDescription = "New" }
+            .semantics { if (isNew) stateDescription = newState }
             .padding(vertical = 4.dp),
         onClick = onClick,
     ) {
@@ -438,7 +444,7 @@ private fun rememberWhatsNewVoiceAvailable(server: OpenCodeServer?): Boolean {
 fun WhatsNewSmallerListPage(store: SettingsStore) {
     val whatsNew by store.observe { it.whatsNew }
     val days = remember(whatsNew.entries) { WhatsNewDay.group(whatsNew.smallerChanges) }
-    SettingsPageScaffold(title = "Smaller Changes", store = store) {
+    SettingsPageScaffold(title = stringResource(R.string.settings_whatsnew_smaller_changes), store = store) {
         for (day in days) {
             settingsSection(key = "day-${day.id}", header = whatsNewDayTitle(day.day)) {
                 day.entries.forEachIndexed { index, entry ->

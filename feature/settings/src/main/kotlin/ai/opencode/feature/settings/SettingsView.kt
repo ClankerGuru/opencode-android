@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.MotionPhase
@@ -63,6 +64,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -281,7 +283,7 @@ private fun SettingsRootPage(store: SettingsStore) {
     }
 
     CompositionLocalProvider(LocalSettingsRowIcons provides true) {
-        SettingsPageScaffold(title = "Settings", store = store) {
+        SettingsPageScaffold(title = stringResource(CoreR.string.common_settings), store = store) {
             item(key = "connection", contentType = "connection") {
                 ConnectionCard(
                     store,
@@ -292,28 +294,28 @@ private fun SettingsRootPage(store: SettingsStore) {
             }
             // Preferences: Appearance, Sessions, Models, Voice and Notifications.
             settingsSection(key = "preferences") {
-                SettingsRow("Appearance", "paintpalette.fill", SettingsTint.Purple, modifier = returnFocus.on(SettingsPage.Appearance)) {
+                SettingsRow(stringResource(R.string.settings_appearance_title), "paintpalette.fill", SettingsTint.Purple, modifier = returnFocus.on(SettingsPage.Appearance)) {
                     push(SettingsPage.Appearance)
                 }
                 SettingsDivider(inset = true)
-                SettingsRow("Sessions", "bubble.left.fill", SettingsTint.Blue, modifier = returnFocus.on(SettingsPage.Sessions)) { push(SettingsPage.Sessions) }
+                SettingsRow(stringResource(R.string.settings_sessions_title), "bubble.left.fill", SettingsTint.Blue, modifier = returnFocus.on(SettingsPage.Sessions)) { push(SettingsPage.Sessions) }
                 if (ExperimentalFeature.hideModels.isActive(hideModels)) {
                     SettingsDivider(inset = true)
-                    SettingsRow("Models", "cpu", SettingsTint.Teal, modifier = returnFocus.on(SettingsPage.Models)) { push(SettingsPage.Models) }
+                    SettingsRow(stringResource(R.string.settings_models_title), "cpu", SettingsTint.Teal, modifier = returnFocus.on(SettingsPage.Models)) { push(SettingsPage.Models) }
                 }
                 SettingsDivider(inset = true)
-                SettingsRow("Voice", "waveform", SettingsTint.Indigo, modifier = returnFocus.on(SettingsPage.Voice), badge = if (voiceModeEnabled) "On" else null) {
+                SettingsRow(stringResource(R.string.settings_voice_title), "waveform", SettingsTint.Indigo, modifier = returnFocus.on(SettingsPage.Voice), badge = if (voiceModeEnabled) stringResource(R.string.settings_value_on) else null) {
                     push(SettingsPage.Voice)
                 }
                 if (notificationPermission != null) {
                     SettingsDivider(inset = true)
-                    SettingsRow("Notifications", "bell.badge.fill", SettingsTint.Red, modifier = returnFocus.on(SettingsPage.Notifications)) {
+                    SettingsRow(stringResource(R.string.settings_notifications_title), "bell.badge.fill", SettingsTint.Red, modifier = returnFocus.on(SettingsPage.Notifications)) {
                         push(SettingsPage.Notifications)
                     }
                 }
             }
             settingsSection(key = "whats-new") {
-                SettingsRow("What’s New", "sparkles", SettingsTint.Orange, modifier = returnFocus.on(SettingsPage.WhatsNew)) { push(SettingsPage.WhatsNew) }
+                SettingsRow(stringResource(R.string.settings_whats_new_title), "sparkles", SettingsTint.Orange, modifier = returnFocus.on(SettingsPage.WhatsNew)) { push(SettingsPage.WhatsNew) }
             }
             settingsSection(
                 key = "experimental",
@@ -331,7 +333,7 @@ private fun SettingsRootPage(store: SettingsStore) {
             ) {
                 ExperimentalSettingsRow(returnFocus.on(SettingsPage.Experimental())) { push(SettingsPage.Experimental()) }
                 SettingsDivider(inset = true)
-                SettingsRow("Developer", "hammer.fill", SettingsTint.Teal, modifier = returnFocus.on(SettingsPage.Developer), badge = if (developerMode) "On" else null) {
+                SettingsRow(stringResource(R.string.settings_developer_title), "hammer.fill", SettingsTint.Teal, modifier = returnFocus.on(SettingsPage.Developer), badge = if (developerMode) stringResource(R.string.settings_value_on) else null) {
                     push(SettingsPage.Developer)
                 }
             }

@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -94,7 +95,7 @@ val VoiceSettingsFeature.State.delegatorRowValue: String
 /** Settings › Voice › Delegator row. */
 @Composable
 internal fun VoiceDelegatorSettingsRow(state: VoiceSettingsFeature.State, onClick: () -> Unit) {
-    SettingsChoiceRow("Delegator", value = state.delegatorRowValue, onClick = onClick)
+    SettingsChoiceRow(stringResource(R.string.settings_delegator_title), value = state.delegatorRowValue, onClick = onClick)
 }
 
 /**
@@ -127,8 +128,13 @@ internal fun VoiceDelegatorSettingsPage(store: SettingsStore) {
         voice.send(VoiceSettingsFeature.Action.VoiceDelegatorChoiceChanged(next))
         store.send(SettingsFeature.Action.Settings(HomeSettingsFeature.Action.VoiceDelegatorChoiceChanged(next)))
     }
+    val modeFooter = stringResource(R.string.settings_delegator_mode_footer)
+    val targetHeader = stringResource(R.string.settings_delegator_target_header)
+    val targetFooter = stringResource(R.string.settings_delegator_target_footer)
+    val sessionsHeader = stringResource(R.string.settings_delegator_sessions_header)
+    val sessionsFooter = stringResource(R.string.settings_delegator_sessions_footer)
 
-    SettingsPageScaffold(title = "Delegator", store = store) {
+    SettingsPageScaffold(title = stringResource(R.string.settings_delegator_title), store = store) {
         val explanation = availability.explanation
         if (explanation != null) {
             settingsSection(key = "unavailable") {
@@ -137,7 +143,7 @@ internal fun VoiceDelegatorSettingsPage(store: SettingsStore) {
         } else if (otherServerPick != null) {
             settingsSection(key = "other-server") {
                 DelegatorNote(
-                    "“${otherServerPick.displayTitle}” is on another server. Pick one on this server, or switch servers.",
+                    stringResource(R.string.settings_delegator_other_server_note, otherServerPick.displayTitle),
                     SFSymbol.ExclamationmarkTriangle,
                     SettingsTint.Orange.color(),
                 )
@@ -145,15 +151,15 @@ internal fun VoiceDelegatorSettingsPage(store: SettingsStore) {
         }
         settingsSection(
             key = "mode",
-            footer = footerText("Built-in runs on OpenAI, without a session. OpenCode Session works in a session on your server."),
+            footer = footerText(modeFooter),
         ) {
             ModeRow(
-                title = "Built-in",
+                title = stringResource(R.string.settings_delegator_built_in),
                 isSelected = !choice.usesOpenCodeSession || !isAvailable,
             ) { select(VoiceDelegatorChoice.BuiltIn) }
             SettingsDivider()
             ModeRow(
-                title = "OpenCode Session",
+                title = stringResource(R.string.settings_delegator_opencode_session),
                 isSelected = choice.usesOpenCodeSession && isAvailable,
                 isEnabled = isAvailable,
             ) { if (!choice.usesOpenCodeSession) select(VoiceDelegatorChoice.AutomaticSession) }
@@ -161,16 +167,16 @@ internal fun VoiceDelegatorSettingsPage(store: SettingsStore) {
         if (choice.usesOpenCodeSession && isAvailable) {
             settingsSection(
                 key = "target",
-                header = "Session Target",
-                footer = footerText("Automatic uses a “Voice” session on this server. Viewed Session uses the one on screen."),
+                header = targetHeader,
+                footer = footerText(targetFooter),
             ) {
                 ModeRow(
-                    title = "Automatic",
+                    title = stringResource(R.string.settings_delegator_automatic),
                     isSelected = choice == VoiceDelegatorChoice.AutomaticSession,
                 ) { select(VoiceDelegatorChoice.AutomaticSession) }
                 SettingsDivider()
                 ModeRow(
-                    title = "Viewed Session",
+                    title = stringResource(R.string.settings_delegator_viewed_session),
                     isSelected = choice == VoiceDelegatorChoice.ViewedSession,
                 ) { select(VoiceDelegatorChoice.ViewedSession) }
                 if (otherServerPick != null) {
@@ -184,19 +190,19 @@ internal fun VoiceDelegatorSettingsPage(store: SettingsStore) {
                     OpenCodeSearchField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        placeholder = "Search Sessions",
+                        placeholder = stringResource(R.string.settings_delegator_search_placeholder),
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                     )
                 }
                 settingsSection(
                     key = "sessions",
-                    header = "Pick a Session",
-                    footer = footerText("A picked session keeps its model."),
+                    header = sessionsHeader,
+                    footer = footerText(sessionsFooter),
                 ) {
                     if (filteredSessions.isEmpty()) {
                         SettingsRowFrame {
                             Text(
-                                if (searchQuery.isEmpty()) "No Sessions on This Server" else "No Matching Sessions",
+                                if (searchQuery.isEmpty()) stringResource(R.string.settings_delegator_no_sessions) else stringResource(R.string.settings_delegator_no_matching_sessions),
                                 style = SettingsText.title,
                                 color = OpenCodeTheme.colors.secondaryText,
                             )
@@ -208,7 +214,7 @@ internal fun VoiceDelegatorSettingsPage(store: SettingsStore) {
                             val folder = lastPathComponent(session.directory)
                             val picked = choice.picked
                             ModeRow(
-                                title = VoiceFeature.State.usableTitle(session.title) ?: "New session",
+                                title = VoiceFeature.State.usableTitle(session.title) ?: stringResource(R.string.settings_delegator_new_session),
                                 subtitle = if (folder.isEmpty() || folder == "/") null else folder,
                                 isSelected = picked?.sessionID == session.id && picked.serverID == serverID,
                             ) { select(VoiceDelegatorChoice.PickedSession(VoiceDelegatorChoice.Picked(session, server))) }

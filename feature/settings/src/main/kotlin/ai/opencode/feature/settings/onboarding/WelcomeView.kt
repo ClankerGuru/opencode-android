@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings.onboarding
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import androidx.compose.foundation.layout.width
@@ -20,6 +21,7 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
+import ai.opencode.feature.settings.R
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -63,6 +65,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -208,11 +211,11 @@ private fun Header(pairing: Boolean, isPreview: Boolean, onBack: () -> Unit, onC
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (pairing) {
-            OpenCodeIconButton(SFSymbol.ChevronBackward, contentDescription = "Back", onClick = onBack)
+            OpenCodeIconButton(SFSymbol.ChevronBackward, contentDescription = stringResource(CoreR.string.common_back), onClick = onBack)
         }
         Spacer(Modifier.weight(1f))
         if (isPreview) {
-            OpenCodeIconButton(SFSymbol.Xmark, contentDescription = "Close", onClick = onClose, modifier = Modifier.semantics { testTag = "welcome-close" })
+            OpenCodeIconButton(SFSymbol.Xmark, contentDescription = stringResource(CoreR.string.common_close), onClick = onClose, modifier = Modifier.semantics { testTag = "welcome-close" })
         }
     }
 }
@@ -284,7 +287,7 @@ private fun Actions(
             modifier = Modifier.widthIn(max = 520.dp).fillMaxWidth().semantics { testTag = "welcome-primary" },
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Text("Get Started", style = OpenCodeTextStyles.headline, modifier = Modifier.welcomeSwap(!pairing, reduced))
+                Text(stringResource(R.string.settings_onboarding_get_started), style = OpenCodeTextStyles.headline, modifier = Modifier.welcomeSwap(!pairing, reduced))
                 Row(
                     Modifier.welcomeSwap(pairing, reduced),
                     horizontalArrangement = Arrangement.spacedBy(9.dp),
@@ -295,7 +298,7 @@ private fun Actions(
                         Text(progress, style = OpenCodeTextStyles.headline)
                     } else {
                         OpenCodeIcon(SFSymbol.QrcodeViewfinder, contentDescription = null)
-                        Text("Scan Pairing Code", style = OpenCodeTextStyles.headline)
+                        Text(stringResource(R.string.settings_onboarding_scan_pairing_code), style = OpenCodeTextStyles.headline)
                     }
                 }
             }
@@ -310,7 +313,7 @@ private fun Actions(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                "Other Ways to Connect",
+                stringResource(R.string.settings_onboarding_other_ways_title),
                 style = OpenCodeTextStyles.body.copy(fontWeight = FontWeight.Medium),
                 color = OpenCodeTheme.colors.secondaryText,
             )
@@ -340,21 +343,21 @@ private fun WelcomeOtherWays(pasteError: String?, send: (WelcomeFeature.Action) 
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                "Other Ways to Connect",
+                stringResource(R.string.settings_onboarding_other_ways_title),
                 style = OpenCodeTextStyles.headline,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).semantics { heading() },
             )
-            OtherWaysSection(header = "Run This in a Terminal", footer = "It shows a code to scan or a link to paste, and works from any network.") {
+            OtherWaysSection(header = stringResource(R.string.settings_onboarding_other_ways_terminal_header), footer = stringResource(R.string.settings_onboarding_other_ways_terminal_footer)) {
                 WelcomeCommand(WelcomeCopy.PAIR_COMMAND) { send(WelcomeFeature.Action.CopyTapped(it)) }
             }
             OtherWaysSection(header = null, footer = pasteError, footerColor = systemOrange()) {
-                OtherWaysButton("Paste a Pairing Link", SFSymbol.DocOnClipboard) { send(WelcomeFeature.Action.PasteTapped) }
-                OtherWaysButton("Enter a Server Address", SFSymbol.Keyboard) { send(WelcomeFeature.Action.EnterAddressTapped) }
+                OtherWaysButton(stringResource(R.string.settings_onboarding_other_ways_paste_link), SFSymbol.DocOnClipboard) { send(WelcomeFeature.Action.PasteTapped) }
+                OtherWaysButton(stringResource(R.string.settings_onboarding_other_ways_enter_address), SFSymbol.Keyboard) { send(WelcomeFeature.Action.EnterAddressTapped) }
             }
-            OtherWaysSection(header = "Don’t Have OpenCode Yet?", footer = null) {
+            OtherWaysSection(header = stringResource(R.string.settings_onboarding_other_ways_install_header), footer = null) {
                 WelcomeCommand(WelcomeCopy.INSTALL_COMMAND) { send(WelcomeFeature.Action.CopyTapped(it)) }
-                OtherWaysButton("Other Ways to Install", symbol = null) { send(WelcomeFeature.Action.OtherWaysToInstallTapped) }
+                OtherWaysButton(stringResource(R.string.settings_onboarding_other_ways_install), symbol = null) { send(WelcomeFeature.Action.OtherWaysToInstallTapped) }
             }
         }
     }
@@ -405,6 +408,8 @@ private fun WelcomeCommand(command: String, onCopy: (String) -> Unit) {
         delay(1_500)
         copied = false
     }
+    val copyDescription = stringResource(R.string.settings_onboarding_command_copy_description, command)
+    val copiedDescription = stringResource(CoreR.string.common_copied)
     // The desktop's shell block: a clearly filled box with a hairline, as on the connection screen.
     val shape = RoundedCornerShape(OpenCodeRadius.fill)
     Row(
@@ -420,8 +425,8 @@ private fun WelcomeCommand(command: String, onCopy: (String) -> Unit) {
             }
             .openCodeTapTarget()
             .clearAndSetSemantics {
-                contentDescription = "Copy $command"
-                stateDescription = if (copied) "Copied" else ""
+                contentDescription = copyDescription
+                stateDescription = if (copied) copiedDescription else ""
             },
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,

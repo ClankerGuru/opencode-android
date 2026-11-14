@@ -31,6 +31,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.delay
 
 /**
@@ -87,15 +89,17 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
     /** A lone row needs no title over it. */
     fun header(group: ExperimentalGroup): String? = if (group.features.size > 1) group.title else null
 
-    SettingsPageScaffold(title = "Experimental", store = store, listState = listState) {
+    val allFooter = stringResource(R.string.settings_experimental_all_footer)
+
+    SettingsPageScaffold(title = stringResource(R.string.settings_experimental_title), store = store, listState = listState) {
         settingsSection(
             key = "experimental-all",
             footer = footerText(
-                "Also turns on new ones, except any that see your screen or listen in the background.",
+                allFooter,
             ),
         ) {
             SettingsToggleRow(
-                title = "All Experiments",
+                title = stringResource(R.string.settings_experimental_all),
                 checked = all,
                 onCheckedChange = { send(HomeSettingsFeature.Action.AllExperimentsChanged(it)) },
                 symbol = "flask.fill",
@@ -162,8 +166,8 @@ fun ExperimentalSettingsRow(modifier: Modifier = Modifier, onClick: () -> Unit) 
     for ((index, feature) in features.withIndex()) {
         if (enabled[index]) on += 1
     }
-    val badge = if (all) "All On" else if (on == 0) null else "$on On"
-    SettingsRow("Experimental", "flask.fill", SettingsTint.Gray, modifier = modifier, badge = badge, onClick = onClick)
+    val badge = if (all) stringResource(R.string.settings_experimental_all_on) else if (on == 0) null else pluralStringResource(R.plurals.settings_experimental_on_count, on, on)
+    SettingsRow(stringResource(R.string.settings_experimental_title), "flask.fill", SettingsTint.Gray, modifier = modifier, badge = badge, onClick = onClick)
 }
 
 val ExperimentalGroup.tint: SettingsTint

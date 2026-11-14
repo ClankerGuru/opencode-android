@@ -62,6 +62,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -140,8 +141,11 @@ fun VoiceSettingsView(store: SettingsStore) {
     val keySource = state.keySource
     LaunchedEffect(keySource) { voice.send(VoiceSettingsFeature.Action.RouteChanged) }
     val showsRaiseToTalk = remember { ai.opencode.core.dependencies.dependency(ai.opencode.feature.voice.RaiseToEarClient).isSupported() }
+    val callSetupHeader = stringResource(R.string.settings_voice_call_setup_header)
+    val callsHeader = stringResource(R.string.settings_voice_calls_header)
+    val raiseToTalkHint = stringResource(R.string.settings_voice_raise_to_talk_hint)
 
-    SettingsPageScaffold(title = "Voice", store = store) {
+    SettingsPageScaffold(title = stringResource(R.string.settings_voice_title), store = store) {
         item(key = "scope") {
             ai.opencode.feature.voice.DotScopeView(
                 mode = ai.opencode.feature.voice.DotScopeMode.Preview(active = state.voiceModeEnabled),
@@ -158,7 +162,7 @@ fun VoiceSettingsView(store: SettingsStore) {
             footer = if (!state.voiceModeEnabled) footerText(keySource.footer) else null,
         ) {
             SettingsToggleRow(
-                "Enable Voice",
+                stringResource(R.string.settings_voice_enable),
                 checked = state.voiceModeEnabled,
                 onCheckedChange = {
                     voice.send(VoiceSettingsFeature.Action.VoiceModeEnabledChanged(it))
@@ -169,7 +173,7 @@ fun VoiceSettingsView(store: SettingsStore) {
         if (state.voiceModeEnabled) {
             settingsSection(
                 key = "configuration",
-                header = "Call Setup",
+                header = callSetupHeader,
                 description = keySource.footer.removeSuffix("."),
             ) {
                 var first = true
@@ -182,7 +186,7 @@ fun VoiceSettingsView(store: SettingsStore) {
                 if (route != VoiceRoute.Server(VoiceRoute.ServerRoute.GeminiLive)) {
                     if (divider()) SettingsDivider()
                     SettingsMenuRow(
-                        title = "Model",
+                        title = stringResource(R.string.settings_voice_model),
                         value = state.modelRowValue,
                         selection = state.voiceEngine,
                         sections = VoiceProvider.allCases.map { provider ->
@@ -192,7 +196,7 @@ fun VoiceSettingsView(store: SettingsStore) {
                             voice.send(VoiceSettingsFeature.Action.VoiceEngineChanged(it))
                             settings(HomeSettingsFeature.Action.VoiceEngineChanged(it))
                         },
-                        accessibilityLabel = "Voice Model",
+                        accessibilityLabel = stringResource(R.string.settings_voice_model_description),
                     )
                 }
                 if (!state.showsProviderRow) {
@@ -212,7 +216,7 @@ fun VoiceSettingsView(store: SettingsStore) {
                 }
                 if (divider()) SettingsDivider()
                 SettingsChoiceRow(
-                    "Voice",
+                    stringResource(R.string.settings_voice_call_voice),
                     value = CallVoicePicker.rowValue(state.callVoice, state.voiceEngine),
                 ) { store.send(SettingsFeature.Action.PagePushed(SettingsPage.CallVoicePicker)) }
                 if (state.showsDelegatorRow) {
@@ -221,10 +225,10 @@ fun VoiceSettingsView(store: SettingsStore) {
                 }
             }
         }
-        settingsSection(key = "options", header = "Calls") {
+        settingsSection(key = "options", header = callsHeader) {
             if (state.voiceModeEnabled && showsRaiseToTalk) {
                 SettingsToggleRow(
-                    "Raise to Talk",
+                    stringResource(R.string.settings_voice_raise_to_talk),
                     checked = state.raiseToTalk,
                     onCheckedChange = {
                         voice.send(VoiceSettingsFeature.Action.RaiseToTalkChanged(it))
@@ -232,7 +236,7 @@ fun VoiceSettingsView(store: SettingsStore) {
                     },
                     // iOS `accessibilityHint`: TalkBack's click label (“Double tap to …”).
                     modifier = Modifier.semantics {
-                        onClick(label = "Toggle starting a call through the earpiece when you raise your phone to your ear on a session") {
+                        onClick(label = raiseToTalkHint) {
                             val on = !state.raiseToTalk
                             voice.send(VoiceSettingsFeature.Action.RaiseToTalkChanged(on))
                             settings(HomeSettingsFeature.Action.RaiseToTalkChanged(on))
@@ -244,7 +248,7 @@ fun VoiceSettingsView(store: SettingsStore) {
             }
             if (state.voiceModeEnabled) {
                 SettingsMenuRow(
-                    title = "Call Sounds",
+                    title = stringResource(R.string.settings_voice_call_sounds),
                     value = state.callSoundPack.title,
                     selection = state.callSoundPack,
                     sections = listOf(null to VoiceCallSoundPack.entries.map { SettingsMenuOption(it, it.title) }),
@@ -252,7 +256,7 @@ fun VoiceSettingsView(store: SettingsStore) {
                 )
                 SettingsDivider()
             }
-            SettingsRow("Call History", symbol = null) { store.send(SettingsFeature.Action.PagePushed(SettingsPage.CallHistory)) }
+            SettingsRow(stringResource(R.string.settings_voice_call_history), symbol = null) { store.send(SettingsFeature.Action.PagePushed(SettingsPage.CallHistory)) }
         }
     }
 }
@@ -269,11 +273,12 @@ private fun KeyRow(state: VoiceSettingsFeature.State, reduceMotion: Boolean, onT
         label = "key-chevron",
     )
     val stacked = isAccessibilitySize()
+    val editKeyLabel = stringResource(R.string.settings_voice_edit_key_label, state.activeProvider.displayName)
     SettingsRowFrame(
         Modifier.semantics(mergeDescendants = true) {
             contentDescription = state.keyRowTitle
             stateDescription = state.keyBadgeTitle
-            onClick(label = "Edit your ${state.activeProvider.displayName} API key") { onTap(); true }
+            onClick(label = editKeyLabel) { onTap(); true }
         },
         onClick = onTap,
     ) {
@@ -298,18 +303,18 @@ private fun KeyStatusAccessory(state: VoiceSettingsFeature.State, rotation: Floa
         when (val status = state.keyStatus) {
             VoiceKeyStatus.Verified -> {
                 OpenCodeIcon(SFSymbol.CheckmarkCircleFill, contentDescription = null, size = 18.dp, tint = SettingsTint.Green.color())
-                Text("Verified", style = SettingsText.title, color = secondary)
+                Text(stringResource(R.string.settings_voice_key_verified), style = SettingsText.title, color = secondary)
             }
             VoiceKeyStatus.Checking -> {
                 CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                Text("Checking…", style = SettingsText.title, color = secondary)
+                Text(stringResource(R.string.settings_voice_key_checking), style = SettingsText.title, color = secondary)
             }
-            VoiceKeyStatus.Saved -> Text("Saved", style = SettingsText.title, color = secondary)
+            VoiceKeyStatus.Saved -> Text(stringResource(R.string.settings_voice_key_saved), style = SettingsText.title, color = secondary)
             is VoiceKeyStatus.Invalid -> {
                 OpenCodeIcon(SFSymbol.ExclamationmarkCircleFill, contentDescription = null, size = 18.dp, tint = SettingsTint.Orange.color())
-                Text("Saved", style = SettingsText.title, color = secondary)
+                Text(stringResource(R.string.settings_voice_key_saved), style = SettingsText.title, color = secondary)
             }
-            VoiceKeyStatus.Missing -> Text("Missing", style = SettingsText.title, color = secondary)
+            VoiceKeyStatus.Missing -> Text(stringResource(R.string.settings_voice_key_missing), style = SettingsText.title, color = secondary)
             is VoiceKeyStatus.OnServer -> Text(status.providerName, style = SettingsText.title, color = secondary)
         }
         OpenCodeIcon(
@@ -355,13 +360,13 @@ fun CallVoicePickerView(store: SettingsStore) {
     DisposableEffect(voice) { onDispose { voice.send(VoiceSettingsFeature.Action.VoicePickerDisappeared) } }
     val settings = { action: HomeSettingsFeature.Action -> store.send(SettingsFeature.Action.Settings(action)) }
     val footer = when {
-        !state.canPreviewVoices -> "Add your ${state.activeProvider.displayName} key to preview voices."
+        !state.canPreviewVoices -> stringResource(R.string.settings_voice_picker_add_key_footer, state.activeProvider.displayName)
         CallVoicePicker.isMissing(state.callVoice, engine) ->
-            "${state.callVoice.title} isn’t available on ${engine.title}, so calls use ${selected.title}."
+            stringResource(R.string.settings_voice_picker_unavailable_footer, state.callVoice.title, engine.title, selected.title)
         else -> null
     }
 
-    SettingsPageScaffold(title = "Voice", store = store) {
+    SettingsPageScaffold(title = stringResource(R.string.settings_voice_call_voice), store = store) {
         state.previewError?.let { error ->
             settingsSection(key = "error") {
                 SettingsRowFrame {
@@ -418,14 +423,16 @@ private fun VoiceRow(
             )
         }
         val accent = MaterialTheme.colorScheme.primary
+        val previewDescription = if (isPlaying) stringResource(R.string.settings_voice_stop_preview_description, voice.title) else stringResource(R.string.settings_voice_preview_description, voice.title)
+        val previewState = if (isPlaying) stringResource(R.string.settings_voice_preview_playing) else (previewHint ?: "")
         Box(
             Modifier
                 .padding(end = 8.dp)
                 .clickable(enabled = canPreview, role = Role.Button, onClick = onPreview)
                 .openCodeTapTarget()
                 .semantics {
-                    contentDescription = if (isPlaying) "Stop ${voice.title} preview" else "Preview ${voice.title}"
-                    stateDescription = if (isPlaying) "Playing" else (previewHint ?: "")
+                    contentDescription = previewDescription
+                    stateDescription = previewState
                 },
             contentAlignment = Alignment.Center,
         ) {

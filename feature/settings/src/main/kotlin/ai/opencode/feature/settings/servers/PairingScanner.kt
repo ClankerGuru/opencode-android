@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings.servers
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.dependencies.PasteboardClient
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.ui.AppearanceColorScheme
@@ -18,6 +19,7 @@ import ai.opencode.core.ui.accessibilityFocusRequest
 import ai.opencode.core.ui.openCodeHairline
 import ai.opencode.core.ui.rememberAccessibilityFocusRequest
 import ai.opencode.core.ui.rememberAppAppearance
+import ai.opencode.feature.settings.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -55,6 +57,7 @@ import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -143,15 +146,15 @@ fun PairingScannerView(
                     contentColor = OpenCodeTheme.colors.text,
                     title = {
                         Text(
-                            "Scan Pairing Code",
+                            stringResource(R.string.settings_servers_scan_pairing_code),
                             style = OpenCodeTextStyles.headline,
                             modifier = Modifier.accessibilityFocusRequest(titleFocus).semantics { heading() },
                         )
                     },
-                    navigation = { ScannerBarButton("Cancel", onClick = onCancel) },
+                    navigation = { ScannerBarButton(stringResource(CoreR.string.common_cancel), onClick = onCancel) },
                     actions = {
                         if (isCameraAvailable && !isAccessDenied) {
-                            ScannerBarButton("Paste", onClick = ::paste)
+                            ScannerBarButton(stringResource(R.string.settings_pairing_paste), onClick = ::paste)
                         }
                     },
                 )
@@ -161,8 +164,8 @@ fun PairingScannerView(
                 when {
                     !isCameraAvailable -> PairingScannerFallback(
                         symbol = "camera.metering.unknown",
-                        title = "No Camera Available",
-                        message = "Copy the link that `opencode pair` prints on your computer, then paste it here.",
+                        title = stringResource(R.string.settings_pairing_no_camera_title),
+                        message = stringResource(R.string.settings_pairing_no_camera_message),
                         settings = false,
                         onOpenSettings = camera.openSettings,
                         onPaste = ::paste,
@@ -170,8 +173,8 @@ fun PairingScannerView(
                     )
                     isAccessDenied -> PairingScannerFallback(
                         symbol = "camera.fill",
-                        title = "Camera Access Is Off",
-                        message = "Allow camera access in Settings to scan the QR code, or paste the link that `opencode pair` prints.",
+                        title = stringResource(R.string.settings_pairing_camera_off_title),
+                        message = stringResource(R.string.settings_pairing_camera_off_message),
                         settings = true,
                         onOpenSettings = camera.openSettings,
                         onPaste = ::paste,
@@ -189,10 +192,10 @@ fun PairingScannerView(
         if (pasteFailed) {
             OpenCodeAlertDialog(
                 onDismissRequest = { pasteFailed = false },
-                confirmButton = { TextButton(onClick = { pasteFailed = false }) { Text("OK") } },
-                title = { Text("Nothing to Paste") },
+                confirmButton = { TextButton(onClick = { pasteFailed = false }) { Text(stringResource(CoreR.string.common_ok)) } },
+                title = { Text(stringResource(R.string.settings_pairing_nothing_to_paste_title)) },
                 text = {
-                    Text("Your clipboard doesn’t have a pairing link. Copy the link that opencode pair prints, then try again.")
+                    Text(stringResource(R.string.settings_pairing_nothing_to_paste_message))
                 },
             )
         }
@@ -231,7 +234,7 @@ private fun PairingViewfinder(modifier: Modifier = Modifier) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text("Point your camera at the QR code", style = OpenCodeTextStyles.headline, color = OpenCodeTheme.colors.text, textAlign = TextAlign.Center)
+            Text(stringResource(R.string.settings_pairing_point_camera), style = OpenCodeTextStyles.headline, color = OpenCodeTheme.colors.text, textAlign = TextAlign.Center)
             Text(
                 buildAnnotatedString {
                     append("On your computer, open OpenCode’s Settings → Pairing, or run ")
@@ -315,12 +318,12 @@ private fun PairingScannerFallback(
         )
         Column(Modifier.padding(top = 8.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (settings) {
-                PasteButton(prominent = true, onClick = onOpenSettings) { Text("Open Settings") }
+                PasteButton(prominent = true, onClick = onOpenSettings) { Text(stringResource(CoreR.string.common_open_settings)) }
             }
             PasteButton(prominent = !settings, onClick = onPaste) {
                 OpenCodeIcon("doc.on.clipboard", contentDescription = null, size = 20.dp)
                 Spacer(Modifier.width(8.dp))
-                Text("Paste Pairing Link")
+                Text(stringResource(R.string.settings_pairing_paste_link))
             }
         }
     }

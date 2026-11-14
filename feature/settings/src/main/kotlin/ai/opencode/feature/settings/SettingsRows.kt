@@ -52,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -346,11 +347,12 @@ fun SettingsToggleRow(
     tint: SettingsTint = SettingsTint.Gray,
     enabled: Boolean = true,
 ) {
+    val stateText = if (checked) stringResource(R.string.settings_value_on) else stringResource(R.string.settings_value_off)
     SettingsRowFrame(
         modifier
             .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange)
             // Spelled out so the change is sent as a state description, which TalkBack speaks on the focused row.
-            .semantics { stateDescription = if (checked) "On" else "Off" },
+            .semantics { stateDescription = stateText },
         onClick = null,
     ) {
         if (symbol != null) SettingsIcon(symbol, tint)

@@ -2,6 +2,7 @@ package ai.opencode.feature.settings.onboarding
 
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.tuning.AnimationTimeScale
+import ai.opencode.feature.settings.R
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -38,6 +39,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -160,9 +162,9 @@ fun WelcomeScene(layout: WelcomeSceneLayout, pairing: Boolean, modifier: Modifie
     SideEffect { voice.play(frame.voice) }
 
     val label = if (pairing) {
-        "OpenCode’s pairing code on a laptop, and a phone’s camera scanning it"
+        stringResource(R.string.settings_onboarding_scene_pairing_description)
     } else {
-        "Someone dictates a task on a phone, OpenCode does it on a laptop and takes a screenshot, and the screenshot comes back to the phone"
+        stringResource(R.string.settings_onboarding_scene_story_description)
     }
     Box(
         modifier

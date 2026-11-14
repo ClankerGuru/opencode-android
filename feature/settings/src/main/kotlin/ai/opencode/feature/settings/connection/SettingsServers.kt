@@ -4,9 +4,11 @@ import ai.opencode.core.ui.OpenCodeTextField
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.ui.AlertTextFields
 import ai.opencode.core.ui.OpenCodeIcon
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.settings.ConnectionStatus
+import ai.opencode.feature.settings.R
 import ai.opencode.feature.settings.SettingsButtonRow
 import ai.opencode.feature.settings.SettingsDivider
 import ai.opencode.feature.settings.SettingsFeature.SettingsDelegate
@@ -41,6 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -94,7 +97,7 @@ fun SettingsServersSection(
         switchableServers(current, savedServers).sortedWith { a, b -> localizedStandardCompare(a.friendlyName, b.friendlyName) }
     }
 
-    SettingsSection(modifier, header = "Servers") {
+    SettingsSection(modifier, header = stringResource(R.string.settings_servers_header)) {
         servers.forEachIndexed { index, server ->
             if (index > 0) SettingsDivider()
             SettingsServerRow(
@@ -112,7 +115,7 @@ fun SettingsServersSection(
         if (offersEditCurrent && (connectionErrorMessage != null || status == ConnectionStatus.disconnected)) {
             SettingsDivider()
             SettingsButtonRow(
-                "Edit ${current.friendlyName}…",
+                stringResource(R.string.settings_servers_edit_server, current.friendlyName),
                 onClick = { send(SettingsDelegate.EditServer(current)) },
                 symbol = SFSymbol.ExclamationmarkTriangle,
             )
@@ -124,10 +127,10 @@ fun SettingsServersSection(
     renaming?.let { server ->
         OpenCodeAlertDialog(
             onDismissRequest = { renaming = null },
-            title = { Text("Rename Server") },
+            title = { Text(stringResource(R.string.settings_server_rename_title)) },
             text = {
                 Column {
-                    Text("Only this ${ai.opencode.core.ui.ThisDevice.name} uses the name. Leave it blank to use the computer’s.")
+                    Text(stringResource(R.string.settings_servers_rename_message, ai.opencode.core.ui.ThisDevice.name))
                     OpenCodeTextField(
                         value = nameDraft,
                         onValueChange = { nameDraft = it },
@@ -143,24 +146,24 @@ fun SettingsServersSection(
                 TextButton(onClick = {
                     renaming = null
                     send(SettingsDelegate.RenameServer(server, nameDraft))
-                }) { Text("Save") }
+                }) { Text(stringResource(CoreR.string.common_save)) }
             },
-            dismissButton = { TextButton(onClick = { renaming = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { renaming = null }) { Text(stringResource(CoreR.string.common_cancel)) } },
         )
     }
 
     removing?.let { server ->
         OpenCodeAlertDialog(
             onDismissRequest = { removing = null },
-            title = { Text("Remove ${server.friendlyName}?") },
-            text = { Text("This forgets the address and password on this ${ai.opencode.core.ui.ThisDevice.name}. Sessions on the server are not affected.") },
+            title = { Text(stringResource(R.string.settings_servers_remove_title, server.friendlyName)) },
+            text = { Text(stringResource(R.string.settings_servers_remove_message, ai.opencode.core.ui.ThisDevice.name)) },
             confirmButton = {
                 TextButton(onClick = {
                     removing = null
                     send(SettingsDelegate.RemoveServer(server))
-                }) { Text("Remove Server", color = OpenCodeTheme.colors.destructive) }
+                }) { Text(stringResource(R.string.settings_servers_remove_server), color = OpenCodeTheme.colors.destructive) }
             },
-            dismissButton = { TextButton(onClick = { removing = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { removing = null }) { Text(stringResource(CoreR.string.common_cancel)) } },
         )
     }
 }
@@ -178,6 +181,8 @@ private fun SettingsServerRow(
 ) {
     var menuShown by remember { mutableStateOf(false) }
     val name = server.friendlyName
+    val currentServerState = stringResource(R.string.settings_servers_current_server_state, server.host)
+    val switchLabel = stringResource(R.string.settings_servers_switch_label)
     Row(
         Modifier.fillMaxWidth().heightIn(min = 52.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -192,8 +197,8 @@ private fun SettingsServerRow(
                 )
                 .clearAndSetSemantics {
                     contentDescription = name
-                    stateDescription = if (isCurrent) "Current server, ${server.host}" else server.host
-                    if (!isCurrent) onClick(label = "Switch to this server") { onSwitch(server); true }
+                    stateDescription = if (isCurrent) currentServerState else server.host
+                    if (!isCurrent) onClick(label = switchLabel) { onSwitch(server); true }
                 }
                 .heightIn(min = 52.dp)
                 .padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
@@ -227,11 +232,11 @@ private fun SettingsServerRow(
         }
         Box(Modifier.padding(end = 4.dp)) {
             IconButton(onClick = { menuShown = true }, modifier = Modifier.size(48.dp)) {
-                OpenCodeIcon(SFSymbol.EllipsisCircle, contentDescription = "$name options")
+                OpenCodeIcon(SFSymbol.EllipsisCircle, contentDescription = stringResource(R.string.settings_servers_options_description, name))
             }
             DropdownMenu(expanded = menuShown, onDismissRequest = { menuShown = false }) {
                 DropdownMenuItem(
-                    text = { Text("Rename…") },
+                    text = { Text(stringResource(R.string.settings_servers_rename_menu)) },
                     leadingIcon = { OpenCodeIcon(SFSymbol.Pencil, contentDescription = null) },
                     onClick = {
                         menuShown = false
@@ -239,7 +244,7 @@ private fun SettingsServerRow(
                     },
                 )
                 DropdownMenuItem(
-                    text = { Text("Edit…") },
+                    text = { Text(stringResource(R.string.settings_servers_edit_menu)) },
                     leadingIcon = { OpenCodeIcon(SFSymbol.SliderHorizontal3, contentDescription = null) },
                     onClick = {
                         menuShown = false
@@ -250,7 +255,7 @@ private fun SettingsServerRow(
                 if (!isCurrent) {
                     val red = OpenCodeTheme.colors.destructive
                     DropdownMenuItem(
-                        text = { Text("Remove…", color = red) },
+                        text = { Text(stringResource(R.string.settings_servers_remove_menu), color = red) },
                         leadingIcon = { OpenCodeIcon(SFSymbol.Trash, contentDescription = null, tint = red) },
                         onClick = {
                             menuShown = false
@@ -269,11 +274,11 @@ private fun AddServerRow(send: (SettingsDelegate) -> Unit) {
     var menuShown by remember { mutableStateOf(false) }
     Box {
         SettingsRowFrame(onClick = { menuShown = true }) {
-            Text("Add Server", style = SettingsText.title, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.settings_servers_add_server), style = SettingsText.title, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
         }
         DropdownMenu(expanded = menuShown, onDismissRequest = { menuShown = false }) {
             DropdownMenuItem(
-                text = { Text("Scan Pairing Code") },
+                text = { Text(stringResource(R.string.settings_servers_scan_pairing_code)) },
                 leadingIcon = { OpenCodeIcon(SFSymbol.QrcodeViewfinder, contentDescription = null) },
                 onClick = {
                     menuShown = false
@@ -281,7 +286,7 @@ private fun AddServerRow(send: (SettingsDelegate) -> Unit) {
                 },
             )
             DropdownMenuItem(
-                text = { Text("Enter Address") },
+                text = { Text(stringResource(R.string.settings_servers_enter_address)) },
                 leadingIcon = { OpenCodeIcon(SFSymbol.Keyboard, contentDescription = null) },
                 onClick = {
                     menuShown = false
