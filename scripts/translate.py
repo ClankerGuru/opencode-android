@@ -5,6 +5,8 @@ Usage:
   scripts/translate.py de fr          translates what `values-de` and `values-fr` are missing
   scripts/translate.py all            every language in LANGUAGES (scripts/translations.py)
   scripts/translate.py --review de    asks the review model to fix wrong translations
+  scripts/translate.py all --redo session_shell_stop
+                                      translates these strings again, after their English changed
 
 Only strings with no translation are sent, so a run after new English text is added translates
 just that. Each request carries the desktop app's own translations of the terms it uses (read
@@ -70,6 +72,8 @@ Rules:
   (Claude, GPT, Gemini), Git, GitHub, Tailscale, MCP, LSP, SSH, URL, QR, macOS, Linux.
   Keep commands, code, file paths and anything that looks like an identifier exactly as written
   (for example `opencode pair --remote`).
+- Technical words keep their computing meaning: a "shell" is a command-line shell running a
+  command (use the usual computing term, or keep "shell"), never a seashell or a company.
 - Keep every placeholder exactly as written: %1$s, %2$d, %d, %s, %%. You may move them within
   the sentence. Never add or remove one, and never write a bare % (write %%).
 - Keep line breaks (\\n) where the English has them.
@@ -92,6 +96,8 @@ For each string, compare the English with the translation. Report only real mist
 - it is still in English, or in the wrong script (it must be {name} in {script} script)
 - it uses a different term than the "Desktop terms" below, which the OpenCode desktop app uses
 - it is clearly unnatural or ungrammatical {name}
+- a technical word lost its computing meaning (a "shell" is a command-line shell, never a
+  seashell)
 Don't report style preferences. Names (OpenCode, Claude, GPT, Git, MCP, …), commands, code and
 placeholders (%1$s, %d, %%) stay as written; keep every placeholder in your fix.
 
@@ -364,7 +370,7 @@ def build_prompt(rules, language, chunk, english, context, terms, guidance, exis
     return "\n\n".join(parts)
 
 
-def translate_file(language, english_path, terms, guidance, model, workdir, review):
+def translate_file(language, english_path, terms, guidance, model, workdir, review, redo):
     qualifier, code, tag, name, script = language
     english = read_strings(english_path)
     path = translated_path(english_path, qualifier)
@@ -372,7 +378,7 @@ def translate_file(language, english_path, terms, guidance, model, workdir, revi
     if path.exists():
         translations = read_strings(path)
     for key in list(translations):
-        if key not in english:
+        if key not in english or key in redo:
             del translations[key]
     if "core_language_tag" in english:
         translations["core_language_tag"] = {"kind": "string", "name": "core_language_tag", "translatable": True, "text": tag}
@@ -427,7 +433,7 @@ def translate_file(language, english_path, terms, guidance, model, workdir, revi
     return changed
 
 
-def run_language(language, repo, model, workdir, review):
+def run_language(language, repo, model, workdir, review, redo):
     qualifier, code = language[0], language[1]
     terms = desktop_terms(repo, code)
     guidance = desktop_guidance(repo, code)
@@ -435,7 +441,7 @@ def run_language(language, repo, model, workdir, review):
         log(f"{qualifier}: no desktop translations found in {repo}")
     total = 0
     for english_path in ordered_files():
-        total += translate_file(language, english_path, terms, guidance, model, workdir, review)
+        total += translate_file(language, english_path, terms, guidance, model, workdir, review, redo)
     log(f"{qualifier}: {'fixed' if review else 'translated'} {total} strings")
 
 
@@ -446,6 +452,7 @@ def main():
     parser.add_argument("--model", help="the model to use (default: %s, or %s with --review)" % (TRANSLATE_MODEL, REVIEW_MODEL))
     parser.add_argument("--desktop", default=str(ROOT.parent / "opencode"), help="the opencode repo checkout")
     parser.add_argument("--jobs", type=int, default=12, help="languages to translate at once")
+    parser.add_argument("--redo", action="append", default=[], metavar="NAME", help="translate this string again (repeatable)")
     args = parser.parse_args()
 
     if args.languages == ["all"]:
@@ -463,7 +470,7 @@ def main():
         with ThreadPoolExecutor(max_workers=args.jobs) as pool:
             futures = []
             for language in languages:
-                futures.append(pool.submit(run_language, language, args.desktop, model, workdir, args.review))
+                futures.append(pool.submit(run_language, language, args.desktop, model, workdir, args.review, set(args.redo)))
             for future in futures:
                 future.result()
     return 0

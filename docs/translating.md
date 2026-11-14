@@ -36,10 +36,13 @@ Anomaly Console models (`opencode/…`):
 python3 scripts/translate.py all          # every language, only strings with no translation
 python3 scripts/translate.py de fr        # some languages
 python3 scripts/translate.py --review de  # a second model checks and fixes existing text
+python3 scripts/translate.py all --redo session_shell_stop  # translate a changed string again
 python3 scripts/translations.py all       # then check every language
 ```
 
-Run it after adding English text to translate just the new strings. It needs the opencode repo
+Run it after adding English text to translate just the new strings. When you change the meaning
+of an existing English string, pass its name with `--redo`, since the old translations would
+otherwise stay. It needs the opencode repo
 next to this one (`--desktop` to point elsewhere): each request carries the desktop app's
 translations of the terms it uses and its locale glossary, so words like session, agent and
 model read as they do on desktop. Answers are checked like `scripts/translations.py` checks
