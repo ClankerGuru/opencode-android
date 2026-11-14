@@ -1,5 +1,6 @@
 package ai.opencode.core.ui
 
+import ai.opencode.core.R
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -33,6 +34,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -187,7 +189,7 @@ fun OpenCodeLargeTopBar(
 /** The title bar's Back control: a plain chevron with a 48 dp target. */
 @Composable
 fun OpenCodeTopBarBackButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    OpenCodeIconButton(SFSymbol.ChevronBackward, contentDescription = "Back", onClick = onClick, modifier = modifier, style = OpenCodeIconButtonStyle.Standard)
+    OpenCodeIconButton(SFSymbol.ChevronBackward, contentDescription = stringResource(R.string.common_back), onClick = onClick, modifier = modifier, style = OpenCodeIconButtonStyle.Standard)
 }
 
 /** The bar's row: navigation, title, actions, at least [OpenCodeTopBarDefaults.height] tall. */

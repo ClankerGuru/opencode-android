@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Alert text fields -->
+    <string name="core_alert_text_field_clear_description">Clear text</string>
+
+    <!-- Text field -->
+    <string name="core_text_field_invalid_input_description">Invalid input</string>
+</resources>
