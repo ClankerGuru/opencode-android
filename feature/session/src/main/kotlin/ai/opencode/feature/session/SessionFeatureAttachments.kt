@@ -31,7 +31,11 @@ private fun SessionFeature.appendAttachment(state: State, attachment: OpenCodeOu
 /** Attachments, uploads, and Location. Null: the action passes on. */
 internal fun SessionFeature.reduceAttachments(state: State, action: Action): Reduced<State, Action>? {
     if (action is Action.DrawingAdded) {
-        if (state.taskIdentity != action.from || !state.takesPasteAttachments) return Reduced(state)
+        if (state.taskIdentity != action.from || state.sendGeneration != action.sendGeneration ||
+            state.sendAfterUploads != null || !state.takesPasteAttachments
+        ) {
+            return Reduced(state)
+        }
         return appendAttachment(state, action.attachment)
     }
     val attachments = (action as? Action.ComposerAttachments)?.action ?: return null

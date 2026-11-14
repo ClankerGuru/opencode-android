@@ -2,6 +2,7 @@ package ai.opencode.feature.media
 
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
+import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.sharing.SharedKeys
@@ -136,11 +137,20 @@ class AgentFileViewerModel(
 
     /**
      * Opens the editor on [image] for [add]'s prompt (iOS `draw(_:add:)`). Its dismissal clears
-     * [drawing], as iOS overrides the store's `dismiss`.
+     * [drawing], as iOS overrides the store's `dismiss`; the store takes the dependencies it's
+     * made under, as a TCA store does.
      */
     fun draw(image: Bitmap, add: ImageDrawingAdd) {
         drawingAdded = false
-        val feature = ImageDrawingFeature { attachment -> add(attachment).also { if (it) drawingAdded = true } }
+        // An editor put away mid-export (or a page released) adds nothing.
+        val feature = ImageDrawingFeature { attachment ->
+            if (drawing == null || !add(attachment)) {
+                false
+            } else {
+                drawingAdded = true
+                true
+            }
+        }
         val dismiss = ImageDrawingFeature.Action.Delegate(ImageDrawingFeature.Action.DelegateAction.Dismiss)
         drawing = Store(
             ImageDrawingFeature.State(image),
@@ -148,6 +158,7 @@ class AgentFileViewerModel(
                 val reduced = feature.reduce(state, action)
                 if (action != dismiss) reduced else Reduced(reduced.state, Effect.merge(reduced.effect, Effect.run { _ -> drawing = null }))
             },
+            DependencyValues.current,
         )
     }
 
@@ -195,6 +206,7 @@ class AgentFileViewerModel(
     /** The page is gone for good: frees the player and the PDF renderer. */
     fun release() {
         stop()
+        drawing = null
         when (val content = (phase as? Phase.Ready)?.content) {
             is Content.Player -> content.player.release()
             is Content.QuickLook -> content.pdf?.close()

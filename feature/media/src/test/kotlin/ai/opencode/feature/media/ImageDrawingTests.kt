@@ -1,14 +1,19 @@
 package ai.opencode.feature.media
 
 import ai.opencode.core.dependencies.UuidClient
+import ai.opencode.core.dependencies.withDependencies
 import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
+import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.model.AgentFileReference
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.os.Looper
 import androidx.compose.ui.geometry.Offset
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -19,6 +24,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.util.UUID
@@ -60,11 +67,17 @@ class ImageDrawingTests {
     }
 }
 
-/** Port of iOS `ImageDrawingFeatureTests`: the editor and the viewer that presents it. */
+/**
+ * Port of iOS `ImageDrawingFeatureTests`: the editor and the viewer that presents it. On
+ * Robolectric for a real failed decode and an agent file model's main-thread store.
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ImageDrawingFeatureTests {
     @get:Rule val isolation = TestIsolationRule()
 
-    private val image = stubBitmap()
+    private val image = Bitmap.createBitmap(40, 30, Bitmap.Config.ARGB_8888)
     private val stroke = ImageDrawing.Stroke(ImageDrawing.Ink.Red, listOf(Offset(2f, 2f), Offset(30f, 20f)))
 
     private fun copy(id: UUID): OpenCodeOutgoingAttachment =
@@ -205,6 +218,23 @@ class ImageDrawingFeatureTests {
         assertTrue(offered.current.isEmpty())
     }
 
+    /**
+     * iOS keeps a page's thumbnail when its original fails to decode (`originalFailed`). Android
+     * opens on full-size originals only: a page whose image fails to decode is `loadFailed` with
+     * no image, so Draw stays off.
+     */
+    @Test fun drawStaysOffOnAThumbnailWhoseOriginalFailedToDecode() = runTest {
+        val offered = Locked(listOf<OpenCodeOutgoingAttachment>())
+        val page = TranscriptImagePreview.Page(id = "img_thumb", image = null, label = "Image", mediaHash = "abc")
+        val store = viewer(page = page, offered = offered)
+        store.send(TranscriptImageViewerFeature.Action.MediaLoaded("img_thumb", MediaReferenceLoadResult.Loaded(byteArrayOf(1, 2, 3)))) {
+            it.copy(preview = it.preview.copy(pages = listOf(page.copy(loadFailed = true))))
+        }
+        store.send(TranscriptImageViewerFeature.Action.DrawTapped)
+        store.finish()
+        assertTrue(offered.current.isEmpty())
+    }
+
     @Test fun theViewerClosesOnlyOnceAnAddedDrawingsEditorHasGone() = runTest {
         val offered = Locked(listOf<OpenCodeOutgoingAttachment>())
         val store = viewer(offered = offered)
@@ -233,5 +263,41 @@ class ImageDrawingFeatureTests {
         store.send(TranscriptImageViewerFeature.Action.Drawing(PresentationAction.Dismiss)) { it.copy(drawing = null) }
         store.finish()
         assertTrue(offered.current.isEmpty())
+    }
+
+    @Test fun closingAFileEditorMidExportAddsNothing() {
+        val gate = CompletableDeferred<Unit>()
+        val offered = Locked(listOf<OpenCodeOutgoingAttachment>())
+        val model = AgentFileViewerModel(
+            reference = AgentFileReference(path = "/fixture/drawer.png"),
+            server = OpenCodeServer(url = "https://fixture.invalid", username = "", password = ""),
+            directory = null,
+            context = RuntimeEnvironment.getApplication(),
+        )
+        withDependencies({
+            this[UuidClient] = UuidClient.incrementing()
+            this[ImageDrawingClient] = ImageDrawingClient(flatten = { _, _, id ->
+                gate.await()
+                copy(UUID.fromString(id))
+            })
+        }) {
+            model.draw(image) { attachment ->
+                offered.update { it + attachment }
+                true
+            }
+        }
+        // Held here so its export keeps running: the worst case, an editor whose effect outlives
+        // its page (Android: the page's model is released).
+        val editor = model.drawing!!
+        editor.send(ImageDrawingFeature.Action.StrokeFinished(stroke))
+        editor.send(ImageDrawingFeature.Action.AddTapped)
+        assertTrue(editor.state.isAdding)
+        model.release()
+        gate.complete(Unit)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals("The export landed and was turned away", ImageDrawingFeature.Failure.Prompt, editor.state.failure)
+        assertTrue(offered.current.isEmpty())
+        assertFalse(model.drawingAdded)
+        editor.close()
     }
 }
