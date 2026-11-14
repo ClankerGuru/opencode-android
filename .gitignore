@@ -22,3 +22,4 @@ secrets.properties
 .DS_Store
 .externalNativeBuild/
 .cxx/
+__pycache__/

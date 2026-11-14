@@ -19,6 +19,35 @@ Each module has its English text in `src/main/res/values/`:
 
 `python3 scripts/translations.py` lists every file.
 
+## Languages
+
+The app is translated into the languages the OpenCode desktop app supports, except the
+right-to-left ones. `LANGUAGES` in `scripts/translations.py` lists them with their folder
+qualifiers. A few differ from the desktop's codes: `zh-rCN` and `zh-rTW` (desktop `zh`, `zht`),
+`pt-rBR` (`br`), `nb` (`no`) and `in` (Indonesian, `id`: Android's folder name is the old code).
+Serbian is in Cyrillic, as on desktop.
+
+## Translate with a model
+
+`scripts/translate.py` fills in missing strings with a model through `opencode run`, using the
+Anomaly Console models (`opencode/…`):
+
+```sh
+python3 scripts/translate.py all          # every language, only strings with no translation
+python3 scripts/translate.py de fr        # some languages
+python3 scripts/translate.py --review de  # a second model checks and fixes existing text
+python3 scripts/translations.py all       # then check every language
+```
+
+Run it after adding English text to translate just the new strings. It needs the opencode repo
+next to this one (`--desktop` to point elsewhere): each request carries the desktop app's
+translations of the terms it uses and its locale glossary, so words like session, agent and
+model read as they do on desktop. Answers are checked like `scripts/translations.py` checks
+the files; a string that keeps failing is left out and shows in English.
+
+To fix one string by hand, edit the `values-<code>` file directly; the scripts only fill gaps
+(and `--review` only touches strings it finds wrong).
+
 ## Add a language
 
 1. For each English file, create the same file name in a `values-<code>` folder next to `values`,
