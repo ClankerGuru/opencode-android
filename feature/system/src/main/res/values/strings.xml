@@ -6,4 +6,56 @@
     <string name="widget_start_call_description">Starts a voice call in a session you choose, or the one you viewed last.</string>
     <string name="widget_open_session_description">Opens a session you choose.</string>
     <string name="widget_new_session_description">Opens a new OpenCode session.</string>
+
+    <!-- Shared across screens -->
+    <string name="system_selected_description">Selected</string>
+    <string name="system_last_viewed_session">Last Viewed Session</string>
+
+    <!-- Quick actions (launcher shortcuts) -->
+    <string name="system_quick_action_session_fallback">Session</string>
+
+    <!-- Live Updates: voice call -->
+    <string name="system_call_muted">Muted</string>
+    <string name="system_call_unmute">Unmute</string>
+    <string name="system_call_mute">Mute</string>
+    <string name="system_call_end">End call</string>
+
+    <!-- Live Updates: hands-free recording -->
+    <string name="system_recording_active">Recording</string>
+    <string name="system_recording_stopped">Recording stopped</string>
+    <string name="system_recording_stop">Stop recording</string>
+
+    <!-- Notification channels -->
+    <string name="system_channel_voice_calls">Voice Calls</string>
+    <string name="system_channel_recording">Recording</string>
+    <string name="system_channel_session_runs">Session Runs</string>
+    <string name="system_channel_session_updates">Session Updates</string>
+    <string name="system_channel_shared_items">Shared Items</string>
+
+    <!-- Share sheet: notifications -->
+    <string name="system_share_continue_notification_body">Tap to continue in OpenCode</string>
+
+    <!-- Share sheet -->
+    <string name="system_share_save_failed_title">Couldn’t Save for OpenCode</string>
+    <string name="system_share_continue_description">Continue in OpenCode</string>
+    <string name="system_share_no_server_title">Connect to a Server First</string>
+    <string name="system_share_no_server_message">Open OpenCode and connect to your computer, then share again.</string>
+    <string name="system_share_send_later">Send Later</string>
+    <string name="system_share_saved_continue">Saved. Open OpenCode to continue</string>
+    <string name="system_share_loading_description">Loading shared items</string>
+    <string name="system_share_image_description">Image</string>
+    <string name="system_share_image_position_description">Image %1$d of %2$d</string>
+    <string name="system_share_search_sessions_description">Search sessions</string>
+    <string name="system_share_new_session_in_project_description">New Session in %1$s</string>
+    <string name="system_share_choose_project_description">Choose its project</string>
+    <string name="system_share_message_placeholder">Message</string>
+    <string name="system_share_sent_to">Sent to %1$s</string>
+    <string name="system_share_sending_description">Sending</string>
+    <string name="system_share_sent_description">Sent</string>
+    <string name="system_share_sessions_title">Sessions</string>
+    <string name="system_share_pinned_header">Pinned</string>
+    <string name="system_share_recents_header">Recents</string>
+
+    <!-- Widget configuration -->
+    <string name="system_widget_choose_session_title">Choose Session</string>
 </resources>

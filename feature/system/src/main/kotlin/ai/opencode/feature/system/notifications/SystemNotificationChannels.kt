@@ -1,5 +1,6 @@
 package ai.opencode.feature.system.notifications
 
+import ai.opencode.feature.system.R
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -24,23 +25,23 @@ object SystemNotificationChannels {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
         manager.createNotificationChannels(
             listOf(
-                NotificationChannel(VOICE_CALL, "Voice Calls", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                NotificationChannel(VOICE_CALL, context.getString(R.string.system_channel_voice_calls), NotificationManager.IMPORTANCE_DEFAULT).apply {
                     setSound(null, null)
                     enableVibration(false)
                     setShowBadge(false)
                 },
-                NotificationChannel(DICTATION, "Recording", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                NotificationChannel(DICTATION, context.getString(R.string.system_channel_recording), NotificationManager.IMPORTANCE_DEFAULT).apply {
                     setSound(null, null)
                     enableVibration(false)
                     setShowBadge(false)
                 },
-                NotificationChannel(SESSION_RUN, "Session Runs", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                NotificationChannel(SESSION_RUN, context.getString(R.string.system_channel_session_runs), NotificationManager.IMPORTANCE_DEFAULT).apply {
                     setSound(null, null)
                     enableVibration(false)
                     setShowBadge(false)
                 },
-                NotificationChannel(SESSIONS, "Session Updates", NotificationManager.IMPORTANCE_HIGH),
-                NotificationChannel(SHARE, "Shared Items", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                NotificationChannel(SESSIONS, context.getString(R.string.system_channel_session_updates), NotificationManager.IMPORTANCE_HIGH),
+                NotificationChannel(SHARE, context.getString(R.string.system_channel_shared_items), NotificationManager.IMPORTANCE_DEFAULT).apply {
                     setShowBadge(false)
                 },
             ),

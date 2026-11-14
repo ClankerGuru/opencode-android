@@ -31,7 +31,7 @@ object ShareNotifier {
      */
     fun continueInApp(context: Context, title: String): Boolean {
         val launch = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return false
-        return post(context, title, "Tap to continue in OpenCode", launch, group = null)
+        return post(context, title, context.getString(R.string.system_share_continue_notification_body), launch, group = null)
     }
 
     @SuppressLint("MissingPermission") // Checked: areNotificationsEnabled covers POST_NOTIFICATIONS.

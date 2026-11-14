@@ -1,6 +1,7 @@
 package ai.opencode.feature.system.intents
 
 import ai.opencode.core.log.SystemActionOrigin
+import ai.opencode.feature.system.R
 import ai.opencode.feature.system.SystemAction
 import ai.opencode.feature.system.SessionDirectory
 import ai.opencode.feature.system.share.ShareSuggestion
@@ -57,7 +58,7 @@ data class SystemQuickAction(
             .putExtra(SystemActionActivity.EXTRA_QUICK_ACTION, kind.rawValue)
         serverKey?.let { intent.putExtra("server", it) }
         sessionID?.let { intent.putExtra("session", it) }
-        val label = title.ifEmpty { "Session" }
+        val label = title.ifEmpty { context.getString(R.string.system_quick_action_session_fallback) }
         return ShortcutInfoCompat.Builder(context, shortcutID)
             .setShortLabel(label)
             .setLongLabel(subtitle?.takeIf { it.isNotEmpty() }?.let { "$label · $it" } ?: label)
