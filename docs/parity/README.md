@@ -1,8 +1,8 @@
 # Parity tracking
 
-The Android app must behave exactly like the iOS app (`/Users/vogel/dev/opencode-ios`): same
-features, flows, states, copy, server contract, retry policy, logging privacy, haptics, timings
-and thresholds. The Swift code is the source of truth; iOS docs drift.
+The Android app started as a port of the iOS app (`/Users/vogel/dev/opencode-ios`) and may now
+differ from it on purpose. These files map each iOS source file to its Android counterpart, so a
+change on one side can be compared with the other. When comparing, read the Swift; iOS docs drift.
 
 Each area has one file listing **every** iOS source file it owns:
 
