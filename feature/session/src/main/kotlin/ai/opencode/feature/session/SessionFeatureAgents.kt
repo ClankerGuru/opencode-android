@@ -87,6 +87,13 @@ internal fun SessionFeature.reduceAgents(state: State, action: Action): Reduced<
         }
     }
 
+    Action.AgentsChanged ->
+        if (!experimentalFeatures(ExperimentalFeature.agentSelection)) {
+            Reduced(state)
+        } else {
+            Reduced(state.copy(agentSelection = state.agentSelection.copy(listedDirectory = null)), Effect.send(Action.AgentsRequested))
+        }
+
     is Action.AgentsResponse -> {
         val agents = action.result.getOrNull()
         if (agents != null) {

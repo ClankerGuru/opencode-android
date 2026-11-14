@@ -153,6 +153,7 @@ private fun eventSource(server: OpenCodeServer, waiting: AtomicInteger): Flow<Op
                     ) {
                         continue
                     }
+                    if (event == OpenCodeServerEvent.ModelsChanged) OpenCodeReadCache.shared.forgetModelCatalogs(server.persistenceID)
                     batches.receive(event)
                 }
             }
@@ -450,6 +451,7 @@ private val HANDLED_TYPES = setOf(
     "permission.asked", "form.created", "permission.replied", "form.replied", "form.cancelled",
     "shell.created", "shell.exited", "shell.deleted",
     "project.updated",
+    "model.updated", "provider.updated", "agent.updated",
 )
 
 /**
@@ -534,6 +536,8 @@ private fun serverEvent(type: String, data: EventPayload?): OpenCodeServerEvent?
             val canonical = data.canonical ?: return null
             OpenCodeServerEvent.ProjectUpdated(ProjectPayload(id, canonical, data.name, data.repository, data.icon).project())
         }
+        "model.updated", "provider.updated" -> OpenCodeServerEvent.ModelsChanged
+        "agent.updated" -> OpenCodeServerEvent.AgentsChanged
         "session.inbox.cancelled" -> {
             val id = data?.sessionID ?: return null
             val inputID = data.inboxID ?: return null

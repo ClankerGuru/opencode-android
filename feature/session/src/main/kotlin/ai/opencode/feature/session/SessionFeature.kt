@@ -631,6 +631,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         /** The model list has gone: its search is cleared. */
         data object ModelListClosed : Action
         data class ModelsResponse(val result: Result<OpenCodeModelCatalog>) : Action
+        /** The server's model catalog changed (`model.updated`, `provider.updated`). */
+        data object ModelsChanged : Action
         data class ModelPicked(val model: OpenCodeModel) : Action
         /** Picks a model and reasoning level together. [ticked]: a drag already played a selection per stop. */
         data class ModelPickedWithLevel(val model: OpenCodeModel, val level: String?, val ticked: Boolean = false) : Action
@@ -648,6 +650,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         /** Agent Selection (`SessionFeatureAgents.kt`). */
         data class AgentApplied(val sessionID: String, val agent: String) : Action
         data object AgentsRequested : Action
+        /** The server's agents changed (`agent.updated`). */
+        data object AgentsChanged : Action
         data class AgentsResponse(val result: Result<List<OpenCodeAutocompleteAgent>>) : Action
         data class AgentPicked(val agent: String) : Action
         data object ProjectButtonTapped : Action

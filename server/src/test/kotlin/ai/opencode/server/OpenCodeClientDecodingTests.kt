@@ -13,6 +13,8 @@ import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeFormRequest
 import ai.opencode.server.model.OpenCodeFormValue
 import ai.opencode.server.model.OpenCodeJSONValue
+import ai.opencode.server.model.OpenCodeModel
+import ai.opencode.server.model.OpenCodeModelCatalog
 import ai.opencode.server.model.OpenCodePermissionReply
 import ai.opencode.server.model.OpenCodePermissionRequest
 import ai.opencode.server.model.OpenCodePromptSource
@@ -462,6 +464,19 @@ class OpenCodeClientDecodingTests {
         } finally {
             retry.close()
         }
+    }
+
+    @Test
+    fun forgettingModelCatalogsDropsOnlyThatServersCatalogs() {
+        val cache = OpenCodeReadCache()
+        val catalog = OpenCodeModelCatalog(listOf(OpenCodeModel(modelID = "m", providerID = "p", name = "M")), defaultModel = null)
+        cache.storeModelCatalog(catalog, "srv|")
+        cache.storeModelCatalog(catalog, "srv|/work/repo")
+        cache.storeModelCatalog(catalog, "other|/work/repo")
+        cache.forgetModelCatalogs("srv")
+        assertNull(cache.modelCatalog("srv|"))
+        assertNull(cache.modelCatalog("srv|/work/repo"))
+        assertEquals(catalog, cache.modelCatalog("other|/work/repo"))
     }
 
     @Test

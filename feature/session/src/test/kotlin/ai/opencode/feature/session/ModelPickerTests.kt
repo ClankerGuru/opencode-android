@@ -210,6 +210,44 @@ class ModelPickerTests {
     }
 
     /**
+     * Models that plugins add after the first read show up without reopening
+     * the session: each change rereads the catalog, a burst leaves one read
+     * standing, and its answer replaces the partial list.
+     */
+    @Test
+    fun aCatalogChangeRereadsModelsAndReplacesAPartialList() = sessionTest { h ->
+        val attempts = LockIsolated(0)
+        val firstCancelled = LockIsolated(false)
+        val firstStarted = Gate()
+
+        val initial = h.state(model = cirrusZen.ref).copy(models = listOf(cirrusZen))
+        val store = h.store(initial) {
+            this[OpenCodeClient] = this[OpenCodeClient].copy(
+                modelCatalog = { _, _ ->
+                    if (attempts.increment() == 1) {
+                        firstStarted.open()
+                        try {
+                            awaitCancellation()
+                        } catch (cancellation: CancellationException) {
+                            firstCancelled.setValue(true)
+                            throw cancellation
+                        }
+                    }
+                    OpenCodeModelCatalog(models = listOf(cirrusZen, basalt), defaultModel = cirrusZen)
+                },
+            )
+        }
+
+        store.send(Action.ModelsChanged)
+        firstStarted.await()
+        store.send(Action.ModelsChanged)
+        store.receive(Action.ModelsResponse::class) { it.copy(models = listOf(cirrusZen, basalt)) }
+        store.state.assertRemembersModelNames(listOf(cirrusZen, basalt))
+        assertEquals(2, attempts.value)
+        assertTrue(firstCancelled.value)
+    }
+
+    /**
      * A failed model catalog fetch records `modelsLoadError` rather than
      * leaving an indistinguishable empty state, and retrying clears the error.
      */
