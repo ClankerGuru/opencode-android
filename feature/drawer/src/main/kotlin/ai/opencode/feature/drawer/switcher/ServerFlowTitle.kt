@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer.switcher
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.motion.transitionBlur
 
 import ai.opencode.core.motion.AmbientTimeline
@@ -15,6 +16,7 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.drawer.HomeConnectionFeature
 import ai.opencode.feature.drawer.HomeFeature
+import ai.opencode.feature.drawer.R
 import ai.opencode.feature.drawer.ServerMenuStatus
 import ai.opencode.feature.drawer.ServerReachability
 import ai.opencode.feature.drawer.ServerSwapTarget
@@ -72,6 +74,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -124,7 +127,8 @@ fun ServerFlowTitle(
         motion.sync(target, animated = previous.value != null && previous.value != target, reduceMotion = reducedMotion)
         previous.value = target
     }
-    val accessibilityValue = if (switchingTo == null) presentation.accessibilityValue else "Connecting"
+    val accessibilityValue = if (switchingTo == null) presentation.accessibilityValue else stringResource(R.string.drawer_server_connecting_state)
+    val selectedText = stringResource(R.string.drawer_row_selected)
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val available = maxWidth
         if (presentation.hasMenu) {
@@ -170,14 +174,14 @@ fun ServerFlowTitle(
                                     if (!isShown) onSwitch(server)
                                 },
                                 // Picking a server switches to it, so it reads as chosen, not as a toggle.
-                                modifier = Modifier.semantics { if (isShown) stateDescription = "Selected" },
+                                modifier = Modifier.semantics { if (isShown) stateDescription = selectedText },
                             )
                         }
                         HorizontalDivider()
                     }
                     if (presentation.offersTryAgain) {
                         DropdownMenuItem(
-                            text = { Text(DrawerTitle.TRY_AGAIN) },
+                            text = { Text(stringResource(CoreR.string.common_try_again)) },
                             leadingIcon = { OpenCodeIcon(SFSymbol.ArrowClockwise, contentDescription = null) },
                             onClick = {
                                 expanded = false
@@ -187,7 +191,7 @@ fun ServerFlowTitle(
                     }
                     if (presentation.offersEdit) {
                         DropdownMenuItem(
-                            text = { Text(DrawerTitle.EDIT_SERVER) },
+                            text = { Text(stringResource(R.string.drawer_server_edit)) },
                             leadingIcon = { OpenCodeIcon(SFSymbol.Key, contentDescription = null) },
                             onClick = {
                                 expanded = false
@@ -197,7 +201,7 @@ fun ServerFlowTitle(
                     }
                     if (presentation.offersTryAgain || presentation.offersEdit) HorizontalDivider()
                     DropdownMenuItem(
-                        text = { Text(DrawerTitle.MANAGE_SERVERS) },
+                        text = { Text(stringResource(R.string.drawer_server_manage)) },
                         leadingIcon = { OpenCodeIcon(SFSymbol.Gearshape, contentDescription = null) },
                         onClick = {
                             expanded = false

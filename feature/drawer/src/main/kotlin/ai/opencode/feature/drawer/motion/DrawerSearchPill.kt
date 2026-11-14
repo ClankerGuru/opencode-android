@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer.motion
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeSurfaces
 import androidx.compose.foundation.shape.RoundedCornerShape
 import ai.opencode.core.ui.OpenCodeRadius
@@ -11,6 +12,7 @@ import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeMinTapTarget
+import ai.opencode.feature.drawer.R
 import ai.opencode.feature.drawer.style.DrawerMetrics
 import ai.opencode.feature.drawer.style.DrawerTunables
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -65,6 +67,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -172,6 +175,7 @@ fun DrawerSearchPill(
     }
 
     val field: @Composable (Modifier) -> Unit = { fieldModifier ->
+        val searchDescription = stringResource(R.string.drawer_search_description)
         BasicTextField(
             value = text,
             onValueChange = onTextChange,
@@ -195,12 +199,12 @@ fun DrawerSearchPill(
                         false
                     }
                 }
-                .semantics { contentDescription = "Search sessions" }
+                .semantics { contentDescription = searchDescription }
                 .padding(end = 12.dp),
             decorationBox = { inner ->
                 Box(contentAlignment = Alignment.CenterStart) {
                     if (text.isEmpty()) {
-                        Text("Search", style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.tertiaryText, maxLines = 1)
+                        Text(stringResource(CoreR.string.common_search), style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.tertiaryText, maxLines = 1)
                     }
                     inner()
                 }
@@ -283,6 +287,7 @@ private fun SearchCapsule(
 ) {
     val leading by animateFloatAsState(leadingPadding.value, DrawerSearchPillDefaults.morph(isSearching), label = "search-leading")
     val trailing by animateFloatAsState(trailingPadding.value, DrawerSearchPillDefaults.morph(isSearching), label = "search-trailing")
+    val searchDescription = stringResource(R.string.drawer_search_description)
     Surface(
         // The drawer's floating control, as its footer buttons: popover fill, hairline ring, soft shadow.
         shape = RoundedCornerShape(OpenCodeRadius.panel),
@@ -299,7 +304,7 @@ private fun SearchCapsule(
                     Modifier.testTag("drawer-search-pill")
                 } else {
                     Modifier
-                        .clearAndSetSemantics { contentDescription = "Search sessions" }
+                        .clearAndSetSemantics { contentDescription = searchDescription }
                         .testTag("drawer-search")
                 },
             ),
@@ -333,6 +338,7 @@ private fun SearchCapsule(
 
 @Composable
 private fun CancelButton(size: Dp, enabled: Boolean = true, onClick: () -> Unit) {
+    val cancelDescription = stringResource(R.string.drawer_search_cancel_description)
     Surface(
         shape = RoundedCornerShape(OpenCodeRadius.panel),
         color = OpenCodeSurfaces.color,
@@ -342,7 +348,7 @@ private fun CancelButton(size: Dp, enabled: Boolean = true, onClick: () -> Unit)
         modifier = Modifier
             .size(size)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = "Cancel Search" }
+            .semantics { contentDescription = cancelDescription }
             .testTag("drawer-search-cancel"),
     ) {
         Box(contentAlignment = Alignment.Center) {

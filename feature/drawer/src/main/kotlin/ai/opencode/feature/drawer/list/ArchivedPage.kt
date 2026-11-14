@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer.list
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.store.StoreOf
@@ -13,6 +14,7 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.InboxSidebarFeature
+import ai.opencode.feature.drawer.R
 import ai.opencode.feature.drawer.inboxSidebarArchivedRows
 import ai.opencode.feature.drawer.style.DrawerMetrics
 import ai.opencode.feature.drawer.style.DrawerTunables
@@ -43,6 +45,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -72,7 +75,7 @@ internal fun ArchivedEntryRow(count: Int, regularList: Boolean, onClick: () -> U
         Box(if (regularList) Modifier.width(22.dp) else Modifier, contentAlignment = Alignment.CenterStart) {
             OpenCodeIcon(SFSymbol.Archivebox, contentDescription = null, tint = colors.secondaryText)
         }
-        Text("Archived", style = font, color = colors.text, modifier = Modifier.weight(1f))
+        Text(stringResource(R.string.drawer_archived), style = font, color = colors.text, modifier = Modifier.weight(1f))
         Text("$count", style = font.copy(fontFeatureSettings = "tnum"), color = colors.secondaryText)
     }
 }
@@ -103,9 +106,9 @@ internal fun ArchivedPage(
                 header()
             } else {
                 Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-                    OpenCodeIconButton(SFSymbol.ChevronBackward, contentDescription = "Back", onClick = onBack, style = OpenCodeIconButtonStyle.Standard)
+                    OpenCodeIconButton(SFSymbol.ChevronBackward, contentDescription = stringResource(CoreR.string.common_back), onClick = onBack, style = OpenCodeIconButtonStyle.Standard)
                     Text(
-                        "Archived",
+                        stringResource(R.string.drawer_archived),
                         style = DrawerTunables.titleFont.font.copy(fontWeight = FontWeight.Bold),
                         color = colors.text,
                         modifier = Modifier.padding(start = 4.dp),
@@ -118,7 +121,7 @@ internal fun ArchivedPage(
                 OpenCodeTextField(
                     value = search,
                     onValueChange = { store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.ArchivedSearchChanged(it))) },
-                    placeholder = "Search Archived",
+                    placeholder = stringResource(R.string.drawer_archived_search_placeholder),
                     leadingIcon = { OpenCodeIcon(SFSymbol.Magnifyingglass, contentDescription = null, size = 18.dp, tint = colors.secondaryText) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = InboxSidebarMetrics.edge, vertical = 8.dp),
@@ -137,7 +140,7 @@ internal fun ArchivedPage(
             if (rows.isEmpty()) {
                 item(key = "archived-empty") {
                     Text(
-                        if (search.isBlank()) "No Archived Sessions" else "No Results",
+                        if (search.isBlank()) stringResource(R.string.drawer_archived_empty) else stringResource(R.string.drawer_no_results),
                         style = OpenCodeTextStyles.body,
                         color = colors.secondaryText,
                         modifier = Modifier.fillMaxWidth().padding(horizontal = InboxSidebarMetrics.edge, vertical = 24.dp),

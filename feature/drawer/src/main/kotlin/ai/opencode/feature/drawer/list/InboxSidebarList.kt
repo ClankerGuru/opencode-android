@@ -13,6 +13,7 @@ import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.InboxSidebarFeature
 import ai.opencode.feature.drawer.InboxSidebarRow
+import ai.opencode.feature.drawer.R
 import ai.opencode.feature.drawer.catchUpSessions
 import ai.opencode.feature.drawer.inboxSidebarRows
 import ai.opencode.feature.drawer.style.DrawerHeaderScrollState
@@ -53,6 +54,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -97,6 +100,7 @@ internal fun InboxSidebarList(
     val catchUpCount by store.observe { it.catchUpSessions.size }
     val archiveError by store.observe { it.inboxSidebarStatus.archiveError }
     val snapshotLoaded by store.observe { it.snapshotLoaded }
+    val catchUpSessionCount = pluralStringResource(R.plurals.drawer_catch_up_session_count, catchUpCount, catchUpCount)
     // iOS `TimelineView(.everyMinute)`: ages tick over on the minute.
     var now by remember { mutableStateOf(Instant.now()) }
     LaunchedEffect(Unit) {
@@ -155,14 +159,14 @@ internal fun InboxSidebarList(
                             .heightIn(min = 48.dp)
                             .clickable(role = Role.Button, onClick = openCatchUp)
                             .openCodeTapTarget()
-                            .semantics { stateDescription = if (catchUpCount == 1) "1 session" else "$catchUpCount sessions" }
+                            .semantics { stateDescription = catchUpSessionCount }
                             .testTag("inbox-catch-up")
                             .padding(horizontal = InboxSidebarMetrics.edge),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         OpenCodeIcon(SFSymbol.RectangleStack, contentDescription = null, tint = colors.signal)
-                        Text("Catch Up", style = OpenCodeTextStyles.body, color = colors.text, modifier = Modifier.weight(1f))
+                        Text(stringResource(R.string.drawer_catch_up_title), style = OpenCodeTextStyles.body, color = colors.text, modifier = Modifier.weight(1f))
                         Text("$catchUpCount", style = OpenCodeTextStyles.body.copy(fontFeatureSettings = "tnum"), color = colors.secondaryText)
                     }
                 }
@@ -190,7 +194,7 @@ internal fun InboxSidebarList(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 OpenCodeIcon(SFSymbol.Tray, contentDescription = null, size = 40.dp, tint = colors.secondaryText)
-                Text("No Sessions", style = MaterialTheme.typography.titleMedium, color = colors.text)
+                Text(stringResource(R.string.drawer_empty_title), style = MaterialTheme.typography.titleMedium, color = colors.text)
             }
         }
     }
@@ -218,6 +222,9 @@ internal fun InboxSidebarSessionRow(
     val openTint = if (checked == null && selected) colors.text.copy(alpha = 0.08f) else Color.Transparent
     val checkedTint = checkedRowTint()
     val checkedTintAlpha = rememberCheckedTintAlpha(checked == true)
+    val selectLabel = stringResource(R.string.drawer_row_select_action)
+    val selectedText = stringResource(R.string.drawer_row_selected)
+    val notSelectedText = stringResource(R.string.drawer_row_not_selected)
     Box(
         Modifier
             .fillMaxWidth()
@@ -242,10 +249,10 @@ internal fun InboxSidebarSessionRow(
                 testTag = "inbox-row-${row.id}"
                 role = Role.Button
                 onClick { currentSelect(); true }
-                if (checked == null) onLongClick("Select") { currentHeld(); true }
+                if (checked == null) onLongClick(selectLabel) { currentHeld(); true }
                 when (checked) {
-                    true -> stateDescription = "Selected"
-                    false -> stateDescription = "Not Selected"
+                    true -> stateDescription = selectedText
+                    false -> stateDescription = notSelectedText
                     null -> Unit
                 }
             },
@@ -259,15 +266,18 @@ internal fun InboxSidebarSessionRow(
 internal fun InboxSidebarRowView(row: InboxSidebarRow, now: Instant, checked: Boolean?) {
     val colors = OpenCodeTheme.colors
     val age = InboxSidebarRow.age(row.updatedAt, now)
+    val needsInputText = stringResource(R.string.drawer_inbox_needs_input)
+    val workingText = stringResource(R.string.drawer_inbox_working)
+    val unreadText = stringResource(R.string.drawer_inbox_unread)
     val description = buildList {
         row.project?.let(::add)
         when (val line = row.line) {
-            InboxSidebarRow.Line.NeedsInput -> add("Needs your input")
-            InboxSidebarRow.Line.Working -> add("Working")
+            InboxSidebarRow.Line.NeedsInput -> add(needsInputText)
+            InboxSidebarRow.Line.Working -> add(workingText)
             is InboxSidebarRow.Line.Reply -> add(line.text)
             InboxSidebarRow.Line.None -> Unit
         }
-        if (row.unread) add("Unread")
+        if (row.unread) add(unreadText)
         add(age)
     }.joinToString(", ")
     Row(
@@ -312,9 +322,9 @@ internal fun InboxSidebarRowView(row: InboxSidebarRow, now: Instant, checked: Bo
             when (val line = row.line) {
                 InboxSidebarRow.Line.NeedsInput -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     OpenCodeIcon(SFSymbol.ExclamationmarkCircleFill, null, size = 16.dp, tint = InboxSidebarMetrics.needsInputTint)
-                    Text("Needs your input", style = OpenCodeTextStyles.subheadline, fontWeight = FontWeight.Medium, color = colors.text)
+                    Text(needsInputText, style = OpenCodeTextStyles.subheadline, fontWeight = FontWeight.Medium, color = colors.text)
                 }
-                InboxSidebarRow.Line.Working -> Text("Working", style = OpenCodeTextStyles.subheadline, color = colors.secondaryText)
+                InboxSidebarRow.Line.Working -> Text(workingText, style = OpenCodeTextStyles.subheadline, color = colors.secondaryText)
                 is InboxSidebarRow.Line.Reply -> Text(line.text, style = OpenCodeTextStyles.subheadline, color = colors.secondaryText, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 InboxSidebarRow.Line.None -> Unit
             }

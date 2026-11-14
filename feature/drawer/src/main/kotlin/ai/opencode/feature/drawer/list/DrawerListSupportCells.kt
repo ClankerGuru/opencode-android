@@ -1,6 +1,7 @@
 package ai.opencode.feature.drawer.list
 
 import ai.opencode.feature.drawer.style.drawerCanvas
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.motion.transitionBlurEffect
 
 import ai.opencode.core.ui.AccessibilityFocusRequest
@@ -12,6 +13,7 @@ import ai.opencode.core.ui.RollingNumberAlignment
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.accessibilityFocusRequest
 import ai.opencode.feature.drawer.DrawerListFooter
+import ai.opencode.feature.drawer.R
 import ai.opencode.feature.drawer.catchup.DrawerCatchUpFinishedLabel
 import ai.opencode.feature.drawer.motion.DrawerMotionTunables
 import ai.opencode.feature.drawer.motion.DrawerShortcutMotion
@@ -49,6 +51,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -75,7 +79,7 @@ import kotlin.math.roundToInt
 /** Pinned or Recents, as a header row or a gap or hairline between sections (iOS `DrawerListHeaderCell`). */
 @Composable
 fun DrawerListHeaderCell(kind: DrawerSectionHeaderKind, pinDrag: DrawerPinDrag, modifier: Modifier = Modifier) {
-    val title = if (kind == DrawerSectionHeaderKind.Pinned) "Pinned" else "Recents"
+    val title = if (kind == DrawerSectionHeaderKind.Pinned) stringResource(R.string.drawer_section_pinned) else stringResource(R.string.drawer_section_recents)
     val key = if (kind == DrawerSectionHeaderKind.Pinned) DrawerPinDrag.ItemKey.PinnedHeader else DrawerPinDrag.ItemKey.RecentsHeader
     val density = LocalDensity.current
     val tag = if (kind == DrawerSectionHeaderKind.Pinned) "drawer-section-pinned" else "drawer-section-recents"
@@ -204,6 +208,10 @@ private fun CatchUpButton(
 ) {
     val shape = RoundedCornerShape(DrawerMetrics.rowCornerRadius)
     val canvas = OpenCodeTheme.colors.drawerCanvas
+    val catchUpTitle = stringResource(R.string.drawer_catch_up_title)
+    val sessionCount = pluralStringResource(R.plurals.drawer_catch_up_session_count, count, count)
+    val openLabel = stringResource(R.string.drawer_catch_up_open_action)
+    val markAllReadLabel = stringResource(R.string.drawer_mark_all_read)
     RecentRowMenu(
         enabled = canMarkAllRead,
         onClick = openCatchUp,
@@ -212,15 +220,15 @@ private fun CatchUpButton(
             // Ahead of the clearing below, which would drop its marker.
             .accessibilityFocusRequest(returnFocus)
             .clearAndSetSemantics {
-                contentDescription = "Catch Up"
-                stateDescription = if (count == 1) "1 session" else "$count sessions"
+                contentDescription = catchUpTitle
+                stateDescription = sessionCount
                 role = Role.Button
-                onClick(label = "Swipe through unread and waiting sessions") { openCatchUp(); true }
-                if (canMarkAllRead) customActions = listOf(CustomAccessibilityAction("Mark All as Read") { markAllRead(); true })
+                onClick(label = openLabel) { openCatchUp(); true }
+                if (canMarkAllRead) customActions = listOf(CustomAccessibilityAction(markAllReadLabel) { markAllRead(); true })
             },
         items = { dismiss ->
             DropdownMenuItem(
-                text = { Text("Mark All as Read") },
+                text = { Text(markAllReadLabel) },
                 leadingIcon = { OpenCodeIcon(SFSymbol.EnvelopeOpen, contentDescription = null) },
                 onClick = {
                     dismiss()
@@ -230,7 +238,7 @@ private fun CatchUpButton(
         },
     ) {
         DrawerShortcutLabel(
-            title = "Catch Up",
+            title = catchUpTitle,
             systemImage = "rectangle.stack",
             modifier = Modifier.background(canvas, shape),
         ) {
@@ -252,20 +260,22 @@ private fun CatchUpButton(
 fun DrawerWhatsNewButton(action: () -> Unit, onHide: () -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(DrawerMetrics.rowCornerRadius)
     val canvas = OpenCodeTheme.colors.drawerCanvas
+    val whatsNewTitle = stringResource(R.string.drawer_whats_new)
+    val hideLabel = stringResource(R.string.drawer_whats_new_hide)
     RecentRowMenu(
         enabled = true,
         onClick = action,
         modifier = modifier
             .testTag("drawer-whats-new")
             .clearAndSetSemantics {
-                contentDescription = "What’s New"
+                contentDescription = whatsNewTitle
                 role = Role.Button
                 onClick { action(); true }
-                customActions = listOf(CustomAccessibilityAction("Hide") { onHide(); true })
+                customActions = listOf(CustomAccessibilityAction(hideLabel) { onHide(); true })
             },
         items = { dismiss ->
             DropdownMenuItem(
-                text = { Text("Hide") },
+                text = { Text(hideLabel) },
                 leadingIcon = { OpenCodeIcon(SFSymbol.EyeSlash, contentDescription = null) },
                 onClick = {
                     dismiss()
@@ -274,7 +284,7 @@ fun DrawerWhatsNewButton(action: () -> Unit, onHide: () -> Unit, modifier: Modif
             )
         },
     ) {
-        DrawerShortcutLabel(title = "What’s New", systemImage = "gift", modifier = Modifier.background(canvas, shape)) {
+        DrawerShortcutLabel(title = whatsNewTitle, systemImage = "gift", modifier = Modifier.background(canvas, shape)) {
             OpenCodeIcon(
                 SFSymbol.CircleFill,
                 contentDescription = null,
@@ -354,11 +364,11 @@ fun DrawerListEmptyRow(search: String, modifier: Modifier = Modifier) {
     ) {
         val colors = OpenCodeTheme.colors
         if (search.isEmpty()) {
-            Text("No Sessions", style = OpenCodeTextStyles.headline, color = colors.text)
-            Text("Start one with New Session.", style = OpenCodeTextStyles.body, color = colors.secondaryText)
+            Text(stringResource(R.string.drawer_empty_title), style = OpenCodeTextStyles.headline, color = colors.text)
+            Text(stringResource(R.string.drawer_empty_message), style = OpenCodeTextStyles.body, color = colors.secondaryText)
         } else {
-            Text("No Results for “$search”", style = OpenCodeTextStyles.headline, color = colors.text)
-            Text("Check the spelling or try a new search.", style = OpenCodeTextStyles.body, color = colors.secondaryText)
+            Text(stringResource(R.string.drawer_search_no_results_title, search), style = OpenCodeTextStyles.headline, color = colors.text)
+            Text(stringResource(R.string.drawer_search_no_results_message), style = OpenCodeTextStyles.body, color = colors.secondaryText)
         }
     }
 }
@@ -369,13 +379,14 @@ fun DrawerListEmptyRow(search: String, modifier: Modifier = Modifier) {
  */
 @Composable
 fun DrawerListFooterRow(footer: DrawerListFooter, retry: () -> Unit, modifier: Modifier = Modifier) {
+    val loadingDescription = stringResource(R.string.drawer_load_more_description)
     when (footer) {
         DrawerListFooter.loading -> Box(
             modifier
                 .fillMaxWidth()
                 .heightIn(min = DrawerMetrics.rowHeight)
                 .testTag("drawer-load-more")
-                .semantics { contentDescription = "Loading more sessions" },
+                .semantics { contentDescription = loadingDescription },
             contentAlignment = Alignment.Center,
         ) {
             CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = OpenCodeTheme.colors.secondaryText)
@@ -389,13 +400,13 @@ fun DrawerListFooterRow(footer: DrawerListFooter, retry: () -> Unit, modifier: M
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                "Couldn’t load more sessions",
+                stringResource(R.string.drawer_load_more_failed),
                 style = OpenCodeTextStyles.footnote,
                 color = OpenCodeTheme.colors.secondaryText,
                 modifier = Modifier.weight(1f),
             )
             TextButton(onClick = retry, modifier = Modifier.testTag("drawer-load-more-retry")) {
-                Text("Try Again", style = OpenCodeTextStyles.footnote, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(CoreR.string.common_try_again), style = OpenCodeTextStyles.footnote, fontWeight = FontWeight.SemiBold)
             }
         }
     }

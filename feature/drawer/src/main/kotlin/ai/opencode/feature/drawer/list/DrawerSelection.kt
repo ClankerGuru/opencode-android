@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer.list
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionReduce
@@ -16,6 +17,7 @@ import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.InboxSidebarFeature
+import ai.opencode.feature.drawer.R
 import ai.opencode.feature.drawer.inboxSidebarArchivedRows
 import ai.opencode.feature.drawer.isMuted
 import ai.opencode.feature.drawer.isPinned
@@ -51,6 +53,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
@@ -134,9 +138,9 @@ internal fun DrawerSelectionBar(
     val colors = OpenCodeTheme.colors
     var overflowOpen by remember { mutableStateOf(false) }
     Row(modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-        OpenCodeIconButton(SFSymbol.Xmark, contentDescription = "Cancel Selection", onClick = onClose, style = OpenCodeIconButtonStyle.Standard)
+        OpenCodeIconButton(SFSymbol.Xmark, contentDescription = stringResource(R.string.drawer_selection_cancel_description), onClick = onClose, style = OpenCodeIconButtonStyle.Standard)
         RollingNumber(
-            "$count Selected",
+            pluralStringResource(R.plurals.drawer_selection_count, count, count),
             style = OpenCodeTextStyles.headline,
             color = colors.text,
             modifier = Modifier.weight(1f).padding(start = 4.dp),
@@ -155,7 +159,7 @@ internal fun DrawerSelectionBar(
         var menuWidth by remember { mutableIntStateOf(0) }
         val shift = with(LocalDensity.current) { (menuWidth - buttonWidth).coerceAtLeast(0).toDp() }
         Box(Modifier.onSizeChanged { buttonWidth = it.width }) {
-            OpenCodeIconButton(SFSymbol.Ellipsis, contentDescription = "More Options", onClick = { overflowOpen = true }, style = OpenCodeIconButtonStyle.Standard)
+            OpenCodeIconButton(SFSymbol.Ellipsis, contentDescription = stringResource(R.string.drawer_selection_more_options_description), onClick = { overflowOpen = true }, style = OpenCodeIconButtonStyle.Standard)
             DropdownMenu(
                 expanded = overflowOpen,
                 onDismissRequest = { overflowOpen = false },
@@ -296,8 +300,8 @@ internal fun DeleteSelectionConfirmation(store: StoreOf<HomeFeature.State, HomeF
     if (!selection.confirmingDelete) return
     OpenCodeAlertDialog(
         onDismissRequest = { selection.confirmingDelete = false },
-        title = { Text("Delete ${selection.ids.size} Sessions?") },
-        text = { Text("This removes them from the server for all clients.") },
+        title = { Text(pluralStringResource(R.plurals.drawer_delete_sessions_title, selection.ids.size, selection.ids.size)) },
+        text = { Text(stringResource(R.string.drawer_delete_sessions_message)) },
         confirmButton = {
             TextButton(onClick = {
                 for (id in selection.ids) {
@@ -306,11 +310,11 @@ internal fun DeleteSelectionConfirmation(store: StoreOf<HomeFeature.State, HomeF
                 }
                 selection.clear()
             }) {
-                Text("Delete", color = OpenCodeTheme.colors.destructive)
+                Text(stringResource(CoreR.string.common_delete), color = OpenCodeTheme.colors.destructive)
             }
         },
         dismissButton = {
-            TextButton(onClick = { selection.confirmingDelete = false }) { Text("Cancel") }
+            TextButton(onClick = { selection.confirmingDelete = false }) { Text(stringResource(CoreR.string.common_cancel)) }
         },
     )
 }

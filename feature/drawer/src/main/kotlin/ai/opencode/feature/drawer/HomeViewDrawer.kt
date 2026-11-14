@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.ui.OpenCodeSurfaces
@@ -111,6 +112,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -488,15 +490,15 @@ fun HomeDeleteConfirmation(store: StoreOf<HomeFeature.State, HomeFeature.Action>
     val session = pending ?: return
     OpenCodeAlertDialog(
         onDismissRequest = { store.send(HomeFeature.Action.DeleteSessionCancelled) },
-        title = { Text("Delete “" + session.title + "”?") },
-        text = { Text("This removes the session from the server for all clients.") },
+        title = { Text(stringResource(R.string.drawer_delete_session_title, session.title)) },
+        text = { Text(stringResource(R.string.drawer_delete_session_message)) },
         confirmButton = {
             TextButton(onClick = { store.send(HomeFeature.Action.DeleteSessionConfirmed) }) {
-                Text("Delete", color = OpenCodeTheme.colors.destructive)
+                Text(stringResource(CoreR.string.common_delete), color = OpenCodeTheme.colors.destructive)
             }
         },
         dismissButton = {
-            TextButton(onClick = { store.send(HomeFeature.Action.DeleteSessionCancelled) }) { Text("Cancel") }
+            TextButton(onClick = { store.send(HomeFeature.Action.DeleteSessionCancelled) }) { Text(stringResource(CoreR.string.common_cancel)) }
         },
         modifier = Modifier.testTag("drawer-delete-confirmation"),
     )
@@ -518,6 +520,7 @@ private fun DrawerNewSessionButton(enabled: Boolean, onClick: () -> Unit) {
     val bearing = DrawerTunables.footerGlyphBearing.value * glyph / 17f
     val rise = DrawerTunables.footerGlyphRise.value * glyph / 17f
     val tint = if (enabled) colors.text else colors.tertiaryText
+    val newSession = stringResource(R.string.drawer_new_session)
     Surface(
         // The desktop's floating control: the popover fill, hairline ring and a soft shadow, at the
         // floating panels' radius so the tall footer buttons don't read as keys.
@@ -531,7 +534,7 @@ private fun DrawerNewSessionButton(enabled: Boolean, onClick: () -> Unit) {
             .openCodeTapTarget()
             .testTag("drawer-new-session")
             .clearAndSetSemantics {
-                contentDescription = "New Session"
+                contentDescription = newSession
                 role = Role.Button
                 if (!enabled) disabled()
                 onClick { onClick(); true }
@@ -552,7 +555,7 @@ private fun DrawerNewSessionButton(enabled: Boolean, onClick: () -> Unit) {
                 modifier = Modifier.offset(y = -rise.dp),
             )
             Text(
-                "New Session",
+                newSession,
                 style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium),
                 color = tint,
                 maxLines = 1,
@@ -632,7 +635,7 @@ private fun DrawerFooterTrailing(
                 ) {
                     OpenCodeIconButton(
                         symbol = SFSymbol.Waveform,
-                        contentDescription = "Start Voice Call",
+                        contentDescription = stringResource(R.string.drawer_start_voice_call_description),
                         onClick = {
                             // The orb breaks out of this button, not the composer's under the drawer.
                             center.breakoutFrom = center.drawerCallButton
@@ -646,7 +649,7 @@ private fun DrawerFooterTrailing(
                 }
                 OpenCodeIconButton(
                     symbol = SFSymbol.GearshapeFill,
-                    contentDescription = "Settings",
+                    contentDescription = stringResource(CoreR.string.common_settings),
                     onClick = onOpenSettings,
                     style = OpenCodeIconButtonStyle.Standard,
                     size = square,
