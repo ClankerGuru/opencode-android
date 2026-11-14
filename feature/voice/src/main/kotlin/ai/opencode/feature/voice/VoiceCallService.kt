@@ -121,8 +121,8 @@ open class VoiceCallService : Service() {
     override fun onCreate() {
         super.onCreate()
         getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel(CHANNEL, "Calls", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "Ongoing OpenCode calls"; setSound(null, null); enableVibration(false); setShowBadge(false)
+            NotificationChannel(CHANNEL, getString(R.string.voice_notification_channel_name), NotificationManager.IMPORTANCE_LOW).apply {
+                description = getString(R.string.voice_notification_channel_description); setSound(null, null); enableVibration(false); setShowBadge(false)
             },
         )
     }
@@ -209,9 +209,9 @@ open class VoiceCallService : Service() {
             .setContentTitle("OpenCode").setCategory(Notification.CATEGORY_CALL).setOngoing(state.phase != VoiceCallServiceState.Phase.ended)
             .setOnlyAlertOnce(true).setVisibility(Notification.VISIBILITY_PUBLIC)
         val text = when (state.phase) {
-            VoiceCallServiceState.Phase.connecting -> "Connecting…"
-            VoiceCallServiceState.Phase.reconnecting -> "Reconnecting…"
-            VoiceCallServiceState.Phase.ended -> "Call ended"
+            VoiceCallServiceState.Phase.connecting -> getString(R.string.voice_notification_connecting)
+            VoiceCallServiceState.Phase.reconnecting -> getString(R.string.voice_notification_reconnecting)
+            VoiceCallServiceState.Phase.ended -> getString(R.string.voice_notification_call_ended)
             VoiceCallServiceState.Phase.live -> null
         }
         if (text != null) builder.setContentText(text).setShowWhen(false)
@@ -220,8 +220,8 @@ open class VoiceCallService : Service() {
             builder.setContentIntent(PendingIntent.getActivity(this, 0, launch, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
         }
         if (state.phase != VoiceCallServiceState.Phase.ended) {
-            builder.addAction(Notification.Action.Builder(null, if (state.muted) "Unmute" else "Mute", command(state.callID, MUTE)).build())
-            builder.addAction(Notification.Action.Builder(null, "End", command(state.callID, END)).build())
+            builder.addAction(Notification.Action.Builder(null, if (state.muted) getString(R.string.voice_unmute) else getString(R.string.voice_mute), command(state.callID, MUTE)).build())
+            builder.addAction(Notification.Action.Builder(null, getString(R.string.voice_notification_end), command(state.callID, END)).build())
         }
         return builder.build()
     }

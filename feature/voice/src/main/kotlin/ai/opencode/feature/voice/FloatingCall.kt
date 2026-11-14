@@ -114,6 +114,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -1128,6 +1129,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
     val terminal = phase.isTerminal
     val scene = center.scene
     val statusText = floatingCallStatus(scene, storeStatus)
+    val expandLabel = stringResource(R.string.voice_floating_expand)
 
     // The keyboard raises the composer in one layout pass: glide after it.
     val rawComposerTop = center.composer?.top
@@ -1405,7 +1407,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
                                 // Already the sheet: nothing to expand to.
                                 if (stage != FloatingCallStage.full) {
                                     customActions = listOf(
-                                        CustomAccessibilityAction("Expand") {
+                                        CustomAccessibilityAction(expandLabel) {
                                             model.send(FloatingCallStageFeature.Action.Requested(FloatingCallStage.full))
                                             true
                                         },
@@ -1690,13 +1692,15 @@ private fun FloatingCallRestControls(
 /** The orb as one control: a tap is told from a drag by the shape's own gesture; TalkBack expands it. */
 @Composable
 private fun FloatingCallOrbControls(isMuted: Boolean, statusText: String, reduceMotion: Boolean, onExpand: () -> Unit, modifier: Modifier) {
+    val orbDescription = stringResource(R.string.voice_floating_orb_description)
+    val showControlsLabel = stringResource(R.string.voice_floating_orb_show_controls)
     Box(
         modifier.clearAndSetSemantics {
             role = Role.Button
-            contentDescription = "Voice call"
+            contentDescription = orbDescription
             stateDescription = statusText
             testTag = "floating-call-orb"
-            onClick(label = "Show the call’s controls") {
+            onClick(label = showControlsLabel) {
                 onExpand()
                 true
             }
@@ -1727,13 +1731,14 @@ private fun FloatingCallOrbControls(isMuted: Boolean, statusText: String, reduce
 /** The capsule's End (iOS `endButton(diameter:)`): a red circle in a full touch target. */
 @Composable
 private fun FloatingCallEndButton(diameter: Float, isEnabled: Boolean, onEnd: () -> Unit, modifier: Modifier = Modifier) {
+    val endDescription = stringResource(R.string.voice_floating_end_description)
     Box(
         modifier
             .size(FloatingCallSurfaceModel.MIN_TOUCH.dp)
             // The press shows on the round button, not the square touch target around it.
             .clip(CircleShape)
             .clickable(enabled = isEnabled, role = Role.Button, onClick = onEnd)
-            .semantics { contentDescription = "End voice call" },
+            .semantics { contentDescription = endDescription },
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -1784,6 +1789,7 @@ internal fun RowScope.FloatingCallControl(
     action: () -> Unit,
 ) {
     val active = !isPlaceholder && isEnabled
+    val placeholderState = stringResource(R.string.voice_floating_control_placeholder_state)
     // Mute turning on, or every control dimming as the call ends, eases rather than flipping.
     val reduceMotion = rememberReduceMotion()
     val dim by animateFloatAsState(if (isPlaceholder || !isEnabled) 0.35f else 1f, Motion.swap.animation(reduceMotion = reduceMotion), label = "floatingCallControlDim")
@@ -1810,7 +1816,7 @@ internal fun RowScope.FloatingCallControl(
             .clickable(interactionSource = interaction, indication = null, enabled = active, role = Role.Button, onClick = action)
             .semantics {
                 contentDescription = name
-                if (isPlaceholder) stateDescription = "Not available in this prototype"
+                if (isPlaceholder) stateDescription = placeholderState
                 if (!active) disabled()
             },
         contentAlignment = Alignment.Center,
@@ -1854,13 +1860,14 @@ internal fun FloatingCallDuration(connectedAt: Instant?, status: String, modifie
         }
     }
     val text = if (connectedAt == null) status else "%d:%02d".format(Locale.ROOT, seconds / 60, seconds % 60)
+    val durationDescription = stringResource(R.string.voice_floating_duration_description)
     Text(
         text,
         style = OpenCodeTextStyles.footnote.copy(fontFeatureSettings = "tnum"),
         color = OpenCodeTheme.colors.secondaryText,
         maxLines = 1,
         modifier = modifier.clearAndSetSemantics {
-            contentDescription = "Call duration"
+            contentDescription = durationDescription
             // TalkBack reads "1:05" as a time of day; say how long it's been.
             stateDescription = if (connectedAt == null) text else floatingCallSpokenDuration(seconds)
         },

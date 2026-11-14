@@ -1,5 +1,6 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.motion.transitionBlurEffect
 
@@ -96,6 +97,7 @@ import androidx.compose.ui.node.invalidateSemantics
 import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -728,10 +730,10 @@ fun VoiceCallEnded(store: VoiceStoreOf, modifier: Modifier = Modifier) {
             .callSurface(shape, VoiceCallSurfaceDefaults.color, VoiceCallSurfaceDefaults.border)
             .padding(start = 18.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
     ) {
-        val title = @Composable { Text("Call Ended", style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold)) }
+        val title = @Composable { Text(stringResource(R.string.voice_call_ended_title), style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold)) }
         val actions = @Composable {
-            OpenCodeSecondaryButton("Close", onClick = { store.send(VoiceFeature.Action.EndPressed) })
-            OpenCodePrimaryButton("Rejoin", onClick = { store.send(VoiceFeature.Action.RejoinTapped) })
+            OpenCodeSecondaryButton(stringResource(CoreR.string.common_close), onClick = { store.send(VoiceFeature.Action.EndPressed) })
+            OpenCodePrimaryButton(stringResource(R.string.voice_call_ended_rejoin), onClick = { store.send(VoiceFeature.Action.RejoinTapped) })
         }
         ViewThatFitsHorizontally(
             wide = {
@@ -790,7 +792,7 @@ private fun VoiceCallFailurePlainCard(store: VoiceStoreOf, message: String, modi
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 OpenCodeIcon(SFSymbol.ExclamationmarkTriangleFill, null, tint = VoiceCallSurfaceDefaults.orange, size = 18.dp)
                 Text(
-                    "Couldn’t Connect Voice",
+                    stringResource(R.string.voice_failure_title),
                     style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
                     color = VoiceCallSurfaceDefaults.orange,
                 )
@@ -802,11 +804,11 @@ private fun VoiceCallFailurePlainCard(store: VoiceStoreOf, message: String, modi
         }
         val actions = @Composable {
             if (isMicrophoneDenied) {
-                OpenCodeSecondaryButton("Open Settings", onClick = { store.send(VoiceFeature.Action.FailureFixTapped(VoiceCallFix.openSettings)) })
+                OpenCodeSecondaryButton(stringResource(CoreR.string.common_open_settings), onClick = { store.send(VoiceFeature.Action.FailureFixTapped(VoiceCallFix.openSettings)) })
             } else {
-                OpenCodeSecondaryButton("Check API Key", onClick = { store.send(VoiceFeature.Action.FailureFixTapped(VoiceCallFix.setUpOnIPhone)) })
+                OpenCodeSecondaryButton(stringResource(R.string.voice_failure_check_api_key), onClick = { store.send(VoiceFeature.Action.FailureFixTapped(VoiceCallFix.setUpOnIPhone)) })
             }
-            OpenCodePrimaryButton("Try Again", onClick = { store.send(VoiceFeature.Action.TryAgainTapped) })
+            OpenCodePrimaryButton(stringResource(CoreR.string.common_try_again), onClick = { store.send(VoiceFeature.Action.TryAgainTapped) })
         }
         ViewThatFitsHorizontally(
             wide = { Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { actions() } },
