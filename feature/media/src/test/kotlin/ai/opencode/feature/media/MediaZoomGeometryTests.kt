@@ -29,6 +29,24 @@ class MediaZoomGeometryTests {
     private fun close(a: Size, b: Size): Boolean = abs(a.width - b.width) < 0.001f && abs(a.height - b.height) < 0.001f
 
     @Test
+    fun movieSurfaceAndItsReportedFrameStayTogetherThroughZoomAndRotation() {
+        // No poster/Bitmap is needed to lay out the decoded 16:9 surface.
+        val zoom = MediaZoomState(Size(1920f, 1080f))
+        val frames = mutableListOf<Rect>()
+        zoom.onFrame = { frames.add(it) }
+        zoom.layout(Size(320f, 640f))
+        assertTrue(close(Size(320f, 180f), frames.last().size))
+        assertPoint(Offset(160f, 320f), frames.last().center)
+
+        zoom.pinch(2f, Offset(160f, 320f), Offset.Zero)
+        assertTrue(close(Size(640f, 360f), frames.last().size))
+        zoom.layout(Size(640f, 320f))
+        assertEquals(2f, zoom.zoomScale, 0f)
+        assertEquals(zoom.imageFrame, frames.last())
+        assertPoint(Offset(320f, 160f), frames.last().center)
+    }
+
+    @Test
     fun fitsTheWholeImageInsideThePage() {
         // Landscape: as wide as the page.
         assertTrue(close(MediaZoomGeometry.fittedSize(Size(120f, 90f), page), Size(440f, 330f)))

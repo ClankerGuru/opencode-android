@@ -14,9 +14,11 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -38,7 +40,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.util.VelocityTracker
-import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.testTag
@@ -153,23 +155,15 @@ object MediaZoomGeometry {
  * gestures.
  */
 @Stable
-class MediaZoomState internal constructor(image: Bitmap) {
-    internal var image: Bitmap = image
-        set(value) {
-            if (value === field) return
-            field = value
-            laidOutSize = Size.Zero
-            reportedFrame = null
-        }
-
+class MediaZoomState internal constructor(private val pixelSize: Size) {
     var zoomScale by mutableFloatStateOf(1f)
         private set
     var contentOffset by mutableStateOf(Offset.Zero)
         private set
 
     /** The page size the image was last fitted to. */
-    private var laidOutSize = Size.Zero
-    private var fitted = Size.Zero
+    private var laidOutSize by mutableStateOf(Size.Zero)
+    private var fitted by mutableStateOf(Size.Zero)
     private var reportedFrame: Rect? = null
     private var isZoomedIn = false
     var maximumZoomScale = MediaZoomGeometry.smallestMaximumScale
@@ -221,9 +215,9 @@ class MediaZoomState internal constructor(image: Bitmap) {
         animation?.cancel()
         laidOutSize = size
         zoomScale = 1f
-        fitted = MediaZoomGeometry.fittedSize(Size(image.width.toFloat(), image.height.toFloat()), size)
+        fitted = MediaZoomGeometry.fittedSize(pixelSize, size)
         maximumZoomScale = MediaZoomGeometry.maximumScale(
-            pixelSize = Size(image.width.toFloat(), image.height.toFloat()),
+            pixelSize = pixelSize,
             fitted = fitted,
             displayScale = 1f,
         )
@@ -465,21 +459,46 @@ fun ZoomableImagePage(
     onZoomChange: (Boolean) -> Unit = {},
     onFrame: (Rect) -> Unit = {},
 ) {
+    val bitmap = remember(image) { image.asImageBitmap() }
+    ZoomableVisualPage(Size(image.width.toFloat(), image.height.toFloat()), label, isSelected, modifier,
+        onSingleTap, onZoomChange, onFrame) { state ->
+        Spacer(Modifier.fillMaxSize().drawBehind {
+            if (isHidden) return@drawBehind
+            val from = state.fadingFrom
+            if (from != null) {
+                drawImageIn(bitmap, from, 1 - state.fade)
+                drawImageIn(bitmap, state.imageFrame, state.fade)
+            } else drawImageIn(bitmap, state.imageFrame, 1f)
+        })
+    }
+}
+
+/** Both pixels and the live movie surface fit, zoom, pan and hand off at the same edges. */
+@Composable
+internal fun ZoomableVisualPage(
+    pixelSize: Size,
+    label: String,
+    isSelected: Boolean,
+    modifier: Modifier = Modifier,
+    onSingleTap: () -> Unit,
+    onZoomChange: (Boolean) -> Unit,
+    onFrame: (Rect) -> Unit,
+    content: @Composable (MediaZoomState) -> Unit,
+) {
     val reducesMotion = rememberReduceMotion()
-    val state = remember { MediaZoomState(image) }
-    state.image = image
+    val state = remember(pixelSize) { MediaZoomState(pixelSize) }
     val currentZoomChange by rememberUpdatedState(onZoomChange)
     val currentFrame by rememberUpdatedState(onFrame)
     val currentTap by rememberUpdatedState(onSingleTap)
     state.onZoomChange = { currentZoomChange(it) }
     state.onFrame = { currentFrame(it) }
-    val bitmap: ImageBitmap = remember(image) { image.asImageBitmap() }
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val slop = LocalViewConfiguration.current.touchSlop
 
-    LaunchedEffect(isSelected) {
-        if (!isSelected) state.resetZoom()
+    DisposableEffect(state) { onDispose { state.stopAnimation() } }
+    LaunchedEffect(state, isSelected) {
+        if (!isSelected) state.resetZoom() else currentZoomChange(state.isZoomed)
         state.reportFrame()
     }
 
@@ -487,11 +506,15 @@ fun ZoomableImagePage(
     val zoomedInState = stringResource(R.string.media_zoom_zoomed_in_state)
     val zoomOutLabel = stringResource(R.string.media_zoom_out_label)
     val zoomInLabel = stringResource(R.string.media_zoom_in_label)
-    Spacer(
+    Box(
         modifier
             .fillMaxSize()
             .testTag("media-zoom-page")
-            .onSizeChanged { size: IntSize -> state.layout(Size(size.width.toFloat(), size.height.toFloat())) }
+            .layout { measurable, constraints ->
+                state.layout(Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat()))
+                val child = measurable.measure(constraints)
+                layout(child.width, child.height) { child.place(0, 0) }
+            }
             .semantics {
                 contentDescription = label
                 role = Role.Image
@@ -514,18 +537,8 @@ fun ZoomableImagePage(
             }
             .pointerInput(state) {
                 zoomGestures(state, scope, slop, density)
-            }
-            .drawBehind {
-                if (isHidden) return@drawBehind
-                val from = state.fadingFrom
-                if (from != null) {
-                    drawImageIn(bitmap, from, 1 - state.fade)
-                    drawImageIn(bitmap, state.imageFrame, state.fade)
-                } else {
-                    drawImageIn(bitmap, state.imageFrame, 1f)
-                }
             },
-    )
+    ) { content(state) }
 }
 
 private fun DrawScope.drawImageIn(bitmap: ImageBitmap, frame: Rect, alpha: Float) {
