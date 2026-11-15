@@ -689,16 +689,11 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         data class AutoBackgroundClaimLapsed(val messageID: String, val requestEpoch: Int) : Action
         data class ComposerAttachments(val action: ComposerAttachmentsFeature.Action) : Action
         /**
-         * Draw on Image's copy, for the draft whose viewer it came from ([from], as of
-         * [sendGeneration]): dropped once that composer has gone, answers a request, or has sent
-         * or is waiting to send that draft. iOS `composerAttachments(.drawingAdded)`; here a
-         * session action, since [State.TaskIdentity] is this module's, above the composer's.
+         * A drawn image for the session whose viewer it came from ([from]), added by the rules a
+         * pasted image follows. A session action, since [State.TaskIdentity] is this module's,
+         * above the composer's.
          */
-        data class DrawingAdded(
-            val attachment: OpenCodeOutgoingAttachment,
-            val from: State.TaskIdentity,
-            val sendGeneration: Int,
-        ) : Action
+        data class DrawingAdded(val attachment: OpenCodeOutgoingAttachment, val from: State.TaskIdentity) : Action
         /** An upward swipe on the unfocused composer asks for the keyboard. */
         data object ComposerSwipedUp : Action
         /** Send a failed message again, with its ID and delivery. */

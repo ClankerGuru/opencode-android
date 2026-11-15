@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">ແຕ້ມຕໍ່</string>
     <string name="media_drawing_add_failed_title">ເພີ່ມຮູບແຕ້ມບໍ່ໄດ້</string>
     <string name="media_drawing_flatten_failed">ສ້າງຮູບພາບບໍ່ໄດ້. ລອງໃໝ່.</string>
-    <string name="media_drawing_prompt_unavailable">prompt ທີ່ເປີດຮູບພາບນີ້ບໍ່ຮັບໄຟລ໌ແນບແລ້ວ.</string>
+    <string name="media_drawing_prompt_unavailable">ຂໍ້ຄວາມຂອງເຊດຊັນນີ້ຍັງແນບໄຟລ໌ບໍ່ໄດ້ໃນຕອນນີ້.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">ສີຂາວ</string>

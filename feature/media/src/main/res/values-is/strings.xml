@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Halda áfram að teikna</string>
     <string name="media_drawing_add_failed_title">Ekki tókst að bæta við teikningu</string>
     <string name="media_drawing_flatten_failed">Ekki tókst að búa til myndina. Reyndu aftur.</string>
-    <string name="media_drawing_prompt_unavailable">Kvaðningin sem opnaði þessa mynd tekur ekki lengur við viðhengjum.</string>
+    <string name="media_drawing_prompt_unavailable">Ekki er hægt að bæta viðhengjum við skilaboð þessarar setu núna.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Hvítur</string>

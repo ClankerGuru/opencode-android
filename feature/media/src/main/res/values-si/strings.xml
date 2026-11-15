@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">දිගටම අඳින්න</string>
     <string name="media_drawing_add_failed_title">ඇඳීම එකතු කිරීමට නොහැකි විය</string>
     <string name="media_drawing_flatten_failed">රූපය සෑදීමට නොහැකි විය. නැවත උත්සාහ කරන්න.</string>
-    <string name="media_drawing_prompt_unavailable">මෙම රූපය විවෘත කළ ප්‍රොම්ප්ට් එක තවදුරටත් ඇමුණුම් භාර නොගනී.</string>
+    <string name="media_drawing_prompt_unavailable">මෙම සැසියේ පණිවිඩයට දැන් ඇමුණුම් එකතු කළ නොහැක.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">සුදු</string>

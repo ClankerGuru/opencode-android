@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">कोर्न जारी राख्नुहोस्</string>
     <string name="media_drawing_add_failed_title">चित्र थप्न सकिएन</string>
     <string name="media_drawing_flatten_failed">छवि बनाउन सकिएन। फेरि प्रयास गर्नुहोस्।</string>
-    <string name="media_drawing_prompt_unavailable">यो छवि खोल्ने प्रम्प्टले अब संलग्नक लिँदैन।</string>
+    <string name="media_drawing_prompt_unavailable">यो सत्रको सन्देशमा अहिले संलग्नक थप्न मिल्दैन।</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">सेतो</string>

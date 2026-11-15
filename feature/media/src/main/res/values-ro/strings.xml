@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Continuă desenul</string>
     <string name="media_drawing_add_failed_title">Desenul nu a putut fi adăugat</string>
     <string name="media_drawing_flatten_failed">Nu s-a putut crea imaginea. Încearcă din nou.</string>
-    <string name="media_drawing_prompt_unavailable">Solicitarea care a deschis această imagine nu mai acceptă atașamente.</string>
+    <string name="media_drawing_prompt_unavailable">Mesajul acestei sesiuni nu poate primi atașamente acum.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Alb</string>

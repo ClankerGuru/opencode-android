@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">描き込みを続ける</string>
     <string name="media_drawing_add_failed_title">描き込みを追加できませんでした</string>
     <string name="media_drawing_flatten_failed">画像を作成できませんでした。もう一度試してください。</string>
-    <string name="media_drawing_prompt_unavailable">この画像を開いたプロンプトは、添付ファイルを受け付けなくなりました。</string>
+    <string name="media_drawing_prompt_unavailable">このセッションのメッセージには、今は添付ファイルを追加できません。</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">白</string>

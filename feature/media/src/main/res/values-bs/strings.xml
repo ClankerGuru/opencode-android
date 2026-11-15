@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Nastavi crtati</string>
     <string name="media_drawing_add_failed_title">Nije moguće dodati crtež</string>
     <string name="media_drawing_flatten_failed">Nije moguće kreirati sliku. Pokušaj ponovo.</string>
-    <string name="media_drawing_prompt_unavailable">Upit iz kojeg je otvorena ova slika više ne prima priloge.</string>
+    <string name="media_drawing_prompt_unavailable">Poruka ove sesije trenutno ne može primati priloge.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Bijela</string>

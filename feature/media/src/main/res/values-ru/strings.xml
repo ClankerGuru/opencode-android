@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Продолжить рисовать</string>
     <string name="media_drawing_add_failed_title">Не удалось добавить рисунок</string>
     <string name="media_drawing_flatten_failed">Не удалось создать изображение. Попробуйте снова.</string>
-    <string name="media_drawing_prompt_unavailable">Запрос, из которого открыто это изображение, больше не принимает вложения.</string>
+    <string name="media_drawing_prompt_unavailable">Сейчас к сообщению в этой сессии нельзя добавить вложения.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Белый</string>

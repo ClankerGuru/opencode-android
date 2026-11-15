@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Continua dibuixant</string>
     <string name="media_drawing_add_failed_title">No s\'ha pogut afegir el dibuix</string>
     <string name="media_drawing_flatten_failed">No s\'ha pogut crear la imatge. Torna-ho a provar.</string>
-    <string name="media_drawing_prompt_unavailable">La indicació que ha obert aquesta imatge ja no admet adjunts.</string>
+    <string name="media_drawing_prompt_unavailable">Ara mateix no es poden afegir adjunts al missatge d\'aquesta sessió.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Blanc</string>

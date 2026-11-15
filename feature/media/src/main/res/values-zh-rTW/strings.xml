@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">繼續繪圖</string>
     <string name="media_drawing_add_failed_title">無法新增繪圖</string>
     <string name="media_drawing_flatten_failed">無法建立圖片，請再試一次。</string>
-    <string name="media_drawing_prompt_unavailable">開啟此圖片的提示詞已無法再新增附件。</string>
+    <string name="media_drawing_prompt_unavailable">此工作階段的訊息目前無法新增附件。</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">白色</string>

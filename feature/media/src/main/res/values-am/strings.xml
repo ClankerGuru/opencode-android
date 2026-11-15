@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">መሳል ቀጥል</string>
     <string name="media_drawing_add_failed_title">ስዕሉን ማከል አልተቻለም</string>
     <string name="media_drawing_flatten_failed">ምስሉን መፍጠር አልተቻለም። እንደገና ሞክር።</string>
-    <string name="media_drawing_prompt_unavailable">ይህን ምስል የከፈተው ፕሮምፕት ከእንግዲህ አባሪዎችን አይቀበልም።</string>
+    <string name="media_drawing_prompt_unavailable">የዚህ ክፍለ ጊዜ መልእክት አሁን አባሪዎችን መቀበል አይችልም።</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">ነጭ</string>

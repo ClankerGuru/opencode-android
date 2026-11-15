@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">继续绘图</string>
     <string name="media_drawing_add_failed_title">无法添加绘图</string>
     <string name="media_drawing_flatten_failed">无法生成图片，请重试。</string>
-    <string name="media_drawing_prompt_unavailable">打开此图片的提示词已无法添加附件。</string>
+    <string name="media_drawing_prompt_unavailable">此会话的消息暂时无法添加附件。</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">白色</string>

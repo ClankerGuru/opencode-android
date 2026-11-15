@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">ड्रॉ करते रहें</string>
     <string name="media_drawing_add_failed_title">ड्रॉइंग नहीं जोड़ सके</string>
     <string name="media_drawing_flatten_failed">छवि नहीं बन सकी। फिर से कोशिश करें।</string>
-    <string name="media_drawing_prompt_unavailable">जिस प्रॉम्प्ट से यह छवि खुली थी, वह अब अटैचमेंट नहीं लेता।</string>
+    <string name="media_drawing_prompt_unavailable">इस सेशन के संदेश में अभी अटैचमेंट नहीं जोड़े जा सकते।</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">सफ़ेद</string>

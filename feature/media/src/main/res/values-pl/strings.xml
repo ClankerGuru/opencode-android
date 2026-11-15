@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Rysuj dalej</string>
     <string name="media_drawing_add_failed_title">Nie udało się dodać rysunku</string>
     <string name="media_drawing_flatten_failed">Nie udało się utworzyć obrazu. Spróbuj ponownie.</string>
-    <string name="media_drawing_prompt_unavailable">Monit, z którego otwarto ten obraz, nie przyjmuje już załączników.</string>
+    <string name="media_drawing_prompt_unavailable">Do wiadomości w tej sesji nie można teraz dodać załączników.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Biały</string>

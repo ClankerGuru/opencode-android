@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">계속 그리기</string>
     <string name="media_drawing_add_failed_title">그림을 추가할 수 없어요</string>
     <string name="media_drawing_flatten_failed">이미지를 만들 수 없어요. 다시 시도해 주세요.</string>
-    <string name="media_drawing_prompt_unavailable">이 이미지를 연 프롬프트에 더 이상 첨부 파일을 추가할 수 없어요.</string>
+    <string name="media_drawing_prompt_unavailable">지금은 이 세션의 메시지에 첨부 파일을 추가할 수 없어요.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">흰색</string>

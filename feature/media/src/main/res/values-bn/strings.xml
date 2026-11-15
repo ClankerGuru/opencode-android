@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">আঁকা চালিয়ে যান</string>
     <string name="media_drawing_add_failed_title">আঁকা যোগ করা যায়নি</string>
     <string name="media_drawing_flatten_failed">ছবি তৈরি করা যায়নি। আবার চেষ্টা করুন।</string>
-    <string name="media_drawing_prompt_unavailable">যে প্রম্পট থেকে এই ছবিটি খোলা হয়েছিল, সেটি আর সংযুক্তি নেয় না।</string>
+    <string name="media_drawing_prompt_unavailable">এই সেশনের বার্তায় এখন সংযুক্তি যোগ করা যাবে না।</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">সাদা</string>

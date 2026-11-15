@@ -404,17 +404,15 @@ fun rememberSessionAttachmentImporter(store: StoreOf<SessionFeature.State, Sessi
 }
 
 /**
- * iOS `drawingHandler()`: Draw on Image's Add to Prompt for a viewer opened from this draft, or
- * null (no Draw button) while it takes no attachments or waits on uploads to send. The reducer
- * drops a copy that lands once this draft has gone, answers a request, or is sent or waiting to
- * send ([SessionFeature.Action.DrawingAdded]).
+ * Draw on Image's Add to Prompt for a viewer opened from this session, or null (no Draw button)
+ * while it takes no attachments. The image joins the session's draft as a pasted one would
+ * ([SessionFeature.Action.DrawingAdded]).
  */
 internal fun drawingHandler(store: StoreOf<SessionFeature.State, SessionFeature.Action>): ImageDrawingAdd? {
-    if (!store.state.takesPasteAttachments || store.state.sendAfterUploads != null) return null
+    if (!store.state.takesPasteAttachments) return null
     val identity = store.state.taskIdentity
-    val generation = store.state.sendGeneration
     return { attachment ->
-        store.send(SessionFeature.Action.DrawingAdded(attachment, from = identity, sendGeneration = generation))
+        store.send(SessionFeature.Action.DrawingAdded(attachment, from = identity))
         store.state.pendingAttachments.any { it.id == attachment.id }
     }
 }

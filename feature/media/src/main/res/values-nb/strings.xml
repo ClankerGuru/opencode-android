@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Fortsett å tegne</string>
     <string name="media_drawing_add_failed_title">Kunne ikke legge til tegning</string>
     <string name="media_drawing_flatten_failed">Kunne ikke lage bildet. Prøv igjen.</string>
-    <string name="media_drawing_prompt_unavailable">Meldingen som åpnet dette bildet, tar ikke lenger imot vedlegg.</string>
+    <string name="media_drawing_prompt_unavailable">Meldingen i denne sesjonen kan ikke ta imot vedlegg akkurat nå.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Hvit</string>

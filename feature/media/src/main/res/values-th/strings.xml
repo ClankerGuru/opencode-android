@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">วาดต่อ</string>
     <string name="media_drawing_add_failed_title">เพิ่มภาพวาดไม่ได้</string>
     <string name="media_drawing_flatten_failed">สร้างรูปภาพไม่ได้ ลองอีกครั้ง</string>
-    <string name="media_drawing_prompt_unavailable">พรอมต์ที่เปิดรูปภาพนี้รับไฟล์แนบไม่ได้แล้ว</string>
+    <string name="media_drawing_prompt_unavailable">ตอนนี้ข้อความของเซสชันนี้ยังเพิ่มไฟล์แนบไม่ได้</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">ขาว</string>

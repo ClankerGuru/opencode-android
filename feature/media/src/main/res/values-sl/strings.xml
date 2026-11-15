@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Nadaljuj z risanjem</string>
     <string name="media_drawing_add_failed_title">Risbe ni bilo mogoče dodati</string>
     <string name="media_drawing_flatten_failed">Slike ni bilo mogoče ustvariti. Poskusite znova.</string>
-    <string name="media_drawing_prompt_unavailable">Poziv, ki je odprl to sliko, ne sprejema več prilog.</string>
+    <string name="media_drawing_prompt_unavailable">Sporočilu v tej seji trenutno ni mogoče dodati prilog.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Bela</string>

@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">རི་མོ་འཕྲོ་མཐུད་བྲིས།</string>
     <string name="media_drawing_add_failed_title">རི་མོ་ཁ་སྐོང་འབད་མ་ཚུགས།</string>
     <string name="media_drawing_flatten_failed">པར་བཟོ་མ་ཚུགས། བསྐྱར་དུ་ཚོད་ལྟ་</string>
-    <string name="media_drawing_prompt_unavailable">པར་འདི་ཁ་ཕྱེ་མི་འདི་འཕྲོ་ལས་འདི་གིས་ད་ལས་ཕར་མཉམ་སྦྲགས་མི་ལེན།</string>
+    <string name="media_drawing_prompt_unavailable">ད་ལྟོ་ལཱ་ཡུན་འདིའི་འཕྲིན་དོན་ལུ་མཉམ་སྦྲགས་ཁ་སྐོང་འབད་མི་ཚུགས།</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">དཀརཔོ་</string>

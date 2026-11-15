@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Keep Drawing</string>
     <string name="media_drawing_add_failed_title">Couldn’t Add Drawing</string>
     <string name="media_drawing_flatten_failed">Couldn’t create the image. Try again.</string>
-    <string name="media_drawing_prompt_unavailable">The prompt that opened this image no longer takes attachments.</string>
+    <string name="media_drawing_prompt_unavailable">This session’s message can’t take attachments right now.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">White</string>

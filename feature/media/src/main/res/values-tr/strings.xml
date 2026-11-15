@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Çizime devam et</string>
     <string name="media_drawing_add_failed_title">Çizim eklenemedi</string>
     <string name="media_drawing_flatten_failed">Görsel oluşturulamadı. Tekrar deneyin.</string>
-    <string name="media_drawing_prompt_unavailable">Bu görseli açan istem artık ek kabul etmiyor.</string>
+    <string name="media_drawing_prompt_unavailable">Bu oturumun mesajına şu anda ek eklenemiyor.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Beyaz</string>

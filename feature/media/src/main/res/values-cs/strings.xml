@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Pokračovat v kreslení</string>
     <string name="media_drawing_add_failed_title">Nepodařilo se přidat kresbu</string>
     <string name="media_drawing_flatten_failed">Obrázek se nepodařilo vytvořit. Zkuste to znovu.</string>
-    <string name="media_drawing_prompt_unavailable">Zadání, ze kterého jste obrázek otevřeli, už nepřijímá přílohy.</string>
+    <string name="media_drawing_prompt_unavailable">Ke zprávě v této relaci teď nelze přidávat přílohy.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Bílá</string>

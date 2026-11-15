@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Расмкаширо идома диҳед</string>
     <string name="media_drawing_add_failed_title">Расм илова нашуд</string>
     <string name="media_drawing_flatten_failed">Тасвир сохта нашуд. Аз нав кӯшиш кунед.</string>
-    <string name="media_drawing_prompt_unavailable">Промпте, ки ин тасвирро кушод, дигар замимаҳоро қабул намекунад.</string>
+    <string name="media_drawing_prompt_unavailable">Ба паёми ин сессия ҳоло замима илова кардан мумкин нест.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Сафед</string>

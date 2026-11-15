@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Rajzolás folytatása</string>
     <string name="media_drawing_add_failed_title">Nem sikerült hozzáadni a rajzot</string>
     <string name="media_drawing_flatten_failed">Nem sikerült létrehozni a képet. Próbálja újra.</string>
-    <string name="media_drawing_prompt_unavailable">A képet megnyitó utasításhoz már nem adhatók mellékletek.</string>
+    <string name="media_drawing_prompt_unavailable">Ennek a munkamenetnek az üzenetéhez most nem adhatók mellékletek.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Fehér</string>

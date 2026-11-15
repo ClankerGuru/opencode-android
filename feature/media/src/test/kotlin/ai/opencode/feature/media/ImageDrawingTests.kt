@@ -174,7 +174,7 @@ class ImageDrawingFeatureTests {
             it.copy(isAdding = false, failure = ImageDrawingFeature.Failure.Prompt)
         }
         store.finish()
-        assertEquals("The prompt that opened this image no longer takes attachments.", ImageDrawingFeature.Failure.Prompt.message)
+        assertEquals("This session’s message can’t take attachments right now.", ImageDrawingFeature.Failure.Prompt.message)
         // Offered once; the opener declined it.
         assertEquals(listOf(copy(UUID(0, 0))), offered.current)
     }

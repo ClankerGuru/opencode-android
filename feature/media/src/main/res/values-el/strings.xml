@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Συνέχεια σχεδίασης</string>
     <string name="media_drawing_add_failed_title">Αδυναμία προσθήκης σχεδίου</string>
     <string name="media_drawing_flatten_failed">Αδυναμία δημιουργίας της εικόνας. Δοκιμάστε ξανά.</string>
-    <string name="media_drawing_prompt_unavailable">Η προτροπή που άνοιξε αυτή την εικόνα δεν δέχεται πλέον συνημμένα.</string>
+    <string name="media_drawing_prompt_unavailable">Το μήνυμα αυτής της συνεδρίας δεν δέχεται συνημμένα αυτή τη στιγμή.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Λευκό</string>

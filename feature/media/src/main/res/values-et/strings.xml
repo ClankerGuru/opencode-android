@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Jätka joonistamist</string>
     <string name="media_drawing_add_failed_title">Joonistuse lisamine ebaõnnestus</string>
     <string name="media_drawing_flatten_failed">Pildi loomine ebaõnnestus. Proovi uuesti.</string>
-    <string name="media_drawing_prompt_unavailable">Viip, millest see pilt avati, ei võta enam manuseid vastu.</string>
+    <string name="media_drawing_prompt_unavailable">Selle seansi sõnumile ei saa praegu manuseid lisada.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Valge</string>

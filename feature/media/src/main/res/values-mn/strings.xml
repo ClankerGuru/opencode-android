@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Үргэлжлүүлэн зурах</string>
     <string name="media_drawing_add_failed_title">Зураг нэмж чадсангүй</string>
     <string name="media_drawing_flatten_failed">Зургийг үүсгэж чадсангүй. Дахин оролдоно уу.</string>
-    <string name="media_drawing_prompt_unavailable">Энэ зургийг нээсэн промпт хавсралт хүлээн авахаа больсон.</string>
+    <string name="media_drawing_prompt_unavailable">Энэ сессийн мессежид одоогоор хавсралт нэмэх боломжгүй байна.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Цагаан</string>

@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Продължаване</string>
     <string name="media_drawing_add_failed_title">Неуспешно добавяне на рисунката</string>
     <string name="media_drawing_flatten_failed">Изображението не можа да се създаде. Опитайте отново.</string>
-    <string name="media_drawing_prompt_unavailable">Подканата, от която е отворено това изображение, вече не приема прикачени файлове.</string>
+    <string name="media_drawing_prompt_unavailable">В момента към съобщението в тази сесия не може да се прикачват файлове.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Бяло</string>

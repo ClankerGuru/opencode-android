@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Continuar desenhando</string>
     <string name="media_drawing_add_failed_title">Não foi possível adicionar o desenho</string>
     <string name="media_drawing_flatten_failed">Não foi possível criar a imagem. Tente novamente.</string>
-    <string name="media_drawing_prompt_unavailable">O prompt que abriu esta imagem não aceita mais anexos.</string>
+    <string name="media_drawing_prompt_unavailable">A mensagem desta sessão não aceita anexos no momento.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Branco</string>

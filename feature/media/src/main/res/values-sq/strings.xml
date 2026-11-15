@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Vazhdo vizatimin</string>
     <string name="media_drawing_add_failed_title">Vizatimi nuk u shtua dot</string>
     <string name="media_drawing_flatten_failed">Imazhi nuk u krijua dot. Provo sërish.</string>
-    <string name="media_drawing_prompt_unavailable">Kërkesa që hapi këtë imazh nuk pranon më bashkëngjitje.</string>
+    <string name="media_drawing_prompt_unavailable">Mesazhi i këtij sesioni nuk pranon bashkëngjitje tani për tani.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">E bardhë</string>

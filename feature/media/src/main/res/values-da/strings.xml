@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Behold tegning</string>
     <string name="media_drawing_add_failed_title">Kunne ikke tilføje tegning</string>
     <string name="media_drawing_flatten_failed">Kunne ikke oprette billedet. Prøv igen.</string>
-    <string name="media_drawing_prompt_unavailable">Prompten, der åbnede dette billede, tager ikke længere imod vedhæftninger.</string>
+    <string name="media_drawing_prompt_unavailable">Beskeden i denne session kan ikke tage imod vedhæftninger lige nu.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Hvid</string>

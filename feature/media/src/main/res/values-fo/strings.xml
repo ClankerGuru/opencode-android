@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Tekna víðari</string>
     <string name="media_drawing_add_failed_title">Kundi ikki leggja tekning afturat</string>
     <string name="media_drawing_flatten_failed">Kundi ikki gera myndina. Royn aftur.</string>
-    <string name="media_drawing_prompt_unavailable">Boðini, sum opnaðu hesa myndina, taka ikki longur ímóti viðheftum.</string>
+    <string name="media_drawing_prompt_unavailable">Boðini í hesi setuni kunnu ikki taka við viðheftum júst nú.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Hvítt</string>

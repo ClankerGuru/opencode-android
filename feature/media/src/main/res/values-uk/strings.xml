@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Продовжити малювати</string>
     <string name="media_drawing_add_failed_title">Не вдалося додати малюнок</string>
     <string name="media_drawing_flatten_failed">Не вдалося створити зображення. Спробуйте ще раз.</string>
-    <string name="media_drawing_prompt_unavailable">Запит, з якого відкрито це зображення, більше не приймає вкладення.</string>
+    <string name="media_drawing_prompt_unavailable">Зараз до повідомлення цієї сесії не можна додати вкладення.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Білий</string>

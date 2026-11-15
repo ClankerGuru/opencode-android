@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Fortsätt rita</string>
     <string name="media_drawing_add_failed_title">Kunde inte lägga till teckningen</string>
     <string name="media_drawing_flatten_failed">Kunde inte skapa bilden. Försök igen.</string>
-    <string name="media_drawing_prompt_unavailable">Prompten som öppnade bilden tar inte längre emot bilagor.</string>
+    <string name="media_drawing_prompt_unavailable">Den här sessionens meddelande kan inte ta emot bilagor just nu.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Vit</string>

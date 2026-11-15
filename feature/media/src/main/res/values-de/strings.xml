@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Weiterzeichnen</string>
     <string name="media_drawing_add_failed_title">Zeichnung konnte nicht hinzugefügt werden</string>
     <string name="media_drawing_flatten_failed">Bild konnte nicht erstellt werden. Versuche es erneut.</string>
-    <string name="media_drawing_prompt_unavailable">Der Prompt, der dieses Bild geöffnet hat, nimmt keine Anhänge mehr an.</string>
+    <string name="media_drawing_prompt_unavailable">Die Nachricht dieser Sitzung kann gerade keine Anhänge aufnehmen.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Weiß</string>

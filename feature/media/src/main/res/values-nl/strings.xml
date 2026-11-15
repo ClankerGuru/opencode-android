@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Verder tekenen</string>
     <string name="media_drawing_add_failed_title">Tekening toevoegen mislukt</string>
     <string name="media_drawing_flatten_failed">Afbeelding maken mislukt. Probeer het opnieuw.</string>
-    <string name="media_drawing_prompt_unavailable">De prompt die deze afbeelding opende, accepteert geen bijlagen meer.</string>
+    <string name="media_drawing_prompt_unavailable">Aan het bericht in deze sessie kunnen nu geen bijlagen worden toegevoegd.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Wit</string>

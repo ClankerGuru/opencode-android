@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Turpināt zīmēt</string>
     <string name="media_drawing_add_failed_title">Neizdevās pievienot zīmējumu</string>
     <string name="media_drawing_flatten_failed">Neizdevās izveidot attēlu. Mēģini vēlreiz.</string>
-    <string name="media_drawing_prompt_unavailable">Uzvedne, no kuras atvērts šis attēls, vairs nepieņem pielikumus.</string>
+    <string name="media_drawing_prompt_unavailable">Šīs sesijas ziņai pašlaik nevar pievienot pielikumus.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Balta</string>

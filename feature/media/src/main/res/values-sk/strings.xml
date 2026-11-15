@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Kresliť ďalej</string>
     <string name="media_drawing_add_failed_title">Kresbu sa nepodarilo pridať</string>
     <string name="media_drawing_flatten_failed">Obrázok sa nepodarilo vytvoriť. Skúste znova.</string>
-    <string name="media_drawing_prompt_unavailable">Výzva, z ktorej ste otvorili tento obrázok, už neprijíma prílohy.</string>
+    <string name="media_drawing_prompt_unavailable">K správe v tejto relácii teraz nemožno pridať prílohy.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Biela</string>

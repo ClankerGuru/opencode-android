@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Jatka piirtämistä</string>
     <string name="media_drawing_add_failed_title">Piirroksen lisääminen epäonnistui</string>
     <string name="media_drawing_flatten_failed">Kuvan luominen epäonnistui. Yritä uudelleen.</string>
-    <string name="media_drawing_prompt_unavailable">Kehote, josta tämä kuva avattiin, ei enää ota vastaan liitteitä.</string>
+    <string name="media_drawing_prompt_unavailable">Tämän istunnon viestiin ei voi juuri nyt lisätä liitteitä.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Valkoinen</string>

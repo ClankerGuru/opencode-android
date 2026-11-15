@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Настави цртање</string>
     <string name="media_drawing_add_failed_title">Није могуће додати цртеж</string>
     <string name="media_drawing_flatten_failed">Није могуће направити слику. Покушајте поново.</string>
-    <string name="media_drawing_prompt_unavailable">Промпт из ког је отворена ова слика више не прима прилоге.</string>
+    <string name="media_drawing_prompt_unavailable">Порука у овој сесији тренутно не може да прими прилоге.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Бела</string>

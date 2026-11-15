@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Çəkməyə davam et</string>
     <string name="media_drawing_add_failed_title">Rəsmi əlavə etmək mümkün olmadı</string>
     <string name="media_drawing_flatten_failed">Şəkli yaratmaq mümkün olmadı. Yenidən cəhd edin.</string>
-    <string name="media_drawing_prompt_unavailable">Bu şəkli açan prompt artıq əlavə qəbul etmir.</string>
+    <string name="media_drawing_prompt_unavailable">Bu sessiyanın mesajına hazırda əlavə əlavə etmək mümkün deyil.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Ağ</string>

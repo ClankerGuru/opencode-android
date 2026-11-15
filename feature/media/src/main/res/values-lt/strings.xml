@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Tęsti piešimą</string>
     <string name="media_drawing_add_failed_title">Nepavyko pridėti piešinio</string>
     <string name="media_drawing_flatten_failed">Nepavyko sukurti vaizdo. Bandykite dar kartą.</string>
-    <string name="media_drawing_prompt_unavailable">Užklausa, iš kurios atidarytas šis vaizdas, nebepriima priedų.</string>
+    <string name="media_drawing_prompt_unavailable">Šiuo metu prie šio seanso žinutės negalima pridėti priedų.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Balta</string>

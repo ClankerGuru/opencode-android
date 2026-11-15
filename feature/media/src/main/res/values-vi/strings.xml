@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Tiếp tục vẽ</string>
     <string name="media_drawing_add_failed_title">Không thể thêm bản vẽ</string>
     <string name="media_drawing_flatten_failed">Không thể tạo hình ảnh. Hãy thử lại.</string>
-    <string name="media_drawing_prompt_unavailable">Lời nhắc đã mở hình ảnh này không còn nhận tệp đính kèm.</string>
+    <string name="media_drawing_prompt_unavailable">Tin nhắn của phiên này hiện chưa thể thêm tệp đính kèm.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Trắng</string>

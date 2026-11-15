@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Շարունակել նկարել</string>
     <string name="media_drawing_add_failed_title">Չհաջողվեց ավելացնել նկարը</string>
     <string name="media_drawing_flatten_failed">Չհաջողվեց ստեղծել պատկերը։ Կրկին փորձեք։</string>
-    <string name="media_drawing_prompt_unavailable">Հուշումը, որից բացվել է այս պատկերը, այլևս կցորդներ չի ընդունում։</string>
+    <string name="media_drawing_prompt_unavailable">Այս նիստի հաղորդագրությանը հիմա հնարավոր չէ կցորդներ ավելացնել։</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Սպիտակ</string>

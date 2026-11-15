@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">ხატვის გაგრძელება</string>
     <string name="media_drawing_add_failed_title">ნახატის დამატება ვერ მოხერხდა</string>
     <string name="media_drawing_flatten_failed">სურათი ვერ შეიქმნა. ხელახლა სცადეთ.</string>
-    <string name="media_drawing_prompt_unavailable">მოთხოვნა, რომლიდანაც ეს სურათი გაიხსნა, დანართებს აღარ იღებს.</string>
+    <string name="media_drawing_prompt_unavailable">ამ სესიის შეტყობინებას ახლა დანართის დამატება არ შეუძლია.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">თეთრი</string>

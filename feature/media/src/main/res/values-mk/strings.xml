@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">Продолжи со цртање</string>
     <string name="media_drawing_add_failed_title">Не успеа додавањето на цртежот</string>
     <string name="media_drawing_flatten_failed">Не успеа креирањето на сликата. Обиди се повторно.</string>
-    <string name="media_drawing_prompt_unavailable">Прашањето од кое е отворена оваа слика веќе не прифаќа прилози.</string>
+    <string name="media_drawing_prompt_unavailable">Пораката во оваа сесија засега не може да прима прилози.</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">Бела</string>

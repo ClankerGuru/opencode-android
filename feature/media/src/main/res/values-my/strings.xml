@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">ဆက်ဆွဲပါ</string>
     <string name="media_drawing_add_failed_title">ပုံဆွဲထားသည်ကို မထည့်နိုင်ပါ</string>
     <string name="media_drawing_flatten_failed">ပုံကို မဖန်တီးနိုင်ပါ။ ပြန်ကြိုးစားပါ။</string>
-    <string name="media_drawing_prompt_unavailable">ဤပုံကို ဖွင့်ခဲ့သော အချက်ပြစာတွင် ပူးတွဲဖိုင် မထည့်နိုင်တော့ပါ။</string>
+    <string name="media_drawing_prompt_unavailable">ဤစက်ရှင်၏ မက်ဆေ့ဂျ်တွင် ယခု ပူးတွဲဖိုင် ထည့်၍ မရပါ။</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">အဖြူရောင်</string>

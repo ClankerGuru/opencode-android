@@ -23,7 +23,7 @@
     <string name="media_drawing_keep">បន្តគូរ</string>
     <string name="media_drawing_add_failed_title">មិនអាចបន្ថែមការគូរបាន</string>
     <string name="media_drawing_flatten_failed">មិនអាចបង្កើតរូបភាពបានទេ។ សូមព្យាយាមម្តងទៀត។</string>
-    <string name="media_drawing_prompt_unavailable">ប្រអប់បញ្ចូលដែលបានបើករូបភាពនេះ លែងទទួលឯកសារភ្ជាប់ហើយ។</string>
+    <string name="media_drawing_prompt_unavailable">សារក្នុងសម័យនេះមិនអាចភ្ជាប់ឯកសារបានទេនៅពេលនេះ។</string>
 
     <!-- Draw on Image: ink colours, read by TalkBack -->
     <string name="media_drawing_ink_white">ស</string>
