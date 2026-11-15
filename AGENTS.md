@@ -122,7 +122,9 @@ already wired by its parent; keep those names.
   constructor argument. One resource per sentence with positional placeholders (`%1$s`), never
   joined pieces; counts use `<plurals>`. Never compare, store or send translated text. Logs,
   model prompts, wire values and developer-only screens stay literals. Tests assert the English
-  text: under unit tests `localized` returns it from the XML files.
+  text: under unit tests `localized` returns it from the XML files. After adding or changing
+  English UI text, run `python3 scripts/translate.py all` for the new strings (with `--redo
+  <name>` when the meaning changed) and `python3 scripts/translations.py all`.
 
 ## Comments
 

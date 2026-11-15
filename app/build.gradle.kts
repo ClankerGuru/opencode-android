@@ -3,7 +3,12 @@ plugins {
 }
 
 // The languages the app is translated into (docs/translating.md).
-val appLanguages = listOf("en")
+val appLanguages = listOf(
+    "en", "am", "az", "bg", "bn", "bs", "ca", "cs", "da", "de", "dz", "el", "es", "et", "fi", "fo",
+    "fr", "hi", "hr", "hu", "hy", "in", "is", "it", "ja", "ka", "km", "ko", "lo", "lt", "lv", "mk",
+    "mn", "ms", "my", "nb", "ne", "nl", "pl", "pt-rBR", "ro", "ru", "si", "sk", "sl", "sq", "sr",
+    "sv", "tg", "th", "tk", "tr", "uk", "uz", "vi", "zh-rCN", "zh-rTW",
+)
 
 android {
     namespace = "ai.opencode.app"
