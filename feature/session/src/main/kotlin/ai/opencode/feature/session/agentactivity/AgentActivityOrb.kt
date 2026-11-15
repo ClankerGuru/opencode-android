@@ -58,7 +58,7 @@ object AgentActivityOrb {
     val coolPearlDarkCore = RGB(0.92, 0.95, 1.0)
 
     // `prototypes/ios-kit/dot-orb/index.js`'s palette: the scope's cool pearl and four phosphor accents.
-    // Done's green and Failed's red are round 4's settled solids (Deep green, Warm red), and `hot` is the
+    // Done's green and Failed's red are settled solids (Deep green, Warm red), and `hot` is the
     // flash they cool from (`prototypes/activity-glyph/round4.html`).
     val dark = Palette(
         base = coolPearlDarkBase,

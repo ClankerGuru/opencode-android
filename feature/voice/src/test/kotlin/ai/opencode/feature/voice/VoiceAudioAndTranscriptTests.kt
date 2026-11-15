@@ -1147,8 +1147,6 @@ class VoiceTranscriptTests {
         assertEquals("[COMPLETE] The session returned a code block in the transcript.", VoiceHandoff.completion(codeBlock))
     }
 
-    /** A watched session's long reply, a walkthrough the user asked for, reaches
-     * the voice agent whole (it was cut at 1,600 characters until Nov 7). */
     @Test fun aWatchedSessionsLongReplyIsNotCut() {
         val reply = (1..150).joinToString(" ") { "Part $it of the explanation." }
         assertTrue(reply.length > 4_000)

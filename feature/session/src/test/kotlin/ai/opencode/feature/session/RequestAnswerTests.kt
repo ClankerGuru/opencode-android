@@ -644,7 +644,7 @@ class RequestAnswerTests {
 
     // endregion
 
-    // region The fold (p229)
+    // region The fold
 
     @Test fun aFoldedQuestionStaysFoldedAcrossASwitchUntilItSettles() = sessionTest { h ->
         val twoQuestions = twoQuestions

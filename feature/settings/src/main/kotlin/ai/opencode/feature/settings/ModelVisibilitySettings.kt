@@ -54,7 +54,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 /**
- * Settings › Models (Hide Unused Models, OC-510), which of this server's models the Today and Sheet
+ * Settings › Models (Hide Unused Models), which of this server's models the Today and Sheet
  * pickers list, kept on this phone per server (`ModelVisibility.modelVisibilityByServer`).
  */
 class ModelVisibilityFeature : Reducer<ModelVisibilityFeature.State, ModelVisibilityFeature.Action> {

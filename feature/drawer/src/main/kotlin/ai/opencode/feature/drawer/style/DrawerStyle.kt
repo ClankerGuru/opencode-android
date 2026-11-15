@@ -133,7 +133,7 @@ enum class DrawerFontWeight(val weight: FontWeight) {
 }
 
 /**
- * How a session row's title reads (D-51, Quiet Hierarchy): the selected row semibold;
+ * How a session row's title reads: the selected row semibold;
  * unread, waiting and running rows at `unreadWeight` in full primary; read rows regular,
  * dimmed to `readOpacity` (full primary under high contrast); muted rows secondary.
  */
@@ -266,8 +266,7 @@ object DrawerTunables {
     val footerPadding: Dp = 18.dp
     /**
      * New Session's symbol starts as far from the pill's end as it sits from the top:
-     * `(height − glyph) / 2` less the symbol's own side bearing, both scaled with the text
-     * (OC-477).
+     * `(height − glyph) / 2` less the symbol's own side bearing, both scaled with the text.
      */
     val footerGlyphBearing: Dp = 2.75.dp
     /** New Session glyph lift. */

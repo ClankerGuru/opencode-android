@@ -53,7 +53,7 @@ class ServerLinkTests {
     @get:Rule val isolation = TestIsolationRule()
 
     companion object {
-        /** Adam's saved "Adams Mini": paired at home, so its LAN address ended up first and the tailnet address second. */
+        /** Paired at home, so its LAN address is first and the tailnet address second. */
         const val lan = "http://192.168.1.155:49374"
         const val tailnet = "http://100.114.13.77:49374"
         val saved = OpenCodeServer(

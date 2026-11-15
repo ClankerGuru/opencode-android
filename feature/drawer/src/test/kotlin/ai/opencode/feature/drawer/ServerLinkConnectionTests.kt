@@ -88,10 +88,7 @@ class ServerLinkConnectionTests {
     }
 
     /**
-     * Adam's phone away from home: "Adams Mini" was saved with its LAN address first, which drops
-     * every packet off the home Wi-Fi. A cold launch connects through the tailnet address at once,
-     * never tries the stream on the LAN address, never shows Reconnecting or Offline, and leaves
-     * the saved server as it was.
+     * The saved server lists its LAN address first, which drops every packet off the home Wi-Fi.
      */
     @Test fun aColdLaunchAwayFromHomeConnectsThroughTheTailnetWithoutShowingAnything() = runTest {
         val clock = TestClock()

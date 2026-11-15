@@ -532,7 +532,7 @@ class LinkHitLayout(
      * With [leadingBelow], each line's rect starts at its glyphs' top and carries the leading down
      * to the next line's glyphs, as TextKit's line fragments do. Compose spreads the leading mostly
      * above each line, so the slop around a wrapped link's second line reached into the words of
-     * the line above (QA F-55). The text's first line is trimmed to its glyphs, so its baseline
+     * the line above. The text's first line is trimmed to its glyphs, so its baseline
      * gives the ascent.
      */
     private fun rects(range: IntRange, leadingBelow: Boolean): List<Rect> {
@@ -626,7 +626,7 @@ fun LinkMenu(
 
     Box(
         modifier
-            // Remembered, so a streaming paragraph's chunks leave the node's semantics alone (AH-01).
+            // Remembered, so a streaming paragraph's chunks leave the node's semantics alone.
             .semantics(properties = accessibilitySemantics)
             // A session chip darkens while a finger is on it: over the text.
             .drawWithContent {

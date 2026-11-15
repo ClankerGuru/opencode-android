@@ -28,12 +28,8 @@ import kotlin.time.Duration.Companion.seconds
 import java.time.Instant
 
 /**
- * From a call log (Oct 25): asked for eye-tracking research, HOME started
- * a background subagent and replied that it had. The watch resolved on
- * that reply, so when the research landed two minutes and three unrelated
- * delegations later, nothing told the user until he asked twice. Work a
- * watched run starts in the background is watched too, and its result is
- * spoken once, at the next opening.
+ * Work a watched run starts in the background is watched too, and its result is spoken once, at the
+ * next opening.
  */
 class VoiceBackgroundResultTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
@@ -186,7 +182,7 @@ class VoiceBackgroundResultTests {
     }
 
     /**
-     * Sol's review: work counts as covered only when its completion landed
+     * Work counts as covered only when its completion landed
      * before text of the reply the call read. One that finished after that
      * reply, even in the moment before the search ran, is still news; so is
      * one whose completion woke a later run of the session nobody read.
@@ -362,12 +358,6 @@ class VoiceBackgroundResultTests {
             .let { if (userActed) it.copy(replyWatch = it.replyWatch.noteUserActed()) else it }
     }
 
-    /**
-     * Incident 4 (Nov 1): under the session delegator, the parent Voice session
-     * receives `<subagent>` and relays a call-aware correction ("The check-in is
-     * already done"), so the phone must never announce the child subagent's raw
-     * text ("Avianca B8OE4C") or double-deliver when a user turn covers the run.
-     */
     @Test fun sessionDelegatorRelaysParentSubagentCorrectionWithoutRawChildOrDoubleDelivery() = runBlocking<Unit> {
         val voiceSessionID = "ses_voice"
         val inboxChild = "ses_inbox"
@@ -485,7 +475,7 @@ class VoiceBackgroundResultTests {
     }
 
     /**
-     * Sol finding 5: if `<subagent>` arrives after the initial 150/400 ms poll
+     * If `<subagent>` arrives after the initial 150/400 ms poll
      * window, or the parent Voice run after `<subagent>` has not yet settled to
      * `"idle"`, ReplyWatch must keep retrying rather than dropping via `.superseded`.
      */
@@ -566,11 +556,7 @@ class VoiceBackgroundResultTests {
     }
 }
 
-/**
- * From a call log: GPT-Live took no new turn while the delegator's 90 s wait
- * held its delegation open. A wait gives way to the user's words, not to a
- * tag or a cancelled wait.
- */
+/** A wait gives way to the user's words, not to a tag or a cancelled wait. */
 class VoiceWaitYieldTests {
     @Test fun theUsersNextWordsEndADelegatorWait() = runTest {
         val harness = LiveHarness(this)

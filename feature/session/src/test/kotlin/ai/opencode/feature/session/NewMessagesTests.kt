@@ -354,7 +354,7 @@ class NewMessagesTests {
         assertNull(fresh.newMessages)
     }
 
-    // region Ported from iOS f657969b (the read-receipt and watermark rework)
+    // region Read receipts and the watermark
 
     private val liveID = "msg_live-text-0"
     private val liveRow: OpenCodeTranscriptItem get() = OpenCodeTranscriptItem.AssistantMarkdown(id = liveID, text = "Streaming reply", inProgress = true)
@@ -394,7 +394,7 @@ class NewMessagesTests {
     }
 
     /**
-     * Kit's bug: rows that stream in front of the reader while the read
+     * Rows that stream in front of the reader while the read
      * after their return is out are seen, so that read never marks them;
      * a row it brings from while they were away still is.
      */

@@ -92,7 +92,7 @@ fun AppearanceSettingsView(store: SettingsStore) {
     val scheme by remember { shared(ThemeSharedKeys.appearanceColorScheme).flow }.collectAsState()
     val isDark = scheme.resolveIsDark(isSystemInDarkTheme())
     val send = { action: HomeSettingsFeature.Action -> store.send(SettingsFeature.Action.Settings(action)) }
-    // QA U-02: Back from the Theme picker puts TalkBack back on the Theme row.
+    // Back from the Theme picker puts TalkBack back on the Theme row.
     val returnFocus = rememberSettingsReturnFocus(store, page = SettingsPage.Appearance)
     val modeHeader = stringResource(R.string.settings_appearance_mode_header)
 
@@ -147,7 +147,7 @@ fun AppearanceSettingsView(store: SettingsStore) {
 }
 
 /**
- * Settings → Appearance → Themes (D-109 Split + D-110 Palette Dots): the top is a session preview
+ * Settings → Appearance → Themes: the top is a session preview
  * edge to edge in the theme's own canvas, pinned, and the curated theme list scrolls independently
  * beneath it, dissolving across a soft edge.
  */
@@ -320,7 +320,7 @@ private fun ThemeOptionRow(
     }
 }
 
-/** The three overlapping palette dots (canvas, accent, syntax) with card knockout rings (D-110). */
+/** The three overlapping palette dots (canvas, accent, syntax) with card knockout rings. */
 object ThemeSwatchTile {
     enum class Size(val dotSize: Dp, val step: Dp, val frameHeight: Dp) {
         Regular(13.dp, 8.5.dp, 29.dp),

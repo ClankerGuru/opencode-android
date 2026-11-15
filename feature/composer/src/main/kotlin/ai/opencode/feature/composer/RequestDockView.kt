@@ -141,7 +141,7 @@ object RequestDockMetrics {
     val rise: Dp = 28.dp
     /** The blur a request's content sharpens in from and blurs away to. */
     val revealBlur: Dp = 8.dp
-    /** Caps scaled down with small text, never up (OC-471): larger text scrolls inside them. */
+    /** Caps scaled down with small text, never up: larger text scrolls inside them. */
     val questionCap: Dp = 220.dp
     val rowsCap: Dp = 300.dp
     val commandCap: Dp = 300.dp
@@ -177,8 +177,8 @@ data class RequestDockContext(
  * below it is your answer: typing or dictating there answers, and its Send sends ([RequestBar]).
  * The panel holds the header (with × for questions), the question, which scrolls on its own, and
  * the choices, which stay in reach; or a permission's action, a one- or two-line summary that
- * expands to the whole command or diff, and Allow Once beside Always Allow (R-177,
- * [RequestTunables]). Deny sits in the bar beside “Tell it what to do instead”, so a reason costs
+ * expands to the whole command or diff, and Allow Once beside Always Allow
+ * ([RequestTunables]). Deny sits in the bar beside “Tell it what to do instead”, so a reason costs
  * no step.
  *
  * Only the content: the session draws the surface, grows it (animating its size), and caps
@@ -440,7 +440,7 @@ private fun Modifier.overlayWithoutHeight(): Modifier = layout { measurable, con
 private class DockViewState {
     /** The action last sent, so only its button shows progress. */
     var sentAction by mutableStateOf<DockAction?>(null)
-    /** The permission whose full command or diff is shown (R-177: folded by default). */
+    /** The permission whose full command or diff is shown (folded by default). */
     var expandedPermissionID by mutableStateOf<String?>(null)
     /** The permission whose Always Allow scope is showing, to confirm. */
     var scopeShownForID by mutableStateOf<String?>(null)

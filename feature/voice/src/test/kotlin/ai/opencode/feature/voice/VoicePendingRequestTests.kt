@@ -23,10 +23,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 
-/**
- * From a call log: a session sat on a question form while the delegator
- * steered two more messages into it, each stuck behind the form.
- */
+/** A session waiting on a question form takes no steered messages. */
 class VoicePendingRequestTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
     private val abattoir = OpenCodeSession(id = "ses_abattoir", serverTitle = "ABATTOIR", projectID = "p", directory = "/Users/kit/abattoir", updatedAt = Instant.parse("0001-01-01T00:00:00Z"))
@@ -120,11 +117,7 @@ class VoicePendingRequestTests {
         assertEquals(0, prompts.value)
     }
 
-    /**
-     * From a call log: Kit approved a cleanup form's choices by voice, and
-     * each approval was steered into HOME as a message. The form stayed
-     * pending until the delegator finally used answer_question.
-     */
+    /** A form approved by voice is answered, never steered into HOME as a message. */
     @Test fun aSpokenApprovalIsHeldEvenWhenHomeHasntSeenTheRequest() = runBlocking<Unit> {
         val reads = Locked(0)
         val prompts = Locked(0)

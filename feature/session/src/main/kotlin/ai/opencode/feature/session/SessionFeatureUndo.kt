@@ -81,7 +81,7 @@ internal fun SessionFeature.stageRevert(
                 return@run
             }
             // A `media:<hash>` attachment comes back without its bytes: load them so Edit's
-            // composer shows the image (or Pasted Text card) again (7f5ac4c5).
+            // composer shows the image (or Pasted Text card) again.
             val hydrated = restoring.copy(attachments = restoring.attachments.map { attachment -> hydrated(attachment, server, references) })
             send(Action.MessageReverted(sessionID, messageID, hydrated, null))
         }.cancellable(SessionFeature.CancelID.Revert, cancelInFlight = true),

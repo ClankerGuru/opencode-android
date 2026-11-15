@@ -199,8 +199,8 @@ class SessionComposerHost {
     /** iOS `scrollEdgeBridge.showsJumpButton`. */
     var showsJumpButton by mutableStateOf(false)
     /**
-     * Android (V-01): the transcript stays invisible while a row saved across process death loads.
-     * The jump pill keeps its state but isn't drawn or touchable, so it shows with the rows (AI-01).
+     * Android: the transcript stays invisible while a row saved across process death loads.
+     * The jump pill keeps its state but isn't drawn or touchable, so it shows with the rows.
      */
     var veilsJumpButton by mutableStateOf(false)
     /** iOS `scrollEdgeBridge.jumpRequest += 1`. */
@@ -1021,8 +1021,8 @@ private fun SessionComposerEnv.ComposerAreaContent(modifier: Modifier) {
     ) {
         ai.opencode.feature.composer.RequestDockPrewarm()
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(pillGap.dp)) {
-            // iOS 812b9ab5: the pill row joining or leaving moves the composer's top, and the transcript
-            // riding it, on the row's own curve; at once, Working jumped a row's height in one frame.
+            // The pill row joining or leaving moves the composer's top, and the transcript riding
+            // it, on the row's own curve.
             AnimatedVisibility(
                 visible = s.hasBackgroundWork || s.queuedMessages.isNotEmpty(),
                 enter = expandVertically(composerColumnAnimation(opening = true, IntSize.VisibilityThreshold), Alignment.Bottom, clip = false),
@@ -1154,9 +1154,8 @@ private fun SessionComposerEnv.DraftProjectsOverlay(modifier: Modifier) {
         contentAlignment = Alignment.BottomCenter,
     ) {
         AnimatedVisibility(visible = showsDraftProjects, enter = enter, exit = exit) {
-            // Android: in a short window (landscape with the keys up, a split screen) the list
-            // would stand over the header and under the status bar. It gives way there, as the
-            // header gives way to the composer (its A-10 cap). iOS phones are portrait-only.
+            // In a short window (landscape with the keys up, a split screen) the list gives way to
+            // the header, as the header gives way to the composer.
             val density = LocalDensity.current
             val headerBottom = WindowInsets.statusBarsIgnoringVisibility.getTop(density) + with(density) { host.headerHeight.dp.toPx() }
             var listTop by remember { mutableFloatStateOf(Float.POSITIVE_INFINITY) }
@@ -1348,7 +1347,7 @@ private val SessionComposerEnv.lingersRequestPanel: Boolean
 
 /**
  * iOS `requestPanelMaxHeight`: the tallest the request panel may be so the composer stays under
- * the header (OC-471), from the room between the top safe area and the keyboard, the header and
+ * the header, from the room between the top safe area and the keyboard, the header and
  * the composer's chrome outside the panel.
  */
 private fun SessionComposerEnv.requestPanelCap(): Float? {
@@ -1701,8 +1700,8 @@ private fun Modifier.composerSwipes(envNow: () -> SessionComposerEnv, density: F
                     val predicted = translation + Offset(velocity.x, velocity.y) / density * 0.5f
                     val focused = env.messageFieldFocused
                     val beganFocused = ownership.beganFocused(start, focused)
-                    // iOS 573770b6: a touch the field's selecting owns (a handle, a drag from the
-                    // selection, a rest first) stays the text's, even just outside the field.
+                    // A touch the field's selecting owns (a handle, a drag from the selection, a
+                    // rest first) stays the text's, even just outside the field.
                     val input = env.host.fieldLink.input
                     val yields = ownership.yields(start, focused, textClaims = input?.isSwipeYieldedToText == true) {
                         env.composerSwipeYields(start) || input?.selectionClaims(start) == true || change.isConsumed
@@ -1966,7 +1965,7 @@ private fun SessionComposerEnv.Composer() {
 @Composable
 private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boolean, bar: RequestBar?) {
     val placeholder = bar?.placeholder ?: stringResource(R.string.session_message_placeholder)
-    // iOS `ComposerFieldScope` (3fa29077): the text is read here alone, so a keystroke recomposes
+    // iOS `ComposerFieldScope`: the text is read here alone, so a keystroke recomposes
     // the field and not the composer around it.
     val draft by store.observe { it.draft }
     // iOS `KeyboardDrivenTextInset`: the keyboard morph scrubs the expanded top inset (none
@@ -1991,12 +1990,12 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
         val takesPaste = s.takesPasteAttachments
         ComposerTextInput(
             text = draft,
-            // The reducer's draft now, not the snapshot this composition captured (iOS 02e85073).
+            // The reducer's draft now, not the snapshot this composition captured.
             currentText = { store.state.draft },
             focusRequest = s.composerFocusRequest,
             // Folded while dictating: keys typed into the hidden field don't reach the draft.
             onTextChange = { new -> onDraftEdited(new, recording) },
-            // A keystroke is one action: the draft and the caret it left (iOS d0b24aaa).
+            // A keystroke is one action: the draft and the caret it left.
             onEdit = { new, caret -> onDraftEdited(new, recording, caret) },
             isFocused = host.messageFieldFocused,
             onFocusedChange = { host.messageFieldFocused = it },
@@ -2054,7 +2053,7 @@ private fun SessionComposerEnv.onDraftEdited(
         store.send(Action.Autocomplete(ComposerAutocompleteAction.TextEdited(new, caret)))
     }
     // The photo sheet rests on the keyboard over the field: typing folds it away so the text shows
-    // where it lands (iOS d82670c2).
+    // where it lands.
     if (photoSheet?.morph?.isOpen == true) photoSheet.closePhotoSheet()
     val state = store.state
     if (!returnKeySends || state.nonSendNewlineDraft == new || new != old + "\n") return

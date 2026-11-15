@@ -150,7 +150,7 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * The newest photos for the New Plus Menu (OC-354), shared by the photo sheet and the recent strip
+ * The newest photos for the New Plus Menu, shared by the photo sheet and the recent strip
  * a hold on + shows, and the photos picked in the sheet, in tap order. A plain object with snapshot
  * state, created by the session screen (`remember { PlusPhotoLibrary() }`); call [stop] when the
  * screen goes.

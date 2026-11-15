@@ -506,7 +506,7 @@ fun HomeDeleteConfirmation(store: StoreOf<HomeFeature.State, HomeFeature.Action>
 
 /**
  * New Session's pill. The symbol's ink sits as far from the pill's leading end as from its top at
- * every text size (OC-477), so its leading padding shrinks as the symbol grows; the trailing stays
+ * every text size, so its leading padding shrinks as the symbol grows; the trailing stays
  * `footerPadding`. Disconnected, the label dims (not the capsule) and it takes no taps.
  */
 @Composable

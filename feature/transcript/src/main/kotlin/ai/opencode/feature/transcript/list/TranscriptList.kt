@@ -153,11 +153,11 @@ private class TranscriptListPosition(val state: LazyListState, anchor: Pair<Stri
 }
 
 /**
- * Android (QA AI-02): while a reply's text is selected, Back ends the selection before the
+ * Android: while a reply's text is selected, Back ends the selection before the
  * screen's own Back, as it dismisses any platform text selection and as the user bubble's
  * selection does (iOS has no Back; a tap elsewhere ends it there). Its own scope, so the
  * selection starting or ending doesn't recompose the list. Not while the keyboard is up: Back
- * puts the keys away first (A-01), then ends the selection.
+ * puts the keys away first, then ends the selection.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -173,7 +173,7 @@ private fun ReplySelectionBackHandler(selection: TranscriptReplySelection) {
     }
 }
 
-/** V-01: whether the list hides while a row restored after process death loads ([decide]d on the list's first composition). */
+/** Whether the list hides while a row restored after process death loads ([decide]d on the list's first composition). */
 private class RestoreHide {
     var decide = true
     var hides by mutableStateOf(false)
@@ -270,7 +270,7 @@ private fun TranscriptListContent(
     val resumed = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
     val currentResumed by rememberUpdatedState(resumed)
 
-    // Saved under the session's key: a draft's list becomes its session's after process death (F-72).
+    // Saved under the session's key: a draft's list becomes its session's after process death.
     val saveKey = "transcript-list|${configuration.server?.persistenceID}|${configuration.sessionID}"
     val position = rememberSaveable(saver = transcriptListPositionSaver, key = "$saveKey|position") { TranscriptListPosition(transcriptListState(0, 0)) }
     val listState = position.state
@@ -349,7 +349,7 @@ private fun TranscriptListContent(
         }
     }
 
-    // V-01: a reader whose row, saved across process death, isn't listed yet (its page is still
+    // A reader whose row, saved across process death, isn't listed yet (its page is still
     // loading) would see the list clamped somewhere else and then jump. It stays invisible until
     // the row is put back, the restore ends, or RESTORE_HIDE_LIMIT_MS passes.
     val currentHidesChanged by rememberUpdatedState(onHidesChanged)
@@ -373,7 +373,7 @@ private fun TranscriptListContent(
             val index = items.indexOfFirst { it.key == anchorKey }
             if (index < 0) {
                 // All of the history is listed and the row isn't in it: nothing to go back to. (Not
-                // `!hasEarlierItems`: a restored cache says that before its first read lands, F-65.)
+                // `!hasEarlierItems`: a restored cache says that before its first read lands.)
                 if (configuration.listsAllHistory) {
                     position.anchor = null
                     endRestoreHide()
@@ -536,7 +536,7 @@ private fun TranscriptListContent(
             maxOf(0f, (oldest.offset + oldest.size - visibleHeight) / density.density)
         }
     }
-    // Also before the first frame, so the header's bar draws with the rows (G-01).
+    // Also before the first frame, so the header's bar draws with the rows.
     DisposableEffect(listState) {
         currentScrolledUnderHeader(scrolledUnderHeader())
         onDispose {}

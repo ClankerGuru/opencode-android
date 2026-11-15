@@ -50,7 +50,7 @@ class NetworkRetryFormTests {
 
     @Test
     fun aFormReplyOnADeadConnectionIsReadBackAndSentAgainOnlyWhilePending() = runTest {
-        // p229: a pooled connection the phone's sleep left dead fails the first POST while the
+        // A pooled connection the phone's sleep left dead fails the first POST while the
         // event stream stays up. The form, still pending, gets the reply once more.
         val status = AtomicReference("pending")
         val posts = AtomicInteger(0)
@@ -99,7 +99,7 @@ class NetworkRetryFormTests {
 
     @Test
     fun aFormSettledWithAnotherAnswerIsAFinalFailure() = runTest {
-        // p229 review: a 409 is success only when the form holds what we sent.
+        // A 409 is success only when the form holds what we sent.
         WireFixture { request ->
             if (request.route == "GET /api/session/ses_1/form/frm_1") formReply("answered", ""","answer":{"q0":"No"}""") else Reply.Json(409, "{}")
         }.use { elsewhere ->

@@ -20,7 +20,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlin.time.Duration.Companion.seconds
 
-// Agent Selection (experimental `agentSelection`, OC-511): the composer's agent menu. A pick is
+// Agent Selection (experimental `agentSelection`): the composer's agent menu. A pick is
 // remembered per session (`sessionAgents`) and, like a model pick, applied (`POST …/agent`) just
 // before the next send; a draft starts with its pick, else the Settings default (`defaultAgentID`).
 

@@ -1025,7 +1025,7 @@ class SendOutboxTests {
 
     // endregion
 
-    // region Riding out an outage (OC-231)
+    // region Riding out an outage
 
     /**
      * A server down for two minutes (a Mac waking, a restart, a tunnel finding its way back)

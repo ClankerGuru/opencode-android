@@ -35,7 +35,7 @@ internal fun SessionLifecycle(store: StoreOf<State, Action>) {
     // Keyed by visit and session: the drawer swaps the screen in place, a draft opened from another
     // draft starts a fresh task, and a draft becoming its own session continues the one it started.
     // Retained across activity recreation so a theme or font-scale change doesn't re-run `.task`
-    // (which reloads the transcript as `.open` and discards pending dictation, K-01).
+    // (which reloads the transcript as `.open` and discards pending dictation).
     val startedTaskIdentity = retain { arrayOfNulls<State.TaskIdentity>(1) }
     LaunchedEffect(taskIdentity) {
         if (startedTaskIdentity[0] == taskIdentity) return@LaunchedEffect

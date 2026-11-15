@@ -130,7 +130,7 @@ fun PairingScannerView(
     }
 
     // VoiceOver starts on the navigation title, a header, and comes back to it once the camera
-    // prompt is answered; TalkBack would start on Cancel (QA OB-B-04).
+    // prompt is answered; TalkBack would start on Cancel.
     val titleFocus = rememberAccessibilityFocusRequest(cameraAccess)
 
     val appearance = rememberAppAppearance()

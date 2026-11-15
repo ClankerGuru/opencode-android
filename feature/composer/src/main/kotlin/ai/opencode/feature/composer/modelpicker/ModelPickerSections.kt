@@ -12,7 +12,7 @@ import ai.opencode.server.model.model
 import ai.opencode.server.model.savedLevel
 
 /**
- * The model list's sections (D-20 round 7, its list from round 6 option 1): Favorites, then one
+ * The model list's sections: Favorites, then one
  * section per provider, as the TUI and desktop app group them. A model several providers offer
  * is listed under each, so the row you tap is the provider. Searching drops Favorites and
  * matches names and providers.
@@ -47,7 +47,7 @@ data class ModelPickerSection(val kind: Kind, val models: List<OpenCodeModel>) {
     companion object {
         /**
          * [recents] (most recent first) adds a Recent section of up to [recentLimit] models
-         * after Favorites, leaving out favorites (New Model Picker, OC-469). Searching drops both.
+         * after Favorites, leaving out favorites (New Model Picker). Searching drops both.
          */
         fun sections(
             models: List<OpenCodeModel>,

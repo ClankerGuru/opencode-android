@@ -285,7 +285,7 @@ fun BackgroundWorkCapsuleLabel(
 ) {
     Row(
         // The glyph's ink as far from the surface's leading edge as from its top and bottom,
-        // concentric with the capsule's end (OC-477).
+        // concentric with the capsule's end.
         modifier
             .heightIn(min = 34.dp)
             .padding(start = BackgroundWorkTunables.glyphLeading.dp, end = 14.dp),
@@ -374,8 +374,7 @@ private fun Modifier.blurringWith(scope: AnimatedVisibilityScope): Modifier = co
 
 /**
  * The capsule's glyph: its most telling subagent's orb, the shell glyph driven by its shells'
- * combined output, or both side by side. Both are the same disc, placed alike (Kit, Oct 19:
- * "so they're both circles").
+ * combined output, or both side by side, the same disc placed alike.
  */
 @Composable
 fun BackgroundWorkGlyph(
@@ -389,7 +388,7 @@ fun BackgroundWorkGlyph(
 ) {
     val reduceMotion = rememberReduceMotion()
     // Swapped in place as subagents come and go, like the words beside it. The disc's dot field
-    // sits a little high in its frame: dropped, it is concentric with the capsule's end (OC-477).
+    // sits a little high in its frame: dropped, it is concentric with the capsule's end.
     Row(modifier.offset(y = BackgroundWorkTunables.orbGlyphNudgeY.dp), horizontalArrangement = Arrangement.spacedBy(BackgroundWorkTunables.pairGap.dp)) {
         val swap = MotionTransition.swap(reduceMotion)
         AnimatedVisibility(agents.isNotEmpty(), enter = swap.enter, exit = swap.exit) {
