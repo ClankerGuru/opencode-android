@@ -34,12 +34,22 @@ internal class ComposerPersistenceWriter(
         var generation = 0
         var pendingTask: Job? = null
         val attachmentCache = HashMap<UUID, ByteArray>()
-        var pendingAttachmentWrites = HashMap<UUID, ByteArray>()
+        val pendingAttachmentWrites = HashMap<UUID, ByteArray>()
+        val storedAttachmentIDs = HashSet<UUID>()
+        var cleanedAttachmentIDs: Set<UUID>? = null
         val inMemoryFiles = HashMap<DraftKey, List<ComposerFileAttachment>>()
         val waitingShares = HashMap<DraftKey, SharedComposerDraft>()
     }
 
+    private class Snapshot(
+        val diskState: PersistedComposerState,
+        val referenced: Set<UUID>,
+        val writes: Map<UUID, ByteArray>,
+        val needsCleaning: Boolean,
+    )
+
     private val lock = Any()
+    private val flushing = Any()
     private var state = WriterState()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -357,15 +367,14 @@ internal class ComposerPersistenceWriter(
     fun flush() {
         val task = synchronized(lock) { state.pendingTask.also { state.pendingTask = null } }
         task?.cancel()
-        val snapshot = synchronized(lock) {
-            val current = state.loaded
-            if (!state.dirty || current == null) return@synchronized null
-            state.dirty = false
-            val writes = state.pendingAttachmentWrites
-            state.pendingAttachmentWrites = HashMap()
-            current to writes
+        synchronized(flushing) {
+            val snapshot = synchronized(lock) {
+                val current = state.loaded
+                if (!state.dirty || current == null) return
+                takeSnapshot(current)
+            }
+            persist(snapshot)
         }
-        snapshot?.let { (current, writes) -> persist(current, writes) }
     }
 
     fun removeAll() {
@@ -378,6 +387,12 @@ internal class ComposerPersistenceWriter(
         storage.removeAll()
     }
 
+    fun retainedAttachmentBytes(): Int = synchronized(lock) {
+        var total = 0
+        for (data in state.attachmentCache.values) total += data.size
+        total
+    }
+
     // Private helpers (call with the lock held)
 
     private fun ensureLoaded(): PersistedComposerState {
@@ -388,7 +403,7 @@ internal class ComposerPersistenceWriter(
         val pruned = decoded.prunedStale(now())
         val current = pruned ?: decoded
         state.loaded = current
-        if (pruned != null) persist(current, emptyMap())
+        if (pruned != null) persist(takeSnapshot(current))
         return current
     }
 
@@ -487,12 +502,13 @@ internal class ComposerPersistenceWriter(
             if (attachment.data.isEmpty()) continue
             val id = PersistedComposerState.attachmentUUID(attachment.id)
             state.attachmentCache[id] = attachment.data
-            state.pendingAttachmentWrites[id] = attachment.data
+            if (id !in state.storedAttachmentIDs) state.pendingAttachmentWrites[id] = attachment.data
         }
     }
 
     private fun scheduleWrite(generation: Int) {
         synchronized(lock) {
+            if (state.generation != generation) return
             state.pendingTask?.cancel()
             state.pendingTask = scope.launch {
                 delay(debounce)
@@ -502,27 +518,63 @@ internal class ComposerPersistenceWriter(
     }
 
     private fun flushIfGenerationMatches(generation: Int) {
-        val snapshot = synchronized(lock) {
-            val current = state.loaded
-            if (!state.dirty || state.generation != generation || current == null) return@synchronized null
-            state.dirty = false
-            state.pendingTask = null
-            val writes = state.pendingAttachmentWrites
-            state.pendingAttachmentWrites = HashMap()
-            current to writes
+        synchronized(flushing) {
+            val snapshot = synchronized(lock) {
+                val current = state.loaded
+                if (!state.dirty || state.generation != generation || current == null) return
+                state.pendingTask = null
+                takeSnapshot(current)
+            }
+            persist(snapshot)
         }
-        snapshot?.let { (current, writes) -> persist(current, writes) }
     }
 
-    private fun persist(current: PersistedComposerState, attachments: Map<UUID, ByteArray>) {
+    private fun takeSnapshot(current: PersistedComposerState): Snapshot {
+        state.dirty = false
         val diskState = current.copy(drafts = current.drafts.filter { it.hasPersistedContent })
-        storage.writeAttachments(attachments, diskState.referencedAttachmentIDs)
-        if (diskState.isEmpty) {
-            storage.writeStateData(null)
-        } else {
-            runCatching { PersistedComposerState.json.encodeToString(PersistedComposerState.serializer(), diskState) }
-                .getOrNull()
-                ?.let { storage.writeStateData(it.toByteArray(Charsets.UTF_8)) }
+        val referenced = diskState.referencedAttachmentIDs
+        return Snapshot(
+            diskState = diskState,
+            referenced = referenced,
+            writes = state.pendingAttachmentWrites.filterKeys { it in referenced },
+            needsCleaning = state.cleanedAttachmentIDs != referenced,
+        )
+    }
+
+    private fun persist(snapshot: Snapshot) {
+        val written = HashSet<UUID>()
+        for ((id, data) in snapshot.writes) {
+            if (storage.writeAttachment(id, data)) written += id
+        }
+        var saved = written.size == snapshot.writes.size
+        if (saved && snapshot.diskState.isEmpty) {
+            saved = storage.writeStateData(null)
+        } else if (saved) {
+            val encoded = runCatching { PersistedComposerState.json.encodeToString(PersistedComposerState.serializer(), snapshot.diskState) }.getOrNull()
+            saved = encoded != null && storage.writeStateData(encoded.toByteArray(Charsets.UTF_8))
+        }
+        if (saved && snapshot.needsCleaning) storage.removeAttachments(snapshot.referenced)
+
+        synchronized(lock) {
+            state.storedAttachmentIDs += written
+            state.pendingAttachmentWrites.keys -= written
+            if (!saved) {
+                state.dirty = true
+                return
+            }
+            if (snapshot.needsCleaning) {
+                state.cleanedAttachmentIDs = snapshot.referenced
+                state.storedAttachmentIDs.retainAll(snapshot.referenced)
+            }
+            val referenced = state.loaded?.referencedAttachmentIDs ?: emptySet()
+            state.attachmentCache.keys.retainAll(referenced)
+            state.pendingAttachmentWrites.keys.retainAll(referenced)
+            for (id in referenced) {
+                if (id in state.storedAttachmentIDs || id in state.pendingAttachmentWrites) continue
+                val data = state.attachmentCache[id] ?: continue
+                state.pendingAttachmentWrites[id] = data
+                state.dirty = true
+            }
         }
     }
 
@@ -569,7 +621,10 @@ internal class ComposerPersistenceWriter(
 
     private fun restoreAttachment(record: PersistedComposerState.AttachmentRecord): OpenCodeOutgoingAttachment? {
         val data = state.attachmentCache[record.id]
-            ?: storage.readAttachment(record.id)?.also { state.attachmentCache[record.id] = it }
+            ?: storage.readAttachment(record.id)?.also {
+                state.attachmentCache[record.id] = it
+                state.storedAttachmentIDs += record.id
+            }
             ?: if (record.mediaHash != null) ByteArray(0) else return null
         val pastedText = if (record.hasPastedText && data.isNotEmpty()) runCatching {
             Charsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(data)).toString()
