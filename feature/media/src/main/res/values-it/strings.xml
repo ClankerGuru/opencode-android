@@ -13,6 +13,26 @@
     <!-- One image of several: the image's label, then its place, as “Image 2 of 3” -->
     <string name="media_image_page_label">%1$s %2$d di %3$d</string>
 
+    <!-- Draw on Image: an editor that marks up a copy of an image and adds it to the prompt -->
+    <string name="media_drawing_draw_on_image_description">Disegna sull\'immagine</string>
+    <string name="media_drawing_undo_description">Annulla</string>
+    <string name="media_drawing_add_to_prompt_description">Aggiungi al prompt</string>
+    <string name="media_drawing_canvas_description">Area di disegno</string>
+    <string name="media_drawing_discard_title">Eliminare il disegno?</string>
+    <string name="media_drawing_discard_confirm">Elimina disegno</string>
+    <string name="media_drawing_keep">Continua a disegnare</string>
+    <string name="media_drawing_add_failed_title">Impossibile aggiungere il disegno</string>
+    <string name="media_drawing_flatten_failed">Impossibile creare l\'immagine. Riprova.</string>
+    <string name="media_drawing_prompt_unavailable">Al momento il messaggio di questa sessione non accetta allegati.</string>
+
+    <!-- Draw on Image: ink colours, read by TalkBack -->
+    <string name="media_drawing_ink_white">Bianco</string>
+    <string name="media_drawing_ink_black">Nero</string>
+    <string name="media_drawing_ink_red">Rosso</string>
+    <string name="media_drawing_ink_yellow">Giallo</string>
+    <string name="media_drawing_ink_green">Verde</string>
+    <string name="media_drawing_ink_blue">Blu</string>
+
     <!-- Zoomable image -->
     <string name="media_zoom_zoomed_in_state">Ingrandita</string>
     <string name="media_zoom_out_label">Riduci</string>

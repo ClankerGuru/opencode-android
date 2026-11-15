@@ -13,6 +13,26 @@
     <!-- One image of several: the image's label, then its place, as “Image 2 of 3” -->
     <string name="media_image_page_label">%1$s %2$d ຈາກ %3$d</string>
 
+    <!-- Draw on Image: an editor that marks up a copy of an image and adds it to the prompt -->
+    <string name="media_drawing_draw_on_image_description">ແຕ້ມໃສ່ຮູບພາບ</string>
+    <string name="media_drawing_undo_description">ຍົກເລີກ</string>
+    <string name="media_drawing_add_to_prompt_description">ເພີ່ມໃສ່ prompt</string>
+    <string name="media_drawing_canvas_description">ພື້ນທີ່ແຕ້ມ</string>
+    <string name="media_drawing_discard_title">ຍົກເລີກຮູບແຕ້ມບໍ?</string>
+    <string name="media_drawing_discard_confirm">ຍົກເລີກຮູບແຕ້ມ</string>
+    <string name="media_drawing_keep">ແຕ້ມຕໍ່</string>
+    <string name="media_drawing_add_failed_title">ເພີ່ມຮູບແຕ້ມບໍ່ໄດ້</string>
+    <string name="media_drawing_flatten_failed">ສ້າງຮູບພາບບໍ່ໄດ້. ລອງໃໝ່.</string>
+    <string name="media_drawing_prompt_unavailable">ຂໍ້ຄວາມຂອງເຊດຊັນນີ້ຍັງແນບໄຟລ໌ບໍ່ໄດ້ໃນຕອນນີ້.</string>
+
+    <!-- Draw on Image: ink colours, read by TalkBack -->
+    <string name="media_drawing_ink_white">ສີຂາວ</string>
+    <string name="media_drawing_ink_black">ສີດຳ</string>
+    <string name="media_drawing_ink_red">ສີແດງ</string>
+    <string name="media_drawing_ink_yellow">ສີເຫຼືອງ</string>
+    <string name="media_drawing_ink_green">ສີຂຽວ</string>
+    <string name="media_drawing_ink_blue">ສີຟ້າ</string>
+
     <!-- Zoomable image -->
     <string name="media_zoom_zoomed_in_state">ຊູມເຂົ້າແລ້ວ</string>
     <string name="media_zoom_out_label">ຊູມອອກ</string>

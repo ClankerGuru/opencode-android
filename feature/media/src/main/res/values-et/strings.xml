@@ -13,6 +13,26 @@
     <!-- One image of several: the image's label, then its place, as “Image 2 of 3” -->
     <string name="media_image_page_label">%1$s %2$d / %3$d</string>
 
+    <!-- Draw on Image: an editor that marks up a copy of an image and adds it to the prompt -->
+    <string name="media_drawing_draw_on_image_description">Joonista pildile</string>
+    <string name="media_drawing_undo_description">Võta tagasi</string>
+    <string name="media_drawing_add_to_prompt_description">Lisa viipa</string>
+    <string name="media_drawing_canvas_description">Joonistuslõuend</string>
+    <string name="media_drawing_discard_title">Kas loobuda joonistusest?</string>
+    <string name="media_drawing_discard_confirm">Loobu joonistusest</string>
+    <string name="media_drawing_keep">Jätka joonistamist</string>
+    <string name="media_drawing_add_failed_title">Joonistuse lisamine ebaõnnestus</string>
+    <string name="media_drawing_flatten_failed">Pildi loomine ebaõnnestus. Proovi uuesti.</string>
+    <string name="media_drawing_prompt_unavailable">Selle seansi sõnumile ei saa praegu manuseid lisada.</string>
+
+    <!-- Draw on Image: ink colours, read by TalkBack -->
+    <string name="media_drawing_ink_white">Valge</string>
+    <string name="media_drawing_ink_black">Must</string>
+    <string name="media_drawing_ink_red">Punane</string>
+    <string name="media_drawing_ink_yellow">Kollane</string>
+    <string name="media_drawing_ink_green">Roheline</string>
+    <string name="media_drawing_ink_blue">Sinine</string>
+
     <!-- Zoomable image -->
     <string name="media_zoom_zoomed_in_state">Suurendatud</string>
     <string name="media_zoom_out_label">Vähenda</string>

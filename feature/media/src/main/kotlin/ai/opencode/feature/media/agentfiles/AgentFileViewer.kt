@@ -143,6 +143,7 @@ fun AgentFileViewer(
     onImageShown: (sourceID: String, image: android.graphics.Bitmap) -> Unit = { _, _ -> },
     onZoomChange: (Boolean) -> Unit = {},
     onImageFrame: (sourceID: String, frame: Rect) -> Unit = { _, _ -> },
+    addDrawing: ImageDrawingAdd? = null,
 ) {
     val models = remember(reference, server, directory) {
         mutableStateListOf(AgentFileViewerModel(reference, server, directory))
@@ -166,6 +167,7 @@ fun AgentFileViewer(
             onImageShown = onImageShown,
             onZoomChange = onZoomChange,
             onImageFrame = onImageFrame,
+            addDrawing = addDrawing,
         )
     }
 }
@@ -184,16 +186,17 @@ fun AgentFilePage(
     onImageShown: (sourceID: String, image: android.graphics.Bitmap) -> Unit = { _, _ -> },
     onZoomChange: (Boolean) -> Unit = {},
     onImageFrame: (sourceID: String, frame: Rect) -> Unit = { _, _ -> },
+    addDrawing: ImageDrawingAdd? = null,
 ) {
     val reference = model.reference
     val renderer = markdown ?: LocalAgentFileMarkdown.current
     if (reference.kind.isMedia) {
         // Media plays in a dark room, like Photos.
         OpenCodeTheme(theme = rememberAppAppearance().theme, appearance = AppearanceColorScheme.Dark) {
-            AgentFilePageContent(model, isRoot, onOpen, onBack, onDone, modifier, isInMediaViewer, renderer, onImageShown, onZoomChange, onImageFrame)
+            AgentFilePageContent(model, isRoot, onOpen, onBack, onDone, modifier, isInMediaViewer, renderer, onImageShown, onZoomChange, onImageFrame, addDrawing)
         }
     } else {
-        AgentFilePageContent(model, isRoot, onOpen, onBack, onDone, modifier, isInMediaViewer, renderer, onImageShown, onZoomChange, onImageFrame)
+        AgentFilePageContent(model, isRoot, onOpen, onBack, onDone, modifier, isInMediaViewer, renderer, onImageShown, onZoomChange, onImageFrame, addDrawing)
     }
 }
 
@@ -212,6 +215,7 @@ private fun AgentFilePageContent(
     onImageShown: (String, android.graphics.Bitmap) -> Unit,
     onZoomChange: (Boolean) -> Unit,
     onImageFrame: (String, Rect) -> Unit,
+    addDrawing: ImageDrawingAdd?,
 ) {
     val reference = model.reference
     val wrapsShared = remember { shared(SharedKeys.fileViewerWrapsLines) }
@@ -270,6 +274,12 @@ private fun AgentFilePageContent(
                             )
                         }
                     }
+                    val image = (phase as? AgentFileViewerModel.Phase.Ready)?.content as? AgentFileViewerModel.Content.Image
+                    if (addDrawing != null && image != null) {
+                        IconButton(onClick = { model.draw(image.image, addDrawing) }, modifier = Modifier.testTag("image-gallery-draw")) {
+                            OpenCodeIcon("pencil", contentDescription = stringResource(R.string.media_drawing_draw_on_image_description))
+                        }
+                    }
                     if (showsTextControls) {
                         IconButton(onClick = model::toggleWrapLines) {
                             OpenCodeIcon(
@@ -312,6 +322,16 @@ private fun AgentFilePageContent(
                 )
             }
         }
+    }
+
+    model.drawing?.let { drawing ->
+        ImageDrawingEditor(drawing)
+        DisposableEffect(drawing) { onDispose { drawing.close() } }
+    }
+    // The image flies home from the viewer, never from under the editor.
+    val closesAfterDrawing = model.drawingAdded && model.drawing == null
+    LaunchedEffect(closesAfterDrawing) {
+        if (closesAfterDrawing) onDone()
     }
 
     model.shareError?.let { error ->

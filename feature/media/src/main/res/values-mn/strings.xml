@@ -13,6 +13,26 @@
     <!-- One image of several: the image's label, then its place, as “Image 2 of 3” -->
     <string name="media_image_page_label">%1$s %2$d / %3$d</string>
 
+    <!-- Draw on Image: an editor that marks up a copy of an image and adds it to the prompt -->
+    <string name="media_drawing_draw_on_image_description">Зураг дээр зурах</string>
+    <string name="media_drawing_undo_description">Буцаах</string>
+    <string name="media_drawing_add_to_prompt_description">Промптод нэмэх</string>
+    <string name="media_drawing_canvas_description">Зургийн самбар</string>
+    <string name="media_drawing_discard_title">Зургийг хаях уу?</string>
+    <string name="media_drawing_discard_confirm">Зургийг хаях</string>
+    <string name="media_drawing_keep">Үргэлжлүүлэн зурах</string>
+    <string name="media_drawing_add_failed_title">Зураг нэмж чадсангүй</string>
+    <string name="media_drawing_flatten_failed">Зургийг үүсгэж чадсангүй. Дахин оролдоно уу.</string>
+    <string name="media_drawing_prompt_unavailable">Энэ сессийн мессежид одоогоор хавсралт нэмэх боломжгүй байна.</string>
+
+    <!-- Draw on Image: ink colours, read by TalkBack -->
+    <string name="media_drawing_ink_white">Цагаан</string>
+    <string name="media_drawing_ink_black">Хар</string>
+    <string name="media_drawing_ink_red">Улаан</string>
+    <string name="media_drawing_ink_yellow">Шар</string>
+    <string name="media_drawing_ink_green">Ногоон</string>
+    <string name="media_drawing_ink_blue">Цэнхэр</string>
+
     <!-- Zoomable image -->
     <string name="media_zoom_zoomed_in_state">Томруулсан</string>
     <string name="media_zoom_out_label">Жижигрүүлэх</string>

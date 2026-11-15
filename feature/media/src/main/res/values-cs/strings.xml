@@ -13,6 +13,26 @@
     <!-- One image of several: the image's label, then its place, as “Image 2 of 3” -->
     <string name="media_image_page_label">%1$s %2$d z %3$d</string>
 
+    <!-- Draw on Image: an editor that marks up a copy of an image and adds it to the prompt -->
+    <string name="media_drawing_draw_on_image_description">Kreslit do obrázku</string>
+    <string name="media_drawing_undo_description">Vrátit zpět</string>
+    <string name="media_drawing_add_to_prompt_description">Přidat do zadání</string>
+    <string name="media_drawing_canvas_description">Plátno pro kreslení</string>
+    <string name="media_drawing_discard_title">Zahodit kresbu?</string>
+    <string name="media_drawing_discard_confirm">Zahodit kresbu</string>
+    <string name="media_drawing_keep">Pokračovat v kreslení</string>
+    <string name="media_drawing_add_failed_title">Nepodařilo se přidat kresbu</string>
+    <string name="media_drawing_flatten_failed">Obrázek se nepodařilo vytvořit. Zkuste to znovu.</string>
+    <string name="media_drawing_prompt_unavailable">Ke zprávě v této relaci teď nelze přidávat přílohy.</string>
+
+    <!-- Draw on Image: ink colours, read by TalkBack -->
+    <string name="media_drawing_ink_white">Bílá</string>
+    <string name="media_drawing_ink_black">Černá</string>
+    <string name="media_drawing_ink_red">Červená</string>
+    <string name="media_drawing_ink_yellow">Žlutá</string>
+    <string name="media_drawing_ink_green">Zelená</string>
+    <string name="media_drawing_ink_blue">Modrá</string>
+
     <!-- Zoomable image -->
     <string name="media_zoom_zoomed_in_state">Přiblíženo</string>
     <string name="media_zoom_out_label">Oddálit</string>

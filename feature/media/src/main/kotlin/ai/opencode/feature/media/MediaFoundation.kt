@@ -72,6 +72,8 @@ data class TranscriptImagePreview(val id: String, val pages: List<Page>, val ser
         val mediaHash: String? = null,
         val name: String? = null,
         val isUnavailable: Boolean = false,
+        /** A video's poster frame, which Draw on Image skips. */
+        val isVideo: Boolean = false,
         val loadFailed: Boolean = false,
         /** The app wrote [label] itself ("Image 1 of 3"), so it isn't a name worth showing as a title. */
         val labelIsPlaceholder: Boolean = false,
@@ -85,6 +87,7 @@ data class TranscriptImagePreview(val id: String, val pages: List<Page>, val ser
                 other.mediaHash == mediaHash &&
                 other.name == name &&
                 other.isUnavailable == isUnavailable &&
+                other.isVideo == isVideo &&
                 other.loadFailed == loadFailed &&
                 other.labelIsPlaceholder == labelIsPlaceholder &&
                 (other.image === image || (other.image != null && image != null && other.image.sameAs(image)))

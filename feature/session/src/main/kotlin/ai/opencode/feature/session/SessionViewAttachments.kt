@@ -36,6 +36,7 @@ import ai.opencode.feature.composer.plusmenu.LibraryPhoto
 import ai.opencode.feature.composer.plusmenu.PhotoFlights
 import ai.opencode.feature.composer.plusmenu.VideoDurationBadge
 import ai.opencode.feature.media.FileAttachmentCard
+import ai.opencode.feature.media.ImageDrawingAdd
 import ai.opencode.feature.media.MediaImageResult
 import ai.opencode.feature.media.MediaReferenceResolver
 import ai.opencode.feature.media.mediaZoomSource
@@ -400,6 +401,20 @@ class SessionAttachmentImporter internal constructor(
 fun rememberSessionAttachmentImporter(store: StoreOf<SessionFeature.State, SessionFeature.Action>): SessionAttachmentImporter {
     val scope = rememberCoroutineScope()
     return remember(store, scope) { SessionAttachmentImporter(store, scope) }
+}
+
+/**
+ * Draw on Image's Add to Prompt for a viewer opened from this session, or null (no Draw button)
+ * while it takes no attachments. The image joins the session's draft as a pasted one would
+ * ([SessionFeature.Action.DrawingAdded]).
+ */
+internal fun drawingHandler(store: StoreOf<SessionFeature.State, SessionFeature.Action>): ImageDrawingAdd? {
+    if (!store.state.takesPasteAttachments) return null
+    val identity = store.state.taskIdentity
+    return { attachment ->
+        store.send(SessionFeature.Action.DrawingAdded(attachment, from = identity))
+        store.state.pendingAttachments.any { it.id == attachment.id }
+    }
 }
 
 /**

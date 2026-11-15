@@ -72,6 +72,13 @@ class ComposerPhotoViewerTests {
         assertNull(ComposerPhotoViewer.preview(listOf(first), selected = second.id))
     }
 
+    @Test fun aVideoFramesPageIsMarkedAsVideo() {
+        val photo = photo(1)
+        val video = OpenCodeOutgoingAttachment(id = "video", data = jpeg(20, 20), mime = "image/jpeg", videoDuration = 10.0)
+        val pages = ComposerPhotoViewer.preview(listOf(photo, video), selected = photo.id)!!.pages
+        assertEquals(listOf(false, true), pages.map { it.isVideo })
+    }
+
     @Test fun removeHandsThePhotoBackAndPagesOnThenDiscardsTheLast() = runTest {
         val photos = listOf(photo(1), photo(2), photo(3))
         val preview = ComposerPhotoViewer.preview(photos, selected = photos[1].id)!!

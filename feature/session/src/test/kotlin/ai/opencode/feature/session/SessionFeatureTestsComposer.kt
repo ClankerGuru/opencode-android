@@ -1,9 +1,11 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.UuidClient
 import ai.opencode.core.files.ComposerStagedFile
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
+import ai.opencode.feature.composer.ComposerAttachmentsFeature
 import ai.opencode.feature.composer.ComposerFileAttachment
 import ai.opencode.feature.composer.ComposerLineGrowth
 import ai.opencode.feature.composer.ComposerTextInputTunables
@@ -12,14 +14,21 @@ import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.session.SessionTestSupport.Harness
+import ai.opencode.feature.session.SessionTestSupport.LockIsolated
+import ai.opencode.feature.session.SessionTestSupport.append
+import ai.opencode.feature.session.SessionTestSupport.receive
 import ai.opencode.feature.session.SessionTestSupport.sessionTest
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeDelivery
+import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.OpenCodePendingRequests
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeTranscriptItem
+import ai.opencode.server.model.OpenCodeUploadEvent
+import android.content.ContextWrapper
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -68,6 +77,98 @@ class SessionFeatureTestsComposer {
         optimisticPromptIDs = setOf(sentID),
         items = listOf(OpenCodeTranscriptItem.UserText(id = sentID, text = text)),
     ).withDraft("")
+
+    // Draw on Image and the session that opened the viewer (iOS `ImageDrawingFeatureTests`).
+
+    private val drawnImage = OpenCodeOutgoingAttachment(id = UUID(0, 2).toString(), data = byteArrayOf(0xFF.toByte(), 0xD8.toByte()), mime = "image/jpeg")
+
+    private fun Harness.drawingSession(answering: Boolean = false): State {
+        val state = sessionState()
+            .withDraft("Check this detail")
+            .withPendingAttachments(listOf(OpenCodeOutgoingAttachment(id = UUID(0, 1).toString(), data = byteArrayOf(1), mime = "image/png")))
+        return if (answering) state { state.beginAnswering() } else state
+    }
+
+    @Test fun aDrawingJoinsTheDraftThatOpenedItAndNothingElse() = sessionTest { h ->
+        val state = h.drawingSession()
+        val store = h.store(state)
+        store.send(Action.DrawingAdded(drawnImage, from = state.taskIdentity)) {
+            it.withPendingAttachments(it.pendingAttachments + drawnImage)
+        }
+        store.finish()
+    }
+
+    @Test fun aDrawingForAnotherComposerAddsNothing() = sessionTest { h ->
+        val state = h.drawingSession()
+        val elsewhere = state.taskIdentity.copy(visit = state.taskIdentity.visit + 1)
+        val store = h.store(state)
+        store.send(Action.DrawingAdded(drawnImage, from = elsewhere))
+    }
+
+    @Test fun aDrawingWhileTheComposerAnswersARequestAddsNothing() = sessionTest { h ->
+        val state = h.drawingSession(answering = true)
+        assertFalse(state.takesPasteAttachments)
+        val store = h.store(state)
+        store.send(Action.DrawingAdded(drawnImage, from = state.taskIdentity))
+    }
+
+    private val clip = ComposerStagedFile(
+        id = UUID(0, 9),
+        name = "clip.mov",
+        mime = "video/quicktime",
+        size = 100,
+        url = File("/nonexistent/ComposerFiles/${UUID(0, 9)}/clip.mov"),
+    )
+
+    /** A finished upload's cleanup reads the staging folder under the app's cache. */
+    private val appContext = object : ContextWrapper(null) {
+        override fun getCacheDir(): File = File(System.getProperty("java.io.tmpdir") ?: "/tmp")
+    }
+
+    private fun Harness.sending(state: State, upload: Channel<OpenCodeUploadEvent>, sent: LockIsolated<List<List<OpenCodeOutgoingAttachment>>>) =
+        store(state) {
+            this[AppContext] = appContext
+            this[UuidClient] = UuidClient.incrementing()
+            this[OpenCodeClient] = this[OpenCodeClient].copy(
+                uploadFile = { _, _, _, _ -> upload.receiveAsFlow() },
+                sendPrompt = { _, _, _, attachments, _, _, _ -> sent.append(attachments) },
+                waitForIdle = { _, _ -> },
+                getSession = { _, _ -> session },
+                transcript = { _, _, _ -> emptyList() },
+                pendingInputs = { _, _ -> emptyList() },
+                familyPendingRequests = { _, _, _ -> OpenCodePendingRequests(permissions = emptyList(), forms = emptyList()) },
+            )
+        }
+
+    private val uploadFinished: (Action) -> Boolean =
+        { (it as? Action.ComposerAttachments)?.action is ComposerAttachmentsFeature.Action.FileUploadFinished }
+
+    /** Add lands while Send waits on an upload: the image goes with that message, like a paste. */
+    @Test fun aDrawingWhileASendWaitsOnUploadsIsAddedLikeAPaste() = sessionTest { h ->
+        val state = h.drawingSession()
+        val photo = state.pendingAttachments
+        val upload = Channel<OpenCodeUploadEvent>(Channel.UNLIMITED)
+        val sent = LockIsolated(listOf<List<OpenCodeOutgoingAttachment>>())
+        val store = h.sending(state, upload, sent)
+        store.exhaustive = false
+        store.send(Action.filesStaged(listOf(clip)))
+        store.send(Action.SendTapped) { it.withSendAfterUploads(OpenCodeDelivery.Steer) }
+        store.skipReceivedActions()
+
+        store.exhaustive = true
+        store.send(Action.DrawingAdded(drawnImage, from = state.taskIdentity)) {
+            it.withPendingAttachments(it.pendingAttachments + drawnImage)
+        }
+
+        store.exhaustive = false
+        upload.send(OpenCodeUploadEvent.Finished(path = "/tmp/opencode/uploads/u/clip.mov"))
+        upload.close()
+        store.receive(uploadFinished, "fileUploadFinished")
+        store.receive(Action.DeferredSendReady::class)
+        store.receive(Action.PromptAdmitted::class)
+        store.finish()
+        assertEquals(listOf(photo + drawnImage), sent.value)
+    }
 
     @Test fun returnKeySubmitsInsteadOfInsertingNewline() = sessionTest { h ->
         h.state { shared(SharedKeys.returnKeySends) }.set(true)

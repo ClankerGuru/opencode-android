@@ -13,6 +13,26 @@
     <!-- One image of several: the image's label, then its place, as “Image 2 of 3” -->
     <string name="media_image_page_label">%1$s %2$d av %3$d</string>
 
+    <!-- Draw on Image: an editor that marks up a copy of an image and adds it to the prompt -->
+    <string name="media_drawing_draw_on_image_description">Tegn på bilde</string>
+    <string name="media_drawing_undo_description">Angre</string>
+    <string name="media_drawing_add_to_prompt_description">Legg til i meldingen</string>
+    <string name="media_drawing_canvas_description">Tegneflate</string>
+    <string name="media_drawing_discard_title">Forkaste tegningen?</string>
+    <string name="media_drawing_discard_confirm">Forkast tegning</string>
+    <string name="media_drawing_keep">Fortsett å tegne</string>
+    <string name="media_drawing_add_failed_title">Kunne ikke legge til tegning</string>
+    <string name="media_drawing_flatten_failed">Kunne ikke lage bildet. Prøv igjen.</string>
+    <string name="media_drawing_prompt_unavailable">Meldingen i denne sesjonen kan ikke ta imot vedlegg akkurat nå.</string>
+
+    <!-- Draw on Image: ink colours, read by TalkBack -->
+    <string name="media_drawing_ink_white">Hvit</string>
+    <string name="media_drawing_ink_black">Svart</string>
+    <string name="media_drawing_ink_red">Rød</string>
+    <string name="media_drawing_ink_yellow">Gul</string>
+    <string name="media_drawing_ink_green">Grønn</string>
+    <string name="media_drawing_ink_blue">Blå</string>
+
     <!-- Zoomable image -->
     <string name="media_zoom_zoomed_in_state">Zoomet inn</string>
     <string name="media_zoom_out_label">Zoom ut</string>

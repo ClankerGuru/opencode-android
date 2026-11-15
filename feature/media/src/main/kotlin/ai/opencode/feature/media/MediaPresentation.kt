@@ -447,7 +447,7 @@ class MediaPresenter internal constructor() {
 
     internal var presentation: Presentation? by mutableStateOf(null)
     internal var imageViewerIsUp: () -> Boolean = { false }
-    internal var sendImage: (TranscriptImagePreview) -> Unit = {}
+    internal var sendImage: (TranscriptImagePreview, ImageDrawingAdd?) -> Unit = { _, _ -> }
 
     val isPresenting: Boolean get() = presentation != null || imageViewerIsUp()
 
@@ -479,10 +479,10 @@ class MediaPresenter internal constructor() {
         return true
     }
 
-    /** The transcript image viewer, through [MediaFeature]. */
-    fun presentImage(preview: TranscriptImagePreview) {
+    /** The transcript image viewer, through [MediaFeature]; [addDrawing] is the opener's prompt for Draw on Image, null hides it. */
+    fun presentImage(preview: TranscriptImagePreview, addDrawing: ImageDrawingAdd? = null) {
         if (presentation != null) return
-        sendImage(preview)
+        sendImage(preview, addDrawing)
     }
 
     companion object {

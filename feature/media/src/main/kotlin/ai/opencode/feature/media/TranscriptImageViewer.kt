@@ -12,12 +12,15 @@ import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.Effect
+import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.Store
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.cancellable
 import ai.opencode.core.store.collectState
+import ai.opencode.core.store.ifLet
+import ai.opencode.core.store.scope
 import ai.opencode.core.ui.OpenCodeIconButton
 import ai.opencode.core.ui.OpenCodeIconButtonStyle
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -215,7 +218,10 @@ val TranscriptImagePreview.Page.displayTitle: String?
 
 // MARK: - Feature
 
-class TranscriptImageViewerFeature : Reducer<TranscriptImageViewerFeature.State, TranscriptImageViewerFeature.Action> {
+/** [addDrawing] is the opener's prompt, for a viewer that [State.allowsDrawing]. */
+class TranscriptImageViewerFeature(
+    addDrawing: ImageDrawingAdd? = null,
+) : Reducer<TranscriptImageViewerFeature.State, TranscriptImageViewerFeature.Action> {
     data class State(
         val preview: TranscriptImagePreview,
         val selectedID: String = preview.id,
@@ -226,6 +232,12 @@ class TranscriptImageViewerFeature : Reducer<TranscriptImageViewerFeature.State,
         val allowsRemove: Boolean = false,
         /** The last page was removed: the viewer goes without flying home. */
         val isDiscarded: Boolean = false,
+        /** Draw on Image hands a marked-up copy to the opener's prompt (`addDrawing`). */
+        val allowsDrawing: Boolean = false,
+        /** Draw on Image's editor, while it's up. */
+        val drawing: ImageDrawingFeature.State? = null,
+        /** Add to Prompt landed: the viewer goes once the editor has. */
+        val closesAfterDrawing: Boolean = false,
     ) {
         val selectedPage: TranscriptImagePreview.Page?
             get() = preview.pages.firstOrNull { it.id == selectedID } ?: preview.pages.firstOrNull()
@@ -242,6 +254,8 @@ class TranscriptImageViewerFeature : Reducer<TranscriptImageViewerFeature.State,
         data class SaveFinished(val saved: Boolean) : Action
         data object ShareTapped : Action
         data object RemoveTapped : Action
+        data object DrawTapped : Action
+        data class Drawing(val action: PresentationAction<ImageDrawingFeature.Action>) : Action
         data class Delegate(val action: DelegateAction) : Action
 
         sealed interface DelegateAction {
@@ -252,7 +266,21 @@ class TranscriptImageViewerFeature : Reducer<TranscriptImageViewerFeature.State,
 
     private data class PageLoadID(val id: String)
 
-    override fun reduce(state: State, action: Action): Reduced<State, Action> = when (action) {
+    private object DrawingSlot
+
+    private val body: Reducer<State, Action> = ifLet(
+        id = DrawingSlot,
+        parent = Reducer(::reduceViewer),
+        state = { it.drawing },
+        setState = { state, drawing -> state.copy(drawing = drawing) },
+        action = { (it as? Action.Drawing)?.action },
+        embed = { Action.Drawing(it) },
+        child = ImageDrawingFeature(addDrawing ?: { false }),
+    )
+
+    override fun reduce(state: State, action: Action): Reduced<State, Action> = body.reduce(state, action)
+
+    private fun reduceViewer(state: State, action: Action): Reduced<State, Action> = when (action) {
         Action.Task -> loadPageIfNeeded(state.selectedID, state)
 
         is Action.PageSelected -> loadPageIfNeeded(action.id, state.copy(selectedID = action.id))
@@ -345,6 +373,24 @@ class TranscriptImageViewerFeature : Reducer<TranscriptImageViewerFeature.State,
             }
         }
 
+        Action.DrawTapped -> {
+            val page = state.selectedPage
+            val image = page?.image
+            if (!state.allowsDrawing || page == null || page.isVideo || image == null) {
+                Reduced(state)
+            } else {
+                Reduced(state.copy(drawing = ImageDrawingFeature.State(image)))
+            }
+        }
+
+        is Action.Drawing -> when ((action.action as? PresentationAction.Presented)?.action) {
+            ImageDrawingFeature.Action.Delegate(ImageDrawingFeature.Action.DelegateAction.Added) ->
+                Reduced(state.copy(closesAfterDrawing = true))
+            ImageDrawingFeature.Action.Delegate(ImageDrawingFeature.Action.DelegateAction.Dismiss) ->
+                Reduced(state.copy(drawing = null))
+            else -> Reduced(state)
+        }
+
         is Action.Delegate -> Reduced(state)
     }
 
@@ -425,6 +471,11 @@ fun TranscriptImageViewer(
     }
     LaunchedEffect(state.isDiscarded) {
         if (state.isDiscarded) viewer.discard()
+    }
+    // The image flies home from the viewer, never from under the editor.
+    val closesAfterDrawing = state.closesAfterDrawing && state.drawing == null
+    LaunchedEffect(closesAfterDrawing) {
+        if (closesAfterDrawing) viewer.dismiss()
     }
 
     val controlsVisible = controlsAreVisible(state.isShowingControls, talkBack, viewer.chromeHidden)
@@ -574,6 +625,17 @@ fun TranscriptImageViewer(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        val page = state.selectedPage
+                        if (state.allowsDrawing && page != null && !page.isVideo) {
+                            OpenCodeIconButton(
+                                symbol = SFSymbol.Pencil,
+                                contentDescription = stringResource(R.string.media_drawing_draw_on_image_description),
+                                onClick = { store.send(TranscriptImageViewerFeature.Action.DrawTapped) },
+                                modifier = Modifier.testTag("image-gallery-draw"),
+                                style = OpenCodeIconButtonStyle.Standard,
+                                enabled = page.image != null,
+                            )
+                        }
                         OpenCodeIconButton(
                             symbol = SFSymbol.SquareAndArrowDown,
                             contentDescription = stringResource(R.string.media_viewer_save_to_photos_description),
@@ -594,6 +656,18 @@ fun TranscriptImageViewer(
                 }
             }
         }
+    }
+
+    state.drawing?.let { first ->
+        val drawing = remember(store) {
+            // The last state, so the scope never reads `null` while its dismissal lands.
+            var last = first
+            store.scope<TranscriptImageViewerFeature.State, TranscriptImageViewerFeature.Action, ImageDrawingFeature.State, ImageDrawingFeature.Action>(
+                state = { it.drawing?.also { current -> last = current } ?: last },
+                action = { TranscriptImageViewerFeature.Action.Drawing(PresentationAction.Presented(it)) },
+            )
+        }
+        ImageDrawingEditor(drawing)
     }
 }
 

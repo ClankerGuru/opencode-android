@@ -13,6 +13,26 @@
     <!-- One image of several: the image's label, then its place, as “Image 2 of 3” -->
     <string name="media_image_page_label">%1$s %2$d dari %3$d</string>
 
+    <!-- Draw on Image: an editor that marks up a copy of an image and adds it to the prompt -->
+    <string name="media_drawing_draw_on_image_description">Gambar di atas gambar</string>
+    <string name="media_drawing_undo_description">Urungkan</string>
+    <string name="media_drawing_add_to_prompt_description">Tambah ke prompt</string>
+    <string name="media_drawing_canvas_description">Kanvas gambar</string>
+    <string name="media_drawing_discard_title">Buang coretan?</string>
+    <string name="media_drawing_discard_confirm">Buang coretan</string>
+    <string name="media_drawing_keep">Lanjut menggambar</string>
+    <string name="media_drawing_add_failed_title">Gagal menambahkan coretan</string>
+    <string name="media_drawing_flatten_failed">Gagal membuat gambar. Coba lagi.</string>
+    <string name="media_drawing_prompt_unavailable">Pesan sesi ini belum bisa menerima lampiran saat ini.</string>
+
+    <!-- Draw on Image: ink colours, read by TalkBack -->
+    <string name="media_drawing_ink_white">Putih</string>
+    <string name="media_drawing_ink_black">Hitam</string>
+    <string name="media_drawing_ink_red">Merah</string>
+    <string name="media_drawing_ink_yellow">Kuning</string>
+    <string name="media_drawing_ink_green">Hijau</string>
+    <string name="media_drawing_ink_blue">Biru</string>
+
     <!-- Zoomable image -->
     <string name="media_zoom_zoomed_in_state">Diperbesar</string>
     <string name="media_zoom_out_label">Perkecil</string>
