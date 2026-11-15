@@ -58,7 +58,7 @@ internal val bindingReducer: Reducer<State, Action> = Reducer { state, action ->
 internal fun SessionFeature.reduceCallAndBindings(state: State, action: Action): Reduced<State, Action>? = when (action) {
     Action.RaisedToEar -> when {
         // Starts a call, never ends one: the ear isn't a toggle.
-        state.voice != null || !state.isVoiceAvailable -> Reduced(state)
+        state.voice != null || !state.isVoiceAvailable || state.isCovered -> Reduced(state)
         // The phone comes near the face while dictating too; a call would take the mic and end the recording.
         state.dictationBlocksRaise { date.now() } -> Reduced(state)
         else -> {
