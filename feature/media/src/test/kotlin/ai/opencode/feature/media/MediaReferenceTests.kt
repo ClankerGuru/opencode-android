@@ -186,42 +186,42 @@ class MediaReferenceTests {
         }
         assertNotNull(preview)
 
-        val store = TestStore(TranscriptImageViewerFeature.State(preview!!), TranscriptImageViewerFeature(), this) {
+        val store = TestStore(FullscreenViewerFeature.State(preview!!), FullscreenViewerFeature(), this) {
             this[DecodedImageCache] = decodedCache
             this[MediaReferenceClient] = mediaReferences
         }
 
-        store.send(TranscriptImageViewerFeature.Action.Task)
-        store.receive({ it is TranscriptImageViewerFeature.Action.MediaLoaded }) {
+        store.send(FullscreenViewerFeature.Action.Task)
+        store.receive({ it is FullscreenViewerFeature.Action.MediaLoaded }) {
             it.withPage(0) { page -> page.copy(loadFailed = true) }
         }
 
         val expectedImage = store.withDependencies { CachedImage.decoded("img-1", pngData, hashA) }
         assertNotNull(expectedImage)
 
-        store.send(TranscriptImageViewerFeature.Action.RetryPageTapped("img-1")) {
+        store.send(FullscreenViewerFeature.Action.RetryPageTapped("img-1")) {
             it.withPage(0) { page -> page.copy(loadFailed = false) }
         }
-        store.receive({ it is TranscriptImageViewerFeature.Action.MediaLoaded }) {
+        store.receive({ it is FullscreenViewerFeature.Action.MediaLoaded }) {
             it.withPage(0) { page -> page.copy(image = expectedImage, loadFailed = false) }
         }
         assertTrue(store.state.preview.pages[0].image === expectedImage)
 
-        store.send(TranscriptImageViewerFeature.Action.PageSelected("img-2")) {
+        store.send(FullscreenViewerFeature.Action.PageSelected("img-2")) {
             it.copy(selectedID = "img-2")
         }
-        store.receive({ it is TranscriptImageViewerFeature.Action.MediaLoaded }) {
+        store.receive({ it is FullscreenViewerFeature.Action.MediaLoaded }) {
             it.withPage(1) { page -> page.copy(isUnavailable = true) }
         }
 
         // Saving an unavailable page is a no-op.
-        store.send(TranscriptImageViewerFeature.Action.SaveTapped)
+        store.send(FullscreenViewerFeature.Action.SaveTapped)
         store.finish()
     }
 
-    private fun TranscriptImageViewerFeature.State.withPage(
+    private fun FullscreenViewerFeature.State.withPage(
         index: Int,
         update: (TranscriptImagePreview.Page) -> TranscriptImagePreview.Page,
-    ): TranscriptImageViewerFeature.State =
+    ): FullscreenViewerFeature.State =
         copy(preview = preview.copy(pages = preview.pages.toMutableList().also { it[index] = update(it[index]) }))
 }

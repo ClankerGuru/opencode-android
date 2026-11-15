@@ -4,14 +4,13 @@ import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.dependencies.dependency
-import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.Store
 import ai.opencode.core.store.collectState
 import ai.opencode.core.ui.OpenCodeAppTheme
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
-import ai.opencode.feature.media.AgentFileViewer
+import ai.opencode.feature.media.AgentFileDestination
 import ai.opencode.feature.media.AgentImageGallery
 import ai.opencode.feature.media.AgentImageViewport
 import ai.opencode.feature.media.AgentImageVisibility
@@ -35,7 +34,6 @@ import ai.opencode.feature.media.LocalAgentImageViewport
 import ai.opencode.feature.media.LocalLinkMenu
 import ai.opencode.feature.media.LocalMediaPresenter
 import ai.opencode.feature.media.MediaBackHandler
-import ai.opencode.feature.media.MediaFeature
 import ai.opencode.feature.media.MediaThumbnail
 import ai.opencode.feature.media.MediaView
 import ai.opencode.feature.media.MermaidDiagramCard
@@ -118,7 +116,6 @@ import androidx.compose.ui.unit.dp
  *   --es server http://10.0.2.2:4118 [--es session <id>] [--es section images|files|mermaid|links|tools]`
  */
 class MediaLabActivity : ComponentActivity() {
-    private val media = Store(MediaFeature.State(), MediaFeature())
     private val browser = Store(BrowserFeature.State(), BrowserFeature())
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -133,7 +130,7 @@ class MediaLabActivity : ComponentActivity() {
         setContent {
             OpenCodeAppTheme {
                 Surface(Modifier.fillMaxSize(), color = OpenCodeTheme.colors.canvas) {
-                    MediaView(media) {
+                    MediaView {
                         LabScreen(server, sessionID, section, browser)
                     }
                 }
@@ -142,7 +139,6 @@ class MediaLabActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        media.close()
         browser.close()
         super.onDestroy()
     }
@@ -279,7 +275,7 @@ private fun ToolImages(item: OpenCodeTranscriptItem.Tool, attachments: List<Pair
             bitmap ?: continue
             Box(
                 Modifier.clip(RoundedCornerShape(TranscriptMetrics.cardCornerRadius)).clickable {
-                    TranscriptImagePreview.fromImages(decoded, id, "Tool image")?.let { presenter?.presentImage(it) }
+                    TranscriptImagePreview.fromImages(decoded, id, "Tool image")?.let { presenter?.presentPreview(it) }
                 },
             ) {
                 MediaThumbnail(bitmap, listOf(id), Modifier.size(if (decoded.size == 1) 240.dp else 140.dp), cornerRadius = TranscriptMetrics.cardCornerRadius)
@@ -375,7 +371,6 @@ private fun LabReply(
     openLink: (String) -> Unit,
 ) {
     val presenter = LocalMediaPresenter.current
-    val reduceMotion = rememberReduceMotion()
     val parsed = remember(item.text) { pieces(item.text).map { piece -> piece to (piece as? Piece.Prose)?.let { paragraph(it.text) } } }
     val siblings = remember(parsed) { parsed.flatMap { it.second?.files.orEmpty() }.filter { it.kind == AgentFileReference.Kind.Image } }
     val blocks = remember(parsed) {
@@ -386,18 +381,7 @@ private fun LabReply(
     LaunchedEffect(targets) { targets.forEach { links.appeared(it, item.id) } }
 
     fun openFile(file: AgentFileReference) {
-        presenter?.present(sourceID = file.zoomSourceID, isMedia = file.kind.isMedia, reducesMotion = reduceMotion) { viewer ->
-            AgentFileViewer(
-                reference = file,
-                server = server,
-                directory = directory,
-                onDone = { viewer.dismiss() },
-                isInMediaViewer = true,
-                onImageShown = { id, image -> viewer.show(id, image) },
-                onZoomChange = { viewer.isZoomed = it },
-                onImageFrame = { id, frame -> viewer.mediaFrames[id] = frame },
-            )
-        }
+        presenter?.presentPreview(TranscriptImagePreview(AgentFileDestination(file, directory), server))
     }
 
     CompositionLocalProvider(LocalAgentImageSiblings provides siblings) {
@@ -405,7 +389,7 @@ private fun LabReply(
             for ((piece, paragraph) in parsed) {
                 when (piece) {
                     is Piece.Code -> if (piece.language == "mermaid") {
-                        if (section == null || section == "mermaid") MermaidDiagramCard(piece.source, onPreview = { presenter?.presentImage(it) })
+                        if (section == null || section == "mermaid") MermaidDiagramCard(piece.source, onPreview = { presenter?.presentPreview(it) })
                     } else if (section == null) {
                         Text(piece.source, style = OpenCodeTextStyles.footnote.copy(fontFamily = OpenCodeFonts.monospace), color = OpenCodeTheme.colors.text)
                     }
@@ -418,7 +402,7 @@ private fun LabReply(
                                     files = paragraph.files,
                                     server = server,
                                     directory = directory,
-                                    onPreviewImage = { presenter?.presentImage(it) },
+                                    onPreviewImage = { presenter?.presentPreview(it) },
                                     onOpenFile = ::openFile,
                                 )
                             }
@@ -457,7 +441,7 @@ private fun ImageLinkThumbnail(url: String) {
         style = OpenCodeTextStyles.footnote,
         color = OpenCodeTheme.colors.secondaryText,
     )
-    Box(Modifier.clip(RoundedCornerShape(TranscriptMetrics.cardCornerRadius)).clickable { presenter?.presentImage(TranscriptImagePreview(url, bitmap, "Image link")) }) {
+    Box(Modifier.clip(RoundedCornerShape(TranscriptMetrics.cardCornerRadius)).clickable { presenter?.presentPreview(TranscriptImagePreview(url, bitmap, "Image link")) }) {
         MediaThumbnail(bitmap, listOf(url), Modifier.fillMaxWidth(), fits = true, maxHeight = 280.dp, cornerRadius = TranscriptMetrics.cardCornerRadius)
     }
 }

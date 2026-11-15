@@ -1,11 +1,7 @@
 package ai.opencode.feature.media
 
 import ai.opencode.core.R as CoreR
-import ai.opencode.core.ui.OpenCodeTopBar
-import ai.opencode.core.ui.OpenCodeTopBarBackButton
 import ai.opencode.core.motion.rememberReduceMotion
-import ai.opencode.core.sharing.SharedKeys
-import ai.opencode.core.sharing.shared
 import ai.opencode.core.strings.localized
 import ai.opencode.core.strings.localizedPlural
 import ai.opencode.core.ui.AppearanceColorScheme
@@ -37,10 +33,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -48,22 +44,14 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import ai.opencode.core.ui.OpenCodeAlertDialog
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -81,17 +69,15 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -112,347 +98,72 @@ data class AgentFileDestination(val reference: AgentFileReference, val directory
 typealias AgentFileMarkdown = @Composable (source: String, server: OpenCodeServer, directory: String?, onOpenFile: (AgentFileReference) -> Unit) -> Unit
 
 /**
- * The app's Markdown renderer for file pages that aren't handed one. Null: Markdown files open as
- * source.
+ * The app's Markdown renderer for file pages. Null: Markdown files open as source.
  */
 val LocalAgentFileMarkdown = staticCompositionLocalOf<AgentFileMarkdown?> { null }
 
-/**
- * Opens a file the agent mentioned: streams media when the server supports ranges, otherwise
- * downloads with progress, then shows the player, a rendered Markdown document, the code viewer, a
- * PDF, or offers another app. Links inside a document push further pages; system back pops them.
- *
- * @param onDone Closes the viewer.
- * @param isInMediaViewer the media viewer hosts it: the root page's dark room is the viewer's own
- *   (clear), which lifts as it's dragged away.
- * @param markdown renders Markdown files; without it [LocalAgentFileMarkdown] does, and without
- *   either they open as source.
- * @param onImageShown The root page decoded its image.
- * @param onZoomChange
- * @param onImageFrame Where the root page's image sits.
- */
+/** Loading, playback and document content only. The fullscreen viewer owns navigation and actions. */
 @Composable
-fun AgentFileViewer(
-    reference: AgentFileReference,
-    server: OpenCodeServer,
-    directory: String?,
-    onDone: () -> Unit,
-    modifier: Modifier = Modifier,
-    isInMediaViewer: Boolean = false,
-    markdown: AgentFileMarkdown? = null,
-    onImageShown: (sourceID: String, image: android.graphics.Bitmap) -> Unit = { _, _ -> },
-    onZoomChange: (Boolean) -> Unit = {},
-    onImageFrame: (sourceID: String, frame: Rect) -> Unit = { _, _ -> },
-    addDrawing: ImageDrawingAdd? = null,
-) {
-    val models = remember(reference, server, directory) {
-        mutableStateListOf(AgentFileViewerModel(reference, server, directory))
-    }
-    DisposableEffect(models) {
-        onDispose { models.forEach(AgentFileViewerModel::release) }
-    }
-    MediaBackHandler(enabled = models.size > 1) {
-        models.removeAt(models.lastIndex).release()
-    }
-    val model = models.last()
-    Box(modifier.fillMaxSize().testTag("agent-file-viewer")) {
-        AgentFilePage(
-            model = model,
-            isRoot = models.size == 1,
-            isInMediaViewer = isInMediaViewer,
-            onOpen = { destination -> models.add(AgentFileViewerModel(destination.reference, server, destination.directory)) },
-            onBack = { if (models.size > 1) models.removeAt(models.lastIndex).release() },
-            onDone = onDone,
-            markdown = markdown,
-            onImageShown = onImageShown,
-            onZoomChange = onZoomChange,
-            onImageFrame = onImageFrame,
-            addDrawing = addDrawing,
-        )
-    }
-}
-
-/** One file's page. Media plays in a dark room, like Photos. */
-@Composable
-fun AgentFilePage(
+internal fun AgentFilePage(
     model: AgentFileViewerModel,
-    isRoot: Boolean,
-    onOpen: (AgentFileDestination) -> Unit,
-    onBack: () -> Unit,
-    onDone: () -> Unit,
-    modifier: Modifier = Modifier,
-    isInMediaViewer: Boolean = false,
-    markdown: AgentFileMarkdown? = null,
-    onImageShown: (sourceID: String, image: android.graphics.Bitmap) -> Unit = { _, _ -> },
-    onZoomChange: (Boolean) -> Unit = {},
-    onImageFrame: (sourceID: String, frame: Rect) -> Unit = { _, _ -> },
-    addDrawing: ImageDrawingAdd? = null,
-) {
-    val reference = model.reference
-    val renderer = markdown ?: LocalAgentFileMarkdown.current
-    if (reference.kind.isMedia) {
-        // Media plays in a dark room, like Photos.
-        OpenCodeTheme(theme = rememberAppAppearance().theme, appearance = AppearanceColorScheme.Dark) {
-            AgentFilePageContent(model, isRoot, onOpen, onBack, onDone, modifier, isInMediaViewer, renderer, onImageShown, onZoomChange, onImageFrame, addDrawing)
-        }
-    } else {
-        AgentFilePageContent(model, isRoot, onOpen, onBack, onDone, modifier, isInMediaViewer, renderer, onImageShown, onZoomChange, onImageFrame, addDrawing)
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@androidx.annotation.OptIn(markerClass = [UnstableApi::class])
-@Composable
-private fun AgentFilePageContent(
-    model: AgentFileViewerModel,
-    isRoot: Boolean,
-    onOpen: (AgentFileDestination) -> Unit,
-    onBack: () -> Unit,
-    onDone: () -> Unit,
-    modifier: Modifier,
-    isInMediaViewer: Boolean,
-    markdown: AgentFileMarkdown?,
-    onImageShown: (String, android.graphics.Bitmap) -> Unit,
-    onZoomChange: (Boolean) -> Unit,
-    onImageFrame: (String, Rect) -> Unit,
-    addDrawing: ImageDrawingAdd?,
-) {
-    val reference = model.reference
-    val wrapsShared = remember { shared(SharedKeys.fileViewerWrapsLines) }
-    val wrapsLines by wrapsShared.flow.collectAsState()
-    var showsSource by remember(model) { mutableStateOf(false) }
-    val phase = model.phase
-    val background = when {
-        !reference.kind.isMedia -> OpenCodeTheme.colors.canvas
-        isRoot && isInMediaViewer -> Color.Transparent
-        else -> Color.Black
-    }
-    val showsTextControls = phase is AgentFileViewerModel.Phase.Ready && when (phase.content) {
-        is AgentFileViewerModel.Content.Text -> true
-        is AgentFileViewerModel.Content.Markdown -> showsSource || markdown == null
-        else -> false
-    }
-
-    DisposableEffect(model) {
-        model.open()
-        onDispose { model.stop() }
-    }
-
-    val playerContent = (phase as? AgentFileViewerModel.Phase.Ready)?.content as? AgentFileViewerModel.Content.Player
-    val pip = playerContent?.let { rememberAgentFilePictureInPicture(it.player, it.isAudio) }
-    if (pip != null && pip.isActive) {
-        // The viewer fills the window: in Picture in Picture the window is only the video.
-        Box(modifier.fillMaxSize().background(Color.Black).testTag("agent-file-pip")) {
-            ContentFrame(player = playerContent.player, modifier = Modifier.fillMaxSize())
-        }
-        return
-    }
-
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        containerColor = background,
-        topBar = {
-            OpenCodeTopBar(
-                containerColor = background,
-                centerTitle = true,
-                // Over a photo or video the bar is just its controls, as the media viewer's.
-                hairline = !reference.kind.isMedia,
-                title = { AgentFileTitle(reference.name, model.locationLabel) },
-                navigation = {
-                    if (isRoot) {
-                        TextButton(onClick = onDone, modifier = Modifier.testTag("agent-file-done")) { Text(stringResource(CoreR.string.common_done)) }
-                    } else {
-                        OpenCodeTopBarBackButton(onClick = onBack)
-                    }
-                },
-                actions = {
-                    if (phase is AgentFileViewerModel.Phase.Ready && phase.content is AgentFileViewerModel.Content.Markdown && markdown != null) {
-                        IconButton(onClick = { showsSource = !showsSource }, modifier = Modifier.testTag("agent-file-source-toggle")) {
-                            OpenCodeIcon(
-                                if (showsSource) "doc.richtext" else "chevron.left.forwardslash.chevron.right",
-                                contentDescription = if (showsSource) stringResource(R.string.media_file_show_preview_description) else stringResource(R.string.media_file_show_source_description),
-                            )
-                        }
-                    }
-                    val image = (phase as? AgentFileViewerModel.Phase.Ready)?.content as? AgentFileViewerModel.Content.Image
-                    if (addDrawing != null && image != null) {
-                        IconButton(onClick = { model.draw(image.image, addDrawing) }, modifier = Modifier.testTag("image-gallery-draw")) {
-                            OpenCodeIcon("pencil", contentDescription = stringResource(R.string.media_drawing_draw_on_image_description))
-                        }
-                    }
-                    if (showsTextControls) {
-                        IconButton(onClick = model::toggleWrapLines) {
-                            OpenCodeIcon(
-                                if (wrapsLines) "arrow.left.and.right.text.vertical" else "text.word.spacing",
-                                contentDescription = if (wrapsLines) stringResource(R.string.media_file_unwrap_lines_description) else stringResource(R.string.media_file_wrap_lines_description),
-                            )
-                        }
-                    }
-                    if (pip != null && pip.isSupported) {
-                        IconButton(onClick = pip::start, modifier = Modifier.testTag("agent-file-pip-start")) {
-                            OpenCodeIcon("pip.enter", contentDescription = stringResource(R.string.media_file_start_pip_description))
-                        }
-                    }
-                    if (phase is AgentFileViewerModel.Phase.Ready) ShareControl(model)
-                },
-            )
-        },
-    ) { padding ->
-        // An image fills the whole screen under the bar, so it zooms in and out of the same frame
-        // the transcript's flight lands on.
-        val fillsScreen = phase is AgentFileViewerModel.Phase.Ready && phase.content is AgentFileViewerModel.Content.Image
-        Box(
-            Modifier
-                .fillMaxSize()
-                .padding(top = if (fillsScreen) 0.dp else padding.calculateTopPadding()),
-            contentAlignment = Alignment.Center,
-        ) {
-            when (phase) {
-                AgentFileViewerModel.Phase.Opening -> StatusView(reference, detail = stringResource(R.string.media_file_opening), progress = null)
-                is AgentFileViewerModel.Phase.Downloading -> StatusView(
-                    reference,
-                    detail = progressText(phase.received, phase.expected),
-                    progress = phase.expected?.let { phase.received.toFloat() / maxOf(it, 1).toFloat() },
-                )
-                is AgentFileViewerModel.Phase.ConfirmLarge -> ConfirmLargeView(reference, phase.size, model::confirmDownload)
-                is AgentFileViewerModel.Phase.Failed -> FailedView(phase.error, model::open)
-                is AgentFileViewerModel.Phase.Ready -> ReadyContent(
-                    model, phase.content, isRoot, wrapsLines, showsSource, background, markdown, onOpen,
-                    onImageShown, onZoomChange, onImageFrame, pip,
-                )
-            }
-        }
-    }
-
-    model.drawing?.let { drawing ->
-        ImageDrawingEditor(drawing)
-        DisposableEffect(drawing) { onDispose { drawing.close() } }
-    }
-    // The image flies home from the viewer, never from under the editor.
-    val closesAfterDrawing = model.drawingAdded && model.drawing == null
-    LaunchedEffect(closesAfterDrawing) {
-        if (closesAfterDrawing) onDone()
-    }
-
-    model.shareError?.let { error ->
-        OpenCodeAlertDialog(
-            onDismissRequest = { model.shareError = null },
-            title = { Text(stringResource(R.string.media_file_share_failed_title)) },
-            text = { Text(error.detail) },
-            confirmButton = { TextButton(onClick = { model.shareError = null }) { Text(stringResource(CoreR.string.common_ok)) } },
-        )
-    }
-}
-
-@Composable
-private fun AgentFileTitle(name: String, location: String?) {
-    Column(
-        Modifier.semantics(mergeDescendants = true) { heading() },
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(name, style = OpenCodeTextStyles.headline, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
-        if (location != null) {
-            Text(
-                location,
-                style = OpenCodeTextStyles.caption1,
-                color = OpenCodeTheme.colors.secondaryText,
-                maxLines = 1,
-                overflow = TextOverflow.StartEllipsis,
-            )
-        }
-    }
-}
-
-/** Share for every file that opens: a streamed one downloads first, its progress in the button's place. */
-@Composable
-private fun ShareControl(model: AgentFileViewerModel) {
-    val progress = model.shareProgress
-    if (progress != null) {
-        val text = progressText(progress.received, progress.expected)
-        val downloadingDescription = stringResource(R.string.media_file_share_downloading_description)
-        Box(Modifier.size(48.dp).testTag("agent-file-share-progress"), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(
-                modifier = Modifier
-                    .size(20.dp)
-                    .semantics {
-                        contentDescription = downloadingDescription
-                        stateDescription = text
-                    },
-                strokeWidth = 2.dp,
-            )
-        }
-    } else {
-        IconButton(onClick = model::share, modifier = Modifier.testTag("agent-file-share")) {
-            OpenCodeIcon("square.and.arrow.up", contentDescription = stringResource(CoreR.string.common_share))
-        }
-    }
-}
-
-@Composable
-private fun ReadyContent(
-    model: AgentFileViewerModel,
-    content: AgentFileViewerModel.Content,
-    isRoot: Boolean,
     wrapsLines: Boolean,
     showsSource: Boolean,
-    background: Color,
-    markdown: AgentFileMarkdown?,
-    onOpen: (AgentFileDestination) -> Unit,
-    onImageShown: (String, android.graphics.Bitmap) -> Unit,
-    onZoomChange: (Boolean) -> Unit,
-    onImageFrame: (String, Rect) -> Unit,
+    noAppOpens: Boolean,
+    isClear: Boolean,
     pip: AgentFilePictureInPicture?,
+    onOpen: (AgentFileDestination) -> Unit,
+    onExternalOpen: (java.io.File) -> Unit,
 ) {
     val reference = model.reference
-    when (content) {
-        is AgentFileViewerModel.Content.Image -> {
-            LaunchedEffect(content.image) { if (isRoot) onImageShown(reference.zoomSourceID, content.image) }
-            ZoomableImagePage(
-                image = content.image,
-                label = reference.name,
-                isSelected = true,
-                modifier = Modifier.fillMaxSize().testTag("agent-file-image"),
-                onZoomChange = onZoomChange,
-                onFrame = { frame -> if (isRoot) onImageFrame(reference.zoomSourceID, frame) },
-            )
-        }
-        is AgentFileViewerModel.Content.Player -> AgentFilePlayer(
-            player = content.player,
-            isAudio = content.isAudio,
-            name = reference.name,
-            isClear = background == Color.Transparent,
-            pip = pip,
-            modifier = Modifier.testTag(if (content.isStreaming) "agent-file-player-streaming" else "agent-file-player"),
+    val markdown = LocalAgentFileMarkdown.current
+    when (val phase = model.phase) {
+        AgentFileViewerModel.Phase.Opening -> StatusView(reference, detail = stringResource(R.string.media_file_opening), progress = null)
+        is AgentFileViewerModel.Phase.Downloading -> StatusView(
+            reference, detail = progressText(phase.received, phase.expected),
+            progress = phase.expected?.let { phase.received.toFloat() / maxOf(it, 1).toFloat() },
         )
-        is AgentFileViewerModel.Content.QuickLook -> {
-            val pdf = content.pdf
-            if (pdf != null) {
-                AgentPdfView(pdf, Modifier.testTag("agent-file-quick-look"))
-            } else {
-                ExternalDocumentView(reference, model.noAppOpens, model::openExternally, Modifier.testTag("agent-file-quick-look"))
+        is AgentFileViewerModel.Phase.ConfirmLarge -> ConfirmLargeView(reference, phase.size, model::confirmDownload)
+        is AgentFileViewerModel.Phase.Failed -> FailedView(phase.error, model::open)
+        is AgentFileViewerModel.Phase.Ready -> when (val content = phase.content) {
+            is AgentFileViewerModel.Content.Image -> Unit // Rendered by the shared zoomable page.
+            is AgentFileViewerModel.Content.Player -> AgentFilePlayer(
+                player = content.player,
+                isAudio = content.isAudio,
+                name = reference.name,
+                isClear = isClear,
+                pip = pip,
+                modifier = Modifier.testTag(if (content.isStreaming) "agent-file-player-streaming" else "agent-file-player"),
+            )
+            is AgentFileViewerModel.Content.QuickLook -> {
+                val pdf = content.pdf
+                if (pdf != null) {
+                    AgentPdfView(pdf, Modifier.testTag("agent-file-quick-look"))
+                } else {
+                    ExternalDocumentView(reference, noAppOpens, { onExternalOpen(content.file) }, Modifier.testTag("agent-file-quick-look"))
+                }
             }
-        }
-        is AgentFileViewerModel.Content.Text -> AgentCodeView(content.document, wrapsLines)
-        is AgentFileViewerModel.Content.Markdown -> {
-            if (showsSource || markdown == null) {
-                AgentCodeView(content.document, wrapsLines)
-            } else {
-                val fileDirectory = model.fileDirectory
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .testTag("agent-file-markdown"),
-                    contentAlignment = Alignment.TopCenter,
-                ) {
+            is AgentFileViewerModel.Content.Text -> AgentCodeView(content.document, wrapsLines)
+            is AgentFileViewerModel.Content.Markdown -> {
+                if (showsSource || markdown == null) {
+                    AgentCodeView(content.document, wrapsLines)
+                } else {
+                    val fileDirectory = model.fileDirectory
                     Box(
                         Modifier
-                            .widthIn(max = TranscriptMetrics.readableColumnWidth)
-                            .fillMaxWidth()
-                            .padding(horizontal = TranscriptMetrics.contentGutter, vertical = TranscriptMetrics.turn)
-                            .navigationBarsPadding(),
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .testTag("agent-file-markdown"),
+                        contentAlignment = Alignment.TopCenter,
                     ) {
-                        markdown(content.source, model.server, fileDirectory) { file -> onOpen(AgentFileDestination(file, fileDirectory)) }
+                        Box(
+                            Modifier
+                                .widthIn(max = TranscriptMetrics.readableColumnWidth)
+                                .fillMaxWidth()
+                                .padding(horizontal = TranscriptMetrics.contentGutter, vertical = TranscriptMetrics.turn)
+                                .navigationBarsPadding(),
+                        ) {
+                            markdown(content.source, model.server, fileDirectory) { file -> onOpen(AgentFileDestination(file, fileDirectory)) }
+                        }
                     }
                 }
             }

@@ -45,7 +45,7 @@ import ai.opencode.feature.composer.plusmenu.PlusMenuGlassSurface
 import ai.opencode.feature.composer.plusmenu.RecentPhotoPeekOverlay
 import ai.opencode.feature.media.LocalMediaPresenter
 import ai.opencode.feature.media.MediaPresenter
-import ai.opencode.feature.media.TranscriptImageViewer
+import ai.opencode.feature.media.FullscreenViewer
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
@@ -884,7 +884,7 @@ private fun presentComposerPhoto(
             if (restoresFocus && store.state.taskIdentity == identity && !store.state.hasPendingRequests) host?.focusComposer()
         },
     ) { viewer ->
-        TranscriptImageViewer(viewerStore, viewer)
+        FullscreenViewer(viewerStore, viewer)
     }
     if (!presented) viewerStore.close()
 }

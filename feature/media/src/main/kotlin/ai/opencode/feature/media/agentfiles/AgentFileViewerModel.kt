@@ -2,18 +2,11 @@ package ai.opencode.feature.media
 
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
-import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.core.log.AppLog
-import ai.opencode.core.sharing.SharedKeys
-import ai.opencode.core.sharing.shared
-import ai.opencode.core.store.Effect
-import ai.opencode.core.store.Reduced
-import ai.opencode.core.store.Reducer
-import ai.opencode.core.store.Store
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.AgentFileReference
-import ai.opencode.core.files.AttachmentFileType
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Context
@@ -34,6 +27,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -46,19 +40,16 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.Request
-import java.io.File
 
 /**
- * One open file's loading, playback and Share. Its state is snapshot state the page reads; the page
- * calls [open] when it appears and [stop] when it goes, and the viewer calls [release] when the
- * page is gone for good.
+ * Loads one file's content and export bytes. The page owns its native player/PDF resources;
+ * the fullscreen feature decides what to present, share or draw.
  */
 class AgentFileViewerModel(
     val reference: AgentFileReference,
     val server: OpenCodeServer,
     val directory: String?,
     private val playbackAudio: MediaPlaybackAudio = dependency(MediaPlaybackAudio),
-    private val shareClient: AgentFileShareClient = dependency(AgentFileShareClient),
     private val context: Context = dependency(AppContext),
 ) {
     sealed interface Content {
@@ -101,65 +92,16 @@ class AgentFileViewerModel(
     var shareProgress: ShareProgress? by mutableStateOf(null)
         private set
 
-    var shareError: AgentFileError? by mutableStateOf(null)
-
-    /** No app on this device opened the document. Cleared by the next try. */
-    var noAppOpens: Boolean by mutableStateOf(false)
-        private set
-
-    /** Draw on Image's editor, while it's up. */
-    var drawing: Store<ImageDrawingFeature.State, ImageDrawingFeature.Action>? by mutableStateOf(null)
-        private set
-
-    /** Add to Prompt landed: the viewer goes once the editor has. */
-    var drawingAdded: Boolean by mutableStateOf(false)
-        private set
-
-    private val wrapsLinesShared = shared(SharedKeys.fileViewerWrapsLines)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var streamLoader: StreamingFileLoader? = null
     private var probe: AgentFileProbe? = null
     private var work: Job? = null
-    private var shareWork: Job? = null
     private var audioHolder: AudioHolder? = null
 
     /** One activation; `holder` is set once activation succeeded off the main thread. */
     private class AudioHolder {
         @Volatile var holder: MediaPlaybackAudio.Holder? = null
         @Volatile var released = false
-    }
-
-    fun toggleWrapLines() {
-        val next = !wrapsLinesShared.value
-        if (wrapsLinesShared.value == next) return
-        wrapsLinesShared.set(next)
-    }
-
-    /**
-     * Opens the editor on [image] for [add]'s prompt (iOS `draw(_:add:)`). Its dismissal clears
-     * [drawing], as iOS overrides the store's `dismiss`; the store takes the dependencies it's
-     * made under, as a TCA store does.
-     */
-    fun draw(image: Bitmap, add: ImageDrawingAdd) {
-        drawingAdded = false
-        // An editor put away mid-export (or a page released) adds nothing.
-        val feature = ImageDrawingFeature { attachment ->
-            if (drawing == null || !add(attachment)) {
-                false
-            } else {
-                drawingAdded = true
-                true
-            }
-        }
-        val dismiss = ImageDrawingFeature.Action.Delegate(ImageDrawingFeature.Action.DelegateAction.Dismiss)
-        drawing = Store(
-            ImageDrawingFeature.State(image),
-            Reducer { state, action ->
-                val reduced = feature.reduce(state, action)
-                if (action != dismiss) reduced else Reduced(reduced.state, Effect.merge(reduced.effect, Effect.run { _ -> drawing = null }))
-            },
-            DependencyValues.current,
-        )
     }
 
     val target: AgentFileReference.Target? get() = reference.target(directory)
@@ -196,7 +138,6 @@ class AgentFileViewerModel(
 
     fun stop() {
         work?.cancel()
-        shareWork?.cancel()
         ((phase as? Phase.Ready)?.content as? Content.Player)?.player?.pause()
         releaseAudio()
         streamLoader?.invalidate()
@@ -206,7 +147,6 @@ class AgentFileViewerModel(
     /** The page is gone for good: frees the player and the PDF renderer. */
     fun release() {
         stop()
-        drawing = null
         when (val content = (phase as? Phase.Ready)?.content) {
             is Content.Player -> content.player.release()
             is Content.QuickLook -> content.pdf?.close()
@@ -254,55 +194,25 @@ class AgentFileViewerModel(
         }
     }
 
-    /**
-     * Every file that opens can be shared, and so saved. A downloaded one shares at once; a
-     * streamed one downloads first, keeps playing meanwhile, and opens the share sheet when it
-     * lands.
-     */
-    fun share() {
-        val ready = phase as? Phase.Ready ?: return
-        val file = ready.localFile
-        if (file != null) {
-            shareClient.share(file, reference.mime)
-            return
-        }
-        shareStreamed()
-    }
-
-    fun shareStreamed() {
-        val ready = phase as? Phase.Ready ?: return
-        if (ready.localFile != null || shareWork != null) return
-        val target = target ?: return
-        val request = server.fileReadRequest(target) ?: return
-        val content = ready.content
+    /** The original for export. A ranged stream keeps playing while its bytes download. */
+    suspend fun exportFile(): File? {
+        val ready = phase as? Phase.Ready ?: return null
+        ready.localFile?.let { return it }
+        if (shareProgress != null) return null
+        val target = target ?: return null
+        val request = server.fileReadRequest(target) ?: return null
         shareProgress = ShareProgress(0, probe?.size)
-        val destination = AgentFileLoader.cacheURL(server, target.absolutePath, reference.name, context.cacheDir)
-        shareWork = scope.launch {
-            try {
-                val file = AgentFileLoader.download(request, destination, server) { received, expected ->
-                    scope.launch { shareDownloaded(received, expected) }
-                }
-                val current = phase as? Phase.Ready
-                if (current == null || current.content !== content || current.localFile != null) return@launch
-                phase = Phase.Ready(content, file)
-                shareClient.share(file, reference.mime)
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: AgentFileError) {
-                shareError = error
-            } catch (error: Exception) {
-                shareError = AgentFileError.network(error)
-            } finally {
-                shareWork = null
-                shareProgress = null
+        try {
+            val destination = AgentFileLoader.cacheURL(server, target.absolutePath, reference.name, context.cacheDir)
+            val file = AgentFileLoader.download(request, destination, server) { received, expected ->
+                scope.launch { shareDownloaded(received, expected) }
             }
+            if (phase !== ready || !scope.isActive) return null
+            phase = ready.copy(localFile = file)
+            return file
+        } finally {
+            shareProgress = null
         }
-    }
-
-    /** Opens a document that can't show here (not a PDF) in another app. */
-    fun openExternally() {
-        val file = ((phase as? Phase.Ready)?.content as? Content.QuickLook)?.file ?: return
-        noAppOpens = !shareClient.view(file, reference.mime)
     }
 
     private fun shareDownloaded(received: Long, expected: Long?) {

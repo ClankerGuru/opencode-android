@@ -19,7 +19,8 @@ import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.appFormattingLocale
 import ai.opencode.core.ui.inContainer
 import ai.opencode.feature.composer.PastedTextViewer
-import ai.opencode.feature.media.AgentFileViewer
+import ai.opencode.feature.media.TranscriptImagePreview
+import ai.opencode.feature.media.AgentFileDestination
 import ai.opencode.feature.media.LinkMenuAction
 import ai.opencode.feature.media.LocalMediaPresenter
 import ai.opencode.feature.media.MediaPresenter
@@ -566,8 +567,7 @@ object SessionTranscriptView {
      * Maps what a row or the list asks for to the `SessionFeature` action of the same name (iOS
      * rows send them directly). Share, files and image previews are the screen's: Share opens
      * the system share sheet with the link; files and images end text focus first, as iOS does
-     * before presenting their viewers (media's [MediaPresenter]: the image viewer, or
-     * [AgentFileViewer] for a file, iOS `presentImage` / `presentFile`).
+     * before presenting their viewers (media's [MediaPresenter]: one fullscreen viewer for an image or file, iOS `presentImage` / `presentFile`).
      */
     fun handle(
         action: TranscriptAction,
@@ -592,7 +592,7 @@ object SessionTranscriptView {
             is TranscriptAction.PreviewImage -> {
                 // The keyboard would stay up over the image.
                 host?.dismissComposerKeyboard()
-                presenter?.presentImage(action.preview, drawingHandler(store))
+                presenter?.presentPreview(action.preview, drawingHandler(store))
             }
             is TranscriptAction.OpenFile -> {
                 host?.dismissComposerKeyboard()
@@ -600,19 +600,7 @@ object SessionTranscriptView {
                 val file = action.file
                 val server = store.state.server
                 val directory = store.state.session?.directory
-                presenter?.present(sourceID = file.zoomSourceID, isMedia = file.kind.isMedia, reducesMotion = reducedMotion) { viewer ->
-                    AgentFileViewer(
-                        reference = file,
-                        server = server,
-                        directory = directory,
-                        onDone = { viewer.dismiss() },
-                        isInMediaViewer = true,
-                        addDrawing = addDrawing,
-                        onImageShown = { sourceID, image -> viewer.show(sourceID, image) },
-                        onZoomChange = { viewer.isZoomed = it },
-                        onImageFrame = { sourceID, frame -> viewer.mediaFrames[sourceID] = frame },
-                    )
-                }
+                presenter?.presentPreview(TranscriptImagePreview(AgentFileDestination(file, directory), server), addDrawing)
             }
             is TranscriptAction.OpenPastedText -> {
                 host?.dismissComposerKeyboard()

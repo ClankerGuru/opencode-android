@@ -5,8 +5,8 @@ import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.store.TestStore
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.feature.media.TranscriptImagePreview
-import ai.opencode.feature.media.TranscriptImageViewerFeature
-import ai.opencode.feature.media.TranscriptImageViewerFeature.Action
+import ai.opencode.feature.media.FullscreenViewerFeature
+import ai.opencode.feature.media.FullscreenViewerFeature.Action
 import ai.opencode.feature.media.displayTitle
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.PastedText
@@ -85,7 +85,7 @@ class ComposerPhotoViewerTests {
         val removed = mutableListOf<String>()
         val haptics = mutableListOf<String>()
         val store = TestStore(
-            TranscriptImageViewerFeature.State(preview, isShowingControls = true, allowsRemove = true),
+            FullscreenViewerFeature.State(preview, isShowingControls = true, allowsRemove = true),
             ComposerPhotoViewerFeature { id -> removed += id },
             this,
         ) {
@@ -118,7 +118,7 @@ class ComposerPhotoViewerTests {
 
     @Test fun transcriptViewersCannotRemove() = runTest {
         val preview = TranscriptImagePreview("img-1", Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888), "shot.png")
-        val store = TestStore(TranscriptImageViewerFeature.State(preview), TranscriptImageViewerFeature(), this)
+        val store = TestStore(FullscreenViewerFeature.State(preview), FullscreenViewerFeature(), this)
         assertFalse(store.state.allowsRemove)
         store.send(Action.RemoveTapped)
     }

@@ -1,0 +1,824 @@
+package ai.opencode.feature.media
+
+import ai.opencode.core.R as CoreR
+import ai.opencode.core.dependencies.AppContext
+import ai.opencode.core.dependencies.DependencyKey
+import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.files.AttachmentFileType
+import ai.opencode.core.haptics.Haptic
+import ai.opencode.core.haptics.HapticsClient
+import ai.opencode.core.log.AppLog
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionRole
+import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.sharing.SharedKeys
+import ai.opencode.core.sharing.shared
+import ai.opencode.core.store.Effect
+import ai.opencode.core.store.PresentationAction
+import ai.opencode.core.store.Reduced
+import ai.opencode.core.store.Reducer
+import ai.opencode.core.store.StoreOf
+import ai.opencode.core.store.cancellable
+import ai.opencode.core.store.collectState
+import ai.opencode.core.store.ifLet
+import ai.opencode.core.store.scope
+import ai.opencode.core.ui.AppearanceColorScheme
+import ai.opencode.core.ui.OpenCodeAlertDialog
+import ai.opencode.core.ui.OpenCodeIcon
+import ai.opencode.core.ui.OpenCodeIconButton
+import ai.opencode.core.ui.OpenCodeIconButtonStyle
+import ai.opencode.core.ui.OpenCodeShape
+import ai.opencode.core.ui.OpenCodeTextStyles
+import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.OpenCodeTopBar
+import ai.opencode.core.ui.OpenCodeTopBarBackButton
+import ai.opencode.core.ui.OpenCodeTopBarDefaults
+import ai.opencode.core.ui.SFSymbol
+import ai.opencode.core.ui.rememberAppAppearance
+import ai.opencode.feature.media.FullscreenViewerFeature.Action
+import android.content.ClipData
+import android.content.ContentValues
+import android.content.Context
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.os.Environment
+import android.provider.MediaStore
+import android.view.accessibility.AccessibilityManager
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsIgnoringVisibility
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.ui.compose.ContentFrame
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlin.math.min
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.withContext
+
+// MARK: - Photo save
+
+sealed class PhotoSaveClientError : Exception() {
+    /** The system refused the write. */
+    data object Denied : PhotoSaveClientError()
+}
+
+/**
+ * Saves an image to the photo library. Android: a MediaStore insert into Pictures, which needs no
+ * permission at this app's minimum SDK (35; `WRITE_EXTERNAL_STORAGE` only mattered on Android 9 and
+ * earlier).
+ */
+class PhotoSaveClient(
+    val saveImage: suspend (Bitmap) -> Unit = {},
+) {
+    companion object Key : DependencyKey<PhotoSaveClient> {
+        override val liveValue: PhotoSaveClient by lazy {
+            PhotoSaveClient(saveImage = { image -> saveToPictures(dependency(AppContext), image) })
+        }
+        override val testValue: PhotoSaveClient = PhotoSaveClient()
+
+        private suspend fun saveToPictures(context: Context, image: Bitmap) = withContext(Dispatchers.IO) {
+            val resolver = context.contentResolver
+            val png = image.hasAlpha()
+            val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+            val values = ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, "IMG_$stamp.${if (png) "png" else "jpg"}")
+                put(MediaStore.Images.Media.MIME_TYPE, if (png) "image/png" else "image/jpeg")
+                put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES)
+                put(MediaStore.Images.Media.IS_PENDING, 1)
+            }
+            val collection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            val uri = try {
+                resolver.insert(collection, values)
+            } catch (_: SecurityException) {
+                throw PhotoSaveClientError.Denied
+            } ?: throw PhotoSaveClientError.Denied
+            try {
+                resolver.openOutputStream(uri)?.use { stream ->
+                    val written = image.compress(if (png) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG, 95, stream)
+                    check(written) { "compress failed" }
+                } ?: error("no output stream")
+                resolver.update(uri, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null)
+            } catch (error: Throwable) {
+                runCatching { resolver.delete(uri, null, null) }
+                throw error
+            }
+        }
+    }
+}
+
+// MARK: - Share
+
+/**
+ * Shares an image through the system share sheet: written to the cache and offered with
+ * `ACTION_SEND` through [MediaFileProvider].
+ */
+class ImageShareClient(
+    val share: suspend (Bitmap, String) -> Unit = { _, _ -> },
+) {
+    companion object Key : DependencyKey<ImageShareClient> {
+        override val liveValue: ImageShareClient by lazy {
+            ImageShareClient(share = { image, label -> shareImage(dependency(AppContext), image, label) })
+        }
+        override val testValue: ImageShareClient = ImageShareClient()
+
+        private suspend fun shareImage(context: Context, image: Bitmap, label: String) {
+            val file = withContext(Dispatchers.IO) {
+                val directory = File(context.cacheDir, MediaFileProvider.SHARE_DIRECTORY)
+                directory.deleteRecursively()
+                directory.mkdirs()
+                val base = AttachmentFileType.sanitizedName(label.trim().ifEmpty { "Image" }).take(80)
+                val file = File(directory, "$base.png")
+                file.outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                file
+            }
+            val uri = FileProvider.getUriForFile(context, MediaFileProvider.authority(context), file)
+            val send = Intent(Intent.ACTION_SEND).apply {
+                type = "image/png"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                clipData = ClipData.newRawUri(null, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            val chooser = Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            context.startActivity(chooser)
+        }
+    }
+}
+
+// MARK: - Page title
+
+/**
+ * A real file or attachment name to show at the top centre when controls are visible, or
+ * `null` when [TranscriptImagePreview.Page.label] is a generic accessibility placeholder.
+ */
+val TranscriptImagePreview.Page.displayTitle: String?
+    get() {
+        name?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+        if (labelIsPlaceholder) return null
+        val trimmed = label.trim()
+        if (trimmed.isEmpty()) return null
+        val lower = trimmed.lowercase()
+        // Labels that arrive already written (a model's alt text) are matched as English words.
+        val placeholders = setOf(
+            "image",
+            "photo",
+            "attachment",
+            "attached image",
+            "tool image",
+            "agent image preview",
+            "diagram",
+        )
+        if (lower in placeholders ||
+            lower.startsWith("tool image ") ||
+            lower.startsWith("attached image ") ||
+            lower.startsWith("image ") ||
+            lower.startsWith("photo ") ||
+            lower.startsWith("attachment ") ||
+            lower.startsWith("diagram, ")
+        ) {
+            return null
+        }
+        return trimmed
+    }
+
+// MARK: - Feature
+
+/** [addDrawing] is the opener's prompt, for a viewer that [State.allowsDrawing]. */
+class FullscreenViewerFeature(
+    addDrawing: ImageDrawingAdd? = null,
+) : Reducer<FullscreenViewerFeature.State, FullscreenViewerFeature.Action> {
+    data class State(
+        val preview: TranscriptImagePreview,
+        val selectedID: String = preview.id,
+        val filePath: List<TranscriptImagePreview.Page> = emptyList(),
+        val shareError: AgentFileError? = null,
+        val noAppOpens: Boolean = false,
+        val isShowingControls: Boolean = preview.pages.firstOrNull()?.file != null,
+        val isSaving: Boolean = false,
+        val isDismissed: Boolean = false,
+        /** Pages can be taken out (a composer's pending photos). */
+        val allowsRemove: Boolean = false,
+        /** The last page was removed: the viewer goes without flying home. */
+        val isDiscarded: Boolean = false,
+        /** Draw on Image hands a marked-up copy to the opener's prompt (`addDrawing`). */
+        val allowsDrawing: Boolean = false,
+        /** Draw on Image's editor, while it's up. */
+        val drawing: ImageDrawingFeature.State? = null,
+        /** Add to Prompt landed: the viewer goes once the editor has. */
+        val closesAfterDrawing: Boolean = false,
+    ) {
+        val selectedPage: TranscriptImagePreview.Page?
+            get() = filePath.lastOrNull() ?: preview.pages.firstOrNull { it.id == selectedID } ?: preview.pages.firstOrNull()
+    }
+
+    sealed interface Action {
+        data object Task : Action
+        data class PageSelected(val id: String) : Action
+        data class RetryPageTapped(val id: String) : Action
+        data class MediaLoaded(val pageID: String, val result: MediaReferenceLoadResult) : Action
+        data object ImageTapped : Action
+        data object CloseTapped : Action
+        data object SaveTapped : Action
+        data class SaveFinished(val saved: Boolean) : Action
+        data class ShareTapped(val file: AgentFileViewerModel? = null) : Action
+        data class ShareFailed(val error: AgentFileError) : Action
+        data object ShareErrorDismissed : Action
+        data class OpenFile(val file: AgentFileDestination) : Action
+        data object BackTapped : Action
+        data object SourceTapped : Action
+        data object WrapTapped : Action
+        data class ExternalOpenTapped(val file: File) : Action
+        data class FileImageLoaded(val file: AgentFileDestination, val image: Bitmap) : Action
+        data object RemoveTapped : Action
+        data object DrawTapped : Action
+        data class Drawing(val action: PresentationAction<ImageDrawingFeature.Action>) : Action
+        data class Delegate(val action: DelegateAction) : Action
+
+        sealed interface DelegateAction {
+            /** The page's media is no longer wanted. */
+            data class Removed(val id: String) : DelegateAction
+        }
+    }
+
+    private data class PageLoadID(val id: String)
+
+    private object ExportSlot
+    private object DrawingSlot
+
+    private val body: Reducer<State, Action> = ifLet(
+        id = DrawingSlot,
+        parent = Reducer(::reduceViewer),
+        state = { it.drawing },
+        setState = { state, drawing -> state.copy(drawing = drawing) },
+        action = { (it as? Action.Drawing)?.action },
+        embed = { Action.Drawing(it) },
+        child = ImageDrawingFeature(addDrawing ?: { false }),
+    )
+
+    override fun reduce(state: State, action: Action): Reduced<State, Action> = body.reduce(state, action)
+
+    private fun reduceViewer(state: State, action: Action): Reduced<State, Action> = when (action) {
+        Action.Task -> loadPageIfNeeded(state.selectedID, state)
+
+        is Action.PageSelected -> if (state.filePath.isEmpty() && state.preview.pages.any { it.id == action.id }) {
+            loadPageIfNeeded(action.id, state.copy(selectedID = action.id))
+        } else Reduced(state)
+
+        is Action.OpenFile -> if (state.selectedPage?.file != null) {
+            navigate(state, state.filePath + TranscriptImagePreview.Page(action.file))
+        } else Reduced(state)
+        Action.BackTapped -> if (state.filePath.isEmpty()) Reduced(state) else navigate(state, state.filePath.dropLast(1))
+        Action.SourceTapped -> {
+            val page = state.selectedPage
+            if (page?.file == null) Reduced(state) else Reduced(state.withSelectedFile(page.copy(showsSource = !page.showsSource)))
+        }
+        Action.WrapTapped -> {
+            val wraps = shared(SharedKeys.fileViewerWrapsLines)
+            wraps.set(!wraps.value)
+            Reduced(state)
+        }
+        is Action.ExternalOpenTapped -> {
+            val reference = state.selectedPage?.file?.reference
+            if (reference == null) Reduced(state) else Reduced(state.copy(noAppOpens = !dependency(AgentFileShareClient).view(action.file, reference.mime)))
+        }
+        is Action.FileImageLoaded -> {
+            val page = state.selectedPage
+            when {
+                page == null || page.file != action.file -> Reduced(state)
+                else -> Reduced(state.withSelectedFile(page.copy(image = action.image)))
+            }
+        }
+
+        is Action.RetryPageTapped -> loadPageIfNeeded(action.id, state, forceRetry = true)
+
+        is Action.MediaLoaded -> {
+            val index = state.preview.pages.indexOfFirst { it.id == action.pageID }
+            if (index < 0) {
+                Reduced(state)
+            } else {
+                val page = state.preview.pages[index]
+                val updated = when (val result = action.result) {
+                    is MediaReferenceLoadResult.Loaded -> {
+                        val image = CachedImage.decoded(action.pageID, result.data, page.mediaHash) ?: decodeBitmap(result.data)
+                        if (image != null) {
+                            page.copy(image = image, isUnavailable = false, loadFailed = false)
+                        } else {
+                            page.copy(loadFailed = true)
+                        }
+                    }
+                    MediaReferenceLoadResult.Unavailable -> page.copy(isUnavailable = true, loadFailed = false)
+                    is MediaReferenceLoadResult.Failed -> page.copy(loadFailed = true)
+                }
+                Reduced(state.withPage(index, updated))
+            }
+        }
+
+        Action.ImageTapped -> Reduced(state.copy(isShowingControls = !state.isShowingControls))
+
+        Action.CloseTapped -> Reduced(state.copy(isDismissed = true, drawing = null), Effect.cancel(ExportSlot))
+
+        Action.SaveTapped -> {
+            val image = state.selectedPage?.image
+            if (state.isSaving || state.selectedPage?.file != null || image == null) {
+                Reduced(state)
+            } else {
+                val photoSave = dependency(PhotoSaveClient)
+                Reduced(
+                    state.copy(isSaving = true),
+                    Effect.run { send ->
+                        val saved = try {
+                            photoSave.saveImage(image)
+                            true
+                        } catch (cancellation: kotlinx.coroutines.CancellationException) {
+                            throw cancellation
+                        } catch (error: Throwable) {
+                            val code = if (error is PhotoSaveClientError.Denied) 0 else -1
+                            AppLog.app.error { "Photo save failed: ${error::class.java.name} code=$code" }
+                            false
+                        }
+                        send(Action.SaveFinished(saved))
+                    },
+                )
+            }
+        }
+
+        is Action.SaveFinished -> {
+            dependency(HapticsClient).play(if (action.saved) Haptic.success else Haptic.error)
+            Reduced(state.copy(isSaving = false))
+        }
+
+        is Action.ShareFailed -> Reduced(state.copy(shareError = action.error))
+        Action.ShareErrorDismissed -> Reduced(state.copy(shareError = null))
+        is Action.ShareTapped -> {
+            val page = state.selectedPage
+            val image = page?.image
+            val model = action.file
+            if (model != null && page?.file == AgentFileDestination(model.reference, model.directory)) {
+                val share = dependency(AgentFileShareClient)
+                Reduced(state, Effect.run<Action>(onError = { error, send ->
+                    send(Action.ShareFailed(error as? AgentFileError ?: AgentFileError.network(error)))
+                }) { _ -> model.exportFile()?.let { share.share(it, model.reference.mime) } }.cancellable(ExportSlot))
+            } else if (page == null || page.file != null || image == null) {
+                Reduced(state)
+            } else {
+                val imageShare = dependency(ImageShareClient)
+                Reduced(state, Effect.run { _ -> imageShare.share(image, page.label) })
+            }
+        }
+
+        Action.RemoveTapped -> {
+            val index = state.preview.pages.indexOfFirst { it.id == state.selectedID }
+            if (!state.allowsRemove || state.selectedPage?.file != null || state.isDiscarded || index < 0) {
+                Reduced(state)
+            } else {
+                val pages = state.preview.pages.toMutableList()
+                val removed = pages.removeAt(index)
+                val next = if (pages.isEmpty()) {
+                    state.copy(isDiscarded = true)
+                } else {
+                    state.copy(
+                        preview = TranscriptImagePreview(state.preview.id, pages, state.preview.server),
+                        selectedID = pages[min(index, pages.size - 1)].id,
+                    )
+                }
+                Reduced(next, Effect.send(Action.Delegate(Action.DelegateAction.Removed(removed.id))))
+            }
+        }
+
+        Action.DrawTapped -> {
+            val page = state.selectedPage
+            val image = page?.image
+            if (!state.allowsDrawing || state.isDismissed || state.isDiscarded || page == null || page.isVideo || page.loadFailed || image == null) {
+                Reduced(state)
+            } else {
+                Reduced(state.copy(drawing = ImageDrawingFeature.State(image)))
+            }
+        }
+
+        is Action.Drawing -> when ((action.action as? PresentationAction.Presented)?.action) {
+            ImageDrawingFeature.Action.Delegate(ImageDrawingFeature.Action.DelegateAction.Added) ->
+                Reduced(state.copy(closesAfterDrawing = true))
+            ImageDrawingFeature.Action.Delegate(ImageDrawingFeature.Action.DelegateAction.Dismiss) ->
+                Reduced(state.copy(drawing = null))
+            else -> Reduced(state)
+        }
+
+        is Action.Delegate -> Reduced(state)
+    }
+
+    private fun State.withSelectedFile(page: TranscriptImagePreview.Page): State = if (filePath.isEmpty()) {
+        withPage(preview.pages.indexOfFirst { it.id == selectedID }, page)
+    } else copy(filePath = filePath.dropLast(1) + page)
+
+    private fun navigate(state: State, path: List<TranscriptImagePreview.Page>): Reduced<State, Action> = Reduced(
+        state.copy(filePath = path, selectedID = path.lastOrNull()?.id ?: state.preview.id,
+            drawing = null, noAppOpens = false, shareError = null),
+        Effect.cancel(ExportSlot),
+    )
+
+    private fun loadPageIfNeeded(id: String, state: State, forceRetry: Boolean = false): Reduced<State, Action> {
+        val index = state.preview.pages.indexOfFirst { it.id == id }
+        if (index < 0) return Reduced(state)
+        val page = state.preview.pages[index]
+        val hash = page.mediaHash
+        if (page.image != null || page.isUnavailable || (!forceRetry && page.loadFailed) || hash == null) return Reduced(state)
+        val mediaReferences = dependency(MediaReferenceClient)
+        val loading = state.withPage(index, page.copy(loadFailed = false))
+        val server = state.preview.server
+        if (server == null) {
+            val image = mediaReferences.cachedData(hash)?.let { data -> CachedImage.decoded(id, data, hash) ?: decodeBitmap(data) }
+            val resolved = if (image != null) page.copy(loadFailed = false, image = image) else page.copy(loadFailed = false, isUnavailable = true)
+            return Reduced(state.withPage(index, resolved))
+        }
+        return Reduced(
+            loading,
+            Effect.run<Action> { send ->
+                val result = mediaReferences.load(server, hash)
+                send(Action.MediaLoaded(id, result))
+            }.cancellable(PageLoadID(id), cancelInFlight = true),
+        )
+    }
+
+    private fun State.withPage(index: Int, page: TranscriptImagePreview.Page): State =
+        copy(preview = preview.copy(pages = preview.pages.toMutableList().also { it[index] = page }))
+
+    private fun decodeBitmap(data: ByteArray): Bitmap? =
+        if (data.isEmpty()) null else BitmapFactory.decodeByteArray(data, 0, data.size)
+}
+
+// MARK: - View
+
+/**
+ * The opener’s exact gallery or a single file. Linked documents scroll in their own page,
+ * never inside the image pager. Both surfaces use the same selection, toolbar and editor.
+ */
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@androidx.annotation.OptIn(markerClass = [UnstableApi::class])
+@Composable
+fun FullscreenViewer(
+    store: StoreOf<FullscreenViewerFeature.State, FullscreenViewerFeature.Action>,
+    viewer: MediaViewerState,
+) {
+    val state by store.collectState()
+    val talkBack = rememberTalkBackEnabled()
+    val page = state.selectedPage ?: return
+    val root = state.filePath.isEmpty()
+    val file = rememberSelectedFile(state)
+    val ready = file?.phase as? AgentFileViewerModel.Phase.Ready
+    val image = (ready?.content as? AgentFileViewerModel.Content.Image)?.image
+    LaunchedEffect(file, image) {
+        if (image != null && page.file != null) store.send(Action.FileImageLoaded(page.file, image))
+    }
+    MediaBackHandler(enabled = !root && state.drawing == null) { store.send(Action.BackTapped) }
+
+    // The status bar and the image on screen, before the flight starts; again once a `media:<hash>`
+    // page's image arrives.
+    DisposableEffect(viewer, root, page.id, page.image) {
+        if (root) viewer.show(sourceID = page.id, image = page.image) else viewer.isZoomed = false
+        onDispose { }
+    }
+    LaunchedEffect(store) { store.send(FullscreenViewerFeature.Action.Task) }
+    val showing = state.isShowingControls || talkBack
+    DisposableEffect(viewer, showing) {
+        viewer.setStatusBarHidden(!showing)
+        onDispose { }
+    }
+    LaunchedEffect(state.isDismissed) {
+        if (state.isDismissed) viewer.dismiss()
+    }
+    LaunchedEffect(state.isDiscarded) {
+        if (state.isDiscarded) viewer.discard()
+    }
+    // The image flies home from the viewer, never from under the editor.
+    val closesAfterDrawing = state.closesAfterDrawing && state.drawing == null
+    LaunchedEffect(closesAfterDrawing) {
+        if (closesAfterDrawing) viewer.dismiss()
+    }
+
+    val player = ready?.content as? AgentFileViewerModel.Content.Player
+    val pip = player?.let { rememberAgentFilePictureInPicture(it.player, it.isAudio) }
+    if (pip?.isActive == true && player != null) {
+        ContentFrame(player = player.player, modifier = Modifier.fillMaxSize().background(Color.Black).testTag("agent-file-pip"))
+        return
+    }
+    val wrapsLines by remember { shared(SharedKeys.fileViewerWrapsLines) }.flow.collectAsState()
+    val visible = controlsAreVisible(state.isShowingControls, talkBack, viewer.chromeHidden)
+    val safe = WindowInsets.systemBarsIgnoringVisibility.union(WindowInsets.displayCutout)
+    val reduceMotion = rememberReduceMotion()
+    val enter = fadeIn(MotionRole.Swap.animation(MotionPhase.Enter, reduceMotion))
+    val exit = fadeOut(MotionRole.Swap.animation(MotionPhase.Exit, reduceMotion))
+    val actions: @Composable () -> Unit = {
+        ViewerActions(state, file, wrapsLines, pip, store::send)
+    }
+    val body: @Composable () -> Unit = {
+        val background = when {
+            file == null -> Color.Transparent
+            !file.reference.kind.isMedia -> OpenCodeTheme.colors.canvas
+            root -> Color.Transparent
+            else -> Color.Black
+        }
+        Box(Modifier.fillMaxSize().background(background).then(if (file != null) Modifier.testTag("agent-file-viewer") else Modifier)) {
+            when {
+                file == null -> ImagePager(state, viewer, store::send)
+                image != null -> ViewerImage(page, image, viewer, selected = true, flight = root, onTap = { store.send(Action.ImageTapped) })
+                else -> Box(
+                    Modifier.fillMaxSize().padding(top = safe.asPaddingValues().calculateTopPadding() + OpenCodeTopBarDefaults.height),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AgentFilePage(file, wrapsLines, page.showsSource, state.noAppOpens, background == Color.Transparent, pip,
+                        onOpen = { store.send(Action.OpenFile(it)) }, onExternalOpen = { store.send(Action.ExternalOpenTapped(it)) })
+                }
+            }
+            AnimatedVisibility(visible, enter = enter, exit = exit, modifier = Modifier.align(Alignment.TopCenter)) {
+                OpenCodeTopBar(
+                    modifier = if (file == null) Modifier.padding(horizontal = 16.dp, vertical = 8.dp) else Modifier,
+                    containerColor = background, hairline = file != null && !file.reference.kind.isMedia, centerTitle = true,
+                    contentColor = if (file == null) Color.White else OpenCodeTheme.colors.text,
+                    title = { ViewerTitle(page, file) },
+                    navigation = {
+                        when {
+                            !root -> OpenCodeTopBarBackButton(onClick = { store.send(Action.BackTapped) })
+                            file != null -> TextButton(onClick = { store.send(Action.CloseTapped) }, modifier = Modifier.testTag("agent-file-done")) { Text(stringResource(CoreR.string.common_done)) }
+                            else -> OpenCodeIconButton(SFSymbol.Xmark, stringResource(CoreR.string.common_close), { store.send(Action.CloseTapped) }, Modifier.testTag("image-gallery-close"))
+                        }
+                    },
+                    actions = { if (file != null) actions() },
+                )
+            }
+            if (file == null) Box(Modifier.fillMaxSize().windowInsetsPadding(safe).padding(16.dp)) {
+                AnimatedVisibility(visible && state.allowsRemove, enter = enter, exit = exit, modifier = Modifier.align(Alignment.BottomStart)) {
+                    OpenCodeIconButton(SFSymbol.Trash, stringResource(CoreR.string.common_remove), { store.send(Action.RemoveTapped) },
+                        Modifier.testTag("image-gallery-remove"), tint = MaterialTheme.colorScheme.error, enabled = !state.isDiscarded)
+                }
+                AnimatedVisibility(visible, enter = enter, exit = exit, modifier = Modifier.align(Alignment.BottomEnd)) {
+                    Surface(shape = OpenCodeShape.control, color = MaterialTheme.colorScheme.surfaceContainerHighest, contentColor = Color.White) {
+                        Row(Modifier.height(52.dp).padding(horizontal = 6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically) { actions() }
+                    }
+                }
+            }
+        }
+    }
+    if (!root && file?.reference?.kind?.isMedia == true) {
+        OpenCodeTheme(theme = rememberAppAppearance().theme, appearance = AppearanceColorScheme.Dark, content = body)
+    } else body()
+
+    state.shareError?.let { error ->
+        val dismiss = { store.send(Action.ShareErrorDismissed) }
+        OpenCodeAlertDialog(onDismissRequest = dismiss, title = { Text(stringResource(R.string.media_file_share_failed_title)) }, text = { Text(error.detail) },
+            confirmButton = { TextButton(onClick = dismiss) { Text(stringResource(CoreR.string.common_ok)) } })
+    }
+
+    state.drawing?.let { first ->
+        val drawing = remember(store) {
+            // The last state, so the scope never reads `null` while its dismissal lands.
+            var last = first
+            store.scope<FullscreenViewerFeature.State, FullscreenViewerFeature.Action, ImageDrawingFeature.State, ImageDrawingFeature.Action>(
+                state = { it.drawing?.also { current -> last = current } ?: last },
+                action = { FullscreenViewerFeature.Action.Drawing(PresentationAction.Presented(it)) },
+            )
+        }
+        ImageDrawingEditor(drawing)
+    }
+}
+
+/** A link covers its document without dropping the download or PDF; popping releases just the link. */
+@Composable
+private fun rememberSelectedFile(state: FullscreenViewerFeature.State): AgentFileViewerModel? {
+    val root = state.preview.pages.firstOrNull { it.id == state.preview.id }?.file ?: return null
+    val path = listOf(root) + state.filePath.mapNotNull { it.file }
+    val models = path.mapIndexed { index, file ->
+        key(index, file) {
+            val model = remember { AgentFileViewerModel(file.reference, requireNotNull(state.preview.server), file.directory) }
+            DisposableEffect(model) { onDispose { model.release() } }
+            model
+        }
+    }
+    val selected = models.last()
+    DisposableEffect(selected) {
+        selected.open()
+        onDispose { selected.stop() }
+    }
+    return selected
+}
+
+@Composable
+private fun ViewerTitle(page: TranscriptImagePreview.Page, file: AgentFileViewerModel?) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        page.displayTitle?.let { title ->
+            Text(title, maxLines = 1, overflow = TextOverflow.MiddleEllipsis,
+                style = if (file != null) OpenCodeTextStyles.headline else OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium),
+                modifier = Modifier.testTag("image-gallery-title"))
+        }
+        (file?.locationLabel ?: page.detail)?.let { detail ->
+            Text(detail, maxLines = 1, overflow = TextOverflow.StartEllipsis, style = OpenCodeTextStyles.caption1,
+                color = if (file != null) OpenCodeTheme.colors.secondaryText else Color.White.copy(alpha = 0.6f),
+                modifier = Modifier.testTag("image-gallery-detail"))
+        }
+    }
+}
+
+/** The same actions in the document title bar or the gallery's bottom toolbar. */
+@androidx.annotation.OptIn(markerClass = [UnstableApi::class])
+@Composable
+private fun ViewerActions(
+    state: FullscreenViewerFeature.State,
+    file: AgentFileViewerModel?,
+    wrapsLines: Boolean,
+    pip: AgentFilePictureInPicture?,
+    send: (Action) -> Unit,
+) {
+    val page = state.selectedPage ?: return
+    val content = (file?.phase as? AgentFileViewerModel.Phase.Ready)?.content
+    val markdown = content is AgentFileViewerModel.Content.Markdown && LocalAgentFileMarkdown.current != null
+    if (markdown) {
+        IconButton(onClick = { send(Action.SourceTapped) }, modifier = Modifier.testTag("agent-file-source-toggle")) {
+            OpenCodeIcon(if (page.showsSource) "doc.richtext" else "chevron.left.forwardslash.chevron.right",
+                contentDescription = if (page.showsSource) stringResource(R.string.media_file_show_preview_description) else stringResource(R.string.media_file_show_source_description))
+        }
+    }
+    if (content is AgentFileViewerModel.Content.Text || (content is AgentFileViewerModel.Content.Markdown && (!markdown || page.showsSource))) {
+        IconButton(onClick = { send(Action.WrapTapped) }) {
+            OpenCodeIcon(if (wrapsLines) "arrow.left.and.right.text.vertical" else "text.word.spacing",
+                contentDescription = if (wrapsLines) stringResource(R.string.media_file_unwrap_lines_description) else stringResource(R.string.media_file_wrap_lines_description))
+        }
+    }
+    if (pip?.isSupported == true) {
+        IconButton(onClick = pip::start, modifier = Modifier.testTag("agent-file-pip-start")) {
+            OpenCodeIcon("pip.enter", contentDescription = stringResource(R.string.media_file_start_pip_description))
+        }
+    }
+    if (state.allowsDrawing && !page.isVideo && (file == null || content is AgentFileViewerModel.Content.Image)) {
+        OpenCodeIconButton(SFSymbol.Pencil, stringResource(R.string.media_drawing_draw_on_image_description), { send(Action.DrawTapped) }, Modifier.testTag("image-gallery-draw"),
+            style = OpenCodeIconButtonStyle.Standard, enabled = page.image != null && !page.loadFailed)
+    }
+    if (file == null) {
+        OpenCodeIconButton(SFSymbol.SquareAndArrowDown, stringResource(R.string.media_viewer_save_to_photos_description), { send(Action.SaveTapped) }, Modifier.testTag("image-gallery-save"),
+            style = OpenCodeIconButtonStyle.Standard, enabled = !state.isSaving && page.image != null)
+    }
+    val progress = file?.shareProgress
+    if (progress != null) {
+        val downloadingDescription = stringResource(R.string.media_file_share_downloading_description)
+        Box(Modifier.size(48.dp).testTag("agent-file-share-progress"), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(Modifier.size(20.dp).semantics {
+                contentDescription = downloadingDescription
+                stateDescription = progressText(progress.received, progress.expected)
+            }, strokeWidth = 2.dp)
+        }
+    } else if (file == null || content != null) {
+        OpenCodeIconButton(SFSymbol.SquareAndArrowUp, stringResource(CoreR.string.common_share), { send(Action.ShareTapped(file)) },
+            Modifier.testTag(if (file == null) "image-gallery-share" else "agent-file-share"),
+            style = OpenCodeIconButtonStyle.Standard, enabled = file != null || page.image != null)
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ImagePager(state: FullscreenViewerFeature.State, viewer: MediaViewerState, send: (Action) -> Unit) {
+    val pages = state.preview.pages
+    val selectedID = rememberUpdatedState(state.selectedID)
+    val initialPage = remember { pages.indexOfFirst { it.id == state.selectedID }.coerceAtLeast(0) }
+    val pagerState = rememberPagerState(initialPage = initialPage) { pages.size }
+    LaunchedEffect(pagerState, pages) {
+        snapshotFlow { pagerState.settledPage }.distinctUntilChanged().collect { index ->
+            val id = pages.getOrNull(index)?.id ?: return@collect
+            if (id != selectedID.value) send(Action.PageSelected(id))
+        }
+    }
+    // A removed page hands the selection on: the pager follows it.
+    LaunchedEffect(pagerState, pages, state.selectedID) {
+        val target = pages.indexOfFirst { it.id == state.selectedID }
+        if (target >= 0 && target != pagerState.currentPage) pagerState.scrollToPage(target)
+    }
+    HorizontalPager(
+        state = pagerState,
+        modifier = Modifier.fillMaxSize().testTag("image-gallery"),
+        beyondViewportPageCount = 1,
+        key = { pages[it].id },
+    ) { index ->
+        val page = pages[index]
+        val selected = state.selectedID == page.id
+        val image = page.image
+        val tap = { send(Action.ImageTapped) }
+        val placeholder = Modifier.fillMaxSize().background(Color.Black).clickable(
+            interactionSource = null,
+            indication = null,
+            onClick = tap,
+        )
+        when {
+            image != null -> ViewerImage(page, image, viewer, selected, onTap = tap)
+            page.isUnavailable -> Box(placeholder) {
+                MediaAttachmentUnavailableView(name = page.name ?: page.displayTitle)
+            }
+            page.loadFailed -> Box(placeholder) {
+                MediaAttachmentUnavailableView(
+                    name = page.name ?: page.displayTitle,
+                    onRetry = { send(Action.RetryPageTapped(page.id)) },
+                    isTransientFailure = true,
+                )
+            }
+            else -> Box(placeholder, contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = Color.White)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ViewerImage(
+    page: TranscriptImagePreview.Page,
+    image: Bitmap,
+    viewer: MediaViewerState,
+    selected: Boolean,
+    flight: Boolean = true,
+    onTap: () -> Unit,
+) {
+    ZoomableImagePage(
+        image = image, label = page.label, isSelected = selected, isHidden = flight && viewer.mediaHidden && selected,
+        modifier = if (page.file != null) Modifier.fillMaxSize().testTag("agent-file-image") else Modifier.fillMaxSize(),
+        onSingleTap = onTap, onZoomChange = { if (selected) viewer.isZoomed = it },
+        onFrame = { if (flight) viewer.mediaFrames[page.id] = it },
+    )
+}
+
+fun controlsAreVisible(isShowingControls: Boolean, voiceOver: Boolean, chromeHidden: Boolean): Boolean =
+    (isShowingControls || voiceOver) && !chromeHidden
+
+/** TalkBack (touch exploration) is on. Live-updating. */
+@Composable
+internal fun rememberTalkBackEnabled(): Boolean {
+    val context = LocalContext.current
+    val manager = remember(context) { context.getSystemService(AccessibilityManager::class.java) }
+    var enabled by remember { mutableStateOf(manager?.isTouchExplorationEnabled == true) }
+    DisposableEffect(manager) {
+        val listener = AccessibilityManager.TouchExplorationStateChangeListener { enabled = it }
+        manager?.addTouchExplorationStateChangeListener(listener)
+        onDispose { manager?.removeTouchExplorationStateChangeListener(listener) }
+    }
+    return enabled
+}
+
+/**
+ * The media area's `FileProvider` (its own subclass so the manifest merger never clashes
+ * with another module's provider). Serves only the share cache directory.
+ */
+class MediaFileProvider : FileProvider(R.xml.media_file_paths) {
+    companion object {
+        const val SHARE_DIRECTORY = "media-share"
+        fun authority(context: Context): String = "${context.packageName}.media.files"
+    }
+}
