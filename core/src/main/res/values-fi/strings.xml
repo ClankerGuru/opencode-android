@@ -34,8 +34,8 @@
     <string name="core_in_app_notice_mode_all">Kaikki päivitykset</string>
 
     <!-- Themes and appearance -->
-    <string name="core_theme_system_title">Järjestelmän mukaan</string>
-    <string name="core_appearance_color_scheme_system_title">Järjestelmän mukaan</string>
+    <string name="core_theme_system_title">Järjestelmä</string>
+    <string name="core_appearance_color_scheme_system_title">Järjestelmä</string>
     <string name="core_appearance_color_scheme_light_title">Vaalea</string>
     <string name="core_appearance_color_scheme_dark_title">Tumma</string>
 
