@@ -43,6 +43,11 @@
     <string name="media_player_play">Phát</string>
     <string name="media_player_position_description">Vị trí phát</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Không thể phát video</string>
+    <string name="media_video_position_description">Vị trí video</string>
+    <string name="media_video_capture_failed_title">Không thể chụp khung hình</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Hiện bản xem trước</string>
     <string name="media_file_show_source_description">Hiện mã nguồn</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Máy chủ không thể đọc tệp (HTTP %1$d). Đây có thể là thư mục.</string>
     <string name="media_file_error_timed_out">Yêu cầu đã hết thời gian chờ.</string>
     <string name="media_file_error_unexpected_response">Máy chủ gửi phản hồi không như mong đợi.</string>
+    <string name="media_file_error_over_limit">Tệp vượt quá giới hạn dung lượng tải xuống.</string>
+    <string name="media_file_error_size_unknown">Máy chủ không cho biết kích thước tệp đính kèm.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Đang tải xuống…</string>

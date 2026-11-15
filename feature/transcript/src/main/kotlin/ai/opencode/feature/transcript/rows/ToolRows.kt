@@ -5,6 +5,7 @@ import ai.opencode.core.ui.OpenCodeIconSize
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.RollingNumber
+import ai.opencode.feature.media.AgentFileCards
 import ai.opencode.feature.media.TranscriptImagePreview
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.InlineRowMetrics
@@ -232,6 +233,8 @@ internal fun InlineToolGroupView(entry: TranscriptEntry, key: String, tools: Lis
                 TranscriptImagePreview.fromAttachments(images, id, toolImageLabel, context.server)?.let { context.send(TranscriptAction.PreviewImage(it)) }
             }
         }
+        val videos = entry.toolVideoReferences
+        if (videos.isNotEmpty()) AgentFileCards(videos, onOpen = { context.send(TranscriptAction.OpenFile(it)) })
         DisclosedBand(isExpanded) {
             Column {
                 for (row in rows) InlineToolRowView(entry, row, subagents)

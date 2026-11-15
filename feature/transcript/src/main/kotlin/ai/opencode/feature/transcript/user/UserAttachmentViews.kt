@@ -89,7 +89,7 @@ internal fun TranscriptFileChips(
                 val summary = file.pasted
                 if (text != null && summary != null) {
                     PastedTextCard(file.id, text, summary, corners)
-                } else if (file.isUnavailable || file.mediaHash != null) {
+                } else if (file.isUnavailable || (file.mediaHash != null && file.mediaViewerReference == null && file.path == null)) {
                     TranscriptMediaFileChip(file, corners)
                 } else {
                     FileChip(file, onOpen, corners)
@@ -102,9 +102,9 @@ internal fun TranscriptFileChips(
 @Composable
 private fun FileChip(file: OpenCodeTranscriptFile, onOpen: ((AgentFileReference) -> Unit)?, corners: UserSurfaceCorners) {
     val typeLabel = AttachmentFileType.label(file.name, file.mime)
-    val path = file.path
+    val ref = file.path?.let { AgentFileReference(it) } ?: file.mediaViewerReference
     val shape = corners.shape(TranscriptMetrics.cardCornerRadius)
-    val open = if (onOpen != null && path != null) ({ onOpen(AgentFileReference(path)) }) else null
+    val open = if (onOpen != null && ref != null) ({ onOpen(ref) }) else null
     val attachedFileDescription = stringResource(R.string.transcript_attached_file_description, file.name)
     val openFileLabel = stringResource(R.string.transcript_file_open_click_label)
     FileAttachmentCard(
@@ -112,16 +112,17 @@ private fun FileChip(file: OpenCodeTranscriptFile, onOpen: ((AgentFileReference)
         symbolName = AttachmentFileType.symbolName(file.name, file.mime),
         modifier = Modifier
             .then(
-                if (path != null && open != null) {
+                if (ref != null && open != null) {
                     Modifier.transcriptDragSource(
-                        TranscriptDragPayload.AgentFile(AgentFileReference(path), mime = file.mime, displayName = file.name),
+                        TranscriptDragPayload.AgentFile(ref, mime = file.mime, displayName = file.name),
                         cornerRadius = TranscriptMetrics.cardCornerRadius,
                     )
                 } else Modifier,
             )
             .clip(shape)
             .background(cardFill(), shape)
-            .then(if (open != null) Modifier.clickable(onClickLabel = openFileLabel, onClick = open) else Modifier)
+            .then(if (open != null && ref != null) Modifier.mediaZoomSource(ref.zoomSourceID, TranscriptMetrics.cardCornerRadius)
+                .clickable(onClickLabel = openFileLabel, onClick = open) else Modifier)
             .semantics(mergeDescendants = true) {
                 contentDescription = attachedFileDescription
                 stateDescription = typeLabel

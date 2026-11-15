@@ -43,6 +43,11 @@
     <string name="media_player_play">Reprodueix</string>
     <string name="media_player_position_description">Posició de reproducció</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">No s\'ha pogut reproduir el vídeo</string>
+    <string name="media_video_position_description">Posició del vídeo</string>
+    <string name="media_video_capture_failed_title">No s\'ha pogut capturar el fotograma</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Mostra la vista prèvia</string>
     <string name="media_file_show_source_description">Mostra el codi font</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">El servidor no l\'ha pogut llegir (HTTP %1$d). Pot ser que sigui una carpeta.</string>
     <string name="media_file_error_timed_out">S\'ha esgotat el temps d\'espera de la sol·licitud.</string>
     <string name="media_file_error_unexpected_response">El servidor ha enviat una resposta inesperada.</string>
+    <string name="media_file_error_over_limit">El fitxer supera el límit de mida de descàrrega.</string>
+    <string name="media_file_error_size_unknown">El servidor no ha indicat la mida de l\'adjunt.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Descarregant…</string>

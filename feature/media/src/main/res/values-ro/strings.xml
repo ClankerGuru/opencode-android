@@ -43,6 +43,11 @@
     <string name="media_player_play">Redă</string>
     <string name="media_player_position_description">Poziția redării</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Nu s-a putut reda videoclipul</string>
+    <string name="media_video_position_description">Poziția în videoclip</string>
+    <string name="media_video_capture_failed_title">Nu s-a putut captura cadrul</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Arată previzualizarea</string>
     <string name="media_file_show_source_description">Arată sursa</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Serverul nu l-a putut citi (HTTP %1$d). Este posibil să fie un folder.</string>
     <string name="media_file_error_timed_out">Solicitarea a expirat.</string>
     <string name="media_file_error_unexpected_response">Serverul a trimis un răspuns neașteptat.</string>
+    <string name="media_file_error_over_limit">Fișierul depășește limita de mărime pentru descărcare.</string>
+    <string name="media_file_error_size_unknown">Serverul nu a raportat mărimea atașamentului.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Se descarcă…</string>

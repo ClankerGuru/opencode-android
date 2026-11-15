@@ -52,6 +52,7 @@ import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import okhttp3.Request
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.coroutines.cancellation.CancellationException
@@ -416,6 +417,13 @@ object CachedImage {
 
 /** Reads and loads `media:<hash>` blobs for views without each holding the client. */
 object MediaReferenceResolver {
+    /** Authenticated original for a range probe, playback, or export; never a workspace read. */
+    fun originalRequest(server: OpenCodeServer, hash: String): Request? {
+        if (!OpenCodeMediaReference.isValidHash(hash)) return null
+        val url = server.endpoint("/api/experimental/media/$hash") ?: return null
+        return server.authorize(Request.Builder().url(url).header("Accept", "*/*")).build()
+    }
+
     fun cachedData(hash: String?): ByteArray? {
         hash ?: return null
         return dependency(MediaReferenceClient).cachedData(hash)

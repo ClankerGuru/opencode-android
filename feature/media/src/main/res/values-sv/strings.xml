@@ -43,6 +43,11 @@
     <string name="media_player_play">Spela upp</string>
     <string name="media_player_position_description">Uppspelningsposition</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Kunde inte spela upp videon</string>
+    <string name="media_video_position_description">Videoposition</string>
+    <string name="media_video_capture_failed_title">Kunde inte ta bildruta</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Visa förhandsgranskning</string>
     <string name="media_file_show_source_description">Visa källkod</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Servern kunde inte läsa filen (HTTP %1$d). Det kan vara en mapp.</string>
     <string name="media_file_error_timed_out">Tidsgränsen för begäran överskreds.</string>
     <string name="media_file_error_unexpected_response">Servern skickade ett oväntat svar.</string>
+    <string name="media_file_error_over_limit">Filen överskrider gränsen för nedladdningsstorlek.</string>
+    <string name="media_file_error_size_unknown">Servern angav inte bilagans storlek.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Laddar ner…</string>

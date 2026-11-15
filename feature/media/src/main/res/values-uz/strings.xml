@@ -43,6 +43,11 @@
     <string name="media_player_play">Ijro etish</string>
     <string name="media_player_position_description">Ijro holati</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Videoni ijro etib bo‘lmadi</string>
+    <string name="media_video_position_description">Video ijro nuqtasi</string>
+    <string name="media_video_capture_failed_title">Kadrni olib bo‘lmadi</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Oldindan ko‘rish</string>
     <string name="media_file_show_source_description">Manbani ko‘rsatish</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Server uni o‘qiy olmadi (HTTP %1$d). U jild bo‘lishi mumkin.</string>
     <string name="media_file_error_timed_out">So‘rov vaqti tugadi.</string>
     <string name="media_file_error_unexpected_response">Server kutilmagan javob yubordi.</string>
+    <string name="media_file_error_over_limit">Fayl yuklab olish hajmi chegarasidan oshib ketdi.</string>
+    <string name="media_file_error_size_unknown">Server biriktirma hajmini bildirmadi.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Yuklab olinmoqda…</string>

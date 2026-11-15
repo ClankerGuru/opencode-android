@@ -43,6 +43,11 @@
     <string name="media_player_play">ဖွင့်ပါ</string>
     <string name="media_player_position_description">ဖွင့်နေသည့် နေရာ</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">ဗီဒီယို မဖွင့်နိုင်ပါ</string>
+    <string name="media_video_position_description">ဗီဒီယို ဖွင့်နေသည့် နေရာ</string>
+    <string name="media_video_capture_failed_title">ဘောင်ပုံ မရိုက်ယူနိုင်ပါ</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">အစမ်းကြည့်ရန်</string>
     <string name="media_file_show_source_description">မူရင်းကို ပြပါ</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">ဆာဗာက ဖတ်မရပါ (HTTP %1$d)။ ဖိုင်တွဲ ဖြစ်နေနိုင်သည်။</string>
     <string name="media_file_error_timed_out">တောင်းဆိုမှု အချိန်ကုန်သွားသည်။</string>
     <string name="media_file_error_unexpected_response">ဆာဗာက မမျှော်လင့်ထားသော တုံ့ပြန်မှု ပို့ခဲ့သည်။</string>
+    <string name="media_file_error_over_limit">ဖိုင်သည် ဒေါင်းလုဒ် အရွယ်အစား ကန့်သတ်ချက်ထက် ကျော်လွန်နေသည်။</string>
+    <string name="media_file_error_size_unknown">ဆာဗာက ပူးတွဲဖိုင်၏ အရွယ်အစားကို မဖော်ပြပါ။</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">ဒေါင်းလုဒ်လုပ်နေသည်…</string>

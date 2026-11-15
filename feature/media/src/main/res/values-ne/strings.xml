@@ -43,6 +43,11 @@
     <string name="media_player_play">चलाउनुहोस्</string>
     <string name="media_player_position_description">प्लेब्याकको स्थान</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">भिडियो चलाउन सकिएन</string>
+    <string name="media_video_position_description">भिडियोको स्थान</string>
+    <string name="media_video_capture_failed_title">फ्रेम खिच्न सकिएन</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">पूर्वावलोकन देखाउनुहोस्</string>
     <string name="media_file_show_source_description">स्रोत देखाउनुहोस्</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">सर्भरले यो पढ्न सकेन (HTTP %1$d)। यो फोल्डर हुन सक्छ।</string>
     <string name="media_file_error_timed_out">अनुरोधको समय सकियो।</string>
     <string name="media_file_error_unexpected_response">सर्भरले अनपेक्षित प्रतिक्रिया पठायो।</string>
+    <string name="media_file_error_over_limit">फाइल डाउनलोड आकारको सीमाभन्दा ठूलो छ।</string>
+    <string name="media_file_error_size_unknown">सर्भरले संलग्नकको आकार बताएन।</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">डाउनलोड गर्दै…</string>

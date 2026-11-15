@@ -43,6 +43,11 @@
     <string name="media_player_play">დაკვრა</string>
     <string name="media_player_position_description">დაკვრის პოზიცია</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">ვიდეოს დაკვრა ვერ მოხერხდა</string>
+    <string name="media_video_position_description">ვიდეოს პოზიცია</string>
+    <string name="media_video_capture_failed_title">კადრის აღება ვერ მოხერხდა</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">გადახედვის ჩვენება</string>
     <string name="media_file_show_source_description">წყაროს ჩვენება</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">სერვერმა ვერ წაიკითხა (HTTP %1$d). შესაძლოა საქაღალდეა.</string>
     <string name="media_file_error_timed_out">მოთხოვნის დრო ამოიწურა.</string>
     <string name="media_file_error_unexpected_response">სერვერმა მოულოდნელი პასუხი გამოგზავნა.</string>
+    <string name="media_file_error_over_limit">ფაილი აჭარბებს ჩამოტვირთვის ზომის ლიმიტს.</string>
+    <string name="media_file_error_size_unknown">სერვერმა დანართის ზომა არ მიუთითა.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">იტვირთება…</string>

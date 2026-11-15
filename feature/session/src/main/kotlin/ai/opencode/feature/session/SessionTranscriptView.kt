@@ -23,6 +23,7 @@ import ai.opencode.feature.media.TranscriptImagePreview
 import ai.opencode.feature.media.AgentFileDestination
 import ai.opencode.feature.media.LinkMenuAction
 import ai.opencode.feature.media.LocalMediaPresenter
+import ai.opencode.feature.media.MermaidTheme
 import ai.opencode.feature.media.MediaPresenter
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.session.SessionFeature.Action
@@ -186,8 +187,9 @@ fun SessionTranscriptView(
     val latestProjection by rememberUpdatedState(projection)
     val showsMoveToBackground by store.observe { it.showsMoveToBackground }
 
-    val send: (TranscriptAction) -> Unit = remember(store, context, host, presenter, reducedMotion) {
-        { action -> SessionTranscriptView.handle(action, store, context, host, presenter, reducedMotion) }
+    val theme = if (OpenCodeTheme.colors.isDark) MermaidTheme.Dark else MermaidTheme.Light
+    val send: (TranscriptAction) -> Unit = remember(store, context, host, presenter, reducedMotion, theme) {
+        { action -> SessionTranscriptView.handle(action, store, context, host, presenter, reducedMotion, theme) }
     }
     val slots = remember(store) {
         TranscriptSlots(
@@ -576,6 +578,7 @@ object SessionTranscriptView {
         host: SessionComposerHost?,
         presenter: MediaPresenter? = null,
         reducedMotion: Boolean = false,
+        theme: MermaidTheme = MermaidTheme.Light,
     ) {
         when (action) {
             is TranscriptAction.LinkMenu -> {
@@ -592,7 +595,8 @@ object SessionTranscriptView {
             is TranscriptAction.PreviewImage -> {
                 // The keyboard would stay up over the image.
                 host?.dismissComposerKeyboard()
-                presenter?.presentPreview(action.preview, drawingHandler(store))
+                val state = store.state
+                presenter?.presentPreview(SessionVisualMedia.preview(action.preview, state.items, state.server, state.session?.directory, theme), drawingHandler(store))
             }
             is TranscriptAction.OpenFile -> {
                 host?.dismissComposerKeyboard()
@@ -600,7 +604,11 @@ object SessionTranscriptView {
                 val file = action.file
                 val server = store.state.server
                 val directory = store.state.session?.directory
-                presenter?.presentPreview(TranscriptImagePreview(AgentFileDestination(file, directory), server), addDrawing)
+                val target = AgentFileDestination(file, directory)
+                val items = store.state.items
+                val gallery = { destination: AgentFileDestination -> SessionVisualMedia.preview(destination, items, server, directory, theme) }
+                val preview = gallery(target) ?: TranscriptImagePreview(target, server)
+                presenter?.presentPreview(preview, addDrawing, gallery)
             }
             is TranscriptAction.OpenPastedText -> {
                 host?.dismissComposerKeyboard()

@@ -43,6 +43,11 @@
     <string name="media_player_play">Reproduzir</string>
     <string name="media_player_position_description">Posição da reprodução</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Não foi possível reproduzir o vídeo</string>
+    <string name="media_video_position_description">Posição do vídeo</string>
+    <string name="media_video_capture_failed_title">Não foi possível capturar o quadro</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Mostrar prévia</string>
     <string name="media_file_show_source_description">Mostrar código-fonte</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">O servidor não conseguiu ler o arquivo (HTTP %1$d). Pode ser uma pasta.</string>
     <string name="media_file_error_timed_out">O tempo limite da solicitação foi excedido.</string>
     <string name="media_file_error_unexpected_response">O servidor enviou uma resposta inesperada.</string>
+    <string name="media_file_error_over_limit">O arquivo excede o limite de tamanho para download.</string>
+    <string name="media_file_error_size_unknown">O servidor não informou o tamanho do anexo.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Baixando…</string>

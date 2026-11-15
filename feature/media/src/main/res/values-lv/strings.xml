@@ -43,6 +43,11 @@
     <string name="media_player_play">Atskaņot</string>
     <string name="media_player_position_description">Atskaņošanas pozīcija</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Neizdevās atskaņot video</string>
+    <string name="media_video_position_description">Video pozīcija</string>
+    <string name="media_video_capture_failed_title">Neizdevās uzņemt kadru</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Rādīt priekšskatījumu</string>
     <string name="media_file_show_source_description">Rādīt pirmkodu</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Serveris nevarēja to nolasīt (HTTP %1$d). Iespējams, tā ir mape.</string>
     <string name="media_file_error_timed_out">Beidzās pieprasījuma gaidīšanas laiks.</string>
     <string name="media_file_error_unexpected_response">Serveris nosūtīja negaidītu atbildi.</string>
+    <string name="media_file_error_over_limit">Fails pārsniedz lejupielādes izmēra limitu.</string>
+    <string name="media_file_error_size_unknown">Serveris nenorādīja pielikuma izmēru.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Notiek lejupielāde…</string>

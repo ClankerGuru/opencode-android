@@ -707,7 +707,13 @@ fun PendingAttachmentsRow(
                 onRemove = removing(key) { onRemoveFile(file.id) },
                 modifier = itemMotion(key),
             ) {
-                ComposerFileChip(file, canRetry = canRetryFiles, onRetry = { onRetryFile(file.id) })
+                ComposerFileChip(
+                    file = file,
+                    canRetry = canRetryFiles,
+                    onRetry = { onRetryFile(file.id) },
+                    cornerRadius = radius,
+                    onOpen = onOpenPhoto?.takeUnless { file.isFailed }?.let { open -> { open(file.id.toString()) } },
+                )
             }
         }
         if (showsLocation) {

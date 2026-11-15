@@ -43,6 +43,11 @@
     <string name="media_player_play">Відтворити</string>
     <string name="media_player_position_description">Позиція відтворення</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Не вдалося відтворити відео</string>
+    <string name="media_video_position_description">Позиція відео</string>
+    <string name="media_video_capture_failed_title">Не вдалося захопити кадр</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Показати попередній перегляд</string>
     <string name="media_file_show_source_description">Показати вихідний код</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Сервер не зміг прочитати файл (HTTP %1$d). Можливо, це папка.</string>
     <string name="media_file_error_timed_out">Час очікування запиту минув.</string>
     <string name="media_file_error_unexpected_response">Сервер надіслав неочікувану відповідь.</string>
+    <string name="media_file_error_over_limit">Файл перевищує ліміт розміру для завантаження.</string>
+    <string name="media_file_error_size_unknown">Сервер не повідомив розмір вкладення.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Завантаження…</string>

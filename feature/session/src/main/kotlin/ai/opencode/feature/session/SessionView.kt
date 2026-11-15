@@ -866,12 +866,16 @@ private fun presentComposerPhoto(
     context: android.content.Context,
 ) {
     presenter ?: return
-    val preview = ComposerPhotoViewer.preview(store.state.pendingAttachments, selected = id) ?: return
+    val preview = ComposerPhotoViewer.preview(
+        attachments = store.state.pendingAttachments, files = store.state.pendingFiles,
+        selected = id, server = store.state.server, directory = store.state.session?.directory,
+    ) ?: return
     val restoresFocus = host?.messageFieldFocused == true
     if (restoresFocus) host?.dismissComposerKeyboard()
     val viewerStore = ComposerPhotoViewer.store(preview, addDrawing = drawingHandler(store)) { removed ->
         val index = store.state.pendingAttachments.indexOfFirst { it.id == removed }
         if (index >= 0) store.send(Action.attachmentRemoved(index))
+        else store.state.pendingFiles.firstOrNull { it.id.toString() == removed }?.let { store.send(Action.fileRemoved(it.id)) }
     }
     val identity = store.state.taskIdentity
     val presented = presenter.present(
@@ -881,12 +885,16 @@ private fun presentComposerPhoto(
         flightAccessories = { mediaID -> ComposerPhotoViewer.flightAccessories(mediaID, store.state.pendingAttachments, context) },
         onDismiss = {
             viewerStore.close()
+            ComposerPhotoViewer.release(preview)
             if (restoresFocus && store.state.taskIdentity == identity && !store.state.hasPendingRequests) host?.focusComposer()
         },
     ) { viewer ->
         FullscreenViewer(viewerStore, viewer)
     }
-    if (!presented) viewerStore.close()
+    if (!presented) {
+        viewerStore.close()
+        ComposerPhotoViewer.release(preview)
+    }
 }
 
 /** The system share sheet with [text] (iOS `ShareLink`). */

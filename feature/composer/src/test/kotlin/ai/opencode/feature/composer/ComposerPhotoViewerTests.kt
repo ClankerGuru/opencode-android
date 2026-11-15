@@ -24,7 +24,11 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import ai.opencode.server.model.OpenCodeFileReference
+import org.junit.rules.TemporaryFolder
+import java.io.File
 import java.io.ByteArrayOutputStream
 import java.util.UUID
 
@@ -79,7 +83,36 @@ class ComposerPhotoViewerTests {
         assertEquals(listOf(false, true), pages.map { it.isVideo })
     }
 
-    @Test fun removeHandsThePhotoBackAndPagesOnThenDiscardsTheLast() = runTest {
+    @get:Rule val temp = TemporaryFolder()
+
+    @Test fun pendingPostersLocalVideosAndUploadedVideosKeepDistinctSources() {
+        val poster = OpenCodeOutgoingAttachment(data = jpeg(2, 2), mime = "image/jpeg", videoDuration = 4.0)
+        val content = OpenCodeOutgoingAttachment(data = jpeg(2, 2), mime = "image/jpeg", videoDuration = 4.0,
+            localVideoURI = "content://media/external/video/media/7")
+        val bytes = byteArrayOf(1, 2, 3)
+        val staged = File(temp.newFolder(), "clip.mov").also { it.writeBytes(bytes) }
+        val local = ComposerFileAttachment(UUID.randomUUID(), staged.name, "video/quicktime", staged.length(), staged.path)
+        val uploaded = ComposerFileAttachment(OpenCodeFileReference("sent.mp4", "video/mp4", "/server/sent.mp4"))
+        val document = ComposerFileAttachment(OpenCodeFileReference("doc.pdf", "application/pdf", "/server/doc.pdf"))
+        val preview = ComposerPhotoViewer.preview(listOf(poster, content), selected = uploaded.id.toString(), files = listOf(local, document, uploaded))!!
+        val leased = File(preview.pages[2].videoURL!!.path!!)
+        try {
+            assertEquals(listOf(poster.id, content.id, local.id.toString(), uploaded.id.toString()).map(ComposerPhotoViewer::mediaID), preview.pages.map { it.id })
+            assertTrue(preview.pages.all { it.isVideo })
+            assertNull(preview.pages[0].videoURL)
+            assertTrue(preview.pages[0].original!!.contentEquals(poster.data))
+            assertEquals(content.localVideoURI, preview.pages[1].videoURL.toString())
+            assertEquals("/server/sent.mp4", preview.pages[3].file?.reference?.path)
+            assertNotEquals(staged, leased)
+            assertTrue(staged.delete()) // Upload finished while a different page was selected.
+            assertTrue(leased.readBytes().contentEquals(bytes))
+        } finally {
+            ComposerPhotoViewer.release(preview)
+        }
+        assertFalse(leased.exists())
+    }
+
+    @Test fun removeHandsThePhotoBackAndPagesOnThenDiscardsTheLast() = runBlocking {
         val photos = listOf(photo(1), photo(2), photo(3))
         val preview = ComposerPhotoViewer.preview(photos, selected = photos[1].id)!!
         val removed = mutableListOf<String>()
@@ -93,11 +126,26 @@ class ComposerPhotoViewerTests {
         }
         val ids = photos.map { ComposerPhotoViewer.mediaID(it.id) }
 
+        // A replacement is cold until Remove selects it. Assert the completion as well as
+        // the delegate, using real time for the media decoder's IO dispatcher.
+        suspend fun receiveOriginal(id: String) {
+            var decoded: Bitmap? = null
+            store.receive({ action ->
+                (action as? Action.SourceLoaded)?.takeIf { it.pageID == id }?.also { decoded = it.image } != null
+            }) { state ->
+                assertNotNull(decoded)
+                state.copy(preview = state.preview.copy(pages = state.preview.pages.map { page ->
+                    if (page.id == id) page.copy(image = decoded, hasDecodedOriginal = true) else page
+                }))
+            }
+        }
+
         // The middle photo goes; the next one takes its place.
         store.send(Action.RemoveTapped) {
             it.copy(preview = TranscriptImagePreview(ids[1], listOf(preview.pages[0], preview.pages[2])), selectedID = ids[2])
         }
         store.receive(Action.Delegate(Action.DelegateAction.Removed(ids[1])))
+        receiveOriginal(ids[2])
         store.finish()
         assertEquals(listOf(photos[1].id), removed)
 
@@ -106,6 +154,7 @@ class ComposerPhotoViewerTests {
             it.copy(preview = TranscriptImagePreview(ids[1], listOf(preview.pages[0])), selectedID = ids[0])
         }
         store.receive(Action.Delegate(Action.DelegateAction.Removed(ids[2])))
+        receiveOriginal(ids[0])
 
         // The only photo left: the viewer goes without flying home.
         store.send(Action.RemoveTapped) { it.copy(isDiscarded = true) }

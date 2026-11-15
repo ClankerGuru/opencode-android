@@ -219,6 +219,69 @@ class MediaReferenceTests {
         store.finish()
     }
 
+    @Test
+    fun coldPagesLoadOnlyOnSelectionAndRemovalStartsTheReplacement() = runTest {
+        val calls = Collections.synchronizedList(mutableListOf<String>())
+        val pixels = Bitmap.createBitmap(3, 2, Bitmap.Config.ARGB_8888)
+        val pages = (1..4).map { n ->
+            val id = "link$n"
+            TranscriptImagePreview.Page(id, image = if (n == 4) pixels else null, label = id,
+                imageSource = SessionVisualImageSource.Link(id))
+        }
+        val state = FullscreenViewerFeature.State(TranscriptImagePreview("link1", pages), allowsRemove = true)
+        val store = TestStore(state, FullscreenViewerFeature(), this) {
+            this[ImageLinkPreviewClient] = ImageLinkPreviewClient(load = { id, _ -> calls.add(id); pixels })
+        }
+        store.send(FullscreenViewerFeature.Action.Task) { it.withPage(3) { p -> p.copy(image = null) } }
+        store.receive(FullscreenViewerFeature.Action.SourceLoaded("link1", pixels)) { it.withPage(0) { p -> p.copy(image = pixels) } }
+        store.send(FullscreenViewerFeature.Action.RemoveTapped) {
+            it.copy(preview = it.preview.copy(pages = it.preview.pages.drop(1)), selectedID = "link2")
+        }
+        store.receive(FullscreenViewerFeature.Action.Delegate(FullscreenViewerFeature.Action.DelegateAction.Removed("link1")))
+        store.receive(FullscreenViewerFeature.Action.SourceLoaded("link2", pixels)) { it.withPage(0) { p -> p.copy(image = pixels) } }
+        store.send(FullscreenViewerFeature.Action.SourceLoaded("link3", pixels)) // stale completion
+        store.finish()
+        assertEquals(listOf("link1", "link2"), calls)
+    }
+
+    @Test
+    fun selectionAndCloseCancelPendingLoadsAndIgnoreLateResults() = runTest {
+        val started = mutableListOf<String>()
+        val cancelled = mutableListOf<String>()
+        val pages = listOf("a", "b").map { TranscriptImagePreview.Page(it, null, it, imageSource = SessionVisualImageSource.Link(it)) }
+        val store = TestStore(FullscreenViewerFeature.State(TranscriptImagePreview("a", pages)), FullscreenViewerFeature(), this) {
+            this[ImageLinkPreviewClient] = ImageLinkPreviewClient(load = { id, _ ->
+                started += id
+                try { kotlinx.coroutines.awaitCancellation() } finally { cancelled += id }
+            })
+        }
+        store.send(FullscreenViewerFeature.Action.Task)
+        testScheduler.runCurrent()
+        store.send(FullscreenViewerFeature.Action.PageSelected("b")) { it.copy(selectedID = "b") }
+        testScheduler.runCurrent()
+        store.send(FullscreenViewerFeature.Action.SourceLoaded("a", null))
+        store.send(FullscreenViewerFeature.Action.CloseTapped) { it.copy(isDismissed = true) }
+        store.send(FullscreenViewerFeature.Action.SourceLoaded("b", null))
+        store.finish()
+        assertEquals(listOf("a", "b"), started)
+        assertEquals(started, cancelled)
+    }
+
+    @Test
+    fun failedOriginalKeepsThumbnailAndDoesNotAutomaticallyRetry() = runTest {
+        val thumbnail = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+        val page = TranscriptImagePreview.Page("photo", thumbnail, "Photo", original = byteArrayOf(0))
+        val state = FullscreenViewerFeature.State(TranscriptImagePreview(page.id, listOf(page)))
+        val store = TestStore(state, FullscreenViewerFeature(), this)
+        store.send(FullscreenViewerFeature.Action.Task)
+        store.receive(FullscreenViewerFeature.Action.SourceLoaded(page.id, null)) {
+            it.withPage(0) { p -> p.copy(loadFailed = true, originalFailed = true) }
+        }
+        assertTrue(store.state.selectedPage?.image === thumbnail)
+        store.send(FullscreenViewerFeature.Action.Task)
+        store.finish()
+    }
+
     private fun FullscreenViewerFeature.State.withPage(
         index: Int,
         update: (TranscriptImagePreview.Page) -> TranscriptImagePreview.Page,

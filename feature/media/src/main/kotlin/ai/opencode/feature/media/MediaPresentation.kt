@@ -481,7 +481,11 @@ class MediaPresenter internal constructor() {
     }
 
     /** A store per presentation, so the opening prompt and its cancellable effects end together. */
-    fun presentPreview(preview: TranscriptImagePreview, addDrawing: ImageDrawingAdd? = null) {
+    fun presentPreview(
+        preview: TranscriptImagePreview,
+        addDrawing: ImageDrawingAdd? = null,
+        documentGallery: (AgentFileDestination) -> TranscriptImagePreview? = { null },
+    ) {
         if (isPresenting) return
         val file = preview.pages.firstOrNull { it.id == preview.id }?.file
         val store = Store(
@@ -489,7 +493,7 @@ class MediaPresenter internal constructor() {
             FullscreenViewerFeature(addDrawing),
         )
         present(preview.id, file?.reference?.kind?.isMedia ?: true, reducesMotion, onDismiss = store::close) { viewer ->
-            FullscreenViewer(store, viewer)
+            CompositionLocalProvider(LocalDocumentVisualGallery provides documentGallery) { FullscreenViewer(store, viewer) }
         }
     }
 

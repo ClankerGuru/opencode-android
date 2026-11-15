@@ -24,6 +24,8 @@ data class OpenCodeToolCall(
     @Serializable(with = InstantSerializer::class) val startedAt: Instant? = null,
     /** When it settled (`time.completed`), from REST windows only. */
     @Serializable(with = InstantSerializer::class) val completedAt: Instant? = null,
+    /** Blob-backed movies are separate from the image mosaic. */
+    val videos: List<OpenCodeTranscriptFile>? = null,
 ) {
     @Serializable
     enum class Status(val rawValue: String) {

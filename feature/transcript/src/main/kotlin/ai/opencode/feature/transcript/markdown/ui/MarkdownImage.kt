@@ -7,6 +7,7 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.media.AgentImageRowAnchor
+import ai.opencode.feature.media.MediaThumbnail
 import ai.opencode.feature.media.DecodedImageCache
 import ai.opencode.feature.media.TranscriptImagePreview
 import ai.opencode.feature.media.TranscriptMetrics
@@ -21,7 +22,6 @@ import ai.opencode.server.model.AgentFileReference
 import ai.opencode.server.model.FileReadTarget
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -51,7 +51,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -165,7 +164,8 @@ fun MarkdownImage(
                     .semantics { contentDescription = openDescription },
                 contentAlignment = Alignment.Center,
             ) {
-                Image(load.image, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.heightIn(max = 360.dp))
+                MediaThumbnail(load.image.asAndroidBitmap(), listOf(cacheKey), Modifier.heightIn(max = 360.dp),
+                    fits = true, maxHeight = 360.dp, cornerRadius = TranscriptMetrics.cardCornerRadius)
             }
         }
         ImageLoad.Failed -> FailedImageCard(

@@ -43,6 +43,11 @@
     <string name="media_player_play">Leisti</string>
     <string name="media_player_position_description">Atkūrimo vieta</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Nepavyko paleisti vaizdo įrašo</string>
+    <string name="media_video_position_description">Vaizdo įrašo vieta</string>
+    <string name="media_video_capture_failed_title">Nepavyko užfiksuoti kadro</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Rodyti peržiūrą</string>
     <string name="media_file_show_source_description">Rodyti šaltinį</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Serveris negalėjo jo nuskaityti (HTTP %1$d). Tai gali būti aplankas.</string>
     <string name="media_file_error_timed_out">Baigėsi užklausai skirtas laikas.</string>
     <string name="media_file_error_unexpected_response">Serveris atsiuntė netikėtą atsakymą.</string>
+    <string name="media_file_error_over_limit">Failas viršija atsisiuntimo dydžio limitą.</string>
+    <string name="media_file_error_size_unknown">Serveris nenurodė priedo dydžio.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Atsiunčiama…</string>

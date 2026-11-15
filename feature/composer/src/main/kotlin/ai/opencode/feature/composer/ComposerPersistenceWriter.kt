@@ -584,6 +584,7 @@ internal class ComposerPersistenceWriter(
             mediaHash = record.mediaHash,
             byteCount = record.byteCount,
             videoDuration = record.videoDuration,
+            localVideoURI = record.localVideoURI,
         )
     }
 

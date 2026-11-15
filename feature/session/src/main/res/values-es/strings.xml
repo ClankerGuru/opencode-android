@@ -9,6 +9,14 @@
     <string name="session_background_work_open_subagent_label">Abrir la sesión del subagente</string>
     <string name="session_background_work_shells_title">Shells</string>
     <string name="session_background_work_show_shell_label">Mostrar la salida del shell</string>
+    <!-- The session's images and videos, paged in the full-screen viewer -->
+    <string name="session_visual_attached_image">Imagen adjunta</string>
+    <string name="session_visual_tool_image">Imagen de la herramienta</string>
+    <string name="session_visual_image">Imagen</string>
+    <!-- One image of several: the image's label, then its place, as “Attached image 2 of 3” -->
+    <string name="session_visual_image_page_label">%1$s %2$d de %3$d</string>
+    <!-- A diagram's label, read by TalkBack. %1$s is its kind, as “Diagram, Flowchart” -->
+    <string name="session_visual_diagram_label">Diagrama, %1$s</string>
     <!-- Jump to latest -->
     <string name="session_scroll_to_latest_description">Ir al mensaje más reciente</string>
     <!-- Dictation bar -->

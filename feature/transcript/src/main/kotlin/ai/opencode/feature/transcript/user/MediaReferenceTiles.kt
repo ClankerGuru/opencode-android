@@ -274,7 +274,7 @@ internal fun TranscriptMediaFileChip(file: OpenCodeTranscriptFile, corners: User
     ) { FileAttachmentDetail(label) }
     LaunchedEffect("${server?.persistenceID ?: ""}|${file.mediaHash ?: ""}") {
         val hash = file.mediaHash
-        if (file.isUnavailable || hash == null) return@LaunchedEffect
+        if (file.isUnavailable || hash == null || !PastedText.isText(file.mime)) return@LaunchedEffect
         val data = MediaReferenceResolver.cachedData(hash) ?: run {
             server ?: return@LaunchedEffect
             when (val result = MediaReferenceResolver.loadData(server, hash)) {

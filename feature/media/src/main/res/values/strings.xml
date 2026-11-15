@@ -43,6 +43,11 @@
     <string name="media_player_play">Play</string>
     <string name="media_player_position_description">Playback position</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Couldn’t play video</string>
+    <string name="media_video_position_description">Video position</string>
+    <string name="media_video_capture_failed_title">Couldn’t capture frame</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Show Preview</string>
     <string name="media_file_show_source_description">Show Source</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">The server couldn’t read it (HTTP %1$d). It may be a folder.</string>
     <string name="media_file_error_timed_out">The request timed out.</string>
     <string name="media_file_error_unexpected_response">The server sent an unexpected response.</string>
+    <string name="media_file_error_over_limit">The file exceeds the download size limit.</string>
+    <string name="media_file_error_size_unknown">The server didn’t report the attachment size.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Downloading…</string>

@@ -3,6 +3,7 @@ package ai.opencode.feature.transcript
 import androidx.compose.ui.unit.dp
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.rows.TranscriptTimeStamps
+import ai.opencode.server.model.AgentFileReference
 import ai.opencode.server.model.OpenCodeImageAttachment
 import ai.opencode.server.model.OpenCodeModel
 import ai.opencode.server.model.OpenCodeQueuedInput
@@ -68,16 +69,19 @@ sealed interface TranscriptEntry {
             is ReplyEnd -> emptyList()
         }
 
-    /** Images produced by the tool calls this entry renders, in display order. */
-    val toolImageAttachments: List<OpenCodeImageAttachment>
-        get() {
-            val tools = when (this) {
-                is Single -> listOf(item)
-                is ToolGroup -> tools
-                else -> return emptyList()
-            }
-            return tools.flatMap { (it as? OpenCodeTranscriptItem.Tool)?.call?.imageAttachments ?: emptyList() }
+    private val toolCalls: List<OpenCodeToolCall>
+        get() = when (this) {
+            is Single -> listOfNotNull((item as? OpenCodeTranscriptItem.Tool)?.call)
+            is ToolGroup -> tools.mapNotNull { (it as? OpenCodeTranscriptItem.Tool)?.call }
+            else -> emptyList()
         }
+
+    val toolImageAttachments: List<OpenCodeImageAttachment> get() = toolCalls.flatMap { it.imageAttachments }
+
+    /** Playable results are file cards, not undecodable image mosaic tiles. */
+    val toolVideoReferences: List<AgentFileReference>
+        get() = toolCalls.flatMap { it.videos.orEmpty() }.mapNotNull { it.mediaViewerReference }
+            .filter { it.kind == AgentFileReference.Kind.Video }.distinctBy { it.id }
 
     /** The members of a group whose members can move between rows. */
     val groupMembers: List<OpenCodeTranscriptItem>?

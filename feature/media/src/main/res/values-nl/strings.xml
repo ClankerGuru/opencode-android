@@ -43,6 +43,11 @@
     <string name="media_player_play">Afspelen</string>
     <string name="media_player_position_description">Afspeelpositie</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Video afspelen mislukt</string>
+    <string name="media_video_position_description">Videopositie</string>
+    <string name="media_video_capture_failed_title">Frame vastleggen mislukt</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Voorbeeld tonen</string>
     <string name="media_file_show_source_description">Bron tonen</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">De server kon het niet lezen (HTTP %1$d). Mogelijk is het een map.</string>
     <string name="media_file_error_timed_out">Time-out voor het verzoek.</string>
     <string name="media_file_error_unexpected_response">De server stuurde een onverwacht antwoord.</string>
+    <string name="media_file_error_over_limit">Het bestand is groter dan de downloadlimiet.</string>
+    <string name="media_file_error_size_unknown">De server heeft de grootte van de bijlage niet doorgegeven.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Downloaden…</string>

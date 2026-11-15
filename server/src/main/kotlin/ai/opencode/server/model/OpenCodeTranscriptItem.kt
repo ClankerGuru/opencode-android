@@ -108,6 +108,8 @@ class OpenCodeOutgoingAttachment(
     val byteCount: Long? = null,
     /** A frame of a library video, sent as an image: its duration in seconds, for the composer thumbnail's “▶ 0:50” badge. */
     val videoDuration: Double? = null,
+    /** Local playback source for a poster; never part of the prompt URI. */
+    val localVideoURI: String? = null,
 ) {
     val isImage: Boolean get() = mime.startsWith("image/")
 
@@ -119,7 +121,7 @@ class OpenCodeOutgoingAttachment(
     override fun equals(other: Any?): Boolean = other is OpenCodeOutgoingAttachment && other.id == id &&
         other.data.contentEquals(data) && other.mime == mime && other.name == name &&
         other.pastedText == pastedText && other.pasted == pasted && other.mediaHash == mediaHash &&
-        other.byteCount == byteCount && other.videoDuration == videoDuration
+        other.byteCount == byteCount && other.videoDuration == videoDuration && other.localVideoURI == localVideoURI
 
     override fun hashCode(): Int = id.hashCode()
     override fun toString(): String = "OpenCodeOutgoingAttachment(id=$id, mime=$mime, ${data.size} bytes)"

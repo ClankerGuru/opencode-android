@@ -84,6 +84,26 @@ class ComposerItemProviderLoaderTests {
         }
     }
 
+    @Test fun libraryMovieAttachesOnlyTheEncodedPoster() = runTest {
+        val uri = "content://media/external/video/media/42"
+        val bitmap = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888)
+        val poster = java.io.ByteArrayOutputStream().use { bytes ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, bytes)
+            bytes.toByteArray()
+        }
+        val importer = importer()
+        val added = mutableListOf<OpenCodeOutgoingAttachment>()
+        importer.start(listOf(ComposerImageSource.Loader(videoDuration = 14.0, localVideoURI = uri) { poster }), onAttachment = { added += it })
+        waitForImport(importer)
+
+        val attachment = added.single()
+        assertEquals(uri, attachment.localVideoURI)
+        assertEquals(14.0, attachment.videoDuration)
+        assertEquals("image/jpeg", attachment.mime)
+        assertTrue(attachment.promptURI.startsWith("data:image/jpeg;base64,"))
+        assertTrue(BitmapFactory.decodeByteArray(attachment.data, 0, attachment.data.size) != null)
+    }
+
     @Test fun imageImportPreservesMixedSourceOrder() = runTest {
         val importer = importer()
         val imported = mutableListOf<Byte>()

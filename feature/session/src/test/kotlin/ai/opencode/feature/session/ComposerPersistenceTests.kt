@@ -160,6 +160,8 @@ class ComposerPersistenceTests {
             data = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47),
             mime = "image/png",
             name = "diagram.png",
+            videoDuration = 50.0,
+            localVideoURI = "content://picker/local-fixture-movie",
         )
         val pastedAttachment = PastedText.attachment((1..14).joinToString("\n") { "line $it" }, id = "00000000-0000-0000-0000-000000000021")
         val sharedLocation = SharedLocation(

@@ -14,6 +14,8 @@ data class AgentFileReference(
     val path: String,
     /** The 1-based line a `path:42` reference points at, for text files. */
     val line: Int? = null,
+    /** When set, path is a media URI, never a workspace path. */
+    val media: MediaFileOriginal? = null,
 ) {
     val id: String get() = path
 
@@ -21,12 +23,18 @@ data class AgentFileReference(
     val zoomSourceID: String get() = "file:$path"
 
     val name: String
-        get() = path.split('/', '\\').lastOrNull { it.isNotEmpty() } ?: path
+        get() = media?.name ?: path.split('/', '\\').lastOrNull { it.isNotEmpty() } ?: path
 
-    val kind: Kind get() = Kind.of(name)
+    val kind: Kind
+        get() = when {
+            media?.mime?.startsWith("video/") == true -> Kind.Video
+            media?.mime?.startsWith("audio/") == true -> Kind.Audio
+            media?.mime == "application/pdf" -> Kind.Pdf
+            else -> Kind.of(name)
+        }
 
     /** The MIME type implied by the extension; the server guesses the same way. */
-    val mime: String get() = mimeForExtension(AttachmentFileType.fileExtension(name)) ?: "application/octet-stream"
+    val mime: String get() = media?.mime ?: mimeForExtension(AttachmentFileType.fileExtension(name)) ?: "application/octet-stream"
 
     val typeLabel: String
         get() = when (kind) {
@@ -51,6 +59,8 @@ data class AgentFileReference(
 
         /** Media and documents earn a card under the reply; code paths stay inline links so a code-heavy answer doesn't sprout a row of cards. */
         val showsCard: Boolean get() = this != Text
+
+        val isVisual: Boolean get() = this == Image || this == Video
 
         /** Streams through range requests when the server supports them. */
         val isTimeBased: Boolean get() = this == Video || this == Audio
@@ -94,6 +104,7 @@ data class AgentFileReference(
     data class Target(val location: String, val relativePath: String, val absolutePath: String)
 
     fun target(directory: String?): Target? {
+        if (media != null) return null
         if (isWindowsAbsolute(path) || (directory != null && isWindowsAbsolute(directory))) return windowsTarget(directory)
         var path = this.path
         if (path.startsWith("~/") || path == "~") {

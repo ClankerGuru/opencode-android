@@ -199,6 +199,23 @@ class ImageDrawingFeatureTests {
     private fun drawing(action: ImageDrawingFeature.Action) =
         FullscreenViewerFeature.Action.Drawing(PresentationAction.Presented(action))
 
+    @Test fun theMovieEditorUsesTheCapturedFrameOnlyWhileItsPageIsCurrent() = runTest {
+        val poster = image
+        val frame = Bitmap.createBitmap(32, 24, Bitmap.Config.ARGB_8888)
+        val page = TranscriptImagePreview.Page("movie", poster, "Video", isVideo = true)
+        val offered = Locked(listOf<OpenCodeOutgoingAttachment>())
+        val store = viewer(page = page, offered = offered)
+        val captured = FullscreenViewerFeature.Action.DrawCapturedFrame(page.id, frame)
+        store.send(FullscreenViewerFeature.Action.DrawCapturedFrame("another movie", frame))
+        store.send(captured) { it.copy(drawing = ImageDrawingFeature.State(frame)) }
+        assertTrue(store.state.drawing?.image === frame)
+        assertTrue(store.state.selectedPage?.image === poster)
+        store.send(FullscreenViewerFeature.Action.CloseTapped) { it.copy(isDismissed = true, drawing = null) }
+        store.send(captured)
+        store.finish()
+        assertTrue(offered.current.isEmpty())
+    }
+
     @Test fun drawOpensOnlyOnADecodedImageForAPromptThatTakesIt() = runTest {
         val offered = Locked(listOf<OpenCodeOutgoingAttachment>())
         viewer(allowsDrawing = false, offered = offered).send(FullscreenViewerFeature.Action.DrawTapped)
@@ -213,17 +230,14 @@ class ImageDrawingFeatureTests {
         assertTrue(offered.current.isEmpty())
     }
 
-    /**
-     * iOS keeps a page's thumbnail when its original fails to decode (`originalFailed`). Android
-     * opens on full-size originals only: a page whose image fails to decode is `loadFailed` with
-     * no image, so Draw stays off.
-     */
     @Test fun drawStaysOffOnAThumbnailWhoseOriginalFailedToDecode() = runTest {
         val offered = Locked(listOf<OpenCodeOutgoingAttachment>())
-        val page = TranscriptImagePreview.Page(id = "img_thumb", image = null, label = "Image", mediaHash = "abc")
+        val page = TranscriptImagePreview.Page(id = "img_thumb", image = image, label = "Image", original = byteArrayOf(1, 2, 3))
         val store = viewer(page = page, offered = offered)
-        store.send(FullscreenViewerFeature.Action.MediaLoaded("img_thumb", MediaReferenceLoadResult.Loaded(byteArrayOf(1, 2, 3)))) {
-            it.copy(preview = it.preview.copy(pages = listOf(page.copy(loadFailed = true))))
+        store.send(FullscreenViewerFeature.Action.DrawTapped) // The original is still pending.
+        store.send(FullscreenViewerFeature.Action.Task)
+        store.receive(FullscreenViewerFeature.Action.SourceLoaded(page.id, null)) {
+            it.copy(preview = it.preview.copy(pages = listOf(page.copy(originalFailed = true, loadFailed = true))))
         }
         store.send(FullscreenViewerFeature.Action.DrawTapped)
         store.finish()

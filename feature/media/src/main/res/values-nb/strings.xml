@@ -43,6 +43,11 @@
     <string name="media_player_play">Spill av</string>
     <string name="media_player_position_description">Avspillingsposisjon</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Kunne ikke spille av videoen</string>
+    <string name="media_video_position_description">Videoposisjon</string>
+    <string name="media_video_capture_failed_title">Kunne ikke ta bilde av rammen</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Vis forhåndsvisning</string>
     <string name="media_file_show_source_description">Vis kilde</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Serveren kunne ikke lese filen (HTTP %1$d). Det kan være en mappe.</string>
     <string name="media_file_error_timed_out">Tidsavbrudd for forespørselen.</string>
     <string name="media_file_error_unexpected_response">Serveren sendte et uventet svar.</string>
+    <string name="media_file_error_over_limit">Filen overskrider størrelsesgrensen for nedlasting.</string>
+    <string name="media_file_error_size_unknown">Serveren oppga ikke størrelsen på vedlegget.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Laster ned…</string>

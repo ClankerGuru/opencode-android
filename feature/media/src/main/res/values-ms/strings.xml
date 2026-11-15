@@ -43,6 +43,11 @@
     <string name="media_player_play">Main</string>
     <string name="media_player_position_description">Kedudukan main balik</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Tidak dapat memainkan video</string>
+    <string name="media_video_position_description">Kedudukan video</string>
+    <string name="media_video_capture_failed_title">Tidak dapat menangkap bingkai</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Tunjukkan pratonton</string>
     <string name="media_file_show_source_description">Tunjukkan sumber</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Pelayan tidak dapat membacanya (HTTP %1$d). Ia mungkin folder.</string>
     <string name="media_file_error_timed_out">Permintaan tamat masa.</string>
     <string name="media_file_error_unexpected_response">Pelayan menghantar respons yang tidak dijangka.</string>
+    <string name="media_file_error_over_limit">Fail melebihi had saiz muat turun.</string>
+    <string name="media_file_error_size_unknown">Pelayan tidak melaporkan saiz lampiran.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Memuat turun…</string>
