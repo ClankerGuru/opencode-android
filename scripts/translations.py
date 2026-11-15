@@ -6,11 +6,11 @@ Usage:
   scripts/translations.py de         checks the `values-de` folders
   scripts/translations.py all        checks every language in LANGUAGES
 
-For a language it reports strings with no translation, translations whose English string is
-gone, placeholders (%1$s, %d, %%) that differ from the English text, plurals without the
-quantities the language needs, text left in English or in the wrong script, and files that
-aren't valid XML. Exits 1 when anything but a missing string is wrong; missing strings only
-show in English.
+It exits 1, and prints the commands that fix it, when a language is missing a string, still
+has a string that's gone from English, has placeholders (%1$s, %d, %%) that differ from the
+English, lacks a plural quantity the language needs, has broken escaping or isn't valid XML.
+Text that looks untranslated (still English, or the wrong script) is only a warning.
+CI runs `scripts/translations.py all` through scripts/check.sh. It needs only Python 3.
 """
 import re
 import sys
@@ -247,10 +247,12 @@ def uses_script(text, script):
 
 
 def problems(english, translated, qualifier, script):
-    """Returns what's wrong with one translated string or plural, as sentences."""
-    found = []
+    """Returns two lists of sentences: what's wrong with one translated string or plural, and
+    what only looks wrong (warnings)."""
+    errors = []
+    warnings = []
     if english["kind"] != translated["kind"]:
-        return [f"is a {translated['kind']} but the English is a {english['kind']}"]
+        return [f"is a {translated['kind']} but the English is a {english['kind']}"], []
     if english["kind"] == "string":
         wanted = placeholders(english["text"])
     else:
@@ -258,30 +260,30 @@ def problems(english, translated, qualifier, script):
         quantities = plural_quantities(qualifier)
         for quantity in quantities:
             if quantity not in translated["items"]:
-                found.append(f"lacks the plural quantity {quantity}")
+                errors.append(f"lacks the plural quantity {quantity}")
         for quantity in translated["items"]:
             if quantity not in quantities:
-                found.append(f"has the plural quantity {quantity}, which the language doesn't use")
+                errors.append(f"has the plural quantity {quantity}, which the language doesn't use")
     english_text = " ".join(texts(english))
     words = english_words(english_text)
     for text in texts(translated):
         if placeholders(text) != wanted:
-            found.append(f"has placeholders {placeholders(text)} instead of {wanted}: {text}")
+            errors.append(f"has placeholders {placeholders(text)} instead of {wanted}: {text}")
         if has_stray_percent(text):
-            found.append(f"has a % that isn't a placeholder (write %%): {text}")
+            errors.append(f"has a % that isn't a placeholder (write %%): {text}")
         if re.search(r"(?<!\\)['\"]", text):
-            found.append(f"has an unescaped quote (write \\' or \\\"): {text}")
+            errors.append(f"has an unescaped quote (write \\' or \\\"): {text}")
         if text.startswith("@") or text.startswith("?"):
-            found.append(f"starts with an unescaped @ or ? (write \\@ or \\?): {text}")
+            errors.append(f"starts with an unescaped @ or ? (write \\@ or \\?): {text}")
         if not words:
             continue
         has_letters = any(character.isalpha() for character in strip_kept(text))
         if script != "Latin" and has_letters and not uses_script(text, script):
-            found.append(f"isn't written in {script} script: {text}")
+            warnings.append(f"isn't written in {script} script: {text}")
         same_as_english = text.strip() in [t.strip() for t in texts(english)]
         if same_as_english and (script != "Latin" or len(english_words(text)) > 1):
-            found.append(f"is still in English: {text}")
-    return found
+            warnings.append(f"is still in English: {text}")
+    return errors, warnings
 
 
 def app_languages():
@@ -300,6 +302,18 @@ def list_files():
     print(f"{total:5}  strings to translate")
 
 
+class Report:
+    """What one language's check found."""
+
+    def __init__(self, qualifier):
+        self.qualifier = qualifier
+        self.missing = 0
+        self.removed = 0
+        self.broken = []
+        self.other = 0
+        self.warnings = 0
+
+
 def check_language(qualifier):
     script = "Latin"
     language_tag = None
@@ -307,44 +321,67 @@ def check_language(qualifier):
         if language[0] == qualifier:
             language_tag = language[2]
             script = language[4]
-    missing = 0
-    broken = 0
+    report = Report(qualifier)
     if qualifier not in app_languages():
         print(f"app/build.gradle.kts: {qualifier} isn't in appLanguages")
-        broken += 1
+        report.other += 1
     for english_path in english_files():
         english = read_strings(english_path)
         path = translated_path(english_path, qualifier)
         relative = path.relative_to(ROOT)
         if not path.exists():
             print(f"{relative}: file missing ({len(english)} strings)")
-            missing += len(english)
+            report.missing += len(english)
             continue
         try:
             translated = read_strings(path)
         except ET.ParseError as error:
             print(f"{relative}: not valid XML: {error}")
-            broken += 1
+            report.other += 1
             continue
         for name in english:
             if name not in translated:
                 print(f"{relative}: missing {name}")
-                missing += 1
+                report.missing += 1
                 continue
             if name == "core_language_tag":
                 if language_tag is not None and translated[name]["text"] != language_tag:
                     print(f"{relative}: core_language_tag should be {language_tag}")
-                    broken += 1
+                    report.other += 1
                 continue
-            for problem in problems(english[name], translated[name], qualifier, script):
+            errors, warnings = problems(english[name], translated[name], qualifier, script)
+            for problem in errors:
                 print(f"{relative}: {name} {problem}")
-                broken += 1
+            if errors:
+                report.broken.append(name)
+            for problem in warnings:
+                print(f"{relative}: warning: {name} {problem}")
+                report.warnings += 1
         for name in translated:
             if name not in english:
                 print(f"{relative}: {name} no longer exists in English")
-                broken += 1
-    print(f"{qualifier}: {missing} missing, {broken} to fix")
-    return missing, broken
+                report.removed += 1
+    return report
+
+
+def print_fixes(reports):
+    print()
+    print("Translations need fixing (docs/translating.md):")
+    if any(report.missing or report.removed for report in reports):
+        print("- Missing strings, or strings gone from English: run")
+        print("    python3 scripts/translate.py all")
+        print("  It translates the missing strings with a model and drops the removed ones. Without")
+        print("  Anomaly Console access, add --model <provider/model> to use your own, or leave the")
+        print("  missing strings for a maintainer to translate.")
+    broken = [report for report in reports if report.broken]
+    if broken:
+        print("- Broken placeholders, plurals or escaping: fix them by hand, or translate them again:")
+        for report in broken:
+            redo = " ".join(f"--redo {name}" for name in report.broken)
+            print(f"    python3 scripts/translate.py {report.qualifier} {redo}")
+    if any(report.other for report in reports):
+        print("- Invalid XML, core_language_tag or appLanguages: fix the file named above by hand.")
+    print("Then check again: python3 scripts/translations.py all")
 
 
 def main():
@@ -355,12 +392,22 @@ def main():
         qualifiers = [language[0] for language in LANGUAGES]
     else:
         qualifiers = sys.argv[1:]
-    failed = False
+    failed = []
+    warnings = 0
     for qualifier in qualifiers:
-        missing, broken = check_language(qualifier)
-        if broken:
-            failed = True
-    return 1 if failed else 0
+        report = check_language(qualifier)
+        warnings += report.warnings
+        problem_count = report.missing + report.removed + len(report.broken) + report.other
+        if problem_count:
+            failed.append(report)
+        if problem_count or len(qualifiers) == 1:
+            print(f"{qualifier}: {report.missing} missing, {report.removed} removed from English, "
+                  f"{len(report.broken) + report.other} to fix")
+    if failed:
+        print_fixes(failed)
+        return 1
+    print(f"Translations OK: {len(qualifiers)} language{"" if len(qualifiers) == 1 else "s"}, {warnings} warnings.")
+    return 0
 
 
 if __name__ == "__main__":

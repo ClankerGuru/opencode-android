@@ -9,17 +9,23 @@ Usage:
                                       translates these strings again, after their English changed
 
 Only strings with no translation are sent, so a run after new English text is added translates
-just that. Each request carries the desktop app's own translations of the terms it uses (read
-from the opencode repo, `--desktop`, default ../opencode) and the app's existing translations,
-so a word reads the same everywhere. Every answer is checked like scripts/translations.py
-checks the files; a string that fails is asked for again, and left out if it still fails.
+just that, and strings gone from English are dropped. Each request carries the desktop app's own
+translations of the terms it uses (read from the opencode repo, `--desktop`, default
+../opencode) and the app's existing translations, so a word reads the same everywhere. Without
+the opencode repo it still runs, with a note, but the words may differ from desktop. Every answer
+is checked like scripts/translations.py checks the files; a string that fails is asked for
+again, and left out if it still fails.
 
-Models run through `opencode run`, using the Anomaly Console provider (`opencode/…`).
+Models run through `opencode run` (install it from https://opencode.ai). The defaults use the
+Anomaly Console provider (`opencode/…`). Without Console access, pass any model `opencode run -m`
+accepts: `--model <provider/model>` to translate, `--review-model <provider/model>` to review.
+Or leave the strings for a maintainer to translate; CI flags them as missing.
 """
 import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -413,7 +419,11 @@ def translate_file(language, english_path, terms, guidance, model, workdir, revi
                         failed.append(key)
                     continue
                 item = item_from_answer(english[key], answer[key])
-                found = ["isn't a string or plural"] if item is None else problems(english[key], item, qualifier, script)
+                if item is None:
+                    found = ["isn't a string or plural"]
+                else:
+                    errors, warnings = problems(english[key], item, qualifier, script)
+                    found = errors + warnings
                 if found:
                     log(f"{qualifier} {relative}: {key} rejected: {found[0]}")
                     if not review:
@@ -433,12 +443,23 @@ def translate_file(language, english_path, terms, guidance, model, workdir, revi
     return changed
 
 
+def has_desktop(repo):
+    result = subprocess.run(
+        ["git", "-C", str(repo), "cat-file", "-e", "origin/dev:packages/app/src/runtime/i18n/en.ts"],
+        capture_output=True,
+    )
+    return result.returncode == 0
+
+
 def run_language(language, repo, model, workdir, review, redo):
     qualifier, code = language[0], language[1]
-    terms = desktop_terms(repo, code)
-    guidance = desktop_guidance(repo, code)
-    if not terms:
-        log(f"{qualifier}: no desktop translations found in {repo}")
+    terms = {}
+    guidance = ""
+    if repo is not None:
+        terms = desktop_terms(repo, code)
+        guidance = desktop_guidance(repo, code)
+        if not terms:
+            log(f"{qualifier}: no desktop translations found in {repo}")
     total = 0
     for english_path in ordered_files():
         total += translate_file(language, english_path, terms, guidance, model, workdir, review, redo)
@@ -449,8 +470,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("languages", nargs="+", help="folder qualifiers (de, pt-rBR) or all")
     parser.add_argument("--review", action="store_true", help="review existing translations instead")
-    parser.add_argument("--model", help="the model to use (default: %s, or %s with --review)" % (TRANSLATE_MODEL, REVIEW_MODEL))
-    parser.add_argument("--desktop", default=str(ROOT.parent / "opencode"), help="the opencode repo checkout")
+    parser.add_argument("--model", default=TRANSLATE_MODEL, metavar="PROVIDER/MODEL", help="the model that translates (default: %(default)s)")
+    parser.add_argument("--review-model", default=REVIEW_MODEL, metavar="PROVIDER/MODEL", help="the model that reviews (default: %(default)s)")
+    parser.add_argument("--desktop", default=str(ROOT.parent / "opencode"), help="the opencode repo checkout, for desktop terms (default: %(default)s)")
     parser.add_argument("--jobs", type=int, default=12, help="languages to translate at once")
     parser.add_argument("--redo", action="append", default=[], metavar="NAME", help="translate this string again (repeatable)")
     args = parser.parse_args()
@@ -459,7 +481,16 @@ def main():
         languages = LANGUAGES
     else:
         languages = [language_info(qualifier) for qualifier in args.languages]
-    model = args.model or (REVIEW_MODEL if args.review else TRANSLATE_MODEL)
+    model = args.review_model if args.review else args.model
+    if shutil.which("opencode") is None:
+        print("opencode isn't installed; get it from https://opencode.ai (docs/translating.md).")
+        return 1
+    desktop = args.desktop
+    if not has_desktop(desktop):
+        print(f"Note: no opencode repo at {desktop}, so desktop terms are skipped and words like session, "
+              "agent and model may differ from the desktop app. Clone https://github.com/anomalyco/opencode "
+              "next to this repo, or pass --desktop <path>.")
+        desktop = None
 
     with tempfile.TemporaryDirectory(prefix="translate-") as workdir:
         agent = Path(workdir) / ".opencode" / "agent" / "translator.md"
@@ -470,7 +501,7 @@ def main():
         with ThreadPoolExecutor(max_workers=args.jobs) as pool:
             futures = []
             for language in languages:
-                futures.append(pool.submit(run_language, language, args.desktop, model, workdir, args.review, set(args.redo)))
+                futures.append(pool.submit(run_language, language, desktop, model, workdir, args.review, set(args.redo)))
             for future in futures:
                 future.result()
     return 0
