@@ -265,7 +265,7 @@ object HeaderBlurTunables {
             HeaderBlurMode.Off -> SessionHeaderStyle.Resolved.ResolvedBlur.None
             HeaderBlurMode.CustomBlur -> custom
             HeaderBlurMode.SystemEdge -> {
-                // Untouched knobs keep the shipped style on every OS, the app blur's own stops included (65c87b90).
+                // Untouched knobs keep the shipped style on every OS, the app blur's own stops included.
                 if (customKnobAdjusted) custom else resolved.blur
             }
         }

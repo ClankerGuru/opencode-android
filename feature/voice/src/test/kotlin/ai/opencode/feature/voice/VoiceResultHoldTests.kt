@@ -12,8 +12,7 @@ import kotlin.time.Duration.Companion.seconds
 
 /**
  * How long a result waits so it doesn't cut anyone off, on a test clock: a loaded machine
- * stretching a pause can't change what the call does (the real clock failed these in train smoke
- * runs on Oct 25).
+ * stretching a pause can't change what the call does.
  */
 class VoiceResultHoldTests {
     private val result = "The session “Upload” finished the work you started there. Its reply: All tests pass."

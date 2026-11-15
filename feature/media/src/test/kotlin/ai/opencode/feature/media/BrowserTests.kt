@@ -433,7 +433,7 @@ class LinkMenuTests {
         assertEquals("Share Link to example.com", LinkMenuText.accessibilityName(LinkMenuAction.Share, url = docs, among = listOf(docs, post)))
     }
 
-    /** Android-only (AA-01): Android throws once a node has more than 32 custom actions; VoiceOver has no cap. */
+    /** Android-only: Android throws once a node has more than 32 custom actions; VoiceOver has no cap. */
     @Test
     fun manyLinksKeepEveryLinkReachableWithinTheNodeLimit() {
         val browserOn = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.inAppBrowser))
@@ -460,7 +460,7 @@ class LinkMenuTests {
         assertEquals("Action 0", guarded.first().label)
     }
 
-    /** Android-only (F-73): TalkBack shows one of several actions with the same label, so links sharing a host need their own names. */
+    /** Android-only: TalkBack shows one of several actions with the same label, so links sharing a host need their own names. */
     @Test
     fun linksOnOneHostGetDistinctActionNames() {
         val links = List(7) { "https://example.net/n-${it + 1}" }
@@ -488,7 +488,7 @@ class LinkMenuTests {
         assertEquals("example.com link 2", LinkMenuText.accessibilityTarget(rootSlash, listOf(root, rootSlash)))
     }
 
-    /** Android-only (AL-01): the block's Quote shares the links' node, after their actions and inside the 32-action cap. */
+    /** Android-only: the block's Quote shares the links' node, after their actions and inside the 32-action cap. */
     @Test
     fun quoteJoinsTheLinksActionsWithinTheNodeLimit() {
         val quote = CustomAccessibilityAction("Quote") { true }

@@ -122,7 +122,7 @@ data class OpenCodePairingLink(
         private val userInfo = Regex("""://[^/]*@""")
 
         /**
-         * [decode], or else the pairing link in text as people copy it (QA FB-02): wrapped across
+         * [decode], or else the pairing link in text as people copy it: wrapped across
          * lines by a terminal (`opencode pair --remote`'s 88-character link plus its indent passes
          * 80 columns, and the TUI's `/pair` box is 29 wide), inside the command's whole output or a
          * sentence, or with brackets or punctuation around it. Every link in it with the first

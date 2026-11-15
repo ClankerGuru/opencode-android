@@ -214,7 +214,7 @@ fun AttachmentPickerButton(
         if (wasOpen && !isOpen) closes += 1
         wasOpen = isOpen
     }
-    // One move per close: laid out again later (the session moved into Catch Up's stack), the + doesn't take it again (QA W-05).
+    // One move per close: laid out again later (the session moved into Catch Up's stack), the + doesn't take it again.
     val closeFocus = rememberAccessibilityFocusRequest(closes.takeIf { it > 0 })
     val pop = remember { PlusPop() }
     var wasPopping by remember { mutableStateOf(popsOnClose) }

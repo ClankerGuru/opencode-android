@@ -140,7 +140,7 @@ internal fun RequestPermissionButton(
 }
 
 /**
- * Always Allow's scope, shown in full before it's given (R-177, D-130): every pattern
+ * Always Allow's scope, shown in full before it's given: every pattern
  * wraps, selectable, and a long list scrolls above the confirm, which stays in view.
  */
 @Composable

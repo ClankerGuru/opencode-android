@@ -60,7 +60,7 @@ import androidx.compose.ui.unit.dp
 
 /**
  * The composer: a 28 dp capsule with the message field, its attachments, and the control row (+,
- * model chip, Send), with a pending request's panel growing out of it (D-31 B), the attachment menu
+ * model chip, Send), with a pending request's panel growing out of it, the attachment menu
  * over it, and the model sheet.
  *
  * Fill the session's screen with it (it draws its overlays over everything and sits the capsule at

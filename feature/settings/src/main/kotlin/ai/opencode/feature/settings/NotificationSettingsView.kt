@@ -31,7 +31,7 @@ sealed interface NotifyPluginCheck {
 
 /**
  * Settings → Notifications, this phone's permission, whether the server runs the notify plugin
- * (with Set Up with OpenCode to have OpenCode install it, 7969c85c), and the In-App Notices picker.
+ * (with Set Up with OpenCode to have OpenCode install it), and the In-App Notices picker.
  */
 @Composable
 fun NotificationSettingsView(store: SettingsStore) {

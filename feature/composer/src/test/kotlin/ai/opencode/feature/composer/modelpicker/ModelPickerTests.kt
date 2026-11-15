@@ -22,7 +22,7 @@ import org.robolectric.annotation.GraphicsMode
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * The model picker (D-20 round 7 option 1): the list's sections, the level scale the meter and
+ * The model picker: the list's sections, the level scale the meter and
  * its panel step through, the meter's press, and picks that wait for the next send.
  *
  * Dropped: `searchableSheetsAvoidForcedNavigationBarDrawerOnMac`.

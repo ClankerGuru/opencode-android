@@ -12,8 +12,7 @@ import kotlin.time.Duration.Companion.seconds
 
 /**
  * How a delegation's answer and the results around it wait for speech, on a test clock: a loaded
- * machine stretching a pause can't change what the call does (the real clock failed these in train
- * smoke runs on Oct 25).
+ * machine stretching a pause can't change what the call does.
  */
 class VoiceAnswerHoldTests {
     private val answer = LiveCallCoordinatorTests.rulesAnswer
@@ -49,10 +48,6 @@ class VoiceAnswerHoldTests {
         call.coordinator.end()
     }
 
-    /**
-     * A walkthrough the user asked for runs long: all of it goes to the voice
-     * agent, in order. Until Nov 7 it stopped at 1,600 characters and two chunks.
-     */
     @Test fun aLongAnswerTheUserAskedForIsSentWhole() = runTest {
         val call = idleCall()
         asked(call)

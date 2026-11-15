@@ -259,8 +259,8 @@ fun ComposerKeyboardMorphState?.layoutProgress(inline: Boolean): Float =
  * iOS `ComposerKeyboardSpacing`: the composer's top padding (`innerVertical`, taken back as the
  * row opens unless folded for dictation, [fold] 0…1 animated with the fold) or its bottom gap
  * (`bottomGap` resting, `keyboardGap` above the keys, on the keyboard's progress). [sides] adds
- * side margins that go from `rest` to `keyboard` on the keyboard's progress, like the bottom gap
- * (iOS d1a9e59f); null adds none. Measured frame by frame in layout, so the composer's size
+ * side margins that go from `rest` to `keyboard` on the keyboard's progress, like the bottom gap;
+ * null adds none. Measured frame by frame in layout, so the composer's size
  * follows without recomposing.
  */
 fun Modifier.composerKeyboardSpacing(

@@ -68,8 +68,8 @@ private fun menuTitle(action: OpenCodeRunError.Action): String =
 internal fun scaledDp(base: Float) = (base * LocalDensity.current.fontScale).dp
 
 /**
- * A run that ended early, in the Working line's place and type (iOS `RunErrorRow`, D-41 2, Quiet
- * Line): the Working orb settled on Failed, what happened in plain words, and one way forward
+ * A run that ended early, in the Working line's place and type (iOS `RunErrorRow`):
+ * the Working orb settled on Failed, what happened in plain words, and one way forward
  * trailing it like Move to Background. Holding the line shows the raw error and every action.
  * Once the reader prompts again only the quiet line stays.
  */

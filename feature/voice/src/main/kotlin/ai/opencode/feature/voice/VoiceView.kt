@@ -344,8 +344,8 @@ private fun Modifier.reachFade(
 }
 
 /**
- * The composer capsule's surface. It grows up out of the bar for a pending request's [panel] (D-31
- * B), the call's rows, or an [expansion] (the model list): one shape, never a second surface, drawn
+ * The composer capsule's surface. It grows up out of the bar for a pending request's [panel],
+ * the call's rows, or an [expansion] (the model list): one shape, never a second surface, drawn
  * above the capsule's frame so the layout around it never changes; it measures as [content] (the
  * bar) alone.
  *

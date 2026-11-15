@@ -35,7 +35,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/** The drawer's older pages and its search over every session (p244). */
+/** The drawer's older pages and its search over every session. */
 class DrawerSessionPagesTests {
     @get:Rule val isolation = TestIsolationRule()
 

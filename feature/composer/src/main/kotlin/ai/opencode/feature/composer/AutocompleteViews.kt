@@ -355,7 +355,7 @@ private fun tone(value: Double): Color {
 /**
  * The growing autocomplete list mounted in the composer surface's panel slot. Rows run bottom-up
  * from the composer text; the highlight sits concentric with the glass; edge fades show only where
- * rows overflow. One pointer handler owns the list (OC-474): a touch scrolls once it passes the tap
+ * rows overflow. One pointer handler owns the list: a touch scrolls once it passes the tap
  * slop and never picks a row after that; a touch that stays within it picks the row it lifts on.
  * TalkBack activates rows through their click action.
  */

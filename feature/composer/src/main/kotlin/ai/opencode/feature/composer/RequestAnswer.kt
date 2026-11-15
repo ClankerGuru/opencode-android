@@ -27,8 +27,7 @@ import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
 
 /**
- * The pending permissions and forms of a session, and the composer's bar while it answers one (D-31
- * B).
+ * The pending permissions and forms of a session, and the composer's bar while it answers one.
  *
  * [Draft] is the session's own composer, parked in [State.parkedComposer] while a request takes the
  * composer's place. The session area owns that type, so the dock carries it opaquely.
@@ -434,7 +433,7 @@ class RequestDockFeature<Draft> : Reducer<RequestDockFeature.State<Draft>, Reque
 }
 
 /**
- * What the composer's bar does while a pending request docks above it (D-31 B): its text is
+ * What the composer's bar does while a pending request docks above it: its text is
  * your own answer, or the reason a decline carries.
  */
 sealed interface RequestBar {

@@ -204,7 +204,7 @@ data class WorkingActivity(
 }
 
 /**
- * The Working line's handoff to the reply's copy button, from the prototype (D-25 A): the
+ * The Working line's handoff to the reply's copy button, from the prototype: the
  * indicator blurs and shrinks toward the copy glyph's centre while the glyph sharpens in,
  * overlapping in the middle. Under Reduce Motion it's a cross-fade. Blur radii are in points (dp).
  */

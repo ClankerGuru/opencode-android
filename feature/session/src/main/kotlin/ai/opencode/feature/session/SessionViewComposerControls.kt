@@ -446,7 +446,7 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
     }
     // iOS `persistentSend`: New Plus Menu's Send stays put, dimmed while there's nothing to send.
     val persistentSend = control is ComposerTrailingControl.Send
-    // QA AF-01: VoiceOver stays in the trailing slot when the Send just pressed turns into Stop, or
+    // VoiceOver stays in the trailing slot when the Send just pressed turns into Stop, or
     // the Stop into Send: iOS swaps the control inside one slot whose accessibility element keeps
     // its frame (SessionView+ComposerControls.swift:400-447). Here each control is its own node,
     // so TalkBack lost its focus with the pressed one and fell back to the screen's first element
@@ -490,7 +490,7 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
                 else -> 18.dp
             },
             visualOffsetX = visualOffset,
-            // The mic's stand and base weigh its mass low: lifted, its optical centre sits on the end-cap's centre (OC-477).
+            // The mic's stand and base weigh its mass low: lifted, its optical centre sits on the end-cap's centre.
             glyphRise = if (control == ComposerTrailingControl.Mic) ComposerTunables.micInkRise else 0f,
         )
         }
@@ -605,5 +605,5 @@ internal fun SessionComposerEnv.DictationTrailingControls(controls: ComposerCont
     }
 }
 
-/** How long a pressed Send or Stop waits for the control that replaces it to take TalkBack's focus (QA AF-01). */
+/** How long a pressed Send or Stop waits for the control that replaces it to take TalkBack's focus. */
 private const val TRAILING_FOCUS_FOLLOW_NANOS = 10_000_000_000L

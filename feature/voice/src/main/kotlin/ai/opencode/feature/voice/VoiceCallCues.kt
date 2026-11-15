@@ -20,7 +20,7 @@ import kotlin.math.pow
 import kotlin.math.sin
 
 /**
- * The call's sounds, ported from Wisp (`wisp-audio` cues, wisp b55d486). Re-render them from Wisp
+ * The call's sounds, ported from Wisp (`wisp-audio` cues). Re-render them from Wisp
  * with the iOS repo's `scripts/wisp-call-sounds/render.sh` and copy them here, rather than editing
  * them.
  */

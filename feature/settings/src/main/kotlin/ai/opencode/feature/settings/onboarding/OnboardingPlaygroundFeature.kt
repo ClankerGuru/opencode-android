@@ -27,7 +27,7 @@ import kotlin.time.Duration.Companion.seconds
  * sends the parent's `PresentationAction.Dismiss`.
  */
 class OnboardingPlaygroundFeature : Reducer<OnboardingPlaygroundFeature.State, OnboardingPlaygroundFeature.Action> {
-    /** D-72's three treatments, in its option order. */
+    /** The three treatments, in option order. */
     enum class Variant(val title: String, val shortTitle: String) {
         signalSweep("Signal Sweep", "Sweep"),
         quietRelay("Quiet Relay", "Relay"),

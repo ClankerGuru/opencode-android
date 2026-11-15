@@ -339,8 +339,8 @@ class WhatsNewTests {
         )
 
         /**
-         * Every ID What’s New listed before features and smaller changes, as of anomaly/main
-         * 275b42b3. Seen state is stored by these IDs.
+         * Every ID What’s New listed before features and smaller changes.
+         * Seen state is stored by these IDs.
          */
         val previousIDs: Set<String> = setOf(
             "transcript-keyboard-space", "share-sheet-sends", "run-error-line", "model-list-and-level-meter",

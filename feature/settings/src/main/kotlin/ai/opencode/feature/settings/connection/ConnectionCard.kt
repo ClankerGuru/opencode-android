@@ -476,7 +476,7 @@ private const val SPOKEN_STATUS_SETTLE_MS = 500L
  * [word] once it has held for [SPOKEN_STATUS_SETTLE_MS]; until then the word before it. TalkBack
  * speaks each new word on a focused node, and a dropped server passes through Reconnecting for a
  * moment (~150 ms) on its way to Offline. TalkBack read both changes after the second, so "Offline,
- * …" was spoken twice (QA F-62); a word that doesn't last isn't given to it. The screen still shows
+ * …" was spoken twice; a word that doesn't last isn't given to it. The screen still shows
  * every word at once.
  */
 @Composable
@@ -781,10 +781,9 @@ private class SpokenStatus {
 
 /**
  * The label leading and the value trailing on one line when both fit at their full widths;
- * otherwise the value stacks under the label, leading, so the label never breaks inside a word (QA
- * D-01). Once stacked it stays stacked while shown at that width and text size, so a value that
- * changes width (Status's round trip, 9 ↔ 10 ms) can't flip the row and move every row below it (QA
- * H-02).
+ * otherwise the value stacks under the label, leading, so the label never breaks inside a word.
+ * Once stacked it stays stacked while shown at that width and text size, so a value that
+ * changes width (Status's round trip, 9 ↔ 10 ms) can't flip the row and move every row below it.
  */
 @Composable
 private fun LabeledContent(label: String, modifier: Modifier = Modifier, value: @Composable () -> Unit) {

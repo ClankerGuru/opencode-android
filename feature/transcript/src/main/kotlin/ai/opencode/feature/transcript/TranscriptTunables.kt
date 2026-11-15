@@ -56,7 +56,7 @@ object TranscriptTunables {
         val bubbleMaxFraction = Tunable("transcript.bubble.maxFraction", "Bubble max width", default = 0.82f, range = 0.55..0.95, step = 0.01)
         val cardCornerRadius = Tunable("transcript.card.cornerRadius", "Card corner radius", default = 8f, range = 6.0..24.0, step = 1.0)
 
-        // Typography (D-52)
+        // Typography
         val bodySize = Tunable("transcript.typography.bodySize", "Body size (pt)", default = 15f, range = 14.0..20.0, step = 0.5)
         val bodyLeading = Tunable("transcript.typography.bodyLeading", "Body leading (pt)", default = 4.5f, range = 0.0..8.0, step = 0.5)
         val bodyTone = Tunable("transcript.typography.bodyTone", "Body tone", default = 0.92, range = 0.75..1.0, step = 0.01)
@@ -98,7 +98,7 @@ object TranscriptTunables {
     val bubbleMaxFraction: Float get() = Knobs.bubbleMaxFraction.value
     val cardCornerRadius: Float get() = Knobs.cardCornerRadius.value
 
-    // Typography (D-52)
+    // Typography
     val bodySize: Float get() = Knobs.bodySize.value
     val bodyLeading: Float get() = Knobs.bodyLeading.value
     val bodyTone: Double get() = Knobs.bodyTone.value
@@ -117,8 +117,8 @@ object TranscriptTunables {
         if (paragraphGap > 0) paragraphGap else flowHalf * 2
 
     /**
-     * Session view typography presets (D-52): 1 is what shipped (Refined Standard with Used N
-     * and Working kept at 17 pt body size), 2 is the pre-D-52 baseline.
+     * Session view typography presets: 1 is what shipped (Refined Standard with Used N
+     * and Working kept at 17 pt body size), 2 is the previous baseline.
      */
     val typography: TuningPresets by lazy {
         with(Knobs) {

@@ -73,10 +73,8 @@ private val emptyArguments: RealtimeJSON = JsonObject(emptyMap())
 private fun isReplyWatch(action: VoiceFeature.Action) = action is VoiceFeature.Action.ReplyWatch
 
 /**
- * From a call log: a session's reply for an earlier request was spoken in
- * the middle of the user's new request. Results are always spoken (the call
- * holds them until the conversation is idle), and say which request they
- * answer once the conversation has gone on.
+ * Results are always spoken (the call holds them until the conversation is idle), and say which
+ * request they answer once the conversation has gone on.
  */
 class VoiceLateResultTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
@@ -121,10 +119,6 @@ class VoiceLateResultTests {
         assertEquals(VoiceHandoff.earlierRequest("x"), VoiceHandoff.earlierRequest(VoiceHandoff.earlierRequest("x")))
     }
 
-    /**
-     * From a call log: asked about a URI, the voice opened with an earlier
-     * request's result as if it answered him. A late result names its request.
-     */
     @Test fun aLateResultNamesTheRequestItAnswers() {
         val topic = "Rename Seer to Opticon and redo its icon"
         val watch = Watch()
@@ -185,13 +179,6 @@ class VoiceLateResultTests {
     }
 }
 
-/**
- * From a call log: three requests steered into one HOME run (an inbox
- * briefing, an X DM question, a clarification) settled together with the
- * cafe lookup the delegator waited on. The delegator's answer suppressed
- * every held result in the session, so the briefing was never spoken; and
- * its read of the reply stopped at 400 characters.
- */
 class VoiceSuppressionTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
     private val home = "ses_home"
@@ -942,10 +929,6 @@ class VoiceSuppressionTests {
         assertTrue(none.contains(""""latest_reply":"""""))
     }
 
-    /**
-     * From a call log: a 90 s wait held the delegation open while the user
-     * asked six times whether it heard them. Their words end the wait.
-     */
     @Test fun waitForSessionEndsWhenTheUserSpeaks() = runTest {
         val sleeping = OpenCodeClient.testValue.copy(
             getSession = { _, _ -> gameEngine },
@@ -1222,10 +1205,6 @@ class VoiceSuppressionTests {
         assertEquals("HOME's result went once nobody held it", listOf("msg_up"), watch.deferredNotices.map { it.promptID })
     }
 
-    /**
-     * Sol finding 8: a deferred result claimed late (e.g. 15 s after arrival)
-     * keeps its original 20 s arrival deadline instead of restarting the timer.
-     */
     @Test fun claimingADeferredResultDoesNotRestartItsTwentySecondDeadline() = runTest {
         val watch = Watch()
         watch.step(ReplyWatch.Event.Sent(listOf(steered[0])))

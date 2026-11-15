@@ -139,14 +139,14 @@ object ComposerTunables {
     const val expandedTopInset = 16f
     const val expandedRowGap = 12f
     const val pillGap = 10f
-    /** New Plus Menu: the attachment tiles sit this far from the surface's top and leading edges (f0670c5d). */
+    /** New Plus Menu: the attachment tiles sit this far from the surface's top and leading edges. */
     const val attachmentInset = 19f
 
     /** New Plus Menu's tile corners: concentric with the composer's, [attachmentInset] in. */
     val attachmentRadius: Float get() = max(cornerRadius - attachmentInset, 6f)
 
     const val plusOffset = 28f
-    /** Nudges the + glyph's ink inside its target (OC-477). */
+    /** Nudges the + glyph's ink inside its target. */
     const val plusInkOffset = 0f
     /** A composer pill's glyph frame starts this far in. */
     const val pillGlyphLeading = 8f
@@ -157,7 +157,7 @@ object ComposerTunables {
     const val queuedGlyphDrop = 1f
     const val plusScale = 17f
     const val buttonDiameter = 34f
-    /** Send's visible face, bigger than the other trailing controls (X feedback); its target stays 48. */
+    /** Send's visible face, bigger than the other trailing controls; its target stays 48. */
     const val sendDiameter = 40f
     const val trailingGap = 11f
     const val micScale = 17f
@@ -166,7 +166,7 @@ object ComposerTunables {
     const val swipeUpDistance = 18f
     const val swipeUpVelocity = 260f
 
-    /** The composer's mic glyph; the Call Tray's Mute wears the same one (OC-473). */
+    /** The composer's mic glyph; the Call Tray's Mute wears the same one. */
     const val micSymbol = "mic"
 
     /** Body medium at the default 17 pt. */
@@ -699,7 +699,7 @@ fun ComposerPillContent(title: String, rolls: Boolean = false, leading: @Composa
  * Scales and fades in and out on a spring, retargeting mid-flight; it leaves the tree (and
  * TalkBack) once its outro settles. In a pill row beside the queued pill its slot (the gap before
  * it included) opens and closes on the same spring. Reduce Motion cross-fades. While [veiled] (read
- * when drawn) it keeps its state but isn't drawn, touched or read out (AI-01).
+ * when drawn) it keeps its state but isn't drawn, touched or read out.
  */
 @Composable
 fun JumpToLatestPill(

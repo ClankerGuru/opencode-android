@@ -352,9 +352,8 @@ class VoiceClaimTests {
     }
 
     /**
-     * Olive call regression (PR 8d): "Just to Olive" came from a past-call tail line
-     * ("And that text to Olive went through, delivered" / "Voice: No. Just to Olive."),
-     * which continuity stripping and mid-call retarget drop at the source so it is never replayed.
+     * A past call's tail line ("Voice: No. Just to Olive.") is dropped at the source by continuity
+     * stripping and mid-call retarget, so it's never replayed.
      */
     @Test fun oliveCallPastVoiceLinesAreNotReplayedAcrossCallsOrRetarget() {
         val shared = preserveSettings()
@@ -425,7 +424,6 @@ class VoiceClaimTests {
         }
     }
 
-    /** Sol finding 2: an open delegation (e.g. cart work still running) must not skip the outcome check. */
     @Test fun openDelegationDoesNotSkipOutcomeCheck() = runTest {
         val call = claimCall()
         val socket = call.socket
@@ -460,7 +458,6 @@ class VoiceClaimTests {
         call.coordinator.end()
     }
 
-    /** Sol finding 4: newer user words during the delay cancel the verify, and `client_verify_N` never advances watermarks. */
     @Test fun outcomeVerifyCancelsOnNewerUserWordsAndPreservesWatermarks() = runTest {
         val call = claimCall()
         val socket = call.socket
@@ -495,7 +492,10 @@ class VoiceClaimTests {
         call.coordinator.end()
     }
 
-    /** Sol findings 1 & 4: session-delegator `VERIFIED` is consumed silently with no ReplyWatch `"finished: VERIFIED"` notice and leaves `state.tail` untouched. */
+    /**
+     * The session delegator's `VERIFIED` settles with no ReplyWatch `"finished: VERIFIED"` notice
+     * and leaves `state.tail` untouched.
+     */
     @Test fun sessionDelegatorVerifiedSettlesSilentlyAndPreservesTailWatermark() = runBlocking<Unit> {
         val shared = preserveSettings()
         val now = Instant.ofEpochSecond(10_000)

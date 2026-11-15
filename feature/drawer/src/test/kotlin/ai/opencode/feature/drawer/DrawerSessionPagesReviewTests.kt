@@ -30,7 +30,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/** The drawer's older pages and server search at their edges (p244 review). */
+/** The drawer's older pages and server search at their edges. */
 class DrawerSessionPagesReviewTests {
     @get:Rule val isolation = TestIsolationRule()
 

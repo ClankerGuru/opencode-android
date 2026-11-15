@@ -166,7 +166,7 @@ fun ProjectHeaderSubtitle(
 }
 
 /**
- * A draft's recent projects, listed above the composer (D-34). The chosen one carries a filled
+ * A draft's recent projects, listed above the composer. The chosen one carries a filled
  * folder, its name in semibold primary, and a quiet highlight. All Projects opens the Project
  * sheet, which also browses the server's folders. Composing, the list folds down to the chosen row,
  * which then opens the sheet: the other rows fade and blur out where they are, riding up with the
@@ -433,7 +433,7 @@ fun ProjectPickerSheet(
     onCancel: () -> Unit,
     folderBrowser: StoreOf<FolderBrowserFeature.State, FolderBrowserFeature.Action>?,
 ) {
-    // Half of it there showed only the title, the search and a row under the gesture bar (QA F-36).
+    // Half of it there showed only the title, the search and a row under the gesture bar.
     val compactHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() } < 480.dp
     ModalBottomSheet(
         onDismissRequest = onCancel,

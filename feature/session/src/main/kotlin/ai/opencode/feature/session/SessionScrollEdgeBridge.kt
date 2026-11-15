@@ -29,9 +29,9 @@ class SessionScrollEdgeBridge {
 
     /**
      * What the transcript last said about Jump to latest (the composer host shows it). Saved with
-     * the composer's height, so a recreated screen's pill is there from its first frame (F-38).
+     * the composer's height, so a recreated screen's pill is there from its first frame.
      * Only within the same process: after process death the list starts hidden while its row
-     * loads (V-01) and says itself when to show the pill (AI-01).
+     * loads and says itself when to show the pill.
      */
     var reportedShowsJumpButton = false
 
@@ -74,8 +74,8 @@ class SessionScrollEdgeBridge {
         /**
          * For the screen's `rememberSaveable`: the composer's last height outlives the activity
          * being recreated, so a restored transcript's first frame already has its bottom inset and
-         * lays the reader's row out where it was (I-02), instead of a frame at a shorter scroll range.
-         * Jump to latest's last state goes with it within the same process (F-38, AI-01).
+         * lays the reader's row out where it was, instead of a frame at a shorter scroll range.
+         * Jump to latest's last state goes with it within the same process.
          */
         val Saver: Saver<SessionScrollEdgeBridge, Any> = listSaver(
             save = { listOf(it.composerHeight, it.reportedShowsJumpButton, process) },

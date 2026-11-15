@@ -33,7 +33,7 @@ data class WispVec2(val x: Float, val y: Float) {
     }
 }
 
-/** Kit's side of the lens (his ribbon enters from the left). */
+/** The user's side of the lens (their ribbon enters from the left). */
 internal val wispKitLook = WispVec2(-0.12f, -0.04f)
 
 // Gaze
@@ -150,8 +150,8 @@ data class WispGazeFrame(
 // Attentive Presence
 
 /**
- * Quiet open-call pauses (Listening, quiet over 4 s): blinking eyes that glance toward Kit and
- * perk up when he speaks.
+ * Quiet open-call pauses (Listening, quiet over 4 s): blinking eyes that glance toward the user and
+ * perk up when they speak.
  */
 class WispAttentiveSim {
     var quietSecs = 0f

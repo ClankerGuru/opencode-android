@@ -659,7 +659,7 @@ class ActivityGyro(op: AgentActivity = AgentActivity.idle, val reduceMotion: Boo
             val TAU = G.TAU
             val HALF = G.HALF
             return mapOf(
-                // Shimmer (round 5, F): no band, a sparse slow glitter across a dimmed orb; Done cools into it slowly.
+                // Shimmer: no band, a sparse slow glitter across a dimmed orb; Done cools into it slowly.
                 AgentActivity.idle to GyroDesign(
                     id = "shimmer",
                     enter = { g ->
@@ -668,7 +668,7 @@ class ActivityGyro(op: AgentActivity = AgentActivity.idle, val reduceMotion: Boo
                     },
                     afterglow = GyroAfterglow(attack = 0.15, decay = 0.5), pattern = GyroPattern.shimmer,
                 ),
-                // Condense (round 4, H): dots sparkle in at random and gather onto Thinking's band, which
+                // Condense: dots sparkle in at random and gather onto Thinking's band, which
                 // turns underneath at Thinking's speed and brightens, so Thinking takes over in motion.
                 AgentActivity.startup to GyroDesign(
                     id = "condense",
@@ -765,7 +765,7 @@ class ActivityGyro(op: AgentActivity = AgentActivity.idle, val reduceMotion: Boo
                     },
                     tick = { g, _ -> train(g, 2, PI) },
                 ),
-                // Ring: the band sweeps on, face-on, into a green ring; a flash sweeps round it (round 4, K).
+                // Ring: the band sweeps on, face-on, into a green ring; a flash sweeps round it.
                 AgentActivity.done to GyroDesign(
                     id = "ring",
                     enter = { g ->
@@ -774,7 +774,7 @@ class ActivityGyro(op: AgentActivity = AgentActivity.idle, val reduceMotion: Boo
                     },
                     flash = GyroFlash(amount = 0.8, decay = 0.9, spread = GyroFlash.Spread.sweep, bloom = 0.1),
                 ),
-                // ×: the band levels, splits and rolls into a red ×; a soft ember flash fades slowly (round 4, P).
+                // ×: the band levels, splits and rolls into a red ×; a soft ember flash fades slowly.
                 AgentActivity.failed to GyroDesign(
                     id = "cross",
                     enter = { g ->
@@ -885,7 +885,7 @@ class GyroField(
     }
 }
 
-// MARK: Afterglow and flash (round 4, `prototypes/activity-glyph/round4.html`)
+// MARK: Afterglow and flash (`prototypes/activity-glyph/round4.html`)
 
 /**
  * A phosphor's time constants (seconds): light rises toward the field over [attack] and falls
@@ -928,10 +928,10 @@ data class GyroFlash(val amount: Double, val decay: Double, val spread: Spread, 
  * on its own clock, so one state's pattern turns into the next's.
  */
 enum class GyroPattern {
-    /** Starting Up (round 4, H): dots sparkle in at random, then only on the band's shape, as it condenses. */
+    /** Starting Up: dots sparkle in at random, then only on the band's shape, as it condenses. */
     condense,
 
-    /** Idle (round 5, F): every dot drifts on its own slow sine and only the crests show, so a few glint at once. */
+    /** Idle: every dot drifts on its own slow sine and only the crests show, so a few glint at once. */
     shimmer;
 
     fun light(cell: GyroCell, shape: Double, t: Double): Double = when (this) {

@@ -110,7 +110,7 @@ import kotlin.math.roundToInt
 /**
  * Every link under a finished reply, in reading order, as one compact line each (one line for a
  * lone link) (iOS `LinkPreviewReplyEnd`). Past [LinkPreviewEntries.shown] the rest wait behind
- * “N more ⌄” at the right end of the Copy row (D-47 option 6, Compact List). No nested scroller:
+ * “N more ⌄” at the right end of the Copy row. No nested scroller:
  * the transcript is the only scrolling surface.
  *
  * [texts] are the reply's texts (`TranscriptEntry.ReplyEnd.texts`), parsed once here; [key] is

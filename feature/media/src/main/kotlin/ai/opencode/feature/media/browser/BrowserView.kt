@@ -109,7 +109,7 @@ object BrowserMetrics {
 }
 
 /**
- * The page pushed over the session (D-40, Push In): the web view edge to edge, a back button where
+ * The page pushed over the session: the web view edge to edge, a back button where
  * the drawer button sits, and a bar at the bottom (the page's back and forward, its title and host,
  * Share, Open in Browser, and Ask). Ask raises a composer over the bar; the question goes to the
  * session with the page attached, and a capsule shows the reply's progress. Going back from the

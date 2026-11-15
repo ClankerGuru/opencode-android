@@ -286,7 +286,7 @@ fun SessionDrawerContainer(
     val chromeBackground = if (isDark) Color(0.04f, 0.04f, 0.04f, 1f) else colors.userBubble
     val borderColor = CatchUpMetrics.borderColor(isDark, colors.border)
     val borderWidthPx = if (isDark) with(density) { 1.dp.toPx() } else 1f
-    // Where the card's or drawer's input focus goes when the container takes it away (QA AD-01).
+    // Where the card's or drawer's input focus goes when the container takes it away.
     // `clearFocus` also drops the view's own focus; out of touch mode (after any key, TalkBack's
     // Back included) the window gives it straight back, and TalkBack follows that input-focus
     // event to the screen's first element (Catch Up's "N Left", the drawer's scrim) after its own

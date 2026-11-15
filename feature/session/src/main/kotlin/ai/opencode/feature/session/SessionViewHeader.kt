@@ -328,7 +328,7 @@ private fun HeaderTitle(
     val fontScale = LocalDensity.current.fontScale
     // TalkBack goes back to the title once Session Info, opened from it, closes, as VoiceOver
     // returns to the button that presented the sheet; with the keyboard up it landed on the
-    // drawer button (QA F-57).
+    // drawer button.
     var returnsFocusAfterInfo by remember { mutableStateOf(false) }
     var infoCloses by remember { mutableIntStateOf(0) }
     val showsInfo by store.observe { it.activePicker == State.ActivePicker.session }
@@ -443,7 +443,7 @@ private fun SessionMenuButton(store: StoreOf<State, Action>, model: SessionHeade
     val showsInfo by store.observe { it.activePicker == State.ActivePicker.session }
     val more = remember { AccessibilityFocusTarget() }
     // Likewise once a dialog the menu opened (Rename, Delete) closes, as VoiceOver returns to the
-    // button behind an alert; with the keyboard up it landed on the title (QA F-57).
+    // button behind an alert; with the keyboard up it landed on the title.
     var returnsFocusAfterDialog by remember { mutableStateOf(false) }
     val showsDialog by store.observe { it.sessionSheet?.let { sheet -> sheet.isRenaming || sheet.confirmsDeletion } == true }
     LaunchedEffect(showsDialog) {
@@ -520,18 +520,18 @@ private fun SessionMenu(
     val developerMode by remember { shared(SharedKeys.developerMode) }.flow.collectAsState()
     var exportOpen by remember(expanded) { mutableStateOf(false) }
     fun menu(action: SessionSheetFeature.Action) = send(Action.SessionMenu(action))
-    // No title heading: the header already shows it (6bbf321d); exports still name the file by it.
+    // No title heading: the header already shows it; exports still name the file by it.
     // Not focusable: the composer keeps the keyboard while the menu is open. A focusable popup took
     // focus, so the keyboard left as the menu was placed against the room above it, and the menu
-    // stayed up over the ⋮ (QA D-03). With the keyboard up the menu still hangs from the ⋮, capped
+    // stayed up over the ⋮. With the keyboard up the menu still hangs from the ⋮, capped
     // to the room above the keys (it scrolls), rather than moving up over the button to fit. A
-    // non-focusable popup gets neither Back nor a hardware Escape (QA L-04): both close it here.
+    // non-focusable popup gets neither Back nor a hardware Escape: both close it here.
     BackHandler(enabled = expanded, onBack = onDismiss)
     EscapeHandler(enabled = expanded, onEscape = onDismiss)
     // Accessibility focus isn't input focus, so TalkBack still treats the open menu as a pane: the
     // menu takes TalkBack's focus as it opens, the screen behind then leaves the accessibility tree
     // so swipes stay in the menu (its window otherwise came after the whole composer), and More
-    // gets the focus back as it closes (QA P-02).
+    // gets the focus back as it closes.
     val hostView = LocalView.current
     val context = LocalContext.current
     val talkBack = remember(context) { context.getSystemService(AccessibilityManager::class.java) }

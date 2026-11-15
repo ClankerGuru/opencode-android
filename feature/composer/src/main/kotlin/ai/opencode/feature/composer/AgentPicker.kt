@@ -48,7 +48,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-// Agent Selection (experimental `agentSelection`, OC-511): choose the primary agent (Build, Plan,
+// Agent Selection (experimental `agentSelection`): choose the primary agent (Build, Plan,
 // or a custom one) from the composer.
 //
 // The experiment's switch lives in Settings (`ExperimentalFeature`, above this module), so the

@@ -11,7 +11,7 @@ import kotlinx.serialization.Serializable
  * In `:server` because both `:feature:composer` (the pickers) and `:feature:settings` (Settings ›
  * Models) read it.
  *
- * Which models one server's pickers list (Hide Unused Models, OC-510). Kept on this phone, per
+ * Which models one server's pickers list (Hide Unused Models). Kept on this phone, per
  * server. Hidden providers hide all their models; otherwise **Hide** lists every model but
  * [hiddenModelIDs], and **Only Show** lists just [shownModelIDs]. Each list is kept when
  * switching, so trying the other choice loses nothing.

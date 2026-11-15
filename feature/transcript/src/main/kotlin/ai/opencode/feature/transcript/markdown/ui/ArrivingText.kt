@@ -164,7 +164,7 @@ internal fun ArrivingText(
     val linkMenu = remember { LinkMenuHandler { action, url -> MarkdownLinkActions.perform(action, url, send) } }
     val menuText = remember(presented.text) { linkMenuText(presented.text) }
     // A paragraph with menu links has one TalkBack node for the links' actions and Quote, the link
-    // menu's (AL-01: an action on the Text too made TalkBack stop there, short of the links').
+    // menu's (an action on the Text too makes TalkBack stop there, short of the links').
     val hasMenuLinks = remember(menuText) { LinkMenuText.webLinks(menuText).isNotEmpty() }
     val quoteOnLinkMenu = quoteAction != null && hasMenuLinks
     val textQuoteAction = quoteAction.takeUnless { quoteOnLinkMenu }
