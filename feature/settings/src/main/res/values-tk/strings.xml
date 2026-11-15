@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Sessiýa ekranyny gowulandyrmaga kömek et. Tapan zatlaryňy görkez we üýtgeşmeleri düşündir.</string>
     <string name="settings_themes_preview_reply">%1$s içinde ýerleşiş meselesini tapdym. Ýazgy bilen habar ýazylýan ýer elýeterli beýikligi paýlaşýar, şonuň üçin klawiatura muny barlamak üçin peýdaly.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Dil</string>
+    <string name="settings_language_system_default">Ulgamyň belleneni</string>
+    <string name="settings_language_search_placeholder">Dilleri gözläň</string>
+    <string name="settings_language_suggested_header">Teklip edilýär</string>
+    <string name="settings_language_all_header">Ähli diller</string>
+    <string name="settings_language_no_matches">Gabat gelýän dil ýok</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Synag</string>
     <string name="settings_experimental_all_footer">Ekranyňyzy görýän ýa-da fonda diňleýänlerden başga täze synaglary hem işledýär.</string>

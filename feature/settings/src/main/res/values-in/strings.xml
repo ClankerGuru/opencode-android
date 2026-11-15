@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Bantu saya memperbaiki layar sesi. Tunjukkan temuan Anda dan jelaskan perubahannya.</string>
     <string name="settings_themes_preview_reply">Saya menemukan masalah tata letak di %1$s. Transkrip dan kolom pesan berbagi ruang vertikal, jadi keyboard cocok untuk menguji batasnya.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Bahasa</string>
+    <string name="settings_language_system_default">Bawaan sistem</string>
+    <string name="settings_language_search_placeholder">Cari bahasa</string>
+    <string name="settings_language_suggested_header">Disarankan</string>
+    <string name="settings_language_all_header">Semua bahasa</string>
+    <string name="settings_language_no_matches">Tidak ada bahasa yang cocok</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Eksperimental</string>
     <string name="settings_experimental_all_footer">Juga mengaktifkan eksperimen baru, kecuali yang melihat layar atau mendengarkan di latar belakang.</string>

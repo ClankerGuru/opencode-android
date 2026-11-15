@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Oturum ekranını iyileştirmeme yardım et. Bulduklarını göster ve değişiklikleri açıkla.</string>
     <string name="settings_themes_preview_reply">%1$s içinde düzen sorununu buldum. Konuşma dökümü ve mesaj yazma alanı mevcut yüksekliği paylaşıyor; bu yüzden klavye iyi bir zorlayıcı test sağlıyor.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Dil</string>
+    <string name="settings_language_system_default">Sistem varsayılanı</string>
+    <string name="settings_language_search_placeholder">Dil ara</string>
+    <string name="settings_language_suggested_header">Önerilen</string>
+    <string name="settings_language_all_header">Tüm diller</string>
+    <string name="settings_language_no_matches">Eşleşen dil yok</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Deneysel</string>
     <string name="settings_experimental_all_footer">Ekranınızı gören veya arka planda dinleyenler hariç, yeni eklenenleri de açar.</string>

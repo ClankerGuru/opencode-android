@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">帮我改进会话界面。告诉我发现了什么，并说明改动。</string>
     <string name="settings_themes_preview_reply">我在 %1$s 中找到了布局问题。对话记录和输入框共用可用高度，所以弹出键盘很适合做压力测试。</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">语言</string>
+    <string name="settings_language_system_default">系统默认</string>
+    <string name="settings_language_search_placeholder">搜索语言</string>
+    <string name="settings_language_suggested_header">建议</string>
+    <string name="settings_language_all_header">所有语言</string>
+    <string name="settings_language_no_matches">没有匹配的语言</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">实验</string>
     <string name="settings_experimental_all_footer">也会自动开启新实验，但查看屏幕或在后台收听的实验除外。</string>

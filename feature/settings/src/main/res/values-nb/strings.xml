@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Hjelp meg å forbedre sesjonsskjermen. Vis meg hva du finner, og forklar endringene.</string>
     <string name="settings_themes_preview_reply">Jeg fant layoutproblemet i %1$s. Samtaleloggen og skrivefeltet deler den tilgjengelige høyden, så tastaturet er en nyttig stresstest.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Språk</string>
+    <string name="settings_language_system_default">Systemstandard</string>
+    <string name="settings_language_search_placeholder">Søk etter språk</string>
+    <string name="settings_language_suggested_header">Foreslått</string>
+    <string name="settings_language_all_header">Alle språk</string>
+    <string name="settings_language_no_matches">Ingen språk funnet</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Eksperimentell</string>
     <string name="settings_experimental_all_footer">Slår også på nye, unntatt de som ser skjermen din eller lytter i bakgrunnen.</string>

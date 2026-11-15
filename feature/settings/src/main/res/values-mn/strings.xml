@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Сессийн дэлгэцийг сайжруулахад туслаач. Олсон зүйлээ харуулж, өөрчлөлтүүдийг тайлбарлаарай.</string>
     <string name="settings_themes_preview_reply">%1$s дотроос байрлалын алдааг оллоо. Ярианы бичвэр, мессеж бичих хэсэг хоёр дэлгэцийн өндрийг хувааж ашигладаг тул гар нээж шалгах нь үр дүнтэй.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Хэл</string>
+    <string name="settings_language_system_default">Системийн өгөгдмөл</string>
+    <string name="settings_language_search_placeholder">Хэл хайх</string>
+    <string name="settings_language_suggested_header">Санал болгосон</string>
+    <string name="settings_language_all_header">Бүх хэл</string>
+    <string name="settings_language_no_matches">Тохирох хэл алга</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Туршилтын</string>
     <string name="settings_experimental_all_footer">Дэлгэцийг харах эсвэл арын горимд сонсохоос бусад шинэ туршилтыг мөн асаана.</string>

@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Palīdzi uzlabot sesijas ekrānu. Parādi, ko atradi, un izskaidro izmaiņas.</string>
     <string name="settings_themes_preview_reply">Atradu izkārtojuma problēmu failā %1$s. Sarunas pieraksts un ziņas ievade dala pieejamo augstumu, tāpēc tastatūra labi noder pārbaudei.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Valoda</string>
+    <string name="settings_language_system_default">Sistēmas noklusējums</string>
+    <string name="settings_language_search_placeholder">Meklēt valodas</string>
+    <string name="settings_language_suggested_header">Ieteikts</string>
+    <string name="settings_language_all_header">Visas valodas</string>
+    <string name="settings_language_no_matches">Nav atbilstošu valodu</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Eksperimentāls</string>
     <string name="settings_experimental_all_footer">Ieslēdz arī jaunus eksperimentus, izņemot tos, kas redz ekrānu vai klausās fonā.</string>

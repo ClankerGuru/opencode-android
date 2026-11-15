@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Help me improve the session screen. Show me what you find and explain the changes.</string>
     <string name="settings_themes_preview_reply">I found the layout issue in %1$s. The transcript and composer share the available height, so the keyboard is a useful stress test.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Language</string>
+    <string name="settings_language_system_default">System Default</string>
+    <string name="settings_language_search_placeholder">Search Languages</string>
+    <string name="settings_language_suggested_header">Suggested</string>
+    <string name="settings_language_all_header">All Languages</string>
+    <string name="settings_language_no_matches">No Matching Languages</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Experimental</string>
     <string name="settings_experimental_all_footer">Also turns on new ones, except any that see your screen or listen in the background.</string>

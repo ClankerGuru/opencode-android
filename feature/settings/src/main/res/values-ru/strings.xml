@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Помоги улучшить экран сессии. Покажи, что найдёшь, и объясни изменения.</string>
     <string name="settings_themes_preview_reply">Проблема с вёрсткой нашлась в %1$s. Переписка и поле ввода делят доступную высоту, поэтому клавиатура помогает проверить вёрстку под нагрузкой.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Язык</string>
+    <string name="settings_language_system_default">Системная</string>
+    <string name="settings_language_search_placeholder">Поиск языков</string>
+    <string name="settings_language_suggested_header">Предложено</string>
+    <string name="settings_language_all_header">Все языки</string>
+    <string name="settings_language_no_matches">Подходящих языков нет</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Экспериментальный</string>
     <string name="settings_experimental_all_footer">Также включает новые функции, кроме тех, что видят экран или слушают в фоне.</string>

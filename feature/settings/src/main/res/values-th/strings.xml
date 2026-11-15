@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">ช่วยปรับปรุงหน้าจอเซสชันให้หน่อย บอกสิ่งที่พบและอธิบายการเปลี่ยนแปลงด้วย</string>
     <string name="settings_themes_preview_reply">พบปัญหาการจัดวางใน %1$s บันทึกการสนทนาและช่องเขียนข้อความใช้พื้นที่แนวตั้งร่วมกัน การเปิดแป้นพิมพ์จึงช่วยทดสอบเมื่อพื้นที่จำกัดได้ดี</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">ภาษา</string>
+    <string name="settings_language_system_default">ค่าเริ่มต้นของระบบ</string>
+    <string name="settings_language_search_placeholder">ค้นหาภาษา</string>
+    <string name="settings_language_suggested_header">แนะนำ</string>
+    <string name="settings_language_all_header">ภาษาทั้งหมด</string>
+    <string name="settings_language_no_matches">ไม่พบภาษาที่ตรงกัน</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">การทดลอง</string>
     <string name="settings_experimental_all_footer">เปิดการทดลองใหม่ด้วย ยกเว้นที่ดูหน้าจอหรือฟังเสียงในเบื้องหลัง</string>

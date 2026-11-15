@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Giúp tôi cải thiện màn hình phiên. Cho tôi xem những gì bạn tìm thấy và giải thích các thay đổi.</string>
     <string name="settings_themes_preview_reply">Tôi tìm thấy lỗi bố cục trong %1$s. Bản chép lời và phần soạn thảo dùng chung chiều cao có sẵn, nên bật bàn phím là cách hữu ích để kiểm tra khi không gian bị thu hẹp.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Ngôn ngữ</string>
+    <string name="settings_language_system_default">Mặc định của hệ thống</string>
+    <string name="settings_language_search_placeholder">Tìm kiếm ngôn ngữ</string>
+    <string name="settings_language_suggested_header">Đề xuất</string>
+    <string name="settings_language_all_header">Tất cả ngôn ngữ</string>
+    <string name="settings_language_no_matches">Không có ngôn ngữ phù hợp</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Thực nghiệm</string>
     <string name="settings_experimental_all_footer">Cũng bật các tính năng mới, trừ những tính năng xem màn hình hoặc nghe trong nền.</string>

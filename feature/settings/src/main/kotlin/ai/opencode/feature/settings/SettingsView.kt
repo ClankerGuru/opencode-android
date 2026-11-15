@@ -138,6 +138,7 @@ private fun SettingsPageContent(store: SettingsStore, page: SettingsPage) {
         SettingsPage.Server -> ServerPage(store)
         SettingsPage.Appearance -> AppearanceSettingsView(store)
         SettingsPage.Themes -> ThemesSettingsView(store)
+        SettingsPage.Language -> LanguageSettingsView(store)
         SettingsPage.Sessions -> SessionsSettingsView(store)
         SettingsPage.Models -> ModelVisibilitySettingsView(store)
         is SettingsPage.ModelProvider -> ModelVisibilityProviderView(store, page.providerID)
@@ -292,10 +293,14 @@ private fun SettingsRootPage(store: SettingsStore) {
                     focusRequest = returnFocus.request(SettingsPage.Server),
                 )
             }
-            // Preferences: Appearance, Sessions, Models, Voice and Notifications.
+            // Preferences: Appearance, Language, Sessions, Models, Voice and Notifications.
             settingsSection(key = "preferences") {
                 SettingsRow(stringResource(R.string.settings_appearance_title), "paintpalette.fill", SettingsTint.Purple, modifier = returnFocus.on(SettingsPage.Appearance)) {
                     push(SettingsPage.Appearance)
+                }
+                SettingsDivider(inset = true)
+                SettingsRow(stringResource(R.string.settings_language_title), "globe", SettingsTint.Blue, modifier = returnFocus.on(SettingsPage.Language)) {
+                    push(SettingsPage.Language)
                 }
                 SettingsDivider(inset = true)
                 SettingsRow(stringResource(R.string.settings_sessions_title), "bubble.left.fill", SettingsTint.Blue, modifier = returnFocus.on(SettingsPage.Sessions)) { push(SettingsPage.Sessions) }

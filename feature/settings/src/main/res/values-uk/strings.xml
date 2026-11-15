@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Допоможи покращити екран сесії. Покажи, що знайдеш, і поясни зміни.</string>
     <string name="settings_themes_preview_reply">Знайшов проблему з компонуванням у %1$s. Розшифровка й редактор повідомлень ділять доступну висоту, тож клавіатура добре допомагає перевірити компонування.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Мова</string>
+    <string name="settings_language_system_default">Системна за замовчуванням</string>
+    <string name="settings_language_search_placeholder">Пошук мов</string>
+    <string name="settings_language_suggested_header">Рекомендовані</string>
+    <string name="settings_language_all_header">Усі мови</string>
+    <string name="settings_language_no_matches">Відповідних мов немає</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Експериментальний</string>
     <string name="settings_experimental_all_footer">Також вмикає нові функції, крім тих, що бачать ваш екран або слухають у фоні.</string>

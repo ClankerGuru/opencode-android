@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Sessiya ekranını yaxşılaşdırmağa kömək et. Tapdıqlarını göstər və dəyişiklikləri izah et.</string>
     <string name="settings_themes_preview_reply">%1$s faylında düzən problemini tapdım. Transkript və mesaj yazma sahəsi mövcud hündürlüyü bölüşür, buna görə klaviatura düzəni sınamaq üçün faydalıdır.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Dil</string>
+    <string name="settings_language_system_default">Sistemin standartı</string>
+    <string name="settings_language_search_placeholder">Dilləri axtar</string>
+    <string name="settings_language_suggested_header">Təklif olunan</string>
+    <string name="settings_language_all_header">Bütün dillər</string>
+    <string name="settings_language_no_matches">Uyğun dil yoxdur</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Eksperimental</string>
     <string name="settings_experimental_all_footer">Ekranınızı görən və ya arxa planda dinləyənlər istisna olmaqla, yenilərini də aktivləşdirir.</string>

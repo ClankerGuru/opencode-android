@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">ལཱ་ཡུན་གྱི་གསལ་གཞི་ལེགས་བཅོས་འབད་ནི་ལུ་ཆ་རོགས་འབད། ག་ཅི་འཚོལ་ཐོབ་ཅི་ག་སྟོན་ཏེ་ བསྒྱུར་བཅོས་ཚུ་འགྲེལ་བཤད་རྐྱབས།</string>
     <string name="settings_themes_preview_reply">%1$s ནང་བཀོད་རིས་ཀྱི་དཀའ་ངལ་འཚོལ་ཐོབ་ཅི། ཁ་སླབ་ཡིག་འབེབས་དང་འཕྲིན་དོན་འབྲི་ས་གཉིས་ཀྱིས་ཡོད་པའི་མཐོ་ཚད་བགོ་ལེན་འབདཝ་ལས་ ལྡེ་སྒྲོམ་ཁ་ཕྱེ་སྟེ་བརྟག་ཞིབ་འབད་བ་ཅིན་ཕན་ཐོགས་འོང་།</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">སྐད༌ཡིག</string>
+    <string name="settings_language_system_default">ལམ་ལུགས་ཀྱི་འཐུས་ཤོར།</string>
+    <string name="settings_language_search_placeholder">སྐད་ཡིག་འཚོལ་ཞིབ་འབད།</string>
+    <string name="settings_language_suggested_header">བསམ་འཆར།</string>
+    <string name="settings_language_all_header">སྐད་ཡིག་ཆ་མཉམ།</string>
+    <string name="settings_language_no_matches">མཐུན་པའི་སྐད་ཡིག་མེད།</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">བརྟག་དཔྱད་འབད་མི།</string>
     <string name="settings_experimental_all_footer">གསལ་གཞི་བལྟ་མི་དང་རྒྱབ་ཁར་ཉན་མི་མ་གཏོགས་ གསརཔ་ཚུ་ཡང་ཨོན་འབདཝ་ཨིན།</string>

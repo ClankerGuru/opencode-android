@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">세션 화면을 개선해 줘. 발견한 문제와 변경 사항을 설명해 줘.</string>
     <string name="settings_themes_preview_reply">%1$s에서 레이아웃 문제를 찾았어요. 대화 기록과 입력창이 화면 높이를 나눠 쓰므로, 키보드를 띄워 보면 문제를 확인하기 좋아요.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">언어</string>
+    <string name="settings_language_system_default">시스템 기본값</string>
+    <string name="settings_language_search_placeholder">언어 검색</string>
+    <string name="settings_language_suggested_header">추천</string>
+    <string name="settings_language_all_header">모든 언어</string>
+    <string name="settings_language_no_matches">일치하는 언어 없음</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">실험적</string>
     <string name="settings_experimental_all_footer">새 실험 기능도 자동으로 켜요. 단, 화면을 보거나 백그라운드에서 듣는 기능은 제외해요.</string>

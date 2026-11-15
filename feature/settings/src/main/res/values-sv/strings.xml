@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Hjälp mig förbättra sessionsvyn. Visa vad du hittar och förklara ändringarna.</string>
     <string name="settings_themes_preview_reply">Jag hittade layoutproblemet i %1$s. Transkriptionen och meddelandefältet delar på den tillgängliga höjden, så tangentbordet är ett bra stresstest.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Språk</string>
+    <string name="settings_language_system_default">Systemstandard</string>
+    <string name="settings_language_search_placeholder">Sök efter språk</string>
+    <string name="settings_language_suggested_header">Föreslagna</string>
+    <string name="settings_language_all_header">Alla språk</string>
+    <string name="settings_language_no_matches">Inga matchande språk</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Experimentell</string>
     <string name="settings_experimental_all_footer">Aktiverar även nya experiment, utom de som ser din skärm eller lyssnar i bakgrunden.</string>

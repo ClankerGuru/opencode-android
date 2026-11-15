@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Hjælp mig med at forbedre sessionsskærmen. Vis mig, hvad du finder, og forklar ændringerne.</string>
     <string name="settings_themes_preview_reply">Jeg fandt layoutproblemet i %1$s. Transskriptionen og skrivefeltet deler den ledige højde, så tastaturet er en god stresstest.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Sprog</string>
+    <string name="settings_language_system_default">Systemets standard</string>
+    <string name="settings_language_search_placeholder">Søg efter sprog</string>
+    <string name="settings_language_suggested_header">Foreslået</string>
+    <string name="settings_language_all_header">Alle sprog</string>
+    <string name="settings_language_no_matches">Ingen matchende sprog</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Eksperimentel</string>
     <string name="settings_experimental_all_footer">Slår også nye til, undtagen dem, der ser din skærm eller lytter i baggrunden.</string>

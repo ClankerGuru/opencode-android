@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Bantu saya menambah baik skrin sesi. Tunjukkan apa yang anda temui dan jelaskan perubahannya.</string>
     <string name="settings_themes_preview_reply">Saya menemui isu susun atur dalam %1$s. Transkrip dan ruang karang berkongsi ketinggian yang tersedia, jadi papan kekunci berguna untuk menguji had susun atur.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Bahasa</string>
+    <string name="settings_language_system_default">Lalai sistem</string>
+    <string name="settings_language_search_placeholder">Cari bahasa</string>
+    <string name="settings_language_suggested_header">Dicadangkan</string>
+    <string name="settings_language_all_header">Semua bahasa</string>
+    <string name="settings_language_no_matches">Tiada bahasa sepadan</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Eksperimen</string>
     <string name="settings_experimental_all_footer">Turut menghidupkan eksperimen baharu, kecuali yang melihat skrin atau mendengar di latar belakang.</string>

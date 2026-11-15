@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Помози ми да побољшам екран сесије. Покажи шта пронађеш и објасни промене.</string>
     <string name="settings_themes_preview_reply">Пронашао сам проблем са распоредом у %1$s. Транскрипт и унос поруке деле доступну висину, па је тастатура добар тест за скучен простор.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Језик</string>
+    <string name="settings_language_system_default">Подразумевано у систему</string>
+    <string name="settings_language_search_placeholder">Претражи језике</string>
+    <string name="settings_language_suggested_header">Предложено</string>
+    <string name="settings_language_all_header">Сви језици</string>
+    <string name="settings_language_no_matches">Нема одговарајућих језика</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Експериментално</string>
     <string name="settings_experimental_all_footer">Укључује и нове експерименте, осим оних који виде екран или слушају у позадини.</string>

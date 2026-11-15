@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Help me het sessiescherm te verbeteren. Laat zien wat je vindt en leg de wijzigingen uit.</string>
     <string name="settings_themes_preview_reply">Ik heb het lay-outprobleem in %1$s gevonden. De transcriptie en berichtinvoer delen de beschikbare hoogte, dus het toetsenbord is een goede stresstest.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Taal</string>
+    <string name="settings_language_system_default">Systeemstandaard</string>
+    <string name="settings_language_search_placeholder">Zoek talen</string>
+    <string name="settings_language_suggested_header">Voorgesteld</string>
+    <string name="settings_language_all_header">Alle talen</string>
+    <string name="settings_language_no_matches">Geen overeenkomende talen</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Experimenteel</string>
     <string name="settings_experimental_all_footer">Schakelt ook nieuwe experimenten in, behalve als ze je scherm bekijken of op de achtergrond luisteren.</string>

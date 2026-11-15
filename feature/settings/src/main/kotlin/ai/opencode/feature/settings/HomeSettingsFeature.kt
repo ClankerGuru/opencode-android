@@ -37,6 +37,7 @@ import ai.opencode.feature.voice.VoiceReadiness
 import ai.opencode.feature.voice.VoiceServerChoice
 import ai.opencode.feature.voice.VoiceSharedKeys
 import ai.opencode.server.OpenCodeServer
+import java.util.Locale
 
 /**
  * Moved down to `:feature:settings`: preferences and their platform effects. Every write goes
@@ -85,12 +86,15 @@ class HomeSettingsFeature : Reducer<HomeSettingsFeature.State, HomeSettingsFeatu
         data object WelcomeOpened : Action
         data class AppThemeChanged(val theme: AppTheme) : Action
         data class AppearanceColorSchemeChanged(val scheme: AppearanceColorScheme) : Action
+        /** Settings › Language: null follows the system. */
+        data class AppLanguageChanged(val locale: Locale?) : Action
         data class ReturnKeySendsChanged(val on: Boolean) : Action
         /** Agent Selection: the agent new sessions start with ("" is the server's). */
         data class DefaultAgentChanged(val id: String) : Action
     }
 
     private val haptics by Dependency(HapticsClient)
+    private val appLanguage by Dependency(AppLanguageClient)
     private val serverVoice by Dependency(ServerVoiceClient)
     private val soundEffects by Dependency(SoundEffectsClient)
 
@@ -210,6 +214,12 @@ class HomeSettingsFeature : Reducer<HomeSettingsFeature.State, HomeSettingsFeatu
                 if (setShared(ThemeSharedKeys.appTheme, action.theme)) haptics.play(Haptic.selection)
             is Action.AppearanceColorSchemeChanged ->
                 if (setShared(ThemeSharedKeys.appearanceColorScheme, action.scheme)) haptics.play(Haptic.selection)
+            is Action.AppLanguageChanged -> {
+                val client = appLanguage
+                if (client.current() == action.locale) return Reduced(state)
+                haptics.play(Haptic.selection)
+                return Reduced(state, Effect.run { client.set(action.locale) })
+            }
             is Action.ReturnKeySendsChanged -> setShared(SharedKeys.returnKeySends, action.on)
             is Action.DefaultAgentChanged -> setShared(SharedKeys.defaultAgentID, action.id)
         }

@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Me ajude a melhorar a tela da sessão. Mostre o que encontrar e explique as mudanças.</string>
     <string name="settings_themes_preview_reply">Encontrei o problema de layout em %1$s. A transcrição e o editor de mensagens dividem a altura disponível, então o teclado é um bom teste de limite.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Idioma</string>
+    <string name="settings_language_system_default">Padrão do sistema</string>
+    <string name="settings_language_search_placeholder">Buscar idiomas</string>
+    <string name="settings_language_suggested_header">Sugerido</string>
+    <string name="settings_language_all_header">Todos os idiomas</string>
+    <string name="settings_language_no_matches">Nenhum idioma correspondente</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Experimental</string>
     <string name="settings_experimental_all_footer">Também ativa novos experimentos, exceto os que veem sua tela ou escutam em segundo plano.</string>

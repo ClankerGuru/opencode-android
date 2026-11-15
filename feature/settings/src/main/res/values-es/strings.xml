@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Ayúdame a mejorar la pantalla de sesión. Muéstrame lo que encuentres y explica los cambios.</string>
     <string name="settings_themes_preview_reply">Encontré el problema de diseño en %1$s. La transcripción y el redactor comparten la altura disponible, así que el teclado sirve para ponerlos a prueba.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Idioma</string>
+    <string name="settings_language_system_default">Predeterminado del sistema</string>
+    <string name="settings_language_search_placeholder">Buscar idiomas</string>
+    <string name="settings_language_suggested_header">Sugerido</string>
+    <string name="settings_language_all_header">Todos los idiomas</string>
+    <string name="settings_language_no_matches">No hay idiomas coincidentes</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Experimental</string>
     <string name="settings_experimental_all_footer">También activa los nuevos, salvo los que ven tu pantalla o escuchan en segundo plano.</string>

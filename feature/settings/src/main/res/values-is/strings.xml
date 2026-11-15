@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Hjálpaðu mér að bæta setuskjáinn. Sýndu mér hvað þú finnur og útskýrðu breytingarnar.</string>
     <string name="settings_themes_preview_reply">Ég fann vandann í uppsetningunni í %1$s. Samtalsskráin og innslátturinn deila tiltækri hæð, svo lyklaborðið er góð leið til að reyna á uppsetninguna.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Tungumál</string>
+    <string name="settings_language_system_default">Sjálfgefið í kerfi</string>
+    <string name="settings_language_search_placeholder">Leita að tungumálum</string>
+    <string name="settings_language_suggested_header">Tillögur</string>
+    <string name="settings_language_all_header">Öll tungumál</string>
+    <string name="settings_language_no_matches">Engin samsvarandi tungumál</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Tilraunakennt</string>
     <string name="settings_experimental_all_footer">Kveikir líka á nýjum tilraunum, nema þeim sem sjá skjáinn þinn eða hlusta í bakgrunni.</string>

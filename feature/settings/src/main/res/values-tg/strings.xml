@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Барои беҳтар кардани экрани сессия кӯмак кунед. Чизи ёфтаатонро нишон диҳед ва тағйиротро шарҳ диҳед.</string>
     <string name="settings_themes_preview_reply">Мушкили ҷойгиршавиро дар %1$s ёфтам. Матни суҳбат ва майдони паём баландии дастрасро байни худ тақсим мекунанд, бинобар ин клавиатура барои санҷидани маҳдудиятҳо муфид аст.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Забон</string>
+    <string name="settings_language_system_default">Пешфарзи система</string>
+    <string name="settings_language_search_placeholder">Ҷустуҷӯи забонҳо</string>
+    <string name="settings_language_suggested_header">Тавсия дода мешавад</string>
+    <string name="settings_language_all_header">Ҳамаи забонҳо</string>
+    <string name="settings_language_no_matches">Забони мувофиқ нест</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Озмоишӣ</string>
     <string name="settings_experimental_all_footer">Имкониятҳои навро ҳам фаъол мекунад, ба ҷуз онҳое, ки экранро мебинанд ё дар замина гӯш мекунанд.</string>

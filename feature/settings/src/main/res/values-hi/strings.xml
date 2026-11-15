@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">सेशन स्क्रीन बेहतर बनाने में मेरी मदद करें। जो मिले, वह दिखाएँ और बदलाव समझाएँ।</string>
     <string name="settings_themes_preview_reply">मुझे %1$s में लेआउट की समस्या मिली। बातचीत का टेक्स्ट और संदेश लेखन उपलब्ध ऊँचाई साझा करते हैं, इसलिए कीबोर्ड खोलकर इसकी अच्छी जाँच हो जाती है।</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">भाषा</string>
+    <string name="settings_language_system_default">सिस्टम का डिफ़ॉल्ट</string>
+    <string name="settings_language_search_placeholder">भाषाएँ खोजें</string>
+    <string name="settings_language_suggested_header">सुझाए गए</string>
+    <string name="settings_language_all_header">सभी भाषाएँ</string>
+    <string name="settings_language_no_matches">कोई मेल खाती भाषा नहीं</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">प्रायोगिक</string>
     <string name="settings_experimental_all_footer">नए प्रयोग भी चालू करता है, सिवाय उनके जो आपकी स्क्रीन देखते हैं या बैकग्राउंड में सुनते हैं।</string>

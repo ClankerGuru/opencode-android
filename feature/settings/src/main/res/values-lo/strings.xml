@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">ຊ່ວຍປັບປຸງໜ້າເຊດຊັນໃຫ້ແດ່. ສະແດງສິ່ງທີ່ພົບ ແລະ ອະທິບາຍການປ່ຽນແປງ.</string>
     <string name="settings_themes_preview_reply">ຂ້ອຍພົບບັນຫາການຈັດວາງໃນ %1$s. ບົດຖອດສຽງ ແລະ ຊ່ອງຂຽນຂໍ້ຄວາມແບ່ງຄວາມສູງທີ່ມີຢູ່ຮ່ວມກັນ, ຈຶ່ງໃຊ້ແປ້ນພິມທົດສອບເວລາພື້ນທີ່ຈຳກັດໄດ້ດີ.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">ພາສາ</string>
+    <string name="settings_language_system_default">ຄ່າເລີ່ມຕົ້ນຂອງລະບົບ</string>
+    <string name="settings_language_search_placeholder">ຄົ້ນຫາພາສາ</string>
+    <string name="settings_language_suggested_header">ແນະນຳ</string>
+    <string name="settings_language_all_header">ພາສາທັງໝົດ</string>
+    <string name="settings_language_no_matches">ບໍ່ມີພາສາທີ່ກົງກັນ</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">ທົດລອງ</string>
     <string name="settings_experimental_all_footer">ເປີດຟີເຈີທົດລອງໃໝ່ນຳ, ຍົກເວັ້ນອັນທີ່ເບິ່ງໜ້າຈໍ ຫຼື ຟັງສຽງໃນພື້ນຫຼັງ.</string>

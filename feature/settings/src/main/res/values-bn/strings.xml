@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">সেশনের পর্দা আরও ভালো করতে সাহায্য করুন। যা খুঁজে পান তা দেখান আর পরিবর্তনগুলো বুঝিয়ে দিন।</string>
     <string name="settings_themes_preview_reply">%1$s-এ লেআউটের সমস্যাটি পেয়েছি। ট্রান্সক্রিপ্ট আর কম্পোজার পর্দার উচ্চতা ভাগ করে নেয়, তাই কীবোর্ড খুলে চাপের মধ্যে লেআউট পরীক্ষা করা যায়।</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">ভাষা</string>
+    <string name="settings_language_system_default">সিস্টেমের ডিফল্ট</string>
+    <string name="settings_language_search_placeholder">ভাষা অনুসন্ধান করুন</string>
+    <string name="settings_language_suggested_header">প্রস্তাবিত</string>
+    <string name="settings_language_all_header">সব ভাষা</string>
+    <string name="settings_language_no_matches">মিলে যাওয়া কোনো ভাষা নেই</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">পরীক্ষামূলক</string>
     <string name="settings_experimental_all_footer">নতুন পরীক্ষামূলক সুবিধাগুলোও চালু হবে, তবে যেগুলো আপনার পর্দা দেখে বা ব্যাকগ্রাউন্ডে শোনে সেগুলো নয়।</string>

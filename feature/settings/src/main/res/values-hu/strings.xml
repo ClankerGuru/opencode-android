@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Segíts javítani a munkamenet képernyőjén. Mutasd meg, mit találsz, és magyarázd el a módosításokat.</string>
     <string name="settings_themes_preview_reply">Megtaláltam az elrendezési hibát itt: %1$s. Az átirat és az üzenetszerkesztő osztozik a rendelkezésre álló magasságon, így a billentyűzettel jól tesztelhető a szűkös hely.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Nyelv</string>
+    <string name="settings_language_system_default">Rendszer alapértelmezése</string>
+    <string name="settings_language_search_placeholder">Nyelvek keresése</string>
+    <string name="settings_language_suggested_header">Javasolt</string>
+    <string name="settings_language_all_header">Összes nyelv</string>
+    <string name="settings_language_no_matches">Nincs megfelelő nyelv</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Kísérleti</string>
     <string name="settings_experimental_all_footer">Az újakat is bekapcsolja, kivéve azokat, amelyek látják a képernyőt vagy a háttérben hallgatóznak.</string>
