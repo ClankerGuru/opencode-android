@@ -43,6 +43,11 @@
     <string name="media_player_play">Aýtdyr</string>
     <string name="media_player_position_description">Aýtdyryş ýeri</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Wideony aýtdyryp bolmady</string>
+    <string name="media_video_position_description">Wideonyň ýeri</string>
+    <string name="media_video_capture_failed_title">Kadry alyp bolmady</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Deslapky syny görkez</string>
     <string name="media_file_show_source_description">Çeşmäni görkez</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Serwer ony okap bilmedi (HTTP %1$d). Ol papka bolup biler.</string>
     <string name="media_file_error_timed_out">Talabyň wagty gutardy.</string>
     <string name="media_file_error_unexpected_response">Serwer garaşylmadyk jogap iberdi.</string>
+    <string name="media_file_error_over_limit">Faýl ýükläp almagyň ölçeg çäginden uly.</string>
+    <string name="media_file_error_size_unknown">Serwer goşundynyň ölçegini habar bermedi.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Ýüklenýär…</string>

@@ -43,6 +43,11 @@
     <string name="media_player_play">Նվագարկել</string>
     <string name="media_player_position_description">Նվագարկման դիրք</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Չհաջողվեց նվագարկել տեսանյութը</string>
+    <string name="media_video_position_description">Տեսանյութի դիրք</string>
+    <string name="media_video_capture_failed_title">Չհաջողվեց պահել կադրը</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Ցույց տալ նախադիտումը</string>
     <string name="media_file_show_source_description">Ցույց տալ սկզբնաղբյուրը</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Սերվերը չկարողացավ կարդալ այն (HTTP %1$d)։ Գուցե այն թղթապանակ է։</string>
     <string name="media_file_error_timed_out">Հարցման ժամանակը սպառվել է։</string>
     <string name="media_file_error_unexpected_response">Սերվերն անսպասելի պատասխան ուղարկեց։</string>
+    <string name="media_file_error_over_limit">Ֆայլը գերազանցում է ներբեռնման չափի սահմանաչափը։</string>
+    <string name="media_file_error_size_unknown">Սերվերը չհայտնեց կցորդի չափը։</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Ներբեռնվում է…</string>

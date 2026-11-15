@@ -43,6 +43,11 @@
     <string name="media_player_play">Luaj</string>
     <string name="media_player_position_description">Pozicioni i luajtjes</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Videoja nuk u luajt dot</string>
+    <string name="media_video_position_description">Pozicioni i videos</string>
+    <string name="media_video_capture_failed_title">Kuadri nuk u kap dot</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Trego pamjen paraprake</string>
     <string name="media_file_show_source_description">Trego kodin burimor</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Serveri nuk e lexoi dot (HTTP %1$d). Mund të jetë dosje.</string>
     <string name="media_file_error_timed_out">Kërkesës i mbaroi koha.</string>
     <string name="media_file_error_unexpected_response">Serveri dërgoi një përgjigje të papritur.</string>
+    <string name="media_file_error_over_limit">Skedari e kalon kufirin e madhësisë për shkarkim.</string>
+    <string name="media_file_error_size_unknown">Serveri nuk e tregoi madhësinë e bashkëngjitjes.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Po shkarkohet…</string>

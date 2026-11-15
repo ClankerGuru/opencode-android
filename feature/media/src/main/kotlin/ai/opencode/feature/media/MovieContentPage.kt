@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
@@ -130,7 +131,7 @@ internal fun MovieContentPage(
                 },
             )
         }
-        if (failed) Text("Couldn’t play video", color = Color.White)
+        if (failed) Text(stringResource(R.string.media_video_play_failed), color = Color.White)
     }
 }
 
@@ -142,14 +143,15 @@ internal fun MovieTransport(player: Player, modifier: Modifier = Modifier) {
     val duration = progress.durationMs.coerceAtLeast(0)
     var drag by remember(player) { mutableStateOf<Float?>(null) }
     val ms = drag ?: progress.currentPositionMs.coerceIn(0, duration).toFloat()
+    val positionDescription = stringResource(R.string.media_video_position_description)
     Row(modifier.fillMaxWidth().padding(bottom = 8.dp).background(Color.Black.copy(alpha = 0.65f)).padding(end = 12.dp),
         verticalAlignment = Alignment.CenterVertically) {
-        OpenCodeIconButton(if (play.showPlay) SFSymbol.PlayFill else SFSymbol.PauseFill, if (play.showPlay) "Play" else "Pause", play::onClick,
+        OpenCodeIconButton(if (play.showPlay) SFSymbol.PlayFill else SFSymbol.PauseFill, if (play.showPlay) stringResource(R.string.media_player_play) else stringResource(R.string.media_player_pause), play::onClick,
             Modifier.testTag("image-gallery-video-play"), enabled = play.isEnabled)
         Slider(value = ms, onValueChange = { if (drag == null) player.pause(); drag = it },
             onValueChangeFinished = { drag?.let { player.seekTo(it.toLong()) }; drag = null },
             valueRange = 0f..maxOf(duration, 1L).toFloat(), enabled = duration > 0,
-            modifier = Modifier.weight(1f).testTag("image-gallery-video-position").semantics { contentDescription = "Video position" })
+            modifier = Modifier.weight(1f).testTag("image-gallery-video-position").semantics { contentDescription = positionDescription })
         val seconds = ms.toLong() / 1000
         Text(String.format(Locale.ROOT, "%d:%02d", seconds / 60, seconds % 60), color = Color.White)
     }

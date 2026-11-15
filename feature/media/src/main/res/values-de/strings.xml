@@ -43,6 +43,11 @@
     <string name="media_player_play">Abspielen</string>
     <string name="media_player_position_description">Wiedergabeposition</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Video konnte nicht abgespielt werden</string>
+    <string name="media_video_position_description">Videoposition</string>
+    <string name="media_video_capture_failed_title">Bild konnte nicht aufgenommen werden</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Vorschau anzeigen</string>
     <string name="media_file_show_source_description">Quelltext anzeigen</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Der Server konnte die Datei nicht lesen (HTTP %1$d). Vielleicht ist es ein Ordner.</string>
     <string name="media_file_error_timed_out">Zeitüberschreitung bei der Anfrage.</string>
     <string name="media_file_error_unexpected_response">Der Server hat eine unerwartete Antwort gesendet.</string>
+    <string name="media_file_error_over_limit">Die Datei überschreitet die maximale Downloadgröße.</string>
+    <string name="media_file_error_size_unknown">Der Server hat die Größe des Anhangs nicht übermittelt.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Wird heruntergeladen…</string>

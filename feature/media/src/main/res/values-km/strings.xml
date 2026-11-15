@@ -43,6 +43,11 @@
     <string name="media_player_play">ចាក់</string>
     <string name="media_player_position_description">ទីតាំងចាក់</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">មិនអាចចាក់វីដេអូបាន</string>
+    <string name="media_video_position_description">ទីតាំងវីដេអូ</string>
+    <string name="media_video_capture_failed_title">មិនអាចថតស៊ុមរូបភាពបាន</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">បង្ហាញការមើលជាមុន</string>
     <string name="media_file_show_source_description">បង្ហាញប្រភព</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">ម៉ាស៊ីនមេមិនអាចអានវាបានទេ (HTTP %1$d)។ វាអាចជាថត។</string>
     <string name="media_file_error_timed_out">សំណើអស់ពេល។</string>
     <string name="media_file_error_unexpected_response">ម៉ាស៊ីនមេបានផ្ញើការឆ្លើយតបដែលមិនបានរំពឹងទុក។</string>
+    <string name="media_file_error_over_limit">ឯកសារនេះលើសដែនកំណត់ទំហំទាញយក។</string>
+    <string name="media_file_error_size_unknown">ម៉ាស៊ីនមេមិនបានប្រាប់ទំហំឯកសារភ្ជាប់ទេ។</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">កំពុងទាញយក…</string>

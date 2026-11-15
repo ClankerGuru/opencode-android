@@ -43,6 +43,11 @@
     <string name="media_player_play">Putar</string>
     <string name="media_player_position_description">Posisi pemutaran</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Gagal memutar video</string>
+    <string name="media_video_position_description">Posisi video</string>
+    <string name="media_video_capture_failed_title">Gagal mengambil bingkai</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Tampilkan pratinjau</string>
     <string name="media_file_show_source_description">Tampilkan sumber</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Server gagal membacanya (HTTP %1$d). Ini mungkin folder.</string>
     <string name="media_file_error_timed_out">Waktu permintaan habis.</string>
     <string name="media_file_error_unexpected_response">Server mengirim respons yang tidak terduga.</string>
+    <string name="media_file_error_over_limit">Berkas melebihi batas ukuran unduhan.</string>
+    <string name="media_file_error_size_unknown">Server tidak melaporkan ukuran lampiran.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Mengunduh…</string>

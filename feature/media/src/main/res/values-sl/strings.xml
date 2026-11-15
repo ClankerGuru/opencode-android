@@ -43,6 +43,11 @@
     <string name="media_player_play">Predvajaj</string>
     <string name="media_player_position_description">Položaj predvajanja</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Videoposnetka ni bilo mogoče predvajati</string>
+    <string name="media_video_position_description">Položaj videoposnetka</string>
+    <string name="media_video_capture_failed_title">Sličice ni bilo mogoče zajeti</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Pokaži predogled</string>
     <string name="media_file_show_source_description">Pokaži izvorno kodo</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Strežnik je ni mogel prebrati (HTTP %1$d). Morda je mapa.</string>
     <string name="media_file_error_timed_out">Časovna omejitev zahteve je potekla.</string>
     <string name="media_file_error_unexpected_response">Strežnik je poslal nepričakovan odziv.</string>
+    <string name="media_file_error_over_limit">Datoteka presega omejitev velikosti za prenos.</string>
+    <string name="media_file_error_size_unknown">Strežnik ni sporočil velikosti priloge.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Prenos…</string>

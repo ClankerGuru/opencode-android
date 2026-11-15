@@ -43,6 +43,11 @@
     <string name="media_player_play">Oynat</string>
     <string name="media_player_position_description">Oynatma mövqeyi</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Videonu oynatmaq mümkün olmadı</string>
+    <string name="media_video_position_description">Video mövqeyi</string>
+    <string name="media_video_capture_failed_title">Kadrı çəkmək mümkün olmadı</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Önbaxışı göstər</string>
     <string name="media_file_show_source_description">Mənbəni göstər</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Server bunu oxuya bilmədi (HTTP %1$d). Qovluq ola bilər.</string>
     <string name="media_file_error_timed_out">Sorğunun vaxtı bitdi.</string>
     <string name="media_file_error_unexpected_response">Server gözlənilməz cavab göndərdi.</string>
+    <string name="media_file_error_over_limit">Fayl endirmə ölçüsü limitini keçir.</string>
+    <string name="media_file_error_size_unknown">Server əlavənin ölçüsünü bildirmədi.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Endirilir…</string>

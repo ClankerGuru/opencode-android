@@ -43,6 +43,11 @@
     <string name="media_player_play">เล่น</string>
     <string name="media_player_position_description">ตำแหน่งการเล่น</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">เล่นวิดีโอไม่ได้</string>
+    <string name="media_video_position_description">ตำแหน่งวิดีโอ</string>
+    <string name="media_video_capture_failed_title">จับภาพเฟรมไม่ได้</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">แสดงตัวอย่าง</string>
     <string name="media_file_show_source_description">แสดงต้นฉบับ</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">เซิร์ฟเวอร์อ่านไม่ได้ (HTTP %1$d) รายการนี้อาจเป็นโฟลเดอร์</string>
     <string name="media_file_error_timed_out">คำขอหมดเวลา</string>
     <string name="media_file_error_unexpected_response">เซิร์ฟเวอร์ส่งคำตอบที่ไม่คาดคิด</string>
+    <string name="media_file_error_over_limit">ไฟล์มีขนาดเกินขีดจำกัดการดาวน์โหลด</string>
+    <string name="media_file_error_size_unknown">เซิร์ฟเวอร์ไม่ได้แจ้งขนาดไฟล์แนบ</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">กำลังดาวน์โหลด…</string>

@@ -712,8 +712,8 @@ fun FullscreenViewer(
 
     if (captureFailed) {
         val dismiss = { captureFailed = false }
-        OpenCodeAlertDialog(onDismissRequest = dismiss, title = { Text("Couldn’t capture frame") },
-            confirmButton = { TextButton(onClick = dismiss) { Text("OK") } })
+        OpenCodeAlertDialog(onDismissRequest = dismiss, title = { Text(stringResource(R.string.media_video_capture_failed_title)) },
+            confirmButton = { TextButton(onClick = dismiss) { Text(stringResource(CoreR.string.common_ok)) } })
     }
     state.shareError?.let { error ->
         val dismiss = { store.send(Action.ShareErrorDismissed) }

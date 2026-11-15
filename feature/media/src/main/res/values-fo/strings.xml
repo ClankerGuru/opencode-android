@@ -43,6 +43,11 @@
     <string name="media_player_play">Spæl</string>
     <string name="media_player_position_description">Stað í avspælingini</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Kundi ikki spæla sjónband</string>
+    <string name="media_video_position_description">Stað í sjónbandinum</string>
+    <string name="media_video_capture_failed_title">Kundi ikki taka mynd</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Vís forskoðan</string>
     <string name="media_file_show_source_description">Vís keldu</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Ambætarin kundi ikki lesa hana (HTTP %1$d). Hon kann vera ein mappa.</string>
     <string name="media_file_error_timed_out">Tíðin til umbønina gekk út.</string>
     <string name="media_file_error_unexpected_response">Ambætarin sendi eitt óvæntað svar.</string>
+    <string name="media_file_error_over_limit">Skráin er størri enn markið fyri niðurtøku.</string>
+    <string name="media_file_error_size_unknown">Ambætarin boðaði ikki frá, hvussu stórt viðheftið er.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Tekur niður…</string>

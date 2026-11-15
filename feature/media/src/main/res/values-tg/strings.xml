@@ -43,6 +43,11 @@
     <string name="media_player_play">Пахш кунед</string>
     <string name="media_player_position_description">Мавқеи пахш</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Видео пахш нашуд</string>
+    <string name="media_video_position_description">Мавқеи видео</string>
+    <string name="media_video_capture_failed_title">Кадр гирифта нашуд</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Пешнамоишро нишон диҳед</string>
     <string name="media_file_show_source_description">Матни аслиро нишон диҳед</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Сервер онро хонда натавонист (HTTP %1$d). Шояд ин папка бошад.</string>
     <string name="media_file_error_timed_out">Муҳлати дархост гузашт.</string>
     <string name="media_file_error_unexpected_response">Сервер ҷавоби ғайричашмдошт фиристод.</string>
+    <string name="media_file_error_over_limit">Файл аз ҳадди андозаи боргирӣ зиёд аст.</string>
+    <string name="media_file_error_size_unknown">Сервер андозаи замимаро нишон надод.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Боргирӣ мешавад…</string>

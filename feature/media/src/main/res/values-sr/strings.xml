@@ -43,6 +43,11 @@
     <string name="media_player_play">Пусти</string>
     <string name="media_player_position_description">Положај репродукције</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Није могуће пустити видео</string>
+    <string name="media_video_position_description">Позиција видеа</string>
+    <string name="media_video_capture_failed_title">Није могуће снимити кадар</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Прикажи преглед</string>
     <string name="media_file_show_source_description">Прикажи извор</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Сервер није могао да прочита датотеку (HTTP %1$d). Можда је у питању фасцикла.</string>
     <string name="media_file_error_timed_out">Истекло је време за захтев.</string>
     <string name="media_file_error_unexpected_response">Сервер је послао неочекиван одговор.</string>
+    <string name="media_file_error_over_limit">Датотека прелази ограничење величине за преузимање.</string>
+    <string name="media_file_error_size_unknown">Сервер није пријавио величину прилога.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Преузимање…</string>

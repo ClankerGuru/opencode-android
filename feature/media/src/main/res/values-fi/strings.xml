@@ -43,6 +43,11 @@
     <string name="media_player_play">Toista</string>
     <string name="media_player_position_description">Toistokohta</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Videon toisto epäonnistui</string>
+    <string name="media_video_position_description">Videon toistokohta</string>
+    <string name="media_video_capture_failed_title">Kuvan kaappaus epäonnistui</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Näytä esikatselu</string>
     <string name="media_file_show_source_description">Näytä lähde</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Palvelin ei voinut lukea sitä (HTTP %1$d). Se voi olla kansio.</string>
     <string name="media_file_error_timed_out">Pyyntö aikakatkaistiin.</string>
     <string name="media_file_error_unexpected_response">Palvelin lähetti odottamattoman vastauksen.</string>
+    <string name="media_file_error_over_limit">Tiedosto ylittää latauksen kokorajan.</string>
+    <string name="media_file_error_size_unknown">Palvelin ei ilmoittanut liitteen kokoa.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Ladataan…</string>

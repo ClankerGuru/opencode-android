@@ -43,6 +43,11 @@
     <string name="media_player_play">වාදනය කරන්න</string>
     <string name="media_player_position_description">වාදනය වන ස්ථානය</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">වීඩියෝව වාදනය කිරීමට නොහැකි විය</string>
+    <string name="media_video_position_description">වීඩියෝ ස්ථානය</string>
+    <string name="media_video_capture_failed_title">රාමුව ග්‍රහණය කිරීමට නොහැකි විය</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">පෙරදසුන පෙන්වන්න</string>
     <string name="media_file_show_source_description">මූලාශ්‍රය පෙන්වන්න</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">සේවාදායකයට එය කියවීමට නොහැකි විය (HTTP %1$d). එය ෆෝල්ඩරයක් විය හැකියි.</string>
     <string name="media_file_error_timed_out">ඉල්ලීමේ කාලය ඉකුත් විය.</string>
     <string name="media_file_error_unexpected_response">සේවාදායකය අනපේක්ෂිත ප්‍රතිචාරයක් එවීය.</string>
+    <string name="media_file_error_over_limit">ගොනුව බාගැනීමේ ප්‍රමාණ සීමාව ඉක්මවයි.</string>
+    <string name="media_file_error_size_unknown">සේවාදායකය ඇමුණුමේ ප්‍රමාණය වාර්තා කළේ නැහැ.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">බාගනිමින්…</string>

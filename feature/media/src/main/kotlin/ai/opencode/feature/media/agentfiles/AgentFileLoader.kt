@@ -155,7 +155,7 @@ object AgentFileLoader {
         return Original(server.fileReadRequest(target) ?: return null, target.absolutePath)
     }
 
-    internal val overLimit get() = AgentFileError.Network("The file exceeds the download size limit.")
+    internal val overLimit get() = AgentFileError.Network(localized(R.string.media_file_error_over_limit))
 
     /** Adds the server's credentials to a request for one of its origins. */
     fun authorizedRequest(request: Request, server: OpenCodeServer?): Request {

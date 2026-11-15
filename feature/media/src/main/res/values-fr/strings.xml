@@ -43,6 +43,11 @@
     <string name="media_player_play">Lire</string>
     <string name="media_player_position_description">Position de lecture</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Impossible de lire la vidéo</string>
+    <string name="media_video_position_description">Position de la vidéo</string>
+    <string name="media_video_capture_failed_title">Impossible de capturer l’image</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Afficher l’aperçu</string>
     <string name="media_file_show_source_description">Afficher la source</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Le serveur n’a pas pu le lire (HTTP %1$d). Il s’agit peut-être d’un dossier.</string>
     <string name="media_file_error_timed_out">Le délai d’attente de la requête est dépassé.</string>
     <string name="media_file_error_unexpected_response">Le serveur a envoyé une réponse inattendue.</string>
+    <string name="media_file_error_over_limit">Le fichier dépasse la taille maximale de téléchargement.</string>
+    <string name="media_file_error_size_unknown">Le serveur n’a pas indiqué la taille de la pièce jointe.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Téléchargement…</string>

@@ -43,6 +43,11 @@
     <string name="media_player_play">Spila</string>
     <string name="media_player_position_description">Staða í spilun</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Ekki tókst að spila myndband</string>
+    <string name="media_video_position_description">Staðsetning í myndbandi</string>
+    <string name="media_video_capture_failed_title">Ekki tókst að grípa ramma</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Sýna forskoðun</string>
     <string name="media_file_show_source_description">Sýna frumkóða</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Netþjónninn gat ekki lesið hana (HTTP %1$d). Hún gæti verið mappa.</string>
     <string name="media_file_error_timed_out">Beiðnin rann út á tíma.</string>
     <string name="media_file_error_unexpected_response">Netþjónninn sendi óvænt svar.</string>
+    <string name="media_file_error_over_limit">Skráin er stærri en hámarksstærð niðurhals.</string>
+    <string name="media_file_error_size_unknown">Netþjónninn gaf ekki upp stærð viðhengisins.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Sækir…</string>

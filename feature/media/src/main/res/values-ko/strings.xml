@@ -43,6 +43,11 @@
     <string name="media_player_play">재생</string>
     <string name="media_player_position_description">재생 위치</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">비디오를 재생할 수 없어요</string>
+    <string name="media_video_position_description">비디오 재생 위치</string>
+    <string name="media_video_capture_failed_title">프레임을 캡처할 수 없어요</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">미리보기 표시</string>
     <string name="media_file_show_source_description">소스 보기</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">서버에서 읽을 수 없어요(HTTP %1$d). 폴더일 수 있어요.</string>
     <string name="media_file_error_timed_out">요청 시간이 초과됐어요.</string>
     <string name="media_file_error_unexpected_response">서버가 예상치 못한 응답을 보냈어요.</string>
+    <string name="media_file_error_over_limit">파일이 다운로드 크기 한도를 초과해요.</string>
+    <string name="media_file_error_size_unknown">서버가 첨부 파일 크기를 알려 주지 않았어요.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">다운로드 중…</string>

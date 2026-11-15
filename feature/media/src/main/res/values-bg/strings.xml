@@ -43,6 +43,11 @@
     <string name="media_player_play">Възпроизвеждане</string>
     <string name="media_player_position_description">Позиция на възпроизвеждане</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Неуспешно възпроизвеждане на видеото</string>
+    <string name="media_video_position_description">Позиция във видеото</string>
+    <string name="media_video_capture_failed_title">Неуспешно заснемане на кадър</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Показване на визуализация</string>
     <string name="media_file_show_source_description">Показване на изходния код</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Сървърът не успя да го прочете (HTTP %1$d). Може да е папка.</string>
     <string name="media_file_error_timed_out">Времето за изчакване на заявката изтече.</string>
     <string name="media_file_error_unexpected_response">Сървърът изпрати неочакван отговор.</string>
+    <string name="media_file_error_over_limit">Файлът надвишава лимита за размер при изтегляне.</string>
+    <string name="media_file_error_size_unknown">Сървърът не съобщи размера на прикачения файл.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Изтегляне…</string>

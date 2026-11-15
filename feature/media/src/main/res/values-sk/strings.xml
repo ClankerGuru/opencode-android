@@ -43,6 +43,11 @@
     <string name="media_player_play">Prehrať</string>
     <string name="media_player_position_description">Pozícia prehrávania</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Nepodarilo sa prehrať video</string>
+    <string name="media_video_position_description">Pozícia videa</string>
+    <string name="media_video_capture_failed_title">Nepodarilo sa zachytiť snímku</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Zobraziť náhľad</string>
     <string name="media_file_show_source_description">Zobraziť zdroj</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Server ho nedokázal prečítať (HTTP %1$d). Možno ide o priečinok.</string>
     <string name="media_file_error_timed_out">Vypršal časový limit požiadavky.</string>
     <string name="media_file_error_unexpected_response">Server odoslal neočakávanú odpoveď.</string>
+    <string name="media_file_error_over_limit">Súbor prekračuje limit veľkosti na stiahnutie.</string>
+    <string name="media_file_error_size_unknown">Server neuviedol veľkosť prílohy.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Sťahuje sa…</string>

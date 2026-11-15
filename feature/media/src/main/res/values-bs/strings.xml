@@ -43,6 +43,11 @@
     <string name="media_player_play">Reproduciraj</string>
     <string name="media_player_position_description">Položaj reprodukcije</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Nije moguće reproducirati video</string>
+    <string name="media_video_position_description">Pozicija videa</string>
+    <string name="media_video_capture_failed_title">Snimanje kadra nije uspjelo</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Prikaži pregled</string>
     <string name="media_file_show_source_description">Prikaži izvor</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Server je nije mogao pročitati (HTTP %1$d). Možda je fascikla.</string>
     <string name="media_file_error_timed_out">Isteklo je vrijeme za zahtjev.</string>
     <string name="media_file_error_unexpected_response">Server je poslao neočekivan odgovor.</string>
+    <string name="media_file_error_over_limit">Datoteka prelazi ograničenje veličine za preuzimanje.</string>
+    <string name="media_file_error_size_unknown">Server nije prijavio veličinu priloga.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Preuzimanje…</string>

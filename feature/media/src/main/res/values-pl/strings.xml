@@ -43,6 +43,11 @@
     <string name="media_player_play">Odtwórz</string>
     <string name="media_player_position_description">Pozycja odtwarzania</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Nie udało się odtworzyć wideo</string>
+    <string name="media_video_position_description">Pozycja wideo</string>
+    <string name="media_video_capture_failed_title">Nie udało się przechwycić klatki</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Pokaż podgląd</string>
     <string name="media_file_show_source_description">Pokaż źródło</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Serwer nie mógł odczytać pliku (HTTP %1$d). To może być folder.</string>
     <string name="media_file_error_timed_out">Przekroczono limit czasu żądania.</string>
     <string name="media_file_error_unexpected_response">Serwer wysłał nieoczekiwaną odpowiedź.</string>
+    <string name="media_file_error_over_limit">Plik przekracza limit rozmiaru pobierania.</string>
+    <string name="media_file_error_size_unknown">Serwer nie podał rozmiaru załącznika.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Pobieranie…</string>

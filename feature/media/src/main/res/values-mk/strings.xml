@@ -43,6 +43,11 @@
     <string name="media_player_play">Пушти</string>
     <string name="media_player_position_description">Позиција на репродукција</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">Не успеа пуштањето на видеото</string>
+    <string name="media_video_position_description">Позиција во видеото</string>
+    <string name="media_video_capture_failed_title">Не успеа снимањето на кадарот</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">Прикажи преглед</string>
     <string name="media_file_show_source_description">Прикажи изворен код</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">Серверот не можеше да ја прочита (HTTP %1$d). Можеби е папка.</string>
     <string name="media_file_error_timed_out">Истече времето за барањето.</string>
     <string name="media_file_error_unexpected_response">Серверот испрати неочекуван одговор.</string>
+    <string name="media_file_error_over_limit">Датотеката го надминува ограничувањето за преземање.</string>
+    <string name="media_file_error_size_unknown">Серверот не ја пријави големината на прилогот.</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">Се презема…</string>

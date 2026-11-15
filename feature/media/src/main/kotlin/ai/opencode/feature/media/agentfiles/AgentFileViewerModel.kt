@@ -5,6 +5,7 @@ import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.core.log.AppLog
+import ai.opencode.core.strings.localized
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.AgentFileReference
 import android.content.ActivityNotFoundException
@@ -220,7 +221,7 @@ class AgentFileViewerModel(
 
     private fun downloadSize(probe: AgentFileProbe?): Long? {
         val media = reference.media ?: return probe?.size
-        return media.downloadSize(probe?.size) ?: throw AgentFileError.Network("The server didn’t report the attachment size.")
+        return media.downloadSize(probe?.size) ?: throw AgentFileError.Network(localized(R.string.media_file_error_size_unknown))
     }
 
     private fun shareDownloaded(received: Long, expected: Long?) {

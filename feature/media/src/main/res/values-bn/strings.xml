@@ -43,6 +43,11 @@
     <string name="media_player_play">চালান</string>
     <string name="media_player_position_description">প্লেব্যাকের অবস্থান</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">ভিডিও চালানো যায়নি</string>
+    <string name="media_video_position_description">ভিডিওর অবস্থান</string>
+    <string name="media_video_capture_failed_title">ফ্রেম ক্যাপচার করা যায়নি</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">পূর্বরূপ দেখান</string>
     <string name="media_file_show_source_description">সোর্স দেখান</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">সার্ভার এটি পড়তে পারেনি (HTTP %1$d)। এটি একটি ফোল্ডার হতে পারে।</string>
     <string name="media_file_error_timed_out">অনুরোধের সময়সীমা শেষ হয়েছে।</string>
     <string name="media_file_error_unexpected_response">সার্ভার অপ্রত্যাশিত প্রতিক্রিয়া পাঠিয়েছে।</string>
+    <string name="media_file_error_over_limit">ফাইলটি ডাউনলোডের আকারের সীমা ছাড়িয়ে গেছে।</string>
+    <string name="media_file_error_size_unknown">সার্ভার সংযুক্তির আকার জানায়নি।</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">ডাউনলোড হচ্ছে…</string>

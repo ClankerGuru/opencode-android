@@ -43,6 +43,11 @@
     <string name="media_player_play">གཏང་།</string>
     <string name="media_player_position_description">གཏང་བའི་ས་མཚམས།</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">གློག་བརྙན་གཏང་མ་ཚུགས།</string>
+    <string name="media_video_position_description">གློག་བརྙན་གྱི་གནས་ས།</string>
+    <string name="media_video_capture_failed_title">བརྙན་རིས་བཟུང་མ་ཚུགས།</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">སྔོན་ལྟ་སྟོན།</string>
     <string name="media_file_show_source_description">འབྱུང་ཁུངས་སྟོན།</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">སར་བར་གྱིས་འདི་ལྷག་མ་ཚུགས་ (HTTP %1$d)། སྣོད་འཛིན་ཅིག་འོང་།</string>
     <string name="media_file_error_timed_out">ཞུ་བའི་དུས་ཚོད་རྫོགས་ཡོདཔ།</string>
     <string name="media_file_error_unexpected_response">སར་བར་གྱིས་རེ་བ་མེད་པའི་ལན་གསལ་ཅིག་བཏང་ནུག།</string>
+    <string name="media_file_error_over_limit">ཡིག་སྣོད་འདི་ཕབ་ལེན་གྱི་ཚད་ལས་བརྒལ་ཡོདཔ།</string>
+    <string name="media_file_error_size_unknown">སར་བར་གྱིས་མཉམ་སྦྲགས་ཀྱི་ཚད་མ་སླབ་པས།</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">ཕབ་ལེན་འབད་དོ…</string>

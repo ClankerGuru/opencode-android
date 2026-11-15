@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.strings.localized
 import ai.opencode.feature.media.AgentFileDestination
 import ai.opencode.feature.media.AgentImageKey
 import ai.opencode.feature.media.AgentImageSighting
@@ -89,8 +90,8 @@ object SessionVisualMedia {
         fun attachments(images: List<OpenCodeImageAttachment>, label: String) {
             for ((index, image) in images.withIndex()) {
                 if (image.mediaHash == null && image.data.isEmpty() && !image.isUnavailable) continue
-                gallery.add(Page(image.id, null, image.name ?: "$label ${index + 1} of ${images.size}", mediaHash = image.mediaHash,
-                    name = image.name, isUnavailable = image.isUnavailable, original = image.data.takeIf { it.isNotEmpty() }))
+                gallery.add(Page(image.id, null, image.name ?: localized(R.string.session_visual_image_page_label, label, index + 1, images.size), mediaHash = image.mediaHash,
+                    name = image.name, isUnavailable = image.isUnavailable, original = image.data.takeIf { it.isNotEmpty() }, labelIsPlaceholder = image.name == null))
             }
         }
         fun appendFile(ref: AgentFileReference, occurrence: String? = null) {
@@ -106,11 +107,11 @@ object SessionVisualMedia {
             }
         }
         for (item in items) when (item) {
-            is OpenCodeTranscriptItem.UserImages -> attachments(item.images, "Attached image")
+            is OpenCodeTranscriptItem.UserImages -> attachments(item.images, localized(R.string.session_visual_attached_image))
             is OpenCodeTranscriptItem.UserFiles -> item.files.forEach(::transcriptFile)
             is OpenCodeTranscriptItem.Tool -> {
                 item.call.fileReference?.let { appendFile(it) }
-                attachments(item.call.imageAttachments, "Tool image")
+                attachments(item.call.imageAttachments, localized(R.string.session_visual_tool_image))
                 item.call.videos.orEmpty().forEach(::transcriptFile)
             }
             is OpenCodeTranscriptItem.AssistantMarkdown -> {
@@ -122,10 +123,11 @@ object SessionVisualMedia {
                         is Kind.Image -> {
                             val key = OpenCodeClient.markdownImageKey(server, directory, kind.source)
                             val local = AgentFileReference.fromLink(kind.source)?.let { filePage(AgentFileDestination(it, directory), key) }
-                            gallery.add(local ?: Page(key, null, kind.alt.ifEmpty { "Image" }, imageSource = SessionVisualImageSource.Markdown(kind.source, directory)))
+                            gallery.add(local ?: Page(key, null, kind.alt.ifEmpty { localized(R.string.session_visual_image) }, labelIsPlaceholder = kind.alt.isEmpty(),
+                                imageSource = SessionVisualImageSource.Markdown(kind.source, directory)))
                         }
                         is Kind.Mermaid -> gallery.add(Page("mermaid|${MermaidCacheKey(kind.source, theme).string}", null,
-                            "Diagram, ${MermaidSyntax.diagramType(kind.source) ?: "Mermaid"}", imageSource = SessionVisualImageSource.Diagram(kind.source, theme)))
+                            localized(R.string.session_visual_diagram_label, MermaidSyntax.diagramType(kind.source) ?: "Mermaid"), imageSource = SessionVisualImageSource.Diagram(kind.source, theme)))
                         else -> Unit
                     }
                     for (url in links[block.id].orEmpty()) gallery.add(Page("image-link:${item.id}|${block.id}|$url", null,

@@ -43,6 +43,11 @@
     <string name="media_player_play">播放</string>
     <string name="media_player_position_description">播放进度</string>
 
+    <!-- Video pages in the full-screen viewer -->
+    <string name="media_video_play_failed">无法播放视频</string>
+    <string name="media_video_position_description">视频播放进度</string>
+    <string name="media_video_capture_failed_title">无法截取画面</string>
+
     <!-- File viewer -->
     <string name="media_file_show_preview_description">显示预览</string>
     <string name="media_file_show_source_description">显示源文件</string>
@@ -68,6 +73,8 @@
     <string name="media_file_error_server">服务器无法读取此文件（HTTP %1$d）。它可能是文件夹。</string>
     <string name="media_file_error_timed_out">请求超时。</string>
     <string name="media_file_error_unexpected_response">服务器返回了意外的响应。</string>
+    <string name="media_file_error_over_limit">文件超出下载大小上限。</string>
+    <string name="media_file_error_size_unknown">服务器未提供附件大小。</string>
 
     <!-- File viewer: download progress. %1$s and %2$s are file sizes, as “1.2 MB” -->
     <string name="media_file_downloading">正在下载…</string>
