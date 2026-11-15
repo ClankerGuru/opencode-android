@@ -35,6 +35,7 @@ sealed interface SettingsPage {
     data object Server : SettingsPage
     data object Appearance : SettingsPage
     data object Themes : SettingsPage
+    data object Language : SettingsPage
     /** Settings › Sessions: the transcript and composer preferences. */
     data object Sessions : SettingsPage
     /** Settings › Models (experimental `hideModels`). */

@@ -232,6 +232,8 @@ Status values: `todo`, `partial: <what is missing>`, `done`, `n/a: <reason and w
 
 Also here: `HomeSettingsFeature.kt` (iOS `Drawer/HomeSettingsFeature.swift`, moved down; see drawer.md): every action but `developerModeChanged`/`motionWatchChanged`/`touchProbeChanged`/`voiceDemoModeChanged` (iOS sends them from `DiagnosticsView`; Android's `:devtools` `DevToolsFeature` owns Developer Mode and Demo Call Audio, Motion Watch and Touch Probe are iOS-only) and the Tuning mirrors of `plusMenuSheet`/`composerAutocomplete` (the composer reads the keys). Synced to iOS f657969b: Sound Effects volume/send and `prepare` on enabling (b275ccb6), `welcomeOpened` (7f411b1c), Orb Style gone (e4aeb212); `voiceDelegatorChoiceChanged`, `callSoundPackSelected`, `voiceModelsLoaded(asked:)` and the delegator's session list wait on voice (see the SettingsView row). Settings-owned Android extras: `SettingsPresentation.kt` is the overlay Home wraps itself in.
 
+Android-only: Settings › Language (`LanguageSettingsView.kt`, `AppLanguageClient.kt`, `HomeSettingsFeature.AppLanguageChanged`) sets the app's language through Android's per-app language setting (`LocaleManager`), listing the languages in the generated `LocaleConfig` with a search field and a Suggested group of the phone's languages, as Android's App language screen does; iOS has no language setting.
+
 ## Tests
 
 iOS `OpenCodeTests` files that test `:feature:settings` code, ported into `feature/settings/src/test`

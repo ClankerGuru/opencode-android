@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Ajuda\'m a millorar la pantalla de la sessió. Mostra\'m què trobes i explica els canvis.</string>
     <string name="settings_themes_preview_reply">He trobat el problema de disposició a %1$s. La transcripció i el redactor comparteixen l\'alçada disponible, així que el teclat va bé per posar-los a prova.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Llengua</string>
+    <string name="settings_language_system_default">Per defecte del sistema</string>
+    <string name="settings_language_search_placeholder">Cerca llengües</string>
+    <string name="settings_language_suggested_header">Suggerit</string>
+    <string name="settings_language_all_header">Totes les llengües</string>
+    <string name="settings_language_no_matches">No hi ha llengües coincidents</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Experimental</string>
     <string name="settings_experimental_all_footer">També activa els experiments nous, excepte els que veuen la pantalla o escolten en segon pla.</string>

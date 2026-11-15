@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">සැසි තිරය වැඩිදියුණු කරන්න මට උදව් කරන්න. හමු වන දේ පෙන්වා වෙනස්කම් පැහැදිලි කරන්න.</string>
     <string name="settings_themes_preview_reply">%1$s තුළ පිරිසැලසුමේ ගැටලුව හමු වුණා. සංවාද පිටපත සහ පණිවිඩ සකසනය තිබෙන උස බෙදාගන්නා නිසා, යතුරුපුවරුවෙන් එහි සීමා පරීක්ෂා කළ හැකියි.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">භාෂාව</string>
+    <string name="settings_language_system_default">පද්ධති පෙරනිමිය</string>
+    <string name="settings_language_search_placeholder">භාෂා සොයන්න</string>
+    <string name="settings_language_suggested_header">යෝජනා කර ඇත</string>
+    <string name="settings_language_all_header">සියලු භාෂා</string>
+    <string name="settings_language_no_matches">ගැළපෙන භාෂා නැත</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">පර්යේෂණාත්මක</string>
     <string name="settings_experimental_all_footer">ඔබේ තිරය බලන හෝ පසුබිමේ සවන් දෙන ඒවා හැර, අලුත් ඒවාත් සක්‍රිය කරයි.</string>

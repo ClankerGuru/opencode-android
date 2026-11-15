@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">စက်ရှင်မျက်နှာပြင် ပိုကောင်းအောင် ကူညီပေးပါ။ တွေ့ရှိချက်တွေကို ပြပြီး အပြောင်းအလဲတွေကို ရှင်းပြပါ။</string>
     <string name="settings_themes_preview_reply">%1$s မှာ အပြင်အဆင်ပြဿနာကို တွေ့ပါပြီ။ စကားပြောမှတ်တမ်းနဲ့ စာရေးကွက်က ရနိုင်တဲ့အမြင့်ကို မျှသုံးထားလို့ ကီးဘုတ်ဖွင့်ပြီး စမ်းကြည့်တာက အဆင်ပြေမပြေ စစ်ဖို့ အသုံးဝင်ပါတယ်။</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">ဘာသာစကား</string>
+    <string name="settings_language_system_default">စနစ် မူရင်း</string>
+    <string name="settings_language_search_placeholder">ဘာသာစကားများကို ရှာဖွေပါ</string>
+    <string name="settings_language_suggested_header">အကြံပြုထားသည်။</string>
+    <string name="settings_language_all_header">ဘာသာစကားအားလုံး</string>
+    <string name="settings_language_no_matches">ကိုက်ညီသော ဘာသာစကား မရှိပါ</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">သမ္ဘာ</string>
     <string name="settings_experimental_all_footer">မျက်နှာပြင်ကို ကြည့်ခြင်း သို့မဟုတ် နောက်ခံမှာ နားထောင်ခြင်း မလုပ်တဲ့ စမ်းသပ်လုပ်ဆောင်ချက်အသစ်တွေကိုလည်း ဖွင့်ပေးမည်။</string>

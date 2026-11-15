@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Pomagaj mi izboljšati zaslon seje. Pokaži, kaj najdeš, in pojasni spremembe.</string>
     <string name="settings_themes_preview_reply">V %1$s sem našel težavo s postavitvijo. Prepis in urejevalnik sporočil si delita razpoložljivo višino, zato je tipkovnica dober preizkus.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Jezik</string>
+    <string name="settings_language_system_default">Privzeto za sistem</string>
+    <string name="settings_language_search_placeholder">Išči jezike</string>
+    <string name="settings_language_suggested_header">Predlagano</string>
+    <string name="settings_language_all_header">Vsi jeziki</string>
+    <string name="settings_language_no_matches">Ni ustreznih jezikov</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Eksperimentalno</string>
     <string name="settings_experimental_all_footer">Vklopi tudi nove preizkuse, razen tistih, ki vidijo zaslon ali poslušajo v ozadju.</string>

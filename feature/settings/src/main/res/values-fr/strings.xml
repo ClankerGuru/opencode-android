@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Aidez-moi à améliorer l’écran de session. Montrez-moi ce que vous trouvez et expliquez les changements.</string>
     <string name="settings_themes_preview_reply">J’ai trouvé le problème de mise en page dans %1$s. La transcription et la zone de saisie se partagent la hauteur disponible. Le clavier permet donc de bien tester les limites.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Langue</string>
+    <string name="settings_language_system_default">Par défaut du système</string>
+    <string name="settings_language_search_placeholder">Rechercher des langues</string>
+    <string name="settings_language_suggested_header">Suggéré</string>
+    <string name="settings_language_all_header">Toutes les langues</string>
+    <string name="settings_language_no_matches">Aucune langue correspondante</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Expérimental</string>
     <string name="settings_experimental_all_footer">Active aussi les nouvelles fonctions, sauf celles qui voient votre écran ou écoutent en arrière-plan.</string>

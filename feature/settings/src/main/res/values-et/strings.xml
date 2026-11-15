@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Aita mul seansikuva paremaks teha. Näita, mida leiad, ja selgita muudatusi.</string>
     <string name="settings_themes_preview_reply">Leidsin paigutusvea failis %1$s. Vestluse tekst ja sõnumiredaktor jagavad vaba kõrgust, nii et klaviatuuriga saab paigutust hästi proovile panna.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Keel</string>
+    <string name="settings_language_system_default">Süsteemi vaikevalik</string>
+    <string name="settings_language_search_placeholder">Otsi keeli</string>
+    <string name="settings_language_suggested_header">Soovitatud</string>
+    <string name="settings_language_all_header">Kõik keeled</string>
+    <string name="settings_language_no_matches">Sobivaid keeli pole</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Eksperimentaalne</string>
     <string name="settings_experimental_all_footer">Lülitab sisse ka uued katselised funktsioonid, välja arvatud need, mis näevad ekraani või kuulavad taustal.</string>

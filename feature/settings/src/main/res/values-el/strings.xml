@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Βοήθησέ με να βελτιώσω την οθόνη της συνεδρίας. Δείξε μου τι βρίσκεις και εξήγησε τις αλλαγές.</string>
     <string name="settings_themes_preview_reply">Βρήκα το πρόβλημα διάταξης στο %1$s. Η καταγραφή συνομιλίας και η σύνταξη μοιράζονται το διαθέσιμο ύψος, οπότε το πληκτρολόγιο είναι μια καλή δοκιμή αντοχής.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Γλώσσα</string>
+    <string name="settings_language_system_default">Προεπιλογή συστήματος</string>
+    <string name="settings_language_search_placeholder">Αναζήτηση γλωσσών</string>
+    <string name="settings_language_suggested_header">Προτεινόμενο</string>
+    <string name="settings_language_all_header">Όλες οι γλώσσες</string>
+    <string name="settings_language_no_matches">Δεν βρέθηκαν αντίστοιχες γλώσσες</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Πειραματικό</string>
     <string name="settings_experimental_all_footer">Ενεργοποιεί και τις νέες λειτουργίες, εκτός από όσες βλέπουν την οθόνη σας ή ακούν στο παρασκήνιο.</string>

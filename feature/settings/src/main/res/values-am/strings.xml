@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">የክፍለ ጊዜውን ማያ ገጽ እንዳሻሽል እርዳኝ። ያገኘኸውን አሳየኝና ለውጦቹን አብራራ።</string>
     <string name="settings_themes_preview_reply">የአቀማመጡን ችግር በ%1$s ውስጥ አግኝቻለሁ። የውይይት ጽሑፉና የመልዕክት መጻፊያው ያለውን ቁመት ይጋራሉ፤ ስለዚህ ቦታ ሲጠብ ለመፈተሽ የቁልፍ ሰሌዳው ይጠቅማል።</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">ቋንቋ</string>
+    <string name="settings_language_system_default">የስርዓቱ ነባሪ</string>
+    <string name="settings_language_search_placeholder">ቋንቋዎችን ፈልግ</string>
+    <string name="settings_language_suggested_header">የሚመከር</string>
+    <string name="settings_language_all_header">ሁሉም ቋንቋዎች</string>
+    <string name="settings_language_no_matches">የሚዛመዱ ቋንቋዎች የሉም</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">ሙከራዊ</string>
     <string name="settings_experimental_all_footer">ማያ ገጽዎን ከሚያዩ ወይም በዳራ ከሚያዳምጡ በስተቀር አዳዲሶቹንም ያበራል።</string>

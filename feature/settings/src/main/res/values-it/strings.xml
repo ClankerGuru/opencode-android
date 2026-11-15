@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Aiutami a migliorare la schermata della sessione. Mostrami cosa trovi e spiega le modifiche.</string>
     <string name="settings_themes_preview_reply">Ho trovato il problema di impaginazione in %1$s. La trascrizione e l\'area di composizione condividono l\'altezza disponibile, quindi la tastiera è un buon banco di prova.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Lingua</string>
+    <string name="settings_language_system_default">Predefinita di sistema</string>
+    <string name="settings_language_search_placeholder">Cerca lingue</string>
+    <string name="settings_language_suggested_header">Suggeriti</string>
+    <string name="settings_language_all_header">Tutte le lingue</string>
+    <string name="settings_language_no_matches">Nessuna lingua corrispondente</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Sperimentale</string>
     <string name="settings_experimental_all_footer">Attiva anche i nuovi esperimenti, tranne quelli che vedono lo schermo o ascoltano in background.</string>

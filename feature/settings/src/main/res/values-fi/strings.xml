@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Auta parantamaan istuntonäkymää. Näytä, mitä löydät, ja selitä muutokset.</string>
     <string name="settings_themes_preview_reply">Löysin asetteluongelman tiedostosta %1$s. Keskusteluloki ja viestikenttä jakavat käytettävissä olevan korkeuden, joten näppäimistö on hyvä rasitustesti.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Kieli</string>
+    <string name="settings_language_system_default">Järjestelmän oletus</string>
+    <string name="settings_language_search_placeholder">Hae kieliä</string>
+    <string name="settings_language_suggested_header">Ehdotetut</string>
+    <string name="settings_language_all_header">Kaikki kielet</string>
+    <string name="settings_language_no_matches">Ei vastaavia kieliä</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Kokeellinen</string>
     <string name="settings_experimental_all_footer">Ottaa käyttöön myös uudet kokeilut, paitsi ne, jotka näkevät näyttösi tai kuuntelevat taustalla.</string>

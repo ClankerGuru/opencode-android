@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Sessiya ekranini yaxshilashga yordam bering. Topganlaringizni ko‘rsating va o‘zgarishlarni tushuntiring.</string>
     <string name="settings_themes_preview_reply">%1$s ichida joylashuv muammosini topdim. Suhbat matni va xabar yozish maydoni mavjud balandlikni bo‘lishadi, shuning uchun klaviatura bilan sinash foydali.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Til</string>
+    <string name="settings_language_system_default">Tizim standarti</string>
+    <string name="settings_language_search_placeholder">Tillarni qidirish</string>
+    <string name="settings_language_suggested_header">Tavsiya etilgan</string>
+    <string name="settings_language_all_header">Barcha tillar</string>
+    <string name="settings_language_no_matches">Mos tillar yo‘q</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Tajriba</string>
     <string name="settings_experimental_all_footer">Yangilarini ham yoqadi, ammo ekranni ko‘radigan yoki fonda tinglaydiganlarini yoqmaydi.</string>

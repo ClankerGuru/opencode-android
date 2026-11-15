@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Ajută-mă să îmbunătățesc ecranul sesiunii. Arată-mi ce găsești și explică modificările.</string>
     <string name="settings_themes_preview_reply">Am găsit problema de aranjare în %1$s. Transcrierea și editorul de mesaje împart înălțimea disponibilă, așa că tastatura e un bun test de rezistență.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Limbă</string>
+    <string name="settings_language_system_default">Implicit în sistem</string>
+    <string name="settings_language_search_placeholder">Caută limbi</string>
+    <string name="settings_language_suggested_header">Sugerat</string>
+    <string name="settings_language_all_header">Toate limbile</string>
+    <string name="settings_language_no_matches">Nicio limbă potrivită</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Experimental</string>
     <string name="settings_experimental_all_footer">Activează și experimentele noi, cu excepția celor care văd ecranul sau ascultă în fundal.</string>

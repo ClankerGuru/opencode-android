@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Помогни ми да подобря екрана на сесията. Покажи какво откри и обясни промените.</string>
     <string name="settings_themes_preview_reply">Открих проблема с оформлението в %1$s. Преписът и редакторът на съобщения си поделят наличната височина, затова клавиатурата е добър тест за това.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Език</string>
+    <string name="settings_language_system_default">По подразбиране за системата</string>
+    <string name="settings_language_search_placeholder">Търсене на езици</string>
+    <string name="settings_language_suggested_header">Предложено</string>
+    <string name="settings_language_all_header">Всички езици</string>
+    <string name="settings_language_no_matches">Няма съответстващи езици</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Експериментален</string>
     <string name="settings_experimental_all_footer">Включва и новите, освен тези, които виждат екрана или слушат във фонов режим.</string>

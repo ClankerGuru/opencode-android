@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">დამეხმარე სესიის ეკრანის გაუმჯობესებაში. მაჩვენე, რას იპოვი და ამიხსენი ცვლილებები.</string>
     <string name="settings_themes_preview_reply">განლაგების პრობლემა ვიპოვე აქ: %1$s. ტრანსკრიპტი და შეტყობინების რედაქტორი ხელმისაწვდომ სიმაღლეს ინაწილებენ, ამიტომ კლავიატურით ამის შემოწმება მოსახერხებელია.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">ენა</string>
+    <string name="settings_language_system_default">სისტემის ნაგულისხმევი</string>
+    <string name="settings_language_search_placeholder">ენების ძიება</string>
+    <string name="settings_language_suggested_header">შემოთავაზებულია</string>
+    <string name="settings_language_all_header">ყველა ენა</string>
+    <string name="settings_language_no_matches">შესაბამისი ენები არ არის</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">ექსპერიმენტული</string>
     <string name="settings_experimental_all_footer">ახალ ფუნქციებსაც რთავს, გარდა იმ ფუნქციებისა, რომლებიც ეკრანს ხედავენ ან ფონურად უსმენენ.</string>

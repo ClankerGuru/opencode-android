@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Pomoz mi vylepšit obrazovku relace. Ukaž mi, co najdeš, a vysvětli změny.</string>
     <string name="settings_themes_preview_reply">Našel jsem problém s rozložením v %1$s. Přepis a editor zpráv sdílejí dostupnou výšku, takže klávesnice dobře prověří, jak rozložení funguje.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Jazyk</string>
+    <string name="settings_language_system_default">Výchozí v systému</string>
+    <string name="settings_language_search_placeholder">Hledat jazyky</string>
+    <string name="settings_language_suggested_header">Doporučeno</string>
+    <string name="settings_language_all_header">Všechny jazyky</string>
+    <string name="settings_language_no_matches">Žádné odpovídající jazyky</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Experimentální</string>
     <string name="settings_experimental_all_footer">Zapne i nové experimenty kromě těch, které sledují obrazovku nebo poslouchají na pozadí.</string>

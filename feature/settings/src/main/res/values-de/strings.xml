@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Hilf mir, die Sitzungsansicht zu verbessern. Zeig mir, was du findest, und erkläre die Änderungen.</string>
     <string name="settings_themes_preview_reply">Ich habe das Layoutproblem in %1$s gefunden. Transkript und Nachrichteneingabe teilen sich die verfügbare Höhe. Die Tastatur ist daher ein guter Belastungstest.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Sprache</string>
+    <string name="settings_language_system_default">Systemstandard</string>
+    <string name="settings_language_search_placeholder">Sprachen durchsuchen</string>
+    <string name="settings_language_suggested_header">Vorgeschlagen</string>
+    <string name="settings_language_all_header">Alle Sprachen</string>
+    <string name="settings_language_no_matches">Keine passenden Sprachen</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Experimentell</string>
     <string name="settings_experimental_all_footer">Aktiviert auch neue Experimente, außer denen, die deinen Bildschirm sehen oder im Hintergrund zuhören.</string>

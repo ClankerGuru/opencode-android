@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Padėk patobulinti seanso ekraną. Parodyk, ką rasi, ir paaiškink pakeitimus.</string>
     <string name="settings_themes_preview_reply">Radau išdėstymo problemą faile %1$s. Pokalbio išrašas ir rašymo laukas dalijasi turimu aukščiu, tad klaviatūra padeda patikrinti, kaip viskas veikia ankštoje erdvėje.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Kalba</string>
+    <string name="settings_language_system_default">Sistemos numatytoji</string>
+    <string name="settings_language_search_placeholder">Ieškoti kalbų</string>
+    <string name="settings_language_suggested_header">Siūloma</string>
+    <string name="settings_language_all_header">Visos kalbos</string>
+    <string name="settings_language_no_matches">Nėra atitinkančių kalbų</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Eksperimentinis</string>
     <string name="settings_experimental_all_footer">Įjungia ir naujus eksperimentus, išskyrus tuos, kurie mato ekraną ar klausosi fone.</string>

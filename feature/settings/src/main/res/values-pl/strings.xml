@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Pomóż mi ulepszyć ekran sesji. Pokaż, co znajdziesz, i wyjaśnij zmiany.</string>
     <string name="settings_themes_preview_reply">Udało mi się znaleźć problem z układem w %1$s. Transkrypcja i pole wiadomości dzielą dostępną wysokość, więc klawiatura dobrze sprawdza ich zachowanie w ciasnym widoku.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Język</string>
+    <string name="settings_language_system_default">Domyślny systemu</string>
+    <string name="settings_language_search_placeholder">Szukaj języków</string>
+    <string name="settings_language_suggested_header">Sugerowane</string>
+    <string name="settings_language_all_header">Wszystkie języki</string>
+    <string name="settings_language_no_matches">Brak pasujących języków</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Eksperymentalny</string>
     <string name="settings_experimental_all_footer">Włącza też nowe eksperymenty, oprócz tych, które widzą ekran lub nasłuchują w tle.</string>

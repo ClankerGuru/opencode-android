@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Օգնիր բարելավել նիստի էկրանը։ Ցույց տուր՝ ինչ ես գտել, և բացատրիր փոփոխությունները։</string>
     <string name="settings_themes_preview_reply">Դասավորության խնդիրը գտա %1$s-ում։ Սղագրությունն ու հաղորդագրության խմբագրիչը կիսում են հասանելի բարձրությունը, ուստի ստեղնաշարով կարելի է ստուգել՝ ինչպես է դասավորությունը դիմանում սահմանափակումներին։</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Լեզու</string>
+    <string name="settings_language_system_default">Համակարգի լռելյայնը</string>
+    <string name="settings_language_search_placeholder">Որոնել լեզուներ</string>
+    <string name="settings_language_suggested_header">Առաջարկված</string>
+    <string name="settings_language_all_header">Բոլոր լեզուները</string>
+    <string name="settings_language_no_matches">Համապատասխան լեզուներ չկան</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Փորձարարական</string>
     <string name="settings_experimental_all_footer">Միացնում է նաև նորերը՝ բացի էկրանը տեսնողներից կամ ֆոնային ռեժիմում լսողներից։</string>

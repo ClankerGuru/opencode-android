@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">セッション画面を改善したいです。気づいた点を教えて、変更内容を説明してください。</string>
     <string name="settings_themes_preview_reply">%1$sにレイアウトの問題が見つかりました。会話履歴と入力欄が表示領域の高さを分け合うので、キーボードを表示すると動作を確認しやすくなります。</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">言語</string>
+    <string name="settings_language_system_default">システムのデフォルト</string>
+    <string name="settings_language_search_placeholder">言語を検索</string>
+    <string name="settings_language_suggested_header">おすすめ</string>
+    <string name="settings_language_all_header">すべての言語</string>
+    <string name="settings_language_no_matches">一致する言語がありません</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">実験的</string>
     <string name="settings_experimental_all_footer">今後追加される機能もオンにします。ただし、画面を見る機能やバックグラウンドで音声を聞く機能は除きます。</string>

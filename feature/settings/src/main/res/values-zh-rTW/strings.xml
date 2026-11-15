@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">幫我改善工作階段畫面。告訴我你發現了什麼，並說明變更。</string>
     <string name="settings_themes_preview_reply">我在 %1$s 找到了版面配置問題。對話紀錄和輸入區共用可用高度，因此可以用鍵盤來測試版面的極限。</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">語言</string>
+    <string name="settings_language_system_default">系統預設</string>
+    <string name="settings_language_search_placeholder">搜尋語言</string>
+    <string name="settings_language_suggested_header">建議</string>
+    <string name="settings_language_all_header">所有語言</string>
+    <string name="settings_language_no_matches">沒有符合的語言</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">實驗性</string>
     <string name="settings_experimental_all_footer">也會開啟新加入的功能，但會讀取螢幕或在背景收音的功能除外。</string>

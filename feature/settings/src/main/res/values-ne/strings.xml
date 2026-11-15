@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">सत्रको स्क्रिन सुधार्न मद्दत गर्नुहोस्। के भेट्नुभयो देखाउनुहोस् र परिवर्तनहरू बुझाउनुहोस्।</string>
     <string name="settings_themes_preview_reply">%1$s मा लेआउटको समस्या भेटेँ। वार्तालापको पाठ र सन्देश लेखनले उपलब्ध उचाइ बाँड्छन्, त्यसैले किबोर्ड खोलेर यसको सीमा जाँच्न सकिन्छ।</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">भाषा</string>
+    <string name="settings_language_system_default">प्रणालीको पूर्वनिर्धारित</string>
+    <string name="settings_language_search_placeholder">भाषाहरू खोज्नुहोस्</string>
+    <string name="settings_language_suggested_header">सिफारिस गर्नुभयो</string>
+    <string name="settings_language_all_header">सबै भाषाहरू</string>
+    <string name="settings_language_no_matches">मिल्दो भाषाहरू छैनन्</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">प्रयोगात्मक</string>
     <string name="settings_experimental_all_footer">नयाँ प्रयोगहरू पनि चालु गर्छ, तर तपाईंको स्क्रिन हेर्ने वा पृष्ठभूमिमा सुन्ने प्रयोगहरू गर्दैन।</string>

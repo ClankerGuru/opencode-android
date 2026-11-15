@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">ជួយខ្ញុំកែលម្អអេក្រង់សម័យ។ បង្ហាញអ្វីដែលអ្នករកឃើញ និងពន្យល់ពីការផ្លាស់ប្តូរ។</string>
     <string name="settings_themes_preview_reply">ខ្ញុំបានរកឃើញបញ្ហាប្លង់នៅក្នុង %1$s។ កំណត់ត្រាសន្ទនា និងប្រអប់សរសេរចែកគ្នាប្រើកម្ពស់ដែលមាន ដូច្នេះការបើកក្តារចុចជួយសាកល្បងប្លង់ពេលទំហំចង្អៀត។</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">ភាសា</string>
+    <string name="settings_language_system_default">លំនាំដើមរបស់ប្រព័ន្ធ</string>
+    <string name="settings_language_search_placeholder">ស្វែងរកភាសា</string>
+    <string name="settings_language_suggested_header">បានស្នើ</string>
+    <string name="settings_language_all_header">ភាសាទាំងអស់</string>
+    <string name="settings_language_no_matches">គ្មានភាសាដែលត្រូវគ្នា</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">ពិសោធន៍</string>
     <string name="settings_experimental_all_footer">បើកមុខងារពិសោធន៍ថ្មីៗផងដែរ លើកលែងតែមុខងារដែលមើលអេក្រង់ ឬស្តាប់នៅផ្ទៃខាងក្រោយ។</string>

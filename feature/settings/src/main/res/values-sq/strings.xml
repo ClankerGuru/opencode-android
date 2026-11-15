@@ -11,6 +11,14 @@
     <string name="settings_themes_preview_user_message">Më ndihmo të përmirësoj ekranin e sesionit. Më trego çfarë gjen dhe shpjego ndryshimet.</string>
     <string name="settings_themes_preview_reply">E gjeta problemin e paraqitjes te %1$s. Transkripti dhe fusha e mesazhit ndajnë lartësinë e disponueshme, ndaj tastiera është një provë e mirë për hapësirën e kufizuar.</string>
 
+    <!-- Language -->
+    <string name="settings_language_title">Gjuha</string>
+    <string name="settings_language_system_default">E paracaktuar nga sistemi</string>
+    <string name="settings_language_search_placeholder">Kërko gjuhë</string>
+    <string name="settings_language_suggested_header">Sugjeruar</string>
+    <string name="settings_language_all_header">Të gjitha gjuhët</string>
+    <string name="settings_language_no_matches">Nuk ka gjuhë që përputhen</string>
+
     <!-- Experimental -->
     <string name="settings_experimental_title">Eksperimentale</string>
     <string name="settings_experimental_all_footer">Aktivizon edhe të rejat, përveç atyre që shohin ekranin ose dëgjojnë në sfond.</string>
