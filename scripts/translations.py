@@ -20,7 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 # Every translated language: Android folder qualifier, the desktop app's code for it
-# (packages/app/src/runtime/i18n/<code>.ts in the opencode repo), the language tag dates and
+# (packages/app/src/runtime/i18n/<code>.ts in github.com/anomalyco/opencode), the language tag dates and
 # numbers use (core_language_tag), its English name and the script its text is written in.
 LANGUAGES = [
     ("am", "am", "am", "Amharic", "Ethiopic"),

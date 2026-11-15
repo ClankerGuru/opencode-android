@@ -10,11 +10,12 @@ Usage:
 
 Only strings with no translation are sent, so a run after new English text is added translates
 just that, and strings gone from English are dropped. Each request carries the desktop app's own
-translations of the terms it uses (read from the opencode repo, `--desktop`, default
-../opencode) and the app's existing translations, so a word reads the same everywhere. Without
-the opencode repo it still runs, with a note, but the words may differ from desktop. Every answer
-is checked like scripts/translations.py checks the files; a string that fails is asked for
-again, and left out if it still fails.
+translations of the terms it uses and its translators' glossary, read from the public opencode
+repo on GitHub (github.com/anomalyco/opencode), plus the app's existing translations, so a word
+reads the same everywhere. If GitHub can't be reached it still runs, with a note, but words like
+session, agent and model may then differ from the desktop app. Every answer is checked like
+scripts/translations.py checks the files; a string that fails is asked for again, and left out
+if it still fails.
 
 Models run through `opencode run` (install it from https://opencode.ai). The defaults use the
 Anomaly Console provider (`opencode/…`). Without Console access, pass any model `opencode run -m`
@@ -30,6 +31,8 @@ import subprocess
 import sys
 import tempfile
 import threading
+import urllib.error
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from xml.sax.saxutils import escape
@@ -47,6 +50,8 @@ from translations import (
 
 TRANSLATE_MODEL = "opencode/gpt-6.1-sol"
 REVIEW_MODEL = "opencode/gemini-3.8-flash"
+DESKTOP_URL = "https://raw.githubusercontent.com/anomalyco/opencode/dev"
+DESKTOP_FOLDERS = ["packages/app/src/runtime/i18n", "packages/ui/src/i18n"]
 CHUNK_SIZE = 60
 ATTEMPTS = 3
 
@@ -205,26 +210,43 @@ def write_translation(english_path, qualifier, translations):
     path.write_text("\n".join(lines) + "\n")
 
 
-def read_desktop(repo, path):
+desktop_files = {}
+desktop_lock = threading.Lock()
+
+
+def fetch_desktop(path):
+    """Returns one file of the opencode repo from GitHub, "" if it doesn't exist, or None if the
+    fetch failed. Each file is fetched once per run."""
+    with desktop_lock:
+        if path not in desktop_files:
+            try:
+                with urllib.request.urlopen(f"{DESKTOP_URL}/{path}", timeout=30) as response:
+                    desktop_files[path] = response.read().decode("utf-8")
+            except urllib.error.HTTPError as error:
+                desktop_files[path] = "" if error.code == 404 else None
+            except (urllib.error.URLError, OSError, UnicodeDecodeError):
+                desktop_files[path] = None
+        return desktop_files[path]
+
+
+def read_desktop(path):
     """Returns key -> text for one desktop i18n file, or {} when it can't be read."""
-    result = subprocess.run(
-        ["git", "-C", str(repo), "show", f"origin/dev:{path}"], capture_output=True, text=True
-    )
-    if result.returncode != 0:
+    text = fetch_desktop(path)
+    if not text:
         return {}
     entries = {}
-    for match in re.finditer(r'"([^"\n]+)"\s*:\s*"((?:[^"\\\n]|\\.)*)"', result.stdout):
+    for match in re.finditer(r'"([^"\n]+)"\s*:\s*"((?:[^"\\\n]|\\.)*)"', text):
         entries[match.group(1)] = match.group(2).replace('\\"', '"')
     return entries
 
 
-def desktop_terms(repo, code):
+def desktop_terms(code):
     """Returns English -> the desktop's translations of its short UI text (up to three words)."""
     english = {}
     translated = {}
-    for folder in ["packages/app/src/runtime/i18n", "packages/ui/src/i18n"]:
-        english.update(read_desktop(repo, f"{folder}/en.ts"))
-        translated.update(read_desktop(repo, f"{folder}/{code}.ts"))
+    for folder in DESKTOP_FOLDERS:
+        english.update(read_desktop(f"{folder}/en.ts"))
+        translated.update(read_desktop(f"{folder}/{code}.ts"))
     terms = {}
     for key, text in english.items():
         if key not in translated or "{{" in text or len(text.split()) > 3:
@@ -240,16 +262,10 @@ def desktop_terms(repo, code):
     return result
 
 
-def desktop_guidance(repo, code):
+def desktop_guidance(code):
     """The desktop translators' notes for the language (.opencode/glossary), if there are any."""
     names = {"zh": "zh-cn", "zht": "zh-tw"}
-    path = f".opencode/glossary/{names.get(code, code)}.md"
-    result = subprocess.run(
-        ["git", "-C", str(repo), "show", f"origin/dev:{path}"], capture_output=True, text=True
-    )
-    if result.returncode != 0:
-        return ""
-    return result.stdout
+    return fetch_desktop(f".opencode/glossary/{names.get(code, code)}.md") or ""
 
 
 def word_stems(text):
@@ -443,23 +459,22 @@ def translate_file(language, english_path, terms, guidance, model, workdir, revi
     return changed
 
 
-def has_desktop(repo):
-    result = subprocess.run(
-        ["git", "-C", str(repo), "cat-file", "-e", "origin/dev:packages/app/src/runtime/i18n/en.ts"],
-        capture_output=True,
-    )
-    return result.returncode == 0
+def has_desktop():
+    for folder in DESKTOP_FOLDERS:
+        if not fetch_desktop(f"{folder}/en.ts"):
+            return False
+    return True
 
 
-def run_language(language, repo, model, workdir, review, redo):
+def run_language(language, use_desktop, model, workdir, review, redo):
     qualifier, code = language[0], language[1]
     terms = {}
     guidance = ""
-    if repo is not None:
-        terms = desktop_terms(repo, code)
-        guidance = desktop_guidance(repo, code)
+    if use_desktop:
+        terms = desktop_terms(code)
+        guidance = desktop_guidance(code)
         if not terms:
-            log(f"{qualifier}: no desktop translations found in {repo}")
+            log(f"{qualifier}: no desktop translations found at {DESKTOP_URL}")
     total = 0
     for english_path in ordered_files():
         total += translate_file(language, english_path, terms, guidance, model, workdir, review, redo)
@@ -472,7 +487,6 @@ def main():
     parser.add_argument("--review", action="store_true", help="review existing translations instead")
     parser.add_argument("--model", default=TRANSLATE_MODEL, metavar="PROVIDER/MODEL", help="the model that translates (default: %(default)s)")
     parser.add_argument("--review-model", default=REVIEW_MODEL, metavar="PROVIDER/MODEL", help="the model that reviews (default: %(default)s)")
-    parser.add_argument("--desktop", default=str(ROOT.parent / "opencode"), help="the opencode repo checkout, for desktop terms (default: %(default)s)")
     parser.add_argument("--jobs", type=int, default=12, help="languages to translate at once")
     parser.add_argument("--redo", action="append", default=[], metavar="NAME", help="translate this string again (repeatable)")
     args = parser.parse_args()
@@ -485,12 +499,12 @@ def main():
     if shutil.which("opencode") is None:
         print("opencode isn't installed; get it from https://opencode.ai (docs/translating.md).")
         return 1
-    desktop = args.desktop
-    if not has_desktop(desktop):
-        print(f"Note: no opencode repo at {desktop}, so desktop terms are skipped and words like session, "
-              "agent and model may differ from the desktop app. Clone https://github.com/anomalyco/opencode "
-              "next to this repo, or pass --desktop <path>.")
-        desktop = None
+    use_desktop = has_desktop()
+    if not use_desktop:
+        print(f"Note: couldn't read the desktop app's translations from {DESKTOP_URL}, so desktop terms "
+              "are skipped and words like session, agent and model may differ from the desktop app. "
+              "Check the connection to GitHub and run again; if it keeps failing, the files may have "
+              "moved and DESKTOP_URL or DESKTOP_FOLDERS in this script need updating.")
 
     with tempfile.TemporaryDirectory(prefix="translate-") as workdir:
         agent = Path(workdir) / ".opencode" / "agent" / "translator.md"
@@ -501,7 +515,7 @@ def main():
         with ThreadPoolExecutor(max_workers=args.jobs) as pool:
             futures = []
             for language in languages:
-                futures.append(pool.submit(run_language, language, desktop, model, workdir, args.review, set(args.redo)))
+                futures.append(pool.submit(run_language, language, use_desktop, model, workdir, args.review, set(args.redo)))
             for future in futures:
                 future.result()
     return 0

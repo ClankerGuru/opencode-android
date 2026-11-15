@@ -47,10 +47,10 @@ English string, pass its name with `--redo`, since the old translations would ot
 typo fix in English doesn't need `--redo`.
 
 Each request carries the desktop app's translations of the terms it uses and its locale
-glossary, so words like session, agent and model read as they do on desktop. These come from the
-opencode repo next to this one (`--desktop <path>` to point elsewhere). Without it the script
-still runs and prints a note, but the words may drift from desktop's; clone
-`https://github.com/anomalyco/opencode` next to this repo to get them. Answers are checked like
+glossary, so words like session, agent and model read as they do on desktop. The script reads
+them from the public [opencode repo](https://github.com/anomalyco/opencode) on GitHub. If GitHub
+can't be reached it still runs and prints a note, but the words may then drift from desktop's,
+so run it again once you're online. Answers are checked like
 `scripts/translations.py` checks the files; a string that keeps failing is left out and shows in
 English.
 
