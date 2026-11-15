@@ -703,7 +703,7 @@ private fun ViewerActions(
         }
     }
     if (state.allowsDrawing && !page.isVideo && (file == null || content is AgentFileViewerModel.Content.Image)) {
-        OpenCodeIconButton(SFSymbol.Pencil, "Draw on Image", { send(Action.DrawTapped) }, Modifier.testTag("image-gallery-draw"),
+        OpenCodeIconButton(SFSymbol.Pencil, stringResource(R.string.media_drawing_draw_on_image_description), { send(Action.DrawTapped) }, Modifier.testTag("image-gallery-draw"),
             style = OpenCodeIconButtonStyle.Standard, enabled = page.image != null && !page.loadFailed)
     }
     if (file == null) {
