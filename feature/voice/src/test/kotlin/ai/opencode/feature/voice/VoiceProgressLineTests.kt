@@ -242,7 +242,6 @@ class VoiceProgressLineTests {
 
     @Test fun activitySaysWhatIsRunning() {
         assertEquals(subagent, VoiceProgressLine.activity(caption = "Starting subagent · Buy Blood domains"))
-        // Dan's call: "asking a subagent to check that one".
         assertNull(VoiceProgressLine.activity(caption = "Starting subagent"))
         assertEquals("running a command", VoiceProgressLine.activity(caption = "Running shell"))
         assertEquals("reading files", VoiceProgressLine.activity(caption = "Reading VoiceFeature.swift"))
