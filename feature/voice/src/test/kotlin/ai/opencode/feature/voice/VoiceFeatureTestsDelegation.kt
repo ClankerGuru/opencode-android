@@ -447,6 +447,50 @@ class VoiceFeatureTestsDelegation {
         store.finish()
     }
 
+    @Test fun aLongCallKeepsItsNewestCaptions() = voiceTest { harness ->
+        h = harness
+        val (store, events) = startLiveCall { voiceCall { copy(end = {}) } }
+        val limit = VoiceTranscriptRecord.maxLogLines
+        for (index in 0 until limit + 50) {
+            store.send(Action.CallEvent(VoiceCallEvent.UserTranscript(itemID = "u$index", text = "line $index", final = true)))
+        }
+        assertEquals(limit, store.state.captions.size)
+        assertEquals("user-u50", store.state.captions.first().id)
+        assertEquals(2 * CaptionReveal.maxLines, store.state.captionTargets.size)
+        assertEquals("line ${limit + 49}", store.state.captionTargets.last().text)
+
+        events.finish()
+        store.receive(Action.CallEnded::class)
+        val log = store.transcripts()["${server.id}:ses_voice"]?.log
+        assertEquals(limit, log?.size)
+        assertEquals("user: line 50", log?.first())
+        store.finish()
+    }
+
+    @Test fun transcriptsKeepTheNewestSessions() = voiceTest { harness ->
+        h = harness
+        val older = (0 until 70).map { "${server.id}:ses_old_$it" }
+        val (store, events) = startLiveCall { voiceCall { copy(end = {}) } }
+        store.withDependencies {
+            val records = mutableMapOf<String, VoiceTranscriptRecord>()
+            for ((index, key) in older.withIndex()) {
+                records[key] = VoiceTranscriptRecord(endedAt = Instant.ofEpochSecond(index - 1_000L), tail = emptyList(), log = listOf("user: old"))
+            }
+            shared(VoiceSharedKeys.voiceTranscripts).set(records)
+        }
+        events.yield(VoiceCallEvent.UserTranscript(itemID = "item_1", text = "hello there", final = true))
+        store.receive(Action.CallEvent::class)
+        events.finish()
+        store.receive(Action.CallEnded::class)
+        store.finish()
+
+        val kept = store.transcripts()
+        assertTrue(kept.size <= VoiceTranscriptRecord.maxSessions)
+        assertEquals(listOf("user: hello there"), kept["${server.id}:ses_voice"]?.tail)
+        assertNull("The session called longest ago went", kept[older[0]])
+        assertTrue(kept[older[69]] != null)
+    }
+
     @Test fun failedCallPersistsOnceAndEndsWithoutASecondWrite() = voiceTest { harness ->
         h = harness
         val (store, events) = startLiveCall { voiceCall { copy(end = {}) } }
