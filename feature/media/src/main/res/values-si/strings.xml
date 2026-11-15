@@ -13,6 +13,26 @@
     <!-- One image of several: the image's label, then its place, as “Image 2 of 3” -->
     <string name="media_image_page_label">%1$s %3$dන් %2$d</string>
 
+    <!-- Draw on Image: an editor that marks up a copy of an image and adds it to the prompt -->
+    <string name="media_drawing_draw_on_image_description">රූපය මත අඳින්න</string>
+    <string name="media_drawing_undo_description">අහෝසි කරන්න</string>
+    <string name="media_drawing_add_to_prompt_description">ප්‍රොම්ප්ට් එකට එකතු කරන්න</string>
+    <string name="media_drawing_canvas_description">ඇඳීමේ කැන්වසය</string>
+    <string name="media_drawing_discard_title">ඇඳීම ඉවත දමන්නද?</string>
+    <string name="media_drawing_discard_confirm">ඇඳීම ඉවත දමන්න</string>
+    <string name="media_drawing_keep">දිගටම අඳින්න</string>
+    <string name="media_drawing_add_failed_title">ඇඳීම එකතු කිරීමට නොහැකි විය</string>
+    <string name="media_drawing_flatten_failed">රූපය සෑදීමට නොහැකි විය. නැවත උත්සාහ කරන්න.</string>
+    <string name="media_drawing_prompt_unavailable">මෙම රූපය විවෘත කළ ප්‍රොම්ප්ට් එක තවදුරටත් ඇමුණුම් භාර නොගනී.</string>
+
+    <!-- Draw on Image: ink colours, read by TalkBack -->
+    <string name="media_drawing_ink_white">සුදු</string>
+    <string name="media_drawing_ink_black">කළු</string>
+    <string name="media_drawing_ink_red">රතු</string>
+    <string name="media_drawing_ink_yellow">කහ</string>
+    <string name="media_drawing_ink_green">කොළ</string>
+    <string name="media_drawing_ink_blue">නිල්</string>
+
     <!-- Zoomable image -->
     <string name="media_zoom_zoomed_in_state">විශාල කර ඇත</string>
     <string name="media_zoom_out_label">කුඩා කරන්න</string>

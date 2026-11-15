@@ -13,6 +13,26 @@
     <!-- One image of several: the image's label, then its place, as “Image 2 of 3” -->
     <string name="media_image_page_label">%1$s %2$d sur %3$d</string>
 
+    <!-- Draw on Image: an editor that marks up a copy of an image and adds it to the prompt -->
+    <string name="media_drawing_draw_on_image_description">Dessiner sur l’image</string>
+    <string name="media_drawing_undo_description">Annuler</string>
+    <string name="media_drawing_add_to_prompt_description">Ajouter à l’invite</string>
+    <string name="media_drawing_canvas_description">Zone de dessin</string>
+    <string name="media_drawing_discard_title">Abandonner le dessin ?</string>
+    <string name="media_drawing_discard_confirm">Abandonner le dessin</string>
+    <string name="media_drawing_keep">Continuer le dessin</string>
+    <string name="media_drawing_add_failed_title">Impossible d’ajouter le dessin</string>
+    <string name="media_drawing_flatten_failed">Impossible de créer l’image. Réessayez.</string>
+    <string name="media_drawing_prompt_unavailable">L’invite qui a ouvert cette image n’accepte plus de pièces jointes.</string>
+
+    <!-- Draw on Image: ink colours, read by TalkBack -->
+    <string name="media_drawing_ink_white">Blanc</string>
+    <string name="media_drawing_ink_black">Noir</string>
+    <string name="media_drawing_ink_red">Rouge</string>
+    <string name="media_drawing_ink_yellow">Jaune</string>
+    <string name="media_drawing_ink_green">Vert</string>
+    <string name="media_drawing_ink_blue">Bleu</string>
+
     <!-- Zoomable image -->
     <string name="media_zoom_zoomed_in_state">Image agrandie</string>
     <string name="media_zoom_out_label">Zoom arrière</string>

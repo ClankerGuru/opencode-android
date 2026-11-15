@@ -13,6 +13,26 @@
     <!-- One image of several: the image's label, then its place, as “Image 2 of 3” -->
     <string name="media_image_page_label">%1$s %2$d / %3$d</string>
 
+    <!-- Draw on Image: an editor that marks up a copy of an image and adds it to the prompt -->
+    <string name="media_drawing_draw_on_image_description">Görsel üzerine çiz</string>
+    <string name="media_drawing_undo_description">Geri al</string>
+    <string name="media_drawing_add_to_prompt_description">İsteme ekle</string>
+    <string name="media_drawing_canvas_description">Çizim tuvali</string>
+    <string name="media_drawing_discard_title">Çizim silinsin mi?</string>
+    <string name="media_drawing_discard_confirm">Çizimi sil</string>
+    <string name="media_drawing_keep">Çizime devam et</string>
+    <string name="media_drawing_add_failed_title">Çizim eklenemedi</string>
+    <string name="media_drawing_flatten_failed">Görsel oluşturulamadı. Tekrar deneyin.</string>
+    <string name="media_drawing_prompt_unavailable">Bu görseli açan istem artık ek kabul etmiyor.</string>
+
+    <!-- Draw on Image: ink colours, read by TalkBack -->
+    <string name="media_drawing_ink_white">Beyaz</string>
+    <string name="media_drawing_ink_black">Siyah</string>
+    <string name="media_drawing_ink_red">Kırmızı</string>
+    <string name="media_drawing_ink_yellow">Sarı</string>
+    <string name="media_drawing_ink_green">Yeşil</string>
+    <string name="media_drawing_ink_blue">Mavi</string>
+
     <!-- Zoomable image -->
     <string name="media_zoom_zoomed_in_state">Yakınlaştırıldı</string>
     <string name="media_zoom_out_label">Uzaklaştır</string>

@@ -629,7 +629,7 @@ fun TranscriptImageViewer(
                         if (state.allowsDrawing && page != null && !page.isVideo) {
                             OpenCodeIconButton(
                                 symbol = SFSymbol.Pencil,
-                                contentDescription = "Draw on Image",
+                                contentDescription = stringResource(R.string.media_drawing_draw_on_image_description),
                                 onClick = { store.send(TranscriptImageViewerFeature.Action.DrawTapped) },
                                 modifier = Modifier.testTag("image-gallery-draw"),
                                 style = OpenCodeIconButtonStyle.Standard,

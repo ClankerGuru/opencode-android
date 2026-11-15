@@ -13,6 +13,26 @@
     <!-- One image of several: the image's label, then its place, as “Image 2 of 3” -->
     <string name="media_image_page_label">%1$s %2$d из %3$d</string>
 
+    <!-- Draw on Image: an editor that marks up a copy of an image and adds it to the prompt -->
+    <string name="media_drawing_draw_on_image_description">Рисовать на изображении</string>
+    <string name="media_drawing_undo_description">Отменить</string>
+    <string name="media_drawing_add_to_prompt_description">Добавить в запрос</string>
+    <string name="media_drawing_canvas_description">Холст для рисования</string>
+    <string name="media_drawing_discard_title">Удалить рисунок?</string>
+    <string name="media_drawing_discard_confirm">Удалить рисунок</string>
+    <string name="media_drawing_keep">Продолжить рисовать</string>
+    <string name="media_drawing_add_failed_title">Не удалось добавить рисунок</string>
+    <string name="media_drawing_flatten_failed">Не удалось создать изображение. Попробуйте снова.</string>
+    <string name="media_drawing_prompt_unavailable">Запрос, из которого открыто это изображение, больше не принимает вложения.</string>
+
+    <!-- Draw on Image: ink colours, read by TalkBack -->
+    <string name="media_drawing_ink_white">Белый</string>
+    <string name="media_drawing_ink_black">Чёрный</string>
+    <string name="media_drawing_ink_red">Красный</string>
+    <string name="media_drawing_ink_yellow">Жёлтый</string>
+    <string name="media_drawing_ink_green">Зелёный</string>
+    <string name="media_drawing_ink_blue">Синий</string>
+
     <!-- Zoomable image -->
     <string name="media_zoom_zoomed_in_state">Увеличено</string>
     <string name="media_zoom_out_label">Уменьшить</string>

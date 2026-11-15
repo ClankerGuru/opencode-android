@@ -13,6 +13,26 @@
     <!-- One image of several: the image's label, then its place, as “Image 2 of 3” -->
     <string name="media_image_page_label">%1$s %3$d枚中%2$d枚目</string>
 
+    <!-- Draw on Image: an editor that marks up a copy of an image and adds it to the prompt -->
+    <string name="media_drawing_draw_on_image_description">画像に描き込む</string>
+    <string name="media_drawing_undo_description">元に戻す</string>
+    <string name="media_drawing_add_to_prompt_description">プロンプトに追加</string>
+    <string name="media_drawing_canvas_description">描画キャンバス</string>
+    <string name="media_drawing_discard_title">描き込みを破棄しますか？</string>
+    <string name="media_drawing_discard_confirm">描き込みを破棄</string>
+    <string name="media_drawing_keep">描き込みを続ける</string>
+    <string name="media_drawing_add_failed_title">描き込みを追加できませんでした</string>
+    <string name="media_drawing_flatten_failed">画像を作成できませんでした。もう一度試してください。</string>
+    <string name="media_drawing_prompt_unavailable">この画像を開いたプロンプトは、添付ファイルを受け付けなくなりました。</string>
+
+    <!-- Draw on Image: ink colours, read by TalkBack -->
+    <string name="media_drawing_ink_white">白</string>
+    <string name="media_drawing_ink_black">黒</string>
+    <string name="media_drawing_ink_red">赤</string>
+    <string name="media_drawing_ink_yellow">黄色</string>
+    <string name="media_drawing_ink_green">緑</string>
+    <string name="media_drawing_ink_blue">青</string>
+
     <!-- Zoomable image -->
     <string name="media_zoom_zoomed_in_state">拡大中</string>
     <string name="media_zoom_out_label">縮小</string>

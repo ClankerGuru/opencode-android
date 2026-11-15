@@ -13,6 +13,26 @@
     <!-- One image of several: the image's label, then its place, as “Image 2 of 3” -->
     <string name="media_image_page_label">%1$s %2$d van %3$d</string>
 
+    <!-- Draw on Image: an editor that marks up a copy of an image and adds it to the prompt -->
+    <string name="media_drawing_draw_on_image_description">Tekenen op afbeelding</string>
+    <string name="media_drawing_undo_description">Ongedaan maken</string>
+    <string name="media_drawing_add_to_prompt_description">Aan prompt toevoegen</string>
+    <string name="media_drawing_canvas_description">Tekenvlak</string>
+    <string name="media_drawing_discard_title">Tekening weggooien?</string>
+    <string name="media_drawing_discard_confirm">Tekening weggooien</string>
+    <string name="media_drawing_keep">Verder tekenen</string>
+    <string name="media_drawing_add_failed_title">Tekening toevoegen mislukt</string>
+    <string name="media_drawing_flatten_failed">Afbeelding maken mislukt. Probeer het opnieuw.</string>
+    <string name="media_drawing_prompt_unavailable">De prompt die deze afbeelding opende, accepteert geen bijlagen meer.</string>
+
+    <!-- Draw on Image: ink colours, read by TalkBack -->
+    <string name="media_drawing_ink_white">Wit</string>
+    <string name="media_drawing_ink_black">Zwart</string>
+    <string name="media_drawing_ink_red">Rood</string>
+    <string name="media_drawing_ink_yellow">Geel</string>
+    <string name="media_drawing_ink_green">Groen</string>
+    <string name="media_drawing_ink_blue">Blauw</string>
+
     <!-- Zoomable image -->
     <string name="media_zoom_zoomed_in_state">Ingezoomd</string>
     <string name="media_zoom_out_label">Uitzoomen</string>

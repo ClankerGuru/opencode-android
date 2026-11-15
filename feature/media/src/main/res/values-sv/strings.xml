@@ -13,6 +13,26 @@
     <!-- One image of several: the image's label, then its place, as “Image 2 of 3” -->
     <string name="media_image_page_label">%1$s %2$d av %3$d</string>
 
+    <!-- Draw on Image: an editor that marks up a copy of an image and adds it to the prompt -->
+    <string name="media_drawing_draw_on_image_description">Rita på bild</string>
+    <string name="media_drawing_undo_description">Ångra</string>
+    <string name="media_drawing_add_to_prompt_description">Lägg till i prompten</string>
+    <string name="media_drawing_canvas_description">Rityta</string>
+    <string name="media_drawing_discard_title">Släng teckningen?</string>
+    <string name="media_drawing_discard_confirm">Släng teckningen</string>
+    <string name="media_drawing_keep">Fortsätt rita</string>
+    <string name="media_drawing_add_failed_title">Kunde inte lägga till teckningen</string>
+    <string name="media_drawing_flatten_failed">Kunde inte skapa bilden. Försök igen.</string>
+    <string name="media_drawing_prompt_unavailable">Prompten som öppnade bilden tar inte längre emot bilagor.</string>
+
+    <!-- Draw on Image: ink colours, read by TalkBack -->
+    <string name="media_drawing_ink_white">Vit</string>
+    <string name="media_drawing_ink_black">Svart</string>
+    <string name="media_drawing_ink_red">Röd</string>
+    <string name="media_drawing_ink_yellow">Gul</string>
+    <string name="media_drawing_ink_green">Grön</string>
+    <string name="media_drawing_ink_blue">Blå</string>
+
     <!-- Zoomable image -->
     <string name="media_zoom_zoomed_in_state">Inzoomad</string>
     <string name="media_zoom_out_label">Zooma ut</string>

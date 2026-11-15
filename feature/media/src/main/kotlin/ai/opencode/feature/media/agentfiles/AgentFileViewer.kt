@@ -277,7 +277,7 @@ private fun AgentFilePageContent(
                     val image = (phase as? AgentFileViewerModel.Phase.Ready)?.content as? AgentFileViewerModel.Content.Image
                     if (addDrawing != null && image != null) {
                         IconButton(onClick = { model.draw(image.image, addDrawing) }, modifier = Modifier.testTag("image-gallery-draw")) {
-                            OpenCodeIcon("pencil", contentDescription = "Draw on Image")
+                            OpenCodeIcon("pencil", contentDescription = stringResource(R.string.media_drawing_draw_on_image_description))
                         }
                     }
                     if (showsTextControls) {

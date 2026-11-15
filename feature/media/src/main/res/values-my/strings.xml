@@ -13,6 +13,26 @@
     <!-- One image of several: the image's label, then its place, as “Image 2 of 3” -->
     <string name="media_image_page_label">%1$s %3$d ခုအနက် %2$d</string>
 
+    <!-- Draw on Image: an editor that marks up a copy of an image and adds it to the prompt -->
+    <string name="media_drawing_draw_on_image_description">ပုံပေါ်တွင် ဆွဲပါ</string>
+    <string name="media_drawing_undo_description">မလုပ်တော့ပါ။</string>
+    <string name="media_drawing_add_to_prompt_description">အချက်ပြစာထဲ ထည့်ပါ</string>
+    <string name="media_drawing_canvas_description">ပုံဆွဲကွက်</string>
+    <string name="media_drawing_discard_title">ပုံဆွဲထားသည်ကို ပယ်မလား?</string>
+    <string name="media_drawing_discard_confirm">ပုံဆွဲထားသည်ကို ပယ်ပါ</string>
+    <string name="media_drawing_keep">ဆက်ဆွဲပါ</string>
+    <string name="media_drawing_add_failed_title">ပုံဆွဲထားသည်ကို မထည့်နိုင်ပါ</string>
+    <string name="media_drawing_flatten_failed">ပုံကို မဖန်တီးနိုင်ပါ။ ပြန်ကြိုးစားပါ။</string>
+    <string name="media_drawing_prompt_unavailable">ဤပုံကို ဖွင့်ခဲ့သော အချက်ပြစာတွင် ပူးတွဲဖိုင် မထည့်နိုင်တော့ပါ။</string>
+
+    <!-- Draw on Image: ink colours, read by TalkBack -->
+    <string name="media_drawing_ink_white">အဖြူရောင်</string>
+    <string name="media_drawing_ink_black">အနက်ရောင်</string>
+    <string name="media_drawing_ink_red">နီရောင်</string>
+    <string name="media_drawing_ink_yellow">အဝါရောင်</string>
+    <string name="media_drawing_ink_green">အစိမ်းရောင်</string>
+    <string name="media_drawing_ink_blue">အပြာရောင်</string>
+
     <!-- Zoomable image -->
     <string name="media_zoom_zoomed_in_state">ချဲ့ထားသည်</string>
     <string name="media_zoom_out_label">ချုံ့ပါ</string>

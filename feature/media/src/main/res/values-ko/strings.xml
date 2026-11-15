@@ -13,6 +13,26 @@
     <!-- One image of several: the image's label, then its place, as “Image 2 of 3” -->
     <string name="media_image_page_label">%1$s %3$d개 중 %2$d번째</string>
 
+    <!-- Draw on Image: an editor that marks up a copy of an image and adds it to the prompt -->
+    <string name="media_drawing_draw_on_image_description">이미지에 그리기</string>
+    <string name="media_drawing_undo_description">실행 취소</string>
+    <string name="media_drawing_add_to_prompt_description">프롬프트에 추가</string>
+    <string name="media_drawing_canvas_description">그리기 캔버스</string>
+    <string name="media_drawing_discard_title">그린 내용을 삭제할까요?</string>
+    <string name="media_drawing_discard_confirm">그린 내용 삭제</string>
+    <string name="media_drawing_keep">계속 그리기</string>
+    <string name="media_drawing_add_failed_title">그림을 추가할 수 없어요</string>
+    <string name="media_drawing_flatten_failed">이미지를 만들 수 없어요. 다시 시도해 주세요.</string>
+    <string name="media_drawing_prompt_unavailable">이 이미지를 연 프롬프트에 더 이상 첨부 파일을 추가할 수 없어요.</string>
+
+    <!-- Draw on Image: ink colours, read by TalkBack -->
+    <string name="media_drawing_ink_white">흰색</string>
+    <string name="media_drawing_ink_black">검은색</string>
+    <string name="media_drawing_ink_red">빨간색</string>
+    <string name="media_drawing_ink_yellow">노란색</string>
+    <string name="media_drawing_ink_green">초록색</string>
+    <string name="media_drawing_ink_blue">파란색</string>
+
     <!-- Zoomable image -->
     <string name="media_zoom_zoomed_in_state">확대됨</string>
     <string name="media_zoom_out_label">축소</string>

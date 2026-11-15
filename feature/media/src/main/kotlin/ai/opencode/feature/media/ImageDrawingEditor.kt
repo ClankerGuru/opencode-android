@@ -1,5 +1,6 @@
 package ai.opencode.feature.media
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.dependencies.UuidClient
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.store.Effect
@@ -8,6 +9,7 @@ import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.cancellable
 import ai.opencode.core.store.collectState
+import ai.opencode.core.strings.localized
 import ai.opencode.core.ui.OpenCodeAlertDialog
 import ai.opencode.core.ui.OpenCodeIconButton
 import ai.opencode.core.ui.OpenCodeShape
@@ -47,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -80,12 +83,18 @@ class ImageDrawingFeature(private val add: ImageDrawingAdd) : Reducer<ImageDrawi
         val failure: Failure? = null,
     )
 
-    enum class Failure(val message: String) {
+    enum class Failure {
         /** The drawn copy couldn't be made. */
-        Flatten("Couldn’t create the image. Try again."),
+        Flatten,
 
         /** The prompt has gone (another session) or is answering a request. */
-        Prompt("The prompt that opened this image no longer takes attachments."),
+        Prompt;
+
+        val message: String
+            get() = when (this) {
+                Flatten -> localized(R.string.media_drawing_flatten_failed)
+                Prompt -> localized(R.string.media_drawing_prompt_unavailable)
+            }
     }
 
     sealed interface Action {
@@ -195,7 +204,7 @@ fun ImageDrawingEditor(store: StoreOf<ImageDrawingFeature.State, ImageDrawingFea
             Row(Modifier.fillMaxWidth().padding(start = 16.dp, top = 8.dp, end = 16.dp)) {
                 OpenCodeIconButton(
                     symbol = SFSymbol.Xmark,
-                    contentDescription = "Cancel",
+                    contentDescription = stringResource(CoreR.string.common_cancel),
                     onClick = { store.send(ImageDrawingFeature.Action.CancelTapped) },
                     modifier = Modifier.testTag("image-drawing-cancel"),
                     enabled = enabled,
@@ -203,7 +212,7 @@ fun ImageDrawingEditor(store: StoreOf<ImageDrawingFeature.State, ImageDrawingFea
                 Spacer(Modifier.weight(1f))
                 OpenCodeIconButton(
                     symbol = SFSymbol.ArrowUturnBackward,
-                    contentDescription = "Undo",
+                    contentDescription = stringResource(R.string.media_drawing_undo_description),
                     onClick = { store.send(ImageDrawingFeature.Action.UndoTapped) },
                     modifier = Modifier.testTag("image-drawing-undo"),
                     enabled = enabled && state.drawing.changed,
@@ -211,7 +220,7 @@ fun ImageDrawingEditor(store: StoreOf<ImageDrawingFeature.State, ImageDrawingFea
                 Spacer(Modifier.width(8.dp))
                 OpenCodeIconButton(
                     symbol = SFSymbol.Checkmark,
-                    contentDescription = "Add to Prompt",
+                    contentDescription = stringResource(R.string.media_drawing_add_to_prompt_description),
                     onClick = { store.send(ImageDrawingFeature.Action.AddTapped) },
                     modifier = Modifier.testTag("image-drawing-add"),
                     enabled = enabled && state.drawing.changed,
@@ -236,13 +245,14 @@ fun ImageDrawingEditor(store: StoreOf<ImageDrawingFeature.State, ImageDrawingFea
                 Row(Modifier.padding(horizontal = 6.dp)) {
                     ImageDrawing.Ink.entries.forEach { ink ->
                         val selected = ink == state.drawing.ink
+                        val inkName = inkName(ink)
                         Box(
                             Modifier
                                 .size(48.dp)
                                 .selectable(selected, enabled = enabled, role = Role.RadioButton) {
                                     store.send(ImageDrawingFeature.Action.InkSelected(ink))
                                 }
-                                .semantics { contentDescription = ink.name },
+                                .semantics { contentDescription = inkName },
                             contentAlignment = Alignment.Center,
                         ) {
                             if (selected) Box(Modifier.size(30.dp).border(2.dp, Color.White, CircleShape))
@@ -255,15 +265,15 @@ fun ImageDrawingEditor(store: StoreOf<ImageDrawingFeature.State, ImageDrawingFea
         if (state.isConfirmingDiscard) {
             OpenCodeAlertDialog(
                 onDismissRequest = { store.send(ImageDrawingFeature.Action.IsConfirmingDiscardChanged(false)) },
-                title = { Text("Discard drawing?") },
+                title = { Text(stringResource(R.string.media_drawing_discard_title)) },
                 confirmButton = {
                     TextButton(onClick = { store.send(ImageDrawingFeature.Action.DiscardConfirmed) }) {
-                        Text("Discard Drawing", color = OpenCodeTheme.colors.destructive)
+                        Text(stringResource(R.string.media_drawing_discard_confirm), color = OpenCodeTheme.colors.destructive)
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { store.send(ImageDrawingFeature.Action.IsConfirmingDiscardChanged(false)) }) {
-                        Text("Keep Drawing")
+                        Text(stringResource(R.string.media_drawing_keep))
                     }
                 },
             )
@@ -271,15 +281,27 @@ fun ImageDrawingEditor(store: StoreOf<ImageDrawingFeature.State, ImageDrawingFea
         state.failure?.let { failure ->
             OpenCodeAlertDialog(
                 onDismissRequest = { store.send(ImageDrawingFeature.Action.FailureDismissed) },
-                title = { Text("Couldn’t Add Drawing") },
+                title = { Text(stringResource(R.string.media_drawing_add_failed_title)) },
                 text = { Text(failure.message) },
                 confirmButton = {
-                    TextButton(onClick = { store.send(ImageDrawingFeature.Action.FailureDismissed) }) { Text("OK") }
+                    TextButton(onClick = { store.send(ImageDrawingFeature.Action.FailureDismissed) }) { Text(stringResource(CoreR.string.common_ok)) }
                 },
             )
         }
     }
 }
+
+@Composable
+private fun inkName(ink: ImageDrawing.Ink): String = stringResource(
+    when (ink) {
+        ImageDrawing.Ink.White -> R.string.media_drawing_ink_white
+        ImageDrawing.Ink.Black -> R.string.media_drawing_ink_black
+        ImageDrawing.Ink.Red -> R.string.media_drawing_ink_red
+        ImageDrawing.Ink.Yellow -> R.string.media_drawing_ink_yellow
+        ImageDrawing.Ink.Green -> R.string.media_drawing_ink_green
+        ImageDrawing.Ink.Blue -> R.string.media_drawing_ink_blue
+    },
+)
 
 /**
  * Owns touch sampling (historical points included) and the live stroke; only a finished stroke
@@ -304,7 +326,7 @@ private class InkCanvas(context: Context) : View(context) {
     private var scale = 1f
 
     init {
-        contentDescription = "Drawing canvas"
+        contentDescription = localized(R.string.media_drawing_canvas_description)
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) = fit()

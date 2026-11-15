@@ -13,6 +13,26 @@
     <!-- One image of several: the image's label, then its place, as “Image 2 of 3” -->
     <string name="media_image_page_label">%1$s %3$dটির মধ্যে %2$d</string>
 
+    <!-- Draw on Image: an editor that marks up a copy of an image and adds it to the prompt -->
+    <string name="media_drawing_draw_on_image_description">ছবিতে আঁকুন</string>
+    <string name="media_drawing_undo_description">পূর্বাবস্থায় ফেরান</string>
+    <string name="media_drawing_add_to_prompt_description">প্রম্পটে যোগ করুন</string>
+    <string name="media_drawing_canvas_description">আঁকার ক্যানভাস</string>
+    <string name="media_drawing_discard_title">আঁকা বাদ দেবেন?</string>
+    <string name="media_drawing_discard_confirm">আঁকা বাদ দিন</string>
+    <string name="media_drawing_keep">আঁকা চালিয়ে যান</string>
+    <string name="media_drawing_add_failed_title">আঁকা যোগ করা যায়নি</string>
+    <string name="media_drawing_flatten_failed">ছবি তৈরি করা যায়নি। আবার চেষ্টা করুন।</string>
+    <string name="media_drawing_prompt_unavailable">যে প্রম্পট থেকে এই ছবিটি খোলা হয়েছিল, সেটি আর সংযুক্তি নেয় না।</string>
+
+    <!-- Draw on Image: ink colours, read by TalkBack -->
+    <string name="media_drawing_ink_white">সাদা</string>
+    <string name="media_drawing_ink_black">কালো</string>
+    <string name="media_drawing_ink_red">লাল</string>
+    <string name="media_drawing_ink_yellow">হলুদ</string>
+    <string name="media_drawing_ink_green">সবুজ</string>
+    <string name="media_drawing_ink_blue">নীল</string>
+
     <!-- Zoomable image -->
     <string name="media_zoom_zoomed_in_state">জুম করা হয়েছে</string>
     <string name="media_zoom_out_label">জুম কমান</string>

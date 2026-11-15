@@ -13,6 +13,26 @@
     <!-- One image of several: the image's label, then its place, as “Image 2 of 3” -->
     <string name="media_image_page_label">%1$s %2$d од %3$d</string>
 
+    <!-- Draw on Image: an editor that marks up a copy of an image and adds it to the prompt -->
+    <string name="media_drawing_draw_on_image_description">Цртај по слици</string>
+    <string name="media_drawing_undo_description">Поништи</string>
+    <string name="media_drawing_add_to_prompt_description">Додај у промпт</string>
+    <string name="media_drawing_canvas_description">Платно за цртање</string>
+    <string name="media_drawing_discard_title">Одбацити цртеж?</string>
+    <string name="media_drawing_discard_confirm">Одбаци цртеж</string>
+    <string name="media_drawing_keep">Настави цртање</string>
+    <string name="media_drawing_add_failed_title">Није могуће додати цртеж</string>
+    <string name="media_drawing_flatten_failed">Није могуће направити слику. Покушајте поново.</string>
+    <string name="media_drawing_prompt_unavailable">Промпт из ког је отворена ова слика више не прима прилоге.</string>
+
+    <!-- Draw on Image: ink colours, read by TalkBack -->
+    <string name="media_drawing_ink_white">Бела</string>
+    <string name="media_drawing_ink_black">Црна</string>
+    <string name="media_drawing_ink_red">Црвена</string>
+    <string name="media_drawing_ink_yellow">Жута</string>
+    <string name="media_drawing_ink_green">Зелена</string>
+    <string name="media_drawing_ink_blue">Плава</string>
+
     <!-- Zoomable image -->
     <string name="media_zoom_zoomed_in_state">Увећано</string>
     <string name="media_zoom_out_label">Умањи</string>

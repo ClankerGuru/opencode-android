@@ -13,6 +13,26 @@
     <!-- One image of several: the image's label, then its place, as “Image 2 of 3” -->
     <string name="media_image_page_label">%1$s %2$d ከ%3$d</string>
 
+    <!-- Draw on Image: an editor that marks up a copy of an image and adds it to the prompt -->
+    <string name="media_drawing_draw_on_image_description">በምስል ላይ ሳል</string>
+    <string name="media_drawing_undo_description">ቀልብስ</string>
+    <string name="media_drawing_add_to_prompt_description">ወደ ፕሮምፕት አክል</string>
+    <string name="media_drawing_canvas_description">የመሳያ ሸራ</string>
+    <string name="media_drawing_discard_title">ስዕሉ ይጣል?</string>
+    <string name="media_drawing_discard_confirm">ስዕሉን ጣል</string>
+    <string name="media_drawing_keep">መሳል ቀጥል</string>
+    <string name="media_drawing_add_failed_title">ስዕሉን ማከል አልተቻለም</string>
+    <string name="media_drawing_flatten_failed">ምስሉን መፍጠር አልተቻለም። እንደገና ሞክር።</string>
+    <string name="media_drawing_prompt_unavailable">ይህን ምስል የከፈተው ፕሮምፕት ከእንግዲህ አባሪዎችን አይቀበልም።</string>
+
+    <!-- Draw on Image: ink colours, read by TalkBack -->
+    <string name="media_drawing_ink_white">ነጭ</string>
+    <string name="media_drawing_ink_black">ጥቁር</string>
+    <string name="media_drawing_ink_red">ቀይ</string>
+    <string name="media_drawing_ink_yellow">ቢጫ</string>
+    <string name="media_drawing_ink_green">አረንጓዴ</string>
+    <string name="media_drawing_ink_blue">ሰማያዊ</string>
+
     <!-- Zoomable image -->
     <string name="media_zoom_zoomed_in_state">ጎልቷል</string>
     <string name="media_zoom_out_label">አሳንስ</string>

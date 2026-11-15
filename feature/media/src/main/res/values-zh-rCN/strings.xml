@@ -13,6 +13,26 @@
     <!-- One image of several: the image's label, then its place, as “Image 2 of 3” -->
     <string name="media_image_page_label">%1$s，第 %2$d 张，共 %3$d 张</string>
 
+    <!-- Draw on Image: an editor that marks up a copy of an image and adds it to the prompt -->
+    <string name="media_drawing_draw_on_image_description">在图片上绘制</string>
+    <string name="media_drawing_undo_description">撤销</string>
+    <string name="media_drawing_add_to_prompt_description">添加到提示词</string>
+    <string name="media_drawing_canvas_description">绘图画布</string>
+    <string name="media_drawing_discard_title">放弃绘图？</string>
+    <string name="media_drawing_discard_confirm">放弃绘图</string>
+    <string name="media_drawing_keep">继续绘图</string>
+    <string name="media_drawing_add_failed_title">无法添加绘图</string>
+    <string name="media_drawing_flatten_failed">无法生成图片，请重试。</string>
+    <string name="media_drawing_prompt_unavailable">打开此图片的提示词已无法添加附件。</string>
+
+    <!-- Draw on Image: ink colours, read by TalkBack -->
+    <string name="media_drawing_ink_white">白色</string>
+    <string name="media_drawing_ink_black">黑色</string>
+    <string name="media_drawing_ink_red">红色</string>
+    <string name="media_drawing_ink_yellow">黄色</string>
+    <string name="media_drawing_ink_green">绿色</string>
+    <string name="media_drawing_ink_blue">蓝色</string>
+
     <!-- Zoomable image -->
     <string name="media_zoom_zoomed_in_state">已放大</string>
     <string name="media_zoom_out_label">缩小</string>
