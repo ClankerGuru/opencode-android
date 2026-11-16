@@ -596,7 +596,11 @@ object SessionTranscriptView {
                 // The keyboard would stay up over the image.
                 host?.dismissComposerKeyboard()
                 val state = store.state
-                presenter?.presentPreview(SessionVisualMedia.preview(action.preview, state.items, state.server, state.session?.directory, theme), drawingHandler(store))
+                presenter?.presentPreview(
+                    SessionVisualMedia.preview(action.preview, state.items, state.server, state.session?.directory, theme),
+                    drawingHandler(store),
+                    flightAccessories = drawingAccessories(store, context),
+                )
             }
             is TranscriptAction.OpenFile -> {
                 host?.dismissComposerKeyboard()
@@ -608,7 +612,7 @@ object SessionTranscriptView {
                 val items = store.state.items
                 val gallery = { destination: AgentFileDestination -> SessionVisualMedia.preview(destination, items, server, directory, theme) }
                 val preview = gallery(target) ?: TranscriptImagePreview(target, server)
-                presenter?.presentPreview(preview, addDrawing, gallery)
+                presenter?.presentPreview(preview, addDrawing, gallery, drawingAccessories(store, context))
             }
             is TranscriptAction.OpenPastedText -> {
                 host?.dismissComposerKeyboard()

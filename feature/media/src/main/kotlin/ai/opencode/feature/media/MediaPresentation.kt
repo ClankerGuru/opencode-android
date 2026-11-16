@@ -63,8 +63,10 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -391,6 +393,12 @@ class MediaViewerState(sourceID: String?) {
     /** Puts the media away without flying it home, for media that's gone (a composer photo removed from the viewer). */
     var discard: () -> Unit = {}
         internal set
+
+    var handOff: (handOff: DrawingHandOff, frame: Rect?) -> Unit = { _, _ -> }
+        internal set
+
+    var handOffCovered by mutableStateOf(false)
+        internal set
     internal var onShow: () -> Unit = {}
 
     /** The content moved to another page or finished loading its image. */
@@ -485,6 +493,7 @@ class MediaPresenter internal constructor() {
         preview: TranscriptImagePreview,
         addDrawing: ImageDrawingAdd? = null,
         documentGallery: (AgentFileDestination) -> TranscriptImagePreview? = { null },
+        flightAccessories: ((String) -> List<MediaFlightAccessory>)? = null,
     ) {
         if (isPresenting) return
         val file = preview.pages.firstOrNull { it.id == preview.id }?.file
@@ -492,7 +501,7 @@ class MediaPresenter internal constructor() {
             FullscreenViewerFeature.State(preview, allowsDrawing = addDrawing != null),
             FullscreenViewerFeature(addDrawing),
         )
-        present(preview.id, file?.reference?.kind?.isMedia ?: true, reducesMotion, onDismiss = store::close) { viewer ->
+        present(preview.id, file?.reference?.kind?.isMedia ?: true, reducesMotion, flightAccessories = flightAccessories, onDismiss = store::close) { viewer ->
             CompositionLocalProvider(LocalDocumentVisualGallery provides documentGallery) { FullscreenViewer(store, viewer) }
         }
     }
@@ -578,6 +587,7 @@ internal class Flight(image: Bitmap, frame: Rect) {
     var corners: MediaCorners by mutableStateOf(MediaCorners.All)
     var alpha by mutableFloatStateOf(1f)
     var scale by mutableFloatStateOf(1f)
+    var drawing: ImageDrawing? by mutableStateOf(null)
 }
 
 /** The source's corner badges riding the flight ([MediaFlightAccessory]), pinned to [frame]. */
@@ -656,6 +666,7 @@ internal class MediaViewerController(
     init {
         state.dismiss = { close() }
         state.discard = { close(home = false) }
+        state.handOff = { handOff, frame -> handOff(handOff, frame) }
         when (style) {
             Style.Photos -> {
                 // The image flies in first; the content shows it once it lands.
@@ -1197,6 +1208,75 @@ internal class MediaViewerController(
         }
     }
 
+    private fun handOff(handOff: DrawingHandOff, frame: Rect?) {
+        if (isLeaving) return
+        state.mediaHidden = true
+        val from = frame?.translate(-originInWindow.x, -originInWindow.y)
+        if (style != Style.Photos || from == null) {
+            state.handOffCovered = true
+            close(home = false)
+            return
+        }
+        isLeaving = true
+        flightGeneration += 1
+        setChromeHidden(true, flightDuration = 0.0)
+        updateStatusBarLight(false)
+        catchBackdrop()
+        dropAccessories()
+        val flight = flightView(handOff.image, from)
+        flight.frame = from
+        flight.radius = 0f
+        flight.corners = MediaCorners.All
+        flight.alpha = 1f
+        flight.scale = 1f
+        flight.drawing = handOff.drawing
+        MediaZoomSources.shared.hide(handOff.target)
+        val backdrop = backdropAlpha
+        flightJob = scope.launch {
+            // The editor's window goes only once the copy is drawn under it.
+            repeat(2) { withFrameNanos { } }
+            state.handOffCovered = true
+            var target = MediaZoomSources.shared.view(handOff.target)?.let(::sourceFrame)
+            var waited = 0
+            while (target == null && waited < 30) {
+                withFrameNanos { }
+                waited += 1
+                target = MediaZoomSources.shared.view(handOff.target)?.let(::sourceFrame)
+            }
+            if (target == null) {
+                val drop = bounds.height * 0.25f
+                spring(MediaMotion.away, phase = MotionPhase.Exit) { p ->
+                    flight.frame = from.translate(0f, drop * p)
+                    flight.scale = 1 - 0.2f * p
+                    flight.alpha = 1 - p
+                    backdropAlpha = backdrop * (1 - p)
+                }
+                finishHome()
+                return@launch
+            }
+            val source = MediaZoomSources.shared.view(handOff.target)
+            val (radius, corners) = shape(source)
+            flight.corners = corners
+            val badges = source?.let { pinHandOffAccessories(handOff.target, from) }
+            var to: Rect = target
+            spring(MediaMotion.home) { p ->
+                MediaZoomSources.shared.view(handOff.target)?.let(::sourceFrame)?.let { to = it }
+                flight.frame = lerp(from, to, p)
+                flight.radius = radius * p
+                badges?.frame = flight.frame
+                badges?.alpha = p * p
+                backdropAlpha = backdrop * (1 - p)
+            }
+            finishHome()
+        }
+    }
+
+    private fun pinHandOffAccessories(target: String, frame: Rect): FlightAccessories? {
+        val badges = state.flightAccessories(target)
+        if (badges.isEmpty()) return null
+        return FlightAccessories(badges, frame, alpha = 0f).also { accessories = it }
+    }
+
     /** Documents: back into their source (the system zoom's dismissal), carrying a release's velocity. */
     private fun zoomOut(velocity: Velocity = Velocity.Zero) {
         if (isLeaving) return
@@ -1557,6 +1637,21 @@ private fun DrawScope.drawFlight(flight: Flight, bitmap: ImageBitmap) {
                     alpha = flight.alpha,
                     filterQuality = FilterQuality.High,
                 )
+                val drawing = flight.drawing
+                if (drawing != null) {
+                    drawIntoCanvas { canvas ->
+                        val native = canvas.nativeCanvas
+                        val saved = native.saveLayerAlpha(null, (flight.alpha * 255).roundToInt())
+                        native.translate(frame.left - (imageW - srcW) / 2 * scale, frame.top - (imageH - srcH) / 2 * scale)
+                        native.scale(scale, scale)
+                        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+                        val width = min(imageW, imageH) * 0.01f
+                        for (stroke in drawing.strokes) {
+                            stroke.draw(native, width, paint)
+                        }
+                        native.restoreToCount(saved)
+                    }
+                }
             }
         }
     }

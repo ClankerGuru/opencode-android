@@ -37,6 +37,7 @@ import ai.opencode.feature.composer.plusmenu.PhotoFlights
 import ai.opencode.feature.composer.plusmenu.VideoDurationBadge
 import ai.opencode.feature.media.FileAttachmentCard
 import ai.opencode.feature.media.ImageDrawingAdd
+import ai.opencode.feature.media.MediaFlightAccessory
 import ai.opencode.feature.media.MediaImageResult
 import ai.opencode.feature.media.MediaReferenceResolver
 import ai.opencode.feature.media.mediaZoomSource
@@ -44,6 +45,7 @@ import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeImageAttachment
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.PastedText
+import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.animation.core.Animatable
@@ -57,6 +59,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -66,6 +69,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyItemScope
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -413,9 +417,13 @@ internal fun drawingHandler(store: StoreOf<SessionFeature.State, SessionFeature.
     val identity = store.state.taskIdentity
     return { attachment ->
         store.send(SessionFeature.Action.DrawingAdded(attachment, from = identity))
-        store.state.pendingAttachments.any { it.id == attachment.id }
+        val added = store.state.pendingAttachments.any { it.id == attachment.id }
+        if (added) ComposerPhotoViewer.mediaID(attachment.id) else null
     }
 }
+
+internal fun drawingAccessories(store: StoreOf<SessionFeature.State, SessionFeature.Action>, context: Context): (String) -> List<MediaFlightAccessory> =
+    { mediaID -> ComposerPhotoViewer.flightAccessories(mediaID, store.state.pendingAttachments, context) }
 
 /**
  * The two import alerts iOS `SessionView` presents: “Couldn’t Add Image” with the import's
@@ -500,6 +508,16 @@ object PendingAttachmentMetrics {
     val slotRadius: Dp = 22.dp
 }
 
+// The full-screen viewer's image flies home into this slot, so all of it has to be on screen.
+private suspend fun LazyListState.reveal(index: Int) {
+    val end = layoutInfo.viewportEndOffset - layoutInfo.afterContentPadding
+    val shown = layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
+    if (shown != null && shown.offset >= 0 && shown.offset + shown.size <= end) return
+    scrollToItem(index)
+    val item = layoutInfo.visibleItemsInfo.firstOrNull { it.index == index } ?: return
+    scrollBy((item.offset + item.size - end).toFloat())
+}
+
 /**
  * iOS `pendingAttachmentsRow`: the composer's attachments in one horizontal row — images, pasted
  * texts, inline files (PDFs the model reads), uploading files, then the location card — each with
@@ -568,6 +586,10 @@ fun PendingAttachmentsRow(
         label = "attachmentRowHeight",
     )
     val listState = rememberLazyListState()
+    val viewingIndex = attachments.indexOfFirst { ComposerPhotoViewer.isShowing(it.id) }
+    LaunchedEffect(viewingIndex) {
+        if (viewingIndex >= 0) listState.reveal(viewingIndex)
+    }
     val departing = rememberDepartingAttachments()
     val placement: FiniteAnimationSpec<IntOffset> =
         if (usesPlusMenuSheet) AttachmentRemoval.animation(reduceMotion) else DepartingAttachments.defaultPlacement
@@ -863,7 +885,8 @@ fun RemovableAttachment(
     content: @Composable () -> Unit,
 ) {
     val entrance = remember { Animatable(if (reduceMotion) 1f else 0f) }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(viewing) {
+        if (viewing) entrance.snapTo(1f)
         if (entrance.value < 1f) entrance.animateTo(1f, Motion.microPop.spec())
     }
     Box(
