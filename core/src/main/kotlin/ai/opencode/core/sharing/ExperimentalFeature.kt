@@ -40,7 +40,6 @@ enum class ExperimentalFeature(
     joinsAll: Boolean = true,
 ) {
     // Composer
-    agentSelection("agent-selection", R.string.core_experiment_agent_selection_title, ExperimentalGroup.composer, "person.crop.circle"),
     hideModels("hide-models", R.string.core_experiment_hide_models_title, ExperimentalGroup.composer, "eye.slash"),
 
     // Calls
@@ -112,7 +111,7 @@ enum class ExperimentalFeature(
          * Call Tray, the Model Picker menu and the switches before it) and of ones now always on
          * (Composer Autocomplete, Server Flow, New Plus Menu, Project Icons, Image Link Previews,
          * Living Orb, New Messages Divider, Open Links from Calls, Audio in Calls, Server Details,
-         * Server Voice, One Picker), with the call-style migration's markers. Nothing reads them;
+         * Server Voice, One Picker, Agent Selection), with the call-style migration's markers. Nothing reads them;
          * they're cleared at launch.
          */
         val retiredKeys: List<String> = buildList {
@@ -132,7 +131,7 @@ enum class ExperimentalFeature(
             val alwaysOn = listOf(
                 "image-link-previews", "living-orb", "new-messages-divider",
                 "open-links-from-calls", "audio-in-calls", "server-details", "server-voice",
-                "one-picker",
+                "one-picker", "agent-selection",
             )
             for (name in alwaysOn) {
                 add("experimental-$name")

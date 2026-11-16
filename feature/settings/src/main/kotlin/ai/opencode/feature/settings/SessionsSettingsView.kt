@@ -1,7 +1,6 @@
 package ai.opencode.feature.settings
 
-import ai.opencode.core.experiments.key
-import ai.opencode.core.experiments.ExperimentalFeature
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
 import ai.opencode.server.ServerSharedKeys
@@ -13,13 +12,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.res.stringResource
 
 /**
- * Settings › Sessions, Composer (Return Key Sends and the default agent). Replaces Settings ›
+ * Settings › Sessions, Composer (Return Key Sends, Agent Selection and the default agent). Replaces Settings ›
  * Composer.
  */
 @Composable
 fun SessionsSettingsView(store: SettingsStore) {
     val returnKeySends by remember { shared(SharedKeys.returnKeySends).flow }.collectAsState()
-    val agentSelection by remember { shared(ExperimentalFeature.agentSelection.key).flow }.collectAsState()
+    val agentSelection by remember { shared(SharedKeys.agentSelection).flow }.collectAsState()
     val defaultAgent by remember { shared(SharedKeys.defaultAgentID).flow }.collectAsState()
     val agents by remember { shared(ServerSharedKeys.knownPrimaryAgents).flow }.collectAsState()
     val send = { action: HomeSettingsFeature.Action -> store.send(SettingsFeature.Action.Settings(action)) }
@@ -34,8 +33,13 @@ fun SessionsSettingsView(store: SettingsStore) {
                 checked = returnKeySends,
                 onCheckedChange = { send(HomeSettingsFeature.Action.ReturnKeySendsChanged(it)) },
             )
+            SettingsToggleRow(
+                stringResource(CoreR.string.core_experiment_agent_selection_title),
+                checked = agentSelection,
+                onCheckedChange = { send(HomeSettingsFeature.Action.AgentSelectionChanged(it)) },
+            )
         }
-        if (ExperimentalFeature.agentSelection.isActive(agentSelection)) {
+        if (agentSelection) {
             settingsSection(
                 key = "default-agent",
                 header = newSessionsHeader,

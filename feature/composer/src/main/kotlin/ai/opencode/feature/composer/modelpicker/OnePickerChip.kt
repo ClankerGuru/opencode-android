@@ -61,6 +61,7 @@ import kotlin.math.roundToInt
  * no button chrome of its own, as the composer's other chips.
  *
  * [targetDrop]: how far its target sits below its ink (the composer's `pickerTargetDrop`).
+ * [besideAgent]: the chip shares the row with the agent chip and leaves its effort level off.
  */
 @Composable
 fun OnePickerChip(
@@ -71,6 +72,7 @@ fun OnePickerChip(
     modifier: Modifier = Modifier,
     isEnabled: Boolean = true,
     targetDrop: Dp = 0.dp,
+    besideAgent: Boolean = false,
 ) {
     val reduceMotion = rememberReduceMotion()
     val density = LocalDensity.current
@@ -147,7 +149,7 @@ fun OnePickerChip(
                 )
             }
         }
-        if (scale != null) {
+        if (scale != null && !besideAgent) {
             if (OnePickerTunables.CHIP_SHOWS_ARC) {
                 AnimatedLevelArc(scale, level, size = 14.5.dp, color = OpenCodeTheme.colors.text.copy(alpha = 0.78f))
             }

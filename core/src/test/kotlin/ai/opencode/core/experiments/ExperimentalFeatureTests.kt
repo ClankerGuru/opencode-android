@@ -81,7 +81,7 @@ class ExperimentalFeatureTests {
             ExperimentalGroup.entries.flatMap { it.features }.toSet(),
         )
         assertEquals(
-            listOf(ExperimentalFeature.agentSelection, ExperimentalFeature.hideModels),
+            listOf(ExperimentalFeature.hideModels),
             ExperimentalGroup.composer.features,
         )
         assertEquals(
