@@ -1,7 +1,6 @@
 package ai.opencode.feature.system
 
 import ai.opencode.core.log.SystemActionOrigin
-import ai.opencode.server.model.OpenCodeSession
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.flow.Flow
@@ -38,11 +37,7 @@ data class SystemAction(
     sealed interface Destination {
         /** The session you'd see on opening the app: the last viewed, else the newest. */
         data object LastViewed : Destination
-        /**
-         * Android: [loaded] is the session fetched by ID when it may be missing from Home's list
-         * (the assistant's pinned session), so it opens anyway.
-         */
-        data class Session(val id: String, val loaded: OpenCodeSession? = null) : Destination
+        data class Session(val id: String) : Destination
         /** A New Session draft, in a project when one is named. */
         data class Draft(val projectID: String?) : Destination
     }

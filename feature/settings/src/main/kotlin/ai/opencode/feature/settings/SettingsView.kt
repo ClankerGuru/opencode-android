@@ -1,7 +1,6 @@
 package ai.opencode.feature.settings
 
 import ai.opencode.core.R as CoreR
-import ai.opencode.core.experiments.AssistantExperiment
 import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.MotionPhase
@@ -151,9 +150,6 @@ private fun SettingsPageContent(store: SettingsStore, page: SettingsPage) {
         SettingsPage.CallHistory -> CallHistoryView(store)
         is SettingsPage.CallReplay -> CallReplayView(store, page.log)
         SettingsPage.Notifications -> NotificationSettingsView(store)
-        SettingsPage.Assistant -> AssistantSettingsView(store)
-        SettingsPage.AssistantSession -> AssistantSessionPickerView(store)
-        SettingsPage.AssistantPermissions -> AssistantPermissionsView(store)
         SettingsPage.WhatsNew -> WhatsNewListPage(store)
         is SettingsPage.WhatsNewDetail -> WhatsNewDetailPage(store, page.entryID)
         SettingsPage.WhatsNewSmallerChanges -> WhatsNewSmallerListPage(store)
@@ -280,7 +276,6 @@ private fun SettingsRootPage(store: SettingsStore) {
     val voiceModeEnabled by remember { shared(SharedKeys.voiceModeEnabled).flow }.collectAsState()
     val developerMode by remember { shared(SharedKeys.developerMode).flow }.collectAsState()
     val hideModels by remember { shared(ExperimentalFeature.hideModels.key).flow }.collectAsState()
-    val assistant by remember { shared(AssistantExperiment.key).flow }.collectAsState()
     val notificationPermission by store.observe { it.notificationPermission }
     val returnFocus = rememberSettingsReturnFocus(store, page = null)
     val push = { page: SettingsPage ->
@@ -316,13 +311,6 @@ private fun SettingsRootPage(store: SettingsStore) {
                 SettingsDivider(inset = true)
                 SettingsRow(stringResource(R.string.settings_voice_title), "waveform", SettingsTint.Indigo, modifier = returnFocus.on(SettingsPage.Voice), badge = if (voiceModeEnabled) stringResource(R.string.settings_value_on) else null) {
                     push(SettingsPage.Voice)
-                }
-                // Android only (experimental): OpenCode on the side button.
-                if (assistant) {
-                    SettingsDivider(inset = true)
-                    SettingsRow("Assistant", "button.programmable", SettingsTint.Indigo, modifier = returnFocus.on(SettingsPage.Assistant)) {
-                        push(SettingsPage.Assistant)
-                    }
                 }
                 if (notificationPermission != null) {
                     SettingsDivider(inset = true)
