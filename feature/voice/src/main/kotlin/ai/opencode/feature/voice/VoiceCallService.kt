@@ -10,8 +10,6 @@ import androidx.core.net.toUri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.util.UUID
@@ -26,19 +24,9 @@ class VoiceCallCommands {
     val events: SharedFlow<Command> = stream
     @Volatile private var active: UUID? = null
     private var pendingForegroundStarts = 0
-    private val activeCall = MutableStateFlow<UUID?>(null)
-    /** Android only: the running call, so a screen share made for it stops when it ends. */
-    val calls: StateFlow<UUID?> = activeCall
-    fun activate(id: UUID) { synchronized(this) { active = id; activeCall.value = id } }
+    fun activate(id: UUID) { synchronized(this) { active = id } }
     fun isActive(id: UUID) = active == id
-    /** Android only: whether any call is running, so the side button shows it instead of starting another. */
-    val hasActiveCall: Boolean get() = active != null
-    fun deactivate(id: UUID) {
-        synchronized(this) {
-            if (active == id) active = null
-            activeCall.value = active
-        }
-    }
+    fun deactivate(id: UUID) { synchronized(this) { if (active == id) active = null } }
     internal fun noteForegroundStartQueued() { synchronized(this) { pendingForegroundStarts++ } }
     internal fun noteForegroundStartFailed() { synchronized(this) { if (pendingForegroundStarts > 0) pendingForegroundStarts-- } }
     internal fun consumeForegroundStart(): Int = synchronized(this) {

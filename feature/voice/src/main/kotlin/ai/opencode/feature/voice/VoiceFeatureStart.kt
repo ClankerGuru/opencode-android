@@ -122,14 +122,11 @@ internal fun VoiceFeature.startCall(state: VoiceFeature.State): Reduced<VoiceFea
         startedTarget = target,
         startedViewing = next.viewing,
     )
-    // Android: an assistant call (the side button) delegates straight into its session, which
-    // holds the phone's tools; neither delegator can reach them.
-    val delegatorEnabled = voiceDelegator.isEnabled && key != "lab" && !next.isAssistantCall
+    val delegatorEnabled = voiceDelegator.isEnabled && key != "lab"
     val experimentalFeatures = dependency(ExperimentalFeatures)
     val sessionDelegatorEligible = experimentalFeatures(ExperimentalFeature.voiceSessionDelegator) &&
         next.voiceDelegatorChoice.usesOpenCodeSession &&
-        key != "lab" &&
-        !next.isAssistantCall
+        key != "lab"
     val usesSessionDelegatorForRoute: (VoiceRoute) -> Boolean = { resolvedRoute ->
         sessionDelegatorEligible && resolvedRoute.engine == VoiceEngine.gptLive
     }

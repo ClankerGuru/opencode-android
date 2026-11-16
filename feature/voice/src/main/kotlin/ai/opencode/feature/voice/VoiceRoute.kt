@@ -86,7 +86,6 @@ sealed interface VoiceRoute {
         provider = provider,
         liveDelegation = if (usesBrokerDelegator) delegation else LiveDelegation.client,
         unboundSpeechUsesInstructions = unboundSpeechUsesInstructions,
-        phoneClaims = context.assistant,
     )
 
     companion object {
