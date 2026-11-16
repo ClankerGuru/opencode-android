@@ -597,17 +597,17 @@ class AgentFileCheckTests {
         checks.watch(server, directory, files + outside)
         checks.watch(server, directory, files)
         assertEquals(listOf("a.mp4", "b.mp4", "c.mp4", "d.mp4"), started)
-        assertTrue(checks.isPending(server, directory, files[0]))
+        assertEquals(AgentFileChecks.Status.Pending, checks.status(server, directory, files[0]))
         assertNull(checks.shown(server, directory, files[0]))
-        assertEquals(outside, checks.shown(server, directory, outside))
+        assertEquals(AgentFileChecks.Status.Found(outside), checks.status(server, directory, outside))
 
         gates.getValue("a.mp4").complete(AgentFileChecks.Result.Found(file("clips/a.mp4")))
         gates.getValue("b.mp4").complete(AgentFileChecks.Result.Missing)
         assertEquals(listOf("a.mp4", "b.mp4", "c.mp4", "d.mp4", "e.mp4", "f.mp4"), started)
+        assertEquals(AgentFileChecks.Status.Found(file("clips/a.mp4")), checks.status(server, directory, files[0]))
         assertEquals(file("clips/a.mp4"), checks.shown(server, directory, files[0]))
+        assertEquals(AgentFileChecks.Status.Missing, checks.status(server, directory, files[1]))
         assertNull(checks.shown(server, directory, files[1]))
-        assertTrue(checks.isMissing(server, directory, files[1]))
-        assertFalse(checks.isPending(server, directory, files[1]))
 
         checks.watch(server, directory, files.take(2))
         assertEquals(6, started.size)
@@ -616,6 +616,24 @@ class AgentFileCheckTests {
         checks.invalidate(server, directory)
         checks.watch(server, directory, files.take(2))
         assertEquals(listOf("a.mp4", "b.mp4", "c.mp4", "d.mp4", "e.mp4", "f.mp4", "b.mp4"), started)
+    }
+
+    @Test
+    fun aFolderChangedDuringACheckIsCheckedAgain() {
+        val gates = mutableListOf<CompletableDeferred<AgentFileChecks.Result>>()
+        val checks = AgentFileChecks(checker = { _, _, _ ->
+            val gate = CompletableDeferred<AgentFileChecks.Result>()
+            gates += gate
+            gate.await()
+        }, dispatcher = Dispatchers.Unconfined)
+        val clip = file("clip.mp4")
+
+        checks.watch(server, directory, listOf(clip))
+        checks.invalidate(server, directory)
+        gates[0].complete(AgentFileChecks.Result.Missing)
+        assertEquals(2, gates.size)
+        gates[1].complete(AgentFileChecks.Result.Found(clip))
+        assertEquals(AgentFileChecks.Status.Found(clip), checks.status(server, directory, clip))
     }
 
     @Test
@@ -635,9 +653,8 @@ class AgentFileCheckTests {
     fun aFileTheViewerCouldNotFindLosesItsCard() {
         val checks = AgentFileChecks(checker = { _, _, reference -> AgentFileChecks.Result.Found(reference) }, dispatcher = Dispatchers.Unconfined)
         val outside = file("/elsewhere/x.mp4")
-        assertEquals(outside, checks.shown(server, directory, outside))
+        assertEquals(AgentFileChecks.Status.Found(outside), checks.status(server, directory, outside))
         checks.markMissing(server, "/elsewhere/x.mp4")
-        assertNull(checks.shown(server, directory, outside))
-        assertTrue(checks.isMissing(server, directory, outside))
+        assertEquals(AgentFileChecks.Status.Missing, checks.status(server, directory, outside))
     }
 }

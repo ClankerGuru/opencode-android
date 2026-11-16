@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateSetOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -22,6 +23,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import okhttp3.OkHttpClient
 
 /**
@@ -39,62 +42,53 @@ class AgentFileChecks(
         data object Missing : Result
     }
 
+    sealed interface Status {
+        /** Its card shows and opens [reference]: checked and there, or a file that isn't checked. */
+        data class Found(val reference: AgentFileReference) : Status
+        data object Missing : Status
+        /** Not checked yet, so whether its card shows isn't known. */
+        data object Pending : Status
+    }
+
     data class FileKey(val server: String, val directory: String, val path: String)
 
     private class Checked(val result: Result, val generation: Int)
 
-    private class Pending(val server: OpenCodeServer, val directory: String, val reference: AgentFileReference)
-
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val results = mutableStateMapOf<FileKey, Checked>()
     private val generations = mutableStateMapOf<String, Int>()
-    private val missingTargets = mutableStateMapOf<AgentImageKey, Boolean>()
+    private val missingTargets = mutableStateSetOf<AgentImageKey>()
     private val watchers = mutableMapOf<FileKey, Int>()
-    private val queue = ArrayDeque<FileKey>()
-    private val pending = mutableMapOf<FileKey, Pending>()
-    private val running = mutableSetOf<FileKey>()
+    private val permits = Semaphore(CONCURRENT_CHECKS)
+    private val queued = mutableSetOf<FileKey>()
 
     /** Bumped when the agent may have changed files in [directory]: what was missing is checked again. */
     fun generation(server: OpenCodeServer, directory: String?): Int =
         if (directory == null) 0 else generations[folder(server.persistenceID, directory)] ?: 0
 
-    /**
-     * What to show for [reference]: the file to open, or null for no card (missing, or not checked
-     * yet). Reads snapshot state, so a composable reading it updates when a check lands.
-     */
-    fun shown(server: OpenCodeServer?, directory: String?, reference: AgentFileReference): AgentFileReference? {
-        if (checker == null || server == null) return reference
+    /** Reads snapshot state, so a composable reading it updates when a check lands. */
+    fun status(server: OpenCodeServer?, directory: String?, reference: AgentFileReference): Status {
+        if (checker == null || server == null) return Status.Found(reference)
         val target = reference.target(directory)
-        if (target != null && missingTargets[AgentImageKey(server.persistenceID, target.absolutePath)] == true) return null
-        if (directory == null || !checks(reference, directory)) return reference
+        if (target != null && AgentImageKey(server.persistenceID, target.absolutePath) in missingTargets) return Status.Missing
+        if (directory == null || !checks(reference, directory)) return Status.Found(reference)
         return when (val result = results[FileKey(server.persistenceID, directory, reference.path)]?.result) {
-            is Result.Found -> result.reference
-            Result.Missing, null -> null
+            is Result.Found -> Status.Found(result.reference)
+            Result.Missing -> Status.Missing
+            null -> Status.Pending
         }
     }
 
-    /** Not checked yet, so whether its card shows isn't known. */
-    fun isPending(server: OpenCodeServer?, directory: String?, reference: AgentFileReference): Boolean {
-        if (checker == null || server == null || directory == null || !checks(reference, directory)) return false
-        return results[FileKey(server.persistenceID, directory, reference.path)] == null
-    }
-
-    /** A file known not to be there: its name stays plain text rather than a link. */
-    fun isMissing(server: OpenCodeServer?, directory: String?, reference: AgentFileReference): Boolean {
-        if (checker == null || server == null) return false
-        val target = reference.target(directory)
-        if (target != null && missingTargets[AgentImageKey(server.persistenceID, target.absolutePath)] == true) return true
-        if (directory == null || !checks(reference, directory)) return false
-        return results[FileKey(server.persistenceID, directory, reference.path)]?.result == Result.Missing
-    }
+    /** The file a card for [reference] opens, or null while it's unchecked or missing. */
+    fun shown(server: OpenCodeServer?, directory: String?, reference: AgentFileReference): AgentFileReference? =
+        (status(server, directory, reference) as? Status.Found)?.reference
 
     /**
      * Checks [references] that need it while they're on screen. Returns the release: a check still
      * waiting its turn when nothing watches it any more is skipped.
      */
     fun watch(server: OpenCodeServer, directory: String, references: List<AgentFileReference>): () -> Unit {
-        if (checker == null) return {}
-        val generation = generation(server, directory)
+        val checker = checker ?: return {}
         val watched = mutableListOf<FileKey>()
         for (reference in references) {
             if (!checks(reference, directory)) continue
@@ -102,20 +96,38 @@ class AgentFileChecks(
             if (key in watched) continue
             watched += key
             watchers[key] = (watchers[key] ?: 0) + 1
-            val checked = results[key]
-            val stale = checked != null && checked.result == Result.Missing && checked.generation < generation
-            if (checked != null && !stale) continue
-            if (key in running || key in pending) continue
-            pending[key] = Pending(server, directory, reference)
-            queue.addLast(key)
+            if (!isStale(key, server, directory)) continue
+            if (!queued.add(key)) continue
+            scope.launch {
+                permits.withPermit {
+                    // Again when the folder changed during the check.
+                    while (key in watchers && isStale(key, server, directory)) {
+                        val generation = generation(server, directory)
+                        val result = try {
+                            checker(server, directory, reference)
+                        } catch (error: CancellationException) {
+                            throw error
+                        } catch (error: Exception) {
+                            Result.Found(reference)
+                        }
+                        results[key] = Checked(result, generation)
+                    }
+                }
+                queued -= key
+            }
         }
-        pump()
         return {
             for (key in watched) {
                 val count = (watchers[key] ?: 1) - 1
                 if (count <= 0) watchers.remove(key) else watchers[key] = count
             }
         }
+    }
+
+    /** Not checked yet, or missing when the folder has changed since. */
+    private fun isStale(key: FileKey, server: OpenCodeServer, directory: String): Boolean {
+        val checked = results[key] ?: return true
+        return checked.result == Result.Missing && checked.generation < generation(server, directory)
     }
 
     /** The agent may have changed files in [directory]. Safe from any thread. */
@@ -126,31 +138,10 @@ class AgentFileChecks(
         }
     }
 
-    /** The viewer found no file at [absolutePath]: its cards go for the rest of the session. */
+    /** The viewer found no file at [absolutePath]: its cards go until the app restarts. */
     fun markMissing(server: OpenCodeServer, absolutePath: String) {
         if (checker == null) return
-        missingTargets[AgentImageKey(server.persistenceID, absolutePath)] = true
-    }
-
-    private fun pump() {
-        while (running.size < CONCURRENT_CHECKS) {
-            val key = queue.removeFirstOrNull() ?: return
-            val request = pending.remove(key) ?: continue
-            if ((watchers[key] ?: 0) == 0) continue
-            running += key
-            scope.launch {
-                val result = try {
-                    checker!!(request.server, request.directory, request.reference)
-                } catch (error: CancellationException) {
-                    throw error
-                } catch (error: Exception) {
-                    Result.Found(request.reference)
-                }
-                results[key] = Checked(result, generation(request.server, request.directory))
-                running -= key
-                pump()
-            }
-        }
+        missingTargets += AgentImageKey(server.persistenceID, absolutePath)
     }
 
     private fun folder(server: String, directory: String) = "$server|${AgentFileReference.normalized(directory)}"
@@ -236,8 +227,11 @@ fun CheckedAgentFiles(
     val shown = mutableListOf<AgentFileReference>()
     var pending = false
     for (file in files) {
-        if (checks.isPending(server, directory, file)) pending = true
-        checks.shown(server, directory, file)?.let { shown += it }
+        when (val status = checks.status(server, directory, file)) {
+            is AgentFileChecks.Status.Found -> shown += status.reference
+            AgentFileChecks.Status.Missing -> Unit
+            AgentFileChecks.Status.Pending -> pending = true
+        }
     }
     if (pending) shown.clear()
     Box(Modifier.fillMaxWidth()) {

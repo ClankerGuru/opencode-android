@@ -225,7 +225,7 @@ private fun withoutMissingFiles(inline: InlineText): InlineText {
     for ((index, run) in inline.runs.withIndex()) {
         val link = run.link ?: continue
         val file = MarkdownLinks.fileReference(link) ?: continue
-        if (!checks.isMissing(server, context.directory, file)) continue
+        if (checks.status(server, context.directory, file) != AgentFileChecks.Status.Missing) continue
         if (runs == null) runs = inline.runs.toMutableList()
         runs[index] = run.copy(link = null)
     }
