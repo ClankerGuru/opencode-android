@@ -447,6 +447,7 @@ class MediaZoomState internal constructor(private val pixelSize: Size) {
  * @param isHidden the flight above draws it for now.
  * @param onFrame where the image sits in the viewer's coordinates: fitted, or where a zoom
  *   has it, so a flight home starts from what's on screen.
+ * @param placement where the viewer's motion draws the image laid out at a frame, if it's moving.
  */
 @Composable
 fun ZoomableImagePage(
@@ -458,17 +459,23 @@ fun ZoomableImagePage(
     onSingleTap: () -> Unit = {},
     onZoomChange: (Boolean) -> Unit = {},
     onFrame: (Rect) -> Unit = {},
+    placement: (Rect) -> MediaPlacement? = { null },
 ) {
     val bitmap = remember(image) { image.asImageBitmap() }
     ZoomableVisualPage(Size(image.width.toFloat(), image.height.toFloat()), label, isSelected, modifier,
         onSingleTap, onZoomChange, onFrame) { state ->
         Spacer(Modifier.fillMaxSize().drawBehind {
             if (isHidden) return@drawBehind
-            val from = state.fadingFrom
-            if (from != null) {
-                drawImageIn(bitmap, from, 1 - state.fade)
-                drawImageIn(bitmap, state.imageFrame, state.fade)
-            } else drawImageIn(bitmap, state.imageFrame, 1f)
+            val placed = placement(state.imageFrame)
+            val alpha = placed?.alpha ?: 1f
+            val draw: DrawScope.() -> Unit = {
+                val from = state.fadingFrom
+                if (from != null) {
+                    drawImageIn(bitmap, from, (1 - state.fade) * alpha)
+                    drawImageIn(bitmap, state.imageFrame, state.fade * alpha)
+                } else drawImageIn(bitmap, state.imageFrame, alpha)
+            }
+            if (placed == null) draw() else drawPlaced(placed, draw)
         })
     }
 }

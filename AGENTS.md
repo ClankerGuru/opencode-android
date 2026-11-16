@@ -36,6 +36,9 @@ by hand (`gh workflow run scheduled-release.yml`) to release sooner ([docs/relea
   on purpose: a bottom-anchored LazyColumn with standard Compose animations. Don't port iOS's transcript
   motion (the `TranscriptListViewController` follower, row growth, send flights); its behaviour, flows
   and copy still follow iOS.
+- The full-screen media viewer's motion (open, close, drag to dismiss, predictive back) is Android-native
+  on purpose: an animated frame and rounded clip in `MediaPresentation.kt`. Don't port iOS's viewer flight;
+  the drawing hand-off into the composer still follows iOS.
 
 ## Modules (fixed; never edit `settings.gradle.kts`)
 

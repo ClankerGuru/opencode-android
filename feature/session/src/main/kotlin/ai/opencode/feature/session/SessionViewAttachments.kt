@@ -645,7 +645,7 @@ fun PendingAttachmentsRow(
                             index,
                             Modifier
                                 .then(if (flights != null && id != null) Modifier.onGloballyPositioned { flights.slot(id, it.boundsOnScreen()) } else Modifier)
-                                .mediaZoomSource(ComposerPhotoViewer.mediaID(attachment.id), radius)
+                                .mediaZoomSource(ComposerPhotoViewer.mediaID(attachment.id), radius, showsMedia = true)
                                 // The image waits for its flight to land (~0.3 s), or shows full screen.
                                 .alpha(if (arriving || viewing) 0f else 1f),
                             // No press effect: the photo flies out of the tile exactly as drawn.
