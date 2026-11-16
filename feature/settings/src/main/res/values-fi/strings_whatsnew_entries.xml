@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Vastausten lainaaminen</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">Valitse tekstiä avustajan vastauksesta ja napauta Lainaa, niin teksti lisätään viestiisi Markdown-lohkolainauksena.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">Valitse tekstiä avustajan vastauksesta ja napauta Lainaa, niin se lisätään viestiisi lainauskorttina.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">Avautumisanimaatio</string>

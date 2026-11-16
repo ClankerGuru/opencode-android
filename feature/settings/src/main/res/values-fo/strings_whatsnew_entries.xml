@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Endurgev svar</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">Vel tekst í einum svari frá hjálparanum og trýst á Endurgev fyri at seta hann inn í tíni boð sum eitt Markdown-sitat.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">Vel tekst í einum svari frá hjálparanum og trýst á Endurgev fyri at leggja hann afturat tínum boðum sum eitt endurgevingarkort.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">Bleyt byrjan</string>

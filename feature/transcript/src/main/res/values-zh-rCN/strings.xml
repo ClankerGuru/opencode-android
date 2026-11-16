@@ -41,6 +41,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">引用</string>
+    <string name="transcript_quote_description">引用：%1$s</string>
+    <string name="transcript_quote_show">显示完整引用</string>
+    <string name="transcript_quote_comment_description">引用：%1$s。评论：%2$s</string>
+    <string name="transcript_quote_add_comment">添加评论</string>
+    <string name="transcript_quote_edit_comment">编辑评论</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">复制回复</string>

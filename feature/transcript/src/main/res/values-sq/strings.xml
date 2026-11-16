@@ -42,6 +42,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">Cito</string>
+    <string name="transcript_quote_description">Citim: %1$s</string>
+    <string name="transcript_quote_show">Trego citimin e plotë</string>
+    <string name="transcript_quote_comment_description">Citim: %1$s. Koment: %2$s</string>
+    <string name="transcript_quote_add_comment">Shto koment</string>
+    <string name="transcript_quote_edit_comment">Redakto komentin</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">Kopjo përgjigjen</string>

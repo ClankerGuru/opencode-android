@@ -287,4 +287,6 @@
     <string name="session_shell_refresh_failed">出力を更新できませんでした</string>
     <string name="session_shell_load_earlier_failed">以前の出力を読み込めませんでした</string>
     <string name="session_shell_stop_failed">シェルを停止できませんでした</string>
+    <string name="session_quote_remove_description">引用を削除</string>
+    <string name="session_quote_comment_placeholder">コメントを追加（任意）…</string>
 </resources>

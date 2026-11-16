@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Jogaplardan sitata al</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">Kömekçiniň jogabyndan tekst saýlap, Sitata al düwmesine basyň. Ol habaryňyza Markdown sitata blogy hökmünde goşular.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">Assistentiň jogabyndan tekst saýlaň we ony habaryňyza sitata kartoçkasy hökmünde goşmak üçin «Sitata al» düwmesine basyň.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">Açylyşda ýaýylma</string>

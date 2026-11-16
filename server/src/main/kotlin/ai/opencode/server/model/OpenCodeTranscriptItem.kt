@@ -160,7 +160,13 @@ sealed interface OpenCodeTranscriptItem {
 
     /** [source] is set when an agent sent it. */
     @Serializable @SerialName("userText")
-    data class UserText(override val id: String, val text: String, val source: OpenCodePromptSource? = null) : OpenCodeTranscriptItem
+    data class UserText(
+        override val id: String,
+        val text: String,
+        val source: OpenCodePromptSource? = null,
+        /** Quotes from `metadata.comments`; [text] excludes their blocks and may be empty. */
+        val quotes: List<OpenCodeQuote> = emptyList(),
+    ) : OpenCodeTranscriptItem
 
     @Serializable @SerialName("userImages")
     data class UserImages(override val id: String, val images: List<OpenCodeImageAttachment>) : OpenCodeTranscriptItem

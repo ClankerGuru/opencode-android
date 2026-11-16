@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Citează răspunsuri</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">Selectează text dintr-un răspuns al asistentului și atinge Citează pentru a-l insera în mesaj ca citat Markdown.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">Selectează text dintr-un răspuns al asistentului și atinge Citează pentru a-l adăuga la mesajul tău sub formă de card de citat.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">Animație la pornire</string>

@@ -41,6 +41,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">Trích dẫn</string>
+    <string name="transcript_quote_description">Trích dẫn: %1$s</string>
+    <string name="transcript_quote_show">Hiện toàn bộ trích dẫn</string>
+    <string name="transcript_quote_comment_description">Trích dẫn: %1$s. Bình luận: %2$s</string>
+    <string name="transcript_quote_add_comment">Thêm bình luận</string>
+    <string name="transcript_quote_edit_comment">Chỉnh sửa bình luận</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">Sao chép phản hồi</string>

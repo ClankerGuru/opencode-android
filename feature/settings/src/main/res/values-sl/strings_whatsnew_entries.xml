@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Citiranje odgovorov</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">Izberi besedilo v odgovoru pomočnika in tapni Citiraj, da ga vstaviš v sporočilo kot citat Markdown.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">Izberite besedilo v odgovoru pomočnika in tapnite Citiraj, da ga dodate v sporočilo kot kartico s citatom.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">Razcvet ob zagonu</string>

@@ -6,6 +6,8 @@ import ai.opencode.core.dependencies.ImmediateClock
 import ai.opencode.core.dependencies.TestClock
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
+import ai.opencode.core.dependencies.UuidClient
+import ai.opencode.feature.composer.ComposerQuote
 import ai.opencode.feature.composer.DraftState
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
@@ -39,6 +41,7 @@ import ai.opencode.server.model.OpenCodeToolCall
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import kotlinx.coroutines.awaitCancellation
 import org.junit.Test
+import java.util.UUID
 
 class SessionFeatureTestsRendering {
     private fun user(id: String, text: String) = OpenCodeTranscriptItem.UserText(id = id, text = text)
@@ -135,29 +138,40 @@ class SessionFeatureTestsRendering {
     }
 
     @Test
-    fun quotingSelectionInsertsBlockquoteIntoEmptyAndExistingDraftAndFocusesComposer() = sessionTest { h ->
+    fun quotingSelectionAddsQuoteCardsAndFocusesComposer() = sessionTest { h ->
         val haptics = HapticsRecorder()
-        val store = h.store(h.makeState()) { this[HapticsClient] = haptics.client }
+        val store = h.store(h.makeState()) {
+            this[HapticsClient] = haptics.client
+            this[UuidClient] = UuidClient.incrementing()
+        }
+        val first = ComposerQuote(id = UUID(0, 0).toString(), text = "First line\nSecond line")
 
-        store.send(Action.QuoteTextTapped("First line\nSecond line")) {
-            it.withDraft("> First line\n> Second line\n\n").copy(composerFocusRequest = 1)
+        store.send(Action.QuoteTextTapped("\nFirst line\nSecond line\n\n")) {
+            it.withPendingQuotes(listOf(first)).copy(composerFocusRequest = 1)
         }
         assertEquals(listOf(Haptic.tap), haptics.log)
 
-        store.send(Action.Binding(BindingAction.Draft("> First line\n> Second line\n\nI agree with this part."))) {
-            it.withDraft("> First line\n> Second line\n\nI agree with this part.")
+        store.send(Action.Binding(BindingAction.Draft("I agree with this part."))) {
+            it.withDraft("I agree with this part.")
         }
 
         val fenced = MarkdownQuote.fencedCode("let x = 1\nreturn x", language = "swift")
+        val second = ComposerQuote(id = UUID(0, 1).toString(), text = fenced)
         store.send(Action.QuoteTextTapped(fenced)) {
-            it.withDraft("> First line\n> Second line\n\nI agree with this part.\n\n> ```swift\n> let x = 1\n> return x\n> ```\n\n")
-                .copy(composerFocusRequest = 2)
+            it.withPendingQuotes(listOf(first, second)).copy(composerFocusRequest = 2)
         }
+        assertEquals("I agree with this part.", store.state.draft)
         assertEquals(listOf(Haptic.tap, Haptic.tap), haptics.log)
 
         // Whitespace-only selections are a no-op and stay quiet.
         store.send(Action.QuoteTextTapped("   \n  "))
         assertEquals(listOf(Haptic.tap, Haptic.tap), haptics.log)
+
+        store.send(Action.quoteCommented(second.id, "  Why two?  ")) {
+            it.withPendingQuotes(listOf(first, second.copy(comment = "Why two?")))
+        }
+        store.send(Action.quoteCommented(second.id, " ")) { it.withPendingQuotes(listOf(first, second)) }
+        store.send(Action.quoteRemoved(first.id)) { it.withPendingQuotes(listOf(second)) }
     }
 
     @Test
@@ -172,11 +186,15 @@ class SessionFeatureTestsRendering {
         val attachment = OpenCodeOutgoingAttachment(data = byteArrayOf(0x89.toByte(), 0x50), mime = "image/png")
         val initial = h.makeState().withPendingAttachments(listOf(attachment))
 
-        val store = h.store(initial) { this[HapticsClient] = haptics.client }
+        val store = h.store(initial) {
+            this[HapticsClient] = haptics.client
+            this[UuidClient] = UuidClient.incrementing()
+        }
+        val staged = ComposerQuote(id = UUID(0, 0).toString(), text = "Staged note")
 
-        // 1. Quoting while an attachment is staged preserves the attachment and appends the quote.
+        // 1. Quoting while an attachment is staged keeps the attachment and adds a quote card.
         store.send(Action.QuoteTextTapped("Staged note")) {
-            it.withDraft("> Staged note\n\n").copy(composerFocusRequest = 1)
+            it.withPendingQuotes(listOf(staged)).copy(composerFocusRequest = 1)
         }
         assertEquals(listOf(attachment), store.state.pendingAttachments)
         assertEquals(listOf(Haptic.tap), haptics.log)
@@ -191,9 +209,9 @@ class SessionFeatureTestsRendering {
         ) {
             it.withFormRequests(listOf(form))
                 .withFormAnswers(it.formAnswers + (form.id to emptyMap()))
-                .withParkedComposer(DraftState(text = "> Staged note\n\n", attachments = listOf(attachment)))
-                .withDraft("")
+                .withParkedComposer(DraftState(attachments = listOf(attachment), quotes = listOf(staged)))
                 .withPendingAttachments(emptyList())
+                .withPendingQuotes(emptyList())
                 .withAnswerShownTarget("frm_1/answer")
                 .withRequestArrivalsAreLive(true)
         }
@@ -203,7 +221,7 @@ class SessionFeatureTestsRendering {
                 .withFormAnswers(it.formAnswers + (form.id to mapOf("answer" to OpenCodeFormValue.Str("> Use the safe flag\n\n"))))
                 .copy(composerFocusRequest = 2)
         }
-        assertEquals("> Staged note\n\n", store.state.parkedComposer?.text)
+        assertEquals(listOf(staged), store.state.parkedComposer?.quotes)
         assertEquals(listOf(attachment), store.state.parkedComposer?.attachments)
         assertEquals(listOf(Haptic.tap, Haptic.attention, Haptic.tap), haptics.log)
     }

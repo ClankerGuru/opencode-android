@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Antworten zitieren</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">Markiere Text in einer Assistentenantwort und tippe auf „Zitieren“, um ihn als Markdown-Blockzitat in deine Nachricht einzufügen.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">Wähle Text in einer Antwort des Assistenten aus und tippe auf „Zitieren“, um ihn als Zitatkarte zu deiner Nachricht hinzuzufügen.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">Neue Startanimation</string>

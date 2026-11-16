@@ -42,6 +42,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">Tsiteeri</string>
+    <string name="transcript_quote_description">Tsitaat: %1$s</string>
+    <string name="transcript_quote_show">Näita kogu tsitaati</string>
+    <string name="transcript_quote_comment_description">Tsitaat: %1$s. Kommentaar: %2$s</string>
+    <string name="transcript_quote_add_comment">Lisa kommentaar</string>
+    <string name="transcript_quote_edit_comment">Muuda kommentaari</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">Kopeeri vastus</string>

@@ -44,6 +44,8 @@ internal fun SessionFeature.reduceAttachments(state: State, action: Action): Red
         is ComposerAttachmentsFeature.Action.AttachmentRemoved,
         ComposerAttachmentsFeature.Action.LocationTapped,
         ComposerAttachmentsFeature.Action.LocationRemoved,
+        is ComposerAttachmentsFeature.Action.QuoteRemoved,
+        is ComposerAttachmentsFeature.Action.QuoteCommented,
         ComposerAttachmentsFeature.Action.LocationErrorDismissed,
         ComposerAttachmentsFeature.Action.LocationSettingsTapped,
         -> Reduced(state)

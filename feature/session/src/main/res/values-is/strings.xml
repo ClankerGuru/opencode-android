@@ -298,4 +298,6 @@
     <string name="session_shell_refresh_failed">Ekki tókst að endurhlaða úttak</string>
     <string name="session_shell_load_earlier_failed">Ekki tókst að hlaða eldra úttaki</string>
     <string name="session_shell_stop_failed">Ekki tókst að stöðva skel</string>
+    <string name="session_quote_remove_description">Fjarlægja tilvitnun</string>
+    <string name="session_quote_comment_placeholder">Bættu við athugasemd ef þú vilt…</string>
 </resources>

@@ -43,6 +43,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">Cita</string>
+    <string name="transcript_quote_description">Citazione: %1$s</string>
+    <string name="transcript_quote_show">Mostra citazione completa</string>
+    <string name="transcript_quote_comment_description">Citazione: %1$s. Commento: %2$s</string>
+    <string name="transcript_quote_add_comment">Aggiungi commento</string>
+    <string name="transcript_quote_edit_comment">Modifica commento</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">Copia la risposta</string>

@@ -42,6 +42,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">Цитирај</string>
+    <string name="transcript_quote_description">Цитат: %1$s</string>
+    <string name="transcript_quote_show">Прикажи го целиот цитат</string>
+    <string name="transcript_quote_comment_description">Цитат: %1$s. Коментар: %2$s</string>
+    <string name="transcript_quote_add_comment">Додадете коментар</string>
+    <string name="transcript_quote_edit_comment">Уреди коментар</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">Копирај одговор</string>

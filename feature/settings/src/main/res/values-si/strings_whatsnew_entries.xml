@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">පිළිතුරු උපුටා දක්වන්න</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">සහායකයාගේ පිළිතුරක පෙළ තෝරා උපුටා දක්වන්න තට්ටු කළ විට, එය Markdown උපුටා දැක්වීමක් ලෙස ඔබේ පණිවිඩයට එක් වේ.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">සහායකයාගේ පිළිතුරක පෙළ තෝරා, එය උපුටාගැනීමේ කාඩ්පතක් ලෙස ඔබේ පණිවිඩයට එකතු කිරීමට උපුටා දක්වන්න තට්ටු කරන්න.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">විහිදී ඇරඹෙන දසුන</string>

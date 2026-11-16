@@ -12,6 +12,7 @@ import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.OpenCodePageContext
 import ai.opencode.server.model.OpenCodePendingInput
 import ai.opencode.server.model.OpenCodePromptPresentation
+import ai.opencode.server.model.OpenCodeQuote
 import ai.opencode.server.model.OpenCodePromptSource
 import ai.opencode.server.model.OpenCodeSkillMention
 import ai.opencode.server.model.PromptContext
@@ -51,6 +52,7 @@ private suspend fun postPrompt(
             page = PromptContext.page.current(),
             callbackURL = PromptContext.notificationCallbackURL.current(),
             mentions = PromptContext.mentions.current(),
+            quotes = PromptContext.quotes.current(),
         ),
         "message",
     )
@@ -72,6 +74,7 @@ internal fun promptBody(
     page: OpenCodePageContext? = null,
     callbackURL: String? = null,
     mentions: OpenCodeAutocompleteMentions? = null,
+    quotes: List<OpenCodeQuote> = emptyList(),
 ): PromptBody {
     val bounded = page?.bounded
     val attachmentFiles = attachments.map { PromptBody.File(uri = it.promptURI, name = it.name) }
@@ -79,12 +82,12 @@ internal fun promptBody(
     val combinedFiles = attachmentFiles + mentionFiles
     return PromptBody(
         id = messageID,
-        text = OpenCodePromptPresentation.modelText(text, files, bounded),
+        text = OpenCodePromptPresentation.modelText(text, files, bounded, quotes),
         files = combinedFiles.ifEmpty { null },
         agents = mentions?.agents?.ifEmpty { null },
         skills = mentions?.skills?.ifEmpty { null },
         delivery = delivery?.rawValue,
-        metadata = PromptBody.Metadata.of(text, files, bounded, callbackURL),
+        metadata = PromptBody.Metadata.of(text, files, bounded, callbackURL, quotes),
     )
 }
 
@@ -110,7 +113,7 @@ internal data class PromptBody(
     data class Metadata(
         val displayText: String? = null,
         /** Desktop only reads `displayText` when `comments` is an array. */
-        val comments: List<String>? = null,
+        val comments: List<Comment>? = null,
         val attachments: List<OpenCodeFileReference>? = null,
         /** Read by the server's notify plugin: POSTs here when this run ends. */
         val notification: Notification? = null,
@@ -118,17 +121,27 @@ internal data class PromptBody(
     ) {
         @Serializable data class Notification(val callbackURL: String)
 
+        @Serializable data class Comment(val type: String, val text: String, val comment: String? = null)
+
         /** The page a message was sent from; its visible text travels in `text` as a `<page>` block. */
         @Serializable data class Page(val url: String, val title: String, val selection: String? = null, val scroll: Double? = null)
 
         companion object {
             /** Null when there is nothing to say, so plain prompts carry no metadata. */
-            fun of(text: String, files: List<OpenCodeFileReference>, page: OpenCodePageContext?, callbackURL: String?): Metadata? {
-                if (files.isEmpty() && page == null && callbackURL == null) return null
-                val describes = files.isNotEmpty() || page != null
+            fun of(
+                text: String,
+                files: List<OpenCodeFileReference>,
+                page: OpenCodePageContext?,
+                callbackURL: String?,
+                quotes: List<OpenCodeQuote> = emptyList(),
+            ): Metadata? {
+                if (files.isEmpty() && page == null && callbackURL == null && quotes.isEmpty()) return null
+                val describes = files.isNotEmpty() || page != null || quotes.isNotEmpty()
+                val comments = ArrayList<Comment>()
+                for (quote in quotes) comments += Comment("quote", quote.text, quote.comment?.trim()?.ifEmpty { null })
                 return Metadata(
                     displayText = if (describes) text else null,
-                    comments = if (describes) emptyList() else null,
+                    comments = if (describes) comments else null,
                     attachments = files.ifEmpty { null },
                     notification = callbackURL?.let(::Notification),
                     page = page?.let { Page(it.url, it.title, it.selection, it.scroll) },
@@ -182,6 +195,7 @@ internal fun pendingInputRows(payload: PendingInputsPayload): List<OpenCodePendi
         isCompaction = item.type == "compaction",
         delivery = item.delivery?.let(OpenCodeDelivery::of) ?: OpenCodeDelivery.Steer,
         files = files,
+        quotes = OpenCodePromptPresentation.quotes(source?.metadata),
         source = OpenCodePromptSource.of(source?.text, source?.metadata),
         inlineFiles = FilePayload.attachedFiles(source?.files ?: emptyList(), item.id),
         images = FilePayload.attachedImages(source?.files ?: emptyList(), item.id),

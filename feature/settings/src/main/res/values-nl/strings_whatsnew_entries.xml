@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Reacties citeren</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">Selecteer tekst in een reactie van de assistent en tik op Citeren om die als Markdown-blokcitaat in je bericht in te voegen.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">Selecteer tekst in een antwoord van de assistent en tik op Citeren om die als citaatkaart aan je bericht toe te voegen.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">Openingsanimatie</string>

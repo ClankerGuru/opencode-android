@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">ដកស្រង់ការឆ្លើយតប</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">ជ្រើសរើសអត្ថបទក្នុងការឆ្លើយតបរបស់ជំនួយការ រួចប៉ះ ដកស្រង់ ដើម្បីបញ្ចូលវាទៅក្នុងសាររបស់អ្នកជាប្លុកសម្រង់ Markdown។</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">ជ្រើសរើសអត្ថបទក្នុងការឆ្លើយតបរបស់ជំនួយការ រួចប៉ះ ដកស្រង់ ដើម្បីបន្ថែមវាទៅសាររបស់អ្នកជាកាតដកស្រង់។</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">ចលនារីកពេលបើក</string>

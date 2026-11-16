@@ -35,6 +35,7 @@ data class PendingPrompt(
     val mentions: OpenCodeAutocompleteMentions? = null,
     /** Chosen autocomplete chips carried with the prompt for edit/restore. */
     val chips: List<ComposerAutocompleteChip> = emptyList(),
+    val quotes: List<ComposerQuote> = emptyList(),
 ) {
     /** A queued send posted mid-run: the run it waits behind keeps its model. */
     val waitsBehindRun: Boolean get() = wasRunning && delivery == OpenCodeDelivery.Queue

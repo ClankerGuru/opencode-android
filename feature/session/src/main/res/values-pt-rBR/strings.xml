@@ -309,4 +309,6 @@
     <string name="session_shell_refresh_failed">Não foi possível atualizar a saída</string>
     <string name="session_shell_load_earlier_failed">Não foi possível carregar a saída anterior</string>
     <string name="session_shell_stop_failed">Não foi possível parar o shell</string>
+    <string name="session_quote_remove_description">Remover citação</string>
+    <string name="session_quote_comment_placeholder">Adicione um comentário opcional…</string>
 </resources>

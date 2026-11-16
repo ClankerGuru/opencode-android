@@ -41,6 +41,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">ອ້າງອີງ</string>
+    <string name="transcript_quote_description">ອ້າງອີງ: %1$s</string>
+    <string name="transcript_quote_show">ສະແດງການອ້າງອີງທັງໝົດ</string>
+    <string name="transcript_quote_comment_description">ອ້າງອີງ: %1$s. ຄຳເຫັນ: %2$s</string>
+    <string name="transcript_quote_add_comment">ເພີ່ມຄຳເຫັນ</string>
+    <string name="transcript_quote_edit_comment">ແກ້ໄຂຄຳເຫັນ</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">ສຳເນົາຄຳຕອບ</string>

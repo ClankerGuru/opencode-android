@@ -672,7 +672,7 @@ private fun appendDelivered(input: OpenCodePendingInput, state: State): State {
     val rows = SessionFeature.promptRows(
         messageID = id, text = input.text, source = input.source,
         images = localImages?.takeIf { it.isNotEmpty() } ?: input.images,
-        fileReferences = input.files, inlineFiles = input.inlineFiles,
+        fileReferences = input.files, inlineFiles = input.inlineFiles, quotes = input.quotes,
     )
     if (rows.isEmpty()) return state
     val previousFirstID = state.visibleItems.firstOrNull()?.id

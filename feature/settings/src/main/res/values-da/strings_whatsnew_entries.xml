@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Citér svar</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">Markér tekst i et svar fra assistenten, og tryk på Citér for at indsætte den i din besked som et Markdown-blokcitat.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">Markér tekst i et svar fra assistenten, og tryk på Citér for at føje den til din besked som et citatkort.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">Opstartsanimation</string>

@@ -298,4 +298,6 @@
     <string name="session_shell_refresh_failed">Väljundi värskendamine ebaõnnestus</string>
     <string name="session_shell_load_earlier_failed">Varasema väljundi laadimine ebaõnnestus</string>
     <string name="session_shell_stop_failed">Shelli peatamine ebaõnnestus</string>
+    <string name="session_quote_remove_description">Eemalda tsitaat</string>
+    <string name="session_quote_comment_placeholder">Lisa soovi korral kommentaar…</string>
 </resources>

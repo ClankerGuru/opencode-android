@@ -298,4 +298,6 @@
     <string name="session_shell_refresh_failed">Couldn’t refresh output</string>
     <string name="session_shell_load_earlier_failed">Couldn’t load earlier output</string>
     <string name="session_shell_stop_failed">Couldn’t stop shell</string>
+    <string name="session_quote_remove_description">Remove Quote</string>
+    <string name="session_quote_comment_placeholder">Add an optional comment…</string>
 </resources>

@@ -42,6 +42,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">Մեջբերել</string>
+    <string name="transcript_quote_description">Մեջբերում՝ %1$s</string>
+    <string name="transcript_quote_show">Ցույց տալ ամբողջ մեջբերումը</string>
+    <string name="transcript_quote_comment_description">Մեջբերում՝ %1$s։ Մեկնաբանություն՝ %2$s</string>
+    <string name="transcript_quote_add_comment">Ավելացնել մեկնաբանություն</string>
+    <string name="transcript_quote_edit_comment">Խմբագրել մեկնաբանությունը</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">Պատճենել պատասխանը</string>

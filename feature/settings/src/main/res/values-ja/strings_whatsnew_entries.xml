@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">返信を引用</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">アシスタントの返信でテキストを選び、「引用」をタップすると、Markdownの引用ブロックとしてメッセージに挿入できます。</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">アシスタントの返信でテキストを選択し、「引用」をタップすると、メッセージに引用カードとして追加できます。</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">起動時のアニメーション</string>

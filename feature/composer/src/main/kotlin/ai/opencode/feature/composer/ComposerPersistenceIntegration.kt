@@ -28,6 +28,7 @@ data class PersistedComposerWatch(
     val location: SharedLocation?,
     val chips: List<ComposerAutocompleteChip>,
     val undoSnapshot: UndoSnapshot?,
+    val quotes: List<ComposerQuote> = emptyList(),
 ) {
     sealed interface FilePhase {
         data object Uploading : FilePhase
@@ -65,6 +66,7 @@ data class PersistedComposerWatch(
             location = composer.location,
             chips = composer.chips,
             undoSnapshot = composer.undoSnapshot,
+            quotes = composer.quotes,
         )
     }
 }

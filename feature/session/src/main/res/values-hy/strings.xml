@@ -298,4 +298,6 @@
     <string name="session_shell_refresh_failed">Չհաջողվեց թարմացնել արտածումը</string>
     <string name="session_shell_load_earlier_failed">Չհաջողվեց բեռնել նախորդ արտածումը</string>
     <string name="session_shell_stop_failed">Չհաջողվեց կանգնեցնել Shell-ը</string>
+    <string name="session_quote_remove_description">Հեռացնել մեջբերումը</string>
+    <string name="session_quote_comment_placeholder">Ըստ ցանկության՝ ավելացրեք մեկնաբանություն…</string>
 </resources>

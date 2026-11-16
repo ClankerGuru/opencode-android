@@ -320,4 +320,6 @@
     <string name="session_shell_refresh_failed">Не вдалося оновити вивід</string>
     <string name="session_shell_load_earlier_failed">Не вдалося завантажити попередній вивід</string>
     <string name="session_shell_stop_failed">Не вдалося зупинити команду</string>
+    <string name="session_quote_remove_description">Видалити цитату</string>
+    <string name="session_quote_comment_placeholder">Додайте коментар за бажанням…</string>
 </resources>

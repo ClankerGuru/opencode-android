@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">응답 인용</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">에이전트 응답에서 텍스트를 선택하고 인용을 탭하면 메시지에 Markdown 인용문으로 넣을 수 있어요.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">어시스턴트 응답에서 텍스트를 선택하고 인용을 누르면 메시지에 인용 카드로 추가돼요.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">펼쳐지는 시작 화면</string>

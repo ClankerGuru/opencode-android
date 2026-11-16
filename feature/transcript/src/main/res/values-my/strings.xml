@@ -41,6 +41,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">ကိုးကားပါ</string>
+    <string name="transcript_quote_description">ကိုးကားချက်: %1$s</string>
+    <string name="transcript_quote_show">ကိုးကားချက်အပြည့်ကို ပြပါ</string>
+    <string name="transcript_quote_comment_description">ကိုးကားချက်: %1$s။ မှတ်ချက်: %2$s</string>
+    <string name="transcript_quote_add_comment">မှတ်ချက်ထည့်ပါ။</string>
+    <string name="transcript_quote_edit_comment">မှတ်ချက် တည်းဖြတ်ရန်</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">ပြန်စာကို ကူးယူပါ</string>

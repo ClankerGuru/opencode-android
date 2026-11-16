@@ -320,4 +320,6 @@
     <string name="session_shell_refresh_failed">Nepodarilo sa obnoviť výstup</string>
     <string name="session_shell_load_earlier_failed">Nepodarilo sa načítať starší výstup</string>
     <string name="session_shell_stop_failed">Nepodarilo sa zastaviť škrupinu</string>
+    <string name="session_quote_remove_description">Odstrániť citát</string>
+    <string name="session_quote_comment_placeholder">Pridajte voliteľný komentár…</string>
 </resources>

@@ -298,4 +298,6 @@
     <string name="session_shell_refresh_failed">ප්‍රතිදානය නැවුම් කිරීමට නොහැකි විය</string>
     <string name="session_shell_load_earlier_failed">පෙර ප්‍රතිදානය පූරණය කිරීමට නොහැකි විය</string>
     <string name="session_shell_stop_failed">ෂෙල් නැවැත්වීමට නොහැකි විය</string>
+    <string name="session_quote_remove_description">උපුටාගැනීම ඉවත් කරන්න</string>
+    <string name="session_quote_comment_placeholder">අවශ්‍ය නම් අදහසක් එක් කරන්න…</string>
 </resources>

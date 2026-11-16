@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Cavabdan sitat gətir</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">Assistentin cavabında mətn seçib «Sitat gətir» düyməsinə toxunun ki, mesajınıza Markdown sitat bloku kimi əlavə olunsun.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">Assistentin cavabında mətn seçin və «Sitat gətir» düyməsinə toxunaraq onu mesajınıza sitat kartı kimi əlavə edin.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">Açılış animasiyası</string>

@@ -320,4 +320,6 @@
     <string name="session_shell_refresh_failed">Nepavyko atnaujinti išvesties</string>
     <string name="session_shell_load_earlier_failed">Nepavyko įkelti ankstesnės išvesties</string>
     <string name="session_shell_stop_failed">Nepavyko sustabdyti apvalkalo</string>
+    <string name="session_quote_remove_description">Pašalinti citatą</string>
+    <string name="session_quote_comment_placeholder">Pridėkite komentarą (neprivaloma)…</string>
 </resources>

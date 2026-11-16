@@ -298,4 +298,6 @@
     <string name="session_shell_refresh_failed">Çıxışı yeniləmək mümkün olmadı</string>
     <string name="session_shell_load_earlier_failed">Əvvəlki çıxışı yükləmək mümkün olmadı</string>
     <string name="session_shell_stop_failed">Shell-i dayandırmaq mümkün olmadı</string>
+    <string name="session_quote_remove_description">Sitatı sil</string>
+    <string name="session_quote_comment_placeholder">İstəyə bağlı şərh əlavə et…</string>
 </resources>

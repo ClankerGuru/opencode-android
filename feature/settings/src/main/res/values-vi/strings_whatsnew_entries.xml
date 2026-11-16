@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Trích dẫn phản hồi</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">Chọn văn bản trong phản hồi của trợ lý rồi chạm Trích dẫn để chèn vào tin nhắn dưới dạng khối trích dẫn Markdown.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">Chọn văn bản trong phản hồi của trợ lý rồi chạm Trích dẫn để thêm vào tin nhắn dưới dạng thẻ trích dẫn.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">Hiệu ứng mở ứng dụng</string>

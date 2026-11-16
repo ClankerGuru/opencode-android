@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">ምላሾችን ጥቀስ</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">ከረዳቱ ምላሽ ጽሑፍ ምረጥና «ጥቀስ» ንካ፤ በመልእክትህ ውስጥ እንደ Markdown ጥቅስ ይገባል።</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">በረዳቱ ምላሽ ውስጥ ጽሑፍ ይምረጡና በጥቅስ ካርድ ወደ መልእክትዎ ለማከል «ጥቀስ» የሚለውን ይንኩ።</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">ሲከፈት የሚዘረጋ እይታ</string>

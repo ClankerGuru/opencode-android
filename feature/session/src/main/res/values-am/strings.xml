@@ -298,4 +298,6 @@
     <string name="session_shell_refresh_failed">ውጤቱን ማደስ አልተቻለም</string>
     <string name="session_shell_load_earlier_failed">የቀደመውን ውጤት መጫን አልተቻለም</string>
     <string name="session_shell_stop_failed">ሼሉን ማቆም አልተቻለም</string>
+    <string name="session_quote_remove_description">ጥቅሱን አስወግድ</string>
+    <string name="session_quote_comment_placeholder">አማራጭ አስተያየት አክል…</string>
 </resources>

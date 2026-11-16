@@ -298,4 +298,6 @@
     <string name="session_shell_refresh_failed">Гаралтыг шинэчилж чадсангүй</string>
     <string name="session_shell_load_earlier_failed">Өмнөх гаралтыг ачаалж чадсангүй</string>
     <string name="session_shell_stop_failed">Shell-ийг зогсоож чадсангүй</string>
+    <string name="session_quote_remove_description">Эшлэлийг арилгах</string>
+    <string name="session_quote_comment_placeholder">Хүсвэл сэтгэгдэл нэмэх…</string>
 </resources>

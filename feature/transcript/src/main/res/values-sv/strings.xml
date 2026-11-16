@@ -42,6 +42,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">Citera</string>
+    <string name="transcript_quote_description">Citat: %1$s</string>
+    <string name="transcript_quote_show">Visa hela citatet</string>
+    <string name="transcript_quote_comment_description">Citat: %1$s. Kommentar: %2$s</string>
+    <string name="transcript_quote_add_comment">Lägg till kommentar</string>
+    <string name="transcript_quote_edit_comment">Redigera kommentar</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">Kopiera svaret</string>

@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Atsakymų citavimas</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">Pažymėkite tekstą asistento atsakyme ir palieskite „Cituoti“, kad įterptumėte jį į žinutę kaip Markdown citatą.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">Pažymėkite tekstą asistento atsakyme ir palieskite „Cituoti“, kad pridėtumėte jį prie savo žinutės kaip citatos kortelę.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">Išsiskleidimas paleidžiant</string>

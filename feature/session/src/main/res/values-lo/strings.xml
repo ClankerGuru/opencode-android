@@ -287,4 +287,6 @@
     <string name="session_shell_refresh_failed">ອັບເດດຜົນລັບບໍ່ໄດ້</string>
     <string name="session_shell_load_earlier_failed">ໂຫຼດຜົນລັບກ່ອນໜ້າບໍ່ໄດ້</string>
     <string name="session_shell_stop_failed">ຢຸດແກະບໍ່ໄດ້</string>
+    <string name="session_quote_remove_description">ເອົາການອ້າງອີງອອກ</string>
+    <string name="session_quote_comment_placeholder">ເພີ່ມຄຳເຫັນ (ທາງເລືອກ)…</string>
 </resources>

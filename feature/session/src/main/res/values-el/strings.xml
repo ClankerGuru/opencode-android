@@ -298,4 +298,6 @@
     <string name="session_shell_refresh_failed">Αδυναμία ανανέωσης εξόδου</string>
     <string name="session_shell_load_earlier_failed">Αδυναμία φόρτωσης προηγούμενης εξόδου</string>
     <string name="session_shell_stop_failed">Αδυναμία διακοπής κελύφους</string>
+    <string name="session_quote_remove_description">Αφαίρεση παράθεσης</string>
+    <string name="session_quote_comment_placeholder">Προσθέστε ένα προαιρετικό σχόλιο…</string>
 </resources>

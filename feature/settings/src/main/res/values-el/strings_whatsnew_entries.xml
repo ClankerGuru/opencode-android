@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Παράθεση απαντήσεων</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">Επιλέξτε κείμενο σε μια απάντηση του βοηθού και πατήστε «Παράθεση» για να το προσθέσετε στο μήνυμά σας ως παράθεση Markdown.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">Επιλέξτε κείμενο σε μια απάντηση του βοηθού και πατήστε Παράθεση για να το προσθέσετε στο μήνυμά σας ως κάρτα παράθεσης.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">Κίνηση εκκίνησης</string>

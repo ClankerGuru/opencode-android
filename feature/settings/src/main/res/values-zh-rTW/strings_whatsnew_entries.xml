@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">引用回覆</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">選取助理回覆中的文字，再點一下「引用」，就能以 Markdown 引用區塊插入訊息。</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">選取助理回覆中的文字，再點一下「引用」，就能以引用卡片加入你的訊息。</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">啟動綻放動畫</string>

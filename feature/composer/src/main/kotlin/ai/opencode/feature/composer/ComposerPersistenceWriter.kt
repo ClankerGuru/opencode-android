@@ -426,6 +426,7 @@ internal class ComposerPersistenceWriter(
                 location = record.location,
                 chips = record.chips,
                 undoSnapshot = record.undoSnapshot,
+                quotes = record.quotes,
             )
             if (draft.isEmpty) return null
             return RestoredComposerDraft(record.project, draft, record.updatedAt)
@@ -457,6 +458,7 @@ internal class ComposerPersistenceWriter(
                 chips = draft.chips,
                 undoSnapshot = draft.undoSnapshot,
                 updatedAt = timestamp,
+                quotes = draft.quotes,
             )
             if (existing.copy(updatedAt = timestamp) == effective) return null
             drafts[index] = effective
@@ -472,6 +474,7 @@ internal class ComposerPersistenceWriter(
                 chips = draft.chips,
                 undoSnapshot = draft.undoSnapshot,
                 updatedAt = timestamp,
+                quotes = draft.quotes,
             )
             if (!record.hasPersistedContent) return null
             drafts += record
@@ -590,6 +593,7 @@ internal class ComposerPersistenceWriter(
         page = pending.page,
         mentions = pending.mentions,
         chips = pending.chips,
+        quotes = pending.quotes,
     )
 
     private fun makeRestoredOutboxEntry(record: PersistedComposerState.OutboxRecord) = RestoredOutboxEntry(
@@ -617,6 +621,7 @@ internal class ComposerPersistenceWriter(
         page = record.page,
         mentions = record.mentions,
         chips = record.chips,
+        quotes = record.quotes,
     )
 
     private fun restoreAttachment(record: PersistedComposerState.AttachmentRecord): OpenCodeOutgoingAttachment? {

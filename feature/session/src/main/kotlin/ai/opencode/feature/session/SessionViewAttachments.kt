@@ -12,6 +12,7 @@ import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.strings.localized
 import ai.opencode.core.strings.localizedPlural
+import ai.opencode.core.ui.OpenCodeMinTapTarget
 import ai.opencode.core.ui.drawerPanHorizontalScroller
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.composer.AttachmentCameraView
@@ -21,6 +22,8 @@ import ai.opencode.feature.composer.AttachmentRemoval
 import ai.opencode.feature.composer.AttachmentRemoval.attachmentRemovalExit
 import ai.opencode.feature.composer.ComposerFileAttachment
 import ai.opencode.feature.composer.ComposerFileChip
+import ai.opencode.feature.composer.ComposerQuote
+import ai.opencode.feature.transcript.user.quoteCardHeight
 import ai.opencode.feature.composer.ComposerFileImporter
 import ai.opencode.feature.composer.ComposerFileRouting
 import ai.opencode.feature.composer.ComposerFileSource
@@ -59,6 +62,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -83,6 +87,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import ai.opencode.feature.composer.SharedLocationCard
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.layout.layout
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -90,11 +95,13 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -508,6 +515,22 @@ object PendingAttachmentMetrics {
     val slotRadius: Dp = 22.dp
 }
 
+// The × sits over a card's top trailing corner; its whole tap target fits past the row's last card.
+private val RemoveTargetReach = ComposerPhotoViewer.removeBadgeOffset.x + OpenCodeMinTapTarget / 2
+
+private suspend fun LazyListState.revealFully(key: Any, index: Int) {
+    var item = layoutInfo.visibleItemsInfo.firstOrNull { it.key == key }
+    if (item == null) {
+        animateScrollToItem(index)
+        item = layoutInfo.visibleItemsInfo.firstOrNull { it.key == key } ?: return
+    }
+    val end = layoutInfo.viewportEndOffset - layoutInfo.afterContentPadding
+    when {
+        item.offset < 0 -> animateScrollBy(item.offset.toFloat())
+        item.offset + item.size > end -> animateScrollBy(minOf(item.offset + item.size - end, item.offset).toFloat())
+    }
+}
+
 // The full-screen viewer's image flies home into this slot, so all of it has to be on screen.
 private suspend fun LazyListState.reveal(index: Int) {
     val end = layoutInfo.viewportEndOffset - layoutInfo.afterContentPadding
@@ -563,8 +586,13 @@ fun PendingAttachmentsRow(
     composerExpanded: Boolean = false,
     /** iOS `store.server`: restored `media:<hash>` photos load their bytes from it. */
     server: OpenCodeServer? = null,
+    quotes: List<ComposerQuote> = emptyList(),
+    onRemoveQuote: (String) -> Unit = {},
+    commentingQuoteID: String? = null,
+    onOpenQuote: (String) -> Unit = {},
 ) {
     val reduceMotion = rememberReduceMotion()
+    val openedQuoteID = commentingQuoteID
     // iOS `usesPlusMenuSheet`: the New Plus Menu's removal is `AttachmentRemoval`'s.
     val usesPlusMenuSheet = flights != null
     // iOS `styled`: with New Plus Menu the tiles sit `attachmentInset` from the surface's top and
@@ -575,10 +603,15 @@ fun PendingAttachmentsRow(
     val parentTop = if (composerExpanded) 0.dp else ComposerTunables.innerVertical.dp
     val radius = ComposerTunables.attachmentRadius.dp
     val locationHeight = SharedLocationCard.compactMapHeight + SharedLocationCard.compactFooterHeight()
-    val rowHeightTarget = if (!styled) {
-        PendingAttachmentMetrics.slotSide
-    } else {
-        maxOf(PendingAttachmentMetrics.slotSide, ComposerFileChip.height, if (showsLocation) locationHeight else 0.dp)
+    val present = attachments.map { it.id }.toSet()
+    val reserved = flights?.reservedAttachments?.filter { it.toString() !in present }.orEmpty()
+    val quoteHeight = quoteCardHeight()
+    // Quotes alone keep the row as short as their cards; beside tiles they sit at the tiles' top.
+    val onlyQuotes = attachments.isEmpty() && reserved.isEmpty() && files.isEmpty() && !showsLocation
+    val rowHeightTarget = when {
+        onlyQuotes -> quoteHeight
+        !styled -> maxOf(PendingAttachmentMetrics.slotSide, quoteHeight)
+        else -> maxOf(PendingAttachmentMetrics.slotSide, ComposerFileChip.height, quoteHeight, if (showsLocation) locationHeight else 0.dp)
     }
     val rowHeight by animateDpAsState(
         rowHeightTarget,
@@ -589,6 +622,41 @@ fun PendingAttachmentsRow(
     val viewingIndex = attachments.indexOfFirst { ComposerPhotoViewer.isShowing(it.id) }
     LaunchedEffect(viewingIndex) {
         if (viewingIndex >= 0) listState.reveal(viewingIndex)
+    }
+    val tileHeight = maxOf(rowHeight, PendingAttachmentMetrics.slotSide)
+    val itemKeys = buildList {
+        for (attachment in attachments) add("attachment-${attachment.id}")
+        for (id in reserved) add("reserved-$id")
+        for (file in files) add("file-${file.id}")
+        for (quote in quotes) add("quote-${quote.id}")
+        if (showsLocation) add("location")
+    }
+    // Adding a card scrolls the row to its end, unless that would push the new card off the start.
+    var knownKeys by remember { mutableStateOf(itemKeys.toSet()) }
+    LaunchedEffect(itemKeys) {
+        val added = itemKeys.lastOrNull { it !in knownKeys }
+        knownKeys = itemKeys.toSet()
+        if (added != null) {
+            withFrameNanos { }
+            listState.revealFully(itemKeys.last(), itemKeys.lastIndex)
+            listState.revealFully(added, itemKeys.indexOf(added))
+        }
+    }
+    // The quote being commented on stays in full view under its panel.
+    LaunchedEffect(openedQuoteID) {
+        val key = "quote-${openedQuoteID ?: return@LaunchedEffect}"
+        val index = itemKeys.indexOf(key)
+        if (index >= 0) listState.revealFully(key, index)
+    }
+    // A row scrolled to its end stays there as the composer narrows.
+    LaunchedEffect(listState) {
+        var width = 0
+        var atEnd = true
+        snapshotFlow { listState.layoutInfo.viewportSize.width to listState.canScrollForward }.collect { (newWidth, canScrollForward) ->
+            if (newWidth < width && atEnd && canScrollForward) listState.scrollBy((width - newWidth).toFloat())
+            width = newWidth
+            atEnd = !listState.canScrollForward
+        }
     }
     val departing = rememberDepartingAttachments()
     val placement: FiniteAnimationSpec<IntOffset> =
@@ -606,7 +674,7 @@ fun PendingAttachmentsRow(
         state = listState,
         // Room for the remove buttons, which sit over the top trailing corner.
         contentPadding = if (styled) {
-            PaddingValues(top = (inset - parentTop).coerceAtLeast(0.dp), start = maxOf(inset, inner), end = 8.dp + inner)
+            PaddingValues(top = (inset - parentTop).coerceAtLeast(0.dp), start = maxOf(inset, inner), end = maxOf(8.dp + inner, RemoveTargetReach))
         } else {
             PaddingValues(top = 8.dp, end = 8.dp)
         },
@@ -650,7 +718,7 @@ fun PendingAttachmentsRow(
                                 .alpha(if (arriving || viewing) 0f else 1f),
                             // No press effect: the photo flies out of the tile exactly as drawn.
                             onOpen = onOpenPhoto?.takeIf { !arriving }?.let { open -> { open(attachment.id) } },
-                            height = { rowHeight },
+                            height = { tileHeight },
                             radius = radius,
                             server = server,
                         )
@@ -705,13 +773,12 @@ fun PendingAttachmentsRow(
             }
         }
         if (flights != null) {
-            val present = attachments.map { it.id }.toSet()
-            items(flights.reservedAttachments.filter { it.toString() !in present }, key = { "reserved-$it" }) { id ->
+            items(reserved, key = { "reserved-$it" }) { id ->
                 Box(
                     Modifier
                         .width(PendingAttachmentMetrics.slotSide)
                         .layout { measurable, constraints ->
-                            val side = rowHeight.roundToPx()
+                            val side = tileHeight.roundToPx()
                             val placeable = measurable.measure(constraints.copy(minHeight = side, maxHeight = side))
                             layout(placeable.width, placeable.height) { placeable.place(0, 0) }
                         }
@@ -736,6 +803,20 @@ fun PendingAttachmentsRow(
                     cornerRadius = radius,
                     onOpen = onOpenPhoto?.takeUnless { file.isFailed }?.let { open -> { open(file.id.toString()) } },
                 )
+            }
+        }
+        items(quotes, key = { "quote-${it.id}" }) { quote ->
+            val key = "quote-${quote.id}"
+            RemovableAttachment(
+                label = stringResource(R.string.session_quote_remove_description),
+                identifier = "remove-quote-${quote.id}",
+                reduceMotion = reduceMotion,
+                onRemove = removing(key) { onRemoveQuote(quote.id) },
+                modifier = itemMotion(key),
+            ) {
+                Box(Modifier.height(rowHeight), contentAlignment = Alignment.TopStart) {
+                    ComposerQuoteCard(quote, radius = radius, onOpen = { onOpenQuote(quote.id) })
+                }
             }
         }
         if (showsLocation) {

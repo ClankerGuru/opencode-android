@@ -298,4 +298,6 @@
     <string name="session_shell_refresh_failed">Ausgabe konnte nicht aktualisiert werden</string>
     <string name="session_shell_load_earlier_failed">Frühere Ausgabe konnte nicht geladen werden</string>
     <string name="session_shell_stop_failed">Shell konnte nicht gestoppt werden</string>
+    <string name="session_quote_remove_description">Zitat entfernen</string>
+    <string name="session_quote_comment_placeholder">Optionalen Kommentar hinzufügen…</string>
 </resources>

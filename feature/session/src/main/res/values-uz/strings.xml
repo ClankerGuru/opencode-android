@@ -298,4 +298,6 @@
     <string name="session_shell_refresh_failed">Natijani yangilab bo‘lmadi</string>
     <string name="session_shell_load_earlier_failed">Oldingi natijani yuklab bo‘lmadi</string>
     <string name="session_shell_stop_failed">Shellni to‘xtatib bo‘lmadi</string>
+    <string name="session_quote_remove_description">Iqtibosni olib tashlash</string>
+    <string name="session_quote_comment_placeholder">Izoh qo\'shing (ixtiyoriy)…</string>
 </resources>

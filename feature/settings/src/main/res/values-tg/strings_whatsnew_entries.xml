@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Иқтибос аз ҷавобҳо</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">Матнро дар ҷавоби ёвар интихоб карда, «Иқтибос»-ро ламс кунед, то он ҳамчун иқтибоси блокии Markdown ба паёматон ворид шавад.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">Матнро дар ҷавоби ёвар интихоб кунед ва «Иқтибос овардан»-ро ламс кунед, то он ба паёми шумо ҳамчун корти иқтибос илова шавад.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">Аниматсияи оғози барнома</string>

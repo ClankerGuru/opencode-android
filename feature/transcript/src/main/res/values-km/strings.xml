@@ -41,6 +41,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">ដកស្រង់</string>
+    <string name="transcript_quote_description">ដកស្រង់៖ %1$s</string>
+    <string name="transcript_quote_show">បង្ហាញការដកស្រង់ទាំងមូល</string>
+    <string name="transcript_quote_comment_description">ដកស្រង់៖ %1$s។ មតិយោបល់៖ %2$s</string>
+    <string name="transcript_quote_add_comment">បន្ថែមមតិ</string>
+    <string name="transcript_quote_edit_comment">កែសម្រួលមតិ</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">ចម្លងការឆ្លើយតប</string>

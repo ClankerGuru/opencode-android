@@ -298,4 +298,6 @@
     <string name="session_shell_refresh_failed">Натиҷа навсозӣ нашуд</string>
     <string name="session_shell_load_earlier_failed">Натиҷаи қаблӣ бор нашуд</string>
     <string name="session_shell_stop_failed">Shell қатъ нашуд</string>
+    <string name="session_quote_remove_description">Иқтибосро хориҷ кунед</string>
+    <string name="session_quote_comment_placeholder">Шарҳ илова кунед (ихтиёрӣ)…</string>
 </resources>

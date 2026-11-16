@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">जवाब से उद्धरण लें</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">सहायक के जवाब में टेक्स्ट चुनें और उद्धरण पर टैप करें। यह आपके संदेश में Markdown ब्लॉककोट के रूप में जुड़ जाएगा।</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">असिस्टेंट के जवाब में टेक्स्ट चुनें और ‘उद्धरण लें’ पर टैप करें। यह आपके संदेश में उद्धरण कार्ड के रूप में जुड़ जाएगा।</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">खुलते ही खिलता ऐप</string>

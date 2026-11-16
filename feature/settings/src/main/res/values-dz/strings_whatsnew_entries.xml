@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">ལན་ལས་ལུང་འདྲེན།</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">ལས་རོགས་ཀྱི་ལན་ནང་ལས་ཡིག་གུ་སེལ་འཐུ་འབད་དེ་ ལུང་འདྲེན་ཨེབ། འདི་ཁྱོད་ཀྱི་འཕྲིན་དོན་ནང་ Markdown ལུང་འདྲེན་སྡེ་ཚན་སྦེ་བཙུགས་འོང་།</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">ལས་རོགས་ཀྱི་ལན་ནང་ལས་ཡིག་གུ་སེལ་འཐུ་འབད་དེ་ ལུང་འདྲེན་ལུ་ཨེབ། དེ་ལས་ཁྱོད་ཀྱི་འཕྲིན་དོན་ནང་ལུང་འདྲེན་ཤོག་བྱང་སྦེ་ཁ་སྐོང་འབད་འོང་།</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">ཁ་ཕྱེཝ་ད་རྒྱས་པ།</string>

@@ -287,4 +287,6 @@
     <string name="session_shell_refresh_failed">รีเฟรชผลลัพธ์ไม่ได้</string>
     <string name="session_shell_load_earlier_failed">โหลดผลลัพธ์ก่อนหน้าไม่ได้</string>
     <string name="session_shell_stop_failed">หยุดเชลล์ไม่ได้</string>
+    <string name="session_quote_remove_description">เอาคำอ้างอิงออก</string>
+    <string name="session_quote_comment_placeholder">เพิ่มความคิดเห็น (ไม่บังคับ)…</string>
 </resources>

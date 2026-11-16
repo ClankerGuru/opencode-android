@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Citiranje odgovora</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">Odaberi tekst u odgovoru asistenta i dodirni Citiraj da ga umetneš u poruku kao Markdown citat.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">Odaberi tekst u odgovoru asistenta i dodirni Citiraj da ga dodaš u svoju poruku kao karticu citata.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">Animacija pri pokretanju</string>

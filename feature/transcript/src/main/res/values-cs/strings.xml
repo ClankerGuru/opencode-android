@@ -44,6 +44,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">Citovat</string>
+    <string name="transcript_quote_description">Citace: %1$s</string>
+    <string name="transcript_quote_show">Zobrazit celou citaci</string>
+    <string name="transcript_quote_comment_description">Citace: %1$s. Komentář: %2$s</string>
+    <string name="transcript_quote_add_comment">Přidat komentář</string>
+    <string name="transcript_quote_edit_comment">Upravit komentář</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">Zkopírujte odpověď</string>

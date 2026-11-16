@@ -26,6 +26,7 @@ import ai.opencode.feature.composer.ComposerAutocompleteChip
 import ai.opencode.feature.composer.ComposerAutocompleteDraftResolution
 import ai.opencode.feature.composer.ComposerCommandFailure
 import ai.opencode.feature.composer.ComposerFileAttachment
+import ai.opencode.feature.composer.ComposerQuote
 import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.feature.composer.DictationHoldRelease
 import ai.opencode.core.sharing.ExperimentalFeature
@@ -319,6 +320,7 @@ internal fun SessionFeature.sendComposer(
     val text = next.pendingLocation?.prompt(typed) ?: typed
     val attachments = next.pendingAttachments
     val files = next.pendingFiles
+    val quotes = next.pendingQuotes
     if (!next.hasPromptContent) return Reduced(forgetSharedSend(next))
     if (next.session == null && next.draftProject == null) return Reduced(forgetSharedSend(next).openProjectPicker())
     if (files.any { it.isFailed }) {
@@ -416,6 +418,7 @@ internal fun SessionFeature.sendComposer(
         files = files,
         delivery = delivery,
         mentions = mentions,
+        quotes = quotes,
         chips = sentChips,
         isRetry = false,
         state = next,
@@ -505,6 +508,7 @@ internal fun SessionFeature.submit(
     page: PageShareRequest? = null,
     mentions: OpenCodeAutocompleteMentions? = null,
     chips: List<ComposerAutocompleteChip> = emptyList(),
+    quotes: List<ComposerQuote> = emptyList(),
     isRetry: Boolean,
     state: State,
 ): Reduced<State, Action> {
@@ -555,7 +559,7 @@ internal fun SessionFeature.submit(
     val pending = PendingPrompt(
         messageID = messageID, text = text, attachments = attachments, files = files,
         wasRunning = wasRunning, delivery = delivery, requestEpoch = requestEpoch, model = model, agent = agent, page = page,
-        mentions = mentions, chips = chips,
+        mentions = mentions, chips = chips, quotes = quotes,
     )
     if (wasRunning) {
         next = enqueueRunningPrompt(pending, next, isRetry = isRetry)
@@ -569,7 +573,7 @@ internal fun SessionFeature.submit(
         // A retried bubble keeps its place, ahead of the sends that waited behind it.
     } else {
         val previousFirstID = if (wasBrowsing) null else next.visibleItems.firstOrNull()?.id
-        val rows = SessionFeature.promptRows(messageID, text, localImages(attachments, messageID), attachments, files)
+        val rows = SessionFeature.promptRows(messageID, text, localImages(attachments, messageID), attachments, files, quotes)
         next = next.copy(items = next.items + rows).retainRenderedWindowStart(previousFirstID)
         val last = rows.lastOrNull()
         if (!isRetry && last != null) next = next.copy(lastSentItemID = last.id, sendGeneration = next.sendGeneration + 1)

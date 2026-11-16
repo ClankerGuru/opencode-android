@@ -42,6 +42,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">Lainaa</string>
+    <string name="transcript_quote_description">Lainaus: %1$s</string>
+    <string name="transcript_quote_show">Näytä koko lainaus</string>
+    <string name="transcript_quote_comment_description">Lainaus: %1$s. Kommentti: %2$s</string>
+    <string name="transcript_quote_add_comment">Lisää kommentti</string>
+    <string name="transcript_quote_edit_comment">Muokkaa kommenttia</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">Kopioi vastaus</string>

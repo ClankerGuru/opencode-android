@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Цитирање одговори</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">Избери текст во одговор од асистентот и допри „Цитирај“ за да го вметнеш во пораката како Markdown цитат.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">Избери текст од одговор на асистентот и допри „Цитирај“ за да го додадеш во твојата порака како картичка со цитат.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">Расцутување при стартување</string>

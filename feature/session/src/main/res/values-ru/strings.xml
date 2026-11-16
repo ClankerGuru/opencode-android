@@ -320,4 +320,6 @@
     <string name="session_shell_refresh_failed">Не удалось обновить вывод</string>
     <string name="session_shell_load_earlier_failed">Не удалось загрузить предыдущий вывод</string>
     <string name="session_shell_stop_failed">Не удалось остановить оболочку</string>
+    <string name="session_quote_remove_description">Удалить цитату</string>
+    <string name="session_quote_comment_placeholder">Добавьте комментарий (необязательно)…</string>
 </resources>

@@ -41,6 +41,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">อ้างอิง</string>
+    <string name="transcript_quote_description">อ้างอิง: %1$s</string>
+    <string name="transcript_quote_show">แสดงคำอ้างอิงทั้งหมด</string>
+    <string name="transcript_quote_comment_description">อ้างอิง: %1$s. ความคิดเห็น: %2$s</string>
+    <string name="transcript_quote_add_comment">เพิ่มความคิดเห็น</string>
+    <string name="transcript_quote_edit_comment">แก้ไขความคิดเห็น</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">คัดลอกคำตอบ</string>

@@ -42,6 +42,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">Sitat gətir</string>
+    <string name="transcript_quote_description">Sitat: %1$s</string>
+    <string name="transcript_quote_show">Tam sitatı göstər</string>
+    <string name="transcript_quote_comment_description">Sitat: %1$s. Şərh: %2$s</string>
+    <string name="transcript_quote_add_comment">Şərh əlavə et</string>
+    <string name="transcript_quote_edit_comment">Şərhi redaktə et</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">Cavabı kopyala</string>

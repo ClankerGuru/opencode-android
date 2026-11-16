@@ -298,4 +298,6 @@
     <string name="session_shell_refresh_failed">Неуспешно обновяване на изхода</string>
     <string name="session_shell_load_earlier_failed">Неуспешно зареждане на по-ранния изход</string>
     <string name="session_shell_stop_failed">Неуспешно спиране на черупката</string>
+    <string name="session_quote_remove_description">Премахване на цитата</string>
+    <string name="session_quote_comment_placeholder">Добавете коментар по избор…</string>
 </resources>

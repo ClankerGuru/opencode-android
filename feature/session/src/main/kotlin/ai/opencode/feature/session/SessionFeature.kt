@@ -817,6 +817,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
             fun locationResponse(result: ComposerAttachmentsFeature.Outcome<SharedLocation, LocationClientError>): Action =
                 ComposerAttachments(ComposerAttachmentsFeature.Action.LocationResponse(result))
             val locationRemoved: Action get() = ComposerAttachments(ComposerAttachmentsFeature.Action.LocationRemoved)
+            fun quoteRemoved(id: String): Action = ComposerAttachments(ComposerAttachmentsFeature.Action.QuoteRemoved(id))
+            fun quoteCommented(id: String, comment: String): Action = ComposerAttachments(ComposerAttachmentsFeature.Action.QuoteCommented(id, comment))
             val locationErrorDismissed: Action get() = ComposerAttachments(ComposerAttachmentsFeature.Action.LocationErrorDismissed)
             val locationSettingsTapped: Action get() = ComposerAttachments(ComposerAttachmentsFeature.Action.LocationSettingsTapped)
             val queuedUploadsStarted: Action get() = ComposerAttachments(ComposerAttachmentsFeature.Action.QueuedUploadsStarted)

@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Хариултаас эшлэх</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">Туслахын хариултаас текст сонгоод «Эшлэх»-ийг товшвол таны мессежид Markdown эшлэл болж орно.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">Туслахын хариултаас текст сонгоод «Эшлэх» дээр товшвол мессежид тань эшлэлийн карт болж нэмэгдэнэ.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">Нээх үеийн дэлгэгдэх хөдөлгөөн</string>

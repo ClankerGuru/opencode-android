@@ -298,4 +298,6 @@
     <string name="session_shell_refresh_failed">Çıktı yenilenemedi</string>
     <string name="session_shell_load_earlier_failed">Önceki çıktı yüklenemedi</string>
     <string name="session_shell_stop_failed">Kabuk durdurulamadı</string>
+    <string name="session_quote_remove_description">Alıntıyı kaldır</string>
+    <string name="session_quote_comment_placeholder">İsteğe bağlı bir yorum ekleyin…</string>
 </resources>
