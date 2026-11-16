@@ -54,8 +54,8 @@ internal fun StoreOf<State, Action>.rememberCallStore(hostedCall: VoiceStoreOf?)
 /**
  * The screen's call tasks.
  * - once per call, the call starts (`.startIfNeeded`): it keeps running while the drawer swaps sessions;
- * - Raise to Talk listens while the setting is on, Voice is available and the app is active; the
- *   reducer decides what a raise does;
+ * - Raise to Talk listens on the front screen (or the call's own screen) while the setting is on,
+ *   Voice is available and the app is active; the reducer decides what a raise does;
  * - a GPT-Live socket kept open (no session started, so free) for a minute after a call could start
  *   here, so a tap skips the connection setup.
  */
@@ -68,8 +68,11 @@ internal fun SessionCallTasks(store: StoreOf<State, Action>, callStore: VoiceSto
     val active = lifecycle.isAtLeast(Lifecycle.State.RESUMED)
     val raiseToTalk by remember { shared(SharedKeys.raiseToTalk).flow }.collectAsState(shared(SharedKeys.raiseToTalk).value)
     val isVoiceAvailable by store.observe { it.isVoiceAvailable }
-    LaunchedEffect(raiseToTalk && isVoiceAvailable && active) {
-        if (!(raiseToTalk && isVoiceAvailable && active)) return@LaunchedEffect
+    val ownsCall by store.observe { it.voice != null }
+    val isCovered by store.observe { it.isCovered }
+    val listensForRaise = raiseToTalk && isVoiceAvailable && active && !isCatchUpCard && (ownsCall || (!hasCall && !isCovered))
+    LaunchedEffect(listensForRaise) {
+        if (!listensForRaise) return@LaunchedEffect
         dependency(RaiseToEarClient).monitor(
             {
                 // The reducer decides; its sends run before this returns.
@@ -83,7 +86,6 @@ internal fun SessionCallTasks(store: StoreOf<State, Action>, callStore: VoiceSto
     }
 
     val routeWarms by store.observe { it.voiceRoute.warmsPhoneConnection }
-    val isCovered by store.observe { it.isCovered }
     val currentHasCall by rememberUpdatedState(hasCall)
     val warmsPhoneConnection = routeWarms && isVoiceAvailable && !hasCall && active && !isCovered && !isCatchUpCard
     LaunchedEffect(warmsPhoneConnection) {
