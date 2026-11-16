@@ -525,7 +525,7 @@ internal fun SessionFeature.submit(
     next = settled.noteOwnSend()
     // The composer's model as it is now, even for a retry: a pick made since the send failed goes with it.
     val model = next.sendModel
-    val agent = if (experimentalFeatures(ExperimentalFeature.agentSelection)) next.sendAgent else null
+    val agent = if (next.agentSelection.isEnabled.value) next.sendAgent else null
     // Every send before the session exists goes to the one its first send creates.
     val lane: PromptOutbox.Lane
     val current = next.session

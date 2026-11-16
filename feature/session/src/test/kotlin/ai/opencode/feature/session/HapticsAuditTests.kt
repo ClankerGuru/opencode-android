@@ -347,6 +347,7 @@ class HapticsAuditTests {
     private fun Harness.newSessionStore(log: HapticsRecorder, picker: Boolean = false): TestStore<SessionFeature.State, Action> {
         var state = state { SessionFeature.State.draft(server = server, draftProject = projects[0], projects = projects) }
         if (picker) state = state.openProjectPicker()
+        state.agentSelection.isEnabled.set(false)
         return store(state) { this[HapticsClient] = log.client }
     }
 

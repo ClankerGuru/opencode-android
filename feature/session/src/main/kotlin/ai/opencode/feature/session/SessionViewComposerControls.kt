@@ -49,6 +49,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -128,13 +129,15 @@ internal fun SessionComposerEnv.ComposerLeadingControls(expanded: Boolean, recor
 }
 
 /**
- * iOS `ComposerAgentChip` (Agent Selection, Experimental): the current agent's name, opening a
+ * iOS `ComposerAgentChip` (Agent Selection): the current agent's name, opening a
  * menu of the server's primary agents; mounted as the composer expands, which refreshes the list.
  */
 @Composable
 private fun SessionComposerEnv.AgentButton() {
-    val name by store.observe { it.currentAgentName }
-    val currentID by store.observe { it.currentAgentID }
+    // A pick in a session changes only the shared `sessionAgents`, which the store's states don't follow.
+    val picks by remember(store) { store.state.agentSelection.sessionAgents.flow }.collectAsState(store.state.sessionAgents)
+    val name by key(picks) { store.observe { it.currentAgentName } }
+    val currentID by key(picks) { store.observe { it.currentAgentID } }
     val agents by store.observe { it.primaryAgents }
     ComposerHidden(foldsComposerControls) {
         ComposerAgentChip(
@@ -176,6 +179,7 @@ private fun SessionComposerEnv.ModelButton(enabled: Boolean) {
             },
             isEnabled = enabled && panels?.onePicker?.isOpen != true,
             targetDrop = ComposerLayoutMetrics.pickerTargetDrop.dp,
+            showsLevel = !agentSelection,
         )
     }
 }

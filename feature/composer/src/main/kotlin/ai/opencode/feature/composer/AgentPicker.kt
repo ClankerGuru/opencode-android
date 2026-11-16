@@ -39,6 +39,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -96,11 +97,8 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import kotlin.math.max
 
-// Agent Selection (experimental `agentSelection`): choose the primary agent (Build, Plan,
+// Agent Selection (`SharedKeys.agentSelection`): choose the primary agent (Build, Plan,
 // or a custom one) from the composer.
-//
-// The experiment's switch lives in Settings (`ExperimentalFeature`, above this module), so the
-// composables take `isEnabled` from their host instead of reading `@Shared(.experimental(...))`.
 
 object AgentPickerSharedKeys {
     /** The agent new sessions start with (an agent ID); empty is the server's default. Declared in `:core` (Settings writes it). */
@@ -189,7 +187,7 @@ fun AgentChip(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium)
-            Text(name, style = style, color = secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(name, style = style, color = secondary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 96.dp))
             OpenCodeIcon(SFSymbol.ChevronDown, null, size = 12.dp, tint = secondary)
         }
         AgentMenu(

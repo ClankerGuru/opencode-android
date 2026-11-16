@@ -5,7 +5,6 @@ import ai.opencode.feature.composer.modelpicker.ModelPickerState
 import ai.opencode.feature.composer.RequestDockFeature
 import ai.opencode.feature.composer.DraftState
 import ai.opencode.core.haptics.Haptic
-import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
@@ -430,7 +429,7 @@ private fun SessionFeature.pickProject(project: OpenCodeProject, byHand: Boolean
     var next = state.copy(draftProject = project, activePicker = null, voice = state.voice?.moveDraft(project.directory))
     // Each folder has its own agents: the last folder's list isn't this one's, so it's dropped and
     // asked for again from the new folder.
-    if (!movesFolder || !experimentalFeatures(ExperimentalFeature.agentSelection)) return Reduced(next)
+    if (!movesFolder || !next.agentSelection.isEnabled.value) return Reduced(next)
     if (next.primaryAgents.isNotEmpty()) next = next.withPrimaryAgents(emptyList())
     return Reduced(next, Effect.send(Action.AgentsRequested))
 }

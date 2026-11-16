@@ -41,6 +41,9 @@ object SharedKeys {
     /** Raise to Talk: raising the phone to your ear on a session starts an earpiece call. Off by default. */
     val raiseToTalk = SharedKey.appStorage("raise-to-talk", false)
 
+    /** Settings › Sessions › Agent Selection: the composer shows the agent and sends with the one picked. On by default. */
+    val agentSelection = SharedKey.appStorage("agent-selection", true)
+
     /** Agent Selection: the agent new sessions start with (an agent ID); empty is the server's default. */
     val defaultAgentID = SharedKey.appStorage("default-agent", "")
 

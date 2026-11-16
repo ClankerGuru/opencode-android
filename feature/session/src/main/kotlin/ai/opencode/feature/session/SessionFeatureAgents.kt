@@ -11,7 +11,7 @@ import ai.opencode.core.strings.localized
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.composer.AgentPickerSharedKeys
-import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.AgentDisplayName
@@ -20,7 +20,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlin.time.Duration.Companion.seconds
 
-// Agent Selection (experimental `agentSelection`): the composer's agent menu. A pick is
+// Agent Selection (`SharedKeys.agentSelection`): the composer's agent menu. A pick is
 // remembered per session (`sessionAgents`) and, like a model pick, applied (`POST …/agent`) just
 // before the next send; a draft starts with its pick, else the Settings default (`defaultAgentID`).
 
@@ -38,6 +38,7 @@ data class AgentSelectionState(
      * composer expands) asks only for another folder's.
      */
     val listedDirectory: ListedDirectory? = null,
+    val isEnabled: Shared<Boolean> = shared(SharedKeys.agentSelection),
     val sessionAgents: Shared<Map<String, String>> = shared(AgentPickerSharedKeys.sessionAgents),
     val defaultAgentID: Shared<String> = shared(AgentPickerSharedKeys.defaultAgentID),
     val knownPrimaryAgents: Shared<List<OpenCodeAutocompleteAgent>> = shared(AgentPickerSharedKeys.knownPrimaryAgents),
@@ -52,7 +53,7 @@ internal const val agentsAttempts = 3
 /** The agent menu's list, picks and applications. */
 internal fun SessionFeature.reduceAgents(state: State, action: Action): Reduced<State, Action> = when (action) {
     Action.AgentsRequested -> {
-        if (!experimentalFeatures(ExperimentalFeature.agentSelection)) {
+        if (!state.agentSelection.isEnabled.value) {
             Reduced(state)
         } else if (state.primaryAgents.isNotEmpty() && state.agentSelection.listedDirectory == ListedDirectory(state.effectiveDirectory)) {
             // Already listed for this folder: the chip shows that list.
@@ -88,7 +89,7 @@ internal fun SessionFeature.reduceAgents(state: State, action: Action): Reduced<
     }
 
     Action.AgentsChanged ->
-        if (!experimentalFeatures(ExperimentalFeature.agentSelection)) {
+        if (!state.agentSelection.isEnabled.value) {
             Reduced(state)
         } else {
             Reduced(state.copy(agentSelection = state.agentSelection.copy(listedDirectory = null)), Effect.send(Action.AgentsRequested))
@@ -143,7 +144,7 @@ internal fun SessionFeature.reduceAgents(state: State, action: Action): Reduced<
 
 /** The pick a send would apply now, while Agent Selection is on. */
 internal fun SessionFeature.waitingAgent(state: State): String? =
-    if (experimentalFeatures(ExperimentalFeature.agentSelection)) state.sendAgent else null
+    if (state.agentSelection.isEnabled.value) state.sendAgent else null
 
 /** A queued send's message started with its agent still waiting. */
 internal fun SessionFeature.applyDueAgentPick(state: State): Reduced<State, Action> {
@@ -173,7 +174,7 @@ internal fun SessionFeature.applyQueuedAgentPick(agent: String, sessionID: Strin
 internal fun SessionFeature.adoptDraftAgent(sessionID: String, state: State): State {
     val picked = state.draftAgent
     val next = state.withDraftAgent(null)
-    if (!experimentalFeatures(ExperimentalFeature.agentSelection)) return next
+    if (!next.agentSelection.isEnabled.value) return next
     val agent = picked ?: next.defaultAgentID.ifEmpty { null } ?: return next
     if (next.sessionAgents[sessionID] != agent) {
         next.agentSelection.sessionAgents.update { it + (sessionID to agent) }

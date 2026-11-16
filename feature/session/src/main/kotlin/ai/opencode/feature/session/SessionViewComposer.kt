@@ -2,13 +2,11 @@ package ai.opencode.feature.session
 
 import ai.opencode.core.strings.localized
 import ai.opencode.core.R as CoreR
-import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.MotionTransition
 import ai.opencode.core.motion.rememberReduceMotion
-import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
@@ -530,8 +528,7 @@ fun SessionComposer(
     val view = remember { SessionComposerViewState() }
     val snapshot by store.observe { ComposerSnapshot.of(it) }
     val returnKeySends by remember(store) { store.state.returnKeySends.flow }.collectAsState(store.state.returnKeySends.value)
-    val agentSelection by remember { shared(ExperimentalFeature.agentSelection.key).flow }
-        .collectAsState(false)
+    val agentSelection by remember(store) { store.state.agentSelection.isEnabled.flow }.collectAsState(store.state.agentSelection.isEnabled.value)
     val autocomplete by store.observe { it.autocomplete }
     val reducedMotion = rememberReduceMotion()
     val focusManager = LocalFocusManager.current
@@ -549,7 +546,7 @@ fun SessionComposer(
         s = snapshot,
         reducedMotion = reducedMotion,
         returnKeySends = returnKeySends,
-        agentSelection = ExperimentalFeature.agentSelection.isActive(agentSelection),
+        agentSelection = agentSelection,
         autocomplete = autocomplete,
         focus = {
             // The field follows `messageFieldFocused` (iOS `focusComposer()`); the keyboard comes up even if it already had focus.

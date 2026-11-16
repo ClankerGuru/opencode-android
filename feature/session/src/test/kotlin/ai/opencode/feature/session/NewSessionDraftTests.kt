@@ -45,7 +45,7 @@ class NewSessionDraftTests {
 
     private fun Harness.draft(project: OpenCodeProject? = null, text: String = ""): SessionFeature.State = state {
         SessionFeature.State.draft(server = server, draftProject = project ?: projects[0], projects = projects).withDraft(text)
-    }
+    }.also { it.agentSelection.isEnabled.set(false) }
 
     /** Failed at the end of the test. */
     private val issues = LockIsolated(listOf<String>())

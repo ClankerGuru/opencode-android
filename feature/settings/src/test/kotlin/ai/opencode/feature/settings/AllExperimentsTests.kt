@@ -96,7 +96,7 @@ class AllExperimentsTests {
     /** Off puts back each switch as it was before, and runs what the switches that change do. */
     @Test fun offRestoresEachEarlierSwitch() = runTest {
         val shared = SettingsTestShared()
-        shared.set(experimental(ExperimentalFeature.agentSelection), true)
+        shared.set(experimental(ExperimentalFeature.hideModels), true)
         shared.set(experimental(ExperimentalFeature.soundEffects), true)
         shared.set(experimental(ExperimentalFeature.backgroundCallIntent), true)
         val log = Locked(listOf<String>())
@@ -106,12 +106,12 @@ class AllExperimentsTests {
         store.send(HomeSettingsFeature.Action.ExperimentalFeatureChanged(ExperimentalFeature.soundEffects, false))
         store.send(HomeSettingsFeature.Action.AllExperimentsChanged(false))
         store.finish()
-        val before = setOf(ExperimentalFeature.agentSelection, ExperimentalFeature.soundEffects, ExperimentalFeature.backgroundCallIntent)
+        val before = setOf(ExperimentalFeature.hideModels, ExperimentalFeature.soundEffects, ExperimentalFeature.backgroundCallIntent)
         for (feature in listed) {
             assertEquals("$feature", feature in before, shared.on(feature))
         }
         assertEquals("back on as before, preloaded again", listOf("sound.prepare"), log.value)
-        assertNull("nothing saved while it's off", shared.get(allExperimentsSaved(ExperimentalFeature.agentSelection)))
+        assertNull("nothing saved while it's off", shared.get(allExperimentsSaved(ExperimentalFeature.hideModels)))
         assertTrue("the skip is kept for next time", shared.get(allExperimentsSkips(ExperimentalFeature.soundEffects)))
     }
 
