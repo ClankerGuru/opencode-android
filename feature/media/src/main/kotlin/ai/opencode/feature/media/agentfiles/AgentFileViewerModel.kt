@@ -52,6 +52,7 @@ class AgentFileViewerModel(
     val directory: String?,
     private val playbackAudio: MediaPlaybackAudio = dependency(MediaPlaybackAudio),
     private val context: Context = dependency(AppContext),
+    private val fileChecks: AgentFileChecks = dependency(AgentFileChecks),
 ) {
     sealed interface Content {
         class Player(val player: ExoPlayer, val isAudio: Boolean, val isStreaming: Boolean) : Content
@@ -191,6 +192,7 @@ class AgentFileViewerModel(
         } catch (error: CancellationException) {
             throw error
         } catch (error: AgentFileError) {
+            if (error == AgentFileError.NotFound) target?.let { fileChecks.markMissing(server, it.absolutePath) }
             phase = Phase.Failed(error)
         } catch (error: Exception) {
             AppLog.network.notice { "Agent file: ${error::class.java.simpleName}" }

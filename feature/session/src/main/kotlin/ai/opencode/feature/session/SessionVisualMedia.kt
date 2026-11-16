@@ -26,8 +26,9 @@ object SessionVisualMedia {
     fun preview(
         opening: TranscriptImagePreview, items: List<OpenCodeTranscriptItem>, server: OpenCodeServer, directory: String?,
         theme: MermaidTheme = MermaidTheme.Light,
+        shownFile: (AgentFileReference) -> AgentFileReference? = { it },
     ): TranscriptImagePreview {
-        val gallery = collect(items, server, directory, theme)
+        val gallery = collect(items, server, directory, theme, shownFile)
         for (page in opening.pages) gallery.add(page, prefer = page.id == opening.id)
         return TranscriptImagePreview(opening.id, gallery.pages.toList(), server)
     }
@@ -35,9 +36,10 @@ object SessionVisualMedia {
     fun preview(
         file: AgentFileDestination, items: List<OpenCodeTranscriptItem>, server: OpenCodeServer, directory: String?,
         theme: MermaidTheme = MermaidTheme.Light,
+        shownFile: (AgentFileReference) -> AgentFileReference? = { it },
     ): TranscriptImagePreview? {
         var tapped = filePage(file) ?: return null
-        val gallery = collect(items, server, directory, theme)
+        val gallery = collect(items, server, directory, theme, shownFile)
         if (file.directory != directory) {
             // A link in a document has no transcript anchor of its own. Resolve it there,
             // without changing the base of any sibling already collected from the session.
@@ -85,7 +87,10 @@ object SessionVisualMedia {
         return Page(id, null, ref.name, name = ref.name, file = file, isVideo = ref.kind == AgentFileReference.Kind.Video)
     }
 
-    private fun collect(items: List<OpenCodeTranscriptItem>, server: OpenCodeServer, directory: String?, theme: MermaidTheme): Gallery {
+    private fun collect(
+        items: List<OpenCodeTranscriptItem>, server: OpenCodeServer, directory: String?, theme: MermaidTheme,
+        shownFile: (AgentFileReference) -> AgentFileReference?,
+    ): Gallery {
         val gallery = Gallery()
         fun attachments(images: List<OpenCodeImageAttachment>, label: String) {
             for ((index, image) in images.withIndex()) {
@@ -119,7 +124,9 @@ object SessionVisualMedia {
                 val links = ImageLinkPolicy.plan(blocks.linkTextBlocks(), item.inProgress)
                 for (block in blocks) {
                     when (val kind = block.kind) {
-                        is Kind.Files -> kind.files.forEach { appendFile(it, item.id) }
+                        is Kind.Files -> for (file in kind.files) {
+                            shownFile(file)?.let { appendFile(it, item.id) }
+                        }
                         is Kind.Image -> {
                             val key = OpenCodeClient.markdownImageKey(server, directory, kind.source)
                             val local = AgentFileReference.fromLink(kind.source)?.let { filePage(AgentFileDestination(it, directory), key) }

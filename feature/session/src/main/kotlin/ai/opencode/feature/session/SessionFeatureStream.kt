@@ -223,7 +223,10 @@ internal fun SessionFeature.reduceStream(
     is Action.MessageInvalidated ->
         if (state.session?.id != action.sessionID) Reduced(state)
         else Reduced(state, Effect.send(Action.RefreshRequested(RefreshReason.Invalidation)))
-    is Action.RefreshRequested -> refreshRequested(state, action.reason)
+    is Action.RefreshRequested -> {
+        val refreshed = refreshRequested(state, action.reason)
+        Reduced(refreshed.state, Effect.merge(refreshed.effect, recheckFiles(state, action.reason)))
+    }
     is Action.RefreshResponse -> refreshResponse(state, action)
     is Action.SceneActiveChanged -> sceneActiveChanged(state, action.isActive)
     is Action.ActiveSessionsRead -> Reduced(state.copy(activeFamilySessionIDs = action.sessionIDs))
@@ -394,6 +397,19 @@ private fun SessionFeature.contentBatch(
             watched.effect,
         ),
     )
+}
+
+/** Opening the session, and each reply the agent finishes, may leave files that weren't there before. */
+private fun SessionFeature.recheckFiles(state: SessionFeature.State, reason: RefreshReason): Effect<Action> {
+    val directory = state.session?.directory ?: return Effect.none()
+    val rechecks = when (reason) {
+        RefreshReason.Open, RefreshReason.Resume, RefreshReason.RunState, is RefreshReason.Settlement -> true
+        else -> false
+    }
+    if (!rechecks) return Effect.none()
+    val checks = fileChecks
+    val server = state.server
+    return Effect.run { checks.invalidate(server, directory) }
 }
 
 private fun SessionFeature.refreshRequested(

@@ -2,6 +2,7 @@
 
 package ai.opencode.feature.session
 
+import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.strings.localized
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.Motion
@@ -20,6 +21,7 @@ import ai.opencode.core.ui.appFormattingLocale
 import ai.opencode.core.ui.inContainer
 import ai.opencode.feature.composer.PastedTextViewer
 import ai.opencode.feature.media.TranscriptImagePreview
+import ai.opencode.feature.media.AgentFileChecks
 import ai.opencode.feature.media.AgentFileDestination
 import ai.opencode.feature.media.LinkMenuAction
 import ai.opencode.feature.media.LocalMediaPresenter
@@ -597,7 +599,9 @@ object SessionTranscriptView {
                 host?.dismissComposerKeyboard()
                 val state = store.state
                 presenter?.presentPreview(
-                    SessionVisualMedia.preview(action.preview, state.items, state.server, state.session?.directory, theme),
+                    SessionVisualMedia.preview(action.preview, state.items, state.server, state.session?.directory, theme) {
+                        dependency(AgentFileChecks).shown(state.server, state.session?.directory, it)
+                    },
                     drawingHandler(store),
                     flightAccessories = drawingAccessories(store, context),
                 )
@@ -605,12 +609,15 @@ object SessionTranscriptView {
             is TranscriptAction.OpenFile -> {
                 host?.dismissComposerKeyboard()
                 val addDrawing = drawingHandler(store)
-                val file = action.file
                 val server = store.state.server
                 val directory = store.state.session?.directory
+                val checks = dependency(AgentFileChecks)
+                val file = checks.shown(server, directory, action.file) ?: action.file
                 val target = AgentFileDestination(file, directory)
                 val items = store.state.items
-                val gallery = { destination: AgentFileDestination -> SessionVisualMedia.preview(destination, items, server, directory, theme) }
+                val gallery = { destination: AgentFileDestination ->
+                    SessionVisualMedia.preview(destination, items, server, directory, theme) { checks.shown(server, directory, it) }
+                }
                 val preview = gallery(target) ?: TranscriptImagePreview(target, server)
                 presenter?.presentPreview(preview, addDrawing, gallery, drawingAccessories(store, context))
             }

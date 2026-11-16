@@ -22,6 +22,7 @@ import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.scope
+import ai.opencode.feature.media.AgentFileChecks
 import ai.opencode.feature.media.BrowserFeature
 import ai.opencode.feature.composer.ComposerAttachmentsFeature
 import ai.opencode.feature.composer.ComposerAutocompleteAction
@@ -1001,6 +1002,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
     internal val haptics by Dependency(HapticsClient)
     internal val soundEffects by Dependency(SoundEffectsClient)
     internal val mediaReferences by Dependency(MediaReferenceClient)
+    internal val fileChecks by Dependency(AgentFileChecks)
     internal val sceneWindow by Dependency(SceneWindowClient)
     internal val markdownStream by Dependency(MarkdownStreamClient)
     internal val dictation by Dependency(DictationClient)
