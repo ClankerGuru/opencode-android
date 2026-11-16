@@ -649,7 +649,7 @@ fun FullscreenViewer(
     val enter = fadeIn(MotionRole.Swap.animation(MotionPhase.Enter, reduceMotion))
     val exit = fadeOut(MotionRole.Swap.animation(MotionPhase.Exit, reduceMotion))
     val actions: @Composable () -> Unit = {
-        ViewerActions(state, file, wrapsLines, pip, capture != null, onDraw = {
+        ViewerActions(state, file, wrapsLines, pip, movie != null, capture != null, onDraw = {
             if (!page.isVideo) store.send(Action.DrawTapped) else {
                 val frame = capture?.invoke()
                 if (frame != null) store.send(Action.DrawCapturedFrame(page.id, frame)) else captureFailed = true
@@ -668,7 +668,11 @@ fun FullscreenViewer(
                 gallery -> VisualPager(state, viewer, store::send, flight = tracksSource,
                     selectedContent = when {
                         movie != null -> visualMovie
-                        file != null && image == null -> ({ AgentFilePage(file, wrapsLines, false, false, true, null, {}, {}) })
+                        file != null && image == null -> ({
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                AgentFilePage(file, wrapsLines, false, false, true, null, {}, {})
+                            }
+                        })
                         else -> null
                     })
                 movie != null -> visualMovie()
@@ -705,7 +709,8 @@ fun FullscreenViewer(
                     OpenCodeIconButton(SFSymbol.Trash, stringResource(CoreR.string.common_remove), { store.send(Action.RemoveTapped) },
                         Modifier.testTag("image-gallery-remove"), tint = MaterialTheme.colorScheme.error, enabled = !state.isDiscarded)
                 }
-                AnimatedVisibility(visible, enter = enter, exit = exit, modifier = Modifier.align(Alignment.BottomEnd)) {
+                val hasActions = file == null || ready != null || file.shareProgress != null
+                AnimatedVisibility(visible && hasActions, enter = enter, exit = exit, modifier = Modifier.align(Alignment.BottomEnd)) {
                     Surface(shape = OpenCodeShape.control, color = MaterialTheme.colorScheme.surfaceContainerHighest, contentColor = Color.White) {
                         Row(Modifier.height(52.dp).padding(horizontal = 6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp),
                             verticalAlignment = Alignment.CenterVertically) { actions() }
@@ -793,6 +798,7 @@ private fun ViewerActions(
     file: AgentFileViewerModel?,
     wrapsLines: Boolean,
     pip: AgentFilePictureInPicture?,
+    hasMovie: Boolean,
     canCapture: Boolean,
     onDraw: () -> Unit,
     send: (Action) -> Unit,
@@ -817,7 +823,8 @@ private fun ViewerActions(
             OpenCodeIcon("pip.enter", contentDescription = stringResource(R.string.media_file_start_pip_description))
         }
     }
-    if (state.allowsDrawing && (page.isVideo || file == null || content is AgentFileViewerModel.Content.Image)) {
+    val drawable = if (page.isVideo) hasMovie else file == null || content is AgentFileViewerModel.Content.Image
+    if (state.allowsDrawing && drawable) {
         OpenCodeIconButton(SFSymbol.Pencil, stringResource(R.string.media_drawing_draw_on_image_description), onDraw, Modifier.testTag("image-gallery-draw"),
             style = OpenCodeIconButtonStyle.Standard, enabled = if (page.isVideo) canCapture else page.image != null && !page.originalPending && !page.originalFailed && !page.loadFailed)
     }
