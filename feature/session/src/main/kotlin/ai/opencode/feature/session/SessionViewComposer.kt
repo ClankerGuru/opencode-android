@@ -218,6 +218,10 @@ class SessionComposerHost {
     var orbClearance by mutableFloatStateOf(0f)
     /** The composer surface's top in the window, in px (NaN when it isn't shown), for `SessionBottomScrollEdge`. */
     var surfaceTopInWindow by mutableFloatStateOf(Float.NaN)
+    /** The composer surface's bounds in the window (null when it isn't shown), which a quote's comment panel spans. */
+    var surfaceInWindow by mutableStateOf<Rect?>(null)
+    /** The quote whose comment panel is open over the composer. */
+    var commentingQuoteID by mutableStateOf<String?>(null)
     /** iOS `toggleAttachmentMenu` (VIEW-PICKERS); null opens nothing. */
     var onPlusTapped: (() -> Unit)? by mutableStateOf(null)
     /** The attachment menu is open (iOS `attachmentMenu != .closed`): + shows open, the composer stays expanded. */
@@ -469,7 +473,7 @@ internal data class ComposerSnapshot(
                 isUploadingFiles = state.isUploadingFiles,
                 isWaitingForUploads = state.isWaitingForUploads,
                 hasFailedFiles = state.pendingFiles.any { it.isFailed },
-                hasNonLocationAttachments = state.pendingAttachments.isNotEmpty() || state.pendingFiles.isNotEmpty(),
+                hasNonLocationAttachments = state.pendingAttachments.isNotEmpty() || state.pendingFiles.isNotEmpty() || state.pendingQuotes.isNotEmpty(),
                 wantsLocationAttachment = state.pendingLocation != null || state.isLocating,
                 dictationHold = state.dictationHold,
                 dictationPhase = state.dictationPhase,
@@ -1286,11 +1290,20 @@ private fun SessionComposerEnv.ComposerCapsule() {
     val cap = { requestPanelCap() }
     val activeHeight = { activeRequestPanelHeight(cap()) }
     val room = { if (showsRequestPanel) activeHeight() else 0f }
-    DisposableEffect(Unit) { onDispose { host.surfaceTopInWindow = Float.NaN } }
+    DisposableEffect(Unit) {
+        onDispose {
+            host.surfaceTopInWindow = Float.NaN
+            host.surfaceInWindow = null
+        }
+    }
     Box(
         Modifier
             .fillMaxWidth()
-            .onGloballyPositioned { host.surfaceTopInWindow = it.boundsInWindow().top }
+            .onGloballyPositioned {
+                val bounds = it.boundsInWindow()
+                host.surfaceTopInWindow = bounds.top
+                host.surfaceInWindow = bounds
+            }
             .layout { measurable, constraints ->
                 val bar = measurable.measure(constraints.offset(vertical = -room().dp.roundToPx()))
                 // Measuring a self-animating permission updates its height. Reserve that

@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">ອ້າງອີງຄຳຕອບ</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">ເລືອກຂໍ້ຄວາມໃນຄຳຕອບຂອງຜູ້ຊ່ວຍ ແລ້ວແຕະ ອ້າງອີງ ເພື່ອແຊກໃສ່ຂໍ້ຄວາມຂອງເຈົ້າເປັນຂໍ້ຄວາມອ້າງອີງແບບ Markdown.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">ເລືອກຂໍ້ຄວາມໃນຄຳຕອບຂອງຜູ້ຊ່ວຍ ແລ້ວແຕະ ອ້າງອີງ ເພື່ອເພີ່ມເປັນບັດອ້າງອີງໃສ່ຂໍ້ຄວາມຂອງເຈົ້າ.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">ເອັບເຟັກບານຕອນເປີດແອັບ</string>

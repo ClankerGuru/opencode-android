@@ -7,6 +7,7 @@ import ai.opencode.feature.composer.DraftState
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.composer.ComposerAttachmentsFeature
 import ai.opencode.feature.composer.ComposerFileAttachment
+import ai.opencode.feature.composer.ComposerQuote
 import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import ai.opencode.feature.composer.SharedLocation
@@ -217,6 +218,8 @@ fun State.withPendingFiles(value: List<ComposerFileAttachment>): State = updateC
 /** A location from the + menu, waiting to go with the next message. */
 val State.pendingLocation: SharedLocation? get() = composerAttachments.pendingLocation
 fun State.withPendingLocation(value: SharedLocation?): State = updateComposerAttachments { it.copy(pendingLocation = value) }
+val State.pendingQuotes: List<ComposerQuote> get() = composerAttachments.pendingQuotes
+fun State.withPendingQuotes(value: List<ComposerQuote>): State = updateComposerAttachments { it.copy(pendingQuotes = value) }
 /** The + menu's Location is finding the phone. */
 val State.isLocating: Boolean get() = composerAttachments.isLocating
 fun State.withIsLocating(value: Boolean): State = updateComposerAttachments { it.copy(isLocating = value) }
@@ -685,6 +688,7 @@ val State.draftState: DraftState
         location = pendingLocation,
         chips = autocomplete.chips,
         undoSnapshot = composerAttachments.undoSnapshot,
+        quotes = pendingQuotes,
     )
 
 fun State.withDraftState(value: DraftState): State =
@@ -694,6 +698,7 @@ fun State.withDraftState(value: DraftState): State =
             pendingAttachments = value.attachments,
             pendingFiles = value.files,
             pendingLocation = value.location,
+            pendingQuotes = value.quotes,
             undoSnapshot = value.undoSnapshot,
         ),
     )
@@ -708,6 +713,7 @@ fun State.applySessionComposer(change: (DraftState) -> DraftState): State {
             pendingAttachments = composer.attachments,
             pendingFiles = composer.files,
             pendingLocation = composer.location,
+            pendingQuotes = composer.quotes,
             undoSnapshot = composer.undoSnapshot,
         ),
     )

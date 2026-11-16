@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Válaszok idézése</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">Jelöljön ki szöveget az asszisztens válaszában, majd koppintson az Idézés gombra, hogy Markdown-idézetként illessze az üzenetébe.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">Jelöljön ki szöveget az asszisztens válaszában, majd koppintson az Idézés gombra, hogy idézetkártyaként hozzáadja az üzenetéhez.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">Kibomló indítóanimáció</string>

@@ -298,4 +298,6 @@
     <string name="session_shell_refresh_failed">Kunde inte uppdatera utdata</string>
     <string name="session_shell_load_earlier_failed">Kunde inte ladda tidigare utdata</string>
     <string name="session_shell_stop_failed">Kunde inte stoppa skalet</string>
+    <string name="session_quote_remove_description">Ta bort citat</string>
+    <string name="session_quote_comment_placeholder">Lägg till en kommentar (valfritt)…</string>
 </resources>

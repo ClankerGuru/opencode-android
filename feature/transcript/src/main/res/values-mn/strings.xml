@@ -42,6 +42,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">Эшлэх</string>
+    <string name="transcript_quote_description">Эшлэл: %1$s</string>
+    <string name="transcript_quote_show">Эшлэлийг бүтнээр харуулах</string>
+    <string name="transcript_quote_comment_description">Эшлэл: %1$s. Сэтгэгдэл: %2$s</string>
+    <string name="transcript_quote_add_comment">Сэтгэгдэл нэмэх</string>
+    <string name="transcript_quote_edit_comment">Сэтгэгдэл засах</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">Хариултыг хуулах</string>

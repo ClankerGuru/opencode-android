@@ -287,4 +287,6 @@
     <string name="session_shell_refresh_failed">Gagal menyegarkan keluaran</string>
     <string name="session_shell_load_earlier_failed">Gagal memuat keluaran sebelumnya</string>
     <string name="session_shell_stop_failed">Gagal menghentikan kerang</string>
+    <string name="session_quote_remove_description">Hapus kutipan</string>
+    <string name="session_quote_comment_placeholder">Tambah komentar opsional…</string>
 </resources>

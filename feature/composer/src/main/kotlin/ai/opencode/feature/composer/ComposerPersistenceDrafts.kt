@@ -22,9 +22,10 @@ data class DraftState(
     val location: SharedLocation? = null,
     val chips: List<ComposerAutocompleteChip> = emptyList(),
     val undoSnapshot: UndoSnapshot? = null,
+    val quotes: List<ComposerQuote> = emptyList(),
 ) {
     val isEmpty: Boolean
-        get() = text.isEmpty() && attachments.isEmpty() && files.isEmpty() && location == null && undoSnapshot == null
+        get() = text.isEmpty() && attachments.isEmpty() && files.isEmpty() && location == null && undoSnapshot == null && quotes.isEmpty()
 
     fun appending(other: DraftState): DraftState {
         val joinedText = SharedComposerDraft.joined(text, other.text)
@@ -36,6 +37,7 @@ data class DraftState(
             files = files + other.files,
             location = location ?: other.location,
             chips = mergedChips,
+            quotes = quotes + other.quotes,
             undoSnapshot = if (restored != null && joinedText != restored) null else undoSnapshot,
         )
     }
@@ -69,6 +71,7 @@ data class SharedComposerDraft(
     val parkedFiles: List<ComposerFileAttachment> = emptyList(),
     val location: SharedLocation? = null,
     val chips: List<ComposerAutocompleteChip> = emptyList(),
+    val quotes: List<ComposerQuote> = emptyList(),
     /** Where a New Session draft should start. */
     val projectID: String? = null,
     /** Continue in OpenCode: the composer takes the keyboard when it opens. */
@@ -89,16 +92,17 @@ data class SharedComposerDraft(
         parkedFiles = composer.files,
         location = composer.location,
         chips = composer.chips,
+        quotes = composer.quotes,
         projectID = projectID,
     )
 
     constructor(restored: RestoredComposerDraft) : this(restored.draft, restored.project?.id)
 
     val isEmpty: Boolean
-        get() = text.isEmpty() && attachments.isEmpty() && files.isEmpty() && parkedFiles.isEmpty() && location == null
+        get() = text.isEmpty() && attachments.isEmpty() && files.isEmpty() && parkedFiles.isEmpty() && location == null && quotes.isEmpty()
 
     val draftState: DraftState
-        get() = DraftState(text = text, attachments = attachments, files = parkedFiles, location = location, chips = chips)
+        get() = DraftState(text = text, attachments = attachments, files = parkedFiles, location = location, chips = chips, quotes = quotes)
 
     /**
      * Shares for one composer join into one message. Send Later shares still send (without
@@ -117,6 +121,7 @@ data class SharedComposerDraft(
             parkedFiles = parkedFiles + other.parkedFiles,
             location = other.location ?: location,
             chips = chips + other.chips.filter { chip -> chips.none { it.id == chip.id } },
+            quotes = quotes + other.quotes,
             projectID = other.projectID ?: projectID,
             focusesComposer = focusesComposer || other.focusesComposer || (sending && nextSend == null),
             send = nextSend,

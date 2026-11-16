@@ -41,6 +41,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">引用</string>
+    <string name="transcript_quote_description">引用: %1$s</string>
+    <string name="transcript_quote_show">引用全文を表示</string>
+    <string name="transcript_quote_comment_description">引用: %1$s。コメント: %2$s</string>
+    <string name="transcript_quote_add_comment">コメントを追加</string>
+    <string name="transcript_quote_edit_comment">コメントを編集</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">返信をコピー</string>

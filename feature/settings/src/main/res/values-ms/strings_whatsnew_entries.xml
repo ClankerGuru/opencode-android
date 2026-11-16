@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Petik balasan</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">Pilih teks dalam balasan pembantu dan ketik Petik untuk memasukkannya ke dalam mesej anda sebagai petikan blok Markdown.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">Pilih teks dalam balasan pembantu dan ketik Petik untuk menambahkannya pada mesej anda sebagai kad petikan.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">Animasi mekar semasa dibuka</string>

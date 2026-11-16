@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Vitna í svör</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">Veldu texta í svari aðstoðarmannsins og pikkaðu á Vitna til að setja hann inn í skilaboðin þín sem Markdown-tilvitnun.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">Veldu texta í svari aðstoðarmannsins og pikkaðu á Vitna í til að bæta honum við skilaboðin þín sem tilvitnunarspjaldi.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">Ný ræsingarhreyfing</string>

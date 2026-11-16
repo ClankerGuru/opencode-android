@@ -42,6 +42,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">उद्धृत गर्नुहोस्</string>
+    <string name="transcript_quote_description">उद्धरण: %1$s</string>
+    <string name="transcript_quote_show">पूरा उद्धरण देखाउनुहोस्</string>
+    <string name="transcript_quote_comment_description">उद्धरण: %1$s. टिप्पणी: %2$s</string>
+    <string name="transcript_quote_add_comment">टिप्पणी थप्नुहोस्</string>
+    <string name="transcript_quote_edit_comment">टिप्पणी सम्पादन गर्नुहोस्</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">जवाफ प्रतिलिपि गर्नुहोस्</string>

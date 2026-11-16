@@ -86,8 +86,8 @@ fun TranscriptUserMessageView(
     }
 }
 
-/** The message's surfaces, top to bottom: images, files, a location, the bubble. */
-private enum class Surface { Images, Files, Location, Bubble }
+/** The message's surfaces, top to bottom: images, files, quotes, a location, the bubble. */
+private enum class Surface { Images, Files, Quotes, Location, Bubble }
 
 @Composable
 private fun UserMessage(
@@ -115,6 +115,7 @@ private fun UserMessage(
         when (it) {
             Surface.Images -> message.images.isNotEmpty()
             Surface.Files -> message.files.isNotEmpty()
+            Surface.Quotes -> message.quotes.isNotEmpty()
             Surface.Location -> message.location != null
             Surface.Bubble -> message.displayText.isNotEmpty()
         }
@@ -183,6 +184,13 @@ private fun UserMessage(
                             message.files,
                             onOpen = if (isPending) null else onOpenFile,
                             trailingCorners = corners(Surface.Files),
+                            modifier = Modifier.graphicsLayer { alpha = dim },
+                        )
+                    }
+                    if (message.quotes.isNotEmpty()) {
+                        TranscriptQuoteCards(
+                            message.quotes,
+                            trailingCorners = corners(Surface.Quotes),
                             modifier = Modifier.graphicsLayer { alpha = dim },
                         )
                     }

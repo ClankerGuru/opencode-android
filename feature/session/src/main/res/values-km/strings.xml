@@ -287,4 +287,6 @@
     <string name="session_shell_refresh_failed">មិនអាចធ្វើឱ្យលទ្ធផលថ្មីឡើងវិញបាន</string>
     <string name="session_shell_load_earlier_failed">មិនអាចផ្ទុកលទ្ធផលមុនបាន</string>
     <string name="session_shell_stop_failed">មិនអាចឈប់សែលបាន</string>
+    <string name="session_quote_remove_description">ដកការដកស្រង់ចេញ</string>
+    <string name="session_quote_comment_placeholder">បន្ថែមមតិ (ជាជម្រើស)…</string>
 </resources>

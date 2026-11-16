@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">引用回复</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">选中助手回复中的文本，点击“引用”，即可将其作为 Markdown 引用块插入消息。</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">在助手回复中选择文本，点击“引用”，即可将其作为引用卡片添加到你的消息中。</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">绽放启动动画</string>

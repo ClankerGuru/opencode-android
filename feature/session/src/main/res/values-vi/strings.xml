@@ -287,4 +287,6 @@
     <string name="session_shell_refresh_failed">Không thể làm mới kết quả</string>
     <string name="session_shell_load_earlier_failed">Không thể tải kết quả trước đó</string>
     <string name="session_shell_stop_failed">Không thể dừng vỏ bọc</string>
+    <string name="session_quote_remove_description">Xóa trích dẫn</string>
+    <string name="session_quote_comment_placeholder">Thêm bình luận (tùy chọn)…</string>
 </resources>

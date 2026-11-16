@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Citovanie odpovedí</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">Vyberte text v odpovedi asistenta a ťuknite na Citovať. Vloží sa do vašej správy ako bloková citácia v Markdowne.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">Vyberte text v odpovedi asistenta a ťuknite na Citovať. Text sa pridá do vašej správy ako karta s citátom.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">Animácia pri spustení</string>

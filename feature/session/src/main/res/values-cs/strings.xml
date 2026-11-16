@@ -320,4 +320,6 @@
     <string name="session_shell_refresh_failed">Nepodařilo se obnovit výstup</string>
     <string name="session_shell_load_earlier_failed">Nepodařilo se načíst starší výstup</string>
     <string name="session_shell_stop_failed">Nepodařilo se zastavit shell</string>
+    <string name="session_quote_remove_description">Odebrat citaci</string>
+    <string name="session_quote_comment_placeholder">Přidat komentář (volitelné)…</string>
 </resources>

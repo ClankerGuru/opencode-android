@@ -287,4 +287,6 @@
     <string name="session_shell_refresh_failed">ရလဒ်ကို ပြန်မဖွင့်နိုင်ပါ</string>
     <string name="session_shell_load_earlier_failed">အစောပိုင်း ရလဒ်များကို မဖွင့်နိုင်ပါ</string>
     <string name="session_shell_stop_failed">ဘူးခွံကို မရပ်နိုင်ပါ</string>
+    <string name="session_quote_remove_description">ကိုးကားချက်ကို ဖယ်ရှားပါ</string>
+    <string name="session_quote_comment_placeholder">မှတ်ချက် ထည့်နိုင်သည်…</string>
 </resources>

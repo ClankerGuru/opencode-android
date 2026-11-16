@@ -298,4 +298,6 @@
     <string name="session_shell_refresh_failed">Uitvoer vernieuwen mislukt</string>
     <string name="session_shell_load_earlier_failed">Eerdere uitvoer laden mislukt</string>
     <string name="session_shell_stop_failed">Shell stoppen mislukt</string>
+    <string name="session_quote_remove_description">Citaat verwijderen</string>
+    <string name="session_quote_comment_placeholder">Voeg eventueel een opmerking toe…</string>
 </resources>

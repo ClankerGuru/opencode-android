@@ -298,4 +298,6 @@
     <string name="session_shell_refresh_failed">Netijäni täzeläp bolmady</string>
     <string name="session_shell_load_earlier_failed">Öňki netijäni ýükläp bolmady</string>
     <string name="session_shell_stop_failed">Shell-i duruzyp bolmady</string>
+    <string name="session_quote_remove_description">Sitatany aýyr</string>
+    <string name="session_quote_comment_placeholder">Islege görä teswir goşuň…</string>
 </resources>

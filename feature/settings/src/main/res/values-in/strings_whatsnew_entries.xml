@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Kutip balasan</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">Pilih teks dalam balasan asisten lalu ketuk Kutip untuk memasukkannya ke pesan Anda sebagai kutipan Markdown.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">Pilih teks dalam balasan asisten lalu ketuk Kutip untuk menambahkannya ke pesan Anda sebagai kartu kutipan.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">Animasi mekar saat dibuka</string>

@@ -42,6 +42,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">Παράθεση</string>
+    <string name="transcript_quote_description">Παράθεση: %1$s</string>
+    <string name="transcript_quote_show">Εμφάνιση ολόκληρης της παράθεσης</string>
+    <string name="transcript_quote_comment_description">Παράθεση: %1$s. Σχόλιο: %2$s</string>
+    <string name="transcript_quote_add_comment">Προσθήκη σχολίου</string>
+    <string name="transcript_quote_edit_comment">Επεξεργασία σχολίου</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">Αντιγραφή απάντησης</string>

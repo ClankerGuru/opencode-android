@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">जवाफ उद्धृत गर्नुहोस्</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">सहायकको जवाफमा पाठ चयन गरी उद्धृत गर्नुहोस् थिच्नुहोस्। त्यो तपाईंको सन्देशमा Markdown उद्धरणका रूपमा थपिन्छ।</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">सहायकको जवाफमा पाठ चयन गरी ‘उद्धृत गर्नुहोस्’ मा ट्याप गर्नुहोस्। त्यो पाठ तपाईंको सन्देशमा उद्धरण कार्डको रूपमा थपिन्छ।</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">खुल्दाको एनिमेसन</string>

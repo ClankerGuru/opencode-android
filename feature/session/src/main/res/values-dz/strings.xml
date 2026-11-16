@@ -287,4 +287,6 @@
     <string name="session_shell_refresh_failed">ཐོན་འབྲས་ཡང་བསྐྱར་མངོན་གསལ་འབད་མ་ཚུགས།</string>
     <string name="session_shell_load_earlier_failed">ཧེ་མའི་ཐོན་འབྲས་མངོན་གསལ་འབད་མ་ཚུགས།</string>
     <string name="session_shell_stop_failed">ཤལ་བཀག་མ་ཚུགས།</string>
+    <string name="session_quote_remove_description">ལུང་འདྲེན་རྩ་བསྐྲད་གཏང་།</string>
+    <string name="session_quote_comment_placeholder">བསམ་འཆར་ཡོད་པ་ཅིན་ ཁ་སྐོང་འབད…</string>
 </resources>

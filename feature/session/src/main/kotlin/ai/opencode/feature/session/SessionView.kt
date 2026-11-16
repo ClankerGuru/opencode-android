@@ -407,6 +407,7 @@ fun SessionView(
                 if (!isInertPreview) {
                     RequestPanelRoomProbe(composerHost, Modifier.matchParentSize())
                     SessionModelPickerOverlays(store, headerHeight)
+                    QuoteCommentOverlay(store, Modifier.matchParentSize())
                 }
             }
         }
@@ -814,6 +815,7 @@ private fun SessionPendingAttachments(store: StoreOf<State, Action>, composerExp
     val canRetry by store.observe { it.supportsFileUploads }
     val location by store.observe { it.pendingLocation }
     val isLocating by store.observe { it.isLocating }
+    val quotes by store.observe { it.pendingQuotes }
     val presenter = LocalMediaPresenter.current
     val reducedMotion = rememberReduceMotion()
     val context = LocalContext.current
@@ -829,6 +831,10 @@ private fun SessionPendingAttachments(store: StoreOf<State, Action>, composerExp
         onRemoveFile = { store.send(Action.fileRemoved(it)) },
         onRetryFile = { store.send(Action.fileRetryTapped(it)) },
         onRemoveLocation = { store.send(Action.locationRemoved) },
+        quotes = quotes,
+        onRemoveQuote = { store.send(Action.quoteRemoved(it)) },
+        commentingQuoteID = host?.commentingQuoteID,
+        onOpenQuote = { host?.commentingQuoteID = it },
         onOpenPastedText = { attachment ->
             val text = attachment.pastedText
             val summary = attachment.pasted

@@ -41,6 +41,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">인용</string>
+    <string name="transcript_quote_description">인용: %1$s</string>
+    <string name="transcript_quote_show">전체 인용 보기</string>
+    <string name="transcript_quote_comment_description">인용: %1$s. 댓글: %2$s</string>
+    <string name="transcript_quote_add_comment">댓글 추가</string>
+    <string name="transcript_quote_edit_comment">댓글 편집</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">응답 복사</string>

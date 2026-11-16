@@ -287,4 +287,6 @@
     <string name="session_shell_refresh_failed">无法刷新输出</string>
     <string name="session_shell_load_earlier_failed">无法加载更早的输出</string>
     <string name="session_shell_stop_failed">无法停止壳牌</string>
+    <string name="session_quote_remove_description">移除引用</string>
+    <string name="session_quote_comment_placeholder">添加评论（可选）…</string>
 </resources>

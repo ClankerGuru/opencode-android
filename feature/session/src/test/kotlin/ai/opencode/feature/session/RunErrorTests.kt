@@ -6,6 +6,7 @@ import ai.opencode.core.dependencies.UuidClient
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.feature.composer.AutocompleteItem
 import ai.opencode.feature.composer.ComposerAttachmentsFeature
+import ai.opencode.feature.composer.ComposerQuote
 import ai.opencode.feature.composer.ComposerAutocompleteChip
 import ai.opencode.feature.composer.ComposerFileAttachment
 import ai.opencode.feature.composer.ComposerPersistence
@@ -457,11 +458,13 @@ class RunErrorTests {
         // 3. Quoting text into the composer clears undoSnapshot.
         revert("Earlier\n\nTighten the drawer\n\nTighten the drawer", "Earlier\n\nTighten the drawer", 2)
 
+        val quoteID = UUID(0, 0).toString()
         store.send(Action.QuoteTextTapped("Hello")) {
-            it.withDraft("Earlier\n\nTighten the drawer\n\nTighten the drawer\n\n> Hello\n\n")
+            it.withPendingQuotes(listOf(ComposerQuote(id = quoteID, text = "Hello")))
                 .withUndoSnapshot(null)
                 .copy(composerFocusRequest = 3)
         }
+        store.send(Action.quoteRemoved(quoteID)) { it.withPendingQuotes(emptyList()) }
         store.send(Action.Binding(BindingAction.Draft("Earlier"))) { it.withDraft("Earlier") }
         store.send(Action.RedoTapped)
         store.receive(Action.Redone::class) { it.setRevertMessageID(null) }

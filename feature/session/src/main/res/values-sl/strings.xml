@@ -320,4 +320,6 @@
     <string name="session_shell_refresh_failed">Izpisa ni bilo mogoče osvežiti</string>
     <string name="session_shell_load_earlier_failed">Prejšnjega izpisa ni bilo mogoče naložiti</string>
     <string name="session_shell_stop_failed">Lupine ni bilo mogoče ustaviti</string>
+    <string name="session_quote_remove_description">Odstrani citat</string>
+    <string name="session_quote_comment_placeholder">Dodaj neobvezen komentar …</string>
 </resources>

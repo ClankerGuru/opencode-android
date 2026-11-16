@@ -320,4 +320,6 @@
     <string name="session_shell_refresh_failed">Nie udało się odświeżyć wyniku</string>
     <string name="session_shell_load_earlier_failed">Nie udało się wczytać wcześniejszego wyniku</string>
     <string name="session_shell_stop_failed">Nie udało się zatrzymać terminala</string>
+    <string name="session_quote_remove_description">Usuń cytat</string>
+    <string name="session_quote_comment_placeholder">Dodaj opcjonalny komentarz…</string>
 </resources>

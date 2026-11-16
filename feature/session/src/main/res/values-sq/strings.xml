@@ -298,4 +298,6 @@
     <string name="session_shell_refresh_failed">Rezultati nuk u rifreskua dot</string>
     <string name="session_shell_load_earlier_failed">Rezultati i mëparshëm nuk u ngarkua dot</string>
     <string name="session_shell_stop_failed">Guaska nuk u ndal dot</string>
+    <string name="session_quote_remove_description">Hiq citimin</string>
+    <string name="session_quote_comment_placeholder">Shto një koment opsional…</string>
 </resources>

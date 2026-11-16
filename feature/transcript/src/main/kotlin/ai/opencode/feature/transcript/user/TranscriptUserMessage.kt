@@ -5,6 +5,7 @@ import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeImageAttachment
 import ai.opencode.server.model.OpenCodePromptSource
 import ai.opencode.server.model.OpenCodeQueuedInput
+import ai.opencode.server.model.OpenCodeQuote
 import ai.opencode.server.model.OpenCodeTranscriptFile
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import androidx.compose.runtime.Immutable
@@ -24,6 +25,7 @@ data class TranscriptUserMessage(
     val pending: OpenCodeDelivery?,
     /** Another session's agent or the parent agent sent it. */
     val source: OpenCodePromptSource? = null,
+    val quotes: List<OpenCodeQuote> = emptyList(),
 ) {
     /**
      * The voice agent sent it on the user's behalf: a Voice message, with the prompt one long
@@ -72,16 +74,17 @@ data class TranscriptUserMessage(
             var images: List<OpenCodeImageAttachment> = emptyList()
             var files: List<OpenCodeTranscriptFile> = emptyList()
             var source: OpenCodePromptSource? = null
+            var quotes: List<OpenCodeQuote> = emptyList()
             for (item in entry.items) {
                 if (TranscriptEntry.promptID(item) != id) return null
                 when (item) {
-                    is OpenCodeTranscriptItem.UserText -> { text = item.text; source = item.source }
+                    is OpenCodeTranscriptItem.UserText -> { text = item.text; source = item.source; quotes = item.quotes }
                     is OpenCodeTranscriptItem.UserImages -> images = item.images
                     is OpenCodeTranscriptItem.UserFiles -> files = item.files
                     else -> return null
                 }
             }
-            return TranscriptUserMessage(id, text, images, files, pending = null, source = source)
+            return TranscriptUserMessage(id, text, images, files, pending = null, source = source, quotes = quotes)
         }
 
         /** A plain pending message; compaction and notices keep their own rows. */
@@ -96,6 +99,7 @@ data class TranscriptUserMessage(
                 } + input.input.inlineFiles,
                 pending = input.delivery,
                 source = input.input.source,
+                quotes = input.input.quotes,
             )
         }
     }

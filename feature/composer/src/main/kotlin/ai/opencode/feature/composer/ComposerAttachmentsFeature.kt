@@ -37,6 +37,7 @@ class ComposerAttachmentsFeature : Reducer<ComposerAttachmentsFeature.State, Com
         val pendingFiles: List<ComposerFileAttachment> = emptyList(),
         /** A location from the + menu, waiting to go with the next message. */
         val pendingLocation: SharedLocation? = null,
+        val pendingQuotes: List<ComposerQuote> = emptyList(),
         /** The + menu's Location is finding the phone. */
         val isLocating: Boolean = false,
         /** Why the last Location couldn't be shared, until dismissed. */
@@ -54,7 +55,7 @@ class ComposerAttachmentsFeature : Reducer<ComposerAttachmentsFeature.State, Com
         val isUploadingFiles: Boolean get() = pendingFiles.any { it.isUploading }
         val isWaitingForUploads: Boolean get() = sendAfterUploads != null
         val hasContent: Boolean
-            get() = pendingAttachments.isNotEmpty() || pendingFiles.isNotEmpty() || pendingLocation != null
+            get() = pendingAttachments.isNotEmpty() || pendingFiles.isNotEmpty() || pendingLocation != null || pendingQuotes.isNotEmpty()
     }
 
     sealed interface Outcome<out T, out E> {
@@ -80,6 +81,8 @@ class ComposerAttachmentsFeature : Reducer<ComposerAttachmentsFeature.State, Com
         data class LocationResponse(val result: Outcome<SharedLocation, LocationClientError>) : Action
         data object LocationRemoved : Action
         data object LocationErrorDismissed : Action
+        data class QuoteRemoved(val id: String) : Action
+        data class QuoteCommented(val id: String, val comment: String) : Action
         data object LocationSettingsTapped : Action
         /** Starts uploads for shared files absorbed into the composer. */
         data object QueuedUploadsStarted : Action
@@ -137,6 +140,14 @@ class ComposerAttachmentsFeature : Reducer<ComposerAttachmentsFeature.State, Com
                 Reduced(state.copy(isLocating = false, pendingLocation = null), Effect.cancel(CancelID.Location))
 
             Action.LocationErrorDismissed -> Reduced(state.copy(locationError = null))
+
+            is Action.QuoteRemoved -> {
+                Reduced(state.copy(pendingQuotes = state.pendingQuotes.filter { it.id != action.id }))
+            }
+            is Action.QuoteCommented -> {
+                val comment = action.comment.trim().ifEmpty { null }
+                Reduced(state.copy(pendingQuotes = state.pendingQuotes.map { if (it.id == action.id) it.copy(comment = comment) else it }))
+            }
 
             Action.LocationSettingsTapped -> {
                 val location = dependency(LocationClient)

@@ -42,6 +42,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">Siter</string>
+    <string name="transcript_quote_description">Sitat: %1$s</string>
+    <string name="transcript_quote_show">Vis hele sitatet</string>
+    <string name="transcript_quote_comment_description">Sitat: %1$s. Kommentar: %2$s</string>
+    <string name="transcript_quote_add_comment">Legg til kommentar</string>
+    <string name="transcript_quote_edit_comment">Rediger kommentar</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">Kopier svar</string>

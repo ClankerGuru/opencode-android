@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Atbilžu citēšana</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">Atlasi tekstu asistenta atbildē un pieskaries “Citēt”, lai ievietotu to savā ziņā kā Markdown citāta bloku.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">Atlasi tekstu asistenta atbildē un pieskaries “Citēt”, lai pievienotu to savai ziņai kā citāta kartīti.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">Atvēršanās animācija</string>

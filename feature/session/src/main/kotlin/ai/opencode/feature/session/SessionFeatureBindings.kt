@@ -1,6 +1,7 @@
 package ai.opencode.feature.session
 
 import ai.opencode.feature.composer.DraftState
+import ai.opencode.feature.composer.ComposerQuote
 import ai.opencode.feature.composer.ComposerCommandOutcome
 import ai.opencode.feature.composer.ComposerAutocompleteOutcome
 import ai.opencode.feature.composer.ComposerAutocompleteEnvironment
@@ -98,16 +99,29 @@ internal fun SessionFeature.reduceCallAndBindings(state: State, action: Action):
     }
 
     is Action.QuoteTextTapped -> {
-        val quoted = MarkdownQuote.blockquote(action.text)
-        if (quoted == null) {
-            Reduced(state)
+        // A request's answer is plain text, so it takes the quote as Markdown.
+        if (state.isAnsweringRequest) {
+            val quoted = MarkdownQuote.blockquote(action.text)
+            if (quoted == null) {
+                Reduced(state)
+            } else {
+                val base = if (state.hasLiveDictation) state.composerWithoutDictation.text else state.draft
+                var next = state.setTyped(MarkdownQuote.append(quoted, base)).applyBarEdit()
+                next = next.copy(composerFocusRequest = next.composerFocusRequest + 1)
+                haptics.play(Haptic.tap)
+                Reduced(next)
+            }
         } else {
-            val base = if (state.hasLiveDictation) state.composerWithoutDictation.text else state.draft
-            var next = state.setTyped(MarkdownQuote.append(quoted, base))
-            next = if (next.isAnsweringRequest) next.applyBarEdit() else next.clearEditedUndoDraft()
-            next = next.copy(composerFocusRequest = next.composerFocusRequest + 1)
-            haptics.play(Haptic.tap)
-            Reduced(next)
+            val cleaned = ComposerQuote.cleaned(action.text)
+            if (cleaned == null) {
+                Reduced(state)
+            } else {
+                val quote = ComposerQuote(id = uuid.next().toString(), text = cleaned)
+                var next = state.withPendingQuotes(state.pendingQuotes + quote).withUndoSnapshot(null)
+                next = next.copy(composerFocusRequest = next.composerFocusRequest + 1)
+                haptics.play(Haptic.tap)
+                Reduced(next)
+            }
         }
     }
 

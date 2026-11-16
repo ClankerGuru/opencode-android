@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Цитаты из ответов</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">Выделите текст в ответе ассистента и нажмите «Цитировать», чтобы вставить его в сообщение как цитату Markdown.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">Выделите текст в ответе ассистента и нажмите «Цитировать», чтобы добавить его в сообщение в виде карточки с цитатой.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">Анимация запуска</string>

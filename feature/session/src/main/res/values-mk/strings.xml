@@ -298,4 +298,6 @@
     <string name="session_shell_refresh_failed">Не успеа освежувањето на излезот</string>
     <string name="session_shell_load_earlier_failed">Не успеа вчитувањето на претходниот излез</string>
     <string name="session_shell_stop_failed">Не успеа запирањето на школката</string>
+    <string name="session_quote_remove_description">Отстрани цитат</string>
+    <string name="session_quote_comment_placeholder">Додадете коментар по желба…</string>
 </resources>

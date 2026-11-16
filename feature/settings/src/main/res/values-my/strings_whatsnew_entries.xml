@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">ပြန်စာကို ကိုးကားရန်</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">အကူအညီပေးသူ၏ ပြန်စာထဲမှ စာသားကို ရွေးပြီး ကိုးကားရန်ကို နှိပ်ပါ။ သင့်မက်ဆေ့ဂျ်ထဲတွင် Markdown ကိုးကားစာပိုဒ်အဖြစ် ထည့်ပေးပါမည်။</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">အကူအညီပေးသူ၏ ပြန်စာထဲမှ စာသားကို ရွေးပြီး ကိုးကားပါ ကို နှိပ်လျှင် သင့်မက်ဆေ့ဂျ်ထဲသို့ ကိုးကားချက်ကတ်အဖြစ် ထည့်ပေးမည်။</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">အက်ပ်ဖွင့်ချိန် ပွင့်ကားမှု</string>

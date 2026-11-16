@@ -25,6 +25,13 @@ import java.util.Locale
 data class OpenCodeFileReference(val name: String, val mime: String, val path: String)
 
 /**
+ * Text quoted from the transcript, as desktop sends it: a block in the model text and a
+ * `{"type":"quote"}` entry in `metadata.comments`.
+ */
+@Serializable
+data class OpenCodeQuote(val text: String, val comment: String? = null)
+
+/**
  * How desktop folds path attachments into a prompt: the model reads a reference line per
  * file, while clients render `displayText` and chips.
  */
@@ -37,9 +44,25 @@ object OpenCodePromptPresentation {
         return (typed + files.map(::referenceLine)).joinToString("\n")
     }
 
-    /** The typed text and file references, then the page block. */
-    fun modelText(text: String, files: List<OpenCodeFileReference>, page: OpenCodePageContext?): String {
-        val base = modelText(text, files)
+    fun quoteBlock(quote: OpenCodeQuote): String {
+        val lines = quote.text.split("\n").joinToString("\n") { "> $it" }
+        val block = "The user quoted the following from earlier in the conversation:\n$lines"
+        val comment = quote.comment?.trimmedWhitespace()?.nonEmpty ?: return block
+        return "$block\n\nThe user made the following comment regarding this quote: $comment"
+    }
+
+    /** The typed text and file references, then each quote's block, then the page block. */
+    fun modelText(
+        text: String,
+        files: List<OpenCodeFileReference>,
+        page: OpenCodePageContext?,
+        quotes: List<OpenCodeQuote> = emptyList(),
+    ): String {
+        val parts = ArrayList<String>()
+        val typed = modelText(text, files)
+        if (typed.isNotEmpty()) parts += typed
+        for (quote in quotes) parts += quoteBlock(quote)
+        val base = parts.joinToString("\n")
         page ?: return base
         return if (base.isEmpty()) pageBlock(page) else base + "\n\n" + pageBlock(page)
     }
@@ -56,6 +79,18 @@ object OpenCodePromptPresentation {
         }
     }
 
+    fun quotes(metadata: Map<String, OpenCodeJSONValue>?): List<OpenCodeQuote> {
+        val items = (metadata?.get("comments") as? OpenCodeJSONValue.Array)?.values ?: return emptyList()
+        val quotes = ArrayList<OpenCodeQuote>()
+        for (item in items) {
+            val o = item.obj ?: continue
+            if (o["type"]?.string != "quote") continue
+            val text = o["text"]?.string ?: continue
+            quotes += OpenCodeQuote(text, o["comment"]?.string?.trimmedWhitespace()?.nonEmpty)
+        }
+        return quotes
+    }
+
     /** The text a client shows: the model text without its reference lines. */
     fun displayText(text: String, files: List<OpenCodeFileReference>): String {
         if (files.isEmpty()) return text
@@ -65,6 +100,8 @@ object OpenCodePromptPresentation {
 
     /** No reference lines, and no page block when the message says it carries one (`metadata.page`). */
     fun displayText(text: String, files: List<OpenCodeFileReference>, metadata: Map<String, OpenCodeJSONValue>?): String {
+        // The quote blocks are the model's; `displayText` is what was typed.
+        if (quotes(metadata).isNotEmpty()) metadata?.get("displayText")?.string?.let { return it.trimmedWhitespace() }
         val stripped = if (metadata?.get("page") == null) text else removingPageBlock(text)
         return displayText(stripped, files)
     }
@@ -407,6 +444,7 @@ object PromptContext {
     /** The notify plugin's callback: POSTs here when this run ends. */
     val notificationCallbackURL = TaskLocal<String?> { null }
     val mentions = TaskLocal<OpenCodeAutocompleteMentions?> { null }
+    val quotes = TaskLocal<List<OpenCodeQuote>> { emptyList() }
     /** The ID a prompt sent with `sendDeliveredPrompt` is admitted under; unset, each call makes a fresh one. */
     val messageID = TaskLocal<String?> { null }
     /** The directory a `"global"` (MCP elicitation) form reply or cancellation targets. */

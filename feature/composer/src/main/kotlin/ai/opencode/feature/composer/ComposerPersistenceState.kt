@@ -92,9 +92,11 @@ data class PersistedComposerState(
         val chips: List<ComposerAutocompleteChip> = emptyList(),
         val undoSnapshot: UndoSnapshot? = null,
         @Serializable(with = ComposerDateSerializer::class) val updatedAt: Instant,
+        val quotes: List<ComposerQuote> = emptyList(),
     ) {
         val hasPersistedContent: Boolean
-            get() = text.isNotEmpty() || attachments.isNotEmpty() || files.isNotEmpty() || location != null || undoSnapshot != null
+            get() = text.isNotEmpty() || attachments.isNotEmpty() || files.isNotEmpty() || location != null || undoSnapshot != null ||
+                quotes.isNotEmpty()
     }
 
     @Serializable
@@ -110,6 +112,7 @@ data class PersistedComposerState(
         @Serializable(with = PageShareRequestSerializer::class) val page: PageShareRequest? = null,
         val mentions: OpenCodeAutocompleteMentions? = null,
         val chips: List<ComposerAutocompleteChip> = emptyList(),
+        val quotes: List<ComposerQuote> = emptyList(),
     )
 
     @Serializable

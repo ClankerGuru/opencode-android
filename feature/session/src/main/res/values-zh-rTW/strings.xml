@@ -287,4 +287,6 @@
     <string name="session_shell_refresh_failed">無法更新輸出</string>
     <string name="session_shell_load_earlier_failed">無法載入較早的輸出</string>
     <string name="session_shell_stop_failed">無法停止 Shell</string>
+    <string name="session_quote_remove_description">移除引用</string>
+    <string name="session_quote_comment_placeholder">新增留言（選填）…</string>
 </resources>

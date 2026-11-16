@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Citar respostas</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">Selecione texto em uma resposta do assistente e toque em Citar para inseri-lo na sua mensagem como uma citação em Markdown.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">Selecione um trecho da resposta do assistente e toque em Citar para adicioná-lo à sua mensagem como um cartão de citação.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">Animação ao abrir</string>

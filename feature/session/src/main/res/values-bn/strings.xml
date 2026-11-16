@@ -298,4 +298,6 @@
     <string name="session_shell_refresh_failed">আউটপুট রিফ্রেশ করা যায়নি</string>
     <string name="session_shell_load_earlier_failed">আগের আউটপুট লোড করা যায়নি</string>
     <string name="session_shell_stop_failed">শেল বন্ধ করা যায়নি</string>
+    <string name="session_quote_remove_description">উদ্ধৃতি সরান</string>
+    <string name="session_quote_comment_placeholder">চাইলে মন্তব্য যোগ করুন…</string>
 </resources>

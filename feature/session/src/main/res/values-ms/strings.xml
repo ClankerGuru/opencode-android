@@ -287,4 +287,6 @@
     <string name="session_shell_refresh_failed">Tidak dapat menyegarkan output</string>
     <string name="session_shell_load_earlier_failed">Tidak dapat memuatkan output terdahulu</string>
     <string name="session_shell_stop_failed">Tidak dapat menghentikan shell</string>
+    <string name="session_quote_remove_description">Alih keluar petikan</string>
+    <string name="session_quote_comment_placeholder">Tambah komen jika mahu…</string>
 </resources>

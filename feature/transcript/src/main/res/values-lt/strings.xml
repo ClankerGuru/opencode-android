@@ -44,6 +44,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">Cituoti</string>
+    <string name="transcript_quote_description">Citata: %1$s</string>
+    <string name="transcript_quote_show">Rodyti visą citatą</string>
+    <string name="transcript_quote_comment_description">Citata: %1$s. Komentaras: %2$s</string>
+    <string name="transcript_quote_add_comment">Pridėti komentarą</string>
+    <string name="transcript_quote_edit_comment">Redaguoti komentarą</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">Kopijuoti atsakymą</string>

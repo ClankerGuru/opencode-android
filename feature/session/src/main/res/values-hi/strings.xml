@@ -298,4 +298,6 @@
     <string name="session_shell_refresh_failed">आउटपुट रीफ़्रेश नहीं किया जा सका</string>
     <string name="session_shell_load_earlier_failed">पहले का आउटपुट लोड नहीं हो सका</string>
     <string name="session_shell_stop_failed">शेल नहीं रोका जा सका</string>
+    <string name="session_quote_remove_description">उद्धरण हटाएँ</string>
+    <string name="session_quote_comment_placeholder">चाहें तो टिप्पणी जोड़ें…</string>
 </resources>

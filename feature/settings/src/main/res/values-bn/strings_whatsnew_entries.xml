@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">জবাব থেকে উদ্ধৃতি</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">সহকারীর জবাবের পাঠ্য নির্বাচন করে উদ্ধৃতি চাপুন। সেটি আপনার বার্তায় Markdown ব্লককোট হিসেবে যোগ হবে।</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">সহকারীর জবাবের পাঠ্য নির্বাচন করে ‘উদ্ধৃতি দিন’ ট্যাপ করুন। তা আপনার বার্তায় উদ্ধৃতি কার্ড হিসেবে যোগ হবে।</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">খোলার সময় ফুটে ওঠা</string>

@@ -8,12 +8,14 @@ import ai.opencode.core.store.Reduced
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.composer.ComposerFileAttachment
+import ai.opencode.feature.composer.ComposerQuote
 import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeFileReference
 import ai.opencode.server.model.OpenCodeImageAttachment
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.OpenCodePendingInput
 import ai.opencode.server.model.OpenCodePromptSource
+import ai.opencode.server.model.OpenCodeQuote
 import ai.opencode.server.model.OpenCodeTranscriptFile
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import ai.opencode.server.model.PastedText
@@ -119,7 +121,7 @@ internal fun enqueueRunningPrompt(pending: PendingPrompt, state: State, isRetry:
     val id = pending.messageID
     val input = OpenCodePendingInput(
         id = id, text = pending.text, delivery = pending.delivery, files = pending.files.mapNotNull { it.reference },
-        inlineFiles = SessionFeature.inlineFiles(id, pending.attachments),
+        inlineFiles = SessionFeature.inlineFiles(id, pending.attachments), quotes = pending.quotes.map { it.quote },
     )
     var next = state
     // A retry goes ahead of the sends that waited behind it, as it's delivered.
@@ -168,7 +170,7 @@ private fun showRestored(pending: PendingPrompt, admission: State.PromptState.Ad
     } else if (!SessionFeature.containsMessage(id, next.items)) {
         val previousFirstID = next.visibleItems.firstOrNull()?.id
         next = next.copy(
-            items = next.items + SessionFeature.promptRows(id, restored.text, localImages(restored.attachments, id), restored.attachments, restored.files),
+            items = next.items + SessionFeature.promptRows(id, restored.text, localImages(restored.attachments, id), restored.attachments, restored.files, restored.quotes),
         ).retainRenderedWindowStart(previousFirstID).pinBrowsingWindowIfNeeded()
     }
     return next to restored
@@ -212,6 +214,7 @@ internal fun SessionFeature.Companion.promptRows(
     images: List<OpenCodeImageAttachment>,
     fileReferences: List<OpenCodeFileReference>,
     inlineFiles: List<OpenCodeTranscriptFile>,
+    quotes: List<OpenCodeQuote> = emptyList(),
 ): List<OpenCodeTranscriptItem> {
     val transcriptFiles = fileReferences.mapIndexed { index, file ->
         OpenCodeTranscriptFile(id = "$messageID-file-$index", name = file.name, mime = file.mime, path = file.path)
@@ -219,7 +222,7 @@ internal fun SessionFeature.Companion.promptRows(
     val rows = ArrayList<OpenCodeTranscriptItem>()
     if (images.isNotEmpty()) rows += OpenCodeTranscriptItem.UserImages("$messageID-images", images)
     if (transcriptFiles.isNotEmpty()) rows += OpenCodeTranscriptItem.UserFiles("$messageID-files", transcriptFiles)
-    if (text.isNotEmpty()) rows += OpenCodeTranscriptItem.UserText(messageID, text, source)
+    if (text.isNotEmpty() || quotes.isNotEmpty()) rows += OpenCodeTranscriptItem.UserText(messageID, text, source, quotes)
     return rows
 }
 
@@ -229,10 +232,12 @@ internal fun SessionFeature.Companion.promptRows(
     images: List<OpenCodeImageAttachment>,
     attachments: List<OpenCodeOutgoingAttachment>,
     files: List<ComposerFileAttachment>,
+    quotes: List<ComposerQuote> = emptyList(),
 ): List<OpenCodeTranscriptItem> = promptRows(
     messageID = messageID, text = text, images = images,
     fileReferences = files.mapNotNull { it.reference },
     inlineFiles = inlineFiles(messageID, attachments),
+    quotes = quotes.map { it.quote },
 )
 
 /** Inline attachments that aren't images, as the server's decoder names them (indices count images too): file chips and Pasted Text cards. */
@@ -262,7 +267,7 @@ internal fun SessionFeature.retry(failed: FailedSend, state: State): Reduced<Sta
     return submit(
         messageID = failed.id, text = pending.text, attachments = pending.attachments, files = pending.files,
         delivery = pending.delivery, page = pending.page, mentions = pending.mentions, chips = pending.chips,
-        isRetry = true, state = next,
+        quotes = pending.quotes, isRetry = true, state = next,
     )
 }
 
@@ -283,7 +288,7 @@ internal fun markFailed(pending: PendingPrompt, reason: String, state: State): S
         val previousFirstID = next.visibleItems.firstOrNull()?.id
         next = next.copy(
             items = next.items + SessionFeature.promptRows(
-                id, pending.text, images ?: localImages(pending.attachments, id), pending.attachments, pending.files,
+                id, pending.text, images ?: localImages(pending.attachments, id), pending.attachments, pending.files, pending.quotes,
             ),
         ).retainRenderedWindowStart(previousFirstID).pinBrowsingWindowIfNeeded()
     }

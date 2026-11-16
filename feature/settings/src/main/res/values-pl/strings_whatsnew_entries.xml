@@ -374,7 +374,7 @@
 
     <!-- 2026-10-18-03-quote-replies -->
     <string name="settings_whatsnew_entry_quote_replies_title">Cytowanie odpowiedzi</string>
-    <string name="settings_whatsnew_entry_quote_replies_summary">Zaznacz tekst w odpowiedzi asystenta i dotknij „Cytuj”, aby wstawić go do wiadomości jako cytat Markdown.</string>
+    <string name="settings_whatsnew_entry_quote_replies_summary">Zaznacz tekst w odpowiedzi asystenta i dotknij „Cytuj”, aby dodać go do swojej wiadomości jako kartę cytatu.</string>
 
     <!-- 2026-10-18-04-launch-bloom -->
     <string name="settings_whatsnew_entry_launch_bloom_title">Animacja przy uruchamianiu</string>

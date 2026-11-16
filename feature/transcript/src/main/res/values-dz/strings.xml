@@ -41,6 +41,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">ལུང་འདྲེན།</string>
+    <string name="transcript_quote_description">ལུང་འདྲེན། %1$s</string>
+    <string name="transcript_quote_show">ལུང་འདྲེན་ཆ་ཚང་སྟོན།</string>
+    <string name="transcript_quote_comment_description">ལུང་འདྲེན། %1$s། བསམ་འཆར། %2$s</string>
+    <string name="transcript_quote_add_comment">བསམ་འཆར་ཁ་སྐོང་།</string>
+    <string name="transcript_quote_edit_comment">བསམ་འཆར་ཞུན་དག</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">ལན་འདེབས་འདྲ་བཤུས།</string>

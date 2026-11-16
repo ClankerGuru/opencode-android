@@ -309,4 +309,6 @@
     <string name="session_shell_refresh_failed">Neizdevās atsvaidzināt izvadi</string>
     <string name="session_shell_load_earlier_failed">Neizdevās ielādēt iepriekšējo izvadi</string>
     <string name="session_shell_stop_failed">Neizdevās apturēt čaulu</string>
+    <string name="session_quote_remove_description">Noņemt citātu</string>
+    <string name="session_quote_comment_placeholder">Pievienot komentāru (nav obligāti)…</string>
 </resources>

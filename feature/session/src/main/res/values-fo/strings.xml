@@ -298,4 +298,6 @@
     <string name="session_shell_refresh_failed">Kundi ikki dagføra úttakið</string>
     <string name="session_shell_load_earlier_failed">Kundi ikki heinta eldri úttak</string>
     <string name="session_shell_stop_failed">Kundi ikki steðga shelli</string>
+    <string name="session_quote_remove_description">Tak endurgeving burtur</string>
+    <string name="session_quote_comment_placeholder">Legg eina viðmerking afturat (valfrítt)…</string>
 </resources>

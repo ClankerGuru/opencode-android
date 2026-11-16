@@ -354,14 +354,16 @@ internal fun SessionFeature.Companion.deliveryJob(
                 val posted: OpenCodeClientError? = PromptContext.notificationCallbackURL.withValue(callbackURL) {
                     PromptContext.page.withValue(page) {
                         PromptContext.mentions.withValue(pending.mentions) {
-                            try {
-                                openCodeClient.sendPrompt(
-                                    server, sessionID, pending.text, attachments,
-                                    pending.files.mapNotNull { it.reference }, pending.messageID, pending.delivery,
-                                )
-                                null
-                            } catch (error: OpenCodeClientError) {
-                                error
+                            PromptContext.quotes.withValue(pending.quotes.map { it.quote }) {
+                                try {
+                                    openCodeClient.sendPrompt(
+                                        server, sessionID, pending.text, attachments,
+                                        pending.files.mapNotNull { it.reference }, pending.messageID, pending.delivery,
+                                    )
+                                    null
+                                } catch (error: OpenCodeClientError) {
+                                    error
+                                }
                             }
                         }
                     }

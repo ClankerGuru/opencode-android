@@ -44,6 +44,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">Цитировать</string>
+    <string name="transcript_quote_description">Цитата: %1$s</string>
+    <string name="transcript_quote_show">Показать цитату целиком</string>
+    <string name="transcript_quote_comment_description">Цитата: %1$s. Комментарий: %2$s</string>
+    <string name="transcript_quote_add_comment">Добавить комментарий</string>
+    <string name="transcript_quote_edit_comment">Редактировать комментарий</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">Копировать ответ</string>

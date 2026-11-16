@@ -41,6 +41,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">Petik</string>
+    <string name="transcript_quote_description">Petikan: %1$s</string>
+    <string name="transcript_quote_show">Tunjukkan petikan penuh</string>
+    <string name="transcript_quote_comment_description">Petikan: %1$s. Komen: %2$s</string>
+    <string name="transcript_quote_add_comment">Tambah komen</string>
+    <string name="transcript_quote_edit_comment">Sunting komen</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">Salin balasan</string>

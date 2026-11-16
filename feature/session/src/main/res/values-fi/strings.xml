@@ -298,4 +298,6 @@
     <string name="session_shell_refresh_failed">Tulosteen päivitys epäonnistui</string>
     <string name="session_shell_load_earlier_failed">Aiemman tulosteen lataaminen epäonnistui</string>
     <string name="session_shell_stop_failed">Komentotulkin pysäyttäminen epäonnistui</string>
+    <string name="session_quote_remove_description">Poista lainaus</string>
+    <string name="session_quote_comment_placeholder">Lisää halutessasi kommentti…</string>
 </resources>

@@ -42,6 +42,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">Иқтибос овардан</string>
+    <string name="transcript_quote_description">Иқтибос: %1$s</string>
+    <string name="transcript_quote_show">Иқтибоси пурраро нишон диҳед</string>
+    <string name="transcript_quote_comment_description">Иқтибос: %1$s. Шарҳ: %2$s</string>
+    <string name="transcript_quote_add_comment">Иловаи шарҳ</string>
+    <string name="transcript_quote_edit_comment">Таҳрири шарҳ</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">Ҷавобро нусхабардорӣ кунед</string>

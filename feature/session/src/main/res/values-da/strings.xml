@@ -298,4 +298,6 @@
     <string name="session_shell_refresh_failed">Kunne ikke opdatere output</string>
     <string name="session_shell_load_earlier_failed">Kunne ikke indlæse tidligere output</string>
     <string name="session_shell_stop_failed">Kunne ikke stoppe shell</string>
+    <string name="session_quote_remove_description">Fjern citat</string>
+    <string name="session_quote_comment_placeholder">Tilføj en valgfri kommentar…</string>
 </resources>

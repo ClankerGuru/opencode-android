@@ -42,6 +42,11 @@
 
     <!-- Selection -->
     <string name="transcript_quote">ጥቀስ</string>
+    <string name="transcript_quote_description">ጥቅስ፦ %1$s</string>
+    <string name="transcript_quote_show">ሙሉ ጥቅሱን አሳይ</string>
+    <string name="transcript_quote_comment_description">ጥቅስ፦ %1$s. አስተያየት፦ %2$s</string>
+    <string name="transcript_quote_add_comment">አስተያየት አክል</string>
+    <string name="transcript_quote_edit_comment">አስተያየት አርትዕ</string>
 
     <!-- Reply actions -->
     <string name="transcript_reply_copy_description">ምላሹን ኮፒ አድርግ</string>

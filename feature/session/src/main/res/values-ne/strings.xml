@@ -298,4 +298,6 @@
     <string name="session_shell_refresh_failed">आउटपुट रिफ्रेस गर्न सकिएन</string>
     <string name="session_shell_load_earlier_failed">अघिल्लो आउटपुट लोड गर्न सकिएन</string>
     <string name="session_shell_stop_failed">शेल रोक्न सकिएन</string>
+    <string name="session_quote_remove_description">उद्धरण हटाउनुहोस्</string>
+    <string name="session_quote_comment_placeholder">चाहनुहुन्छ भने टिप्पणी थप्नुहोस्…</string>
 </resources>

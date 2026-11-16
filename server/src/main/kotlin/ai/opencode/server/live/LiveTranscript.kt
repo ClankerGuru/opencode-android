@@ -216,8 +216,10 @@ internal fun transcriptItems(message: MessagePayload): List<OpenCodeTranscriptIt
         } + inlineFiles
         if (files.isNotEmpty()) items += OpenCodeTranscriptItem.UserFiles("${message.id}-files", files)
         val text = OpenCodePromptPresentation.displayText(message.text ?: "", references, message.metadata)
-        text.trimmedWhitespace().nonEmpty?.let {
-            items += OpenCodeTranscriptItem.UserText(message.id, it, OpenCodePromptSource.of(message.text, message.metadata))
+        val quotes = OpenCodePromptPresentation.quotes(message.metadata)
+        val shown = text.trimmedWhitespace()
+        if (shown.isNotEmpty() || quotes.isNotEmpty()) {
+            items += OpenCodeTranscriptItem.UserText(message.id, shown, OpenCodePromptSource.of(message.text, message.metadata), quotes)
         }
         items
     }
