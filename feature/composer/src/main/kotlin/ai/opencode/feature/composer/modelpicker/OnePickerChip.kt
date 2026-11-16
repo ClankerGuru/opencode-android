@@ -61,7 +61,7 @@ import kotlin.math.roundToInt
  * no button chrome of its own, as the composer's other chips.
  *
  * [targetDrop]: how far its target sits below its ink (the composer's `pickerTargetDrop`).
- * [besideAgent]: the chip shares the row with the agent chip and matches it, a name and a chevron.
+ * [besideAgent]: the chip shares the row with the agent chip and leaves its effort level off.
  */
 @Composable
 fun OnePickerChip(
@@ -131,7 +131,7 @@ fun OnePickerChip(
         // them and ellipsizes into what's left.
         OnePickerChipRoll(key, animates, reduceMotion, label = "onePickerName", modifier = Modifier.weight(1f, fill = false)) { rolled ->
             Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (OnePickerTunables.CHIP_SHOWS_LOGO && !besideAgent && (state.currentModel != null || model != null)) {
+                if (OnePickerTunables.CHIP_SHOWS_LOGO && (state.currentModel != null || model != null)) {
                     OnePickerProviderMark(
                         providerID = state.currentModel?.providerID ?: "opencode",
                         canonical = model?.canonicalProviderID,
@@ -168,7 +168,7 @@ fun OnePickerChip(
                 }
             }
         }
-        if (OnePickerTunables.CHIP_SHOWS_CHEVRON || besideAgent) {
+        if (OnePickerTunables.CHIP_SHOWS_CHEVRON) {
             OpenCodeIcon(SFSymbol.ChevronDown, null, size = 11.dp, tint = OpenCodeTheme.colors.secondaryText)
         }
     }

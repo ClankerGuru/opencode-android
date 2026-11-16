@@ -86,7 +86,7 @@ object OnePickerTunables {
     const val SHOWS_ALL_MODELS = true
 
     /** "Provider logo on chip". */
-    const val CHIP_SHOWS_LOGO = true
+    const val CHIP_SHOWS_LOGO = false
 
     /** "Arc glyph on chip". */
     const val CHIP_SHOWS_ARC = false
@@ -98,7 +98,7 @@ object OnePickerTunables {
     const val CHIP_SHOWS_LEVEL_WORD = true
 
     /** "Chevron on chip". */
-    const val CHIP_SHOWS_CHEVRON = false
+    const val CHIP_SHOWS_CHEVRON = true
 }
 
 /**
