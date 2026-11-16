@@ -308,6 +308,15 @@ class SystemActionTests {
     }
 
     @Test
+    fun linksNameServersByAddress() {
+        val session = SystemAction("https://home.example", SystemAction.Destination.Session("ses_x"))
+        assertEquals(session, SystemAction.fromUrl("opencode://session/ses_x?server=https%3A%2F%2Fhome.example"))
+        assertEquals(session, SystemAction.fromUrl("opencode://server/aHR0cHM6Ly9ob21lLmV4YW1wbGU/session/ses_x"))
+        assertEquals(SystemAction("https://home.example", SystemAction.Destination.LastViewed), SystemAction.fromUrl("opencode://server/aHR0cHM6Ly9ob21lLmV4YW1wbGU"))
+        assertNull(SystemAction.fromUrl("opencode://server/aHR0cHM6Ly9ob21lLmV4YW1wbGU/files/x"))
+    }
+
+    @Test
     fun linksNeverStartCalls() {
         assertNull(SystemAction.fromUrl("opencode://call"))
         assertNull(SystemAction.fromUrl("https://session/ses_x"))

@@ -3,6 +3,8 @@ package ai.opencode.app
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.TestClock
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.TestStore
@@ -139,6 +141,26 @@ class SystemRoutingTests {
             it.copy(systemActionError = "This server is no longer saved on this phone. Connect to it again to open the session.")
         }
         store.finish()
+    }
+
+    @Test
+    fun anAddressNamesASavedServerBehindItsExperiment() = runTest {
+        saveAll(listOf(server, otherServer))
+        val action = SystemAction(serverKey = "https://other.example:443/", destination = SystemAction.Destination.Session("ses_remote"))
+        val off = store(shared.appState())
+        off.send(AppFeature.Action.SystemActionReceived(action)) {
+            it.copy(systemActionError = "This server is no longer saved on this phone. Connect to it again to open the session.")
+        }
+        off.finish()
+
+        val on = store(shared.appState().copy(home = home())) {
+            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.serverAddressLinks))
+            this[OpenCodeClient] = OpenCodeClient.testValue.copy(health = {}, events = { emptyFlow() }, transcript = hangingTranscript)
+        }
+        on.exhaustive = false
+        on.send(AppFeature.Action.SystemActionReceived(action))
+        assertEquals(action.copy(serverKey = SessionDirectory.serverKey(otherServer.persistenceID)), on.state.pendingSystemAction)
+        effects.skipInFlightEffects()
     }
 
     @Test

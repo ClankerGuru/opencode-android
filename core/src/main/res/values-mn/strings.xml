@@ -18,6 +18,7 @@
     <string name="core_experiment_inbox_sidebar_title">Ирсэн мэдээний хажуугийн самбар</string>
     <string name="core_experiment_session_live_activity_title">Сессийн шууд шинэчлэлтүүд</string>
     <string name="core_experiment_sound_effects_title">Дууны эффект</string>
+    <string name="core_experiment_server_address_links_title">Холбоосыг серверийн хаягаар нээх</string>
     <string name="core_experiment_in_app_browser_title">Апп доторх хөтөч</string>
     <string name="core_experiment_welcome_preview_title">Угтах дэлгэцийг урьдчилан харах</string>
     <string name="core_experiment_since_you_left_title">Таныг гарснаас хойш</string>

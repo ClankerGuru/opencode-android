@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.channels.awaitClose
 import java.net.URI
 import java.net.URLDecoder
+import java.util.Base64
 import java.util.UUID
 
 /**
@@ -17,7 +18,10 @@ import java.util.UUID
  * `AppFeature` routes it like a tapped notification.
  */
 data class SystemAction(
-    /** `SessionDirectory.serverKey(...)`; null means the server on screen. */
+    /**
+     * `SessionDirectory.serverKey(...)`, or from a link one of the server's addresses; null means
+     * the server on screen.
+     */
     val serverKey: String? = null,
     val destination: Destination,
     /** Starts a voice call there through the call button's own path. */
@@ -43,8 +47,9 @@ data class SystemAction(
 
         /**
          * `opencode://session/<id>?server=<key>`, `opencode://last-session?server=<key>` and
-         * `opencode://new-session?server=<key>&project=<id>`. Links only open: a web page must
-         * never be able to start a call.
+         * `opencode://new-session?server=<key>&project=<id>`, where `<key>` may also be an address.
+         * `opencode://server/<base64url address>[/session/<id>]` is the web app's session route.
+         * Links only open: a web page must never be able to start a call.
          */
         fun fromUrl(url: String): SystemAction? {
             val uri = runCatching { URI(url) }.getOrNull() ?: return null
@@ -65,6 +70,13 @@ data class SystemAction(
                 }
                 "last-session" -> SystemAction(query["server"], Destination.LastViewed)
                 "new-session" -> SystemAction(query["server"], Destination.Draft(query["project"]))
+                "server" -> {
+                    if (path.isEmpty()) return null
+                    val address = runCatching { String(Base64.getUrlDecoder().decode(path[0]), Charsets.UTF_8) }.getOrNull() ?: return null
+                    if (path.size == 1) return SystemAction(address, Destination.LastViewed)
+                    if (path.size != 3 || path[1] != "session" || path[2].isEmpty()) return null
+                    SystemAction(address, Destination.Session(path[2]))
+                }
                 else -> null
             }
         }
