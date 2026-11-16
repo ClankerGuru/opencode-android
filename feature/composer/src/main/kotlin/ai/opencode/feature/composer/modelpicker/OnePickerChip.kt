@@ -61,7 +61,7 @@ import kotlin.math.roundToInt
  * no button chrome of its own, as the composer's other chips.
  *
  * [targetDrop]: how far its target sits below its ink (the composer's `pickerTargetDrop`).
- * [showsLevel]: false leaves the level off the chip, when it shares the row with the agent chip.
+ * [besideAgent]: the chip shares the row with the agent chip and matches it, a name and a chevron.
  */
 @Composable
 fun OnePickerChip(
@@ -72,7 +72,7 @@ fun OnePickerChip(
     modifier: Modifier = Modifier,
     isEnabled: Boolean = true,
     targetDrop: Dp = 0.dp,
-    showsLevel: Boolean = true,
+    besideAgent: Boolean = false,
 ) {
     val reduceMotion = rememberReduceMotion()
     val density = LocalDensity.current
@@ -131,7 +131,7 @@ fun OnePickerChip(
         // them and ellipsizes into what's left.
         OnePickerChipRoll(key, animates, reduceMotion, label = "onePickerName", modifier = Modifier.weight(1f, fill = false)) { rolled ->
             Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (OnePickerTunables.CHIP_SHOWS_LOGO && (state.currentModel != null || model != null)) {
+                if (OnePickerTunables.CHIP_SHOWS_LOGO && !besideAgent && (state.currentModel != null || model != null)) {
                     OnePickerProviderMark(
                         providerID = state.currentModel?.providerID ?: "opencode",
                         canonical = model?.canonicalProviderID,
@@ -149,7 +149,7 @@ fun OnePickerChip(
                 )
             }
         }
-        if (scale != null && showsLevel) {
+        if (scale != null && !besideAgent) {
             if (OnePickerTunables.CHIP_SHOWS_ARC) {
                 AnimatedLevelArc(scale, level, size = 14.5.dp, color = OpenCodeTheme.colors.text.copy(alpha = 0.78f))
             }
@@ -168,7 +168,7 @@ fun OnePickerChip(
                 }
             }
         }
-        if (OnePickerTunables.CHIP_SHOWS_CHEVRON) {
+        if (OnePickerTunables.CHIP_SHOWS_CHEVRON || besideAgent) {
             OpenCodeIcon(SFSymbol.ChevronDown, null, size = 11.dp, tint = OpenCodeTheme.colors.secondaryText)
         }
     }

@@ -113,7 +113,8 @@ internal fun SessionComposerEnv.ComposerLeadingControls(expanded: Boolean, recor
         // While dictating, the same + turns into the recording's ×.
         AttachmentButton()
         val chips = @Composable {
-            Row(horizontalArrangement = Arrangement.spacedBy(ComposerTunables.leadingSpacing.dp), verticalAlignment = Alignment.CenterVertically) {
+            val chipSpacing = ComposerTunables.leadingSpacing.dp + if (agentSelection) 8.dp else 0.dp
+            Row(horizontalArrangement = Arrangement.spacedBy(chipSpacing), verticalAlignment = Alignment.CenterVertically) {
                 // The composer survives a server switch; the new detail needs its own chip mount to request agents.
                 if (agentSelection) key(s.taskIdentity) { AgentButton() }
                 ModelButton(enabled = expanded && !recording)
@@ -179,7 +180,7 @@ private fun SessionComposerEnv.ModelButton(enabled: Boolean) {
             },
             isEnabled = enabled && panels?.onePicker?.isOpen != true,
             targetDrop = ComposerLayoutMetrics.pickerTargetDrop.dp,
-            showsLevel = !agentSelection,
+            besideAgent = agentSelection,
         )
     }
 }

@@ -187,8 +187,8 @@ fun AgentChip(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium)
-            Text(name, style = style, color = secondary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 96.dp))
-            OpenCodeIcon(SFSymbol.ChevronDown, null, size = 12.dp, tint = secondary)
+            Text(name, style = style, color = OpenCodeTheme.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 96.dp))
+            OpenCodeIcon(SFSymbol.ChevronDown, null, size = 11.dp, tint = secondary)
         }
         AgentMenu(
             open = open,
