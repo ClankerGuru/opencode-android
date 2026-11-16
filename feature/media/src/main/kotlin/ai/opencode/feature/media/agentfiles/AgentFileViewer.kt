@@ -190,7 +190,7 @@ private fun StatusView(reference: AgentFileReference, detail: String, progress: 
     ) {
         FileGlyph(reference)
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(TranscriptMetrics.compact)) {
-            Text(reference.name, style = OpenCodeTextStyles.headline, textAlign = TextAlign.Center)
+            Text(reference.name, style = OpenCodeTextStyles.headline, color = OpenCodeTheme.colors.text, textAlign = TextAlign.Center)
             Text(
                 detail,
                 style = OpenCodeTextStyles.subheadline.copy(fontFeatureSettings = "tnum"),
@@ -215,7 +215,7 @@ private fun ConfirmLargeView(reference: AgentFileReference, size: Long, onDownlo
     ) {
         FileGlyph(reference)
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(TranscriptMetrics.compact)) {
-            Text(reference.name, style = OpenCodeTextStyles.headline, textAlign = TextAlign.Center)
+            Text(reference.name, style = OpenCodeTextStyles.headline, color = OpenCodeTheme.colors.text, textAlign = TextAlign.Center)
             Text(
                 stringResource(R.string.media_file_confirm_large_message, fileSizeText(size)),
                 style = OpenCodeTextStyles.subheadline,
@@ -240,7 +240,7 @@ private fun FailedView(error: AgentFileError, onRetry: () -> Unit) {
             size = OpenCodeIconSize.hero,
             tint = OpenCodeTheme.colors.secondaryText,
         )
-        Text(error.title, style = OpenCodeTextStyles.title2, textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
+        Text(error.title, style = OpenCodeTextStyles.title2, color = OpenCodeTheme.colors.text, textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
         Text(error.detail, style = OpenCodeTextStyles.subheadline, color = OpenCodeTheme.colors.secondaryText, textAlign = TextAlign.Center)
         Spacer(Modifier.size(TranscriptMetrics.compact))
         OpenCodeSecondaryButton(text = stringResource(CoreR.string.common_try_again), onClick = onRetry)
@@ -257,7 +257,7 @@ private fun ExternalDocumentView(reference: AgentFileReference, noAppOpens: Bool
     ) {
         FileGlyph(reference)
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(TranscriptMetrics.compact)) {
-            Text(reference.name, style = OpenCodeTextStyles.headline, textAlign = TextAlign.Center)
+            Text(reference.name, style = OpenCodeTextStyles.headline, color = OpenCodeTheme.colors.text, textAlign = TextAlign.Center)
             Text(reference.typeLabel, style = OpenCodeTextStyles.subheadline, color = OpenCodeTheme.colors.secondaryText)
         }
         OpenCodePrimaryButton(text = stringResource(R.string.media_file_open_in_another_app), onClick = onOpen)
