@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">एजेन्ट छान्नुहोस्</string>
     <string name="composer_agent_loading">एजेन्टहरू लोड गर्दै…</string>
-    <string name="composer_agent_section_title">एजेन्ट</string>
     <string name="composer_agent_server_default">सर्भरको पूर्वनिर्धारित</string>
     <string name="composer_agent_default_title">पूर्वनिर्धारित एजेन्ट</string>
     <string name="composer_agent_default_footer">नयाँ सत्रहरू यही एजेन्टबाट सुरु हुन्छन्। हरेक सत्रले तपाईंले छानेको एजेन्ट सम्झन्छ।</string>

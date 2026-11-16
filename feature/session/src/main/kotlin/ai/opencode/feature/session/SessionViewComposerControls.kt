@@ -145,6 +145,7 @@ private fun SessionComposerEnv.AgentButton() {
             onOpen = { store.send(Action.AgentsRequested) },
             onPick = { store.send(Action.AgentPicked(it)) },
             targetDrop = ComposerLayoutMetrics.pickerTargetDrop.dp,
+            menuBottomInWindow = { host.surfaceTopInWindow },
         )
     }
 }

@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">නියෝජිතයා තෝරන්න</string>
     <string name="composer_agent_loading">නියෝජිතයන් පූරණය කරමින්…</string>
-    <string name="composer_agent_section_title">නියෝජිතයා</string>
     <string name="composer_agent_server_default">සේවාදායක පෙරනිමිය</string>
     <string name="composer_agent_default_title">පෙරනිමි නියෝජිතයා</string>
     <string name="composer_agent_default_footer">නව සැසි මේ නියෝජිතයා සමඟ ඇරඹේ. එක් එක් සැසිය ඔබ තෝරන නියෝජිතයා මතක තබාගනී.</string>

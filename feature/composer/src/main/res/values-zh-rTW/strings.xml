@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">選擇代理程式</string>
     <string name="composer_agent_loading">正在載入代理程式…</string>
-    <string name="composer_agent_section_title">代理程式</string>
     <string name="composer_agent_server_default">伺服器預設</string>
     <string name="composer_agent_default_title">預設代理程式</string>
     <string name="composer_agent_default_footer">新工作階段會使用此代理程式。每個工作階段都會記住你的選擇。</string>

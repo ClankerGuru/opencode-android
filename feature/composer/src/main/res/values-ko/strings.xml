@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">에이전트 선택</string>
     <string name="composer_agent_loading">에이전트 로딩 중…</string>
-    <string name="composer_agent_section_title">에이전트</string>
     <string name="composer_agent_server_default">서버 기본값</string>
     <string name="composer_agent_default_title">기본 에이전트</string>
     <string name="composer_agent_default_footer">새 세션은 이 에이전트로 시작해요. 세션마다 선택한 에이전트를 기억해요.</string>

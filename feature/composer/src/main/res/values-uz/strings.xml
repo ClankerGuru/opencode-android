@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">Agentni tanlang</string>
     <string name="composer_agent_loading">Agentlar yuklanmoqda…</string>
-    <string name="composer_agent_section_title">Agent</string>
     <string name="composer_agent_server_default">Server standarti</string>
     <string name="composer_agent_default_title">Standart agent</string>
     <string name="composer_agent_default_footer">Yangi sessiyalar shu agent bilan boshlanadi. Har bir sessiya tanlagan agentingizni eslab qoladi.</string>

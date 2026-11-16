@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">Zgjidhni agjentin</string>
     <string name="composer_agent_loading">Po ngarkohen agjentët…</string>
-    <string name="composer_agent_section_title">Agjenti</string>
     <string name="composer_agent_server_default">I paracaktuar nga serveri</string>
     <string name="composer_agent_default_title">Agjenti i paracaktuar</string>
     <string name="composer_agent_default_footer">Sesionet e reja nisin me këtë agjent. Çdo sesion mban mend agjentin që zgjedh.</string>

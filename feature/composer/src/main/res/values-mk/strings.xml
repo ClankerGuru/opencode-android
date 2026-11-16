@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">Изберете агент</string>
     <string name="composer_agent_loading">Се вчитуваат агенти…</string>
-    <string name="composer_agent_section_title">Агент</string>
     <string name="composer_agent_server_default">Стандардно за серверот</string>
     <string name="composer_agent_default_title">Стандарден агент</string>
     <string name="composer_agent_default_footer">Новите сесии почнуваат со овој агент. Секоја сесија го памети твојот избор.</string>

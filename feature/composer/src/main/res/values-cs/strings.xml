@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">Vyberte agenta</string>
     <string name="composer_agent_loading">Načítání agentů…</string>
-    <string name="composer_agent_section_title">Agent</string>
     <string name="composer_agent_server_default">Výchozí na serveru</string>
     <string name="composer_agent_default_title">Výchozí agent</string>
     <string name="composer_agent_default_footer">Nové relace začínají s tímto agentem. Každá relace si pamatuje vaši volbu.</string>

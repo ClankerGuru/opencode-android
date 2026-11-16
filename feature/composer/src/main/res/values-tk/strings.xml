@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">Agent saýlaň</string>
     <string name="composer_agent_loading">Agentler ýüklenýär…</string>
-    <string name="composer_agent_section_title">Agent</string>
     <string name="composer_agent_server_default">Serweriň belleneni</string>
     <string name="composer_agent_default_title">Bellenen agent</string>
     <string name="composer_agent_default_footer">Täze sessiýalar şu agent bilen başlanýar. Her sessiýa saýlan agentiňizi ýatda saklaýar.</string>

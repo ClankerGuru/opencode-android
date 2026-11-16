@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">Pasirinkite agentą</string>
     <string name="composer_agent_loading">Įkeliami agentai…</string>
-    <string name="composer_agent_section_title">Agentas</string>
     <string name="composer_agent_server_default">Serverio numatytasis</string>
     <string name="composer_agent_default_title">Numatytasis agentas</string>
     <string name="composer_agent_default_footer">Nauji seansai pradedami su šiuo agentu. Kiekvienas seansas įsimena jūsų pasirinktą agentą.</string>

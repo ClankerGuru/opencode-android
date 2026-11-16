@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">აირჩიე აგენტი</string>
     <string name="composer_agent_loading">იტვირთება აგენტები…</string>
-    <string name="composer_agent_section_title">აგენტი</string>
     <string name="composer_agent_server_default">სერვერის ნაგულისხმევი</string>
     <string name="composer_agent_default_title">ნაგულისხმევი აგენტი</string>
     <string name="composer_agent_default_footer">ახალი სესიები ამ აგენტით იწყება. თითოეული სესია იმახსოვრებს თქვენს არჩევანს.</string>

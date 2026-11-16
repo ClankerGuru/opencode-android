@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">Chọn tác nhân</string>
     <string name="composer_agent_loading">Đang tải tác nhân…</string>
-    <string name="composer_agent_section_title">Tác nhân</string>
     <string name="composer_agent_server_default">Mặc định của máy chủ</string>
     <string name="composer_agent_default_title">Tác nhân mặc định</string>
     <string name="composer_agent_default_footer">Phiên mới bắt đầu với tác nhân này. Mỗi phiên ghi nhớ tác nhân bạn chọn.</string>

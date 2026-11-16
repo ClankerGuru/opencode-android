@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">ወኪሉን ይምረጡ</string>
     <string name="composer_agent_loading">ወኪሎችን በመጫን ላይ…</string>
-    <string name="composer_agent_section_title">ወኪል</string>
     <string name="composer_agent_server_default">የአገልጋዩ ነባሪ</string>
     <string name="composer_agent_default_title">ነባሪ ወኪል</string>
     <string name="composer_agent_default_footer">አዲስ ክፍለ ጊዜዎች በዚህ ወኪል ይጀምራሉ። እያንዳንዱ ክፍለ ጊዜ የመረጡትን ወኪል ያስታውሳል።</string>

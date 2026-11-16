@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">एजेंट चुनें</string>
     <string name="composer_agent_loading">एजेंट लोड हो रहे हैं…</string>
-    <string name="composer_agent_section_title">एजेंट</string>
     <string name="composer_agent_server_default">सर्वर का डिफ़ॉल्ट</string>
     <string name="composer_agent_default_title">डिफ़ॉल्ट एजेंट</string>
     <string name="composer_agent_default_footer">नए सेशन इस एजेंट से शुरू होते हैं। हर सेशन में आपका चुना हुआ एजेंट याद रखा जाता है।</string>

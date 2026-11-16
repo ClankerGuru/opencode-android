@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">ជ្រើសរើសភ្នាក់ងារ</string>
     <string name="composer_agent_loading">កំពុងផ្ទុកភ្នាក់ងារ…</string>
-    <string name="composer_agent_section_title">ភ្នាក់ងារ</string>
     <string name="composer_agent_server_default">លំនាំដើមរបស់ម៉ាស៊ីនមេ</string>
     <string name="composer_agent_default_title">ភ្នាក់ងារលំនាំដើម</string>
     <string name="composer_agent_default_footer">សម័យថ្មីចាប់ផ្តើមជាមួយភ្នាក់ងារនេះ។ សម័យនីមួយៗចងចាំភ្នាក់ងារដែលអ្នកជ្រើសរើស។</string>
