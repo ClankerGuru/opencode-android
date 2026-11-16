@@ -118,7 +118,7 @@ internal fun UserImageAttachmentTile(
                         cornerRadius = TranscriptMetrics.cardCornerRadius,
                     )
                     .then(tile)
-                    .mediaZoomSource(attachment.id, TranscriptMetrics.cardCornerRadius)
+                    .mediaZoomSource(attachment.id, TranscriptMetrics.cardCornerRadius, showsMedia = true)
                     .clickable(enabled = !isPending) {
                         TranscriptImagePreview.fromAttachments(images, attachment.id, attachedImageLabel, server)?.let(onPreviewImage)
                     }

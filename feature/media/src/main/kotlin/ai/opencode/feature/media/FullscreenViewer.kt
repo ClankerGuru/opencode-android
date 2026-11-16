@@ -602,7 +602,11 @@ fun FullscreenViewer(
     // The status bar and the image on screen, before the flight starts; again once a `media:<hash>`
     // page's image arrives.
     DisposableEffect(viewer, tracksSource, page.id, page.image) {
-        if (tracksSource) viewer.show(sourceID = page.id, image = page.image) else viewer.isZoomed = false
+        if (tracksSource) {
+            viewer.show(sourceID = page.id, image = page.image.takeUnless { page.isVideo }, isVideo = page.isVideo)
+        } else {
+            viewer.show(sourceID = viewer.sourceID, image = null)
+        }
         onDispose { }
     }
     LaunchedEffect(store) { store.send(FullscreenViewerFeature.Action.Task) }
@@ -631,7 +635,8 @@ fun FullscreenViewer(
     var captureFailed by remember(page.id, movie) { mutableStateOf(false) }
     val visualMovie: @Composable () -> Unit = {
         if (movie != null) MovieContentPage(movie, page.label, { store.send(Action.ImageTapped) }, { viewer.isZoomed = it },
-            { frame -> if (tracksSource) viewer.mediaFrames[page.id] = frame; pip?.videoFrame = frame }, { capture = it },
+            { frame -> if (tracksSource) viewer.mediaFrames[page.id] = frame; pip?.videoFrame = frame },
+            { capture = it; if (tracksSource) viewer.videoRendered(page.id.takeIf { _ -> it != null }) },
             modifier = Modifier.testTag(if (pip?.isActive == true) "agent-file-pip" else if (remote?.isStreaming == true) "agent-file-player-streaming" else "agent-file-player"),
             isHidden = state.handOff != null || tracksSource && viewer.mediaHidden && viewer.image != null)
     }
@@ -913,6 +918,7 @@ private fun ViewerImage(
         modifier = if (page.file != null) Modifier.fillMaxSize().testTag("agent-file-image") else Modifier.fillMaxSize(),
         onSingleTap = onTap, onZoomChange = { if (selected) viewer.isZoomed = it },
         onFrame = { if (flight) viewer.mediaFrames[page.id] = it },
+        placement = { if (flight && selected) viewer.placeImage(it) else null },
     )
 }
 
