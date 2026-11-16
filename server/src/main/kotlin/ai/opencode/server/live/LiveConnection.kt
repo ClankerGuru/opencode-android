@@ -50,7 +50,7 @@ internal suspend fun requestRedeemPairing(link: OpenCodePairingLink): OpenCodeSe
                         retry = RetryPolicy.once, followsRedirects = false, isConnectionProbe = true, server = anonymous,
                     )
                     val session = decoded(response.data, decode = PairingSessionPayload::decode)
-                    Result.success(OpenCodeServer(url = origin, username = "opencode", password = session.token, name = session.deviceName))
+                    Result.success(OpenCodeServer(url = origin, username = "opencode", password = session.token, name = link.name ?: session.deviceName))
                 } catch (error: OpenCodeClientError) {
                     Result.failure(error)
                 }
