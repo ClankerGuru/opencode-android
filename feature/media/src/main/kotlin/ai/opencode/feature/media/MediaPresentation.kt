@@ -101,6 +101,7 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
@@ -1741,12 +1742,13 @@ private fun StatusBarEffect(controller: MediaViewerController) {
     val hidden = controller.statusBarHidden
     LaunchedEffect(light, hidden, appLight) {
         insets.isAppearanceLightStatusBars = if (light) false else appLight
-        if (hidden) insets.hide(WindowInsetsCompat.Type.statusBars()) else insets.show(WindowInsetsCompat.Type.statusBars())
+        insets.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        if (hidden) insets.hide(WindowInsetsCompat.Type.systemBars()) else insets.show(WindowInsetsCompat.Type.systemBars())
     }
     DisposableEffect(window) {
         onDispose {
             insets.isAppearanceLightStatusBars = currentAppLight
-            insets.show(WindowInsetsCompat.Type.statusBars())
+            insets.show(WindowInsetsCompat.Type.systemBars())
         }
     }
 }

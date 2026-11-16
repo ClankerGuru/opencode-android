@@ -192,4 +192,5 @@
     <string name="media_mermaid_type_architecture">සැකැස්මේ රූපසටහන</string>
     <string name="media_mermaid_type_radar">රේඩාර් ප්‍රස්තාරය</string>
     <string name="media_mermaid_type_treemap">රුක් සිතියම</string>
+    <string name="media_viewer_page_counter">%1$d / %2$d</string>
 </resources>
