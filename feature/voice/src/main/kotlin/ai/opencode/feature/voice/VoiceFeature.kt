@@ -461,7 +461,7 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
                 val lines = next.tail.lines
                 shared(VoiceSharedKeys.voiceTranscripts).update { records ->
                     val record = records[key] ?: VoiceTranscriptRecord(endedAt = at, tail = emptyList(), log = emptyList())
-                    records + (key to record.appending(tail = lines, log = emptyList(), endedAt = at))
+                    VoiceTranscriptRecord.pruned(records + (key to record.appending(tail = lines, log = emptyList(), endedAt = at)))
                 }
             }
             val sessionID = next.target.sessionID
@@ -528,14 +528,14 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
                     val record = updated[key] ?: VoiceTranscriptRecord(endedAt = endedAt, tail = emptyList(), log = emptyList())
                     updated[key] = record.appending(tail = tailLines, log = lines, endedAt = endedAt)
                 }
-                updated
+                VoiceTranscriptRecord.pruned(updated)
             }
         }
 
         val captionTargets: List<CaptionTarget>
             get() {
                 val targets = callNote?.let { mutableListOf(CaptionTarget(id = "call-note", isUser = false, text = callNoteDisplayText(it))) } ?: mutableListOf()
-                targets += captions.map { CaptionTarget(id = it.id, isUser = it.role == VoiceTranscriptTail.Role.user, text = it.text) }
+                targets += captions.takeLast(2 * CaptionReveal.maxLines).map { CaptionTarget(id = it.id, isUser = it.role == VoiceTranscriptTail.Role.user, text = it.text) }
                 val progress = sessionDelegator.progressCaption
                 if (liveAssistantText.isNotEmpty()) {
                     // The settled caption reuses this ID, so its words don't appear twice.
@@ -1330,7 +1330,7 @@ class VoiceFeature : Reducer<VoiceFeature.State, VoiceFeature.Action> {
         val captions = if (index >= 0) {
             state.captions.toMutableList().also { it[index] = it[index].copy(text = text) }
         } else {
-            state.captions + State.Caption(id = id, role = role, text = text)
+            (state.captions + State.Caption(id = id, role = role, text = text)).takeLast(VoiceTranscriptRecord.maxLogLines)
         }
         return state.copy(captions = captions)
     }

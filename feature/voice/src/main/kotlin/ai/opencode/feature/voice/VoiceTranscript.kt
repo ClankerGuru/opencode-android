@@ -572,6 +572,17 @@ data class VoiceTranscriptRecord(
 
     companion object {
         const val maxLogLines = 400
+        const val maxSessions = 64
+
+        fun pruned(records: Map<String, VoiceTranscriptRecord>): Map<String, VoiceTranscriptRecord> {
+            if (records.size <= maxSessions) return records
+            val oldest = records.entries.sortedBy { it.value.endedAt }.take(records.size - maxSessions)
+            val kept = records.toMutableMap()
+            for (entry in oldest) {
+                kept.remove(entry.key)
+            }
+            return kept
+        }
 
         /** The tail lines a later call may carry: the user's own turns, never the voice agent's. */
         fun continuityLines(lines: List<String>): List<String> = lines.filter { line ->
