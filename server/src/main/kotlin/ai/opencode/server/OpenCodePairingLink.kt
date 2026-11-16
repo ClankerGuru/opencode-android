@@ -12,7 +12,7 @@ import kotlinx.serialization.builtins.serializer
 import java.util.Base64
 
 /**
- * A one-time `opencode pair` code: JSON `{"code","urls"}`, the `https://opencode.ai/pair#…` page,
+ * A one-time `opencode pair` code: JSON `{"code","urls","name"?}`, the `https://opencode.ai/pair#…` page,
  * an `opencode(-ios)://pair?code=…&url=…` deep link, or one `…/auth/connect/<code>` link. Never log
  * [code].
  */
@@ -22,6 +22,8 @@ data class OpenCodePairingLink(
     val code: String,
     /** The other addresses a QR payload listed, redeemed concurrently with [origin]. */
     val alternateOrigins: List<String> = emptyList(),
+    /** The name the link suggests for the server it pairs, such as “Anomaly Box”. */
+    val name: String? = null,
 ) {
     /** Every address to redeem at, in listed order, deduplicated. */
     val candidateOrigins: List<String> get() = (listOf(origin) + alternateOrigins).distinct()
@@ -32,7 +34,7 @@ data class OpenCodePairingLink(
      */
     val deepLinkURL: String
         get() {
-            val items = listOf("code" to code) + candidateOrigins.map { "url" to it }
+            val items = listOf("code" to code) + candidateOrigins.map { "url" to it } + listOfNotNull(name?.let { "name" to it })
             return "opencode-ios://pair?" + items.joinToString("&") {
                 percentEncodeQueryComponent(it.first) + "=" + percentEncodeQueryComponent(it.second)
             }
@@ -55,14 +57,14 @@ data class OpenCodePairingLink(
         get() {
             val origins = redeemOrigins
             val first = origins.firstOrNull() ?: return this
-            return OpenCodePairingLink(first, code, origins.drop(1))
+            return OpenCodePairingLink(first, code, origins.drop(1), name)
         }
 
     /** The unauthenticated server descriptor for this link's reachable addresses. */
     val server: OpenCodeServer
         get() {
             val candidates = redeemOrigins
-            return OpenCodeServer(url = candidates[0], username = "opencode", password = "", alternateURLs = candidates.drop(1))
+            return OpenCodeServer(url = candidates[0], username = "opencode", password = "", alternateURLs = candidates.drop(1), name = name)
         }
 
     /** Every saved server entry this pairing link would replace. */
@@ -211,7 +213,7 @@ data class OpenCodePairingLink(
 
         /** A code and its addresses as listed, before [validatedLink] checks them. */
         @Serializable
-        private data class Payload(val code: String, val urls: List<String>)
+        private data class Payload(val code: String, val urls: List<String>, val name: String? = null)
 
         private fun decodePayload(text: String): Payload? {
             val payload = try { WireJson.decodeFromString(Payload.serializer(), text) } catch (_: Exception) { return null }
@@ -231,6 +233,7 @@ data class OpenCodePairingLink(
             }
             var queryCode: String? = null
             val rawURLs = mutableListOf<String>()
+            var linkName: String? = null
             for ((name, value) in queryItems) {
                 when (name.lowercase()) {
                     "code" -> {
@@ -253,6 +256,10 @@ data class OpenCodePairingLink(
                             rawURLs += trimmed
                         }
                     }
+                    "name" -> {
+                        if (linkName != null) return null
+                        linkName = value.orEmpty()
+                    }
                     // Reject credential-bearing (`username`, `password`, `token`) or unknown parameters.
                     else -> return null
                 }
@@ -260,16 +267,17 @@ data class OpenCodePairingLink(
             if (pathCode != null && queryCode != null && pathCode != queryCode) return null
             val code = queryCode ?: pathCode ?: return null
             if (!isCode(code)) return null
-            return Payload(code, rawURLs)
+            return Payload(code, rawURLs, linkName)
         }
 
-        /** One malformed address rejects the whole code. */
+        /** One malformed address rejects the whole code. A blank name counts as none. */
         private fun validatedLink(listed: Payload): OpenCodePairingLink? {
             val code = listed.code
             val addresses = listed.urls.map(::normalizedOrigin)
             if (addresses.isEmpty() || addresses.any { it == null }) return null
             val origins = addresses.filterNotNull().distinct()
-            return OpenCodePairingLink(origins[0], code, origins.drop(1))
+            val name = listed.name?.trimmedWhitespace()?.ifEmpty { null }
+            return OpenCodePairingLink(origins[0], code, origins.drop(1), name)
         }
 
         private fun decodeLink(text: String): OpenCodePairingLink? {
