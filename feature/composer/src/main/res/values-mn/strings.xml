@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">Агент сонгох</string>
     <string name="composer_agent_loading">Агентуудыг ачаалж байна…</string>
-    <string name="composer_agent_section_title">Агент</string>
     <string name="composer_agent_server_default">Серверийн өгөгдмөл</string>
     <string name="composer_agent_default_title">Өгөгдмөл агент</string>
     <string name="composer_agent_default_footer">Шинэ сесс энэ агентаар эхэлнэ. Сесс бүр таны сонгосон агентийг санана.</string>

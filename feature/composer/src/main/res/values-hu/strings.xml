@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">Válasszon ügynököt</string>
     <string name="composer_agent_loading">Ügynökök betöltése…</string>
-    <string name="composer_agent_section_title">Ügynök</string>
     <string name="composer_agent_server_default">Kiszolgáló alapértelmezése</string>
     <string name="composer_agent_default_title">Alapértelmezett ügynök</string>
     <string name="composer_agent_default_footer">Az új munkamenetek ezzel az ügynökkel indulnak. Minden munkamenet megjegyzi a kiválasztott ügynököt.</string>

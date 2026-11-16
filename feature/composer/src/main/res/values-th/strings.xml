@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">เลือกเอเจนต์</string>
     <string name="composer_agent_loading">กำลังโหลดเอเจนต์…</string>
-    <string name="composer_agent_section_title">เอเจนต์</string>
     <string name="composer_agent_server_default">ค่าเริ่มต้นของเซิร์ฟเวอร์</string>
     <string name="composer_agent_default_title">เอเจนต์เริ่มต้น</string>
     <string name="composer_agent_default_footer">เซสชันใหม่จะเริ่มด้วยเอเจนต์นี้ แต่ละเซสชันจะจำเอเจนต์ที่คุณเลือกไว้</string>

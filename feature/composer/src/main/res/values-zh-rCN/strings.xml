@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">选择智能体</string>
     <string name="composer_agent_loading">正在加载智能体…</string>
-    <string name="composer_agent_section_title">智能体</string>
     <string name="composer_agent_server_default">服务器默认</string>
     <string name="composer_agent_default_title">默认智能体</string>
     <string name="composer_agent_default_footer">新会话使用此智能体。每个会话都会记住你选择的智能体。</string>

@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">Ajan seç</string>
     <string name="composer_agent_loading">Ajanlar yükleniyor…</string>
-    <string name="composer_agent_section_title">Ajan</string>
     <string name="composer_agent_server_default">Sunucu varsayılanı</string>
     <string name="composer_agent_default_title">Varsayılan ajan</string>
     <string name="composer_agent_default_footer">Yeni oturumlar bu ajanla başlar. Her oturum seçtiğiniz ajanı hatırlar.</string>

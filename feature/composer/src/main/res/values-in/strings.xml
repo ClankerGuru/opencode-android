@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">Pilih agen</string>
     <string name="composer_agent_loading">Memuat agen…</string>
-    <string name="composer_agent_section_title">Agen</string>
     <string name="composer_agent_server_default">Bawaan server</string>
     <string name="composer_agent_default_title">Agen bawaan</string>
     <string name="composer_agent_default_footer">Sesi baru dimulai dengan agen ini. Tiap sesi mengingat agen yang Anda pilih.</string>

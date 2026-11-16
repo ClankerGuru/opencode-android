@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">Valige agent</string>
     <string name="composer_agent_loading">Agentide laadimine…</string>
-    <string name="composer_agent_section_title">Agent</string>
     <string name="composer_agent_server_default">Serveri vaikevalik</string>
     <string name="composer_agent_default_title">Vaikeagent</string>
     <string name="composer_agent_default_footer">Uued seansid algavad selle agendiga. Iga seanss jätab sinu valitud agendi meelde.</string>

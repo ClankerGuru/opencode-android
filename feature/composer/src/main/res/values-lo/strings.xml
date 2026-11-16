@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">ເລືອກຕົວແທນ</string>
     <string name="composer_agent_loading">ກຳລັງໂຫຼດຕົວແທນ…</string>
-    <string name="composer_agent_section_title">ຕົວແທນ</string>
     <string name="composer_agent_server_default">ຄ່າເລີ່ມຕົ້ນຂອງເຊີບເວີ</string>
     <string name="composer_agent_default_title">ຕົວແທນເລີ່ມຕົ້ນ</string>
     <string name="composer_agent_default_footer">ເຊດຊັນໃໝ່ຈະເລີ່ມດ້ວຍຕົວແທນນີ້. ແຕ່ລະເຊດຊັນຈະຈື່ຕົວແທນທີ່ເຈົ້າເລືອກ.</string>

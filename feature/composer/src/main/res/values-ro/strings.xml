@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">Alege agentul</string>
     <string name="composer_agent_loading">Se încarcă agenții…</string>
-    <string name="composer_agent_section_title">Agent</string>
     <string name="composer_agent_server_default">Implicit pe server</string>
     <string name="composer_agent_default_title">Agent implicit</string>
     <string name="composer_agent_default_footer">Sesiunile noi încep cu acest agent. Fiecare sesiune reține agentul ales.</string>

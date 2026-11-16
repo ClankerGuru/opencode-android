@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">Valitse agentti</string>
     <string name="composer_agent_loading">Ladataan agentteja…</string>
-    <string name="composer_agent_section_title">Agentti</string>
     <string name="composer_agent_server_default">Palvelimen oletus</string>
     <string name="composer_agent_default_title">Oletusagentti</string>
     <string name="composer_agent_default_footer">Uudet istunnot alkavat tällä agentilla. Kukin istunto muistaa valitsemasi agentin.</string>

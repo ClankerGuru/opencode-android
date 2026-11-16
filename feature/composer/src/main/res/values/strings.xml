@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">Choose agent</string>
     <string name="composer_agent_loading">Loading Agents…</string>
-    <string name="composer_agent_section_title">Agent</string>
     <string name="composer_agent_server_default">Server Default</string>
     <string name="composer_agent_default_title">Default Agent</string>
     <string name="composer_agent_default_footer">New sessions start with this agent. Each session remembers the one you choose.</string>

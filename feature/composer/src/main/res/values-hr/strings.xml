@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">Odaberite agenta</string>
     <string name="composer_agent_loading">Učitavanje agenata…</string>
-    <string name="composer_agent_section_title">Agent</string>
     <string name="composer_agent_server_default">Zadano na poslužitelju</string>
     <string name="composer_agent_default_title">Zadani agent</string>
     <string name="composer_agent_default_footer">Nove sesije počinju s ovim agentom. Svaka sesija pamti vaš odabir.</string>

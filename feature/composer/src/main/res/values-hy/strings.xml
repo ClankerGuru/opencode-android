@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">Ընտրեք գործակալ</string>
     <string name="composer_agent_loading">Գործակալները բեռնվում են…</string>
-    <string name="composer_agent_section_title">Գործակալ</string>
     <string name="composer_agent_server_default">Սերվերի լռելյայնը</string>
     <string name="composer_agent_default_title">Լռելյայն գործակալ</string>
     <string name="composer_agent_default_footer">Նոր նիստերը սկսվում են այս գործակալով։ Յուրաքանչյուր նիստ հիշում է ձեր ընտրած գործակալին։</string>

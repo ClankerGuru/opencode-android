@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">ལས་ཚབ་གདམ་ཁ་རྐྱབས།</string>
     <string name="composer_agent_loading">ལས་ཚབ་ཚུ་མངོན་གསལ་འབད་དོ།…</string>
-    <string name="composer_agent_section_title">ལས་ཚབ།</string>
     <string name="composer_agent_server_default">སར་བར་གྱི་འཐུས་ཤོར།</string>
     <string name="composer_agent_default_title">འཐུས་ཤོར་ལས་ཚབ།</string>
     <string name="composer_agent_default_footer">ལཱ་ཡུན་གསརཔ་ཚུ་ལས་ཚབ་འདི་དང་འགོ་བཙུགསཔ་ཨིན། ལཱ་ཡུན་རེ་རེ་གིས་ཁྱོད་ཀྱིས་གདམ་མི་འདི་སེམས་ཁར་བཞགཔ་ཨིན།</string>

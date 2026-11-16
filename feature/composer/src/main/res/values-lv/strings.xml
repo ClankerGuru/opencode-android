@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">Izvēlies aģentu</string>
     <string name="composer_agent_loading">Notiek aģentu ielāde…</string>
-    <string name="composer_agent_section_title">Aģents</string>
     <string name="composer_agent_server_default">Servera noklusējums</string>
     <string name="composer_agent_default_title">Noklusējuma aģents</string>
     <string name="composer_agent_default_footer">Jaunas sesijas sākas ar šo aģentu. Katra sesija atceras tavu izvēli.</string>

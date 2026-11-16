@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">Агентро интихоб кунед</string>
     <string name="composer_agent_loading">Агентҳо бор карда мешаванд…</string>
-    <string name="composer_agent_section_title">Агент</string>
     <string name="composer_agent_server_default">Пешфарзи сервер</string>
     <string name="composer_agent_default_title">Агенти пешфарз</string>
     <string name="composer_agent_default_footer">Сессияҳои нав бо ин агент оғоз мешаванд. Ҳар сессия агенти интихобкардаатонро дар хотир нигоҳ медорад.</string>

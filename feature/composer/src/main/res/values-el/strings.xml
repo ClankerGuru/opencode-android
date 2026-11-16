@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">Επιλογή πράκτορα</string>
     <string name="composer_agent_loading">Φόρτωση πρακτόρων…</string>
-    <string name="composer_agent_section_title">Πράκτορας</string>
     <string name="composer_agent_server_default">Προεπιλογή διακομιστή</string>
     <string name="composer_agent_default_title">Προεπιλεγμένος πράκτορας</string>
     <string name="composer_agent_default_footer">Οι νέες συνεδρίες ξεκινούν με αυτόν τον πράκτορα. Κάθε συνεδρία θυμάται ποιον επιλέγετε.</string>

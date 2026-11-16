@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">Vel agent</string>
     <string name="composer_agent_loading">Heintar agentar…</string>
-    <string name="composer_agent_section_title">Agentur</string>
     <string name="composer_agent_server_default">Forsett hjá ambætara</string>
     <string name="composer_agent_default_title">Forsettur agentur</string>
     <string name="composer_agent_default_footer">Nýggjar setur byrja við hesum agenti. Hvør seta minnist tann, tú velur.</string>

@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">Veldu fulltrúa</string>
     <string name="composer_agent_loading">Hleður fulltrúum…</string>
-    <string name="composer_agent_section_title">Fulltrúi</string>
     <string name="composer_agent_server_default">Sjálfgefið á netþjóni</string>
     <string name="composer_agent_default_title">Sjálfgefinn fulltrúi</string>
     <string name="composer_agent_default_footer">Nýjar setur byrja með þessum fulltrúa. Hver seta man hvaða fulltrúa þú velur.</string>

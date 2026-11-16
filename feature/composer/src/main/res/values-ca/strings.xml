@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">Trieu un agent</string>
     <string name="composer_agent_loading">S\'estan carregant els agents…</string>
-    <string name="composer_agent_section_title">Agent</string>
     <string name="composer_agent_server_default">Per defecte del servidor</string>
     <string name="composer_agent_default_title">Agent per defecte</string>
     <string name="composer_agent_default_footer">Les sessions noves comencen amb aquest agent. Cada sessió recorda el que tries.</string>

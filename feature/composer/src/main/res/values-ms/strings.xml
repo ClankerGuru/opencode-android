@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">Pilih ejen</string>
     <string name="composer_agent_loading">Memuatkan ejen…</string>
-    <string name="composer_agent_section_title">Ejen</string>
     <string name="composer_agent_server_default">Lalai pelayan</string>
     <string name="composer_agent_default_title">Ejen lalai</string>
     <string name="composer_agent_default_footer">Sesi baharu bermula dengan ejen ini. Setiap sesi mengingati ejen yang anda pilih.</string>

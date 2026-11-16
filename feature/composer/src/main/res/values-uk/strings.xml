@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">Вибрати агента</string>
     <string name="composer_agent_loading">Завантаження агентів…</string>
-    <string name="composer_agent_section_title">Агент</string>
     <string name="composer_agent_server_default">За замовчуванням на сервері</string>
     <string name="composer_agent_default_title">Агент за замовчуванням</string>
     <string name="composer_agent_default_footer">Нові сесії починаються з цим агентом. Кожна сесія запам’ятовує ваш вибір.</string>

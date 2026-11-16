@@ -3,7 +3,6 @@
     <!-- Agent picker -->
     <string name="composer_agent_choose_description">အေးဂျင့်ကို ရွေးပါ။</string>
     <string name="composer_agent_loading">အေးဂျင့်များကို ဖွင့်နေသည်…</string>
-    <string name="composer_agent_section_title">အေးဂျင့်</string>
     <string name="composer_agent_server_default">ဆာဗာ မူရင်း</string>
     <string name="composer_agent_default_title">မူရင်း အေးဂျင့်</string>
     <string name="composer_agent_default_footer">စက်ရှင်အသစ်များကို ဒီအေးဂျင့်ဖြင့် စတင်မည်။ စက်ရှင်တစ်ခုစီက သင်ရွေးထားသော အေးဂျင့်ကို မှတ်ထားမည်။</string>
