@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 /** Commands/events are encoded/decoded here; nothing above this layer sees JSON/base64. */
 class LiveConnection(
@@ -144,6 +145,15 @@ class LiveSocketWarmer(private val date: DateClient = dependency(DateClient)) {
     companion object {
         const val maxAge = 20.0
         const val liveURL = "wss://api.openai.com/v1/live/sessions"
+        val rewarmEvery = (maxAge / 2).seconds
+        val window = 60.seconds
+
+        suspend fun warmWindow(warm: () -> Unit) {
+            repeat((window / rewarmEvery).toInt()) {
+                warm()
+                delay(rewarmEvery)
+            }
+        }
     }
 }
 class LiveSocketWarmerClient(
