@@ -30,29 +30,24 @@ import androidx.core.net.toUri
 import java.util.Locale
 import kotlinx.coroutines.withTimeoutOrNull
 
-// The media-level half of iOS `Transcript/TranscriptDragSource.swift`: the `.url` and
-// `.agentFile` payloads media's own surfaces drag (links in `LinkMenu`, gallery tiles, file
-// cards). `:feature:transcript` keeps the rest of `TranscriptDragPayload` above this module; its
-// `AgentFile` and `Image` cases (no clip data there yet) can hand over to [MediaDragPayload], and
-// its type helpers ([MediaDragPayload.fileExtension], [MediaDragPayload.codeMimeType], …) are the
-// same port, so the transcript can drop its copies.
+// The `.url` and `.agentFile` payloads media's own surfaces drag (links in `LinkMenu`, gallery
+// tiles, file cards). `:feature:transcript` keeps the rest of `TranscriptDragPayload` above this
+// module; its `AgentFile` and `Image` cases (no clip data there yet) can hand over to
+// [MediaDragPayload], and its type helpers ([MediaDragPayload.fileExtension],
+// [MediaDragPayload.codeMimeType], …) are the same port, so the transcript can drop its copies.
 
-/**
- * Server and directory context for resolving agent files dragged out of a row (iOS
- * `TranscriptDragContext`, the `\.transcriptDragContext` environment value).
- */
+/** Server and directory context for resolving agent files dragged out of a row. */
 @Immutable
 data class MediaDragContext(val server: OpenCodeServer? = null, val directory: String? = null)
 
-/** iOS `EnvironmentValues.transcriptDragContext`: read by [mediaDragSource]. */
+/** Read by [mediaDragSource]. */
 val LocalMediaDragContext = staticCompositionLocalOf { MediaDragContext() }
 
 /**
- * What a media surface provides when dragged into another app or the composer (iOS
- * `TranscriptDragPayload.url` / `.agentFile`). Android carries it as [ClipData] ([clipData]);
- * an agent file goes out as a `content://` URI of [AgentFileDragProvider], which downloads it
- * through [AgentFileLoader] only when the drop target reads it, as iOS's item provider loads
- * lazily.
+ * What a media surface provides when dragged into another app or the composer. Android carries it
+ * as [ClipData] ([clipData]); an agent file goes out as a `content://` URI of
+ * [AgentFileDragProvider], which downloads it through [AgentFileLoader] only when the drop target
+ * reads it.
  */
 @Immutable
 sealed interface MediaDragPayload {
@@ -70,8 +65,8 @@ sealed interface MediaDragPayload {
     ) : MediaDragPayload
 
     /**
-     * The drag's data. Registers an agent file with [AgentFileDragProvider] (nothing is read
-     * until the drop target opens it). A file no server serves drags as its path, as on iOS.
+     * The drag's data. Registers an agent file with [AgentFileDragProvider] (nothing is read until
+     * the drop target opens it). A file no server serves drags as its path.
      */
     fun clipData(context: Context, dragContext: MediaDragContext = MediaDragContext()): ClipData? = when (this) {
         is Url -> {
@@ -165,10 +160,7 @@ sealed interface MediaDragPayload {
             }
         }
 
-        /**
-         * The MIME type for a code block's fence language (iOS `codeUTType(for:)`); null where
-         * iOS answers the generic `.sourceCode`.
-         */
+        /** The MIME type for a code block's fence language. */
         fun codeMimeType(language: String?): String? {
             val ext = fileExtension(language) ?: return null
             return when (ext) {
@@ -193,7 +185,7 @@ sealed interface MediaDragPayload {
             }
         }
 
-        /** The MIME type for an agent or attached file (iOS `fileUTType(fileName:mime:kind:)`). */
+        /** The MIME type for an agent or attached file. */
         fun fileMimeType(fileName: String, mime: String?, kind: AgentFileReference.Kind): String {
             val ext = AttachmentFileType.fileExtension(fileName)
             if (ext.isNotEmpty()) {
@@ -213,7 +205,7 @@ sealed interface MediaDragPayload {
             }
         }
 
-        /** iOS `sanitizedSuggestedName(_:defaultName:utType:)`: the type's extension when the name has none. */
+        /** The type's extension when the name has none. */
         fun sanitizedSuggestedName(name: String, defaultName: String, mime: String): String {
             val sanitized = AttachmentFileType.sanitizedName(name.ifEmpty { defaultName })
             if (AttachmentFileType.fileExtension(sanitized).isNotEmpty()) return sanitized
@@ -225,12 +217,11 @@ sealed interface MediaDragPayload {
 }
 
 /**
- * Makes a media surface draggable into other apps and the composer (iOS
- * `.transcriptDragSource(_:cornerRadius:)` for the payloads media owns). Holding it lifts the
- * surface as drawn (its own fill and corners, iOS's lift preview) and starts the system drag with
- * [payload]'s [ClipData], `DRAG_FLAG_GLOBAL | DRAG_FLAG_GLOBAL_URI_READ`, so another app can read
- * the file's `content://` URI. The clip data is built when the drag starts. Taps and scrolling
- * stay with the surface. `null` leaves the surface untouched.
+ * Makes a media surface draggable into other apps and the composer. Holding it lifts the surface as
+ * drawn and starts the system drag with [payload]'s [ClipData], `DRAG_FLAG_GLOBAL |
+ * DRAG_FLAG_GLOBAL_URI_READ`, so another app can read the file's `content://` URI. The clip data is
+ * built when the drag starts. Taps and scrolling stay with the surface. `null` leaves the surface
+ * untouched.
  */
 @OptIn(ExperimentalFoundationApi::class)
 fun Modifier.mediaDragSource(payload: MediaDragPayload?): Modifier = if (payload == null) this else composed {
@@ -267,7 +258,6 @@ fun Modifier.mediaDragSource(payload: MediaDragPayload?): Modifier = if (payload
     dragAndDropSource(start)
 }
 
-/** iOS `LabMarks.mark("transcript_drag_begin")` (DEBUG builds only). */
 internal fun markDragBegin() {
     if (InternalBuild.isDebug) LabMarks.mark("transcript_drag_begin")
 }

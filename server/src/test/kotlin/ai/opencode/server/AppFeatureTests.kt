@@ -20,11 +20,6 @@ import java.net.URI
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * Port of the `:server` half of iOS `AppFeatureTests.swift`: pairing-link decoding, live
- * redemption, reachability ranking and the Home cache's wire format. The `AppFeature` reducer
- * half is `:app`'s `AppFeatureTests`.
- */
 class AppFeatureTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -51,8 +46,7 @@ class AppFeatureTests {
             cache,
         )
 
-        // A session cached before Always Notify has no `alwaysNotify`. (Android writes ISO dates; iOS's
-        // reference-date seconds were never written here.)
+        // A session cached before Always Notify has no `alwaysNotify`.
         val beforeAlwaysNotify = """{"serverID":"kit|https://saved.example","snapshot":{"projects":[],"sessions":[{"id":"ses_1","title":"Release","projectID":"global","directory":"/tmp","updatedAt":"2026-05-09T01:46:40Z","cost":0.5}],"activeSessionIDs":[]}}"""
         val session = json.decodeFromString(CachedHomeSnapshot.serializer(), beforeAlwaysNotify).snapshot.sessions.first()
         assertEquals(
@@ -75,7 +69,7 @@ class AppFeatureTests {
         assertEquals(true, OpenCodePairingLink.decode("http://127.0.0.1:4096/auth/connect/code")?.isLoopback)
     }
 
-    /** QA FB-02 (Android only; iOS decodes the trimmed text): pairing links as people copy them. */
+    /** Pairing links as people copy them. */
     @Test
     fun copiedPairingLinksDecode() {
         val link = "https://abcdefghijklmnop.qrstuvwxyz12.opentunnel.xyz/auth/connect/Ab3_x-9QAb3_x-9QAb3_x-"
@@ -205,7 +199,7 @@ class AppFeatureTests {
         )) {
             assertNull(link, OpenCodePairingLink.decode(link))
             assertTrue(link, OpenCodePairingLink.isPairingEndpoint(link))
-            // iOS skips what `URL(string:)` rejects (the `!` code); the string checks apply to every link here.
+            // The string checks apply to every link here.
             assertTrue(link, OpenCodePairingLink.shouldHandleOpenURL(link))
             assertNull(link, OpenCodePairingLink.shareableURL(link))
         }

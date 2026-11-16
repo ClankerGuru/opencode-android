@@ -6,9 +6,8 @@ import android.content.pm.ApplicationInfo
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * The voice lab's hooks: iOS reads `OPENCODE_LAB_*` environment variables in `#if DEBUG`
- * builds; Android reads system properties, in debuggable builds only. Release builds always
- * answer null / false, so no lab hook can change a shipped app.
+ * The voice lab's hooks; Android reads system properties, in debuggable builds only. Release builds
+ * always answer null / false, so no lab hook can change a shipped app.
  *
  * `OPENCODE_LAB_VOICE_ROTATE_AFTER` maps to `debug.opencode.voice_rotate_after` (the
  * `OPENCODE_LAB_` prefix dropped, lowercased). Set one before launching the app:
@@ -18,9 +17,8 @@ import java.util.concurrent.ConcurrentHashMap
  * adb shell setprop debug.opencode.voice_mute_output 1
  * ```
  *
- * Clear it with `adb shell setprop debug.opencode.voice_rotate_after ""`. Each property is
- * read once per process (`getprop`) and cached, so restart the app after changing one.
- * Use it only where iOS reads the variable.
+ * Clear it with `adb shell setprop debug.opencode.voice_rotate_after ""`. Each property is read
+ * once per process (`getprop`) and cached, so restart the app after changing one.
  */
 object VoiceLabEnvironment {
     private const val PREFIX = "OPENCODE_LAB_"
@@ -34,7 +32,7 @@ object VoiceLabEnvironment {
         return value.ifEmpty { null }
     }
 
-    /** Whether the variable is "1" (iOS compares `== "1"`). */
+    /** Whether the variable is "1". */
     fun flag(name: String): Boolean = string(name) == "1"
 
     /** `OPENCODE_LAB_VOICE_ROTATE_AFTER` → `debug.opencode.voice_rotate_after`. */

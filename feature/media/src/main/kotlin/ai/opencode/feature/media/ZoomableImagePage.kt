@@ -14,9 +14,11 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -38,10 +40,11 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.util.VelocityTracker
-import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -61,7 +64,6 @@ import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
-/** UIKit's `UIEdgeInsets`, for [MediaZoomGeometry]. */
 data class MediaInsets(val top: Float, val left: Float, val bottom: Float, val right: Float) {
     companion object {
         val Zero = MediaInsets(0f, 0f, 0f, 0f)
@@ -69,10 +71,9 @@ data class MediaInsets(val top: Float, val left: Float, val bottom: Float, val r
 }
 
 /**
- * Where a zoomable image sits and how far it zooms, in a page's units (iOS
- * `MediaZoomGeometry`, `Media/ZoomableImagePage.swift`). The image lays out fitted at zoom
- * scale 1, so 1 is fit. Android works in pixels, so callers pass `displayScale = 1` with
- * pixel sizes.
+ * Where a zoomable image sits and how far it zooms, in a page's units. The image lays out fitted at
+ * zoom scale 1, so 1 is fit. Android works in pixels, so callers pass `displayScale = 1` with pixel
+ * sizes.
  */
 object MediaZoomGeometry {
     /** However small the image, it zooms at least this far. */
@@ -149,28 +150,20 @@ object MediaZoomGeometry {
 }
 
 /**
- * One page's zoom (iOS `MediaZoomScrollView`): a scroll view's zoom scale and content offset,
- * with the image fitted at scale 1 and centred by insets. A plain object owning per-frame
- * motion; the page composable drives it from gestures.
+ * One page's zoom: a scroll view's zoom scale and content offset, with the image fitted at scale 1
+ * and centred by insets. A plain object owning per-frame motion; the page composable drives it from
+ * gestures.
  */
 @Stable
-class MediaZoomState internal constructor(image: Bitmap) {
-    internal var image: Bitmap = image
-        set(value) {
-            if (value === field) return
-            field = value
-            laidOutSize = Size.Zero
-            reportedFrame = null
-        }
-
+class MediaZoomState internal constructor(private val pixelSize: Size) {
     var zoomScale by mutableFloatStateOf(1f)
         private set
     var contentOffset by mutableStateOf(Offset.Zero)
         private set
 
     /** The page size the image was last fitted to. */
-    private var laidOutSize = Size.Zero
-    private var fitted = Size.Zero
+    private var laidOutSize by mutableStateOf(Size.Zero)
+    private var fitted by mutableStateOf(Size.Zero)
     private var reportedFrame: Rect? = null
     private var isZoomedIn = false
     var maximumZoomScale = MediaZoomGeometry.smallestMaximumScale
@@ -188,7 +181,7 @@ class MediaZoomState internal constructor(image: Bitmap) {
 
     val isZoomed: Boolean get() = zoomScale > minimumZoomScale + 0.01f
 
-    /** Mirrors iOS `isZoomedIn`, which drives accessibility. */
+    /** Which drives accessibility. */
     var zoomedForAccessibility by mutableStateOf(false)
         private set
 
@@ -199,7 +192,7 @@ class MediaZoomState internal constructor(image: Bitmap) {
     /** Where the image is drawn in the page: fitted, or where a zoom has it. */
     val imageFrame: Rect get() = Rect(Offset(-contentOffset.x, -contentOffset.y), contentSize)
 
-    /** iOS `layoutSubviews`: fit when the page size changes. */
+    /** Fit when the page size changes. */
     fun layout(size: Size) {
         if (size != laidOutSize) fit(size)
     }
@@ -222,9 +215,9 @@ class MediaZoomState internal constructor(image: Bitmap) {
         animation?.cancel()
         laidOutSize = size
         zoomScale = 1f
-        fitted = MediaZoomGeometry.fittedSize(Size(image.width.toFloat(), image.height.toFloat()), size)
+        fitted = MediaZoomGeometry.fittedSize(pixelSize, size)
         maximumZoomScale = MediaZoomGeometry.maximumScale(
-            pixelSize = Size(image.width.toFloat(), image.height.toFloat()),
+            pixelSize = pixelSize,
             fitted = fitted,
             displayScale = 1f,
         )
@@ -422,7 +415,7 @@ class MediaZoomState internal constructor(image: Bitmap) {
             set(scale, offset)
             animation = scope.launch {
                 try {
-                    // The reduced cross-fade (iOS `Motion.reduced`).
+                    // The reduced cross-fade.
                     animate(0f, 1f, animationSpec = MotionRole.Reduced.animation(reduceMotion = true)) { value, _ -> fade = value }
                 } finally {
                     fade = 1f
@@ -445,15 +438,16 @@ class MediaZoomState internal constructor(image: Bitmap) {
 }
 
 /**
- * One image fitted to its page, reporting where so the viewer's flight lands on it (iOS
- * `ZoomableImagePage`). Pinching (about the fingers, past either limit with resistance),
- * panning (with momentum, bouncing back flush with the edges), and double tapping behave like Photos. At
- * fit, drags belong to the pager and the dismissal; zoomed, a drag from a side edge heading
- * out turns the page ([MediaZoomGeometry.handsOffToPager]).
+ * One image fitted to its page, reporting where so the viewer's flight lands on it. Pinching (about
+ * the fingers, past either limit with resistance), panning (with momentum, bouncing back flush with
+ * the edges), and double tapping behave like Photos. At fit, drags belong to the pager and the
+ * dismissal; zoomed, a drag from a side edge heading out turns the page
+ * ([MediaZoomGeometry.handsOffToPager]).
  *
  * @param isHidden the flight above draws it for now.
  * @param onFrame where the image sits in the viewer's coordinates: fitted, or where a zoom
  *   has it, so a flight home starts from what's on screen.
+ * @param placement where the viewer's motion draws the image laid out at a frame, if it's moving.
  */
 @Composable
 fun ZoomableImagePage(
@@ -465,40 +459,78 @@ fun ZoomableImagePage(
     onSingleTap: () -> Unit = {},
     onZoomChange: (Boolean) -> Unit = {},
     onFrame: (Rect) -> Unit = {},
+    placement: (Rect) -> MediaPlacement? = { null },
+) {
+    val bitmap = remember(image) { image.asImageBitmap() }
+    ZoomableVisualPage(Size(image.width.toFloat(), image.height.toFloat()), label, isSelected, modifier,
+        onSingleTap, onZoomChange, onFrame) { state ->
+        Spacer(Modifier.fillMaxSize().drawBehind {
+            if (isHidden) return@drawBehind
+            val placed = placement(state.imageFrame)
+            val alpha = placed?.alpha ?: 1f
+            val draw: DrawScope.() -> Unit = {
+                val from = state.fadingFrom
+                if (from != null) {
+                    drawImageIn(bitmap, from, (1 - state.fade) * alpha)
+                    drawImageIn(bitmap, state.imageFrame, state.fade * alpha)
+                } else drawImageIn(bitmap, state.imageFrame, alpha)
+            }
+            if (placed == null) draw() else drawPlaced(placed, draw)
+        })
+    }
+}
+
+/** Both pixels and the live movie surface fit, zoom, pan and hand off at the same edges. */
+@Composable
+internal fun ZoomableVisualPage(
+    pixelSize: Size,
+    label: String,
+    isSelected: Boolean,
+    modifier: Modifier = Modifier,
+    onSingleTap: () -> Unit,
+    onZoomChange: (Boolean) -> Unit,
+    onFrame: (Rect) -> Unit,
+    content: @Composable (MediaZoomState) -> Unit,
 ) {
     val reducesMotion = rememberReduceMotion()
-    val state = remember { MediaZoomState(image) }
-    state.image = image
+    val state = remember(pixelSize) { MediaZoomState(pixelSize) }
     val currentZoomChange by rememberUpdatedState(onZoomChange)
     val currentFrame by rememberUpdatedState(onFrame)
     val currentTap by rememberUpdatedState(onSingleTap)
     state.onZoomChange = { currentZoomChange(it) }
     state.onFrame = { currentFrame(it) }
-    val bitmap: ImageBitmap = remember(image) { image.asImageBitmap() }
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val slop = LocalViewConfiguration.current.touchSlop
 
-    LaunchedEffect(isSelected) {
-        if (!isSelected) state.resetZoom()
+    DisposableEffect(state) { onDispose { state.stopAnimation() } }
+    LaunchedEffect(state, isSelected) {
+        if (!isSelected) state.resetZoom() else currentZoomChange(state.isZoomed)
         state.reportFrame()
     }
 
     val zoomed = state.zoomedForAccessibility
-    Spacer(
+    val zoomedInState = stringResource(R.string.media_zoom_zoomed_in_state)
+    val zoomOutLabel = stringResource(R.string.media_zoom_out_label)
+    val zoomInLabel = stringResource(R.string.media_zoom_in_label)
+    Box(
         modifier
             .fillMaxSize()
             .testTag("media-zoom-page")
-            .onSizeChanged { size: IntSize -> state.layout(Size(size.width.toFloat(), size.height.toFloat())) }
+            .layout { measurable, constraints ->
+                state.layout(Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat()))
+                val child = measurable.measure(constraints)
+                layout(child.width, child.height) { child.place(0, 0) }
+            }
             .semantics {
                 contentDescription = label
                 role = Role.Image
-                if (zoomed) stateDescription = "Zoomed in"
+                if (zoomed) stateDescription = zoomedInState
                 customActions = listOf(
                     if (zoomed) {
-                        CustomAccessibilityAction("Zoom Out") { state.zoomOut(scope, reducesMotion); true }
+                        CustomAccessibilityAction(zoomOutLabel) { state.zoomOut(scope, reducesMotion); true }
                     } else {
-                        CustomAccessibilityAction("Zoom In") { state.zoomInAtCentre(scope, reducesMotion); true }
+                        CustomAccessibilityAction(zoomInLabel) { state.zoomInAtCentre(scope, reducesMotion); true }
                     },
                 )
             }
@@ -512,18 +544,8 @@ fun ZoomableImagePage(
             }
             .pointerInput(state) {
                 zoomGestures(state, scope, slop, density)
-            }
-            .drawBehind {
-                if (isHidden) return@drawBehind
-                val from = state.fadingFrom
-                if (from != null) {
-                    drawImageIn(bitmap, from, 1 - state.fade)
-                    drawImageIn(bitmap, state.imageFrame, state.fade)
-                } else {
-                    drawImageIn(bitmap, state.imageFrame, 1f)
-                }
             },
-    )
+    ) { content(state) }
 }
 
 private fun DrawScope.drawImageIn(bitmap: ImageBitmap, frame: Rect, alpha: Float) {

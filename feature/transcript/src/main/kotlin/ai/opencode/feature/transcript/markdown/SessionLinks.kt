@@ -1,12 +1,13 @@
 package ai.opencode.feature.transcript.markdown
 
+import ai.opencode.core.strings.localized
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.SessionLinkTarget
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.SessionLink
 
-// The rich-text half of iOS `SessionLink` (`Transcript/SessionLinks.swift`): marking session IDs
-// in parsed inline Markdown. The URL/ID half is `:server`'s [SessionLink], which the link menu
-// (`:feature:media`) reads too; these extend it so call sites read as iOS's.
+// Marking session IDs in parsed inline Markdown. The URL/ID half is `:server`'s [SessionLink],
+// which the link menu (`:feature:media`) reads too; these extend it so call sites read.
 
 /** Marks the session IDs in inline Markdown freshly parsed from [markdown]. Text whose source can't render an ID returns as is. */
 fun SessionLink.mark(text: InlineText, markdown: String): InlineText {
@@ -78,10 +79,8 @@ fun SessionLink.ids(text: InlineText): List<String> {
     return seen.toList()
 }
 
-/** iOS `SessionLinkTarget.maximumTitle`. */
 const val SESSION_LINK_MAXIMUM_TITLE = 40
 
-/** iOS `SessionLinkTarget.init(_ session:)`. */
 fun sessionLinkTarget(session: OpenCodeSession): SessionLinkTarget =
     SessionLinkTarget.Session(session.title, session.parentID)
 
@@ -89,7 +88,7 @@ fun sessionLinkTarget(session: OpenCodeSession): SessionLinkTarget =
 fun SessionLinkTarget.label(id: String): String {
     if (this !is SessionLinkTarget.Session) return SessionLink.shortID(id)
     val trimmed = SwiftText.trimWhitespaceAndNewlines(title)
-    if (trimmed.isEmpty()) return "New Session"
+    if (trimmed.isEmpty()) return localized(R.string.transcript_session_link_new_session)
     return if (trimmed.length > SESSION_LINK_MAXIMUM_TITLE) trimmed.take(SESSION_LINK_MAXIMUM_TITLE - 1) + "…" else trimmed
 }
 
@@ -98,12 +97,12 @@ val SessionLinkTarget.resolvedTitle: String?
     get() = if (this is SessionLinkTarget.Session) label("") else null
 
 /**
- * One replacement in a text, in the original text's characters (iOS `InlineLinkText.Edit`), so
- * streamed arrival offsets map through it.
+ * One replacement in a text, in the original text's characters, so streamed arrival offsets map
+ * through it.
  */
 data class InlineTextEdit(val start: Int, val removed: Int, val inserted: Int) {
     companion object {
-        /** Where a character offset in the original text lands after [edits] (iOS `InlineLinkText.offset`). */
+        /** Where a character offset in the original text lands after [edits]. */
         fun offset(original: Int, edits: List<InlineTextEdit>): Int {
             var delta = 0
             for (edit in edits) {
@@ -121,8 +120,8 @@ data class InlineTextEdit(val start: Int, val removed: Int, val inserted: Int) {
 }
 
 /**
- * A reply text with its session links showing their titles (or short IDs), iOS
- * `SessionLinkText`. Offsets of streamed arrivals map through [edits], as with link icons.
+ * A reply text with its session links showing their titles (or short IDs). Offsets of streamed
+ * arrivals map through [edits], as with link icons.
  */
 data class SessionLinkText(val text: InlineText, val edits: List<InlineTextEdit>, val ids: List<String>) {
     fun offset(original: Int): Int = InlineTextEdit.offset(original, edits)
@@ -130,7 +129,7 @@ data class SessionLinkText(val text: InlineText, val edits: List<InlineTextEdit>
     fun knownLength(length: Int?): Int? = if (edits.isEmpty()) length else null
 
     companion object {
-        /** iOS `SessionChipLayout` padding: room for the glyph first, then the label. */
+        /** Room for the glyph first, then the label. */
         const val leadingPad = "\u00A0\u2007\u00A0"
         const val trailingPad = "\u00A0\u202F"
 
@@ -193,7 +192,7 @@ data class SessionLinkText(val text: InlineText, val edits: List<InlineTextEdit>
     }
 }
 
-/** The session IDs this block links (iOS `OpenCodeMarkdownBlock.sessionLinkIDs`). */
+/** The session IDs this block links. */
 val OpenCodeMarkdownBlock.sessionLinkIDs: List<String>
     get() = when (val kind = kind) {
         is OpenCodeMarkdownBlock.Kind.Paragraph -> SessionLink.ids(kind.text)
@@ -205,5 +204,5 @@ val OpenCodeMarkdownBlock.sessionLinkIDs: List<String>
         else -> emptyList()
     }
 
-/** The session IDs a reply's blocks link, for resolving before its rows draw (iOS `OpenCodeTranscriptItem.sessionLinkIDs`). */
+/** The session IDs a reply's blocks link, for resolving before its rows draw. */
 fun sessionLinkIDs(blocks: List<OpenCodeMarkdownBlock>): List<String> = blocks.flatMap { it.sessionLinkIDs }

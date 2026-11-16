@@ -6,17 +6,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * Port of iOS `DictationLiveActivityTests.swift`: only its `DictationFeature`
- * store test lives here.
- *
- * Skipped → `:feature:drawer` (they drive `HomeFeature`):
- * `aHandsFreeRecordingShowsItsActivityUntilStop`,
- * `aStopWithNoRecordingEndsTheActivity`,
- * `onlyALiveHandsFreeRecordingOutsideACallShows`,
- * `aFinalizingMessageStaysWithItsSessionAcrossASwitch`,
- * `theStopIntentSendsItsCommand` (the dictation activity's stop command).
- */
+/** Only its `DictationFeature` store test lives here. */
 class DictationLiveActivityTests {
     @Test fun dictationFeatureReducesHoldArmingLockingAndFinishExhaustively() = runTest {
         var stoppedPress: Int? = null

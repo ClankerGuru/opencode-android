@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.strings.localized
 import ai.opencode.server.model.PastedTextSummary
 import ai.opencode.feature.media.MediaReferenceLoadResult
 import ai.opencode.feature.media.MediaReferenceClient
@@ -22,7 +23,7 @@ import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.PastedText
 import java.util.UUID
 
-// Port of iOS `SessionFeature+Undo.swift`: a send's draft back in the composer, and reverts.
+// A send's draft back in the composer, and reverts.
 
 /**
  * A send's words lead the draft (or follow it when reverting a turn), its attachments and files
@@ -80,7 +81,7 @@ internal fun SessionFeature.stageRevert(
                 return@run
             }
             // A `media:<hash>` attachment comes back without its bytes: load them so Edit's
-            // composer shows the image (or Pasted Text card) again (7f5ac4c5).
+            // composer shows the image (or Pasted Text card) again.
             val hydrated = restoring.copy(attachments = restoring.attachments.map { attachment -> hydrated(attachment, server, references) })
             send(Action.MessageReverted(sessionID, messageID, hydrated, null))
         }.cancellable(SessionFeature.CancelID.Revert, cancelInFlight = true),
@@ -108,7 +109,7 @@ private suspend fun hydrated(attachment: OpenCodeOutgoingAttachment, server: Ope
 internal fun SessionFeature.reportRevertError(error: OpenCodeClientError, state: State): Reduced<State, Action> {
     haptics.play(Haptic.error)
     val details = error.message.trim()
-    return Reduced(appendInfo(state, if (details.isEmpty()) "Couldn’t revert" else "Couldn’t revert: $details"))
+    return Reduced(appendInfo(state, if (details.isEmpty()) localized(R.string.session_revert_failed) else localized(R.string.session_revert_failed_details, details)))
 }
 
 /**

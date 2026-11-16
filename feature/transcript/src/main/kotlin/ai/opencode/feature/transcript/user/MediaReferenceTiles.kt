@@ -16,6 +16,7 @@ import ai.opencode.feature.media.TranscriptImagePreview
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.media.mediaZoomSource
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.rows.JustifiedImageRows
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeImageAttachment
@@ -44,6 +45,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -102,14 +104,13 @@ internal fun UserImageAttachmentTile(
     val isUnavailable = attachment.isUnavailable ||
         retryState.failure == MediaAttachmentFailure.Unavailable ||
         MediaReferenceResolver.isUnavailable(attachment, server)
-    // Every state marks the slot a sent photo lands in (iOS `SendLandingProbe.imageID`).
-    val marker = rememberSendLandingMarker(messageID?.let { SendLanding.imageID(it, index) })
-    val tile = Modifier.sendLandingMarker(marker).size(side).clip(shape)
+    val tile = Modifier.size(side).clip(shape)
     when {
         image != null && !isUnavailable -> {
             val dragData = MediaReferenceResolver.resolvedData(attachment)
             val bitmap = remember(image) { image.asImageBitmap() }
-            val label = if (images.size == 1) "Open attached image" else "Open attached image ${index + 1} of ${images.size}"
+            val label = if (images.size == 1) stringResource(R.string.transcript_attached_image_open_description) else stringResource(R.string.transcript_attached_image_open_numbered_description, index + 1, images.size)
+            val attachedImageLabel = stringResource(R.string.transcript_attached_image)
             Box(
                 Modifier
                     .transcriptDragSource(
@@ -117,9 +118,9 @@ internal fun UserImageAttachmentTile(
                         cornerRadius = TranscriptMetrics.cardCornerRadius,
                     )
                     .then(tile)
-                    .mediaZoomSource(attachment.id, TranscriptMetrics.cardCornerRadius)
+                    .mediaZoomSource(attachment.id, TranscriptMetrics.cardCornerRadius, showsMedia = true)
                     .clickable(enabled = !isPending) {
-                        TranscriptImagePreview.fromAttachments(images, attachment.id, "Attached image", server)?.let(onPreviewImage)
+                        TranscriptImagePreview.fromAttachments(images, attachment.id, attachedImageLabel, server)?.let(onPreviewImage)
                     }
                     .semantics {
                         contentDescription = label
@@ -197,6 +198,7 @@ internal fun ToolImageMosaicTile(
             MediaAttachmentUnavailableView(attachment.name, framed, onRetry = { retryState = retryState.retry() }, isTransientFailure = true)
         else -> {
             val dragData = MediaReferenceResolver.resolvedData(attachment)
+            val openDescription = stringResource(R.string.transcript_tool_image_open_numbered_description, index + 1, total)
             Box(
                 Modifier
                     .transcriptDragSource(
@@ -208,7 +210,7 @@ internal fun ToolImageMosaicTile(
                     .background(cardFill())
                     .clickable { onPreview(attachment.id) }
                     .clearAndSetSemantics {
-                        contentDescription = "Open tool image ${index + 1} of $total"
+                        contentDescription = openDescription
                         role = Role.Button
                     },
                 contentAlignment = Alignment.Center,
@@ -255,7 +257,8 @@ internal fun TranscriptMediaFileChip(file: OpenCodeTranscriptFile, corners: User
         return
     }
     val symbol = if (isUnavailable) "exclamationmark.triangle" else file.symbolName
-    val label = if (isUnavailable) "Media unavailable" else file.typeLabel
+    val label = if (isUnavailable) stringResource(R.string.transcript_media_unavailable) else file.typeLabel
+    val attachedFileDescription = stringResource(R.string.transcript_attached_file_description, file.name)
     val shape = corners.shape(TranscriptMetrics.cardCornerRadius)
     FileAttachmentCard(
         name = file.name,
@@ -264,14 +267,14 @@ internal fun TranscriptMediaFileChip(file: OpenCodeTranscriptFile, corners: User
             .clip(shape)
             .background(cardFill(), shape)
             .clearAndSetSemantics {
-                contentDescription = "Attached file ${file.name}"
+                contentDescription = attachedFileDescription
                 stateDescription = label
                 testTag = if (isUnavailable) "media-unavailable" else "attached-file-${file.name}"
             },
     ) { FileAttachmentDetail(label) }
     LaunchedEffect("${server?.persistenceID ?: ""}|${file.mediaHash ?: ""}") {
         val hash = file.mediaHash
-        if (file.isUnavailable || hash == null) return@LaunchedEffect
+        if (file.isUnavailable || hash == null || !PastedText.isText(file.mime)) return@LaunchedEffect
         val data = MediaReferenceResolver.cachedData(hash) ?: run {
             server ?: return@LaunchedEffect
             when (val result = MediaReferenceResolver.loadData(server, hash)) {

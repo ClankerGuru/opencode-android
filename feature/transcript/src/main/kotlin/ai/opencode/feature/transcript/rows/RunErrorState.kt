@@ -4,11 +4,10 @@ import ai.opencode.server.model.OpenCodeRunError
 import ai.opencode.server.model.OpenCodeTranscriptItem
 
 /**
- * The item-level halves of iOS `RunErrorState.swift` (an extension on `SessionFeature.State`).
  * The state lives in `:feature:session`, so these take the fields they read; the session's
- * `actionableRunErrorID`, `runErrorActions`, `editableLastMessage` and `hidingUndone` call
- * them. `restoredPrompt`, `settleRevertForNewPrompt` and `dropUndone` touch composer and session
- * state and stay with `:feature:session`.
+ * `actionableRunErrorID`, `runErrorActions`, `editableLastMessage` and `hidingUndone` call them.
+ * `restoredPrompt`, `settleRevertForNewPrompt` and `dropUndone` touch composer and session state
+ * and stay with `:feature:session`.
  */
 object RunErrorState {
     /**
@@ -56,7 +55,7 @@ object RunErrorState {
 
     /**
      * The last message the reader sent, when Edit can put it back in the composer whole: its words
-     * only (an image or file couldn't come back). [isVoiceHandoff] is iOS `VoiceHandoff.parse(text) != nil`.
+     * only (an image or file couldn't come back).
      */
     fun editableLastMessage(
         items: List<OpenCodeTranscriptItem>,
@@ -95,7 +94,7 @@ object RunErrorState {
     fun isUserItem(item: OpenCodeTranscriptItem): Boolean =
         item is OpenCodeTranscriptItem.UserText || item is OpenCodeTranscriptItem.UserImages || item is OpenCodeTranscriptItem.UserFiles
 
-    /** The MIME type of image bytes, by signature (iOS `imageMIME(for:)`); JPEG when unknown. */
+    /** The MIME type of image bytes, by signature; JPEG when unknown. */
     fun imageMIME(data: ByteArray): String {
         fun startsWith(vararg bytes: Int) = data.size >= bytes.size && bytes.indices.all { data[it] == bytes[it].toByte() }
         if (startsWith(0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)) return "image/png"

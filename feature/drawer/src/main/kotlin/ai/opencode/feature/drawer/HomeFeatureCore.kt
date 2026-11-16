@@ -14,8 +14,8 @@ import ai.opencode.feature.settings.onboarding.WelcomeFeature
 import ai.opencode.server.OpenCodeServerEvent
 
 /*
- * Port of iOS `HomeFeature+Core.swift`: Home's own reducer, routing each action to the area that
- * handles it, then absorbing shared drafts and persisting the snapshot after list-changing actions.
+ * Home's own reducer, routing each action to the area that handles it, then absorbing shared drafts
+ * and persisting the snapshot after list-changing actions.
  */
 
 internal fun HomeFeature.core(state: State, action: Action): Reduced<State, Action> {
@@ -235,7 +235,7 @@ private fun HomeFeature.coreRoute(state: State, action: Action): Reduced<State, 
     is Action.Settings -> {
         val reduced = reducePreferences(state, action.action)
         if (action.action == HomeSettingsFeature.Action.WelcomeOpened) {
-            // iOS `.settings(.welcomeOpened)`: Show Welcome, over Settings and Home.
+            // Show Welcome, over Settings and Home.
             Reduced(state.copy(welcome = WelcomeFeature.State(isPreview = true)))
         } else if (!action.action.switchesOffSessionLiveActivity) {
             reduced

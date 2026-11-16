@@ -1,11 +1,13 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
+import ai.opencode.core.strings.localized
 import ai.opencode.core.ui.appFormattingLocale
 import ai.opencode.server.OpenCodeClient
 import ai.opencode.server.OpenCodeClientError
@@ -19,22 +21,19 @@ import ai.opencode.server.model.OpenCodePendingRequests
 import ai.opencode.server.model.OpenCodePermissionReply
 import ai.opencode.server.model.OpenCodePermissionRequest
 import ai.opencode.server.replyForm
+import androidx.annotation.StringRes
 import kotlinx.coroutines.CancellationException
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
 
 /**
- * Port of iOS `RequestDockFeature` (`OpenCode/Composer/RequestAnswer.swift`): the pending
- * permissions and forms of a session, and the composer's bar while it answers one (D-31 B).
+ * The pending permissions and forms of a session, and the composer's bar while it answers one.
  *
- * [Draft] is the session's own composer (iOS `SessionFeature.State.DraftState`), parked in
- * [State.parkedComposer] while a request takes the composer's place. The session area owns
- * that type, so the dock carries it opaquely.
+ * [Draft] is the session's own composer, parked in [State.parkedComposer] while a request takes the
+ * composer's place. The session area owns that type, so the dock carries it opaquely.
  *
- * Like iOS, this reducer only handles the actions that touch the dock alone
- * (`reviewRequestSelected`, `questionPageChanged`, `formValueChanged`); the rest are the
- * session's (`SessionFeature+Requests.swift`), which calls [RequestReplies] for the reply
- * flows and [RequestAnswering] for the composer hand-over.
+ * The rest are the session's, which calls [RequestReplies] for the reply flows and
+ * [RequestAnswering] for the composer hand-over.
  */
 class RequestDockFeature<Draft> : Reducer<RequestDockFeature.State<Draft>, RequestDockFeature.Action> {
 
@@ -108,8 +107,8 @@ class RequestDockFeature<Draft> : Reducer<RequestDockFeature.State<Draft>, Reque
         /** What the request's error line leads with when its last reply or dismissal failed; null when its error is something else. */
         fun replyFailureTitle(id: String, isForm: Boolean): String? {
             return when (requestFailures[id]) {
-                RequestFailure.Dismissal, RequestFailure.SettledDismissal -> "Couldn’t dismiss request"
-                RequestFailure.Reply, RequestFailure.Settled -> if (isForm) "Couldn’t send answer" else "Couldn’t send reply"
+                RequestFailure.Dismissal, RequestFailure.SettledDismissal -> localized(R.string.composer_request_dismiss_failed)
+                RequestFailure.Reply, RequestFailure.Settled -> if (isForm) localized(R.string.composer_request_answer_failed) else localized(R.string.composer_request_reply_failed)
                 null -> null
             }
         }
@@ -276,7 +275,7 @@ class RequestDockFeature<Draft> : Reducer<RequestDockFeature.State<Draft>, Reque
             return next to (hadSelection && selected == null)
         }
 
-        // The composer hand-over (iOS `extension SessionFeature.State`, here over explicit inputs).
+        // The composer hand-over.
 
         /**
          * The composer becomes the answer: [composer] (what was typed) waits, and the bar
@@ -314,15 +313,14 @@ class RequestDockFeature<Draft> : Reducer<RequestDockFeature.State<Draft>, Reque
             return copy(parkedComposer = null, answerDrafts = emptyMap(), answerShownTarget = null, answerBarBaseline = "") to parked
         }
 
-        /** iOS `answerContext`, given the session's [RequestAnswering.wantsRequestDock]. */
+        /** Given the session's [RequestAnswering.wantsRequestDock]. */
         fun answerContext(wants: Boolean): AnswerContext = AnswerContext(wants, answerTarget)
 
         /**
-         * A pending-requests snapshot (iOS `pendingRequestsResponse` success): reconciles the
-         * fetched requests with the ones being answered or from owners the read didn't cover,
-         * seeds default answers, prunes, and keeps what's docked docked. [Reconciled.arrived]
-         * is whether new requests appeared (the session plays `.attention` when
-         * [RequestAnswering.announcesArrival] also holds).
+         * A pending-requests snapshot: reconciles the fetched requests with the ones being answered
+         * or from owners the read didn't cover, seeds default answers, prunes, and keeps what's
+         * docked docked. [Reconciled.arrived] is whether new requests appeared (the session plays
+         * `.attention` when [RequestAnswering.announcesArrival] also holds).
          */
         fun reconciled(
             requests: OpenCodePendingRequests,
@@ -342,7 +340,7 @@ class RequestDockFeature<Draft> : Reducer<RequestDockFeature.State<Draft>, Reque
                 }
             }
             val forms = reconcile(requests.forms, formRequests, { it.id }, { it.sessionID })
-            // iOS `restorePersistedAnswers` runs before the defaults fill in what's left.
+            // Restores persisted answers before the defaults fill in what's left.
             var next = restoring(
                 copy(
                     requestLoadAttempt = null,
@@ -365,12 +363,11 @@ class RequestDockFeature<Draft> : Reducer<RequestDockFeature.State<Draft>, Reque
         }
     }
 
-    /** iOS `SessionFeature.State.AnswerContext`. */
     data class AnswerContext(val wants: Boolean, val target: String?)
 
     /**
      * A snapshot applied. [arrived]: new requests appeared. [clearedSelection]: the selected
-     * request left, so the session closes the requests sheet if it's open (iOS `pruneRequests`).
+     * request left, so the session closes the requests sheet if it's open.
      */
     data class Reconciled<Draft>(val state: State<Draft>, val arrived: Boolean, val clearedSelection: Boolean)
 
@@ -436,7 +433,7 @@ class RequestDockFeature<Draft> : Reducer<RequestDockFeature.State<Draft>, Reque
 }
 
 /**
- * What the composer's bar does while a pending request docks above it (D-31 B): its text is
+ * What the composer's bar does while a pending request docks above it: its text is
  * your own answer, or the reason a decline carries.
  */
 sealed interface RequestBar {
@@ -451,19 +448,22 @@ sealed interface RequestBar {
         override val isLast: Boolean get() = true
     }
 
-    enum class Verb(val title: String) {
-        Deny("Deny"),
-        Dismiss("Dismiss"),
+    enum class Verb(@StringRes private val titleRes: Int) {
+        Deny(R.string.composer_request_deny),
+        Dismiss(CoreR.string.common_dismiss),
+        ;
+
+        val title: String get() = localized(titleRes)
     }
 
     val placeholder: String
         get() = when (this) {
-            is Answer -> if (multiple) "Add your own" else "Answer in your own words"
-            is Choose, is Decline -> "Tell it what to do instead"
+            is Answer -> if (multiple) localized(R.string.composer_review_add_own_placeholder) else localized(R.string.composer_review_own_words_placeholder)
+            is Choose, is Decline -> localized(R.string.composer_request_decline_placeholder)
         }
 
     /** The field's accessibility label. */
-    val fieldLabel: String get() = if (this is Answer) "Your answer" else "Reason"
+    val fieldLabel: String get() = if (this is Answer) localized(R.string.composer_review_answer_description) else localized(R.string.composer_request_reason_description)
 
     val isReady: Boolean
         get() = when (this) {
@@ -475,10 +475,7 @@ sealed interface RequestBar {
     val isLast: Boolean
 }
 
-/**
- * The `extension SessionFeature.State` parts of `RequestAnswer.swift` as pure functions over
- * the session's values (the session area wires them).
- */
+/** Pure functions over the session's values (the session area wires them). */
 object RequestAnswering {
     /**
      * A pending request takes the composer once any dictation into the message has finished. A
@@ -504,7 +501,7 @@ object RequestAnswering {
      */
     fun takesPasteAttachments(isAnsweringRequest: Boolean): Boolean = !isAnsweringRequest
 
-    /** iOS `SessionFeature.pruneAnswerDrafts(_:to:)`: bar drafts are keyed by request or "request/field" (`answerTarget`). */
+    /** Bar drafts are keyed by request or "request/field" (`answerTarget`). */
     fun pruneAnswerDrafts(drafts: Map<String, String>, live: Set<String>): Map<String, String> {
         fun isLive(key: String): Boolean {
             if (key in live) return true
@@ -518,7 +515,7 @@ object RequestAnswering {
     fun isOnlyReturn(text: String, returnKeySends: Boolean, nonSendNewlineDraft: String?, dock: RequestDockFeature.State<*>): Boolean =
         returnKeySends && nonSendNewlineDraft != text && dock.isOnlyReturn(text)
 
-    /** iOS `clearEditedUndoDraft`: whether an undo snapshot no longer matches the composer and should drop. */
+    /** Whether an undo snapshot no longer matches the composer and should drop. */
     fun clearsEditedUndoDraft(current: String, restoredDraft: String?): Boolean = restoredDraft != null && current != restoredDraft
 
     /**
@@ -531,9 +528,8 @@ object RequestAnswering {
 }
 
 /**
- * The reply flows of iOS `SessionFeature+Requests.swift` over the dock's state, so the session
- * reducer only supplies the server and the session's location (iOS `effectiveDirectory`,
- * sent as `location[directory]` for global and MCP forms).
+ * The reply flows over the dock's state, so the session reducer only supplies the server and the
+ * session's location.
  */
 object RequestReplies {
     private fun <D> canRespond(state: RequestDockFeature.State<D>, id: String): Boolean =
@@ -712,7 +708,7 @@ object RequestReplies {
             } catch (error: OpenCodeClientError) {
                 error
             } catch (error: Exception) {
-                OpenCodeClientError(error.message ?: "The request failed")
+                OpenCodeClientError(error.message ?: localized(R.string.composer_request_failed))
             }
             send(RequestDockFeature.Action.ResponseFinished(sessionID, requestID, error, dismissal))
         }
@@ -720,6 +716,6 @@ object RequestReplies {
     }
 }
 
-/** Swift's `Double.formatted()` for a typed number: grouped, in the app's formatting locale. */
+/** Grouped, in the app's formatting locale. */
 private fun formattedNumber(value: Double): String =
     DecimalFormat("#,##0.######", DecimalFormatSymbols.getInstance(appFormattingLocale())).format(value)

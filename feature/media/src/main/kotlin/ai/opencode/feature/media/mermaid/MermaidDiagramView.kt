@@ -1,5 +1,6 @@
 package ai.opencode.feature.media
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.dependencies.PasteboardClient
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
@@ -55,6 +56,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -76,7 +78,6 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/** Port of iOS `MermaidDiagramCard`'s constants and sizing. */
 object MermaidDiagramMetrics {
     val maxHeight: Dp = 360.dp
     val placeholderHeight: Dp = 180.dp
@@ -88,7 +89,7 @@ object MermaidDiagramMetrics {
         return Size((natural.width * scale).roundToInt().toFloat(), (natural.height * scale).roundToInt().toFloat())
     }
 
-    /** Whether a completed diagram render alters the laid-out height from [laidOutSize] (iOS `MermaidDiagramCard.revisesRow`). */
+    /** Whether a completed diagram render alters the laid-out height from [laidOutSize]. */
     fun revisesRow(laidOutSize: Size?, renderedSize: Size): Boolean {
         if (laidOutSize == null) return true
         return abs(laidOutSize.width - renderedSize.width) >= 0.5f || abs(laidOutSize.height - renderedSize.height) >= 0.5f
@@ -97,11 +98,11 @@ object MermaidDiagramMetrics {
 
 /**
  * A finished Mermaid block as a card showing the diagram at its natural aspect, at most
- * [MermaidDiagramMetrics.maxHeight] tall. It holds a steady height while the diagram renders
- * (its final one once Pele has sized the source), marking its row revised before any change,
- * opens full screen (zoomable, sharp) on a tap, and shows its source from the hold menu. A
- * diagram Pele rejects shows as the code it is; one whose render was interrupted is tried once
- * more, then shows the code until it appears again or is tapped. Port of iOS `MermaidDiagramCard`.
+ * [MermaidDiagramMetrics.maxHeight] tall. It holds a steady height while the diagram renders (its
+ * final one once Pele has sized the source), marking its row revised before any change, opens full
+ * screen (zoomable, sharp) on a tap, and shows its source from the hold menu. A diagram Pele
+ * rejects shows as the code it is; one whose render was interrupted is tried once more, then shows
+ * the code until it appears again or is tapped.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -141,6 +142,12 @@ fun MermaidDiagramCard(
     val naturalSize: Size? = natural?.takeIf { it.first == diagramKey }?.second
         ?: renderer.naturalSize(source, theme)
     val hasFailed = failed == diagramKey || renderer.cachedFailure(source, theme)
+    val previewLabel = stringResource(R.string.media_mermaid_preview_label, diagramType)
+    val viewerScreenName = stringResource(R.string.media_mermaid_viewer_screen_title)
+    val retryLabel = stringResource(CoreR.string.common_retry)
+    val diagramDescription = stringResource(R.string.media_mermaid_diagram_description)
+    val loadingState = stringResource(R.string.media_mermaid_loading_state, diagramType)
+    val viewSourceLabel = stringResource(R.string.media_mermaid_view_source)
 
     fun retry() {
         row.revised()
@@ -154,13 +161,13 @@ fun MermaidDiagramCard(
             val full = runCatching {
                 renderer.viewerImage(source, theme, density, configuration.screenWidthDp.toFloat(), configuration.screenHeightDp.toFloat())
             }.getOrNull() ?: return@launch
-            onPreview(TranscriptImagePreview(mediaID, full, "Diagram, $diagramType"))
+            onPreview(TranscriptImagePreview(mediaID, full, previewLabel, labelIsPlaceholder = true))
         }
     }
 
     fun showSource() {
         focusManager.clearFocus()
-        presenter?.present(sourceID = mediaID, isMedia = false, reducesMotion = reduceMotion, screenName = "Diagram Viewer") { viewer ->
+        presenter?.present(sourceID = mediaID, isMedia = false, reducesMotion = reduceMotion, screenName = viewerScreenName) { viewer ->
             MermaidSourceView(source, viewer)
         }
     }
@@ -171,7 +178,7 @@ fun MermaidDiagramCard(
             source,
             modifier
                 .clickable(onClick = ::retry)
-                .semantics { customActions = listOf(CustomAccessibilityAction("Retry") { retry(); true }) },
+                .semantics { customActions = listOf(CustomAccessibilityAction(retryLabel) { retry(); true }) },
         )
         else -> BoxWithConstraints(modifier.fillMaxWidth()) {
             val width = maxWidth.value
@@ -200,11 +207,11 @@ fun MermaidDiagramCard(
                         },
                     )
                     .clearAndSetSemantics {
-                        contentDescription = "Diagram"
-                        stateDescription = if (!isRendered) "$diagramType, loading" else diagramType
+                        contentDescription = diagramDescription
+                        stateDescription = if (!isRendered) loadingState else diagramType
                         role = Role.Button
                         onClick { open(); true }
-                        customActions = listOf(CustomAccessibilityAction("View Source") { showSource(); true })
+                        customActions = listOf(CustomAccessibilityAction(viewSourceLabel) { showSource(); true })
                     }
                     .testTag("mermaid-diagram"),
                 contentAlignment = Alignment.Center,
@@ -223,7 +230,7 @@ fun MermaidDiagramCard(
                 }
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }, properties = ai.opencode.feature.media.liftMenuProperties()) {
                     DropdownMenuItem(
-                        text = { Text("View Source") },
+                        text = { Text(viewSourceLabel) },
                         leadingIcon = { OpenCodeIcon("chevron.left.forwardslash.chevron.right", contentDescription = null) },
                         onClick = {
                             menuOpen = false
@@ -276,7 +283,7 @@ fun MermaidDiagramCard(
     }
 }
 
-/** The diagram as the code it is: a highlighted, horizontally scrolling band (iOS `MarkdownBand`). */
+/** The diagram as the code it is: a highlighted, horizontally scrolling band. */
 @Composable
 private fun MermaidCode(source: String, modifier: Modifier = Modifier) {
     val palette = SyntaxHighlighter.Palette.current
@@ -293,11 +300,11 @@ private fun MermaidCode(source: String, modifier: Modifier = Modifier) {
     }
 }
 
-/** iOS `TranscriptMetrics.codeFont`: subheadline, monospaced. */
+/** Subheadline, monospaced. */
 @Composable
 private fun codeStyle() = OpenCodeTextStyles.subheadline.copy(fontFamily = OpenCodeFonts.monospace)
 
-/** A diagram's Mermaid source, highlighted and selectable (iOS `MermaidSourceView`). */
+/** A diagram's Mermaid source, highlighted and selectable. */
 @Composable
 private fun MermaidSourceView(source: String, viewer: MediaViewerState) {
     val scope = rememberCoroutineScope()
@@ -312,16 +319,16 @@ private fun MermaidSourceView(source: String, viewer: MediaViewerState) {
                     scope.launch { pasteboard.setString(source) }
                 }) {
                     OpenCodeIcon("doc.on.doc", contentDescription = null, size = 18.dp)
-                    Text("Copy", Modifier.padding(start = 6.dp))
+                    Text(stringResource(CoreR.string.common_copy), Modifier.padding(start = 6.dp))
                 }
                 Text(
-                    "Diagram Source",
+                    stringResource(R.string.media_mermaid_source_title),
                     style = OpenCodeTextStyles.headline,
                     modifier = Modifier.weight(1f).semantics { },
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     fontWeight = FontWeight.SemiBold,
                 )
-                TextButton(onClick = { viewer.dismiss() }) { Text("Done") }
+                TextButton(onClick = { viewer.dismiss() }) { Text(stringResource(CoreR.string.common_done)) }
             }
             Box(
                 Modifier

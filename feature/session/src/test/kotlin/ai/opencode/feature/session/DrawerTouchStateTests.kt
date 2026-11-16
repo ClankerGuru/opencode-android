@@ -10,10 +10,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Port of iOS `DrawerTouchStateTests.swift`, the page stack's case (the drawer's cases live in
- * `:feature:drawer`'s `DrawerTouchStateTests`).
- */
 class DrawerTouchStateTests {
     @Test
     fun aBackDragCaughtMidPopLetsThePopLand() = runTest {

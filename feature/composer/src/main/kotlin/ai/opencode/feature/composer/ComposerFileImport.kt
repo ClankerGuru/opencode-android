@@ -24,20 +24,16 @@ import java.util.Locale
 import java.util.UUID
 
 /**
- * Where a composer file comes from (iOS `ComposerFileSource`). Every source ends as a private
- * staged copy the upload streams from.
- *
- * Android: Files-picker documents, dropped `ClipData` items and transcript files all arrive as
- * content (or file) [Uri]s, so iOS's `.url` and `.itemProvider` cases are both [Url].
+ * Where a composer file comes from. Every source ends as a private staged copy the upload streams
+ * from. Pickers, drops and transcript files all arrive as [Uri]s.
  */
 sealed interface ComposerFileSource {
     /** From the Files picker (`ACTION_OPEN_DOCUMENT`) or a dropped file. */
     data class Url(val uri: Uri) : ComposerFileSource
 
     /**
-     * A video picked in the system photo picker. The staged file takes [id], so the picker
-     * can find its chip again when the video is deselected. (iOS `ComposerMovieFile` copies
-     * Photos' temporary movie before it goes away; a picker URI is read the same way.)
+     * A video picked in the system photo picker. The staged file takes [id], so the picker can find
+     * its chip again when the video is deselected.
      */
     data class PhotosPickerItem(val uri: Uri, val id: UUID = UUID.randomUUID()) : ComposerFileSource
 }
@@ -47,9 +43,8 @@ object ComposerFileRouting {
     private val inlineImageMimes = setOf("image/png", "image/jpeg", "image/gif", "image/webp", "image/heic", "image/heif")
 
     /**
-     * Image files from Files keep the inline image path (re-encoded like photos); everything
-     * else uploads. iOS reads the extension's `UTType`; a content URI has no extension, so
-     * its display name or resolver MIME type decides.
+     * Image files from Files keep the inline image path (re-encoded like photos); everything else
+     * uploads. A content URI has no extension, so its display name or MIME type decides.
      */
     fun isInlineImage(name: String, mime: String? = null): Boolean {
         val type = mime?.lowercase(Locale.ROOT)
@@ -62,9 +57,8 @@ object ComposerFileRouting {
 }
 
 /**
- * Stages picked files off the main thread (iOS `ComposerFileImporter`). Unlike image imports,
- * file imports don't supersede one another; each finishes on its own. [isLoading] is
- * Compose state, so views observe it like iOS's `@Observable`.
+ * Stages picked files off the main thread. File imports don't supersede one another. [isLoading] is
+ * Compose state.
  */
 class ComposerFileImporter(private val scope: CoroutineScope) {
     private var active by mutableIntStateOf(0)
@@ -124,11 +118,7 @@ internal object ComposerContentInfo {
     }
 }
 
-/**
- * Copies a content `Uri` into `:core`'s [ComposerFileStaging] folder (iOS `ComposerFileStaging.stage(_:)`
- * reads a URL; Android pickers hand out `Uri`s). Everything else (bytes, bounded copies, verify,
- * rename, discard) is `:core`'s `ComposerFileStaging`.
- */
+/** Copies a content `Uri` into `:core`'s [ComposerFileStaging] folder, which does the rest. */
 object ComposerUriStaging {
     /**
      * Copies [source] into a fresh per-file directory that keeps the original name. Blocking:
@@ -162,11 +152,8 @@ object ComposerUriStaging {
 }
 
 /**
- * The system pickers behind the + menu's Files and Photos (iOS `.fileImporter(allowedContentTypes:
- * [.item], allowsMultipleSelection: true)` and `PhotosPicker`). Activity results need an
- * Activity, so the screen launches these intents (`ActivityResultContracts.StartActivityForResult`)
- * and hands [uris] of the result to `ComposerFileRouting` / [ComposerFileImporter] /
- * `ComposerImageImporter`, the same routing as iOS's `importPickedFiles`.
+ * The system pickers behind the + menu's Files and Photos. Activity results need an Activity, so
+ * the screen launches these intents and routes the result [uris].
  */
 object ComposerPickers {
     /** Files: any document, several at once. */
@@ -194,7 +181,7 @@ object ComposerPickers {
         return listOfNotNull(data.data)
     }
 
-    /** iOS `InlinePhotoSelection.isVideo`: a picked item whose type is a movie. */
+    /** A picked item whose type is a movie. */
     fun isVideo(uri: Uri, context: Context = dependency(AppContext)): Boolean =
         context.contentResolver.getType(uri)?.startsWith("video/") == true
 }

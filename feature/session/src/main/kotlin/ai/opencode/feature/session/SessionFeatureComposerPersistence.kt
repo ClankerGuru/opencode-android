@@ -21,12 +21,11 @@ import ai.opencode.feature.composer.reconcilePersistedSession
 import ai.opencode.feature.composer.restorePersistedAnswers
 import ai.opencode.feature.composer.RequestDockFeature
 
-// Port of the `extension SessionFeature` / `extension SessionFeature.State` half of iOS
-// `Composer/ComposerPersistence.swift`. The client, records and the pure logic are
-// `:feature:composer`'s (`ComposerPersistence`, `ComposerPersistenceIntegration.kt`); these members
-// read and write `SessionFeature.State`, so they live here.
+// The client, records and the pure logic are `:feature:composer`'s (`ComposerPersistence`,
+// `ComposerPersistenceIntegration.kt`); these members read and write `SessionFeature.State`, so
+// they live here.
 
-/** iOS `persistedComposerWatch`: the session's draft and where it belongs. */
+/** The session's draft and where it belongs. */
 val State.persistedComposerWatch: PersistedComposerWatch
     get() = PersistedComposerWatch.of(
         serverID = server.persistenceID,
@@ -36,14 +35,14 @@ val State.persistedComposerWatch: PersistedComposerWatch
         composer = sessionComposer,
     )
 
-/** iOS `reconcilePersistedComposer(from:in:)`: saves the composer as it changes. */
+/** Saves the composer as it changes. */
 internal fun SessionFeature.reconcilePersistedComposer(old: PersistedComposerWatch, state: State): Reduced<State, Action> {
     if (!state.readsOnView) return Reduced(state)
     composerPersistence.reconcilePersistedComposer(old, state.persistedComposerWatch, state.sessionComposer)
     return Reduced(state)
 }
 
-/** iOS `persistedSessionWatch`: the screen's waiting model pick and request answers. */
+/** The screen's waiting model pick and request answers. */
 val State.persistedSessionWatch: PersistedSessionWatch
     get() {
         val knowsRequests = requestDock.permissionRequests.isNotEmpty() || requestDock.formRequests.isNotEmpty()
@@ -66,26 +65,26 @@ val State.persistedSessionWatch: PersistedSessionWatch
         )
     }
 
-/** iOS `reconcilePersistedSession(from:in:)`: the same screen's pick or answers changed. */
+/** The same screen's pick or answers changed. */
 internal fun SessionFeature.reconcilePersistedSession(old: PersistedSessionWatch, state: State): Reduced<State, Action> {
     composerPersistence.reconcilePersistedSession(old, state.persistedSessionWatch)
     return Reduced(state)
 }
 
-/** iOS `restorePersistedAnswers(_:)`: requests that just arrived take back the answers saved before a relaunch. */
+/** Requests that just arrived take back the answers saved before a relaunch. */
 internal fun SessionFeature.restoringPersistedAnswers(
     dock: RequestDockFeature.State<DraftState>,
     state: State,
 ): RequestDockFeature.State<DraftState> =
     composerPersistence.restorePersistedAnswers(dock, state.server.persistenceID, state.session, state.readsOnView)
 
-/** iOS `persistedDraftDirectory(for:isRetry:in:)`: where a retried draft send creates its session. */
+/** Where a retried draft send creates its session. */
 internal fun SessionFeature.persistedDraftDirectory(messageID: String, isRetry: Boolean, state: State): String? =
     persistedDraftDirectory(messageID, isRetry, state.server.persistenceID, promptOutbox, composerPersistence)
 
 /**
- * iOS `restorePersistedComposer(_:)`: binds the outbox and failed sends to persistence, restores
- * the screen's saved draft, and seeds sends a previous process left unsent into the outbox.
+ * Binds the outbox and failed sends to persistence, restores the screen's saved draft, and seeds
+ * sends a previous process left unsent into the outbox.
  */
 internal fun SessionFeature.restorePersistedComposer(state: State): State {
     val restore = restorePersistedComposer(
@@ -118,7 +117,7 @@ internal fun SessionFeature.restorePersistedComposer(state: State): State {
     return next
 }
 
-/** iOS `restoredDeliveryJob(for:in:)`: the entry's session, or a new one in its directory, reconciling first. */
+/** The entry's session, or a new one in its directory, reconciling first. */
 private fun SessionFeature.restoredDeliveryJob(
     @Suppress("UNUSED_PARAMETER") entry: RestoredOutboxEntry,
     sessionID: String?,
@@ -139,7 +138,7 @@ private fun SessionFeature.restoredDeliveryJob(
     )
 }
 
-/** iOS `syncAndFlushPersistedComposer(_:)`: saves the composer now and writes it at once (backgrounding). */
+/** Saves the composer now and writes it at once (backgrounding). */
 internal fun SessionFeature.syncAndFlushPersistedComposer(state: State): Effect<Action> {
     if (state.readsOnView) {
         val current = state.persistedComposerWatch
@@ -151,23 +150,21 @@ internal fun SessionFeature.syncAndFlushPersistedComposer(state: State): Effect<
 }
 
 /**
- * iOS `familyDrafts`: a family member's draft, in composer persistence while the screen reads on
- * view, else in [State.catchUpFamilyDrafts] (a Catch Up card). Write back with [withFamilyDrafts].
+ * A family member's draft, in composer persistence while the screen reads on view, else in
+ * [State.catchUpFamilyDrafts] (a Catch Up card). Write back with [withFamilyDrafts].
  */
 val State.familyDrafts: FamilyDrafts
     get() = FamilyDrafts(server.persistenceID, readsOnView, catchUpFamilyDrafts, dependency(ComposerPersistence))
 
-/** iOS `familyDrafts` (set). */
 fun State.withFamilyDrafts(value: FamilyDrafts): State = copy(catchUpFamilyDrafts = value.catchUpDrafts)
 
-/** iOS `familyDrafts[sessionID] = value`. */
 fun State.settingFamilyDraft(sessionID: String, value: DraftState?): State {
     val drafts = familyDrafts
     drafts[sessionID] = value
     return withFamilyDrafts(drafts)
 }
 
-/** iOS `applyPersistedDraft(_:)`: the saved draft, and a draft's saved project. */
+/** The saved draft, and a draft's saved project. */
 fun State.applyPersistedDraft(restored: RestoredComposerDraft): State {
     var next = restoreDraft(restored.draft)
     val project = restored.project

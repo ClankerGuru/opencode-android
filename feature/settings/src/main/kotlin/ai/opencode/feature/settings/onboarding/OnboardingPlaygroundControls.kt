@@ -55,8 +55,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 /**
- * Port of iOS `Settings/Onboarding/OnboardingPlaygroundControls.swift`.
- *
  * The playground's control bar: Material controls on the field, nothing behind them. Every
  * button interrupts whatever is running.
  */
@@ -128,7 +126,7 @@ internal fun OnboardingPlaygroundControls(
     }
 }
 
-/** What the simulated server does with the next code (iOS's “Server” menu). */
+/** What the simulated server does with the next code. */
 @Composable
 private fun FailureMenu(failure: Failure?, onChange: (Failure?) -> Unit) {
     var expanded by remember { mutableStateOf(false) }

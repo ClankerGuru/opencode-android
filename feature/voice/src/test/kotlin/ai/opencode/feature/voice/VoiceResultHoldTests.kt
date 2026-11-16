@@ -11,10 +11,8 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `VoiceResultHoldTests`. How long a result waits so it doesn't
- * cut anyone off, on a test clock: a loaded machine stretching a pause can't
- * change what the call does (the real clock failed these in train smoke runs
- * on Oct 25).
+ * How long a result waits so it doesn't cut anyone off, on a test clock: a loaded machine
+ * stretching a pause can't change what the call does.
  */
 class VoiceResultHoldTests {
     private val result = "The session “Upload” finished the work you started there. Its reply: All tests pass."
@@ -244,11 +242,10 @@ class VoiceResultHoldTests {
     )
 
     /**
-     * Kit's Oct 30 call (632.5–655.8 s): a result arrived 2.5 s into a long
-     * dictation, was held 450 ms past each transcript fragment and at most
-     * 5 s, went out 1.5 s into a pause, and the voice agent talked over him
-     * for 9 s. Now it waits until he has been quiet for 2 s, however long
-     * he talks, through pauses the transcript has no words for.
+     * A result arrived 2.5 s into a long dictation, was held 450 ms past each transcript fragment
+     * and at most 5 s, went out 1.5 s into a pause, and the voice agent talked over him for 9 s.
+     * Now it waits until he has been quiet for 2 s, however long he talks, through pauses the
+     * transcript has no words for.
      */
     @Test fun aResultDuringDictationWaitsUntilTheUserHasFinished() = runTest {
         val call = turnTaking()

@@ -4,9 +4,6 @@ import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.ImmediateClock
 import ai.opencode.core.dependencies.UuidClient
-import ai.opencode.core.sharing.ExperimentalFeature
-import ai.opencode.core.sharing.ExperimentalFeatures
-import ai.opencode.core.sharing.experimental
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.Store
 import ai.opencode.core.store.TestStore
@@ -49,10 +46,9 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /**
- * Port of iOS `SessionFeatureTests+AgentSelection.swift`: Agent Selection (experimental, OC-511).
- * iOS's `resetAgentKeys()` has no counterpart: each test's shared keys live in its own in-memory
- * store. `Shared` values aren't compared by the store, so iOS's `$sessionAgents.withLock` asserts
- * are checked on the shared value after the step.
+ * Agent Selection. Each test's shared keys live in its own in-memory store. `Shared`
+ * values aren't compared by the store, so their asserts are checked on the shared value after the
+ * step.
  */
 class SessionFeatureTestsAgentSelection {
     private val agents = listOf(
@@ -66,13 +62,11 @@ class SessionFeatureTestsAgentSelection {
      */
     private fun Harness.agentStore(
         state: State,
-        enabled: Boolean = true,
         calls: LockIsolated<List<String>>,
         refuseAgent: Boolean = false,
     ): TestStore<State, Action> = store(state) {
         this[UuidClient] = UuidClient.incrementing()
         this[Clock] = ImmediateClock()
-        this[ExperimentalFeatures] = if (enabled) ExperimentalFeatures.enabling(setOf(ExperimentalFeature.agentSelection)) else ExperimentalFeatures.enabling(emptySet())
         this[OpenCodeClient] = this[OpenCodeClient].copy(
             switchAgent = { _, sessionID, agent ->
                 calls.append("agent $sessionID $agent")
@@ -128,7 +122,6 @@ class SessionFeatureTestsAgentSelection {
         val agents = agents
         val store = h.store(h.makeState(session = agentSession())) {
             this[Clock] = ImmediateClock()
-            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.agentSelection))
             this[OpenCodeClient] = this[OpenCodeClient].copy(
                 primaryAgents = { _, _ ->
                     tries.increment()
@@ -154,7 +147,6 @@ class SessionFeatureTestsAgentSelection {
         val agents = agents
         val store = h.store(h.makeState(session = agentSession())) {
             this[Clock] = ImmediateClock()
-            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.agentSelection))
             this[OpenCodeClient] = this[OpenCodeClient].copy(
                 primaryAgents = { _, _ ->
                     asked.increment()
@@ -171,12 +163,34 @@ class SessionFeatureTestsAgentSelection {
         assertEquals("Listed once for the folder", 1, asked.value)
     }
 
+    /** A change to the server's agents lists them again, even for a folder already listed. */
+    @Test fun anAgentsChangeListsAgentsAgain() = sessionTest { h ->
+        val asked = LockIsolated(0)
+        val first = agents.take(1)
+        val all = agents
+        val store = h.store(h.makeState(session = agentSession())) {
+            this[Clock] = ImmediateClock()
+            this[OpenCodeClient] = this[OpenCodeClient].copy(
+                primaryAgents = { _, _ -> if (asked.increment() == 1) first else all },
+            )
+        }
+        store.send(Action.AgentsRequested)
+        store.receive({ it is Action.AgentsResponse && it.result.isSuccess }, "agentsResponse.success") {
+            it.withPrimaryAgents(first).listed()
+        }
+        store.send(Action.AgentsChanged) { it.copy(agentSelection = it.agentSelection.copy(listedDirectory = null)) }
+        store.receive(Action.AgentsRequested)
+        store.receive({ it is Action.AgentsResponse && it.result.isSuccess }, "agentsResponse.success") {
+            it.withPrimaryAgents(all).listed()
+        }
+        assertEquals(2, asked.value)
+    }
+
     /** After the last try the failure is reported once, not retried forever. */
     @Test fun agentsRequestGivesUpAfterTheLastTry() = sessionTest { h ->
         val tries = LockIsolated(0)
         val store = h.store(h.makeState(session = agentSession())) {
             this[Clock] = ImmediateClock()
-            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.agentSelection))
             this[OpenCodeClient] = this[OpenCodeClient].copy(
                 primaryAgents = { _, _ ->
                     tries.increment()
@@ -191,7 +205,7 @@ class SessionFeatureTestsAgentSelection {
 
     /**
      * Moving a new session's draft to another project lists that project's
-     * agents, not the ones of the project it started in (TestFlight build 702).
+     * agents, not the ones of the project it started in.
      */
     @Test fun aDraftMovedToAnotherProjectListsThatProjectsAgents() = sessionTest { h ->
         val first = OpenCodeProject(id = "p1", name = "one", directory = "/srv/one")
@@ -204,7 +218,6 @@ class SessionFeatureTestsAgentSelection {
         }
         val store = h.store(state) {
             this[Clock] = ImmediateClock()
-            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.agentSelection))
             this[OpenCodeClient] = this[OpenCodeClient].copy(
                 primaryAgents = { _, directory ->
                     asked.append(directory)
@@ -305,7 +318,8 @@ class SessionFeatureTestsAgentSelection {
         val calls = LockIsolated(listOf<String>())
         val state = h.makeState(session = agentSession(), draft = "hello")
         state.agentSelection.sessionAgents.set(mapOf("ses_1" to "plan"))
-        val store = h.agentStore(state, enabled = false, calls = calls)
+        state.agentSelection.isEnabled.set(false)
+        val store = h.agentStore(state, calls = calls)
         store.send(Action.AgentsRequested)
         store.send(Action.SendTapped) { it.expectOptimisticSend() }
         store.receive(Action.PromptAdmitted(sessionID = "ses_1", messageID = sentID, requestEpoch = 1)) { it.admitted() }
@@ -408,14 +422,12 @@ class AgentSelectionComposerTests {
 
     @Test fun switchingServersFromADraftListsTheNewServersAgents() {
         val values = DependencyValues.testing().update {
-            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.agentSelection))
             this[OpenCodeClient] = this[OpenCodeClient].copy(primaryAgents = { server, _ ->
                 val id = if (server == testServer) "build" else "review"
                 listOf(OpenCodeAutocompleteAgent(id = id, name = id, mode = "primary"))
             })
         }
         DependencyValues.withValues(values) {
-            shared(experimental(ExperimentalFeature.agentSelection)).set(true)
             val draft = State.draft(testServer, null, emptyList(), visit = 1)
             val store = Store(draft, SessionFeature(), dependencies = values)
             val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup()

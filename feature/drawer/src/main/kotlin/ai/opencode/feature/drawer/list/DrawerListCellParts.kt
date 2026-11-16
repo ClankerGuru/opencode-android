@@ -80,14 +80,13 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-// The pieces of a drawer session row (iOS `DrawerListCellParts.swift`).
+// The pieces of a drawer session row.
 
-/** The drawer's row fonts (iOS `DrawerListFonts`). */
+/** The drawer's row fonts. */
 object DrawerListFonts {
     /**
-     * A text style at a weight. iOS steps the weight up itself under Bold Text; Android's
-     * Bold Text (`Configuration.fontWeightAdjustment`) is applied by Compose's font
-     * resolution, so it isn't added again here.
+     * A text style at a weight. Android's Bold Text (`Configuration.fontWeightAdjustment`) is
+     * applied by Compose's font resolution, so it isn't added again here.
      */
     fun font(style: TextStyle, weight: FontWeight): TextStyle = style.copy(fontWeight = weight)
 
@@ -97,24 +96,22 @@ object DrawerListFonts {
         return font(style.font, resolved)
     }
 
-    /** Tabular figures (iOS `kMonospacedNumbersSelector`). */
+    /** Tabular figures. */
     fun monospacedDigits(style: TextStyle): TextStyle = style.copy(fontFeatureSettings = "tnum")
 }
 
 /**
- * The Working ring (iOS `DrawerListActivityRing`): an open arc (72 % of the circle, 1.8 dp,
- * round caps) with a fading tail, turned once every 0.8 s in the draw phase (no recomposition or
- * positional layer invalidation per frame). Pass `isSpinning = running && !reduceMotion`: it stops
- * under reduce motion and while the drawer is hidden. [opaqueTail] (high contrast) draws the tail
- * at full strength. Size it with [modifier].
+ * The Working ring: an open arc (72 % of the circle, 1.8 dp, round caps) with a fading tail, turned
+ * once every 0.8 s in the draw phase (no recomposition or positional layer invalidation per frame).
+ * Pass `isSpinning = running && !reduceMotion`: it stops under reduce motion and while the drawer
+ * is hidden. [opaqueTail] (high contrast) draws the tail at full strength. Size it with [modifier].
  */
 @Composable
 fun DrawerListActivityRing(isSpinning: Boolean, opaqueTail: Boolean, modifier: Modifier = Modifier) {
     val color = OpenCodeTheme.colors.secondaryText
     val tail = if (opaqueTail) color else color.copy(alpha = 0f)
-    // Half an ambient sweep per turn (iOS 03adf07a: `AmbientClock`, so every ring turns in step).
-    // A hidden drawer's ring holds still: no frame ticks for a drawer nobody sees; nor does it
-    // while TalkBack explores by touch (W-06).
+    // Half an ambient sweep per turn (`AmbientClock`, so every ring turns in step). Holds still
+    // while the drawer is hidden or TalkBack explores by touch.
     val hidden = LocalDrawerHidden.current.value
     val spins = isSpinning && !hidden && !rememberTouchExplorationEnabled()
     val rotation = remember { mutableFloatStateOf(0f) }
@@ -147,12 +144,12 @@ fun DrawerListActivityRing(isSpinning: Boolean, opaqueTail: Boolean, modifier: M
     }
 }
 
-/** Metrics of the project tile (iOS `DrawerListProjectTile` statics). */
+/** Metrics of the project tile. */
 object DrawerListProjectTile {
     /**
-     * The tile's side at the current font scale: a little larger from XXXL. iOS steps by
-     * content size category; these are the categories' body sizes over Large (17 pt):
-     * XXXL 23 (≈1.35), AX Medium 28 (≈1.65), AX Extra Large 40 (≈2.35).
+     * The tile's side at the current font scale: a little larger from XXXL. These are the content
+     * size categories' body sizes over Large (17 pt): XXXL 23 (≈1.35), AX Medium 28 (≈1.65), AX
+     * Extra Large 40 (≈2.35).
      */
     fun side(base: Dp, fontScale: Float): Dp = when {
         fontScale >= 40f / 17f -> base + 4.dp
@@ -163,9 +160,9 @@ object DrawerListProjectTile {
 }
 
 /**
- * The project's icon to show: the cached one at once, else the initial tile until loading
- * brings one (iOS's tile asked `ProjectIconClient` cached first, then loaded). Loading runs in
- * [ProjectIconClient]'s own scope; leaving composition stops observing, not the shared fetch.
+ * The project's icon to show: the cached one at once, else the initial tile until loading brings
+ * one. Loading runs in [ProjectIconClient]'s own scope; leaving composition stops observing, not
+ * the shared fetch.
  */
 @Composable
 fun rememberProjectIcon(
@@ -181,8 +178,8 @@ fun rememberProjectIcon(
 }
 
 /**
- * The project tile leading a drawer row (OC-419), loading its icon through
- * [ProjectIconClient], cached first. See the overload taking an icon.
+ * The project tile leading a drawer row, loading its icon through [ProjectIconClient], cached
+ * first. See the overload taking an icon.
  */
 @Composable
 fun DrawerListProjectTile(
@@ -209,12 +206,11 @@ fun DrawerListProjectTile(
 }
 
 /**
- * The [side]-square project tile leading a drawer row (iOS `DrawerListProjectTile`, OC-419):
- * the project's [icon] (full-bleed, or padded on a neutral backing) or its initial on its
- * palette colour, lit (iOS a0fc7375/d7aea740, OC-578): a highlight from the top, a 0.5 dp
- * white edge fading toward the bottom ([ProjectTileLighting]) and a soft contact shadow.
- * High contrast text swaps the edge for a solid 1 dp palette border. An arriving icon
- * cross-fades in over 0.18 s (cut under reduce motion). Decorative: hidden from TalkBack.
+ * The [side]-square project tile leading a drawer row: the project's [icon] (full-bleed, or padded
+ * on a neutral backing) or its initial on its palette colour, lit by [ProjectTileLighting] with a
+ * soft contact shadow. High contrast text swaps the edge for a solid 1 dp palette border. An
+ * arriving icon cross-fades in over 0.18 s (cut under reduce motion). Decorative: hidden from
+ * TalkBack.
  */
 @Composable
 fun DrawerListProjectTile(
@@ -243,7 +239,7 @@ fun DrawerListProjectTile(
     ) {
         Crossfade(
             targetState = icon,
-            // The initial and palette dissolve into the icon (iOS `Motion.swap`).
+            // The initial and palette dissolve into the icon.
             animationSpec = MotionRole.Swap.animation(reduceMotion = reducedMotion),
             label = "project-tile",
         ) { shown ->
@@ -288,7 +284,7 @@ fun DrawerListProjectTile(
 @Composable
 private fun TileInitial(initial: String, color: Color, side: Dp) {
     val density = LocalDensity.current
-    // A fixed size from the tile's side (which already follows the font scale), as iOS's systemFont(ofSize:).
+    // A fixed size from the tile's side (which already follows the font scale).
     val fontSize = with(density) { (side.value * 0.55f).roundToInt().dp.toSp() }
     val shadowBlur = with(density) { 2.dp.toPx() }
     Text(
@@ -321,9 +317,9 @@ private fun ProjectTileLighting(radius: Dp, highlight: Float, edgeOpacity: Float
 }
 
 /**
- * The project tile's light (iOS `ProjectTileLighting`), drawn once per size and look: white
- * over the palette, so every tile shares it. A highlight centred just above the top edge,
- * wider than tall, and a 0.5 dp inner edge, bright at the top and fading 85 % toward the bottom.
+ * The project tile's light, drawn once per size and look: white over the palette, so every tile
+ * shares it. A highlight centred just above the top edge, wider than tall, and a 0.5 dp inner edge,
+ * bright at the top and fading 85 % toward the bottom.
  */
 object ProjectTileLighting {
     /** [side] and [radius] in dp; [scale] is pixels per dp. */
@@ -378,9 +374,9 @@ object ProjectTileLighting {
 }
 
 /**
- * The tile's contact shadow (iOS `contactShadow`/`ambientShadow`): 0.5 dp down with a 0.5 dp
- * blur at 30 %, and 1.5 dp down with a 1.75 dp blur at 14 %, both × [depth], scaled with the
- * tile ([k]). Drawn behind the clipped surface, so it spills past the tile's edge.
+ * The tile's contact shadow: 0.5 dp down with a 0.5 dp blur at 30 %, and 1.5 dp down with a 1.75 dp
+ * blur at 14 %, both × [depth], scaled with the tile ([k]). Drawn behind the clipped surface, so it
+ * spills past the tile's edge.
  */
 private fun Modifier.projectTileShadow(radius: Dp, k: Float, depth: Float): Modifier = if (depth <= 0f) this else drawBehind {
     val r = radius.toPx()
@@ -439,13 +435,12 @@ object DrawerListTitle {
 }
 
 /**
- * A session row's title (iOS `DrawerListTitleView`): one line that, when it doesn't fit,
- * keeps its own start in view whatever the layout direction (an English title in a
- * right-to-left layout still shows its first words) and fades out over its last [fade]
- * instead of an ellipsis (a mask, so it works on any highlight, the selected row's included).
- * The card-edge fade during the time reveal is the whole row's. Under reduce motion the
- * reveal cross-fades the title into the session's [time] instead; [revealProgress] is read
- * in the draw phase only, so a per-frame reveal never recomposes the row.
+ * A session row's title: one line that, when it doesn't fit, keeps its own start in view whatever
+ * the layout direction (an English title in a right-to-left layout still shows its first words) and
+ * fades out over its last [fade] instead of an ellipsis (a mask, so it works on any highlight, the
+ * selected row's included). The card-edge fade during the time reveal is the whole row's. Under
+ * reduce motion the reveal cross-fades the title into the session's [time] instead;
+ * [revealProgress] is read in the draw phase only, so a per-frame reveal never recomposes the row.
  */
 @Composable
 fun DrawerListTitleView(

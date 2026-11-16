@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.UuidClient
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
@@ -33,16 +34,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `ShareComposerTests`' `ShareComposerAppTests`: the app taking over what the share
- * sheet's composer handed it (Send Later, Continue in OpenCode), the credentials Home shares on
- * leaving, and the suggestions it donates.
- *
- * Other modules' tests of this file: `ShareCredentialsTests`, `ShareHandoffDeliveryTests`,
- * `ShareSenderTests`, `ShareSendMotionTests` and `ShareCompositionTests` are `:feature:system`'s,
- * except `ShareCompositionTests.sharesJoiningOneComposerSendOnlyWhenAllAskTo`
- * (`SharedComposerDraft.append`), which is `:feature:composer`'s.
- */
 class ShareComposerAppTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -93,6 +84,7 @@ class ShareComposerAppTests {
         val sent = Collections.synchronizedList(mutableListOf<Triple<String, String, String>>())
         val store = context.store(backgroundScope, { home() }) {
             this[UuidClient] = UuidClient.incrementing()
+            this[DateClient] = DateClient.constant(Instant.ofEpochSecond(100))
             // The outbox delivers on the test's scheduler (live: its own background scope).
             this[PromptOutbox] = PromptOutbox(scope = backgroundScope)
             this[OpenCodeClient] = OpenCodeClient.testValue.copy(

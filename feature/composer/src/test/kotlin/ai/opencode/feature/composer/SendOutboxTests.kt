@@ -7,47 +7,9 @@ import org.junit.Test
 import java.time.Instant
 
 /**
- * Port of iOS `SendOutboxTests.swift`.
- *
- * Every other test in the file drives `SessionFeature` (the outbox's sends
- * reach the store as `queuedInputs`, `failedSends`, `deliveryNotes` and
- * `promptStates`), so they can't live in this module. Skipped →
- * `:feature:session`:
- * `twoQuickSendsWhileTheFirstPostIsSlowBothShowAndDeliverInOrder`,
- * `aTransientFailureRetriesQuietlyThenSucceeds`,
- * `anATSFailureOnAWorkingHTTPOriginRetriesSilentlyThroughTheLiveClient`,
- * `aTerminalFailureOffersRetryAndHoldsLaterSends`,
- * `deletingAFailedSendLetsTheLaterOnesGo`,
- * `changesToWaitingSendsAreMadeBeforeTheyArePosted`,
- * `aDraftsSecondSendGoesToTheSessionItsFirstCreates`,
- * `sendsStillOnTheirWayComeBackWithTheirSession`,
- * `deletingASendBeingRetriedMeansItsNeverPostedAgain`,
- * `movingASendBeingRetriedToTheQueuePostsItQueued`,
- * `aSendDeletedWhileBeingPostedStaysDeletedAcrossASwitchAndIsTakenBackOnAdmission`,
- * `aFamilySwitchRoundTripKeepsSendsStillOnTheirWay`,
- * `aSendAdmittedWhileAwayIsThereOnTheFirstFrameBack`,
- * `anIdleSessionHeldByAFailedSendIsntWorkingAndRetryKeepsTheOrder`,
- * `stopHoldsTheSendsNotYetPostedAndLetsThePostingOneFinish`,
- * `stopWithNothingRunningOnTheServerClearsAtOnce`,
- * `stopOnADraftCallsOffItsCreationAndReturnsTheWords`,
- * `aRetriedSessionCreationUsesTheSameID`,
- * `aTooManyRequestsWaitsAsLongAsTheServerAsks`,
- * `aSendStoppedMidPostThatFailsIsAFailedSendAndTheLaneGoesOn`,
- * `aSendStoppedWhileWaitingToRetryCanBeRetriedAtOnce`,
- * `aSendAdmittedLateAfterStopIsntInterruptedAgain`,
- * `stopOnADraftWhoseSessionExistsIsThatSessionsStop`,
- * `aRefusedMoveToQueueWhileAwayComesBackAsPosted`,
- * `aRefusedDeleteKeepsTheMessageAndReadsTheInboxAgain`,
- * `offlinePastTheBudgetIsAFailedSendWithNoAttemptAfterIt`,
- * `theServerAnsweringEndsAConnectionBackoffAtOnce`,
- * `deletingASendWaitingForTheNetworkWithdrawsIt`,
- * `stoppingASendWaitingForTheNetworkHoldsItAsStopped`,
- * `aSendOutlastsAnOutageLongerThanTheOldBudget`,
- * `aFailureThatCantPassStillFailsAtOnce`,
- * `aSendStillFailingAfterItsWindowIsOfferedForRetry`,
- * `theServerAnsweringDuringAnAttemptRetriesAtOnce`,
- * `timeInTheBackgroundDoesNotSpendTheWindow`,
- * `aReconnectDuringEveryAttemptStillBacksOff`.
+ * Every other test in the file drives `SessionFeature` (the outbox's sends reach the store as
+ * `queuedInputs`, `failedSends`, `deliveryNotes` and `promptStates`), so they can't live in this
+ * module.
  */
 class SendOutboxTests {
     // Retry-After

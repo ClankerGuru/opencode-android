@@ -31,20 +31,6 @@ import org.junit.Test
 import java.time.Instant
 import kotlin.time.Duration.Companion.seconds
 
-/*
- * Port of the `SessionFeature` tests of iOS `PastedTextTests.swift` (several suites; each is a class
- * here under its iOS name).
- *
- * Not ported here (:server / :feature:composer, `PastedText` / `PastedTextSummary` / `AgentTextDocument` alone):
- * all of `PastedTextThresholdTests`; `PastedTextRoundTripTests.promptCarriesThePasteAsAnInlineTextFile`,
- * `theStoredMessageComesBackAsACard`, `theInboxListsAPendingPasteAsACard` (client wire and decoding, :server /
- * :feature:transcript).
- * Not ported here (:feature:transcript, `UserBubbleFold` / `TranscriptUserMessageView` sizing):
- * `UserBubbleFoldTests.foldsPastTwelveLines`, `aLongBubbleFoldsAndOpensInPlace`.
- * UIKit-only: `PastedTextOnceTests.theSummaryIsComputedOnceForTheCardAndItsRows` (a DEBUG summary tally around
- * rendering the SwiftUI card in a `UIHostingController`).
- */
-
 private val pasteServer = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
 private val pasteSession = OpenCodeSession(id = "ses_1", serverTitle = "Paste", projectID = "p", directory = "/project", updatedAt = Instant.EPOCH)
 

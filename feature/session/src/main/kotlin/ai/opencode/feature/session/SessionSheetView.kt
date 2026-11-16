@@ -1,5 +1,7 @@
 package ai.opencode.feature.session
 
+import androidx.annotation.StringRes
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeTextField
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeSwitch
@@ -99,6 +101,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.animation.core.snap
@@ -168,21 +171,20 @@ object SessionSheetFormat {
         return if (rest.isEmpty()) "~" else "~/$rest"
     }
 
-    /** iOS `cost.formatted(.currency(code: "USD"))`. */
     fun cost(value: Double, locale: Locale = appFormattingLocale()): String =
         NumberFormat.getCurrencyInstance(locale).apply { currency = Currency.getInstance("USD") }.format(value)
 }
 
 /** The sheet's status orb: the session's own activity. */
-enum class SessionSheetStatus(val text: String) {
-    Working("Working"),
-    Waiting("Needs your input"),
-    Idle("Idle"),
+enum class SessionSheetStatus(@StringRes val textRes: Int) {
+    Working(R.string.session_status_working),
+    Waiting(R.string.session_status_needs_input),
+    Idle(R.string.session_activity_idle),
 }
 
 /**
- * What the Session sheet reads from `SessionFeature.State` (iOS reads `store.*` directly).
- * The SessionView group builds this from the session store:
+ * What the Session sheet reads from `SessionFeature.State`. The SessionView group builds this from
+ * the session store.
  *
  * - [session]: `state.session`.
  * - [hasPendingRequests]: `permissionRequests` or `formRequests` is non-empty.
@@ -214,18 +216,17 @@ data class SessionSheetDetails(
 }
 
 /**
- * Port of iOS `SessionSheetView`: session details and actions, opened from the header's title
- * or the … menu, in a Material bottom sheet just tall enough for its content (drag up for more).
- * Includes [SessionActionPresentations]; when the sheet is closed the SessionView shows those
- * on its own (actions started from the header menu).
+ * Session details and actions, opened from the header's title or the … menu, in a Material bottom
+ * sheet just tall enough for its content (drag up for more). Includes [SessionActionPresentations];
+ * when the sheet is closed the SessionView shows those on its own (actions started from the header
+ * menu).
  *
  * @param sheet the session's `sessionSheet` child store.
  * @param details what the sheet reads from the session ([SessionSheetDetails]).
  * @param onModelTapped `SessionFeature.Action.modelButtonTapped`.
  * @param onDismissRequest the sheet was swiped or tapped away.
- * @param statusOrb draws the status orb (iOS `AgentActivityGlyph(.subagent(…))` scoped
- *   `"<server persistenceID>|<session id or draft>|sheet"`); the default is a plain dot.
- * @param providerIcon draws the model's provider mark (iOS `ProviderIcon`), sized by the caller.
+ * @param statusOrb Draws the status orb; the default is a plain dot.
+ * @param providerIcon Draws the model's provider mark, sized by the caller.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -389,12 +390,21 @@ private fun Hero(
     val reduceMotion = rememberReduceMotion()
     val density = LocalDensity.current
     val orbSize = with(density) { (22 * fontScale).dp }
-    // From the orb's centre down to the title's first baseline: half a cap height (iOS `orbToBaseline`).
+    // From the orb's centre down to the title's first baseline: half a cap height.
     val orbToBaseline = with(density) { (8 * fontScale).dp.roundToPx() }
     val isAutoRenaming = state.operation == SessionSheetFeature.Operation.AutoRenaming
-    val renameValue = listOfNotNull(session?.title, if (state.autoRenameFailed) "Couldn’t rename" else null).joinToString(", ")
+    val renameFailed = stringResource(R.string.session_sheet_rename_failed)
+    val statusDescription = stringResource(R.string.session_sheet_status_description)
+    val statusText = stringResource(details.status.textRes)
+    val renameSessionLabel = stringResource(R.string.session_rename_title)
+    val sessionTitle = session?.title
+    val renameValue = when {
+        sessionTitle != null && state.autoRenameFailed -> stringResource(R.string.session_list_two, sessionTitle, renameFailed)
+        state.autoRenameFailed -> renameFailed
+        else -> sessionTitle ?: ""
+    }
     // The title's own height: its target grows only downward from it, over the location line, so
-    // nothing moves (iOS `minimumHitTarget(side: 50, topReach: 0)`).
+    // nothing moves.
     var titleHeight by remember { mutableStateOf(0) }
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
         Box(
@@ -402,8 +412,8 @@ private fun Hero(
                 // The orb's centre sits half a cap height above the title's first baseline.
                 .alignBy { it.measuredHeight / 2 + orbToBaseline }
                 .clearAndSetSemantics {
-                    contentDescription = "Status"
-                    stateDescription = details.status.text
+                    contentDescription = statusDescription
+                    stateDescription = statusText
                 }
                 .testTag("session-sheet-status"),
         ) {
@@ -417,9 +427,9 @@ private fun Hero(
                 Modifier
                     .fillMaxWidth()
                     .height(max(with(density) { titleHeight.toDp() }, 48.dp))
-                    .clickable(enabled = !isBusy, onClickLabel = "Rename Session", role = Role.Button, onClick = onRename)
+                    .clickable(enabled = !isBusy, onClickLabel = renameSessionLabel, role = Role.Button, onClick = onRename)
                     .clearAndSetSemantics {
-                        contentDescription = "Rename Session"
+                        contentDescription = renameSessionLabel
                         stateDescription = renameValue
                         role = Role.Button
                         if (isBusy) disabled()
@@ -435,7 +445,7 @@ private fun Hero(
                             AnimatedContent(
                                 targetState = title,
                                 transitionSpec = {
-                                    // iOS `.titleRoll` timed by `Motion.swap`; without animation it swaps in place.
+                                    // Without animation it swaps in place.
                                     if (!animates) fadeIn(snap()) togetherWith fadeOut(snap())
                                     else MotionTransition.roll(MotionRollDirection.Up, reduceMotion, density, Motion.swap).content
                                 },
@@ -474,7 +484,7 @@ private fun LocationLine(session: OpenCodeSession, project: OpenCodeProject?, au
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         if (autoRenameFailed) {
-            Text("Couldn’t rename", style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.secondaryText)
+            Text(stringResource(R.string.session_sheet_rename_failed), style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.secondaryText)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             Text(name, style = OpenCodeTextStyles.subheadline, color = OpenCodeTheme.colors.secondaryText, maxLines = 1, modifier = Modifier.alignByBaseline())
@@ -513,26 +523,26 @@ private fun Tiles(
     send: (SessionSheetFeature.Action) -> Unit,
 ) {
     val isBusy = state.operation != null
+    val untitledSession = stringResource(R.string.session_untitled_title)
     val tiles = buildList<@Composable () -> Unit> {
         if (isListRow) {
-            add { ToggleTile("Pin", "Pinned", SFSymbol.Pin, SFSymbol.PinFill, context.isPinned == true, "pin") { send(SessionSheetFeature.Action.PinTapped) } }
-            add { ToggleTile("Unread", "Unread", SFSymbol.EnvelopeOpen, SFSymbol.EnvelopeBadgeFill, context.isUnread, "read") { send(SessionSheetFeature.Action.ReadTapped) } }
-            add { ToggleTile("Mute", "Muted", SFSymbol.Bell, SFSymbol.BellSlashFill, context.isMuted, "mute") { send(SessionSheetFeature.Action.MuteTapped) } }
+            add { ToggleTile(stringResource(R.string.session_pin), stringResource(R.string.session_pinned), SFSymbol.Pin, SFSymbol.PinFill, context.isPinned == true, "pin") { send(SessionSheetFeature.Action.PinTapped) } }
+            add { ToggleTile(stringResource(R.string.session_unread), stringResource(R.string.session_unread), SFSymbol.EnvelopeOpen, SFSymbol.EnvelopeBadgeFill, context.isUnread, "read") { send(SessionSheetFeature.Action.ReadTapped) } }
+            add { ToggleTile(stringResource(R.string.session_mute), stringResource(R.string.session_muted), SFSymbol.Bell, SFSymbol.BellSlashFill, context.isMuted, "mute") { send(SessionSheetFeature.Action.MuteTapped) } }
         }
         add {
-            ActionTile("Compact", SFSymbol.RectangleCompressVertical, state.operation == SessionSheetFeature.Operation.Compacting, isBusy, "compact") {
+            ActionTile(stringResource(R.string.session_compact), SFSymbol.RectangleCompressVertical, state.operation == SessionSheetFeature.Operation.Compacting, isBusy, "compact") {
                 send(SessionSheetFeature.Action.CompactTapped)
             }
         }
         add {
-            ActionTile("Fork", SFSymbol.ArrowTriangleBranch, state.operation == SessionSheetFeature.Operation.Forking, isBusy, "fork") {
+            ActionTile(stringResource(R.string.session_fork), SFSymbol.ArrowTriangleBranch, state.operation == SessionSheetFeature.Operation.Forking, isBusy, "fork") {
                 send(SessionSheetFeature.Action.ForkTapped)
             }
         }
-        add { ExportTile(state.operation is SessionSheetFeature.Operation.Exporting, isBusy) { send(SessionSheetFeature.Action.ExportTapped(it, title ?: "Session")) } }
+        add { ExportTile(state.operation is SessionSheetFeature.Operation.Exporting, isBusy) { send(SessionSheetFeature.Action.ExportTapped(it, title ?: untitledSession)) } }
     }
-    // Six across; at accessibility sizes they wrap into rows of three, then two (iOS
-    // `.accessibility3` and up; Android's largest font scale, 2.0, stands in for it).
+    // Six across; at accessibility sizes they wrap into rows of three, then two.
     val fontScale = LocalDensity.current.fontScale
     val across = minOf(tiles.size, if (fontScale >= 2f) 2 else if (isAccessibilityFontScale(fontScale)) 3 else tiles.size)
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -548,13 +558,15 @@ private fun Tiles(
 /** Pin, Unread and Mute: the caption may read as the state (Pinned), but TalkBack hears one name with its value. */
 @Composable
 private fun ToggleTile(title: String, onTitle: String, symbol: SFSymbol, onSymbol: SFSymbol, isOn: Boolean, id: String, onClick: () -> Unit) {
+    val onState = stringResource(R.string.session_toggle_on_description)
+    val offState = stringResource(R.string.session_toggle_off_description)
     Box(
         Modifier
             .testTag("session-sheet-$id")
             .clickable(role = Role.Switch, onClick = onClick)
             .clearAndSetSemantics {
                 contentDescription = title
-                stateDescription = if (isOn) "On" else "Off"
+                stateDescription = if (isOn) onState else offState
                 role = Role.Switch
             },
     ) {
@@ -580,22 +592,23 @@ private fun ActionTile(title: String, symbol: SFSymbol, inFlight: Boolean, isBus
 @Composable
 private fun ExportTile(inFlight: Boolean, isBusy: Boolean, onExport: (OpenCodeExportFormat) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
+    val exportLabel = stringResource(R.string.session_export)
     Box {
         Box(
             Modifier
                 .testTag("session-sheet-export")
                 .clickable(enabled = !isBusy, role = Role.Button) { expanded = true }
                 .clearAndSetSemantics {
-                    contentDescription = "Export"
+                    contentDescription = exportLabel
                     role = Role.Button
                 },
         ) {
-            SessionSheetTile(title = "Export", symbol = SFSymbol.SquareAndArrowUp, inFlight = inFlight, dimmed = isBusy && !inFlight, symbolChanges = false)
+            SessionSheetTile(title = exportLabel, symbol = SFSymbol.SquareAndArrowUp, inFlight = inFlight, dimmed = isBusy && !inFlight, symbolChanges = false)
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             for (format in OpenCodeExportFormat.entries) {
                 DropdownMenuItem(
-                    text = { Text(if (format == OpenCodeExportFormat.Markdown) "Markdown" else "JSON") },
+                    text = { Text(if (format == OpenCodeExportFormat.Markdown) stringResource(R.string.session_export_markdown) else stringResource(R.string.session_export_json)) },
                     onClick = {
                         expanded = false
                         onExport(format)
@@ -641,7 +654,7 @@ private fun SessionSheetTile(title: String, symbol: SFSymbol, isOn: Boolean = fa
                 }
             }
         }
-        // iOS `.lineLimit(1).minimumScaleFactor(0.75)`: a long caption shrinks to 75 % before it truncates.
+        // A long caption shrinks to 75 % before it truncates.
         val style = OpenCodeTextStyles.caption1.copy(fontWeight = if (isOn) FontWeight.SemiBold else FontWeight.Normal)
         BasicText(
             title,
@@ -655,9 +668,9 @@ private fun SessionSheetTile(title: String, symbol: SFSymbol, isOn: Boolean = fa
 }
 
 /**
- * iOS `.minimumScaleFactor`: the caption at full size when it fits, which takes one layout (a
- * step-based search lays each caption out five or six times); only a caption that doesn't fit
- * searches down, in 0.25 sp steps, for the largest size that does.
+ * The caption at full size when it fits, which takes one layout (a step-based search lays each
+ * caption out five or six times); only a caption that doesn't fit searches down, in 0.25 sp steps,
+ * for the largest size that does.
  */
 private data class CaptionAutoSize(val min: TextUnit, val max: TextUnit) : TextAutoSize {
     override fun TextAutoSizeLayoutScope.getFontSize(constraints: Constraints, text: AnnotatedString): TextUnit {
@@ -681,7 +694,6 @@ private data class CaptionAutoSize(val min: TextUnit, val max: TextUnit) : TextA
 private fun cardFill(): Color {
     val colors = OpenCodeTheme.colors
     return when {
-        // iOS `.fill.tertiary` / `.fill.quaternary` in dark: (118, 118, 128) at 24 % / 18 %.
         colors.isDark && colors.highContrast -> colors.text.copy(alpha = 0.11f)
         colors.isDark -> colors.text.copy(alpha = 0.08f)
         colors.highContrast -> colors.text.copy(alpha = 0.1f)
@@ -735,13 +747,14 @@ private fun ModelRow(details: SessionSheetDetails, onModelTapped: () -> Unit, pr
     val variants = details.currentModelInfo?.variants?.takeIf { it.isNotEmpty() }
     val currentLevel = if (level != null && variants != null) ModelVariant.sorted(variants) to level else null
     val iconSize = with(LocalDensity.current) { (18 * fontScale).dp }
+    val modelLabel = stringResource(R.string.session_sheet_model)
     DetailRow(
-        "Model",
+        modelLabel,
         Modifier
             .testTag("session-sheet-model")
             .clickable(role = Role.Button, onClick = onModelTapped)
             .clearAndSetSemantics {
-                contentDescription = "Model"
+                contentDescription = modelLabel
                 stateDescription = details.currentModelLabel
                 role = Role.Button
             },
@@ -764,11 +777,13 @@ private fun ContextRow(details: SessionSheetDetails) {
     val usage = details.contextUsage
     val alignment = if (isAccessibilitySize) RollingNumberAlignment.Start else RollingNumberAlignment.End
     val ringSize = with(LocalDensity.current) { (16 * fontScale).dp }
+    val contextLabel = stringResource(R.string.session_sheet_context)
+    val unknownValue = stringResource(R.string.session_sheet_unknown_description)
     DetailRow(
-        "Context",
+        contextLabel,
         Modifier.testTag("session-sheet-context").clearAndSetSemantics {
-            contentDescription = "Context"
-            stateDescription = usage?.let { SessionContextText.accessibilityValue(it.tokens, details.contextLimit) } ?: "Unknown"
+            contentDescription = contextLabel
+            stateDescription = usage?.let { SessionContextText.accessibilityValue(it.tokens, details.contextLimit) } ?: unknownValue
         },
     ) {
         val fraction = details.contextFraction
@@ -777,7 +792,7 @@ private fun ContextRow(details: SessionSheetDetails) {
                 SessionContextRing(fraction, Modifier.size(ringSize), lineWidth = 2.2.dp)
                 RollingNumber("${SessionContextRing.percent(fraction)}%", style = OpenCodeTextStyles.callout, alignment = alignment)
             }
-            usage != null -> RollingNumber("${NumberFormat.getIntegerInstance(appFormattingLocale()).format(usage.tokens)} tokens", style = OpenCodeTextStyles.callout, alignment = alignment)
+            usage != null -> RollingNumber(stringResource(R.string.session_sheet_context_tokens, NumberFormat.getIntegerInstance(appFormattingLocale()).format(usage.tokens)), style = OpenCodeTextStyles.callout, alignment = alignment)
             else -> Text("—", style = OpenCodeTextStyles.callout, color = OpenCodeTheme.colors.secondaryText)
         }
     }
@@ -787,11 +802,13 @@ private fun ContextRow(details: SessionSheetDetails) {
 private fun CostRow(details: SessionSheetDetails) {
     val cost = details.sessionCost
     val alignment = if (isAccessibilitySize) RollingNumberAlignment.Start else RollingNumberAlignment.End
+    val costLabel = stringResource(R.string.session_sheet_cost)
+    val unknownValue = stringResource(R.string.session_sheet_unknown_description)
     DetailRow(
-        "Cost",
+        costLabel,
         Modifier.testTag("session-sheet-cost").clearAndSetSemantics {
-            contentDescription = "Cost"
-            stateDescription = cost?.let { SessionSheetFormat.cost(it) } ?: "Unknown"
+            contentDescription = costLabel
+            stateDescription = cost?.let { SessionSheetFormat.cost(it) } ?: unknownValue
         },
     ) {
         if (cost != null) {
@@ -806,8 +823,11 @@ private fun CostRow(details: SessionSheetDetails) {
 
 @Composable
 private fun AlwaysNotifyCard(isOn: Boolean, isPending: Boolean, onToggle: (Boolean) -> Unit) {
-    // iOS `ThisDevice.name` (“iPhone”, “iPad”).
-    val device = if (LocalConfiguration.current.smallestScreenWidthDp >= 600) "tablet" else "phone"
+    val message = if (LocalConfiguration.current.smallestScreenWidthDp >= 600) {
+        stringResource(R.string.session_always_notify_message_tablet)
+    } else {
+        stringResource(R.string.session_always_notify_message_phone)
+    }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
             Modifier
@@ -821,11 +841,11 @@ private fun AlwaysNotifyCard(isOn: Boolean, isPending: Boolean, onToggle: (Boole
                 .padding(horizontal = 16.dp, vertical = if (isAccessibilitySize) 10.dp else 0.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Always Notify", style = OpenCodeTextStyles.callout, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.session_always_notify), style = OpenCodeTextStyles.callout, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
             OpenCodeSwitch(checked = isOn, onCheckedChange = null, enabled = !isPending)
         }
         Text(
-            "Notify this $device whenever a reply finishes, even ones you didn’t send from here.",
+            message,
             style = OpenCodeTextStyles.footnote,
             color = OpenCodeTheme.colors.secondaryText,
             modifier = Modifier.padding(horizontal = 16.dp),
@@ -849,7 +869,7 @@ private fun DeleteRow(enabled: Boolean, onClick: () -> Unit) {
         contentAlignment = Alignment.CenterStart,
     ) {
         Text(
-            "Delete Session",
+            stringResource(R.string.session_delete_session),
             style = OpenCodeTextStyles.callout,
             color = OpenCodeTheme.colors.destructive.copy(alpha = if (enabled) 1f else 0.4f),
         )
@@ -890,9 +910,9 @@ object ModelLevelBars {
 }
 
 /**
- * Port of iOS `SessionActionPresentations`: rename, failure, delete confirmation, and export
- * sharing for the Session sheet's actions, wherever they were started (the sheet or the header
- * menu). Shown inside [SessionSheetView]; the SessionView shows it itself while the sheet is closed.
+ * Rename, failure, delete confirmation, and export sharing for the Session sheet's actions,
+ * wherever they were started (the sheet or the header menu). Shown inside [SessionSheetView]; the
+ * SessionView shows it itself while the sheet is closed.
  *
  * @param title the session's title, for the delete confirmation.
  */
@@ -900,17 +920,17 @@ object ModelLevelBars {
 fun SessionActionPresentations(sheet: StoreOf<SessionSheetFeature.State, SessionSheetFeature.Action>, title: String?) {
     val state by sheet.collectState()
     if (state.isRenaming) {
-        // The alert's field takes the keyboard as it opens, as iOS's alert text field does.
+        // The alert's field takes the keyboard as it opens.
         val focus = remember { FocusRequester() }
         LaunchedEffect(Unit) { focus.requestFocus() }
         OpenCodeAlertDialog(
             onDismissRequest = { sheet.send(SessionSheetFeature.Action.IsRenamingChanged(false)) },
-            title = { Text("Rename Session") },
+            title = { Text(stringResource(R.string.session_rename_title)) },
             text = {
                 OpenCodeTextField(
                     value = state.renameDraft,
                     onValueChange = { sheet.send(SessionSheetFeature.Action.RenameDraftChanged(it)) },
-                    placeholder = "Title",
+                    placeholder = stringResource(R.string.session_rename_placeholder),
                     trailingIcon = AlertTextFields.clearButton(state.renameDraft) {
                         sheet.send(SessionSheetFeature.Action.RenameDraftChanged(""))
                     },
@@ -920,12 +940,12 @@ fun SessionActionPresentations(sheet: StoreOf<SessionSheetFeature.State, Session
                     modifier = Modifier.fillMaxWidth().focusRequester(focus),
                 )
             },
-            // Three actions stack, Cancel last, as an iOS alert with more than two buttons does.
+            // Three actions stack, Cancel last.
             confirmButton = {
                 Column(horizontalAlignment = Alignment.End) {
-                    TextButton(onClick = { sheet.send(SessionSheetFeature.Action.AutoRenameTapped) }) { Text("Auto Rename") }
-                    TextButton(onClick = { sheet.send(SessionSheetFeature.Action.RenameSubmitted) }) { Text("Rename") }
-                    TextButton(onClick = { sheet.send(SessionSheetFeature.Action.IsRenamingChanged(false)) }) { Text("Cancel") }
+                    TextButton(onClick = { sheet.send(SessionSheetFeature.Action.AutoRenameTapped) }) { Text(stringResource(R.string.session_auto_rename)) }
+                    TextButton(onClick = { sheet.send(SessionSheetFeature.Action.RenameSubmitted) }) { Text(stringResource(CoreR.string.common_rename)) }
+                    TextButton(onClick = { sheet.send(SessionSheetFeature.Action.IsRenamingChanged(false)) }) { Text(stringResource(CoreR.string.common_cancel)) }
                 }
             },
         )
@@ -935,21 +955,21 @@ fun SessionActionPresentations(sheet: StoreOf<SessionSheetFeature.State, Session
             onDismissRequest = { sheet.send(SessionSheetFeature.Action.FailureDismissed) },
             title = { Text(failure.title) },
             text = { Text(failure.message) },
-            confirmButton = { TextButton(onClick = { sheet.send(SessionSheetFeature.Action.FailureDismissed) }) { Text("OK") } },
+            confirmButton = { TextButton(onClick = { sheet.send(SessionSheetFeature.Action.FailureDismissed) }) { Text(stringResource(CoreR.string.common_ok)) } },
         )
     }
     if (state.confirmsDeletion) {
         OpenCodeAlertDialog(
             onDismissRequest = { sheet.send(SessionSheetFeature.Action.ConfirmsDeletionChanged(false)) },
-            title = { Text("Delete “${title ?: "Session"}”?", modifier = Modifier.semantics { heading() }) },
-            text = { Text("This removes the session from the server for all clients.") },
+            title = { Text(stringResource(R.string.session_delete_confirm_title, title ?: stringResource(R.string.session_untitled_title)), modifier = Modifier.semantics { heading() }) },
+            text = { Text(stringResource(R.string.session_delete_confirm_message)) },
             confirmButton = {
                 TextButton(onClick = { sheet.send(SessionSheetFeature.Action.DeleteConfirmed) }) {
-                    Text("Delete", color = OpenCodeTheme.colors.destructive)
+                    Text(stringResource(CoreR.string.common_delete), color = OpenCodeTheme.colors.destructive)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { sheet.send(SessionSheetFeature.Action.ConfirmsDeletionChanged(false)) }) { Text("Cancel") }
+                TextButton(onClick = { sheet.send(SessionSheetFeature.Action.ConfirmsDeletionChanged(false)) }) { Text(stringResource(CoreR.string.common_cancel)) }
             },
         )
     }
@@ -958,8 +978,7 @@ fun SessionActionPresentations(sheet: StoreOf<SessionSheetFeature.State, Session
 
 /**
  * The share sheet itself is started by [SessionExportClient.share]; this only notices it closing:
- * after the app pauses for it and resumes, the export is dismissed (and its file removed), as
- * iOS's `completionWithItemsHandler` does.
+ * after the app pauses for it and resumes, the export is dismissed (and its file removed).
  */
 @Composable
 private fun ExportShareDismissal(isSharing: Boolean, onDismiss: () -> Unit) {

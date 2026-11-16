@@ -4,13 +4,12 @@ import ai.opencode.core.sharing.FileDirectory
 import ai.opencode.core.sharing.SharedKey
 
 /**
- * The voice-typed keys of iOS `OpenCode/Core/SharedKeys.swift` and `Voice/ServerVoiceClient.swift`
- * (same names, defaults and semantics), declared here because their value types belong to
- * Voice. The value types live with their iOS files: [VoiceEngine] (`LiveProtocol.kt`),
- * [ServerVoiceProvider], [ServerVoiceSupport] and [VoiceServerChoice] (`ServerVoiceClient.kt`),
- * [CallVoice] (`CallVoice.kt`), [VoiceTranscriptRecord] (`VoiceTranscript.kt`).
- * Bool and key-chain voice keys (`voiceModeEnabled`, `voiceEngineMigratedToGPTLive`,
- * `openAIAPIKey`, `xaiAPIKey`, …) live in `:core`'s `SharedKeys`.
+ * The voice-typed shared keys, declared here because their value types belong to Voice.
+ * [VoiceEngine] (`LiveProtocol.kt`), [ServerVoiceProvider], [ServerVoiceSupport] and
+ * [VoiceServerChoice] (`ServerVoiceClient.kt`), [CallVoice] (`CallVoice.kt`),
+ * [VoiceTranscriptRecord] (`VoiceTranscript.kt`). Bool and key-chain voice keys
+ * (`voiceModeEnabled`, `voiceEngineMigratedToGPTLive`, `openAIAPIKey`, `xaiAPIKey`, …) live in
+ * `:core`'s `SharedKeys`.
  */
 object VoiceSharedKeys {
     /** Voice engine for new calls. Defaults to GPT-Live, including for users upgrading from builds that only had Realtime. */
@@ -26,7 +25,7 @@ object VoiceSharedKeys {
     /** The voice new calls speak with. A call on an engine that doesn't offer it uses the default instead (`CallVoice.resolved(engine)`). */
     val callVoice = SharedKey.appStorage("voice-call-voice", CallVoice.default)
 
-    /** Settings › Voice › Call Sounds (iOS `callSoundPack`, declared in `VoiceCallCues.swift`). */
+    /** Settings › Voice › Call Sounds. */
     val callSoundPack = SharedKey.appStorage("call-sound-pack", VoiceCallSoundPack.default)
 
     /** Settings › Voice › Voice Provider. Automatic by default. */
@@ -43,16 +42,15 @@ object VoiceSharedKeys {
     )
 
     /**
-     * Each saved server's last voice models answer, by `persistenceID` (iOS
-     * `voiceModelsByServer`, declared in `VoiceProvider.swift`). Settings › Voice asks; calls
-     * read it to choose automatically.
+     * Each saved server's last voice models answer, by `persistenceID`. Settings › Voice asks;
+     * calls read it to choose automatically.
      */
     val voiceModelsByServer =
         SharedKey.inMemory<Map<String, ServerVoiceModelsAnswer>>("voice-models-by-server", emptyMap())
 
     /**
-     * How many times each server (by `persistenceID`) reconnected: an answer asked before
-     * the latest says nothing of the server now (iOS `voiceModelsEpochs`).
+     * How many times each server (by `persistenceID`) reconnected: an answer asked before the
+     * latest says nothing of the server now.
      */
     val voiceModelsEpochs = SharedKey.inMemory<Map<String, Int>>("voice-models-epochs", emptyMap())
 

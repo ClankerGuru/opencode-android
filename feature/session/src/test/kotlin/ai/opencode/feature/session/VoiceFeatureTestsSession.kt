@@ -10,11 +10,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Port of the `SessionFeature` test of iOS `VoiceFeatureTests.swift`, deferred from
- * `:feature:voice` (its `VoiceFeatureTests.kt` holds the rest). The shared keys live in the test's
- * own in-memory store, so iOS's `defer` reset has no counterpart.
- */
+/** The shared keys live in the test's own in-memory store. */
 class VoiceFeatureTestsSession {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
     private val session = OpenCodeSession(id = "ses_voice", serverTitle = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = distantPast)

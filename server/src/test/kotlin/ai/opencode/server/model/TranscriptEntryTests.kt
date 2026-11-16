@@ -5,11 +5,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `TranscriptEntryTests.swift` › `TaskListAndExecuteTests`, the `:server` part:
- * `executeRowsNameTheToolsTheirScriptCalls` ([OpenCodeToolCall.calledTools], `subtitle`).
- * The task-list half is `:feature:transcript`'s.
- */
 class TaskListAndExecuteTests {
     @get:Rule val isolation = TestIsolationRule()
 

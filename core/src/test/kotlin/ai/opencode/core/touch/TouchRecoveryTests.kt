@@ -7,18 +7,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `TouchRecoveryTests` (`OpenCodeTests/TouchRecoveryTests.swift`).
- *
- * Not here (UIKit-only fixtures for owners Android doesn't watch, see `docs/parity/core.md`):
- * `closedDrawerRecoversAncestorAndScrimButOpenDrawerKeepsOwnership`,
- * `catchUpLeftoverChromeAndCardGateRecoverAfterExit`,
- * `pushedPageTouchesBelongToTheDrawerNotTheBrowserStack`,
- * `browserStackLandsAPopWhosePageHasAlreadyLeft`, `browserPopStillOnScreenKeepsItsTransition`
- * (a `UINavigationController`-style stack in a `UIWindow`),
- * `sheetRecoveryRecognizesOnlyAnInvisibleUncoveredPresentation`,
- * `recoveredSwiftUISheetClearsItsBindingAndOpensAgain`.
- */
 class TouchRecoveryTests {
     @get:Rule val isolation = TestIsolationRule()
 

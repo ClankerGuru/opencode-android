@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.files.AttachmentFileType
@@ -66,6 +67,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -81,16 +84,15 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /**
- * The queued messages, opened from the queued pill (iOS `QueuedMessagesSheet`, D-59 option 3,
- * Fitted Sheet · Rows): a sheet only as tall as the queue, growing as it does and scrolling
- * once it reaches [QueuedMessagesSheetMetrics.maximumHeight]. Each message is a numbered row
- * of two lines (a tap reads the rest) with quiet trailing icons: ↑ Send Now on a small grey
- * disc and a trash glyph for Cancel Message. A swipe left cancels (a full swipe acts); a swipe
- * right only reveals Send Now, so a careless full swipe never sends. Holding a row offers
+ * The queued messages, opened from the queued pill: a sheet only as tall as the queue, growing as
+ * it does and scrolling once it reaches [QueuedMessagesSheetMetrics.maximumHeight]. Each message is
+ * a numbered row of two lines (a tap reads the rest) with quiet trailing icons: ↑ Send Now on a
+ * small grey disc and a trash glyph for Cancel Message. A swipe left cancels (a full swipe acts); a
+ * swipe right only reveals Send Now, so a careless full swipe never sends. Holding a row offers
  * Send Now, Copy and Cancel Message. Nothing here is red.
  *
- * [displayText] turns a queued voice delegation into its Voice message (iOS
- * `VoiceHandoff.parse(text)?.displayText ?: text`); the session area passes the voice area's parser.
+ * [displayText] turns a queued voice delegation into its Voice message; the session area passes the
+ * voice area's parser.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -101,7 +103,7 @@ fun QueuedMessagesSheet(
     onCancel: (String) -> Unit,
     onClose: () -> Unit,
     displayText: (String) -> String = { it },
-    /** iOS `server`: where a `media:<hash>` thumbnail loads from. */
+    /** Where a `media:<hash>` thumbnail loads from. */
     server: OpenCodeServer? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -121,13 +123,13 @@ fun QueuedMessagesSheet(
         ) {
             Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
                 Text(
-                    "Queued Messages",
+                    stringResource(R.string.composer_queued_title),
                     style = OpenCodeTextStyles.headline,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.align(Alignment.Center).semantics { heading() },
                 )
                 IconButton(onClick = onClose, modifier = Modifier.align(Alignment.CenterEnd).testTag("queued-messages-close")) {
-                    OpenCodeIcon(SFSymbol.Xmark, contentDescription = "Close")
+                    OpenCodeIcon(SFSymbol.Xmark, contentDescription = stringResource(CoreR.string.common_close))
                 }
             }
             if (messages.isEmpty()) {
@@ -140,7 +142,7 @@ fun QueuedMessagesSheet(
                         .padding(vertical = 24.dp),
                 ) {
                     OpenCodeIcon(SFSymbol.Tray, contentDescription = null, size = OpenCodeIconSize.large, tint = OpenCodeTheme.colors.secondaryText)
-                    Text("No Queued Messages", style = OpenCodeTextStyles.headline)
+                    Text(stringResource(R.string.composer_queued_empty), style = OpenCodeTextStyles.headline)
                 }
             } else {
                 LazyColumn(
@@ -148,7 +150,6 @@ fun QueuedMessagesSheet(
                     contentPadding = PaddingValues(top = QueuedMessagesSheetMetrics.listTop, bottom = QueuedMessagesSheetMetrics.listBottom),
                 ) {
                     itemsIndexed(messages, key = { _, input -> input.id }) { index, input ->
-                        // iOS `.animation(Motion.layout.animation(reduceMotion:), value: ids)`.
                         Column(if (reduceMotion) Modifier else Modifier.animateItem(placementSpec = Motion.layout.animation(visibilityThreshold = IntOffset.VisibilityThreshold))) {
                             QueuedMessageRow(
                                 input = input,
@@ -174,7 +175,7 @@ object QueuedMessagesSheetMetrics {
     val listTop = 4.dp
     val listBottom = 12.dp
 
-    /** What a row is taken to be before it has been measured (iOS 76 pt). */
+    /** What a row is taken to be before it has been measured. */
     val estimatedRowHeight = 76.dp
 
 
@@ -182,13 +183,12 @@ object QueuedMessagesSheetMetrics {
     fun maximumHeight(screenHeight: androidx.compose.ui.unit.Dp) = maxOf(screenHeight - 110.dp, 320.dp)
 }
 
-/** How far a swipe reveals its action (the iOS swipe action's width). */
+/** How far a swipe reveals its action. */
 private val SWIPE_REVEAL = 88.dp
 
 /**
- * One queued message (iOS `QueuedMessageRow`): its number in the sending order, two lines of
- * its text (a tap reads the rest) under any attachment chips, and the quiet Cancel Message and
- * Send Now icons trailing it.
+ * One queued message: its number in the sending order, two lines of its text (a tap reads the rest)
+ * under any attachment chips, and the quiet Cancel Message and Send Now icons trailing it.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -212,9 +212,17 @@ fun QueuedMessageRow(
     val offset = remember { Animatable(0f) }
     var width by remember { mutableStateOf(0) }
     val revealPx = with(LocalDensity.current) { SWIPE_REVEAL.toPx() }
+    val singleImageText = stringResource(R.string.composer_queued_image)
+    val imagesText = pluralStringResource(R.plurals.composer_queued_images, input.images.size, input.images.size)
+    val positionText = stringResource(R.string.composer_queued_position, number, count)
+    val sendNowText = stringResource(R.string.composer_queued_send_now)
+    val copyText = stringResource(CoreR.string.common_copy)
+    val cancelMessageText = stringResource(R.string.composer_queued_cancel_message)
+    val showLessText = stringResource(R.string.composer_queued_show_less)
+    val showMoreText = stringResource(R.string.composer_queued_show_more)
 
     val accessibilityText = buildList {
-        if (input.images.isNotEmpty()) add(if (input.images.size == 1) "Image" else "${input.images.size} images")
+        if (input.images.isNotEmpty()) add(if (input.images.size == 1) singleImageText else imagesText)
         input.files.forEach { add(it.name) }
         input.input.inlineFiles.forEach { file -> add(file.pasted?.let { "${file.name}, ${it.length}" } ?: file.name) }
         if (text.isNotEmpty()) add(text)
@@ -228,7 +236,7 @@ fun QueuedMessageRow(
             Row(Modifier.matchParentSize()) {
                 if (offset.value > 0f) {
                     SwipeAction(
-                        label = "Send Now",
+                        label = sendNowText,
                         symbol = SFSymbol.ArrowUp,
                         fill = MaterialTheme.colorScheme.surfaceContainerHighest,
                         onClick = { settle(0f); onSendNow() },
@@ -237,7 +245,7 @@ fun QueuedMessageRow(
                 } else {
                     Spacer(Modifier.weight(1f))
                     SwipeAction(
-                        label = "Cancel Message",
+                        label = cancelMessageText,
                         symbol = SFSymbol.Trash,
                         fill = MaterialTheme.colorScheme.outline,
                         onClick = { settle(0f); onCancel() },
@@ -279,16 +287,16 @@ fun QueuedMessageRow(
                             if (offset.value != 0f) settle(0f) else if (canExpand) expanded = !expanded
                         },
                         onLongClick = { menuOpen = true },
-                        onClickLabel = if (canExpand) (if (expanded) "Show Less" else "Show More") else null,
+                        onClickLabel = if (canExpand) (if (expanded) showLessText else showMoreText) else null,
                     )
                     .semantics(mergeDescendants = false) {
                         contentDescription = accessibilityText
-                        stateDescription = "Queued message $number of $count"
+                        stateDescription = positionText
                         customActions = buildList {
-                            add(CustomAccessibilityAction("Send Now") { onSendNow(); true })
-                            if (input.text.isNotEmpty()) add(CustomAccessibilityAction("Copy") { onCopy(); true })
-                            add(CustomAccessibilityAction("Cancel Message") { onCancel(); true })
-                            if (canExpand) add(CustomAccessibilityAction(if (expanded) "Show Less" else "Show More") { expanded = !expanded; true })
+                            add(CustomAccessibilityAction(sendNowText) { onSendNow(); true })
+                            if (input.text.isNotEmpty()) add(CustomAccessibilityAction(copyText) { onCopy(); true })
+                            add(CustomAccessibilityAction(cancelMessageText) { onCancel(); true })
+                            if (canExpand) add(CustomAccessibilityAction(if (expanded) showLessText else showMoreText) { expanded = !expanded; true })
                         }
                     }
                     .testTag("queued-message-$number")
@@ -347,19 +355,19 @@ fun QueuedMessageRow(
         content()
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
             DropdownMenuItem(
-                text = { Text("Send Now") },
+                text = { Text(sendNowText) },
                 leadingIcon = { OpenCodeIcon(SFSymbol.ArrowUp, contentDescription = null) },
                 onClick = { menuOpen = false; onSendNow() },
             )
             if (input.text.isNotEmpty()) {
                 DropdownMenuItem(
-                    text = { Text("Copy") },
+                    text = { Text(copyText) },
                     leadingIcon = { OpenCodeIcon(SFSymbol.DocOnDoc, contentDescription = null) },
                     onClick = { menuOpen = false; onCopy() },
                 )
             }
             DropdownMenuItem(
-                text = { Text("Cancel Message") },
+                text = { Text(cancelMessageText) },
                 leadingIcon = { OpenCodeIcon(SFSymbol.Trash, contentDescription = null) },
                 onClick = { menuOpen = false; onCancel() },
             )
@@ -367,7 +375,7 @@ fun QueuedMessageRow(
     }
 }
 
-/** iOS `isAccessibilitySize` starts at AX1 (about 1.6× the default text size). */
+/** Accessibility sizes start at AX1 (about 1.6× the default text size). */
 private const val ACCESSIBILITY_FONT_SCALE = 1.6f
 
 /** Past this share of the row's width, a swipe left cancels on release. */
@@ -392,6 +400,8 @@ private fun SwipeAction(label: String, symbol: SFSymbol, fill: androidx.compose.
 
 @Composable
 private fun QueuedRowActions(onCancel: () -> Unit, onSendNow: () -> Unit, modifier: Modifier = Modifier) {
+    val cancelMessageText = stringResource(R.string.composer_queued_cancel_message)
+    val sendNowText = stringResource(R.string.composer_queued_send_now)
     Row(modifier) {
         Box(
             contentAlignment = Alignment.Center,
@@ -399,7 +409,7 @@ private fun QueuedRowActions(onCancel: () -> Unit, onSendNow: () -> Unit, modifi
                 .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
                 .clip(CircleShape)
                 .clickable(onClick = onCancel)
-                .semantics { contentDescription = "Cancel Message" },
+                .semantics { contentDescription = cancelMessageText },
         ) {
             OpenCodeIcon(SFSymbol.Trash, contentDescription = null, tint = OpenCodeTheme.colors.secondaryText)
         }
@@ -409,7 +419,7 @@ private fun QueuedRowActions(onCancel: () -> Unit, onSendNow: () -> Unit, modifi
                 .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
                 .clip(CircleShape)
                 .clickable(onClick = onSendNow)
-                .semantics { contentDescription = "Send Now" },
+                .semantics { contentDescription = sendNowText },
         ) {
             Box(
                 contentAlignment = Alignment.Center,
@@ -431,8 +441,8 @@ private fun QueuedAttachments(input: OpenCodeQueuedInput, server: OpenCodeServer
         if (input.images.isNotEmpty()) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 for (image in input.images) {
-                    // iOS `CachedImage(..., compact: true)`: a `media:<hash>` photo loads from the
-                    // server, and one it no longer has shows the unavailable glyph.
+                    // A `media:<hash>` photo loads from the server, and one it no longer has shows
+                    // the unavailable glyph.
                     CachedImage(
                         id = image.id,
                         data = image.data,
@@ -455,7 +465,7 @@ private fun QueuedAttachments(input: OpenCodeQueuedInput, server: OpenCodeServer
             val pasted = file.pasted
             QueuedChip(
                 when {
-                    file.isUnavailable -> "${file.name} · Media unavailable"
+                    file.isUnavailable -> stringResource(R.string.composer_queued_media_unavailable, file.name)
                     pasted != null -> "${file.name} · ${pasted.length}"
                     else -> file.name
                 },
@@ -479,7 +489,6 @@ private fun QueuedChip(title: String, symbolName: String) {
             style = OpenCodeTextStyles.subheadline,
             color = OpenCodeTheme.colors.secondaryText,
             maxLines = 1,
-            // iOS `.truncationMode(.middle)`.
             overflow = TextOverflow.MiddleEllipsis,
         )
     }

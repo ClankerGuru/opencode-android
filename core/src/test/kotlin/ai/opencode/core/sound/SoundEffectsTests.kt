@@ -14,11 +14,6 @@ import org.junit.Test
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
-/**
- * Port of iOS `SoundEffectsTests`' `:core` half: the defaults and the live gate. Which events
- * play which sound is the session's and Home's (`:feature:session`, `:feature:drawer`); the
- * Settings test is in `:feature:settings`' `SoundEffectsSettingsTests`.
- */
 class SoundEffectsTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -95,13 +90,10 @@ class SoundEffectsTests {
 }
 
 /**
- * Port of iOS `SoundEffectsPlaybackTests`: the session side of Sound Effects, never activated by
- * a preload, borrowed only while idle, given back as a sound ends, and given up at once when
- * anything else needs the audio. iOS drives a real `AudioSessionOwner`, which lives in
- * `:feature:voice` here; [Owner] is its holder admission (activation runs the borrower's stop
- * first, the last release deactivates) behind [AudioSessionIdleState]. iOS's notifications are
- * [SoundEffectsEvent]s: route reasons `oldDeviceUnavailable`/`newDeviceAvailable` are a device
- * removed/added, `categoryChange`/`routeConfigurationChange` our own configuration.
+ * The session side of Sound Effects, never activated by a preload, borrowed only while idle, given
+ * back as a sound ends, and given up at once when anything else needs the audio. Route reasons
+ * `oldDeviceUnavailable`/`newDeviceAvailable` are a device removed/added,
+ * `categoryChange`/`routeConfigurationChange` our own configuration.
  */
 class SoundEffectsPlaybackTests {
     @get:Rule val isolation = TestIsolationRule()

@@ -1,5 +1,6 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.tuning.Tunable
 import ai.opencode.core.tuning.TuningStore
 import ai.opencode.core.ui.OpenCodeIcon
@@ -34,6 +35,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -67,8 +69,7 @@ object VoiceProviderTunables {
 
 /**
  * A logo-free tile: a waveform for OpenAI, a person for your own account, code brackets for
- * OpenCode, a sparkle for Gemini, the device for a server that can't run calls (iOS
- * `VoiceProviderTile`; the settings Provider page uses it too).
+ * OpenCode, a sparkle for Gemini, the device for a server that can't run calls.
  */
 sealed interface VoiceProviderTileKind {
     data object openAI : VoiceProviderTileKind
@@ -96,7 +97,7 @@ sealed interface VoiceProviderTileKind {
         }
 
     companion object {
-        /** iOS `init(brand:)`: nil is a server that can't say who'd run its calls. */
+        /** Nil is a server that can't say who'd run its calls. */
         fun of(brand: VoiceProviderOption.Brand?): VoiceProviderTileKind = when (brand) {
             VoiceProviderOption.Brand.openAI -> openAI
             VoiceProviderOption.Brand.openAIAccount -> openAIAccount
@@ -105,7 +106,7 @@ sealed interface VoiceProviderTileKind {
             null -> device("desktopcomputer")
         }
 
-        /** iOS `init(option:)`: this phone is always your own account. */
+        /** This phone is always your own account. */
         fun of(option: VoiceProviderOption): VoiceProviderTileKind =
             if (option.place == VoiceProviderOption.Place.Phone) openAIAccount else of(option.brand)
 
@@ -171,10 +172,10 @@ fun VoiceProviderStatus(state: VoiceProviderState, modifier: Modifier = Modifier
 }
 
 /**
- * Above the call bar while a call connects through a server: who runs it and where,
- * “Connecting via My Mac…”. A small control-shaped panel on the call's surface with its hairline,
- * like the failure and ended cards in the same slot (iOS glass capsule): it floats over the
- * transcript, where bare text ran into the messages behind it.
+ * Above the call bar while a call connects through a server: who runs it and where, “Connecting via
+ * My Mac…”. A small control-shaped panel on the call's surface with its hairline, like the failure
+ * and ended cards in the same slot: it floats over the transcript, where bare text ran into the
+ * messages behind it.
  */
 @Composable
 fun VoiceConnectingCaption(place: VoiceCallPlace, text: String, modifier: Modifier = Modifier) {
@@ -250,7 +251,7 @@ fun VoiceProviderFailureCard(
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    "Couldn’t Start Call",
+                    stringResource(R.string.voice_failure_start_title),
                     style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
                     modifier = Modifier.semantics { heading() },
                 )
@@ -276,10 +277,10 @@ fun VoiceProviderFailureCard(
 /** A failed call's ×: Close, as the bar's End. */
 @Composable
 fun VoiceFailureCloseButton(action: () -> Unit, modifier: Modifier = Modifier) {
+    val closeDescription = stringResource(CoreR.string.common_close)
     Box(
         modifier
-            // iOS's negative padding (-12 vertical, -10 trailing): the target reaches into the
-            // card's corner without making its row taller.
+            // The target reaches into the card's corner without making its row taller.
             .layout { measurable, constraints ->
                 val placeable = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
                 val trailing = 10.dp.roundToPx()
@@ -290,14 +291,14 @@ fun VoiceFailureCloseButton(action: () -> Unit, modifier: Modifier = Modifier) {
             }
             .clickable(interactionSource = null, indication = null, role = Role.Button, onClick = action)
             .openCodeTapTarget()
-            .semantics { contentDescription = "Close"; role = Role.Button },
+            .semantics { contentDescription = closeDescription; role = Role.Button },
         contentAlignment = Alignment.Center,
     ) {
         OpenCodeIcon(SFSymbol.Xmark, null, tint = OpenCodeTheme.colors.secondaryText, size = 18.dp)
     }
 }
 
-/** UIKit's system tints the provider status uses besides orange. */
+/** System tints the provider status uses besides orange. */
 private object VoiceProviderColors {
     /** `UIColor.systemGreen`: Ready. */
     val green: Color

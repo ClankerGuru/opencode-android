@@ -57,21 +57,8 @@ import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
 /*
- * Port of the `SessionFeature` half of iOS `BrowserTests.swift`. iOS keeps several suites
- * (structs) in the file; each `SessionFeature` suite is a class here under its iOS name.
- *
- * Not ported here (:feature:media, `BrowserLinkPolicy` / page prompt bodies / `BrowserFeature` /
- * `LinkMenuAction` / `LinkMenuText` alone): all of `BrowserLinkPolicyTests`, `PagePromptBodyTests`,
- * `BrowserFeatureTests` (`aPagePushesGoesBackAndForwardAndCloses`, `theSameLinkKeepsThePageAndANewOneReplacesIt`,
- * `askRaisesAComposerAndOnlyAnOpenPageIsShared`), `LinkMenuTests.onlyWebLinksGetTheMenu`.
- * Not ported here (:feature:drawer, `HomeFeature`): `OpenLinksInAppsTests.aSwitchBeforeTheAnswerCancelsTheTap`,
- * `aSwitchKeepingTheScreenDropsTheAnswer`, `pushingASubagentCancelsTheParentsTap`, `aNestedPushCancelsTheTapBeneath`,
- * `popBeforeTheAnswerCancelsTheTap`, `aFamilyRoundTripInCatchUpCancelsTheTap`, `dismissingTheLastCatchUpCardCancelsItsTap`;
- * `BrowserLifetimeTests.switchingSessionsLetsGoOfThePageAndItsStore`, `theSessionsOwnRowGoesBackToItFromUnderItsPage`.
- * Not ported here (:feature:voice, `VoiceFeature` / `VoiceInstructions` alone): `BrowserVoiceTests.aPageOpenedWhileConnectingIsToldOnConnect`,
- * `anotherSessionNeverInheritsThePage`, `aPageTitleIsDataNotInstructions`.
- * UIKit/WebKit-only: all of `BrowserObscuredInsetsTests`, and the `BrowserWebViews.Delegate.contextMenuConfiguration`
- * (WebKit context-menu preview) tail of `LinkMenuTests.holdingALinkOffersSafariCopyAndShare`.
+ * All of `BrowserObscuredInsetsTests`, and the `BrowserWebViews.Delegate.contextMenuConfiguration`
+ * tail of `LinkMenuTests.holdingALinkOffersSafariCopyAndShare`.
  */
 
 private val browserServer = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
@@ -577,9 +564,8 @@ class BrowserPeekEndTests {
 }
 
 /**
- * A universal-link check the test answers when it chooses (iOS `LinkProbeGate` actor). Each check
- * is its own request, numbered per link from 1, and says when it was asked or cancelled; waiting
- * for either fails after 5 s.
+ * A universal-link check the test answers when it chooses. Each check is its own request, numbered
+ * per link from 1, and says when it was asked or cancelled; waiting for either fails after 5 s.
  */
 private class LinkProbeGate {
     sealed interface Event {

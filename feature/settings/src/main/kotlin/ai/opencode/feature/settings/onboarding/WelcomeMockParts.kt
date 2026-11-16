@@ -43,25 +43,24 @@ import kotlin.math.min
 import kotlin.math.sin
 
 /*
- * Pieces both devices' screens draw with (iOS `WelcomeMockParts.swift`). The screens are
- * illustrations at fixed logical sizes, scaled into the devices, so their type is fixed too: the
- * welcome's own copy carries font scaling and TalkBack.
+ * Pieces both devices' screens draw with. The screens are illustrations at fixed logical sizes,
+ * scaled into the devices, so their type is fixed too: the welcome's own copy carries font scaling
+ * and TalkBack.
  */
 
-/** iOS `WelcomeInk`. */
 internal object WelcomeInk {
     fun gray(white: Double, opacity: Double = 1.0): Color = Color(white.toFloat(), white.toFloat(), white.toFloat(), opacity.toFloat())
 
     fun hex(value: Long, opacity: Double = 1.0): Color = Color(0xFF000000 or value).copy(alpha = opacity.toFloat())
 
-    /** iOS dark mode's secondary and tertiary labels. */
+    /** Dark mode's secondary and tertiary labels. */
     val label2 = Color(235 / 255f, 235 / 255f, 245 / 255f, 0.6f)
     val label3 = Color(235 / 255f, 235 / 255f, 245 / 255f, 0.3f)
 }
 
 /**
  * Shows a row by its entrance progress [p] (0…1), rising [dy] points and sharpening from a blur,
- * optionally leaving by [out] (0…1). Reduce Motion keeps only the fade (iOS `welcomeShow`).
+ * optionally leaving by [out] (0…1). Reduce Motion keeps only the fade.
  */
 internal fun Modifier.welcomeShow(
     p: Double,
@@ -89,8 +88,8 @@ internal fun Modifier.welcomeBlur(radius: Float): Modifier =
     if (radius > 0.05f) blur(radius.dp, BlurredEdgeTreatment.Unbounded) else this
 
 /**
- * The desktop's live status: the text dims a little and a light runs through it, by [amount]
- * (0 at rest). Still under Reduce Motion (iOS `welcomeShimmer`).
+ * The desktop's live status: the text dims a little and a light runs through it, by [amount] (0 at
+ * rest). Still under Reduce Motion.
  */
 internal fun Modifier.welcomeShimmer(amount: Double, wall: Double, reduced: Boolean): Modifier {
     val shown = if (reduced) 0.0 else amount.clamped01()
@@ -113,7 +112,7 @@ internal fun Modifier.welcomeShimmer(amount: Double, wall: Double, reduced: Bool
     }
 }
 
-/** Labels in one place, crossfading by weight (“New session” → the title; iOS `WelcomeStack`). */
+/** Labels in one place, crossfading by weight. */
 @Composable
 internal fun WelcomeStack(
     labels: List<String>,
@@ -145,7 +144,7 @@ internal fun WelcomeStack(
 
 /**
  * Text arriving a word at a time; `progress` counts how far in it is. The words still to come are
- * laid out clear, so the text's lines never move (iOS `WelcomeStreamedText`).
+ * laid out clear, so the text's lines never move.
  */
 internal object WelcomeStreamedText {
     fun attributed(words: List<String>, progress: Double, color: Color, fade: Double = 2.2, code: FontFamily? = null): AnnotatedString =
@@ -160,24 +159,23 @@ internal object WelcomeStreamedText {
         }
 }
 
-/** A row's place in [WelcomeColumn] (iOS `WelcomeRowOpen` and `WelcomeRowLift`). */
+/** A row's place in [WelcomeColumn]. */
 private data class WelcomeRowData(val open: Float, val lift: Float) : ParentDataModifier {
     override fun Density.modifyParentData(parentData: Any?): Any = this@WelcomeRowData
 }
 
 /**
  * A row in [WelcomeColumn] that takes [open] of its height, [lift] of the way from its place down
- * to the composer (iOS `welcomeRow`).
+ * to the composer.
  */
 internal fun Modifier.welcomeRow(open: Double, lift: Double = 0.0): Modifier =
     then(WelcomeRowData(max(0.0, open).toFloat(), lift.toFloat())).alpha(if (open > 0.001) 1f else 0f)
 
 /**
- * A transcript's rows, pinned to the latest like the app's list: stacked from the top, and
- * scrolled up once the last would pass the bottom. Each row takes its height times its open
- * fraction, so a row opening on a spring pushes what follows (and the scroll) smoothly; a sent
- * message rises from the composer, [liftDrop] (points) below the column's bottom (iOS
- * `WelcomeColumn`).
+ * A transcript's rows, pinned to the latest like the app's list: stacked from the top, and scrolled
+ * up once the last would pass the bottom. Each row takes its height times its open fraction, so a
+ * row opening on a spring pushes what follows (and the scroll) smoothly; a sent message rises from
+ * the composer, [liftDrop] (points) below the column's bottom.
  */
 @Composable
 internal fun WelcomeColumn(modifier: Modifier = Modifier, liftDrop: Float = 0f, content: @Composable () -> Unit) {
@@ -199,12 +197,12 @@ internal fun WelcomeColumn(modifier: Modifier = Modifier, liftDrop: Float = 0f, 
     }
 }
 
-/** The places the scene's lights fly between, wherever the devices' layout puts them (iOS `WelcomeTarget`). */
+/** The places the scene's lights fly between, wherever the devices' layout puts them. */
 internal enum class WelcomeTarget { PhoneSend, PhoneShot, DeskPrompt, DeskShip, BrowserPage }
 
 /**
- * Where each [WelcomeTarget] is in the scene, in px (iOS `WelcomeTargets` anchor preferences):
- * written as the screens are placed, read by the carriers as they draw.
+ * Where each [WelcomeTarget] is in the scene, in px: written as the screens are placed, read by the
+ * carriers as they draw.
  */
 internal class WelcomeTargets {
     var scene: LayoutCoordinates? = null
@@ -213,7 +211,7 @@ internal class WelcomeTargets {
 
 internal val LocalWelcomeTargets = staticCompositionLocalOf<WelcomeTargets?> { null }
 
-/** Marks this view's bounds as [target] for the scene's lights (iOS `welcomeTarget`). */
+/** Marks this view's bounds as [target] for the scene's lights. */
 internal fun Modifier.welcomeTarget(target: WelcomeTarget, targets: WelcomeTargets?): Modifier {
     if (targets == null) return this
     return onGloballyPositioned { coordinates ->
@@ -222,7 +220,7 @@ internal fun Modifier.welcomeTarget(target: WelcomeTarget, targets: WelcomeTarge
     }
 }
 
-/** The apps' working glyph: a 3 × 3 dot matrix with a light running through it (iOS `WelcomeWorkingDots`). */
+/** The apps' working glyph: a 3 × 3 dot matrix with a light running through it. */
 @Composable
 internal fun WelcomeWorkingDots(wall: Double, modifier: Modifier = Modifier, dot: Float = 3f, gap: Float = 2f, color: Color = Color.White, reduced: Boolean = false) {
     Canvas(modifier.size((dot * 3 + gap * 2).dp)) {
@@ -238,7 +236,10 @@ internal fun WelcomeWorkingDots(wall: Double, modifier: Modifier = Modifier, dot
     }
 }
 
-/** A pairing code's look: finder squares and seeded modules around a hole for the mark. Not a readable code (iOS `WelcomeQRShape`). */
+/**
+ * A pairing code's look: finder squares and seeded modules around a hole for the mark. Not a
+ * readable code.
+ */
 internal object WelcomeQRShape {
     const val MODULES = 29
     const val HOLE = 11
@@ -270,7 +271,7 @@ internal object WelcomeQRShape {
     }
 }
 
-/** The pairing code with the OpenCode mark in its hole (iOS `WelcomeQRCode`; the mark is iOS `OpenCodeAppMark`, dark). */
+/** The pairing code with the OpenCode mark in its hole. */
 @Composable
 internal fun WelcomeQRCode(modifier: Modifier = Modifier) {
     Canvas(modifier) {

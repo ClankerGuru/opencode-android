@@ -25,14 +25,13 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * The composer's state on disk (iOS `PersistedComposerState`): drafts, unsent outbox lanes and
- * failed sends, keyed by server persistence ID and session ID. Inline attachment bytes live
- * beside it (`ComposerAttachments/<uuid>`), referenced by ID.
+ * The composer's state on disk: drafts, unsent outbox lanes and failed sends, keyed by server
+ * persistence ID and session ID. Inline attachment bytes live beside it
+ * (`ComposerAttachments/<uuid>`), referenced by ID.
  */
 @Serializable
 data class PersistedComposerState(
-    // Swift's synthesized `Decodable` ignores property defaults: a file missing any of these
-    // fails to decode (and the composer starts afresh), as on iOS.
+    // These keys are required: decoding ignores property defaults.
     @Required val version: Int = CURRENT_VERSION,
     @Required val drafts: List<DraftRecord> = emptyList(),
     @Required val outbox: List<OutboxRecord> = emptyList(),
@@ -50,6 +49,7 @@ data class PersistedComposerState(
         val hasPastedText: Boolean,
         val pasted: PastedTextSummary? = null,
         val videoDuration: Double? = null,
+        val localVideoURI: String? = null,
     ) {
         constructor(attachment: OpenCodeOutgoingAttachment) : this(
             id = attachmentUUID(attachment.id),
@@ -60,6 +60,7 @@ data class PersistedComposerState(
             hasPastedText = attachment.pastedText != null,
             pasted = attachment.pasted,
             videoDuration = attachment.videoDuration,
+            localVideoURI = attachment.localVideoURI,
         )
     }
 
@@ -91,9 +92,11 @@ data class PersistedComposerState(
         val chips: List<ComposerAutocompleteChip> = emptyList(),
         val undoSnapshot: UndoSnapshot? = null,
         @Serializable(with = ComposerDateSerializer::class) val updatedAt: Instant,
+        val quotes: List<ComposerQuote> = emptyList(),
     ) {
         val hasPersistedContent: Boolean
-            get() = text.isNotEmpty() || attachments.isNotEmpty() || files.isNotEmpty() || location != null || undoSnapshot != null
+            get() = text.isNotEmpty() || attachments.isNotEmpty() || files.isNotEmpty() || location != null || undoSnapshot != null ||
+                quotes.isNotEmpty()
     }
 
     @Serializable
@@ -109,6 +112,7 @@ data class PersistedComposerState(
         @Serializable(with = PageShareRequestSerializer::class) val page: PageShareRequest? = null,
         val mentions: OpenCodeAutocompleteMentions? = null,
         val chips: List<ComposerAutocompleteChip> = emptyList(),
+        val quotes: List<ComposerQuote> = emptyList(),
     )
 
     @Serializable
@@ -174,20 +178,16 @@ data class PersistedComposerState(
             encodeDefaults = true
         }
 
-        /**
-         * Attachment IDs are `UUID`s on iOS and strings in `:server`'s `OpenCodeOutgoingAttachment`;
-         * a non-UUID ID maps to a stable name-based UUID so its blob still has one file.
-         */
+        /** A non-UUID ID maps to a stable name-based UUID so its blob still has one file. */
         internal fun attachmentUUID(id: String): UUID =
             runCatching { UUID.fromString(id) }.getOrElse { UUID.nameUUIDFromBytes(id.toByteArray(Charsets.UTF_8)) }
     }
 }
 
-/** iOS `OpenCodeDelivery: Codable` (its raw value). */
 internal object DeliverySerializer : KSerializer<OpenCodeDelivery> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("OpenCodeDelivery", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: OpenCodeDelivery) = encoder.encodeString(value.rawValue)
-    // An unknown raw value fails the decode (the whole state starts afresh), as Swift's `RawRepresentable` `Decodable` does.
+    // An unknown raw value fails the decode (the whole state starts afresh).
     override fun deserialize(decoder: Decoder): OpenCodeDelivery {
         val raw = decoder.decodeString()
         return OpenCodeDelivery.of(raw) ?: throw SerializationException("Unknown delivery")
@@ -195,9 +195,8 @@ internal object DeliverySerializer : KSerializer<OpenCodeDelivery> {
 }
 
 /**
- * iOS `JSONEncoder`'s default date strategy (`.deferredToDate`): seconds since
- * 2001-01-01T00:00:00Z as a JSON number. Decoding also takes the ISO-8601 strings earlier
- * Android builds wrote.
+ * Seconds since 2001-01-01T00:00:00Z as a JSON number. Decoding also takes the ISO-8601 strings
+ * earlier Android builds wrote.
  */
 internal object ComposerDateSerializer : KSerializer<Instant> {
     /** 2001-01-01T00:00:00Z (`Date.timeIntervalSinceReferenceDate`'s zero). */
@@ -224,8 +223,8 @@ internal object ComposerDateSerializer : KSerializer<Instant> {
 }
 
 /**
- * iOS `PageShareRequest: Codable`: `pageID`, `url`, `title`. An older save's `includesScreenshot`
- * is ignored (`ComposerPersistenceState.json` ignores unknown keys).
+ * `pageID`, `url`, `title`. An older save's `includesScreenshot` is ignored
+ * (`ComposerPersistenceState.json` ignores unknown keys).
  */
 internal object PageShareRequestSerializer : KSerializer<PageShareRequest> {
     @Serializable

@@ -1,5 +1,7 @@
 package ai.opencode.feature.composer.modelpicker
 
+import ai.opencode.core.strings.localized
+import ai.opencode.feature.composer.R
 import ai.opencode.server.model.ModelVisibility
 import ai.opencode.server.model.ModelProviderGroup
 import ai.opencode.server.model.ModelSearch
@@ -10,9 +12,7 @@ import ai.opencode.server.model.model
 import ai.opencode.server.model.savedLevel
 
 /**
- * Port of iOS `ModelPickerSection` (`Composer/ModelPicker/ModelPickerSections.swift`).
- *
- * The model list's sections (D-20 round 7, its list from round 6 option 1): Favorites, then one
+ * The model list's sections: Favorites, then one
  * section per provider, as the TUI and desktop app group them. A model several providers offer
  * is listed under each, so the row you tap is the provider. Searching drops Favorites and
  * matches names and providers.
@@ -37,9 +37,9 @@ data class ModelPickerSection(val kind: Kind, val models: List<OpenCodeModel>) {
 
     val title: String
         get() = when (kind) {
-            Kind.Favorites -> "Favorites"
-            Kind.Recent -> "Recent"
-            Kind.AllModels -> "All Models"
+            Kind.Favorites -> localized(R.string.composer_model_section_favorites)
+            Kind.Recent -> localized(R.string.composer_model_section_recent)
+            Kind.AllModels -> localized(R.string.composer_model_section_all_models)
             Kind.SearchResults -> ""
             is Kind.Provider -> ModelProviderGroup.title(kind.id)
         }
@@ -47,7 +47,7 @@ data class ModelPickerSection(val kind: Kind, val models: List<OpenCodeModel>) {
     companion object {
         /**
          * [recents] (most recent first) adds a Recent section of up to [recentLimit] models
-         * after Favorites, leaving out favorites (New Model Picker, OC-469). Searching drops both.
+         * after Favorites, leaving out favorites (New Model Picker). Searching drops both.
          */
         fun sections(
             models: List<OpenCodeModel>,
@@ -82,13 +82,8 @@ data class ModelPickerSection(val kind: Kind, val models: List<OpenCodeModel>) {
 }
 
 /**
- * The model picker's inputs, as `SessionFeature.State` holds them on iOS. The iOS file extends
- * `SessionFeature.State` (and its `Store`) with the picker's derived values; `SessionFeature`
- * sits above this module, so the session area builds this value from its state and the pickers
- * read it. Every property here is the iOS computed property of the same name
- * (`ModelPickerSections.swift`'s extension: `currentModelName`, `currentModelInfo`,
- * `currentModelLabel`; and `SessionFeature+State.swift`'s `pickerModels`, `hiddenModelCount`,
- * `filteredModels`).
+ * The model picker's inputs, as `SessionFeature.State` holds them. `SessionFeature` sits above this
+ * module, so the session area builds this value from its state and the pickers read it.
  */
 data class ModelPickerState(
     val models: List<OpenCodeModel> = emptyList(),
@@ -109,7 +104,7 @@ data class ModelPickerState(
     /** Resolve a label without borrowing another provider's capabilities. */
     val currentModelName: String
         get() {
-            val ref = currentModel ?: return "Model"
+            val ref = currentModel ?: return localized(R.string.composer_model_placeholder)
             val model = currentModelInfo
             if (model != null && ModelDisplayNames.usable(model.name, model.key, model.modelID)) return model.name
             return modelDisplayNames.name(ref)
@@ -206,9 +201,8 @@ data class ModelPickerState(
 }
 
 /**
- * The picker actions iOS's views send to `SessionFeature` (the reducer lives in the session
- * area, `SessionFeature+Models.swift`). The pickers here call one lambda with these; the
- * session area maps each to its own action of the same name.
+ * The picker actions the views send to `SessionFeature`. The pickers here call one lambda with
+ * these; the session area maps each to its own action of the same name.
  */
 sealed interface ModelPickerEvent {
     /** `.modelPicked`: keeps the current variant when the new model offers it; closes the picker. */
@@ -244,7 +238,7 @@ sealed interface ModelPickerEvent {
     data object Dismiss : ModelPickerEvent
 }
 
-/** Case-insensitive multi-field filter used by the picker sheets (iOS `Array.filtered(by:fields:)`). */
+/** Case-insensitive multi-field filter used by the picker sheets. */
 fun <T> List<T>.filtered(query: String, fields: (T) -> List<String>): List<T> {
     val trimmed = query.trim()
     if (trimmed.isEmpty()) return this

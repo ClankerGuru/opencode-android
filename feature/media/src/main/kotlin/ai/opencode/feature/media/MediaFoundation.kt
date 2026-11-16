@@ -3,12 +3,15 @@ package ai.opencode.feature.media
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.strings.localized
 import ai.opencode.core.tuning.Tunable
 import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.model.AgentFileReference
 import ai.opencode.server.model.OpenCodeImageAttachment
 import android.content.ComponentCallbacks2
 import android.content.res.Configuration
 import android.graphics.Bitmap
+import android.net.Uri
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import java.security.MessageDigest
@@ -55,19 +58,6 @@ object TranscriptMetrics {
 }
 
 /**
- * iOS `TranscriptTunables.sendImageDuration` (declared in `Composer/SentImageFlight.swift`): how
- * long a sent photo takes to fly from the composer into its slot, the 99.5% time of a critical
- * spring. Lives here because the composer's `SentImageFlight` and the session's flight read it
- * and `:feature:transcript` (which registers it, after `jumpDuration`) sits above the composer.
- */
-object SendImageTunables {
-    val sendImageDuration = Tunable("transcript.send.imageDuration", "Image send duration", default = 0.55, range = 0.25..1.2, step = 0.01)
-
-    /** The flight's 99.5% time, seconds; ω = 7.43 / this. */
-    val duration: Double get() = sendImageDuration.value
-}
-
-/**
  * What the full-screen photo viewer pages through (iOS `TranscriptImagePreview`, now in
  * `Media/TranscriptImageViewer.swift`). Lives in media because the viewer, the image gallery
  * and Mermaid cards build it; the transcript sits above media. A `media:<hash>` page may
@@ -84,25 +74,44 @@ data class TranscriptImagePreview(val id: String, val pages: List<Page>, val ser
         val mediaHash: String? = null,
         val name: String? = null,
         val isUnavailable: Boolean = false,
+        /** A video's poster frame, which Draw on Image skips. */
+        val isVideo: Boolean = false,
         val loadFailed: Boolean = false,
+        /** The app wrote [label] itself ("Image 1 of 3"), so it isn't a name worth showing as a title. */
+        val labelIsPlaceholder: Boolean = false,
+        val file: AgentFileDestination? = null,
+        val videoURL: Uri? = null,
+        val imageSource: SessionVisualImageSource? = null,
+        /** Immutable encoded bytes, kept so distant pages can release their full-size pixels. */
+        val original: ByteArray? = null,
+        val hasDecodedOriginal: Boolean = false,
+        val originalFailed: Boolean = false,
+        val showsSource: Boolean = false,
     ) {
-        // iOS `Page: Equatable`: every field, and the image by identity or by its pixels.
-        override fun equals(other: Any?): Boolean =
-            other is Page &&
-                other.id == id &&
-                other.label == label &&
-                other.detail == detail &&
-                other.mediaHash == mediaHash &&
-                other.name == name &&
-                other.isUnavailable == isUnavailable &&
-                other.loadFailed == loadFailed &&
-                (other.image === image || (other.image != null && image != null && other.image.sameAs(image)))
+        constructor(file: AgentFileDestination) : this(
+            id = file.reference.zoomSourceID,
+            image = null,
+            label = file.reference.name,
+            name = file.reference.name,
+            isVideo = file.reference.kind == AgentFileReference.Kind.Video,
+            file = file,
+        )
 
-        override fun hashCode(): Int = id.hashCode() * 31 + label.hashCode()
+        val usesFileViewer: Boolean get() = file != null || videoURL != null
+        val originalPending: Boolean get() = original != null && !hasDecodedOriginal && !originalFailed
+
+        // Snapshots compare arrays and bitmaps by identity: never scan pixels on the UI thread.
+        override fun hashCode(): Int = id.hashCode()
+
+        internal fun evicted(): Page = if (image != null && !usesFileViewer && !isUnavailable && !originalFailed &&
+            (original != null || mediaHash != null || imageSource != null)
+        ) copy(image = null, hasDecodedOriginal = false) else this
     }
 
-    constructor(id: String, image: Bitmap, label: String, server: OpenCodeServer? = null) :
-        this(id, listOf(Page(id, image, label)), server)
+    constructor(file: AgentFileDestination, server: OpenCodeServer) : this(file.reference.zoomSourceID, listOf(Page(file)), server)
+
+    constructor(id: String, image: Bitmap, label: String, server: OpenCodeServer? = null, labelIsPlaceholder: Boolean = false) :
+        this(id, listOf(Page(id, image, label, labelIsPlaceholder = labelIsPlaceholder)), server)
 
     companion object {
         /**
@@ -117,12 +126,10 @@ data class TranscriptImagePreview(val id: String, val pages: List<Page>, val ser
             server: OpenCodeServer? = null,
         ): TranscriptImagePreview? {
             val items = attachments.mapNotNull { attachment ->
-                val image = CachedImage.decoded(attachment.id, attachment.data, attachment.mediaHash)
-                when {
-                    image != null -> attachment to image
-                    attachment.mediaHash != null || attachment.isUnavailable -> attachment to null
-                    else -> null
-                }
+                val image = CachedImage.cached(attachment.id, attachment.mediaHash)
+                if (image != null || attachment.data.isNotEmpty() || attachment.mediaHash != null || attachment.isUnavailable) {
+                    attachment to image
+                } else null
             }
             if (items.none { it.first.id == selectedID }) return null
             return TranscriptImagePreview(
@@ -131,10 +138,13 @@ data class TranscriptImagePreview(val id: String, val pages: List<Page>, val ser
                     Page(
                         id = attachment.id,
                         image = image,
-                        label = attachment.name ?: "$label ${index + 1} of ${items.size}",
+                        label = attachment.name ?: localized(R.string.media_image_page_label, label, index + 1, items.size),
+                        original = attachment.data.takeIf { it.isNotEmpty() },
+                        hasDecodedOriginal = image != null && attachment.data.isNotEmpty(),
                         mediaHash = attachment.mediaHash,
                         name = attachment.name,
                         isUnavailable = attachment.isUnavailable || MediaReferenceResolver.isUnavailable(attachment, server),
+                        labelIsPlaceholder = attachment.name == null,
                     )
                 },
                 server,
@@ -151,7 +161,7 @@ data class TranscriptImagePreview(val id: String, val pages: List<Page>, val ser
             if (decoded.none { it.first == selectedID }) return null
             return TranscriptImagePreview(
                 selectedID,
-                decoded.mapIndexed { index, (id, image) -> Page(id, image, "$label ${index + 1} of ${decoded.size}") },
+                decoded.mapIndexed { index, (id, image) -> Page(id, image, localized(R.string.media_image_page_label, label, index + 1, decoded.size), labelIsPlaceholder = true) },
             )
         }
     }

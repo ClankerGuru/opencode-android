@@ -46,15 +46,14 @@ import kotlin.math.roundToInt
 import kotlin.time.DurationUnit
 
 /**
- * Port of iOS `ConnectionProbeClient` (`Settings/ConnectionMonitor.swift`): health checks for the
- * connection card: a light `GET /api/info` every two seconds (1.5 while reconnecting, never more
- * than one out at a time), only while the card is on screen and the app active, timed from the
- * phone. Also finds the server's machine name by a reverse lookup of its IP (MagicDNS answers for
- * a tailnet IP), since V2 servers report only addresses.
+ * Health checks for the connection card: a light `GET /api/info` every two seconds (1.5 while
+ * reconnecting, never more than one out at a time), only while the card is on screen and the app
+ * active, timed from the phone. Also finds the server's machine name by a reverse lookup of its IP,
+ * since V2 servers report only addresses.
  *
- * Deliberately a single-shot probe like iOS's `URLRequest` on `URLSession.shared` (the transport's
- * request pool), not an `OpenCodeClient` call: each beat is one measured round trip, and a missed
- * one is a dropped beat, so nothing retries (the policy is bound to [RetryPolicy.once] as iOS does).
+ * A single-shot probe on the transport's request pool, not an `OpenCodeClient` call: each beat is
+ * one measured round trip and a missed one is a dropped beat, so nothing retries
+ * ([RetryPolicy.once]).
  */
 class ConnectionProbeClient(
     val check: suspend (OpenCodeServer) -> Answer,
@@ -76,7 +75,7 @@ class ConnectionProbeClient(
             reverseName = { null },
         )
 
-        /** iOS `URLRequest(timeoutInterval: 4)`: an idle timeout, not a total deadline. */
+        /** An idle timeout, not a total deadline. */
         private const val TIMEOUT_SECONDS = 4L
 
         private val json = Json { ignoreUnknownKeys = true }
@@ -134,7 +133,7 @@ class ConnectionProbeClient(
             })
         }
 
-        /** iOS `getnameinfo(NI_NAMEREQD)`: null when no name is found (Android answers the IP itself). */
+        /** Null when no name is found (Android answers the IP itself). */
         internal fun reverseLookup(address: String): String? = try {
             val name = InetAddress.getByName(address).canonicalHostName
             name.takeIf { it != address }
@@ -145,15 +144,10 @@ class ConnectionProbeClient(
 }
 
 /**
- * Port of iOS `ConnectionMonitor`: drives [ConnectionHealth] for the card on screen: feeds it
- * Home's link, runs the checks, and applies each status change at its moment on the trace. A plain
- * object (iOS `@Observable` class), view-local and short-lived; nothing here outlives Settings but
- * the last averaged round trip per server and the machine names found. Its readable values are Compose
- * state; the card and the server page animate their changes (numbers roll, words replace, a
- * cross-fade under reduce motion). Used on the main thread only.
- *
- * iOS's `ConnectionLabScenario` (`-lab-connection-state`, scripted XCUITest connections) is n/a:
- * Android has no lab launch arguments; the fixture servers drive real states.
+ * Drives [ConnectionHealth] for the card on screen: feeds it Home's link, runs the checks, and
+ * applies each status change at its moment on the trace. View-local and short-lived; only the last
+ * averaged round trip per server and the machine names found outlive Settings. Its readable values
+ * are Compose state. Main thread only.
  */
 class ConnectionMonitor(server: OpenCodeServer, link: ConnectionHealth.Link) {
     private val probe = dependency(ConnectionProbeClient)
@@ -300,10 +294,9 @@ class ConnectionMonitor(server: OpenCodeServer, link: ConnectionHealth.Link) {
         val id = health.beginCheck(now)
         publish()
         val server = arrivedServer ?: server
-        // One request at a time: while the last is still out (a server not answering holds it for
-        // its 4 s timeout), this beat sends nothing and drops at its deadline, as it would have
-        // anyway. Stacked requests into a dead route can stall a VPN tunnel
-        // (tailscale/tailscale#21773).
+        // One request at a time: while the last is still out (up to its 4 s timeout), this beat
+        // sends nothing and drops at its deadline. Stacked requests into a dead route can stall a
+        // VPN tunnel.
         if (checks.isNotEmpty()) return
         val probe = probe
         checks[id] = scope.launch {
@@ -354,7 +347,7 @@ class ConnectionMonitor(server: OpenCodeServer, link: ConnectionHealth.Link) {
         /** The last averaged round trip per server, so reopening Settings shows a number at once. */
         private val lastMilliseconds = ConcurrentHashMap<String, Int>()
 
-        /** iOS `UserDefaults` `connection-card-machine-names`: machine names found, by IP. */
+        /** Machine names found, by IP. */
         private val namesKey = SharedKey.appStorage<Map<String, String>>("connection-card-machine-names", emptyMap())
 
         private fun savedName(server: OpenCodeServer): String? =

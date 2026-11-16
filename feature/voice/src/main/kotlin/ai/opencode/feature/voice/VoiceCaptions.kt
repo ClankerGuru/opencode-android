@@ -102,7 +102,7 @@ data class CaptionReveal(
     }
 }
 
-/** Each word fades in where it lies, out of a light blur (iOS `CaptionWordRenderer`). */
+/** Each word fades in where it lies, out of a light blur. */
 object CaptionWordRenderer {
     const val duration = 0.42
 

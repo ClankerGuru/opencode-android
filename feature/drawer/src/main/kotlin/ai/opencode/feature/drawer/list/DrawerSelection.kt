@@ -1,11 +1,13 @@
 package ai.opencode.feature.drawer.list
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionReduce
 import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
+import ai.opencode.core.strings.localized
 import ai.opencode.core.ui.OpenCodeAlertDialog
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconButton
@@ -16,6 +18,7 @@ import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.InboxSidebarFeature
+import ai.opencode.feature.drawer.R
 import ai.opencode.feature.drawer.inboxSidebarArchivedRows
 import ai.opencode.feature.drawer.isMuted
 import ai.opencode.feature.drawer.isPinned
@@ -51,14 +54,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 
 /**
- * The drawer's selection (Android, as in Gmail and Files; iOS holds a row for its menu instead).
- * Holding a row chooses it; while any row is chosen, a tap adds or removes one, and the header
- * shows [DrawerSelectionBar] with the chosen sessions' actions.
+ * The drawer's selection. Holding a row chooses it; while any row is chosen, a tap adds or removes
+ * one, and the header shows [DrawerSelectionBar] with the chosen sessions' actions.
  */
 @Stable
 class DrawerSelection {
@@ -134,9 +138,9 @@ internal fun DrawerSelectionBar(
     val colors = OpenCodeTheme.colors
     var overflowOpen by remember { mutableStateOf(false) }
     Row(modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-        OpenCodeIconButton(SFSymbol.Xmark, contentDescription = "Cancel Selection", onClick = onClose, style = OpenCodeIconButtonStyle.Standard)
+        OpenCodeIconButton(SFSymbol.Xmark, contentDescription = stringResource(R.string.drawer_selection_cancel_description), onClick = onClose, style = OpenCodeIconButtonStyle.Standard)
         RollingNumber(
-            "$count Selected",
+            pluralStringResource(R.plurals.drawer_selection_count, count, count),
             style = OpenCodeTextStyles.headline,
             color = colors.text,
             modifier = Modifier.weight(1f).padding(start = 4.dp),
@@ -155,7 +159,7 @@ internal fun DrawerSelectionBar(
         var menuWidth by remember { mutableIntStateOf(0) }
         val shift = with(LocalDensity.current) { (menuWidth - buttonWidth).coerceAtLeast(0).toDp() }
         Box(Modifier.onSizeChanged { buttonWidth = it.width }) {
-            OpenCodeIconButton(SFSymbol.Ellipsis, contentDescription = "More Options", onClick = { overflowOpen = true }, style = OpenCodeIconButtonStyle.Standard)
+            OpenCodeIconButton(SFSymbol.Ellipsis, contentDescription = stringResource(R.string.drawer_selection_more_options_description), onClick = { overflowOpen = true }, style = OpenCodeIconButtonStyle.Standard)
             DropdownMenu(
                 expanded = overflowOpen,
                 onDismissRequest = { overflowOpen = false },
@@ -202,7 +206,7 @@ internal fun selectionActions(
 
     val main = listOf(
         DrawerRowMenuItem(
-            if (anyUnread) "Mark as Read" else "Mark as Unread",
+            if (anyUnread) localized(R.string.drawer_mark_as_read) else localized(R.string.drawer_mark_as_unread),
             if (anyUnread) SFSymbol.EnvelopeOpen else SFSymbol.EnvelopeBadge,
         ) {
             for (session in sessions) {
@@ -214,13 +218,13 @@ internal fun selectionActions(
             }
             selection.clear()
         },
-        DrawerRowMenuItem("Archive", SFSymbol.Archivebox) {
+        DrawerRowMenuItem(localized(R.string.drawer_archive), SFSymbol.Archivebox) {
             for (session in sessions) {
                 store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveTapped(session.id, session.title)))
             }
             selection.clear()
         },
-        DrawerRowMenuItem("Delete", SFSymbol.Trash) {
+        DrawerRowMenuItem(localized(CoreR.string.common_delete), SFSymbol.Trash) {
             if (ids.size == 1) {
                 // One session asks in the existing words ([ai.opencode.feature.drawer.HomeDeleteConfirmation]).
                 store.send(HomeFeature.Action.DeleteSessionTapped(ids[0]))
@@ -233,7 +237,7 @@ internal fun selectionActions(
 
     val overflow = mutableListOf<DrawerRowMenuItem>()
     overflow.add(
-        DrawerRowMenuItem(if (allMuted) "Unmute" else "Mute", if (allMuted) SFSymbol.Bell else SFSymbol.BellSlash) {
+        DrawerRowMenuItem(if (allMuted) localized(R.string.drawer_unmute) else localized(R.string.drawer_mute), if (allMuted) SFSymbol.Bell else SFSymbol.BellSlash) {
             for (session in sessions) {
                 if (state.isMuted(session.id) == allMuted) store.send(HomeFeature.Action.ToggleMute(session.id))
             }
@@ -242,7 +246,7 @@ internal fun selectionActions(
     )
     if (pins) {
         overflow.add(
-            DrawerRowMenuItem(if (allPinned) "Unpin" else "Pin", if (allPinned) SFSymbol.PinSlash else SFSymbol.Pin) {
+            DrawerRowMenuItem(if (allPinned) localized(R.string.drawer_unpin) else localized(R.string.drawer_pin), if (allPinned) SFSymbol.PinSlash else SFSymbol.Pin) {
                 for (session in sessions) {
                     if (state.isPinned(session.id) == allPinned) store.send(HomeFeature.Action.TogglePin(session.id))
                 }
@@ -253,7 +257,7 @@ internal fun selectionActions(
     val windows = dependency(WindowsClient)
     if (ids.size == 1 && windows.isAvailable()) {
         overflow.add(
-            DrawerRowMenuItem("Open in New Window", SFSymbol.MacwindowBadgePlus) {
+            DrawerRowMenuItem(localized(R.string.drawer_open_in_new_window), SFSymbol.MacwindowBadgePlus) {
                 windows.open(SessionWindowTarget(serverID = state.server.persistenceID, sessionID = ids[0]))
                 selection.clear()
             },
@@ -269,13 +273,13 @@ internal fun archivedSelectionActions(
 ): List<DrawerRowMenuItem> {
     val rows = store.state.inboxSidebarArchivedRows().filter { it.id in selection.ids }
     return listOf(
-        DrawerRowMenuItem("Unarchive", SFSymbol.TrayAndArrowDown) {
+        DrawerRowMenuItem(localized(R.string.drawer_unarchive), SFSymbol.TrayAndArrowDown) {
             for (row in rows) {
                 store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.UnarchiveTapped(row.id, row.title)))
             }
             selection.clear()
         },
-        DrawerRowMenuItem("Delete", SFSymbol.Trash) {
+        DrawerRowMenuItem(localized(CoreR.string.common_delete), SFSymbol.Trash) {
             // Delete reads the sessions Home lists, so the archived ones join it first.
             for (row in rows) {
                 store.send(HomeFeature.Action.InboxSidebar(InboxSidebarFeature.Action.ArchivedRowTapped(row.id)))
@@ -296,8 +300,8 @@ internal fun DeleteSelectionConfirmation(store: StoreOf<HomeFeature.State, HomeF
     if (!selection.confirmingDelete) return
     OpenCodeAlertDialog(
         onDismissRequest = { selection.confirmingDelete = false },
-        title = { Text("Delete ${selection.ids.size} Sessions?") },
-        text = { Text("This removes them from the server for all clients.") },
+        title = { Text(pluralStringResource(R.plurals.drawer_delete_sessions_title, selection.ids.size, selection.ids.size)) },
+        text = { Text(stringResource(R.string.drawer_delete_sessions_message)) },
         confirmButton = {
             TextButton(onClick = {
                 for (id in selection.ids) {
@@ -306,11 +310,11 @@ internal fun DeleteSelectionConfirmation(store: StoreOf<HomeFeature.State, HomeF
                 }
                 selection.clear()
             }) {
-                Text("Delete", color = OpenCodeTheme.colors.destructive)
+                Text(stringResource(CoreR.string.common_delete), color = OpenCodeTheme.colors.destructive)
             }
         },
         dismissButton = {
-            TextButton(onClick = { selection.confirmingDelete = false }) { Text("Cancel") }
+            TextButton(onClick = { selection.confirmingDelete = false }) { Text(stringResource(CoreR.string.common_cancel)) }
         },
     )
 }

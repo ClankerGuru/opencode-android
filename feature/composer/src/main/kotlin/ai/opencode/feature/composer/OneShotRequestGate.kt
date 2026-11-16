@@ -9,12 +9,8 @@ import kotlinx.coroutines.withContext
 
 /**
  * One cancellable platform request (a MediaStore thumbnail or image read) that resumes exactly
- * once: the coroutine's cancellation cancels the request through its [CancellationSignal], and a
- * cancelled or failed request reads as null. iOS `OneShotRequestGate` (PhotoKit's request ID, a
- * map snapshotter's `cancel()`) guards a continuation resumed from a callback thread
- * (`arm`/`started`/`finish`); on Android the signal plus structured cancellation are the whole
- * gate, and the map snapshot needs none (`LocationClient.prefetchCompactSnapshot` bounds its own
- * job).
+ * once: cancelling the coroutine cancels the request through its [CancellationSignal], and a
+ * cancelled or failed request reads as null.
  */
 class OneShotRequestGate {
     val signal = CancellationSignal()

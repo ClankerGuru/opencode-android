@@ -1,8 +1,10 @@
 package ai.opencode.feature.system.intents
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeTextField
 import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.feature.system.LeftToRight
+import ai.opencode.feature.system.R
 import ai.opencode.feature.system.SessionDirectory
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.dependency
@@ -53,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -73,17 +76,16 @@ import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Ask OpenCode's door (iOS `AskOpenCodeIntent`, run by Siri or Shortcuts): a small dialog over
- * whatever is on screen that sends without opening the app. When a verified assistant
- * ([AppActionActivity.isVerifiedAssistant]) hands the message in `EXTRA_TEXT` it sends at
- * once, as Siri does; any other app's text only fills the field, and Send needs a tap;
- * without text it asks “What should OpenCode do?”. Activities never show over the lock
- * screen, so it needs an unlocked phone, as iOS's `.requiresAuthentication`.
+ * Ask OpenCode's door: a small dialog over whatever is on screen that sends without opening the
+ * app. When a verified assistant ([AppActionActivity.isVerifiedAssistant]) hands the message in
+ * `EXTRA_TEXT` it sends at once; any other app's text only fills the field, and Send needs a tap;
+ * without text it asks “What should OpenCode do?”. Activities never show over the lock screen, so
+ * it needs an unlocked phone.
  *
- * iOS's intents can't be started by other apps; this activity can, so its Send can't be
- * covered: other apps' overlays are hidden and obscured touches dropped while it shows, and it
- * closes when anything else comes on top before the message is sent, so a caller can't put
- * its own screen over the dialog and lift it as the user taps.
+ * Other apps can start this activity, so its Send can't be covered: other apps' overlays are
+ * hidden and obscured touches dropped while it shows, and it closes when anything else comes on
+ * top before the message is sent, so a caller can't put its own screen over the dialog and lift it
+ * as the user taps.
  */
 class AskOpenCodeActivity : ComponentActivity() {
     private val model: AskOpenCodeModel by viewModels()
@@ -217,7 +219,7 @@ private fun AskOpenCodeView(
             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OpenCodeIcon(SFSymbol.TextBubble, contentDescription = null)
-                    Text(AskOpenCodeIntent.TITLE, style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
+                    Text(stringResource(R.string.system_ask_title), style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
                 }
                 val result = state.result
                 if (result != null) {
@@ -229,7 +231,7 @@ private fun AskOpenCodeView(
                     )
                     if (state.failed) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                            OpenCodeSecondaryButton("Done", onClick = onCancel)
+                            OpenCodeSecondaryButton(stringResource(CoreR.string.common_done), onClick = onCancel)
                         }
                     }
                     return@Column
@@ -238,8 +240,8 @@ private fun AskOpenCodeView(
                 OpenCodeTextField(
                     value = state.message,
                     onValueChange = { text -> onUpdate { it.copy(message = text) } },
-                    label = AskOpenCodeIntent.MESSAGE_TITLE,
-                    placeholder = AskOpenCodeIntent.REQUEST_VALUE_DIALOG,
+                    label = stringResource(R.string.system_ask_message_title),
+                    placeholder = stringResource(R.string.system_ask_message_placeholder),
                     minLines = 2,
                     maxLines = 6,
                     enabled = !state.isSending,
@@ -260,12 +262,12 @@ private fun AskOpenCodeView(
                     }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)) {
-                    OpenCodeSecondaryButton("Cancel", onClick = onCancel)
+                    OpenCodeSecondaryButton(stringResource(CoreR.string.common_cancel), onClick = onCancel)
                     OpenCodePrimaryButton(onClick = onSend, enabled = state.canSend) {
                         if (state.isSending) {
                             CircularProgressIndicator(Modifier.heightIn(max = 18.dp), strokeWidth = 2.dp)
                         } else {
-                            Text("Send")
+                            Text(stringResource(CoreR.string.common_send))
                         }
                     }
                 }
@@ -291,8 +293,8 @@ private fun SessionPicker(
         ) {
             Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(AskOpenCodeIntent.SESSION_TITLE, style = MaterialTheme.typography.labelMedium)
-                    Text(state.session?.title ?: "Last Viewed Session", style = MaterialTheme.typography.bodyLarge, maxLines = 1)
+                    Text(stringResource(R.string.system_ask_session_title), style = MaterialTheme.typography.labelMedium)
+                    Text(state.session?.title ?: stringResource(R.string.system_last_viewed_session), style = MaterialTheme.typography.bodyLarge, maxLines = 1)
                     state.session?.detail?.let {
                         Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                     }
@@ -311,7 +313,7 @@ private fun SessionPicker(
                     },
                     leadingIcon = { OpenCodeIcon(entity.symbol, contentDescription = null) },
                     trailingIcon = if (entity.id == state.session?.id) {
-                        { OpenCodeIcon(SFSymbol.Checkmark, contentDescription = "Selected") }
+                        { OpenCodeIcon(SFSymbol.Checkmark, contentDescription = stringResource(R.string.system_selected_description)) }
                     } else null,
                     onClick = {
                         expanded = false

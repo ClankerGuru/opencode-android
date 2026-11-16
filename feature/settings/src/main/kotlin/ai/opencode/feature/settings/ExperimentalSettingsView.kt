@@ -31,15 +31,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.delay
 
 /**
- * Port of iOS `Settings/ExperimentalSettingsView.swift`: Settings › Experimental, All Experiments
- * in its own section, then the experimental switches in open groups (Composer, Calls, Drawer,
- * Transcript); a group with one row has no header. Sound Effects' volume and send rows sit under
- * the drawer's switches while it's on.
- * Opened for one experiment (What’s New), it scrolls to that row and briefly highlights it
- * (1.2 s, then a 0.6 s ease-out).
+ * Settings › Experimental, All Experiments in its own section, then the experimental switches in
+ * open groups (Composer, Calls, Drawer, Transcript); a group with one row has no header. Sound
+ * Effects' volume and send rows sit under the drawer's switches while it's on. Opened for one
+ * experiment (What’s New), it scrolls to that row and briefly highlights it (1.2 s, then a 0.6 s
+ * ease-out).
  */
 @Composable
 fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) {
@@ -53,7 +54,7 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
     var highlighted by remember { mutableStateOf<ExperimentalFeature?>(null) }
 
     // Scroll to the focused row (All Experiments, then each group's section, are one list item
-    // each, in order), centred as iOS `scrollTo(_, anchor: .center)`, and tint it.
+    // each, in order), centred, and tint it.
     LaunchedEffect(focus) {
         val target = focus ?: return@LaunchedEffect
         val group = target.group ?: return@LaunchedEffect
@@ -87,15 +88,17 @@ fun ExperimentalSettingsView(store: SettingsStore, focus: ExperimentalFeature?) 
     /** A lone row needs no title over it. */
     fun header(group: ExperimentalGroup): String? = if (group.features.size > 1) group.title else null
 
-    SettingsPageScaffold(title = "Experimental", store = store, listState = listState) {
+    val allFooter = stringResource(R.string.settings_experimental_all_footer)
+
+    SettingsPageScaffold(title = stringResource(R.string.settings_experimental_title), store = store, listState = listState) {
         settingsSection(
             key = "experimental-all",
             footer = footerText(
-                "Also turns on new ones, except any that see your screen or listen in the background.",
+                allFooter,
             ),
         ) {
             SettingsToggleRow(
-                title = "All Experiments",
+                title = stringResource(R.string.settings_experimental_all),
                 checked = all,
                 onCheckedChange = { send(HomeSettingsFeature.Action.AllExperimentsChanged(it)) },
                 symbol = "flask.fill",
@@ -145,13 +148,13 @@ fun ExperimentalFeatureToggle(
     )
 }
 
-/** Tinted at once, then fades out on the dim role (iOS `Motion.dim.animation(.exit)`). */
+/** Tinted at once, then fades out on the dim role. */
 private fun highlightSpec(highlighted: Boolean, reduceMotion: Boolean): AnimationSpec<Color> =
     if (highlighted) snap() else MotionRole.Dim.animation(MotionPhase.Exit, reduceMotion)
 
 /**
- * iOS `ExperimentalSettingsRow`: Settings' row into Experimental, counting experiments turned on
- * (“2 On”), or “All On” while All Experiments is. Android divergence: the count is a badge.
+ * Settings' row into Experimental, counting experiments turned on (“2 On”), or “All On” while All
+ * Experiments is. The count is a badge.
  */
 @Composable
 fun ExperimentalSettingsRow(modifier: Modifier = Modifier, onClick: () -> Unit) {
@@ -162,8 +165,8 @@ fun ExperimentalSettingsRow(modifier: Modifier = Modifier, onClick: () -> Unit) 
     for ((index, feature) in features.withIndex()) {
         if (enabled[index]) on += 1
     }
-    val badge = if (all) "All On" else if (on == 0) null else "$on On"
-    SettingsRow("Experimental", "flask.fill", SettingsTint.Gray, modifier = modifier, badge = badge, onClick = onClick)
+    val badge = if (all) stringResource(R.string.settings_experimental_all_on) else if (on == 0) null else pluralStringResource(R.plurals.settings_experimental_on_count, on, on)
+    SettingsRow(stringResource(R.string.settings_experimental_title), "flask.fill", SettingsTint.Gray, modifier = modifier, badge = badge, onClick = onClick)
 }
 
 val ExperimentalGroup.tint: SettingsTint
@@ -175,11 +178,10 @@ val ExperimentalGroup.tint: SettingsTint
     }
 
 /**
- * Settings › Developer (iOS `Diagnostics/DiagnosticsView.swift`): `:devtools`'
- * Developer screen (Developer Mode, Record Diagnostics, Demo Call Audio, Troubleshooting,
- * Tuning, Android's tools), with Settings' Playgrounds under Tuning as on iOS, and the server's
- * Server Details row last while there is a server (iOS p217). Its sub-pages go back inside it;
- * its main page's back pops Settings' stack. The overlay shares the store.
+ * Settings › Developer: `:devtools`' Developer screen (Developer Mode, Record Diagnostics, Demo
+ * Call Audio, Troubleshooting, Tuning, Android's tools), with Settings' Playgrounds under Tuning,
+ * and the server's Server Details row last while there is a server. Its sub-pages go back inside
+ * it; its main page's back pops Settings' stack. The overlay shares the store.
  */
 @Composable
 fun DeveloperSettingsView(store: SettingsStore) {
@@ -194,9 +196,8 @@ fun DeveloperSettingsView(store: SettingsStore) {
 }
 
 /**
- * Port of iOS `PlaygroundsSettingsView` (`Settings/SettingsView.swift`). The Transcript, Session
- * List and Composer playgrounds are iOS Tuning tools (`:devtools` on Android); Onboarding ports here.
- * Welcome Preview's switch and its Show Welcome row live here, out of Experimental (iOS p217).
+ * Onboarding ports here. Welcome Preview's switch and its Show Welcome row live here, out of
+ * Experimental.
  */
 @Composable
 fun PlaygroundsSettingsView(store: SettingsStore) {
@@ -228,7 +229,7 @@ fun PlaygroundsSettingsView(store: SettingsStore) {
     }
 }
 
-/** Settings › Playgrounds › Motion: iOS `MotionPlaygroundView`, one example per motion role. */
+/** Settings › Playgrounds › Motion. */
 @Composable
 fun MotionPlaygroundSettingsView(store: SettingsStore) {
     SettingsPageScaffold(title = "Motion", store = store) {

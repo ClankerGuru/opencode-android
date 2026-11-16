@@ -6,11 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.abs
 
-/**
- * The `:feature:transcript` tests of iOS `OpenCodeTests/AgentImagePreviewTests.swift`
- * ([JustifiedImageRows], which lays out named images with `AgentImagePlan.loneMaxHeight`); the
- * rest is `:feature:media`'s. Points → dp.
- */
+/** Points → dp. */
 class AgentImagePreviewTests {
     private val loneMaxHeight = AgentImagePlan.LONE_MAX_HEIGHT.value
 

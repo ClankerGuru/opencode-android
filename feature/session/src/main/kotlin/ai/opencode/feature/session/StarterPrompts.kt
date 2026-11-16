@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.strings.localized
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
@@ -19,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -26,7 +28,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
-/** iOS `StarterPromptTunables`. */
 object StarterPromptTunables {
     /** Header to prompts. */
     const val headerGap = 2f
@@ -36,14 +37,14 @@ object StarterPromptTunables {
 }
 
 /**
- * The first computer's ready session: questions any project can answer from its files alone, so
- * the first send shows the agent reading and replying (iOS `firstSessionStarters`).
+ * The first computer's ready session: questions any project can answer from its files alone, so the
+ * first send shows the agent reading and replying.
  */
 val SessionFeature.State.Companion.firstSessionStarters: List<String>
     get() = listOf(
-        "What does this project do?",
-        "Give me a quick tour of the code",
-        "What changed here recently?",
+        localized(R.string.session_starter_project_purpose),
+        localized(R.string.session_starter_code_tour),
+        localized(R.string.session_starter_recent_changes),
     )
 
 /**
@@ -54,15 +55,15 @@ val SessionFeature.State.composingRetiresStarterPrompts: Boolean
     get() = starterPrompts.isNotEmpty() && hasPromptContent
 
 /**
- * iOS `StarterPromptList`: starter prompts above a draft's recent projects. A tap types the prompt
- * into the composer for the person to send; composing, they fade away.
+ * Starter prompts above a draft's recent projects. A tap types the prompt into the composer for the
+ * person to send; composing, they fade away.
  */
 @Composable
 fun StarterPromptList(prompts: List<String>, onPick: (String) -> Unit, modifier: Modifier = Modifier) {
     val iconWidth = with(LocalDensity.current) { (22 * fontScale).dp }
     Column(modifier.testTag("starter-prompts"), verticalArrangement = Arrangement.spacedBy(StarterPromptTunables.headerGap.dp)) {
         Text(
-            "Try Asking",
+            stringResource(R.string.session_starter_prompts_title),
             style = OpenCodeTextStyles.footnote.copy(fontWeight = FontWeight.SemiBold),
             color = OpenCodeTheme.colors.secondaryText,
             modifier = Modifier.padding(start = 17.dp).semantics { heading() },
@@ -72,7 +73,7 @@ fun StarterPromptList(prompts: List<String>, onPick: (String) -> Unit, modifier:
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = 48.dp)
-                    .clickable(role = Role.Button, onClickLabel = "Type it into the message") { onPick(prompt) }
+                    .clickable(role = Role.Button, onClickLabel = stringResource(R.string.session_starter_prompt_pick_label)) { onPick(prompt) }
                     // The bubble lines up with the project folders and the composer's +.
                     .padding(start = 17.dp, end = 16.dp)
                     .testTag("starter-prompt"),

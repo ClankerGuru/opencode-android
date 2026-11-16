@@ -20,12 +20,6 @@ import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * The `OpenCodeClient` half of iOS `SessionSheetTests.swift` (`contextDecodingMatchesTheTUI`,
- * `sheetRoutesMatchTheV2Contract`, `alwaysNotifyMergesIntoTheSessionsMetadataAndDecodes`,
- * `modelCatalogCarriesTheContextWindow`); the sheet's reducer tests are `:feature:session`'s
- * `SessionSheetTests`.
- */
 class SessionSheetWireTests {
     @get:Rule val isolation = TestIsolationRule()
 

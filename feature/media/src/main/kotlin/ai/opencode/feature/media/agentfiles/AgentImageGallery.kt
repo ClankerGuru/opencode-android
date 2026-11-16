@@ -3,6 +3,7 @@ package ai.opencode.feature.media
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.strings.localized
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
@@ -45,8 +46,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -61,7 +62,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
@@ -190,8 +190,9 @@ data class AgentImagePlan(
          * by a constrained network from a path outside the project.
          */
         fun outsideAccessibilityValue(file: AgentFileReference, directory: String?): String {
-            val target = file.target(directory) ?: return "Outside the project"
-            return if (isInside(target, directory)) "Deferred for Low Data Mode" else "Outside the project"
+            val target = file.target(directory) ?: return localized(R.string.media_image_outside_project_value)
+            if (isInside(target, directory)) return localized(R.string.media_image_deferred_low_data_value)
+            return localized(R.string.media_image_outside_project_value)
         }
 
         /** The images held out of the layout until their shape is known. */
@@ -261,12 +262,6 @@ val LocalAgentImageSiblings = staticCompositionLocalOf<List<AgentFileReference>>
 /** The place these blocks are shown (a reply's item): each new place an image is named rechecks it, and its full-screen flight starts there. */
 val LocalAgentImageOccurrence = staticCompositionLocalOf { "blocks" }
 
-/** The height last laid out, for this gallery's place (a reused row's state belongs to another). */
-private class AgentImageLaidOut {
-    var place: String? = null
-    var height: Float = 0f
-}
-
 /**
  * A block's named files (iOS `AgentImageGallery`): previews as bentos in decided batches, Not
  * found and Tap to load cards, and file cards, in the order named. Tapping a loaded tile opens
@@ -286,13 +281,12 @@ fun AgentImageGallery(
     val siblings = LocalAgentImageSiblings.current
     val occurrence = LocalAgentImageOccurrence.current
     val block = LocalAgentImageBlock.current
-    val rowGrowth = LocalAgentImageRowGrowth.current
     val gap = LocalAgentImageGap.current
     val gathering = LocalAgentImageGathering.current
-    val density = LocalDensity.current
-    val laidOut = remember { AgentImageLaidOut() }
     val serverID = server.persistenceID
     val targets = remember(files, directory) { files.map { it.target(directory) } }
+    val notFoundState = stringResource(R.string.media_image_not_found)
+    val loadImageLabel = stringResource(R.string.media_image_load_label)
     fun key(target: AgentFileReference.Target) = AgentImageKey(serverID, target.absolutePath)
     fun sighting(target: AgentFileReference.Target) = AgentImageSighting(key(target), occurrence)
     fun request(target: AgentFileReference.Target): AgentImageRequest? =
@@ -367,14 +361,7 @@ fun AgentImageGallery(
 
     Box(
         modifier.onSizeChanged { size ->
-            // Reports its own growth (from nothing too), so the text below holds still while the row eases.
-            val height = with(density) { size.height.toDp().value }
-            if (laidOut.place == place && abs(height - laidOut.height) > 0.5f && block != null) {
-                rowGrowth?.add(block, height - laidOut.height)
-            }
-            laidOut.place = place
-            laidOut.height = height
-            if (height > 0.5f) previews.markPresented(place)
+            if (size.height > 0) previews.markPresented(place)
         },
     ) {
         Box(Modifier.matchParentSize()) {
@@ -449,7 +436,7 @@ fun AgentImageGallery(
                                     AgentImageStatusCard.Status.NotFound,
                                     Modifier.clearAndSetSemantics {
                                         contentDescription = file.name
-                                        stateDescription = "Not found"
+                                        stateDescription = notFoundState
                                         testTag = "agent-image-not-found"
                                     },
                                 )
@@ -463,7 +450,7 @@ fun AgentImageGallery(
                                 AgentImageStatusCard.Status.Outside,
                                 Modifier
                                     .clip(RoundedCornerShape(TranscriptMetrics.cardCornerRadius))
-                                    .clickable(onClickLabel = "Load the image", role = Role.Button) {
+                                    .clickable(onClickLabel = loadImageLabel, role = Role.Button) {
                                         targets[segment.index]?.let { previews.allow(key(it)) }
                                     }
                                     // The button's own label and value, not the card's text (iOS `.accessibilityLabel` on the Button).
@@ -472,7 +459,7 @@ fun AgentImageGallery(
                                         contentDescription = file.name
                                         stateDescription = value
                                         testTag = "agent-image-outside"
-                                        onClick(label = "Load the image") {
+                                        onClick(label = loadImageLabel) {
                                             targets[segment.index]?.let { previews.allow(key(it)) }
                                             true
                                         }
@@ -543,14 +530,15 @@ private fun AgentImageGalleryTile(
 ) {
     val appear = rememberAgentImageAppearance(sighting.mediaID)
     val loaded = entry.phase == AgentImagePreviews.Phase.Loaded
+    val loadingState = stringResource(R.string.media_image_loading_state)
     Box(
         Modifier
             .fillMaxSize()
             .mediaDragSource(drag)
-            .clickable(onClickLabel = "Open the image", role = Role.Button, onClick = onClick)
+            .clickable(onClickLabel = stringResource(R.string.media_image_open_label), role = Role.Button, onClick = onClick)
             .semantics(mergeDescendants = true) {
                 contentDescription = file.name
-                if (!loaded) stateDescription = "Loading"
+                if (!loaded) stateDescription = loadingState
             }
             .testTag("agent-image")
             // A tile fades in where it first appears; the marker under it, so what's drawn is what's read.
@@ -727,7 +715,7 @@ fun AgentImageStatusCard(file: AgentFileReference, status: AgentImageStatusCard.
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                if (notFound) "Not found" else "Tap to load",
+                if (notFound) stringResource(R.string.media_image_not_found) else stringResource(R.string.media_image_tap_to_load),
                 style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium),
                 color = if (notFound) colors.secondaryText else colors.text,
                 maxLines = 1,

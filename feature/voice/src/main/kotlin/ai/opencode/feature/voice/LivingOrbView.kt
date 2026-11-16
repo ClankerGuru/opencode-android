@@ -40,7 +40,7 @@ import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sin
 
-/** What a Living Orb draws (iOS `LivingOrbConfig`). */
+/** What a Living Orb draws. */
 data class LivingOrbConfig(
     val mood: FloatingCallMood,
     val isMuted: Boolean,
@@ -72,7 +72,7 @@ data class LivingOrbConfig(
     }
 }
 
-/** The disc inside a bigger field, in the view's dp (iOS `LivingOrbBloom`). */
+/** The disc inside a bigger field, in the view's dp. */
 data class LivingOrbBloom(
     val center: Offset,
     val radius: Float,
@@ -94,20 +94,17 @@ data class LivingOrbBloom(
 }
 
 /**
- * The call's voice orb: Wisp's glass lens and phosphor dots ([WispOrbSim], [WispOrbShaders])
- * (iOS `LivingOrbView`).
+ * The call's voice orb: Wisp's glass lens and phosphor dots ([WispOrbSim], [WispOrbShaders]).
  *
  * Android: an AGSL [RuntimeShader] drawn by a Compose [Canvas]; a `withFrameNanos` loop steps the
- * plain-object [WispOrbRenderer] only while it shows (not [isHidden], lifecycle resumed: iOS
- * `scenePhase == .active`). Under Reduce Motion it draws once whenever its inputs change. Wisp's
- * glass looks the same in light and dark.
+ * plain-object [WispOrbRenderer] only while it shows. Under Reduce Motion it draws once whenever
+ * its inputs change. Wisp's glass looks the same in light and dark.
  *
  * @param isHidden faded out behind the panel: no drawing.
  * @param bloom where the bloom is this frame, read as each frame renders (overrides `config.bloom`).
  */
 @Composable
 fun LivingOrbView(config: LivingOrbConfig, modifier: Modifier = Modifier, isHidden: Boolean = false, bloom: (() -> LivingOrbBloom?)? = null) {
-    // iOS `.onAppear { WispOrbTunables.register() }`.
     LaunchedEffect(Unit) { WispOrbTunables.register() }
     val reduceMotion = rememberReduceMotion()
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
@@ -156,12 +153,10 @@ fun LivingOrbView(config: LivingOrbConfig, modifier: Modifier = Modifier, isHidd
 }
 
 /**
- * Steps [WispOrbSim] at display rate and draws a frame (iOS `WispOrbRenderer`): [WispOrbCells]
- * lights every LED, then [WispOrbShaders] rasterises the lens. A plain object, one per mounted orb;
- * main thread only.
+ * Steps [WispOrbSim] at display rate and draws a frame: [WispOrbCells] lights every LED, then
+ * [WispOrbShaders] rasterises the lens. A plain object, one per mounted orb; main thread only.
  *
- * Android: the cell kernel runs on the CPU (iOS dispatches it as a Metal compute pass in the same
- * command buffer) and its cells reach the shader as a half-float bitmap.
+ * Android: the cell kernel runs on the CPU and its cells reach the shader as a half-float bitmap.
  */
 class WispOrbRenderer private constructor() {
     private val shader = RuntimeShader(WispOrbShaders.wispOrbFragment)
@@ -320,7 +315,7 @@ class WispOrbRenderer private constructor() {
 /**
  * A made-up voice for scripted orbs (the Orb settings preview, the lab): phrases of syllables with
  * pauses between them, stressed syllables that make onsets, and a falling intonation with bright
- * consonants for Voice Tone. Levels only: nothing plays (iOS `LivingOrbVoiceSignal`).
+ * consonants for Voice Tone. Levels only: nothing plays.
  */
 object LivingOrbVoiceSignal {
     data class Sample(val level: Double, val tone: Double)

@@ -2,10 +2,17 @@ plugins {
     id("opencode.android.application")
 }
 
+// The languages the app is translated into (docs/translating.md).
+val appLanguages = listOf(
+    "en", "am", "az", "bg", "bn", "bs", "ca", "cs", "da", "de", "dz", "el", "es", "et", "fi", "fo",
+    "fr", "hi", "hr", "hu", "hy", "in", "is", "it", "ja", "ka", "km", "ko", "lo", "lt", "lv", "mk",
+    "mn", "ms", "my", "nb", "ne", "nl", "pl", "pt-rBR", "ro", "ru", "si", "sk", "sl", "sq", "sr",
+    "sv", "tg", "th", "tk", "tr", "uk", "uz", "vi", "zh-rCN", "zh-rTW",
+)
+
 android {
     namespace = "ai.opencode.app"
     defaultConfig {
-        // Matches the iOS bundle identifier.
         applicationId = "ai.opencode.mobilecode"
         // CI stamps builds so testers can tell them apart: the workflow run number as the
         // version code (each build installs over the last), the release tag's version
@@ -51,10 +58,12 @@ android {
     buildFeatures {
         buildConfig = true
     }
-    // The app is English only, as iOS's bundle: keep library (Material, AndroidX) translations
-    // out so their labels, e.g. a sheet's "Drag handle", read in English beside the app's own.
     androidResources {
-        localeFilters += "en"
+        // Library (Material, AndroidX) translations are kept only for the app's own languages, so
+        // their labels, e.g. a sheet's "Drag handle", never read in a language the app isn't in.
+        localeFilters += appLanguages
+        // Android's per-app language setting lists the languages that have a values-xx folder.
+        generateLocaleConfig = true
     }
 }
 

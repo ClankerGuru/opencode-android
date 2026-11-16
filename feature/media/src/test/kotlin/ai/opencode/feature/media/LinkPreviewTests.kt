@@ -26,12 +26,10 @@ internal object LinkBlocks {
 }
 
 /**
- * Port of iOS `LinkPreviewTests.swift` (`LinkPreviewTests`). The Markdown in iOS's extraction
- * tests is parsed by `OpenCodeMarkdownBlock` (`:feature:transcript`); here the same replies are
- * given as the [LinkTextBlock]s the transcript hands media. `LinkPreviewSummary` (the
- * editorial card's lines) is the transcript's; only its accessibility labels are checked here.
- * `extractionFindsLinksInOrderOnceAndSkipsPrivateOnes` reads bare URLs with the framework's
- * `Patterns.WEB_URL`, so it runs under Robolectric in [LinkPreviewFrameworkTests].
+ * `LinkPreviewSummary` (the editorial card's lines) is the transcript's; only its accessibility
+ * labels are checked here. `extractionFindsLinksInOrderOnceAndSkipsPrivateOnes` reads bare URLs
+ * with the framework's `Patterns.WEB_URL`, so it runs under Robolectric in
+ * [LinkPreviewFrameworkTests].
  */
 class LinkPreviewTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -96,7 +94,7 @@ class LinkPreviewTests {
         assertEquals("publish.x.com", request.url.host)
         assertEquals("/oembed", request.url.encodedPath)
         assertEquals("https://x.com/example_dev/status/1844", request.url.queryParameter("url"))
-        // iOS `httpShouldHandleCookies == false`: the preview transport has no cookie jar.
+        // The preview transport has no cookie jar.
         assertNull(request.header("Cookie"))
         assertNull(request.body)
     }
@@ -144,7 +142,6 @@ class LinkPreviewTests {
         assertEquals("Read as it shows, not as a raw path", "Springs, docs.example.org", web.accessibilityLabel)
     }
 
-    /** The accessibility labels of iOS's editorial summary test (its `LinkPreviewSummary` lines are `:feature:transcript`'s). */
     @Test
     fun editorialSummaryShowsWhatTheURLAndMetadataSay() {
         val pr = LinkPreviewTarget.of("https://github.com/acme/widget/pull/1251")!!
@@ -169,7 +166,6 @@ class LinkPreviewTests {
         assertNull(title("https://example.com/?q=swift"))
     }
 
-    /** The accessibility labels of iOS's test (the pending titles are `LinkPreviewSummary`'s, `:feature:transcript`). */
     @Test
     fun pendingLinksSayWhatTheyAre() {
         val issue = LinkPreview.of(LinkPreviewTarget.of("https://github.com/acme/widget/issues/5")!!, null)
@@ -187,7 +183,7 @@ class LinkPreviewTests {
     }
 }
 
-/** Port of iOS `LinkPreviewLoaderTests` (`LinkPreviewTests.swift`). Times are milliseconds. */
+/** Times are milliseconds. */
 class LinkPreviewLoaderTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -291,7 +287,9 @@ class LinkPreviewLoaderTests {
     }
 }
 
-/** Port of iOS `LinkPreviewStoreTests` (`LinkPreviewTests.swift`). Times are milliseconds; `targetsAreExtractedOncePerReply` is in [LinkPreviewStoreFrameworkTests]. */
+/**
+ * Times are milliseconds; `targetsAreExtractedOncePerReply` is in [LinkPreviewStoreFrameworkTests].
+ */
 class LinkPreviewStoreTests {
     @get:Rule val isolation = TestIsolationRule()
 

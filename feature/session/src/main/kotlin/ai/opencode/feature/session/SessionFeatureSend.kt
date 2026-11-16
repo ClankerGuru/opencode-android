@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.strings.localized
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.sound.SoundEffect
@@ -25,6 +26,7 @@ import ai.opencode.feature.composer.ComposerAutocompleteChip
 import ai.opencode.feature.composer.ComposerAutocompleteDraftResolution
 import ai.opencode.feature.composer.ComposerCommandFailure
 import ai.opencode.feature.composer.ComposerFileAttachment
+import ai.opencode.feature.composer.ComposerQuote
 import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.feature.composer.DictationHoldRelease
 import ai.opencode.core.sharing.ExperimentalFeature
@@ -49,7 +51,8 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import java.util.UUID
 
-// Port of iOS `SessionFeature+Send.swift`: sends and their delivery. Undo lives in `SessionFeatureUndo.kt`, the outbox in `SessionFeatureOutbox.kt`.
+// Sends and their delivery. Undo lives in `SessionFeatureUndo.kt`, the outbox in
+// `SessionFeatureOutbox.kt`.
 
 /** Sends, failed sends, run errors, and undo. Null: the action passes on. */
 internal fun SessionFeature.reduceSending(state: State, action: Action): Reduced<State, Action>? {
@@ -193,7 +196,7 @@ internal fun SessionFeature.reduceSending(state: State, action: Action): Reduced
             val error = action.error
             if (error != null) {
                 haptics.play(Haptic.error)
-                return Reduced(appendInfo(next, "Couldn’t undo the message: ${error.message}"))
+                return Reduced(appendInfo(next, localized(R.string.session_undo_message_failed, error.message)))
             }
             next = next.setRevertMessageID(action.messageID)
             next = fillComposerDraft(
@@ -317,6 +320,7 @@ internal fun SessionFeature.sendComposer(
     val text = next.pendingLocation?.prompt(typed) ?: typed
     val attachments = next.pendingAttachments
     val files = next.pendingFiles
+    val quotes = next.pendingQuotes
     if (!next.hasPromptContent) return Reduced(forgetSharedSend(next))
     if (next.session == null && next.draftProject == null) return Reduced(forgetSharedSend(next).openProjectPicker())
     if (files.any { it.isFailed }) {
@@ -414,6 +418,7 @@ internal fun SessionFeature.sendComposer(
         files = files,
         delivery = delivery,
         mentions = mentions,
+        quotes = quotes,
         chips = sentChips,
         isRetry = false,
         state = next,
@@ -503,6 +508,7 @@ internal fun SessionFeature.submit(
     page: PageShareRequest? = null,
     mentions: OpenCodeAutocompleteMentions? = null,
     chips: List<ComposerAutocompleteChip> = emptyList(),
+    quotes: List<ComposerQuote> = emptyList(),
     isRetry: Boolean,
     state: State,
 ): Reduced<State, Action> {
@@ -523,7 +529,7 @@ internal fun SessionFeature.submit(
     next = settled.noteOwnSend()
     // The composer's model as it is now, even for a retry: a pick made since the send failed goes with it.
     val model = next.sendModel
-    val agent = if (experimentalFeatures(ExperimentalFeature.agentSelection)) next.sendAgent else null
+    val agent = if (next.agentSelection.isEnabled.value) next.sendAgent else null
     // Every send before the session exists goes to the one its first send creates.
     val lane: PromptOutbox.Lane
     val current = next.session
@@ -553,7 +559,7 @@ internal fun SessionFeature.submit(
     val pending = PendingPrompt(
         messageID = messageID, text = text, attachments = attachments, files = files,
         wasRunning = wasRunning, delivery = delivery, requestEpoch = requestEpoch, model = model, agent = agent, page = page,
-        mentions = mentions, chips = chips,
+        mentions = mentions, chips = chips, quotes = quotes,
     )
     if (wasRunning) {
         next = enqueueRunningPrompt(pending, next, isRetry = isRetry)
@@ -567,7 +573,7 @@ internal fun SessionFeature.submit(
         // A retried bubble keeps its place, ahead of the sends that waited behind it.
     } else {
         val previousFirstID = if (wasBrowsing) null else next.visibleItems.firstOrNull()?.id
-        val rows = SessionFeature.promptRows(messageID, text, localImages(attachments, messageID), attachments, files)
+        val rows = SessionFeature.promptRows(messageID, text, localImages(attachments, messageID), attachments, files, quotes)
         next = next.copy(items = next.items + rows).retainRenderedWindowStart(previousFirstID)
         val last = rows.lastOrNull()
         if (!isRetry && last != null) next = next.copy(lastSentItemID = last.id, sendGeneration = next.sendGeneration + 1)

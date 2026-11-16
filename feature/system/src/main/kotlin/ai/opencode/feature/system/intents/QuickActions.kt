@@ -1,6 +1,8 @@
 package ai.opencode.feature.system.intents
 
 import ai.opencode.core.log.SystemActionOrigin
+import ai.opencode.core.strings.localized
+import ai.opencode.feature.system.R
 import ai.opencode.feature.system.SystemAction
 import ai.opencode.feature.system.SessionDirectory
 import ai.opencode.feature.system.share.ShareSuggestion
@@ -12,9 +14,9 @@ import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 
 /**
- * Port of iOS `SystemQuickAction`: one launcher shortcut (Home Screen quick action). Shown at
- * most four: the static New Session (`res/xml/shortcuts.xml`), then Start Call while Voice is
- * set up, then the most recent sessions to fill the rest.
+ * One launcher shortcut (Home Screen quick action). Shown at most four: the static New Session
+ * (`res/xml/shortcuts.xml`), then Start Call while Voice is set up, then the most recent sessions
+ * to fill the rest.
  */
 data class SystemQuickAction(
     val kind: Kind,
@@ -57,10 +59,10 @@ data class SystemQuickAction(
             .putExtra(SystemActionActivity.EXTRA_QUICK_ACTION, kind.rawValue)
         serverKey?.let { intent.putExtra("server", it) }
         sessionID?.let { intent.putExtra("session", it) }
-        val label = title.ifEmpty { "Session" }
+        val label = title.ifEmpty { context.getString(R.string.system_quick_action_session_fallback) }
         return ShortcutInfoCompat.Builder(context, shortcutID)
             .setShortLabel(label)
-            .setLongLabel(subtitle?.takeIf { it.isNotEmpty() }?.let { "$label · $it" } ?: label)
+            .setLongLabel(subtitle?.takeIf { it.isNotEmpty() }?.let { context.getString(R.string.system_quick_action_long_label, label, it) } ?: label)
             .setIcon(IconCompat.createWithResource(context, symbol.drawable))
             .setIntent(intent)
             .setRank(rank)
@@ -85,7 +87,7 @@ data class SystemQuickAction(
             server ?: return emptyList()
             val items = mutableListOf<SystemQuickAction>()
             if (voiceAvailable) {
-                items += SystemQuickAction(Kind.StartCall, "Start Call", server.lastViewed?.title, SFSymbol.Waveform, server.key)
+                items += SystemQuickAction(Kind.StartCall, localized(R.string.system_start_call), server.lastViewed?.title, SFSymbol.Waveform, server.key)
             }
             for (session in server.sessions.take(LIMIT - STATIC_COUNT - items.size)) {
                 items += SystemQuickAction(

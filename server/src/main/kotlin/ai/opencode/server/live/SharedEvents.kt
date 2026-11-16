@@ -1,10 +1,12 @@
 package ai.opencode.server.live
 
 import ai.opencode.core.log.AppLog
+import ai.opencode.core.strings.localized
 import ai.opencode.server.EventBatcher
 import ai.opencode.server.EventStreamOverflow
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.R
 import ai.opencode.server.OpenCodeServerEvent
 import ai.opencode.server.model.OpenCodeHomeSnapshot
 import ai.opencode.server.model.OpenCodeSession
@@ -28,9 +30,9 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.nanoseconds
 
 /**
- * Whether several windows (multi-instance, desktop windowing) share one upstream event
- * stream and coalesce Home reads (iOS `MultipleWindows.isSupported`, iPad only). Off by
- * default, as on iPhone: each subscription is its own stream. Set once at startup.
+ * Whether several windows (multi-instance, desktop windowing) share one upstream event stream and
+ * coalesce Home reads. Off by default, as on iPhone: each subscription is its own stream. Set once
+ * at startup.
  */
 object MultipleWindows {
     @Volatile var isSupported: Boolean = false
@@ -100,7 +102,7 @@ internal class SharedEventStreams(private val source: (OpenCodeServer) -> Flow<O
             channel.subscribers.clear()
             ended
         }
-        val error = failure ?: OpenCodeClientError("The event stream ended.")
+        val error = failure ?: OpenCodeClientError(localized(R.string.server_error_event_stream_ended))
         for (subscriber in subscribers) subscriber.close(error)
     }
 

@@ -19,10 +19,6 @@ import org.junit.Test
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 
-/**
- * Port of the `ConnectionFailureDetail` half of iOS `ConnectionErrorReportTests.swift`. The
- * `AppFeature` half (state, report, failure context) is `:app`'s `ConnectionErrorReportTests`.
- */
 class ConnectionErrorReportTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -140,7 +136,6 @@ class ConnectionErrorReportTests {
             assertFalse(secret, detail.text.contains(secret))
         }
         assertEquals("code=-1001 tailnetAddress=false", detail.logSummary)
-        // iOS logs "URLError -1001"; Android appends the exception type in place of iOS's underlying domain.
         val urlFailure = SocketTimeoutException(url.toString())
         assertTrue(logDescription(urlFailure).startsWith("URLError -1001"))
         for (privateValue in listOf("studio", "ts.net", "4096", "34.117.59.81", "password", "pair-secret")) {

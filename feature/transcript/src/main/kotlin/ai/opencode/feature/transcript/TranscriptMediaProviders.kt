@@ -25,9 +25,7 @@ import kotlinx.coroutines.launch
 
 /**
  * What `:feature:media` draws with the transcript's renderer, provided once at the app root:
- * Markdown files in the file viewer render as a reply does (iOS `AgentFileViewer` builds
- * `MarkdownBlocksView` itself; here media sits below the transcript, so it reads
- * `LocalAgentFileMarkdown`).
+ * Markdown files in the file viewer render as a reply does.
  */
 @Composable
 fun TranscriptMediaProviders(content: @Composable () -> Unit) {
@@ -35,9 +33,9 @@ fun TranscriptMediaProviders(content: @Composable () -> Unit) {
 }
 
 /**
- * A Markdown file's page (iOS `AgentFilePage`'s `.markdown` case): the document as history (no
- * reveal), file cards rather than image previews, links as written. File links push the file;
- * web links open in the browser, and hold menus act on the link here.
+ * A Markdown file's page: the document as history (no reveal), file cards rather than image
+ * previews, links as written. File links push the file; web links open in the browser, and hold
+ * menus act on the link here.
  */
 private val AgentFileMarkdownRenderer: AgentFileMarkdown = { source, server, directory, onOpenFile ->
     AgentFileMarkdownDocument(source, server, directory, onOpenFile)
@@ -70,7 +68,7 @@ private fun AgentFileMarkdownDocument(
     }
 }
 
-/** The document's links and copies, outside a session: what iOS's `openURL` override and the link menu do there. */
+/** The document's links and copies, outside a session. */
 private fun perform(action: TranscriptAction, scope: CoroutineScope, onOpenFile: (AgentFileReference) -> Unit) {
     when (action) {
         is TranscriptAction.OpenFile -> onOpenFile(action.file)

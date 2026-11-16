@@ -1,8 +1,12 @@
 package ai.opencode.feature.transcript.user
 
+import ai.opencode.core.R as CoreR
+import ai.opencode.core.strings.localized
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.feature.transcript.R
+import ai.opencode.feature.transcript.rows.rowClickable
 import ai.opencode.feature.transcript.rows.rowHitTarget
 import ai.opencode.server.model.OpenCodeDelivery
 import androidx.compose.foundation.clickable
@@ -27,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -54,8 +59,8 @@ class TranscriptPendingActions(
     @Composable
     fun Menu(copying: String?, dismiss: () -> Unit, selecting: (() -> Unit)? = null) {
         if (!copying.isNullOrEmpty()) {
-            UserMenuItem("Copy", "square.on.square", dismiss) { copy(copying) }
-            if (selecting != null) UserMenuItem("Select", "selection.pin.in.out", dismiss, onClick = selecting)
+            UserMenuItem(stringResource(CoreR.string.common_copy), "square.on.square", dismiss) { copy(copying) }
+            if (selecting != null) UserMenuItem(stringResource(R.string.transcript_message_select), "selection.pin.in.out", dismiss, onClick = selecting)
         }
         QueueAndDelete(dismiss)
     }
@@ -63,16 +68,16 @@ class TranscriptPendingActions(
     /** Send Now (when stranded), Move to Queue and Delete, after a menu's own Copy. */
     @Composable
     fun QueueAndDelete(dismiss: () -> Unit) {
-        sendNow?.let { UserMenuItem("Send Now", OpenCodeDelivery.Steer.symbolName, dismiss, onClick = it) }
-        UserMenuItem("Move to Queue", OpenCodeDelivery.Queue.symbolName, dismiss, onClick = moveToQueue)
-        UserMenuItem("Delete", "trash", dismiss, destructive = true, onClick = delete)
+        sendNow?.let { UserMenuItem(stringResource(R.string.transcript_pending_send_now), OpenCodeDelivery.Steer.symbolName, dismiss, onClick = it) }
+        UserMenuItem(stringResource(R.string.transcript_pending_move_to_queue), OpenCodeDelivery.Queue.symbolName, dismiss, onClick = moveToQueue)
+        UserMenuItem(stringResource(CoreR.string.common_delete), "trash", dismiss, destructive = true, onClick = delete)
     }
 
     fun accessibilityActions(copying: String? = null): List<CustomAccessibilityAction> = buildList {
-        if (!copying.isNullOrEmpty()) add(action("Copy") { copy(copying) })
-        sendNow?.let { add(action("Send Now", it)) }
-        add(action("Move to Queue", moveToQueue))
-        add(action("Delete", delete))
+        if (!copying.isNullOrEmpty()) add(action(localized(CoreR.string.common_copy)) { copy(copying) })
+        sendNow?.let { add(action(localized(R.string.transcript_pending_send_now), it)) }
+        add(action(localized(R.string.transcript_pending_move_to_queue), moveToQueue))
+        add(action(localized(CoreR.string.common_delete), delete))
     }
 }
 
@@ -100,7 +105,7 @@ class TranscriptFailedSend(
     val edit: () -> Unit,
     val delete: () -> Unit,
 ) {
-    val moveTitle: String? get() = failure.moveTo?.let { "Move to $it" }
+    val moveTitle: String? get() = failure.moveTo?.let { localized(R.string.transcript_failed_send_move_to, it) }
 
     /** The bubble's menu: why it failed, then what to do about it. */
     @Composable
@@ -118,27 +123,27 @@ class TranscriptFailedSend(
         } else if (moveTitle != null) {
             UserMenuItem(moveTitle, "folder", dismiss, onClick = move)
         }
-        UserMenuItem("Retry", "arrow.clockwise", dismiss, enabled = !failure.isMoving, onClick = retry)
-        UserMenuItem("Edit", "pencil", dismiss, onClick = edit)
-        UserMenuItem("Delete", "trash", dismiss, destructive = true, onClick = delete)
+        UserMenuItem(stringResource(CoreR.string.common_retry), "arrow.clockwise", dismiss, enabled = !failure.isMoving, onClick = retry)
+        UserMenuItem(stringResource(CoreR.string.common_edit), "pencil", dismiss, onClick = edit)
+        UserMenuItem(stringResource(CoreR.string.common_delete), "trash", dismiss, destructive = true, onClick = delete)
     }
 
     val accessibilityActions: List<CustomAccessibilityAction>
         get() = buildList {
             if (!failure.isMoving) {
                 moveTitle?.let { add(action(it, move)) }
-                add(action("Retry", retry))
+                add(action(localized(CoreR.string.common_retry), retry))
             }
-            add(action("Edit", edit))
-            add(action("Delete", delete))
+            add(action(localized(CoreR.string.common_edit), edit))
+            add(action(localized(CoreR.string.common_delete), delete))
         }
 
     override fun equals(other: Any?): Boolean = other is TranscriptFailedSend && other.failure == failure
     override fun hashCode(): Int = failure.hashCode()
 
     companion object {
-        const val status = "Couldn’t send"
-        const val moving = "Moving…"
+        val status: String get() = localized(R.string.transcript_failed_send_status)
+        val moving: String get() = localized(R.string.transcript_failed_send_moving)
     }
 }
 
@@ -226,7 +231,7 @@ internal fun TranscriptFailedSendLine(failedSend: TranscriptFailedSend, modifier
                 color = OpenCodeTheme.colors.secondaryText,
                 glyphColor = OpenCodeTheme.colors.destructive,
                 modifier = Modifier
-                    .rowHitTarget(top = 12.dp, bottom = 12.dp, target = Modifier.clickable { menu = true })
+                    .rowHitTarget(top = 12.dp, bottom = 12.dp, target = Modifier.rowClickable(role = null) { menu = true })
                     .clearAndSetSemantics {
                         contentDescription = TranscriptFailedSend.status
                         stateDescription = failedSend.failure.reason
@@ -248,7 +253,7 @@ internal fun TranscriptFailedSendLine(failedSend: TranscriptFailedSend, modifier
         } else {
             val moveTitle = failedSend.moveTitle
             Text(
-                moveTitle ?: "Retry",
+                moveTitle ?: stringResource(CoreR.string.common_retry),
                 style = style.copy(fontWeight = FontWeight.SemiBold),
                 color = OpenCodeTheme.colors.accent,
                 maxLines = 1,
@@ -256,7 +261,7 @@ internal fun TranscriptFailedSendLine(failedSend: TranscriptFailedSend, modifier
                     .rowHitTarget(
                         top = 12.dp,
                         bottom = 12.dp,
-                        target = Modifier.clickable(onClick = if (moveTitle == null) failedSend.retry else failedSend.move),
+                        target = Modifier.rowClickable(role = null, onClick = if (moveTitle == null) failedSend.retry else failedSend.move),
                     )
                     .semantics { }
                     .testTag(if (moveTitle == null) "failed-send-retry" else "failed-send-move"),

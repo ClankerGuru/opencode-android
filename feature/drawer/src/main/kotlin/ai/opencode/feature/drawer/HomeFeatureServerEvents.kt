@@ -21,19 +21,18 @@ import ai.opencode.server.OpenCodeServerEvent
 import ai.opencode.server.model.OpenCodeProject
 
 /*
- * Port of iOS `HomeFeature+ServerEvents.swift`: the event stream projected onto Home's list and
- * forwarded to the screens that care. REST snapshots stay authoritative: anything an event can't
- * settle on its own asks for a fresh snapshot (`refreshSnapshot`).
+ * The event stream projected onto Home's list and forwarded to the screens that care. REST
+ * snapshots stay authoritative: anything an event can't settle on its own asks for a fresh snapshot
+ * (`refreshSnapshot`).
  */
 
 
 internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEvent): HomeReduced {
     when (event) {
         is OpenCodeServerEvent.SessionViewChanged -> {
-            // The event carries the watermark, so unread updates in place rather than refetching the
-            // list (which also cancelled the snapshot in flight). `OpenCodeClient` consumes the SSE
-            // echo of this device's own `POST /view`, so an event here means another client read the
-            // session.
+            // The event carries the watermark, so unread updates in place rather than refetching
+            // the list. `OpenCodeClient` consumes the SSE echo of this device's own `POST /view`,
+            // so an event here means another client read the session.
             var becameRead = true
             var s = state.updatingSession(event.sessionID) { session ->
                 val next = maxOf(session.viewedMilliseconds ?: 0, event.idle)
@@ -338,6 +337,10 @@ internal fun HomeFeature.reduceServerEvent(state: State, event: OpenCodeServerEv
                 .updatingSubagents { screen -> screen.copy(projects = screen.projects.upserting(project)) }
             return Reduced(s)
         }
+
+        OpenCodeServerEvent.ModelsChanged -> return Reduced(state, forwardToScreens(state, SessionFeature.Action.ModelsChanged))
+
+        OpenCodeServerEvent.AgentsChanged -> return Reduced(state, forwardToScreens(state, SessionFeature.Action.AgentsChanged))
     }
 }
 

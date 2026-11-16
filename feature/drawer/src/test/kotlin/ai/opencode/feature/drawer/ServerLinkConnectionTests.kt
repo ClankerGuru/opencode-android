@@ -49,12 +49,8 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `ServerLinkConnectionTests.swift`: how Home's connection rides out a lost server, the
- * address race, the quiet grace before Reconnecting, Offline, and what becoming active or leaving
- * the app does to the event stream.
- *
- * The `AppFeature` cases (connecting picks the address, keeps the saved order) live in `:app`'s
- * `ServerLinkConnectionTests`. Parameterized iOS tests run each argument in turn inside one method.
+ * How Home's connection rides out a lost server, the address race, the quiet grace before
+ * Reconnecting, Offline, and what becoming active or leaving the app does to the event stream.
  */
 class ServerLinkConnectionTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -92,10 +88,7 @@ class ServerLinkConnectionTests {
     }
 
     /**
-     * Adam's phone away from home: "Adams Mini" was saved with its LAN address first, which drops
-     * every packet off the home Wi-Fi. A cold launch connects through the tailnet address at once,
-     * never tries the stream on the LAN address, never shows Reconnecting or Offline, and leaves
-     * the saved server as it was.
+     * The saved server lists its LAN address first, which drops every packet off the home Wi-Fi.
      */
     @Test fun aColdLaunchAwayFromHomeConnectsThroughTheTailnetWithoutShowingAnything() = runTest {
         val clock = TestClock()

@@ -11,8 +11,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 
 /**
- * Android's System theme follows the wallpaper (Material You), the way iOS's System theme
- * follows UIKit. The curated themes (OpenCode, Tokyo Night, …) keep their fixed palettes.
+ * Android's System theme follows the wallpaper (Material You). The curated themes (OpenCode, Tokyo
+ * Night, …) keep their fixed palettes.
  *
  * Code highlighting and diff colours stay on [ThemePalette.system]'s values: dynamic colour
  * has no roles for them, and tinting them with the wallpaper would hurt legibility.
@@ -30,7 +30,7 @@ object DynamicSystemTheme {
     fun definition(context: Context): ThemeDefinition {
         return ThemeDefinition(
             id = AppTheme.System,
-            title = ThemePalette.system.title,
+            title = AppTheme.System.title,
             light = variant(colorScheme(context, isDark = false), ThemePalette.system.light),
             dark = variant(colorScheme(context, isDark = true), ThemePalette.system.dark),
         )

@@ -1,8 +1,11 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionTransition
+import ai.opencode.core.strings.localized
+import ai.opencode.server.OpenCodeClientError
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.ui.OpenCodeIcon
@@ -43,6 +46,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -55,10 +59,9 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 
 /**
- * Server Flow's tunables (iOS `ServerFlowTunables`, `OpenCode/Drawer/ServerFlow.swift`), moved
- * down from the drawer because the session's [ServerConnectionPill] reads the pill's palette;
- * the drawer reads the springs and travels, the app the switch-back timeout. Constants here:
- * Android has no Tuning Panel.
+ * Server Flow's tunables, moved down from the drawer because the session's [ServerConnectionPill]
+ * reads the pill's palette; the drawer reads the springs and travels, the app the switch-back
+ * timeout. Constants here: Android has no Tuning Panel.
  */
 object ServerFlowTunables {
     /** Switch back after (s). */
@@ -81,10 +84,8 @@ object ServerFlowTunables {
 }
 
 /**
- * What a session's pill says while its server isn't connected (iOS `ServerConnectionNotice`,
- * `OpenCode/Drawer/ServerFlow.swift`; here in `:feature:session` because [SessionListContext]
- * carries it). The drawer builds it from Home's connection (`ServerConnectionNotice(status:…)`
- * in `:feature:drawer`'s `ServerFlow.kt`).
+ * What a session's pill says while its server isn't connected. The drawer builds it from Home's
+ * connection (`ServerConnectionNotice(status:…)` in `:feature:drawer`'s `ServerFlow.kt`).
  */
 data class ServerConnectionNotice(
     val kind: Kind,
@@ -98,9 +99,9 @@ data class ServerConnectionNotice(
 
     val title: String
         get() = when (kind) {
-            Kind.reconnecting -> "Reconnecting to $serverName…"
-            Kind.failed -> "Couldn’t connect to $serverName"
-            Kind.signInFailed -> "Couldn’t sign in to $serverName"
+            Kind.reconnecting -> localized(R.string.session_server_reconnecting, serverName)
+            Kind.failed -> localized(R.string.session_server_connect_failed, serverName)
+            Kind.signInFailed -> localized(R.string.session_server_sign_in_failed, serverName)
         }
 
     /** The pill's tap: retry, or pair again for a sign-in the server refused. */
@@ -110,8 +111,16 @@ data class ServerConnectionNotice(
     val action: String?
         get() = when (kind) {
             Kind.reconnecting -> null
-            Kind.failed -> "Try Again"
-            Kind.signInFailed -> "Pair Again"
+            Kind.failed -> localized(CoreR.string.common_try_again)
+            Kind.signInFailed -> localized(R.string.session_server_pair_again)
+        }
+
+    /** What TalkBack says the pill's tap does (“Double-tap to try again”). */
+    val actionClickLabel: String?
+        get() = when (kind) {
+            Kind.reconnecting -> null
+            Kind.failed -> localized(R.string.session_server_try_again_click_label)
+            Kind.signInFailed -> localized(R.string.session_server_pair_again_click_label)
         }
 
     val systemImage: SFSymbol
@@ -123,10 +132,9 @@ data class ServerConnectionNotice(
 
     companion object {
         /**
-         * iOS `init?(status:credentialsRejected:errorMessage:server:isSwitching:)` without Home's
-         * status type: null while connected and while the drawer switches servers (the switch is
-         * the drawer's to show). Pass Home's displayed status, which reads connected while a
-         * reconnect is still in its grace.
+         * Null while connected and while the drawer switches servers (the switch is the drawer's to
+         * show). Pass Home's displayed status, which reads connected while a reconnect is still in
+         * its grace.
          */
         fun of(
             isConnected: Boolean,
@@ -139,17 +147,20 @@ data class ServerConnectionNotice(
             if (isSwitching || isConnected) return null
             if (isReconnecting) return ServerConnectionNotice(Kind.reconnecting, serverName)
             if (credentialsRejected) return ServerConnectionNotice(Kind.signInFailed, serverName)
-            val detail = errorMessage?.takeIf { it.isNotEmpty() && !it.startsWith("Couldn’t") }
+            // The pill already says the server couldn't be reached, so that message adds nothing as a detail.
+            // The English check covers the other “Couldn’t …” messages; in other languages those show as the detail.
+            val detail = errorMessage?.takeIf {
+                it.isNotEmpty() && it != OpenCodeClientError.UNREACHABLE_MESSAGE && !it.startsWith("Couldn’t")
+            }
             return ServerConnectionNotice(Kind.failed, serverName, detail)
         }
     }
 }
 
 /**
- * Server Flow: a pill right above the composer while the session's server isn't connected
- * (iOS `ServerConnectionPill`). It says what's happening, and its tap retries (or pairs again,
- * for a sign-in the server refused); a long press offers Edit Server… then. iOS's glass capsule
- * is an M3 tonal surface here.
+ * Server Flow: a pill right above the composer while the session's server isn't connected. It says
+ * what's happening, and its tap retries (or pairs again, for a sign-in the server refused); a long
+ * press offers Edit Server… then.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -166,6 +177,7 @@ fun ServerConnectionPill(
     val offersEdit = notice.kind == ServerConnectionNotice.Kind.signInFailed
     var menuShown by remember { mutableStateOf(false) }
     val fontScale = LocalDensity.current.fontScale
+    val editServerLabel = stringResource(R.string.session_server_edit)
     Box(modifier) {
         // The desktop's floating chip: flat fill, hairline ring, small radius.
         Surface(
@@ -183,9 +195,9 @@ fun ServerConnectionPill(
                 .clearAndSetSemantics {
                     contentDescription = notice.title
                     notice.detail?.let { stateDescription = it }
-                    onClick(label = notice.action?.lowercase()) { onAction(notice.primary); true }
+                    onClick(label = notice.actionClickLabel) { onAction(notice.primary); true }
                     if (offersEdit) {
-                        customActions = listOf(CustomAccessibilityAction("Edit Server…") { onAction(ServerConnectionNotice.Action.editServer); true })
+                        customActions = listOf(CustomAccessibilityAction(editServerLabel) { onAction(ServerConnectionNotice.Action.editServer); true })
                     }
                 }
                 .testTag("server-connection-pill"),
@@ -220,7 +232,7 @@ fun ServerConnectionPill(
         }
         DropdownMenu(expanded = menuShown && offersEdit, onDismissRequest = { menuShown = false }) {
             DropdownMenuItem(
-                text = { Text("Edit Server…") },
+                text = { Text(editServerLabel) },
                 leadingIcon = { OpenCodeIcon(SFSymbol.Pencil, contentDescription = null) },
                 onClick = {
                     menuShown = false
@@ -232,10 +244,9 @@ fun ServerConnectionPill(
 }
 
 /**
- * iOS `.motionMicroTransition()` on the pill, with its room in the composer's column
- * (`composerColumnAnimation`): the room opens on `layout` and closes on `collapse`, so the
- * composer's top, and the transcript riding it, move with the pill instead of jumping its height
- * in one frame. Under Reduce Motion it cross-fades.
+ * The pill's room in the composer's column opens on `layout` and closes on `collapse`, so the
+ * composer's top, and the transcript riding it, move with the pill instead of jumping its height in
+ * one frame. Under Reduce Motion it cross-fades.
  */
 object ServerConnectionPillTransition {
     fun enter(reducedMotion: Boolean): EnterTransition {

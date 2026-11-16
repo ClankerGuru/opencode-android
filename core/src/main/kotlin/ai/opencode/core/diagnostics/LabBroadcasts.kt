@@ -13,18 +13,14 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
 /**
- * Port of iOS `LabDarwinNotifications`: payload-free pokes a lab run sends the app, here as
- * broadcasts: `adb shell am broadcast -p <app id> -a <app id>.<name>` (for the debug app,
- * `-a ai.opencode.mobilecode.debug.ai.opencode.lab.hit-sweep`). Debug builds only: the receiver is
- * registered at runtime and exported, since `adb`'s shell user is another app as far as
- * `RECEIVER_NOT_EXPORTED` is concerned; release builds register nothing. Actions carry the app
- * id so no other app's broadcast can collide with them.
+ * As broadcasts: `adb shell am broadcast -p <app id> -a <app id>.<name>`. Debug only; exported
+ * because `adb`'s shell user counts as another app.
  */
 object LabBroadcasts {
     private val handlers = HashMap<String, (String) -> Unit>()
     private val posted = MutableSharedFlow<String>(extraBufferCapacity = 16, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
-    /** What [forward] reposts (iOS's `NotificationCenter.default` names), for in-process observers to collect. */
+    /** What [forward] reposts, for in-process observers to collect. */
     val notifications: SharedFlow<String> = posted.asSharedFlow()
 
     /**

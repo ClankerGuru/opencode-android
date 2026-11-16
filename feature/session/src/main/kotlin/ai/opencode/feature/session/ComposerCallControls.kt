@@ -36,16 +36,18 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `ComposerCallPress` (`OpenCode/Session/ComposerCallControls.swift`): how long a
- * press on the composer's call controls may, or must, last. A thumb or palm resting on the
- * bottom corner while the phone is held stays down far longer than a tap; its release must do
+ * How long a press on the composer's call controls may, or must, last. A thumb or palm resting on
+ * the bottom corner while the phone is held stays down far longer than a tap; its release must do
  * nothing.
  */
 object ComposerCallPress {
     /** A press released within this is a tap. Past it the release does nothing, however far the finger drifted. */
     val tapWindow: Duration = 350.milliseconds
 
-    /** Stop held this long starts a call. iOS SwiftUI's default (0.5 s) was short enough for a resting thumb mid-run. */
+    /**
+     * Stop held this long starts a call. Half a second was short enough for a resting thumb
+     * mid-run.
+     */
     val stopHold: Duration = 1.seconds
 
     /**
@@ -59,10 +61,10 @@ object ComposerCallPress {
 }
 
 /**
- * iOS `ComposerCallButton`: the empty composer's call button. Only a tap starts the call: a
- * press held past [ComposerCallPress.tapWindow] (a resting thumb, drifting or not) or slid off
- * the button does nothing on release. TalkBack and Switch Access always start it. [modifier]
- * applies inside the tap target, to the circle itself (where a floating call breaks out of).
+ * The empty composer's call button. Only a tap starts the call: a press held past
+ * [ComposerCallPress.tapWindow] (a resting thumb, drifting or not) or slid off the button does
+ * nothing on release. TalkBack and Switch Access always start it. [modifier] applies inside the tap
+ * target, to the circle itself (where a floating call breaks out of).
  */
 @Composable
 fun ComposerCallButton(
@@ -89,10 +91,9 @@ fun ComposerCallButton(
 }
 
 /**
- * iOS `ComposerStopButton`: the run's Stop. A tap stops the run; held
- * [ComposerCallPress.stopHold] it starts a call instead ([onHold]), with a threshold haptic as
- * it does. A release in between, or after the hold, does neither. TalkBack's activation always
- * stops; the call is its own action.
+ * The run's Stop. A tap stops the run; held [ComposerCallPress.stopHold] it starts a call instead
+ * ([onHold]), with a threshold haptic as it does. A release in between, or after the hold, does
+ * neither. TalkBack's activation always stops; the call is its own action.
  */
 @Composable
 fun ComposerStopButton(
@@ -133,11 +134,10 @@ fun ComposerStopButton(
 }
 
 /**
- * iOS `PressTiming` + `PressStart`: times each press from touch-down. Movement never resets the
- * timing, so a thumb that drifts while resting is still timed from when it landed. A release
- * on the control within [ComposerCallPress.tapWindow] runs [onTap]; one later, slid off, or
- * taken by a scroll does nothing. With a [hold], a press still down that long runs [onHold],
- * and its release does nothing.
+ * Times each press from touch-down. Movement never resets the timing, so a thumb that drifts while
+ * resting is still timed from when it landed. A release on the control within
+ * [ComposerCallPress.tapWindow] runs [onTap]; one later, slid off, or taken by a scroll does
+ * nothing. With a [hold], a press still down that long runs [onHold], and its release does nothing.
  */
 private suspend fun PointerInputScope.timedPresses(
     interactions: MutableInteractionSource,

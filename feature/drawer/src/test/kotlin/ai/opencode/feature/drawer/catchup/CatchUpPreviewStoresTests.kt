@@ -53,10 +53,8 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /**
- * iOS `CatchUpTests.previewStoresPreserveFirstFrameFlagAcrossSameSessionRefreshesAndResetOnNewSession`
- * and `catchUpPreviewRefreshesWhenPreviewTranscriptIsPrefetchedOrRefreshed`, apart from `CatchUpTests.kt` because the preview's real `Store` needs Android's main looper
- * (Robolectric). Android replaces the preview's state after composition (`commit()`), so the test
- * commits where iOS's store reads the new state at once.
+ * Apart from `CatchUpTests.kt` because the preview's real `Store` needs Android's main looper
+ * (Robolectric). Android replaces the preview's state after composition (`commit()`).
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -133,7 +131,7 @@ class CatchUpPreviewStoresTests {
             }.copy(previewRevision = 1)
         }
         assertEquals(1, store.state.previewRevision)
-        // The card re-reads its store when the revision changes (iOS observation tracking).
+        // The card re-reads its store when the revision changes.
         assertSame(preview, previews.store(newer, store.state))
         previews.commit()
         assertEquals(prefetchedItems, preview.state.items)
@@ -158,10 +156,9 @@ class CatchUpPreviewStoresTests {
     }
 
     /**
-     * iOS `NewMessagesTests.catchUpPreviewMarksWhatArrivedLikeTheOpenCard`: the next Catch Up card
-     * previews marked as it will open, so it doesn't jump to a divider once it's promoted. Here
-     * rather than in `NewMessagesTests` because the preview's `Store` needs the main looper, and the
-     * second card's state lands with `commit()` as it does after composition.
+     * The next Catch Up card previews marked as it will open, so it doesn't jump to a divider once
+     * it's promoted. Here rather than in `NewMessagesTests` because the preview's `Store` needs the
+     * main looper, and the second card's state lands with `commit()` as it does after composition.
      */
     @Test
     fun catchUpPreviewMarksWhatArrivedLikeTheOpenCard() = DependencyValues.withValues(DependencyValues.testing()) {
@@ -190,11 +187,9 @@ class CatchUpPreviewStoresTests {
     }
 
     /**
-     * K-01: recreating the activity mid-stream (dark/light switch or font-scale change) must keep
-     * the live SSE connection on `HomeLifecycle` instead of re-sending `HomeFeature.Action.Task` or
-     * `RetryConnectionTapped` (which start a new socket epoch, fire `EventStreamConnected`, clear
-     * `SessionFeature.State.liveText`, and freeze the streaming reply until `TextEnded`). A real
-     * background-to-foreground return after recreation still reconnects.
+     * Recreating the activity mid-stream (dark mode, font scale) keeps the live SSE connection on
+     * `HomeLifecycle` instead of starting a new socket epoch. A real background-to-foreground
+     * return after recreation still reconnects.
      */
     @Test
     fun activityRecreationKeepsLiveStreamAndContinuesStreamingReply() {

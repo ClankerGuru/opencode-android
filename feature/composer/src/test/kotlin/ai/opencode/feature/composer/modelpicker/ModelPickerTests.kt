@@ -22,23 +22,10 @@ import org.robolectric.annotation.GraphicsMode
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Port of iOS `ModelPickerTests.swift`.
- *
- * The model picker (D-20 round 7 option 1): the list's sections, the level scale the meter and
+ * The model picker: the list's sections, the level scale the meter and
  * its panel step through, the meter's press, and picks that wait for the next send.
  *
- * Skipped → `:feature:session` (they drive `SessionFeature`'s reducer, which lives there):
- * `openingTheListRefreshesTheCatalogWithoutASheet`, `openingKeepsATypedQueryAndClosingClearsIt`,
- * `picksAndLevelsWaitForTheNextSend`, `holdingARowFavoritesThatProvidersModel`,
- * `plainPickerSheetSortsFavoritesAndKeepsSheetOpenWhenChangingThinking`,
- * `openingPickerWhileLoadingRestartsModelCatalogFetchAndCancelsHungLoad`,
- * `failedModelCatalogRecordsErrorAndRetriesOnReopen`,
- * `theSheetsLevelMenuPicksAndStaysOpenAndARowTapCloses`,
- * `aPickFromALevelDragThatTickedIsQuietOnRelease`, `aRowLevelIsASelectionOnlyWhenTheLevelChanges`,
- * and the reducer half of `searchParsesTrailingLevelAndReturnPicksBestMatchAtThatLevel`.
- *
- * Dropped: `searchableSheetsAvoidForcedNavigationBarDrawerOnMac` (SwiftUI `SearchFieldPlacement`
- * on Mac and an iOS source scan).
+ * Dropped: `searchableSheetsAvoidForcedNavigationBarDrawerOnMac`.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -77,7 +64,7 @@ class ModelPickerTests {
         assertTrue(ModelPickerSection.sections(models, emptySet(), filter = "zzz").isEmpty())
     }
 
-    // MARK: Search (OC-331)
+    // MARK: Search
 
     private val sonnet45 = model("claude-sonnet-4-5-20250929", "anthropic", "Claude Sonnet 4.5")
     private val sonnet4 = model("claude-sonnet-4-20250514", "anthropic", "Claude Sonnet 4")
@@ -130,7 +117,7 @@ class ModelPickerTests {
         assertEquals("gemini 2 5 pro", ModelSearch.normalize("Gémini 2,5 – Pro"))
     }
 
-    /** iOS reads `filteredModels`/`modelSections` off `SessionFeature.State`; here off [ModelPickerState], which the session builds. */
+    /** Off [ModelPickerState], which the session builds. */
     @Test fun bothPickersShareTheSearch() {
         val sections = ModelPickerSection.sections(catalog, setOf(opus.id), filter = "anthropic opus")
         assertEquals(listOf("Anthropic", "OpenRouter"), sections.map { it.title })
@@ -236,7 +223,7 @@ class ModelPickerTests {
         )
     }
 
-    /** TalkBack's grabber reads and adjusts the rest like a sheet's (iOS `.increment`/`.decrement` → +1/−1). */
+    /** TalkBack's grabber reads and adjusts the rest like a sheet's. */
     @Test fun theGrabberAdjustsTheRest() {
         assertEquals("Half", ModelListDetent.Medium.accessibilityValue)
         assertEquals("Full", ModelListDetent.Large.accessibilityValue)
@@ -259,13 +246,7 @@ class ModelPickerTests {
         assertEquals(listOf("second"), runs)
     }
 
-    /**
-     * D-65 option 3: level j of n fills j/n of the arc, so the lowest is never empty and the
-     * highest always full, at any count; Default fills to the middle, dimmed. iOS checks the
-     * `Shape`'s path (empty at fill 0, centred in its box); Android draws the arc straight into a
-     * `DrawScope` ([LevelArc.draw]), so the check reads the drawn pixels' bounds instead.
-     */
-    /** The pixel bounds [LevelArc.draw] covers in a 20×20 box (a 1 px stroke, close to the iOS path), or null when nothing is drawn. */
+    /** The pixel bounds [LevelArc.draw] covers in a 20×20 box (a 1 px stroke), or null when nothing is drawn. */
     private fun drawnBounds(fill: Double): androidx.compose.ui.geometry.Rect? {
         val image = androidx.compose.ui.graphics.ImageBitmap(20, 20)
         androidx.compose.ui.graphics.drawscope.CanvasDrawScope().draw(
@@ -309,7 +290,7 @@ class ModelPickerTests {
         assertEquals(1.0, band[28], 0.0)
     }
 
-    // MARK: - Model names and levels (OC-397)
+    // MARK: - Model names and levels
 
     private val opus55 = model("claude-opus-5-5", "anthropic", "Claude Opus 5.5", listOf("low", "medium", "high", "max"))
     private val sonnet55Anthropic = model("claude-sonnet-5-5", "anthropic", "Claude Sonnet 5.5", listOf("low", "medium", "high"))
@@ -336,8 +317,8 @@ class ModelPickerTests {
     }
 
     /**
-     * New Model Picker (OC-469): Recent sits between Favorites and the providers, most recent
-     * first, without favorites, up to its limit, and goes while searching, as Favorites does.
+     * Recent sits between Favorites and the providers, most recent first, without favorites, up to
+     * its limit, and goes while searching, as Favorites does.
      */
     @Test fun theSheetsRecentSitsAfterFavoritesWithoutThemUpToItsLimit() {
         val models = listOf(opus55, sonnet55Anthropic, argon, astra, haiku)
@@ -362,7 +343,6 @@ class ModelPickerTests {
         )
     }
 
-    /** The parse half; the reducer half (`.modelSearchSubmitted`) is skipped → `:feature:session`. */
     @Test fun searchParsesTrailingLevelAndReturnPicksBestMatchAtThatLevel() {
         val parsedHigh = ModelSearch.parseLevelQuery("argon high")
         assertTrue(parsedHigh.terms == listOf("argon") && parsedHigh.level == "high")

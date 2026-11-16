@@ -28,11 +28,7 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import java.util.UUID
 
-/**
- * How one delivery ended (iOS `SessionFeature.DeliveryOutcome`, `Session/SessionFeature+Delivery.swift`).
- * Moved down from the session area because [PromptOutbox] reports it; the session area's
- * delivery job returns it.
- */
+/** How one delivery ended. Lives here because [PromptOutbox] reports it. */
 sealed interface DeliveryOutcome {
     /** [appliedModel] / [appliedAgent]: the model and agent this delivery applied before its prompt. */
     data class Sent(
@@ -59,25 +55,12 @@ sealed interface DeliveryOutcome {
 }
 
 /**
- * Sends from this phone waiting for the server, in the order they were made (iOS
- * `PromptOutbox`). Each session (or draft, until its session exists) is one lane that
- * delivers one message at a time, so the server admits them in order, while the screen
- * shows every send at once and never waits for it.
- *
- * It lives for the app's lifetime, outside any screen: leaving a session, switching sessions,
- * or backgrounding the app doesn't stop a lane (its work runs in the outbox's own coroutine
- * scope, under a [BackgroundTaskClient] assertion while a lane works), and a screen that opens
- * on the session shows what's still on its way. What the reader asks of a send (Delete, Move
- * to Queue, Send Now) is kept on the send itself, so it holds wherever the reader goes: a
- * send still waiting changes before it's posted, and one already being posted changes on
- * the server once it's admitted. A send that fails for good, or that Stop holds back, is
- * held: sends behind a held one wait until it's retried (in its place) or deleted. Every
- * send ends delivered or held as a failed send the screen shows with Retry and Delete; none
- * is ever left without a way on.
- *
- * The retry loop itself (`RetryPolicy.send`, silent retries under the same message ID, model
- * and agent applied just before the prompt) is the session area's delivery job
- * (`SessionFeature.deliveryJob`); this class only orders, holds and reports.
+ * Sends from this phone waiting for the server, in the order they were made. Each session (or
+ * draft) is one lane that delivers one message at a time, so the server admits them in order. It
+ * lives for the app's lifetime in its own scope, so leaving a session or the app doesn't stop a
+ * lane. A send that fails for good, or that Stop holds back, holds the sends behind it until it's
+ * retried or deleted. The retry loop itself is the session's delivery job; this class only orders,
+ * holds and reports.
  */
 class PromptOutbox(
     /**
@@ -408,9 +391,20 @@ class PromptOutbox(
         val admitted: List<PendingPrompt> = emptyList(),
     )
 
+    val retainedAttachmentBytes: Int
+        get() = synchronized(lock) {
+            var total = 0
+            for (lane in storage.lanes.values) {
+                for (item in lane.items) total += item.pending.attachments.sumOf { it.data.size }
+                for (admitted in lane.admitted) total += admitted.pending.attachments.sumOf { it.data.size }
+            }
+            total
+        }
+
     fun contents(serverKey: String, sessionID: String): Contents = contents(serverKey, Lane.Session(sessionID))
 
     fun contents(serverKey: String, lane: Lane): Contents = synchronized(lock) {
+        expireAdmitted()
         val laneState = storage.lanes[resolve(lane, serverKey)] ?: return Contents()
         val unsent = mutableListOf<Entry>()
         var blocked = false
@@ -423,8 +417,7 @@ class PromptOutbox(
             unsent += Entry(item.pending, blocked)
         }
         val admitted = if (lane is Lane.Session) {
-            val cutoff = now().minusMillis((ADMITTED_MEMORY_SECONDS * 1000).toLong())
-            laneState.admitted.filter { it.at > cutoff && it.sessionID == lane.id }.map { it.pending }
+            laneState.admitted.filter { it.sessionID == lane.id }.map { it.pending }
         } else {
             emptyList()
         }
@@ -444,6 +437,7 @@ class PromptOutbox(
             lane.admitted = lane.admitted.filterNot { it.pending.messageID == admitted.messageID }
             lane.appendAdmitted(admitted, sessionID, now())
             storage.lanes[key] = lane
+            expireAdmitted()
         }
     }
 
@@ -454,7 +448,7 @@ class PromptOutbox(
             storage.delivered += messageID
             if (storage.delivered.size > 64) repeat(storage.delivered.size - 64) { storage.delivered.removeAt(0) }
             for (lane in storage.lanes.values) {
-                // iOS updates the lane's first match only.
+                // Updates the lane's first match only.
                 val index = lane.admitted.indexOfFirst { it.pending.messageID == messageID }
                 if (index < 0) continue
                 lane.admitted = lane.admitted.toMutableList().also {
@@ -606,6 +600,7 @@ class PromptOutbox(
     fun settle(messageIDs: Set<String>) {
         if (messageIDs.isEmpty()) return
         val (held, persistence) = synchronized(lock) {
+            expireAdmitted()
             storage.lanes.values.flatMap { lane ->
                 lane.items.filter { it.phase == Phase.Held && it.pending.messageID in messageIDs }.map { it.pending.messageID }
             } to storage.persistence
@@ -676,6 +671,7 @@ class PromptOutbox(
                     // Its delivery can arrive over the event stream before the post's answer.
                     val pending = if (item.pending.messageID in storage.delivered) item.pending.copy(wasRunning = false) else item.pending
                     lane.appendAdmitted(pending, outcome.sessionID, now())
+                    expireAdmitted()
                     status = Status.Settled(
                         DeliveryOutcome.Sent(outcome.sessionID, announce, outcome.appliedModel, outcome.appliedAgent),
                         item.pending,
@@ -881,6 +877,13 @@ class PromptOutbox(
     private fun prune(key: String) {
         val lane = storage.lanes[key] ?: return
         if (lane.items.isEmpty() && !lane.isWorking && !lane.isDraft && lane.admitted.isEmpty()) storage.lanes.remove(key)
+    }
+
+    private fun expireAdmitted() {
+        val cutoff = now().minusMillis((ADMITTED_MEMORY_SECONDS * 1000).toLong())
+        for (lane in storage.lanes.values) {
+            if (lane.admitted.any { it.at <= cutoff }) lane.admitted = lane.admitted.filter { it.at > cutoff }
+        }
     }
 
     private fun locate(messageID: String): Pair<String, Int>? {

@@ -40,9 +40,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * Port of iOS `ShareViewController`: the share target's entry point. Hosts [ShareView], sends from
- * here ([ShareSender]), and hands the rest to the app (ShareHandoff.kt). The [ShareModel] lives in
- * a ViewModel so a rotation or theme change keeps what was loaded and a send in flight.
+ * The share target's entry point. Hosts [ShareView], sends from here ([ShareSender]), and hands the
+ * rest to the app (ShareHandoff.kt). The [ShareModel] lives in a ViewModel so a rotation or theme
+ * change keeps what was loaded and a send in flight.
  */
 class ShareActivity : ComponentActivity() {
     private val holder: ShareHolder by viewModels()
@@ -76,7 +76,7 @@ class ShareActivity : ComponentActivity() {
             }
             OpenCodeAppTheme {
                 val state by model.state.collectAsStateWithLifecycle()
-                // Back (and the back gesture) cancel, as a swipe down does on iOS.
+                // Back (and the back gesture) cancel, as a swipe down does.
                 BackHandler { cancel() }
                 ShareView(
                     state = state,
@@ -150,9 +150,8 @@ class ShareActivity : ComponentActivity() {
     }
 
     /**
-     * Saves the share as the session's draft, then opens the app on it. Unlike an iOS share
-     * extension, this activity can always start the app; the notification (and "Saved. Open
-     * OpenCode to continue") only stand in if launching fails.
+     * Saves the share as the session's draft, then opens the app on it. The notification (and
+     * "Saved. Open OpenCode to continue") only stand in if launching fails.
      */
     private fun continueInApp() {
         val model = holder.model ?: return

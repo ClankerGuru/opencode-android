@@ -1,8 +1,10 @@
 package ai.opencode.server.live
 
+import ai.opencode.core.strings.localized
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodePairingLink
 import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.R
 import ai.opencode.server.ServerLinkStore
 import ai.opencode.server.model.OpenCodeNotifyPluginStatus
 import ai.opencode.server.retry.RequestIdempotency
@@ -48,7 +50,7 @@ internal suspend fun requestRedeemPairing(link: OpenCodePairingLink): OpenCodeSe
                         retry = RetryPolicy.once, followsRedirects = false, isConnectionProbe = true, server = anonymous,
                     )
                     val session = decoded(response.data, decode = PairingSessionPayload::decode)
-                    Result.success(OpenCodeServer(url = origin, username = "opencode", password = session.token, name = session.deviceName))
+                    Result.success(OpenCodeServer(url = origin, username = "opencode", password = session.token, name = link.name ?: session.deviceName))
                 } catch (error: OpenCodeClientError) {
                     Result.failure(error)
                 }
@@ -95,17 +97,17 @@ private fun pairingFailure(failures: List<OpenCodeClientError>): OpenCodeClientE
     val details = failures.flatMap { it.connectionFailures }
     if (failures.any { it.statusCode == 401 }) {
         return OpenCodeClientError(
-            "This pairing code expired or was already used. Run `opencode pair --remote` again.",
+            localized(R.string.server_error_pairing_expired),
             statusCode = 401, connectionFailures = details,
         )
     }
     if (failures.any { it.statusCode == 404 }) {
         return OpenCodeClientError(
-            "This server doesn’t support pairing links. Update OpenCode on your computer, or enter the server manually.",
+            localized(R.string.server_error_pairing_unsupported),
             statusCode = 404, connectionFailures = details,
         )
     }
-    val failure = failures.lastOrNull() ?: OpenCodeClientError("Couldn’t reach the OpenCode server")
+    val failure = failures.lastOrNull() ?: OpenCodeClientError(OpenCodeClientError.UNREACHABLE_MESSAGE)
     return failure.copy(connectionFailures = details)
 }
 
@@ -128,9 +130,9 @@ private data class NotificationPreviewPairReply(val output: Output) {
 }
 
 /**
- * iOS `OpenCodeClient.pairNotificationPreview` (1ddd36b2): exchanges public keys on the saved
- * server, never on the push relay. A plain LAN connection can't authenticate this exchange, so
- * only a paired HTTPS address is used; without one it fails before sending anything.
+ * Exchanges public keys on the saved server, never on the push relay. A plain LAN connection can't
+ * authenticate this exchange, so only a paired HTTPS address is used; without one it fails before
+ * sending anything.
  */
 internal suspend fun requestPairNotificationPreview(
     server: OpenCodeServer,
@@ -139,7 +141,7 @@ internal suspend fun requestPairNotificationPreview(
     publicKey: String,
 ): String {
     val secure = server.candidateURLs.firstOrNull { it.substringBefore("://", "").lowercase() == "https" }
-        ?: throw OpenCodeClientError("Encrypted notification previews need an HTTPS server connection.")
+        ?: throw OpenCodeClientError(localized(R.string.server_error_notification_previews_need_https))
     val reply = request<NotificationPreviewPairReply>(
         "/api/rpc/mobile-notifications/pair",
         method = "POST",

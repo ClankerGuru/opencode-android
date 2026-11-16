@@ -1,5 +1,7 @@
 package ai.opencode.feature.system.share
 
+import ai.opencode.core.R as CoreR
+import ai.opencode.core.strings.localizedPlural
 import ai.opencode.core.ui.OpenCodeSearchField
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeRadius
@@ -22,6 +24,7 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
+import ai.opencode.feature.system.R
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -99,6 +102,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
@@ -161,9 +165,9 @@ class ShareActions(
 )
 
 /**
- * Port of iOS `ShareView`: the share sheet as a composer: what was shared, large, at the top; the
- * sessions as chips right above an app-style composer; Send in the composer and Continue in
- * OpenCode beside the title. Wrap in `OpenCodeAppTheme {}`.
+ * The share sheet as a composer: what was shared, large, at the top; the sessions as chips right
+ * above an app-style composer; Send in the composer and Continue in OpenCode beside the title. Wrap
+ * in `OpenCodeAppTheme {}`.
  */
 @Composable
 fun ShareView(state: ShareModel.State, actions: ShareActions) {
@@ -177,8 +181,8 @@ fun ShareView(state: ShareModel.State, actions: ShareActions) {
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .padding(top = 8.dp)
-                // A swipe down cancels, as the system sheet's does on iOS; from Send until it
-                // closes the sheet is the send's to end, so it springs back.
+                // A swipe down cancels, as the system sheet's does; from Send until it closes the
+                // sheet is the send's to end, so it springs back.
                 .swipeDownToDismiss(enabled = !state.isBusy, reduceMotion = reduceMotion, onDismiss = actions.onCancel),
             shape = OpenCodeShape.sheetTop,
             color = colors.canvas,
@@ -200,9 +204,9 @@ fun ShareView(state: ShareModel.State, actions: ShareActions) {
     state.saveError?.let { error ->
         OpenCodeAlertDialog(
             onDismissRequest = actions.onDismissSaveError,
-            title = { Text("Couldn’t Save for OpenCode") },
+            title = { Text(stringResource(R.string.system_share_save_failed_title)) },
             text = { Text(error) },
-            confirmButton = { TextButton(onClick = actions.onDismissSaveError) { Text("OK") } },
+            confirmButton = { TextButton(onClick = actions.onDismissSaveError) { Text(stringResource(CoreR.string.common_ok)) } },
         )
     }
 
@@ -212,9 +216,9 @@ fun ShareView(state: ShareModel.State, actions: ShareActions) {
 }
 
 /**
- * iOS's page-sheet swipe: the sheet follows a downward drag (on itself, or past the top of
- * what scrolls inside it), and goes when let go past half its height or flung down; anything
- * less springs back. Dismissal runs [onDismiss] once the sheet has slid away.
+ * The sheet follows a downward drag (on itself, or past the top of what scrolls inside it), and
+ * goes when let go past half its height or flung down; anything less springs back. Dismissal runs
+ * [onDismiss] once the sheet has slid away.
  */
 @Composable
 private fun Modifier.swipeDownToDismiss(enabled: Boolean, reduceMotion: Boolean, onDismiss: () -> Unit): Modifier {
@@ -228,8 +232,8 @@ private fun Modifier.swipeDownToDismiss(enabled: Boolean, reduceMotion: Boolean,
     val currentDismiss by rememberUpdatedState(onDismiss)
     val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     val flingVelocity = with(density) { SWIPE_DISMISS_VELOCITY.toPx() }
-    // The dimming behind the sheet fades with how far it has been pulled down, as iOS's
-    // sheet's dimming view does, so nothing pops when it closes.
+    // The dimming behind the sheet fades with how far it has been pulled down, so nothing pops when
+    // it closes.
     val window = androidx.activity.compose.LocalActivity.current?.window
     androidx.compose.runtime.LaunchedEffect(window) {
         if (window == null) return@LaunchedEffect
@@ -253,7 +257,7 @@ private fun Modifier.swipeDownToDismiss(enabled: Boolean, reduceMotion: Boolean,
         val goes = currentEnabled && offset > 0f && (offset > height / 2f || velocity > flingVelocity)
         if (goes) {
             dismissed = true
-            // As a committed sheet dismissal on iOS: the keyboard goes down alongside the sheet.
+            // As a committed sheet dismissal: the keyboard goes down alongside the sheet.
             keyboard?.hide()
         }
         settling = scope.launch {
@@ -298,7 +302,7 @@ private fun TopBar(state: ShareModel.State, actions: ShareActions) {
         // Inert, not dimmed, from Send until the sheet closes.
         OpenCodeIconButton(
             symbol = SFSymbol.Xmark,
-            contentDescription = "Cancel",
+            contentDescription = stringResource(CoreR.string.common_cancel),
             onClick = { if (!state.isBusy) actions.onCancel() },
             modifier = Modifier.align(Alignment.CenterStart),
             style = OpenCodeIconButtonStyle.Standard,
@@ -311,7 +315,7 @@ private fun TopBar(state: ShareModel.State, actions: ShareActions) {
         if (state.targets != null) {
             OpenCodeIconButton(
                 symbol = SFSymbol.ArrowUpForwardApp,
-                contentDescription = "Continue in OpenCode",
+                contentDescription = stringResource(R.string.system_share_continue_description),
                 onClick = { if (!state.isBusy) actions.onContinue() },
                 modifier = Modifier.align(Alignment.CenterEnd),
                 style = OpenCodeIconButtonStyle.Standard,
@@ -330,10 +334,10 @@ private fun EmptyState(modifier: Modifier) {
     ) {
         OpenCodeIcon(SFSymbol.Desktopcomputer, contentDescription = null, size = OpenCodeIconSize.hero, tint = OpenCodeTheme.colors.secondaryText)
         Spacer(Modifier.height(16.dp))
-        Text("Connect to a Server First", style = OpenCodeTextStyles.title2.copy(fontWeight = FontWeight.Bold), textAlign = TextAlign.Center)
+        Text(stringResource(R.string.system_share_no_server_title), style = OpenCodeTextStyles.title2.copy(fontWeight = FontWeight.Bold), textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
         Text(
-            "Open OpenCode and connect to your computer, then share again.",
+            stringResource(R.string.system_share_no_server_message),
             style = OpenCodeTextStyles.subheadline,
             color = OpenCodeTheme.colors.secondaryText,
             textAlign = TextAlign.Center,
@@ -387,12 +391,12 @@ private fun Status(state: ShareModel.State, actions: ShareActions, reduceMotion:
             when (val current = shown[0]) {
                 is ShareModel.Phase.Failed -> {
                     Text(current.problem.message, style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.weight(1f))
-                    FilledTonalButton(onClick = actions.onSendLater, shape = OpenCodeShape.control) { Text("Send Later") }
-                    if (current.problem.canRetry) Button(onClick = actions.onSend, shape = OpenCodeShape.control) { Text("Try Again") }
+                    FilledTonalButton(onClick = actions.onSendLater, shape = OpenCodeShape.control) { Text(stringResource(R.string.system_share_send_later)) }
+                    if (current.problem.canRetry) Button(onClick = actions.onSend, shape = OpenCodeShape.control) { Text(stringResource(CoreR.string.common_try_again)) }
                 }
                 else -> {
-                    Text("Saved. Open OpenCode to continue", style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.weight(1f))
-                    Button(onClick = actions.onDone, shape = OpenCodeShape.control) { Text("Done") }
+                    Text(stringResource(R.string.system_share_saved_continue), style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.weight(1f))
+                    Button(onClick = actions.onDone, shape = OpenCodeShape.control) { Text(stringResource(CoreR.string.common_done)) }
                 }
             }
         }
@@ -435,7 +439,7 @@ private fun Modifier.sendingStage(phase: ShareModel.Phase, reduceMotion: Boolean
         .then(if (phase == ShareModel.Phase.Sent) Modifier.semantics { hideFromAccessibility() } else Modifier)
 }
 
-/** Takes no touches while [blocked] (iOS `allowsHitTesting(false)`), without dimming. */
+/** Takes no touches while [blocked], without dimming. */
 private fun Modifier.blockInput(blocked: Boolean): Modifier = if (!blocked) this else pointerInput(Unit) {
     awaitPointerEventScope {
         while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
@@ -459,7 +463,8 @@ private fun ShareItemsPreview(state: ShareModel.State, modifier: Modifier) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (state.isLoading && !state.hasContent) {
-                CircularProgressIndicator(Modifier.semantics { contentDescription = "Loading shared items" })
+                val loadingDescription = stringResource(R.string.system_share_loading_description)
+                CircularProgressIndicator(Modifier.semantics { contentDescription = loadingDescription })
             }
             Images(state.images, imageHeight)
             for (file in state.files) {
@@ -530,7 +535,7 @@ private fun Images(images: List<ShareModel.SharedImage>, height: Dp) {
         val bitmap = remember(image.id) { image.preview.asImageBitmap() }
         Image(
             bitmap = bitmap,
-            contentDescription = "Image",
+            contentDescription = stringResource(R.string.system_share_image_description),
             contentScale = ContentScale.Fit,
             modifier = Modifier.heightIn(max = height).clip(RoundedCornerShape(OpenCodeRadius.card)),
         )
@@ -543,7 +548,7 @@ private fun Images(images: List<ShareModel.SharedImage>, height: Dp) {
                 val bitmap = remember(image.id) { image.preview.asImageBitmap() }
                 Image(
                     bitmap = bitmap,
-                    contentDescription = "Image ${index + 1} of ${images.size}",
+                    contentDescription = stringResource(R.string.system_share_image_position_description, index + 1, images.size),
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.heightIn(max = minOf(height, 300.dp)).clip(RoundedCornerShape(OpenCodeRadius.card)),
                 )
@@ -566,8 +571,8 @@ private fun Card(modifier: Modifier = Modifier, content: @Composable () -> Unit)
 
 private fun skippedNote(images: Int, files: Int): String {
     val parts = mutableListOf<String>()
-    if (images > 0) parts.add(if (images == 1) "1 image couldn’t be added" else "$images images couldn’t be added")
-    if (files > 0) parts.add(if (files == 1) "1 file couldn’t be added" else "$files files couldn’t be added")
+    if (images > 0) parts.add(localizedPlural(R.plurals.system_share_images_skipped, images, images))
+    if (files > 0) parts.add(localizedPlural(R.plurals.system_share_files_skipped, files, files))
     return parts.joinToString(" · ")
 }
 
@@ -617,19 +622,20 @@ private fun ShareTargetChips(
             val selected = (state.destination as? ShareComposition.Destination.Session)?.session?.id == session.id
             Chip(
                 selected = selected,
-                label = "${session.title}, ${session.projectName}",
+                label = stringResource(R.string.system_share_session_chip_description, session.title, session.projectName),
                 onClick = { onChoose(ShareComposition.Destination.Session(session)) },
             ) {
                 Text(session.title, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 220.dp))
             }
         }
         item(key = SEARCH_KEY) {
+            val searchDescription = stringResource(R.string.system_share_search_sessions_description)
             Box(
                 Modifier
                     .clip(OpenCodeShape.circle)
                     .clickable(onClickLabel = null, role = Role.Button, onClick = onSearch)
                     .openCodeTapTarget()
-                    .semantics { contentDescription = "Search sessions" },
+                    .semantics { contentDescription = searchDescription },
                 contentAlignment = Alignment.Center,
             ) {
                 Box(
@@ -667,12 +673,12 @@ private fun NewSessionChip(state: ShareModel.State, onChoose: (ShareComposition.
         Box {
             Chip(
                 selected = true,
-                label = "New Session in ${destination.project.name}",
-                hint = "Choose its project",
+                label = stringResource(R.string.system_share_new_session_in_project_description, destination.project.name),
+                hint = stringResource(R.string.system_share_choose_project_description),
                 onClick = { expanded = true },
             ) {
                 OpenCodeIcon(SFSymbol.Plus, contentDescription = null, size = 14.dp)
-                Text("New Session")
+                Text(stringResource(R.string.system_new_session))
                 Text(destination.project.name, modifier = Modifier.alpha(0.65f), maxLines = 1)
                 OpenCodeIcon(SFSymbol.ChevronDown, contentDescription = null, size = 12.dp)
             }
@@ -685,7 +691,7 @@ private fun NewSessionChip(state: ShareModel.State, onChoose: (ShareComposition.
                             onChoose(ShareComposition.Destination.NewSession(candidate))
                         },
                         trailingIcon = if (candidate.id == destination.project.id) {
-                            { OpenCodeIcon(SFSymbol.Checkmark, contentDescription = "Selected", size = OpenCodeIconSize.small) }
+                            { OpenCodeIcon(SFSymbol.Checkmark, contentDescription = stringResource(R.string.system_selected_description), size = OpenCodeIconSize.small) }
                         } else {
                             null
                         },
@@ -695,9 +701,9 @@ private fun NewSessionChip(state: ShareModel.State, onChoose: (ShareComposition.
         }
     } else {
         val project = state.projects.firstOrNull() ?: return
-        Chip(selected = false, label = "New Session", onClick = { onChoose(ShareComposition.Destination.NewSession(project)) }) {
+        Chip(selected = false, label = stringResource(R.string.system_new_session), onClick = { onChoose(ShareComposition.Destination.NewSession(project)) }) {
             OpenCodeIcon(SFSymbol.Plus, contentDescription = null, size = 14.dp)
-            Text("New Session")
+            Text(stringResource(R.string.system_new_session))
         }
     }
 }
@@ -765,9 +771,8 @@ private fun MessageBar(state: ShareModel.State, actions: ShareActions, reduceMot
     val fieldBlur by animateDpAsState(if (phase == ShareModel.Phase.Sent && !reduceMotion) 6.dp else 0.dp, phaseAnimation(reduceMotion), label = "fieldBlur")
     val fieldLift by animateDpAsState(if (phase == ShareModel.Phase.Sent && !reduceMotion) (-6).dp else 0.dp, phaseAnimation(reduceMotion), label = "fieldLift")
     val density = LocalDensity.current
-    // How far the centre of the field's last-line capitals sits above the field's bottom
-    // edge (iOS `lastLineCapCentre`, 11.8 pt at the default size, scaling with it): measured
-    // from the laid-out text, so the last line's capitals centre on the arrow at any size.
+    // How far the centre of the field's last-line capitals sits above the field's bottom edge:
+    // measured from the laid-out text, so the last line's capitals centre on the arrow at any size.
     val bodySize = with(density) { OpenCodeTextStyles.body.fontSize.toPx() }
     val capHeight = remember(bodySize) {
         val bounds = android.graphics.Rect()
@@ -820,7 +825,7 @@ private fun MessageBar(state: ShareModel.State, actions: ShareActions, reduceMot
                     decorationBox = { inner ->
                         Box {
                             if (state.message.isEmpty()) {
-                                Text("Message", style = OpenCodeTextStyles.body, color = colors.tertiaryText)
+                                Text(stringResource(R.string.system_share_message_placeholder), style = OpenCodeTextStyles.body, color = colors.tertiaryText)
                             }
                             inner()
                         }
@@ -835,7 +840,7 @@ private fun MessageBar(state: ShareModel.State, actions: ShareActions, reduceMot
                     exit = MotionTransition.swap(reduceMotion).exit,
                 ) {
                     Text(
-                        "Sent to ${destination?.title ?: ""}",
+                        stringResource(R.string.system_share_sent_to, destination?.title ?: ""),
                         style = OpenCodeTextStyles.body,
                         color = colors.secondaryText,
                         maxLines = 1,
@@ -875,9 +880,9 @@ private fun SendButton(state: ShareModel.State, onSend: () -> Unit, reduceMotion
         else -> Glyph.Arrow
     }
     val label = when (phase) {
-        ShareModel.Phase.Sending -> "Sending"
-        ShareModel.Phase.Sent -> "Sent"
-        else -> "Send"
+        ShareModel.Phase.Sending -> stringResource(R.string.system_share_sending_description)
+        ShareModel.Phase.Sent -> stringResource(R.string.system_share_sent_description)
+        else -> stringResource(CoreR.string.common_send)
     }
     val face = modifier.size(48.dp)
     Box(
@@ -973,24 +978,26 @@ private fun ShareSessionSearch(
         Box(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
             OpenCodeIconButton(
                 symbol = SFSymbol.Xmark,
-                contentDescription = "Close",
+                contentDescription = stringResource(CoreR.string.common_close),
                 onClick = onClose,
                 modifier = Modifier.align(Alignment.CenterStart),
                 style = OpenCodeIconButtonStyle.Standard,
             )
-            Text("Sessions", style = OpenCodeTextStyles.headline, modifier = Modifier.align(Alignment.Center))
+            Text(stringResource(R.string.system_share_sessions_title), style = OpenCodeTextStyles.headline, modifier = Modifier.align(Alignment.Center))
         }
         OpenCodeSearchField(
             value = query,
             onValueChange = { query = it },
-            placeholder = "Search",
+            placeholder = stringResource(CoreR.string.common_search),
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         )
         val pinned = matches(state.targets?.pinned ?: emptyList(), query)
         val recents = matches(state.targets?.recents ?: emptyList(), query)
+        val pinnedTitle = stringResource(R.string.system_share_pinned_header)
+        val recentsTitle = stringResource(R.string.system_share_recents_header)
         LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(bottom = 24.dp)) {
-            section("Pinned", pinned, state.destination, onChoose, onClose)
-            section("Recents", recents, state.destination, onChoose, onClose)
+            section(pinnedTitle, pinned, state.destination, onChoose, onClose)
+            section(recentsTitle, recents, state.destination, onChoose, onClose)
         }
     }
 }

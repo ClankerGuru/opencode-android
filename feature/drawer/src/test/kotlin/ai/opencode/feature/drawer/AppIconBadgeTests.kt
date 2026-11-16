@@ -29,12 +29,6 @@ import org.junit.Test
 import java.time.Instant
 import java.util.Collections
 
-/**
- * Port of iOS `AppIconBadgeTests.swift`'s Home publishing tests: the app icon's badge counts what
- * Catch Up holds on the server in use (`HomeFeature.State.appBadgeLedger` → `AppIconBadgeClient.publish`).
- * The ledger/storage/ref tests are `:feature:system`'s, identity forgetting `:app`'s;
- * `BadgeAuthorization` (incl. `callsWhileOneRunsShareIt`) has no Android counterpart.
- */
 class AppIconBadgeTests {
     @get:Rule val isolation = TestIsolationRule()
 

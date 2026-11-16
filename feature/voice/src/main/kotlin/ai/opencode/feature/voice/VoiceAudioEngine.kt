@@ -36,9 +36,10 @@ object VoiceAudioRoute {
         if (demo || hasExternalOutput || atEar) Override.none else Override.speaker
 }
 
-/** The platform seam for deterministic ownership/route/focus checks. Permission is
- * asked here (iOS `AVAudioApplication.requestRecordPermission()` at call start), through
- * the requester :app registers on [VoiceMicrophonePermission]. */
+/**
+ * The platform seam for deterministic ownership/route/focus checks. Permission is asked here,
+ * through the requester:app registers on [VoiceMicrophonePermission].
+ */
 interface VoiceAudioSessionControlling {
     val mode: Int
     val outputPorts: List<Int>
@@ -160,8 +161,7 @@ class LiveVoiceAudioSession(private val context: Context) : VoiceAudioSessionCon
             deviceIDs.addAll(manager.getDevices(AudioManager.GET_DEVICES_INPUTS or AudioManager.GET_DEVICES_OUTPUTS).map { it.id })
             manager.registerAudioDeviceCallback(devices, handler)
             manager.addOnModeChangedListener(context.mainExecutor, modeListener)
-            // A selected communication device is an output override, not an iOS
-            // category/old-device/new-device change. Our route() writes it too.
+            // A selected communication device is an output override. Our route() writes it too.
             registered = true
         }
     }
@@ -287,9 +287,9 @@ class VoiceAudioEngine(
     @Volatile var atEar = atEar; private set
     @Volatile var running = false; private set
     @Volatile private var alive = false
-    /** Audio was taken and hasn't come back (iOS `recoveryPending`). */
+    /** Audio was taken and hasn't come back. */
     @Volatile private var interrupted = false
-    /** Between an interruption's start and its end (iOS `interruptionInProgress`). */
+    /** Between an interruption's start and its end. */
     @Volatile private var interruptionInProgress = false
     private var didConnect = false
     private var mediaReset = false
@@ -686,8 +686,8 @@ class VoiceAudioEngine(
                 return@withLock
             }
         } else {
-            // iOS notes a fallback to the built-in output (`oldDeviceUnavailable`) as the ear's
-            // route, and following an external device as a route change.
+            // A fallback to the built-in output (`oldDeviceUnavailable`) counts as the ear's route,
+            // and following an external device as a route change.
             val route = when { demo || external -> "Route changed · "; atEar -> "At the ear: earpiece · "; else -> "Away from the ear: speaker · " }
             note(VoiceCallLog.Note.Kind.audio, route + session.routeDescription)
         }
@@ -712,7 +712,7 @@ class VoiceAudioEngine(
             recoverFromInterruption()
         }
     }
-    /** `interrupted` stays set (iOS `recoveryPending`) until this succeeds. */
+    /** `interrupted` stays set until this succeeds. */
     private fun recoverFromInterruption() = try {
         holder.activate { session.activate(demo); session.route(atEar, demo) }
         cancelSpeakerRamp()

@@ -1,5 +1,6 @@
 package ai.opencode.core.ui
 
+import ai.opencode.core.R
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -31,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -78,7 +80,7 @@ fun OpenCodeTextField(
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = modifier.fieldErrorSemantics(isError, supportingText),
+        modifier = modifier.fieldErrorSemantics(isError, supportingText, stringResource(R.string.core_text_field_invalid_input_description)),
         enabled = enabled,
         readOnly = readOnly,
         textStyle = textStyle.copy(color = colors.text),
@@ -137,7 +139,7 @@ fun OpenCodeTextField(
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = modifier.fieldErrorSemantics(isError, supportingText),
+        modifier = modifier.fieldErrorSemantics(isError, supportingText, stringResource(R.string.core_text_field_invalid_input_description)),
         enabled = enabled,
         readOnly = readOnly,
         textStyle = textStyle.copy(color = colors.text),
@@ -371,9 +373,9 @@ private fun FieldDecoration(
 }
 
 /** Material's error semantics: TalkBack announces the error with the field. */
-private fun Modifier.fieldErrorSemantics(isError: Boolean, supportingText: String?): Modifier {
+private fun Modifier.fieldErrorSemantics(isError: Boolean, supportingText: String?, defaultError: String): Modifier {
     if (!isError) return this
-    return semantics { error(supportingText ?: FieldMetrics.DEFAULT_ERROR) }
+    return semantics { error(supportingText ?: defaultError) }
 }
 
 private object FieldMetrics {
@@ -385,5 +387,4 @@ private object FieldMetrics {
     val multilineVerticalPadding: Dp = 13.dp
     const val ANIMATION_MILLIS = 120
     const val DISABLED_ALPHA = 0.5f
-    const val DEFAULT_ERROR = "Invalid input"
 }

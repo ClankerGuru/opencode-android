@@ -3,10 +3,10 @@ package ai.opencode.feature.composer
 import ai.opencode.core.dependencies.DependencyKey
 
 /**
- * Messages whose send failed, kept for the app's lifetime until Retry, Edit, or Delete
- * resolves them, or the server turns out to have them (iOS `UndeliveredPrompts`). A screen
- * that opens on their session (or the next draft, for a failed create) shows them again as
- * failed bubbles, so a send is never silently dropped.
+ * Messages whose send failed, kept for the app's lifetime until Retry, Edit, or Delete resolves
+ * them, or the server turns out to have them. A screen that opens on their session (or the next
+ * draft, for a failed create) shows them again as failed bubbles, so a send is never silently
+ * dropped.
  */
 class UndeliveredPrompts {
     data class Entry(val pending: PendingPrompt, val reason: String)

@@ -11,11 +11,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Port of iOS `VoiceHandoffParseTests.swift` (`VoiceHandoffParseTests`, `VoiceFramingTests`,
- * `VoiceSteeringInstructionsTests`). Assertions on `TranscriptUserMessage`/`VoiceMessageIndicator`
- * (`:feature:transcript`) are ported with that module's tests.
- */
 class VoiceHandoffParseTests {
     @Test fun readsBackWhatFormatWrote() {
         val prompt = VoiceHandoff.format(instruction = "Check why the upload test is flaky.", transcriptDelta = listOf("user: the upload test", "assistant: On it."))
@@ -190,7 +185,6 @@ class VoiceFramingTests {
             "Looking that up now.", "Working on that.", "Sure", "  ", "",
             "Let me look into that.", "Checking.", "I'm checking on that.", "Let me dig into that.",
             "Checking your sessions.", "Checking with the team.", "Sending that to the session.",
-            // Reactions from Kit's Oct 15 call.
             "Yeah, I heard you.", "Yeah, good call.", "Still digging into that.", "Yeah.", "Makes sense, noted.",
         )) {
             assertNull(ack, VoiceHandoff.framing(ack))
@@ -243,17 +237,16 @@ class VoiceSteeringInstructionsTests {
                 assertEquals("$engine", 2, text.split("backend").size)
                 assertFalse(text.contains("Backend"))
                 assertFalse(text.contains("OpenCode iOS"))
-                // A natural reaction described, never quoted: GPT-Live copied the
-                // quoted "Checking." five times in one call (Oct 15).
+                // A natural reaction is described, never quoted: GPT-Live repeats a quoted phrase.
                 assertTrue(
                     "$engine",
                     text.contains("react the way a friend on the phone would: quickly and naturally, to what the user just said") ||
                         text.contains("react once the way a friend on the phone would: quickly and naturally, to what the user just said"),
                 )
-                // Victor (Oct 23): a rambled request needs its acknowledgement to say
-                // what was understood, as a statement, not a permission question.
-                assertTrue("$engine", text.contains("Name the specific thing you understood them to want, in your own words, so they hear how you read it; this matters most when they rambled or circled. Say it as asking, not as done: \"On it, asking for the check-in\", never \"I'm checking you in now\" or \"Done\". Only a result decides what happened. Never use the same stock word or phrase twice in a row"))
-                // Nov 1 call: "Done… added those rules" before any tool ran; an invented deadline.
+                // A rambled request's acknowledgement says what was understood, as a statement, not
+                // a question.
+                assertTrue("$engine", text.contains("Name the specific thing you understood them to want, in your own words, so they hear how you read it; this matters most when they rambled or circled. Say it in the first person as work you're starting, not as done and not as asking, sending, or handing it to anyone, unless the user asked for exactly that; never \"Done\". Only a result decides what happened. Never use the same stock word or phrase twice in a row"))
+                assertFalse("$engine", text.contains("asking for the check-in"))
                 assertTrue("$engine", text.contains("A result's own words set the claim. \"Asked\", \"started\" or \"will\" stays that; never upgrade it to \"done\", and never add a date, deadline or urgency the result didn't say."))
                 assertFalse("$engine", text.contains("It can mention the thing itself."))
                 assertTrue(
@@ -266,8 +259,8 @@ class VoiceSteeringInstructionsTests {
         }
         val live = VoiceInstructions.build(context, engine = VoiceEngine.gptLive)
         assertTrue(live.contains("When the user is mid-thought or it's a quick follow-up, a simple yeah or nothing at all is fine."))
-        // Kit's Nov 1 call: a long ask ending "Are you listening or no" got
-        // "Listening. I've got that." and nothing about the ask.
+        // A long ask ending "Are you listening or no" got "Listening. I've got that." and nothing
+        // about the ask.
         assertTrue(live.contains("After a long turn, even one that ends by asking whether you're there, name what they asked for; a stock line that names nothing doesn't cover it."))
         assertTrue(live.contains("- Say it once, without saying how the request will be framed or passed on"))
         // One place for what's said around a delegation.
@@ -277,11 +270,6 @@ class VoiceSteeringInstructionsTests {
         assertTrue(realtime.contains("for a quick follow-up a simple yeah is enough. Never start work in silence."))
     }
 
-    /**
-     * From a call log: a note Kit wanted for himself became "We'll relay it
-     * in a neutral way, but I'll have them take a look at it" and "product
-     * feedback for the team"; and a prompt example was read out word for word.
-     */
     @Test fun requestsKeepTheirAudienceAndResultsNameTheConcreteAction() {
         val managed = context.copy(managesSessions = true)
         for (context in listOf(context, managed)) {
@@ -304,14 +292,10 @@ class VoiceSteeringInstructionsTests {
         assertFalse(VoiceHandoff.earlierRequestLead.contains("\""))
         assertFalse(VoiceHandoff.earlierRequestLead.contains("upload tests"))
         assertEquals("This answers an earlier request, not what the user said last; open by saying it's about that earlier request and naming it, then give the result. ", VoiceHandoff.earlierRequestLead)
-        // From a call log: a wait for a session held the delegation open while
-        // the user asked six times whether it heard them.
         assertTrue(delegator.contains("when a wait returns user_spoke, answer at once without waiting again"))
         val wait = VoiceDelegator.tools.firstOrNull { it["name"] == JsonPrimitive("wait_for_session") }
         val waitDescription = wait?.get("description")?.jsonPrimitive?.content ?: ""
         assertTrue(waitDescription.contains("ending early if the user starts talking"))
-        // From a call log: steers stacked behind a question form, and the voice
-        // said a Slack draft was sent while it still waited for the user's OK.
         assertTrue(delegator.contains("A session waiting on a permission or question takes no steering"))
         assertTrue(delegator.contains("Never answer, grant, or dismiss a request the user didn't speak to."))
         assertTrue(delegator.contains("A draft waiting for the user's OK hasn't been sent."))
@@ -353,7 +337,7 @@ class VoiceSteeringInstructionsTests {
         )
         assertTrue(realtime.contains("any status or outcome question goes to `delegate` unless a completed result on this call directly answers it"))
         assertTrue(VoiceSessionDelegator.activeCallBlock.contains("Next is X; keep, drop, or note?"))
-        // Short by default, long when asked (Kit, Nov 7: a fixed 1–3 sentences was too rigid).
+        // Short by default, long when asked.
         assertTrue(VoiceSessionDelegator.activeCallBlock.contains("Keep it short by default"))
         assertTrue(VoiceSessionDelegator.activeCallBlock.contains("When they ask for detail, an explanation, a walkthrough, or to be taught something, answer at whatever length it needs"))
         assertFalse(VoiceSessionDelegator.activeCallBlock.contains("1–3"))

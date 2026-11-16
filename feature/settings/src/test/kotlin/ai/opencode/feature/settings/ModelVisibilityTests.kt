@@ -20,12 +20,10 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Port of iOS `ModelVisibilityTests.swift`, the "Settings › Models" section
- * (`ModelVisibilitySettingsFeature` → Android's [ModelVisibilityFeature]). The "Rules" section is
- * `:server`'s port; the "Pickers" section drives `SessionFeature` (`:feature:session`).
+ * The "Settings › Models" section (`ModelVisibilitySettingsFeature` → Android's
+ * [ModelVisibilityFeature]).
  *
- * iOS's exhaustive store asserts the shared `visibilityByServer` in each step; Android's state
- * reads it live from the shared key, so each step checks the key after the send.
+ * Android's state reads it live from the shared key, so each step checks the key after the send.
  */
 class ModelVisibilityTests {
     @get:Rule val isolation = TestIsolationRule()

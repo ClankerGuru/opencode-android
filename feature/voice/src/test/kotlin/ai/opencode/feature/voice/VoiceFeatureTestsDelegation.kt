@@ -41,7 +41,6 @@ import org.junit.Test
 import java.time.Instant
 import kotlin.time.Duration.Companion.seconds
 
-/** Port of iOS `VoiceFeatureTests+Delegation.swift` (an extension of `VoiceFeatureTests`). */
 class VoiceFeatureTestsDelegation {
     private lateinit var h: Harness
 
@@ -52,7 +51,7 @@ class VoiceFeatureTestsDelegation {
         // Each test starts from no saved conversation (the shared store is the test's own).
         val store = h.store(h.state { State(server, session) }) {
             this[DateClient] = DateClient.constant(Instant.EPOCH)
-            // Android: an ended call's notification lingers on the clock (iOS's Live Activity is Home's).
+            // Android: an ended call's notification lingers on the clock.
             this[Clock] = ImmediateClock()
             voiceCall { copy(completeFunction = { _, _ -> }) }
             configure()
@@ -383,10 +382,8 @@ class VoiceFeatureTestsDelegation {
                 copy(
                     submit = { _, _ ->
                         entered.yield()
-                        // Held until the hang-up cancels it; the server still admits the
-                        // prompt, so the POST reports success after the call is over.
-                        // (Swift's `for await` on a cancelled task just ends; a cancelled
-                        // Kotlin receive throws, so the stand-in swallows it the same way.)
+                        // Held until the hang-up cancels it; the server still admits the prompt, so
+                        // the POST reports success after the call is over.
                         try {
                             admission.awaitFinish()
                         } catch (_: CancellationException) {
@@ -448,6 +445,50 @@ class VoiceFeatureTestsDelegation {
             completed.value,
         )
         store.finish()
+    }
+
+    @Test fun aLongCallKeepsItsNewestCaptions() = voiceTest { harness ->
+        h = harness
+        val (store, events) = startLiveCall { voiceCall { copy(end = {}) } }
+        val limit = VoiceTranscriptRecord.maxLogLines
+        for (index in 0 until limit + 50) {
+            store.send(Action.CallEvent(VoiceCallEvent.UserTranscript(itemID = "u$index", text = "line $index", final = true)))
+        }
+        assertEquals(limit, store.state.captions.size)
+        assertEquals("user-u50", store.state.captions.first().id)
+        assertEquals(2 * CaptionReveal.maxLines, store.state.captionTargets.size)
+        assertEquals("line ${limit + 49}", store.state.captionTargets.last().text)
+
+        events.finish()
+        store.receive(Action.CallEnded::class)
+        val log = store.transcripts()["${server.id}:ses_voice"]?.log
+        assertEquals(limit, log?.size)
+        assertEquals("user: line 50", log?.first())
+        store.finish()
+    }
+
+    @Test fun transcriptsKeepTheNewestSessions() = voiceTest { harness ->
+        h = harness
+        val older = (0 until 70).map { "${server.id}:ses_old_$it" }
+        val (store, events) = startLiveCall { voiceCall { copy(end = {}) } }
+        store.withDependencies {
+            val records = mutableMapOf<String, VoiceTranscriptRecord>()
+            for ((index, key) in older.withIndex()) {
+                records[key] = VoiceTranscriptRecord(endedAt = Instant.ofEpochSecond(index - 1_000L), tail = emptyList(), log = listOf("user: old"))
+            }
+            shared(VoiceSharedKeys.voiceTranscripts).set(records)
+        }
+        events.yield(VoiceCallEvent.UserTranscript(itemID = "item_1", text = "hello there", final = true))
+        store.receive(Action.CallEvent::class)
+        events.finish()
+        store.receive(Action.CallEnded::class)
+        store.finish()
+
+        val kept = store.transcripts()
+        assertTrue(kept.size <= VoiceTranscriptRecord.maxSessions)
+        assertEquals(listOf("user: hello there"), kept["${server.id}:ses_voice"]?.tail)
+        assertNull("The session called longest ago went", kept[older[0]])
+        assertTrue(kept[older[69]] != null)
     }
 
     @Test fun failedCallPersistsOnceAndEndsWithoutASecondWrite() = voiceTest { harness ->
@@ -697,8 +738,8 @@ class VoiceFeatureTestsDelegation {
         }
 
         store.send(Action.Start)
-        // iOS counts `haptics.cancelPendingVoiceStart`; Android's is `VoiceCallSounds.cancelPendingStart`,
-        // which ends the connecting stage the tap began.
+        // Counts `VoiceCallSounds.cancelPendingStart`, which ends the connecting stage the tap
+        // began.
         assertTrue(h.haptics.sounds.stageElapsed(DotScopeSimulation.Stage.connecting) != null)
         store.receive(Action.CallEnded::class)
         assertNull("The scanner's timeline from the tap ends with the start", h.haptics.sounds.stageElapsed(DotScopeSimulation.Stage.connecting))

@@ -15,6 +15,7 @@ import ai.opencode.feature.composer.AttachmentMenuMotion
 import ai.opencode.feature.composer.AttachmentMenuMeasure
 import ai.opencode.feature.composer.AttachmentMenuRows
 import ai.opencode.feature.composer.PlusMenuTunables
+import ai.opencode.feature.composer.R
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.clickable
@@ -47,6 +48,7 @@ import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.paneTitle
@@ -62,15 +64,13 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * The New Plus Menu's own surface (iOS `PlusMenuGlassSurface`): the + menu grows out of the +
- * itself over the composer, and collapses back into it, shrinking on into the + glyph's centre
- * and leaving there under the + as it pops back (`AttachmentPickerButton(popsOnClose = true)`).
- * Liquid Glass maps to a tonal Material surface (AGENTS.md).
+ * The New Plus Menu's own surface: the + menu grows out of the + itself over the composer, and
+ * collapses back into it, shrinking on into the + glyph's centre and leaving there under the + as
+ * it pops back (`AttachmentPickerButton(popsOnClose = true)`). Liquid Glass maps to a tonal
+ * Material surface (AGENTS.md).
  *
- * iOS draws it in its own window, or on the keyboard's window so it overlaps the keys. Android's
- * IME is another process's window that no app surface can draw over, so the menu always stands
- * above the keys ([PlusMenuPlacement.visibleMenu] with `coversKeyboard = false`, iOS's own
- * fallback when its guarded keyboard surface is unavailable); `KeyboardBandSurface` is n/a.
+ * Android's IME is another process's window that no app surface can draw over, so the menu always
+ * stands above the keys; `KeyboardBandSurface` is n/a.
  *
  * [AttachmentMenuMeasure] measures the rows and publishes
  * [anchors]; this draws them. Put it in a full-screen box over the session.
@@ -102,7 +102,7 @@ fun PlusMenuGlassSurface(
     var handedOff by remember { mutableStateOf(false) }
     var resumes by remember { mutableStateOf(false) }
 
-    // iOS `PlusMenuWindowBridge.Coordinator.update(from:)`: the host's lifetime.
+    // The host's lifetime.
     if (handsOff) {
         if (hosted || !handedOff) {
             handedOff = true
@@ -119,8 +119,8 @@ fun PlusMenuGlassSurface(
         }
     }
 
-    // iOS `update(from:)`: touch ownership follows intent, even during a zero-sized layout. A
-    // close that loses its geometry can't run its collapse to retire, so it retires now.
+    // Touch ownership follows intent, even during a zero-sized layout. A close that loses its
+    // geometry can't run its collapse to retire, so it retires now.
     val hasGeometry = anchors.menu.width > 0f && size.width > 0f
     LaunchedEffect(hasGeometry, isOpen, hosted) {
         if (!hasGeometry && !isOpen && hosted) {
@@ -129,8 +129,7 @@ fun PlusMenuGlassSurface(
         }
     }
 
-    // iOS `plusMenuTouchRecovery`: a closed menu still hosted after its collapse (one second,
-    // well past the close) retires.
+    // A closed menu still hosted after its collapse (one second, well past the close) retires.
     val host = remember { PlusMenuHost() }
     rememberTouchRecovery(
         owner = TouchRecovery.Owner.PlusMenu,
@@ -175,7 +174,7 @@ fun PlusMenuGlassSurface(
             onRetired = { if (!isOpen) hosted = false },
         )
     }
-    // iOS `accessibilityAction(.escape)`: system Back closes it.
+    // System Back closes it.
     BackHandler(enabled = isOpen && !handsOff) { onDismiss() }
 }
 
@@ -195,7 +194,7 @@ private fun PlusMenuWindowContent(
     onRetired: () -> Unit,
 ) {
     val density = LocalDensity.current
-    // `expanded` on iOS, animated: 0 at the shrunk + disc, 1 at the menu.
+    // `expanded`, animated: 0 at the shrunk + disc, 1 at the menu.
     val expanded = remember { Animatable(if (resumes && isOpen) 1f else 0f) }
     /** The glass's opacity: Liquid Glass's materialize transition, a fade here. */
     val glass = remember { Animatable(if (resumes && isOpen) 1f else 0f) }
@@ -233,6 +232,7 @@ private fun PlusMenuWindowContent(
     val radius = lerp(end.height / 2, menuRadius, p)
     val shape = RoundedCornerShape(with(density) { radius.toDp() })
     val interactive = isOpen && (!reduceMotion || expanded.value > 0.99f)
+    val attachmentOptionsTitle = stringResource(R.string.composer_plus_menu_title)
 
     Box(Modifier.fillMaxSize()) {
         // The dismissing tap.
@@ -240,7 +240,7 @@ private fun PlusMenuWindowContent(
             Box(
                 Modifier
                     .fillMaxSize()
-                    // iOS `accessibilityHidden(true)`: TalkBack reaches only the menu.
+                    // TalkBack reaches only the menu.
                     .clearAndSetSemantics {}
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss),
             )
@@ -263,21 +263,21 @@ private fun PlusMenuWindowContent(
                         onDragEnd = {
                             val translation = dragged / density.density
                             val velocity = tracker.calculateVelocity().y / density.density
-                            // iOS `predictedEndTranslation`: about a fifth of a second of the throw.
+                            // About a fifth of a second of the throw.
                             if (PlusMenuPlacement.dragDismisses(translation, translation + velocity * 0.2f)) onDismiss()
                         },
                     )
                 }
-                // iOS `accessibilityElement(children: .contain)` + `.isModal`, hidden unless open
-                // (`accessibilityHidden(!isOpen || (reduceMotion && !expanded))`). The screen hides
-                // what's behind it; announced as it appears, as TalkBack announces a dialog.
+                // Hidden unless open (`accessibilityHidden(!isOpen || (reduceMotion &&
+                // !expanded))`). The screen hides what's behind it; announced as it appears, as
+                // TalkBack announces a dialog.
                 .then(
                     if (interactive) {
                         Modifier.semantics {
                             isTraversalGroup = true
                             testTag = "attachment-menu"
                             traversalIndex = -1f
-                            paneTitle = "Attachment options"
+                            paneTitle = attachmentOptionsTitle
                         }
                     } else Modifier.clearAndSetSemantics {},
                 ),
@@ -315,7 +315,7 @@ private fun PlusMenuWindowContent(
     }
 }
 
-/** What a stranded Plus menu's touch recovery names in the log (iOS `PlusMenuHostingController`). */
+/** What a stranded Plus menu's touch recovery names in the log. */
 private class PlusMenuHost
 
 private object PlusMenuWindowContent {
@@ -328,9 +328,8 @@ private object PlusMenuWindowContent {
 }
 
 /**
- * The single `AttachmentMenuRows` instance the + menu draws (iOS `PlusMenuRowsHost`, declared
- * in `PlusPhotoSheet.swift`): interactive while open, its rows staggering in out of the + and
- * back into it. Paste is a plain row on Android, so iOS's paste-control warm-up is n/a.
+ * The single `AttachmentMenuRows` instance the + menu draws: interactive while open, its rows
+ * staggering in out of the + and back into it. Paste is a plain row on Android.
  */
 @Composable
 fun PlusMenuRowsHost(
@@ -364,7 +363,7 @@ fun PlusMenuRowsHost(
     )
 }
 
-/** iOS `PlusMenuPlacement`: where the New Plus Menu stands (all in one space, px or dp alike). */
+/** Where the New Plus Menu stands (all in one space, px or dp alike). */
 object PlusMenuPlacement {
     /** Public fallback when the guarded keyboard surface is unavailable or disabled: the menu rises clear of the keys. */
     fun visibleMenu(menu: Rect, keyboardTop: Float?, coversKeyboard: Boolean, gap: Float = AttachmentMenuMetrics.composerGap.value): Rect {
@@ -375,7 +374,7 @@ object PlusMenuPlacement {
     /**
      * [navigationBarInset] (Android only): the navigation bar's height over [screenBottom] while
      * the keyboard is down. The foot stays out of it, since Android keeps that area for system
-     * gestures, whereas iOS draws its home indicator over the menu.
+     * gestures.
      */
     fun foot(
         composer: Rect,

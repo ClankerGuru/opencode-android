@@ -15,10 +15,7 @@ import org.junit.Rule
 import org.junit.Test
 import kotlin.math.abs
 
-/**
- * Port of iOS `MediaZoomGeometryTests.swift`. Android passes pixel sizes with
- * `displayScale = 1`; the geometry is unit-free, so the iOS point values carry over.
- */
+/** Android passes pixel sizes with `displayScale = 1`; the geometry is unit-free. */
 class MediaZoomGeometryTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -30,6 +27,24 @@ class MediaZoomGeometryTests {
     }
 
     private fun close(a: Size, b: Size): Boolean = abs(a.width - b.width) < 0.001f && abs(a.height - b.height) < 0.001f
+
+    @Test
+    fun movieSurfaceAndItsReportedFrameStayTogetherThroughZoomAndRotation() {
+        // No poster/Bitmap is needed to lay out the decoded 16:9 surface.
+        val zoom = MediaZoomState(Size(1920f, 1080f))
+        val frames = mutableListOf<Rect>()
+        zoom.onFrame = { frames.add(it) }
+        zoom.layout(Size(320f, 640f))
+        assertTrue(close(Size(320f, 180f), frames.last().size))
+        assertPoint(Offset(160f, 320f), frames.last().center)
+
+        zoom.pinch(2f, Offset(160f, 320f), Offset.Zero)
+        assertTrue(close(Size(640f, 360f), frames.last().size))
+        zoom.layout(Size(640f, 320f))
+        assertEquals(2f, zoom.zoomScale, 0f)
+        assertEquals(zoom.imageFrame, frames.last())
+        assertPoint(Offset(320f, 160f), frames.last().center)
+    }
 
     @Test
     fun fitsTheWholeImageInsideThePage() {
@@ -127,22 +142,21 @@ class MediaZoomGeometryTests {
     }
 }
 
-/** Port of iOS `TranscriptImageViewerFeatureTests` (`MediaZoomGeometryTests.swift`). */
-class TranscriptImageViewerFeatureTests {
+class FullscreenViewerFeatureTests {
     @get:Rule val isolation = TestIsolationRule()
 
     @Test
-    fun controlsStartHiddenAndToggleOnTap() = runTest {
+    fun controlsStartShownAndToggleOnTap() = runTest {
         val preview = TranscriptImagePreview(id = "img-1", image = stubBitmap(), label = "Tool image 1 of 1")
         val haptics = Locked(listOf<Haptic>())
-        val store = TestStore(TranscriptImageViewerFeature.State(preview), TranscriptImageViewerFeature(), this) {
+        val store = TestStore(FullscreenViewerFeature.State(preview), FullscreenViewerFeature(), this) {
             this[HapticsClient] = HapticsClient(play = { haptic -> haptics.update { it + haptic } })
         }
 
-        assertFalse(store.state.isShowingControls)
-        store.send(TranscriptImageViewerFeature.Action.ImageTapped) { it.copy(isShowingControls = true) }
-        store.send(TranscriptImageViewerFeature.Action.ImageTapped) { it.copy(isShowingControls = false) }
-        store.send(TranscriptImageViewerFeature.Action.CloseTapped) { it.copy(isDismissed = true) }
+        assertTrue(store.state.isShowingControls)
+        store.send(FullscreenViewerFeature.Action.ImageTapped) { it.copy(isShowingControls = false) }
+        store.send(FullscreenViewerFeature.Action.ImageTapped) { it.copy(isShowingControls = true) }
+        store.send(FullscreenViewerFeature.Action.CloseTapped) { it.copy(isDismissed = true) }
         store.finish()
         assertTrue(haptics.current.isEmpty())
     }
@@ -163,7 +177,7 @@ class TranscriptImageViewerFeatureTests {
         val haptics = Locked(listOf<Haptic>())
         val shouldFail = Locked(false)
 
-        val store = TestStore(TranscriptImageViewerFeature.State(preview), TranscriptImageViewerFeature(), this) {
+        val store = TestStore(FullscreenViewerFeature.State(preview), FullscreenViewerFeature(), this) {
             this[HapticsClient] = HapticsClient(play = { haptic -> haptics.update { it + haptic } })
             this[PhotoSaveClient] = PhotoSaveClient(saveImage = { image ->
                 if (shouldFail.current) throw PhotoSaveClientError.Denied
@@ -173,22 +187,22 @@ class TranscriptImageViewerFeatureTests {
         }
 
         assertEquals(null, store.state.selectedPage?.displayTitle)
-        store.send(TranscriptImageViewerFeature.Action.PageSelected("img-2")) { it.copy(selectedID = "img-2") }
+        store.send(FullscreenViewerFeature.Action.PageSelected("img-2")) { it.copy(selectedID = "img-2") }
         assertEquals("lab-iso.png", TranscriptImagePreview.Page(id = "file-1", image = first, label = "lab-iso.png").displayTitle)
         assertEquals(null, TranscriptImagePreview.Page(id = "diag-1", image = first, label = "Diagram, Flowchart").displayTitle)
 
-        store.send(TranscriptImageViewerFeature.Action.SaveTapped) { it.copy(isSaving = true) }
-        store.receive(TranscriptImageViewerFeature.Action.SaveFinished(true)) { it.copy(isSaving = false) }
+        store.send(FullscreenViewerFeature.Action.SaveTapped) { it.copy(isSaving = true) }
+        store.receive(FullscreenViewerFeature.Action.SaveFinished(true)) { it.copy(isSaving = false) }
         assertEquals(1, savedImages.current.size)
         assertTrue(savedImages.current.first() === second)
         assertEquals(listOf(Haptic.success), haptics.current)
 
         shouldFail.set(true)
-        store.send(TranscriptImageViewerFeature.Action.SaveTapped) { it.copy(isSaving = true) }
-        store.receive(TranscriptImageViewerFeature.Action.SaveFinished(false)) { it.copy(isSaving = false) }
+        store.send(FullscreenViewerFeature.Action.SaveTapped) { it.copy(isSaving = true) }
+        store.receive(FullscreenViewerFeature.Action.SaveFinished(false)) { it.copy(isSaving = false) }
         assertEquals(listOf(Haptic.success, Haptic.error), haptics.current)
 
-        store.send(TranscriptImageViewerFeature.Action.ShareTapped)
+        store.send(FullscreenViewerFeature.Action.ShareTapped())
         store.finish()
         assertEquals(listOf("Tool image 2 of 2"), sharedLabels.current)
     }

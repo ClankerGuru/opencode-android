@@ -21,12 +21,9 @@ import ai.opencode.feature.composer.SharedImageEncoder as ComposerImageEncoder
 import ai.opencode.feature.system.share.SharedImageEncoder as ShareImageEncoder
 
 /**
- * The composer half of iOS `ShareHandoffTests.swift`'s `SharedImageEncoderTests`
- * (`shareReencodingMatchesTheComposerAndStripsMetadata`): an image shared through the share sheet
- * and the same image imported in the composer become the same bytes. Android has two copies of
- * the encoder (`:feature:system`'s for the share sheet, `:feature:composer`'s for imports);
- * `:feature:session` is the lowest module that sees both. The metadata, rotation and size checks
- * and `oversizedSourcesAreRejected` are `:feature:system`'s (`share/ShareHandoffTests.kt`).
+ * An image shared through the share sheet and the same image imported in the composer become the
+ * same bytes. Android has two copies of the encoder (`:feature:system`'s for the share sheet,
+ * `:feature:composer`'s for imports); `:feature:session` is the lowest module that sees both.
  * Robolectric native graphics (real `ImageDecoder`/`Bitmap` codecs, `ExifInterface`).
  */
 @RunWith(RobolectricTestRunner::class)

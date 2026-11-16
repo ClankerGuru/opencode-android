@@ -8,13 +8,13 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToLong
 
-/** A point in dp (iOS `CGPoint`). */
+/** A point in dp. */
 data class AutocompletePoint(val x: Double, val y: Double)
 
-/** A size in dp (iOS `CGSize`). */
+/** A size in dp. */
 data class AutocompleteSize(val width: Double, val height: Double)
 
-/** A rect in dp (iOS `CGRect`, never negative here). */
+/** A rect in dp. */
 data class AutocompleteRect(val x: Double, val y: Double, val width: Double, val height: Double) {
     val minX: Double get() = x
     val minY: Double get() = y
@@ -35,9 +35,8 @@ data class AutocompleteRect(val x: Double, val y: Double, val width: Double, val
 }
 
 /**
- * Pure, frame-by-frame simulation of the Round 2 Composer Grows autocomplete popover, row
- * slot collapse, concentric highlight, edge fades and chip flights (iOS
- * `AutocompleteSimulation`). All lengths are dp; `displayScale` is the density (px per dp).
+ * Pure, frame-by-frame simulation of the autocomplete popover, row slot collapse, concentric
+ * highlight, edge fades and chip flights. Lengths are dp; `displayScale` is px per dp.
  */
 class AutocompleteSimulation(var params: AutocompleteParameters = AutocompleteParameters()) {
     data class FrozenRow(val rect: AutocompleteRect, val fullSize: AutocompleteSize, val offsetFromAnchor: AutocompletePoint)

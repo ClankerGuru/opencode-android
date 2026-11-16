@@ -19,11 +19,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `VoiceSessionDelegatorTests+Progress.swift` (an extension of
- * `VoiceSessionDelegatorTests`): which delegation hears a running tool, for
- * the spoken progress line.
- */
 class VoiceSessionDelegatorTestsProgress {
     /** Two delegations in two sessions: each hears only its own session's tools. */
     @Test fun toolsInTwoSessionsReachOnlyTheirOwnDelegation() = runBlocking {

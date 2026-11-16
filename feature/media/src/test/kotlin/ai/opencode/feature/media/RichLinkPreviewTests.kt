@@ -11,7 +11,7 @@ import org.junit.Test
 import java.io.IOException
 import java.nio.file.Files
 
-/** Port of iOS `RichLinkPreviewTests.swift`. Times are milliseconds. */
+/** Times are milliseconds. */
 class RichLinkPreviewTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -21,7 +21,7 @@ class RichLinkPreviewTests {
     fun firstPartyRequestsCarryOnlyParsedIdentifiers() {
         val pr = source("https://github.com/acme/widget/pull/42?search=private-text#discussion")!!
         assertEquals("https://api.github.com/repos/acme/widget/pulls/42", pr.request.url.toString())
-        // iOS `httpShouldHandleCookies == false`: the preview transport has no cookie jar.
+        // The preview transport has no cookie jar.
         assertNull(pr.request.header("Cookie"))
         assertNull(pr.request.header("Authorization"))
         val video = source("https://www.youtube.com/watch?v=aBcD3fGh1jK&t=44&extra=private")!!
@@ -142,10 +142,6 @@ class RichLinkPreviewTests {
         }
     }
 
-    /**
-     * iOS parses Markdown (`:feature:transcript`), which appends a pull request card block; the
-     * extractor reads only the prose's own links, given here as the transcript hands them.
-     */
     @Test
     fun aPRIsOneCardEvenWithCachedAppendedBlocks() {
         val blocks = with(LinkBlocks) {

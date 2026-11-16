@@ -2,14 +2,16 @@ package ai.opencode.server.model
 
 import ai.opencode.core.sharing.FileDirectory
 import ai.opencode.core.sharing.SharedKey
+import ai.opencode.core.strings.localized
+import ai.opencode.server.R
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Port of iOS `Composer/ModelPicker/ModelVisibility.swift` (moved down to `:server` because both
- * `:feature:composer` (the pickers) and `:feature:settings` (Settings › Models) read it).
+ * In `:server` because both `:feature:composer` (the pickers) and `:feature:settings` (Settings ›
+ * Models) read it.
  *
- * Which models one server's pickers list (Hide Unused Models, OC-510). Kept on this phone, per
+ * Which models one server's pickers list (Hide Unused Models). Kept on this phone, per
  * server. Hidden providers hide all their models; otherwise **Hide** lists every model but
  * [hiddenModelIDs], and **Only Show** lists just [shownModelIDs]. Each list is kept when
  * switching, so trying the other choice loses nothing.
@@ -30,8 +32,8 @@ data class ModelVisibility(
 
         val title: String
             get() = when (this) {
-                hide -> "Hide Selected"
-                onlyShow -> "Only Show Selected"
+                hide -> localized(R.string.server_model_visibility_hide)
+                onlyShow -> localized(R.string.server_model_visibility_only_show)
             }
     }
 

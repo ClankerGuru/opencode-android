@@ -14,7 +14,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 
-/** Port of iOS `VoiceUplinkWatchTests.swift` (`VoiceUplinkWatchTests`, `ReplyWatchCoreTests`). */
 class VoiceUplinkWatchTests {
     private val t0 = Instant.ofEpochSecond(1_000)
     private fun Instant.adding(seconds: Double): Instant = plusNanos((seconds * 1e9).toLong())
@@ -41,7 +40,7 @@ class VoiceUplinkWatchTests {
         assertNull(check(0.5))
         assertEquals(true, check(1.1))
         assertNull("reported once", check(2.0))
-        // It finally goes out after 3.9 s (Kit's call), then sends are quick again.
+        // It finally goes out after 3.9 s, then sends are quick again.
         watch.sendFinished(t0.adding(3.9)).let { watch = it.first; assertNull(it.second) }
         var recoveredAt: Double? = null
         for (i in 1..60) {
@@ -217,7 +216,7 @@ class ReplyWatchCoreTests {
             )
     }
 
-    /** iOS `@Test(arguments: scenarios)`: one run per scenario, named in the failure. */
+    /** One run per scenario, named in the failure. */
     @Test fun replyWatchStateMachineScenarios() {
         for (scenario in scenarios) {
             var state = scenario.initial

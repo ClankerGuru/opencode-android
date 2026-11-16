@@ -1,11 +1,13 @@
 package ai.opencode.feature.transcript.markdown.ui
 
+import ai.opencode.core.strings.localized
 import ai.opencode.core.ui.OpenCodeColors
 import ai.opencode.core.ui.OpenCodeFonts
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.media.SiteIcon
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.SessionLinkTarget
 import ai.opencode.feature.transcript.markdown.InlineRun
 import ai.opencode.feature.transcript.markdown.MathSyntax
@@ -59,14 +61,14 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
- * A character edit the presentation made (a session ID shown as its title, a bare URL shown
- * as its clean address, an inline icon slot), in the original text's characters (iOS
- * `InlineLinkText.Edit`). Streamed arrivals map through these.
+ * A character edit the presentation made (a session ID shown as its title, a bare URL shown as its
+ * clean address, an inline icon slot), in the original text's characters. Streamed arrivals map
+ * through these.
  */
 @Immutable
 data class TextEdit(val start: Int, val removed: Int, val inserted: Int)
 
-/** Where a character offset in the original text lands in the presented text (iOS `InlineLinkText.offset`). */
+/** Where a character offset in the original text lands in the presented text. */
 fun List<TextEdit>.mapOffset(original: Int): Int {
     var delta = 0
     for (edit in this) {
@@ -85,13 +87,13 @@ fun List<TextEdit>.mapOffset(original: Int): Int {
 @Immutable
 data class AtomicRun(val start: Int, val end: Int, val text: String)
 
-/** One chip in a reply's text, on its padding and label (iOS `SessionChip`). */
+/** One chip in a reply's text, on its padding and label. */
 @Immutable
 data class SessionChip(val id: String, val muted: Boolean, val isSubagent: Boolean, val start: Int, val end: Int, val url: String)
 
 /**
- * A Markdown block's text as drawn (iOS `PresentedMarkdownText`): styled runs, session IDs as
- * their titles (`SessionLinkText`), then Link Icons, with inline math typeset in place.
+ * A Markdown block's text as drawn: styled runs, session IDs as their titles (`SessionLinkText`),
+ * then Link Icons, with inline math typeset in place.
  */
 @Immutable
 class PresentedText(
@@ -107,12 +109,11 @@ class PresentedText(
     val fetchableLinks: List<String>,
     /** Typeset math draws images the per-character fade can't follow; it appears at once. */
     val hasMath: Boolean,
-    /** TalkBack's hint: “Links to …” (iOS `InlineLinkPresentation.hint`). */
+    /** TalkBack's hint: “Links to …”. */
     val linkHint: String?,
     /**
-     * Drawn characters that stand for other text in a reply selection (iOS
-     * `TranscriptSelectionText.leaf(_:)`): a link's icon slot reads nothing, typeset math reads
-     * its source with its delimiters.
+     * Drawn characters that stand for other text in a reply selection: a link's icon slot reads
+     * nothing, typeset math reads its source with its delimiters.
      */
     val atomics: List<AtomicRun> = emptyList(),
 ) {
@@ -125,7 +126,7 @@ class PresentedText(
     }
 }
 
-/** How a block's text presents (iOS `MarkdownStyle.styled(_:secondary:inHeading:tonesBody:)` and its callers). */
+/** How a block's text presents. */
 @Immutable
 data class PresentationOptions(
     /** The text's own colour (prose, a done task's secondary, a quote's secondary). */
@@ -141,11 +142,11 @@ data class PresentationOptions(
     val isGrowing: Boolean = false,
 )
 
-/** Builds [PresentedText] (iOS `PresentedMarkdownText.make`, `SessionLinkText.present`, `InlineLinkText.decorate`, `InlineMath.text`). */
+/** Builds [PresentedText]. */
 object MarkdownPresentation {
     private val plainRun = InlineRun("")
     private const val wordJoiner = "\u2060"
-    /** No-break padding in the surrounding font: the glyph sits in a figure space (iOS `SessionChipLayout`). */
+    /** No-break padding in the surrounding font: the glyph sits in a figure space. */
     const val chipLeadingPad = SessionLinkText.leadingPad
     const val chipTrailingPad = SessionLinkText.trailingPad
     /** A chip's domain and path, before its ellipsis. */
@@ -169,7 +170,7 @@ object MarkdownPresentation {
         val groups = group(inline.runs)
         val hasMathRun = inline.runs.any { MathSyntax.Delimiter.from(it.languageIdentifier) != null }
         // In the transcript only (its rows redraw when an icon arrives): [siteIcon] is the list's
-        // store (iOS `linkIcons`: `linkStyle != .today, let linkStore, !InlineMath.contains`).
+        // store.
         val decoratesLinks = options.linkStyle != InlineLinkStyle.Today && siteIcon != null && !hasMathRun
         val inlineContent = mutableMapOf<String, InlineTextContent>()
         val edits = mutableListOf<TextEdit>()
@@ -194,7 +195,7 @@ object MarkdownPresentation {
                         val chipURL = MarkdownLinks.sessionURL(sessionID, target.resolvedTitle)
                         val start = length
                         // Empty, not null: Material's Text gives a link without styles its default
-                        // underline; the chip draws its own fill and press (iOS `SessionChipRenderer`).
+                        // underline; the chip draws its own fill and press.
                         withLink(clickable(chipURL, TextLinkStyles(), links)) {
                             appendChip(sessionID, target, group.runs.first(), options, style)
                         }
@@ -210,8 +211,8 @@ object MarkdownPresentation {
                         if (chipURL !in menuLinks) menuLinks += chipURL
                     }
                     url != null -> {
-                        // iOS `InlineLinkText.decorate`: every link the hold menu offers (web, and a
-                        // shareable pairing link); session links are chips above.
+                        // Every link the hold menu offers (web, and a shareable pairing link);
+                        // session links are chips above.
                         val slotted = MarkdownLinks.offersMenu(url)
                         val linkStyles = TextLinkStyles(SpanStyle(color = colors.link))
                         withLink(clickable(url, linkStyles, links)) {
@@ -273,12 +274,12 @@ object MarkdownPresentation {
             menuLinks = menuLinks,
             fetchableLinks = fetchable,
             hasMath = hasMath,
-            linkHint = if (hosts.isEmpty()) null else "Links to " + listFormatted(hosts),
+            linkHint = if (hosts.isEmpty()) null else localized(R.string.transcript_links_to_description, listFormatted(hosts)),
             atomics = atomics,
         )
     }
 
-    /** Highlighted code (iOS `HighlightedCode.text`): the source with its tokens' theme colours. */
+    /** Highlighted code: the source with its tokens' theme colours. */
     fun code(code: OpenCodeMarkdownBlock.HighlightedCode, colors: OpenCodeColors): AnnotatedString = buildAnnotatedString {
         append(code.source)
         for (token in code.tokens) {
@@ -296,7 +297,7 @@ object MarkdownPresentation {
         SyntaxTokenKind.Type -> colors.syntaxType
     }
 
-    /** A bare URL as the style shows it, or null to keep it as written (iOS `InlineLinkText.displayed`). */
+    /** A bare URL as the style shows it, or null to keep it as written. */
     fun displayed(url: String, style: InlineLinkStyle): String? = when (style) {
         InlineLinkStyle.Today, InlineLinkStyle.Icon -> null
         InlineLinkStyle.Address -> {
@@ -332,8 +333,8 @@ object MarkdownPresentation {
     }
 
     /**
-     * iOS `LinkPreviewPolicy.displayHost`: the URL's host, lowercased, without `www.`; the whole
-     * URL when it has none. TalkBack's “Links to …” hint and a chip's domain.
+     * The URL's host, lowercased, without `www.`; the whole URL when it has none. TalkBack's “Links
+     * to …” hint and a chip's domain.
      */
     fun slotHost(url: String): String {
         val host = runCatching { android.net.Uri.parse(url).host }.getOrNull()?.takeIf { it.isNotEmpty() }?.lowercase() ?: url
@@ -386,7 +387,7 @@ object MarkdownPresentation {
             },
             fontStyle = if (run.emphasized) FontStyle.Italic else null,
             fontFamily = if (run.code) OpenCodeFonts.monospace else null,
-            // iOS parses inline code as `.subheadline` monospaced; in a heading it takes the heading's size.
+            // In a heading it takes the heading's size.
             fontSize = if (run.code && heading == null) OpenCodeTextStyles.subheadline.fontSize else TextUnit.Unspecified,
             background = if (run.code) colors.inlineCodeFill else Color.Unspecified,
             textDecoration = if (run.strikethrough) TextDecoration.LineThrough else null,
@@ -424,12 +425,12 @@ object MarkdownPresentation {
     }
 
     /**
-     * The icon's slot in a line of text (iOS `InlineLinkIconMetrics` + `InlineLinkIconImages`): a
-     * little taller than the capitals (`capHeight × 1.25`, Roboto's cap height ≈ 0.711 em), centred
-     * on the line, and a small gap before the link's text. The site's icon is rounded like the
-     * cards (`side × 0.225`); a mark that would vanish gets a plate (a dark one a light plate in
-     * dark mode, a light one a dark plate in light mode). Until it arrives, or for a link still
-     * streaming in, the globe; a link the icon service is never asked about, a neutral link glyph.
+     * The icon's slot in a line of text: a little taller than the capitals (`capHeight × 1.25`,
+     * Roboto's cap height ≈ 0.711 em), centred on the line, and a small gap before the link's text.
+     * The site's icon is rounded like the cards (`side × 0.225`); a mark that would vanish gets a
+     * plate (a dark one a light plate in dark mode, a light one a dark plate in light mode). Until
+     * it arrives, or for a link still streaming in, the globe; a link the icon service is never
+     * asked about, a neutral link glyph.
      */
     private fun linkIcon(
         url: String,
@@ -475,7 +476,6 @@ object MarkdownPresentation {
         }
     }
 
-    /** iOS `UIBezierPath(roundedRect:cornerRadius: side * 0.225)`. */
     private val SiteIconShape = GenericShape { size, _ ->
         addRoundRect(RoundRect(Rect(Offset.Zero, size), CornerRadius(size.minDimension * 0.225f)))
     }
@@ -494,7 +494,13 @@ object MarkdownPresentation {
 
     private fun listFormatted(items: List<String>): String = when (items.size) {
         1 -> items[0]
-        2 -> "${items[0]} and ${items[1]}"
-        else -> items.dropLast(1).joinToString(", ") + ", and " + items.last()
+        2 -> localized(R.string.transcript_list_two, items[0], items[1])
+        else -> {
+            var leading = items[0]
+            for (index in 1 until items.size - 1) {
+                leading = localized(R.string.transcript_spoken_pair, leading, items[index])
+            }
+            localized(R.string.transcript_list_many, leading, items.last())
+        }
     }
 }

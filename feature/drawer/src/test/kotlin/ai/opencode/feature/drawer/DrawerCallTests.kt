@@ -31,9 +31,9 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * iOS `DrawerCallTests`: the drawer's call button ([HomeFeature.Action.DrawerCallTapped]): a call on
- * it calls the screen behind the drawer through its own call button, else Start Voice
- * Call's Last Viewed path, and it's gone during a call.
+ * The drawer's call button ([HomeFeature.Action.DrawerCallTapped]): a call on it calls the screen
+ * behind the drawer through its own call button, else Start Voice Call's Last Viewed path, and it's
+ * gone during a call.
  *
  * Voice set-up is written into the test's own shared store.
  */

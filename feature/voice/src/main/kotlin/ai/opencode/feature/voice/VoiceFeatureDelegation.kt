@@ -21,14 +21,12 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlin.time.Duration.Companion.seconds
 
-// iOS `VoiceFeature+Delegation.swift`.
-
 private typealias Action = VoiceFeature.Action
 private typealias State = VoiceFeature.State
 
 private suspend fun isCancelled(): Boolean = !currentCoroutineContext().isActive
 
-/** An effect's failure as the `OpenCodeClientError` iOS's typed throws guarantee. */
+/** An effect's failure. */
 internal fun Throwable.asClientError(): OpenCodeClientError =
     this as? OpenCodeClientError ?: OpenCodeClientError(message ?: toString())
 
@@ -532,10 +530,9 @@ private fun recordReplyWatchLog(entry: ReplyWatch.LogEntry, state: State) {
 internal fun ownsRetries(operation: suspend (Send<Action>) -> Unit): Effect<Action> = runOwningRetries(operation)
 
 /**
- * Keep every voice engine's accepted sends visible both now and on entry
- * (iOS `VoiceFeature.recordAdmission`). iOS records a
- * `SessionFeature.PendingPrompt` in `PromptOutbox`; voice hands a [VoiceAdmittedPrompt] to
- * [VoiceAdmissionRecorder], which the app installs over the composer's outbox.
+ * Keep every voice engine's accepted sends visible both now and on entry. Voice hands a
+ * [VoiceAdmittedPrompt] to [VoiceAdmissionRecorder], which the app installs over the composer's
+ * outbox.
  */
 internal suspend fun recordAdmission(
     prompt: VoiceAdmittedPrompt,

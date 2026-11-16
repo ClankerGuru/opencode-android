@@ -29,7 +29,7 @@ import org.junit.Test
 import java.time.Instant
 import kotlin.time.Duration.Companion.seconds
 
-/** Port of iOS `ScreenAwakeTests.swift`: a call keeps the screen on, only in the foreground. */
+/** A call keeps the screen on, only in the foreground. */
 class ScreenAwakeTests {
     @get:Rule val isolation = TestIsolationRule()
 

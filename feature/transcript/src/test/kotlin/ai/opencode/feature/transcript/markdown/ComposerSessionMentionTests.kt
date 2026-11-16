@@ -8,12 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The `:feature:transcript` test of iOS `OpenCodeTests/ComposerSessionMentionTests.swift`: a sent
- * `@session:` token renders as a session link ([SessionLink.marked], [SessionLinkText]). The
- * composer tests are `:feature:composer`'s and `:feature:session`'s. iOS `AttributedString` →
- * [InlineText]; `String($0.text.characters)` → [InlineText.text].
- */
+/** `String($0.text.characters)` → [InlineText.text]. */
 class ComposerSessionMentionTests {
     private fun mentionID(seed: String) = "ses_" + seed + "0".repeat(26 - seed.length)
 

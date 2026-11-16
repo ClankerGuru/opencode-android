@@ -1,6 +1,8 @@
 package ai.opencode.server.model
 
 import ai.opencode.core.sharing.InstantSerializer
+import ai.opencode.core.strings.localized
+import ai.opencode.server.R
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.time.Instant
@@ -22,6 +24,8 @@ data class OpenCodeToolCall(
     @Serializable(with = InstantSerializer::class) val startedAt: Instant? = null,
     /** When it settled (`time.completed`), from REST windows only. */
     @Serializable(with = InstantSerializer::class) val completedAt: Instant? = null,
+    /** Blob-backed movies are separate from the image mosaic. */
+    val videos: List<OpenCodeTranscriptFile>? = null,
 ) {
     @Serializable
     enum class Status(val rawValue: String) {
@@ -134,7 +138,7 @@ data class OpenCodeToolCall(
         const val DECLINED_MESSAGE = "The user declined this tool call"
 
         fun displayName(name: String): String {
-            if (name == "bash") return "Shell"
+            if (name == "bash") return localized(R.string.server_tool_shell)
             val bare = if (name.startsWith("opencode_") && name.length > 9) name.drop(9) else name
             val words = bare.replace("_", " ").replace("-", " ")
             return words.take(1).uppercase() + words.drop(1)
@@ -155,6 +159,17 @@ data class OpenCodeToolCall(
             }
             return seen
         }
+    }
+}
+
+object OpenCodeToolBounds {
+    const val TEXT_LIMIT = 20_000
+
+    fun output(texts: List<String>): List<String> = texts.map { it.bounded(TEXT_LIMIT) }
+
+    fun metadata(metadata: Map<String, OpenCodeJSONValue>): Map<String, OpenCodeJSONValue> {
+        if (metadata.values.any { it.needsBounding(TEXT_LIMIT, 100) }) return metadata.mapValues { it.value.bounded() }
+        return metadata
     }
 }
 

@@ -27,10 +27,9 @@ import ai.opencode.server.model.OpenCodeProject
 import java.time.Instant
 
 /*
- * Port of iOS `HomeFeature+DrawerState.swift`: the drawer's derived lists, read state, pins and
- * mutes, Catch Up's queue upkeep, and what a deleted session leaves behind. iOS mutates `inout
- * State`; these return the next state. Shared keys are written through (only when changed) along
- * with their mirrors in [HomeFeature.State].
+ * The drawer's derived lists, read state, pins and mutes, Catch Up's queue upkeep, and what a
+ * deleted session leaves behind. These return the next state. Shared keys are written through (only
+ * when changed) along with their mirrors in [HomeFeature.State].
  */
 
 // region Shared-key write-through
@@ -183,7 +182,7 @@ val HomeFeature.State.pinnedSessions: List<OpenCodeSession> get() = drawerSessio
 
 val HomeFeature.State.recentSessions: List<OpenCodeSession> get() = drawerSessions.recents
 
-/** The drawer's two lists (iOS's `(pinned:, recents:)` tuple). */
+/** The drawer's two lists. */
 data class DrawerSessions(val pinned: List<OpenCodeSession>, val recents: List<OpenCodeSession>)
 
 /**
@@ -344,7 +343,7 @@ fun HomeFeature.State.notingViewAcknowledged(sessionID: String, idle: Long): Hom
     return s
 }
 
-/** iOS `hasUnreadWatermark(_:)`: whether the session had something unread before this phone read it. */
+/** Whether the session had something unread before this phone read it. */
 fun HomeFeature.State.hasUnreadWatermark(session: OpenCodeSession): Boolean {
     val key = sessionKey(session.id)
     if (key in manuallyUnreadSessionKeys) return true
@@ -353,7 +352,7 @@ fun HomeFeature.State.hasUnreadWatermark(session: OpenCodeSession): Boolean {
     return false
 }
 
-/** iOS `unseenCutoffMilliseconds(for:wasUnread:)`: the server read unseen rows count from, if it marks any. */
+/** The server read unseen rows count from, if it marks any. */
 fun HomeFeature.State.unseenCutoffMilliseconds(session: OpenCodeSession, wasUnread: Boolean): Long? {
     if (sessionKey(session.id) in manuallyUnreadSessionKeys) return null
     val listed = sessions.firstOrNull { it.id == session.id }
@@ -364,10 +363,9 @@ fun HomeFeature.State.unseenCutoffMilliseconds(session: OpenCodeSession, wasUnre
     return viewed
 }
 
-/** iOS `HomeFeature.State.OpeningParameters`: what a session opens with for its New divider. */
+/** What a session opens with for its New divider. */
 data class OpeningParameters(val seen: Set<String>?, val viewedMilliseconds: Long?, val unread: Boolean)
 
-/** iOS `openingParameters(for:pending:)`. */
 fun HomeFeature.State.openingParameters(
     session: OpenCodeSession,
     pending: HomeFeature.State.PendingOpenReadState? = null,
@@ -398,7 +396,6 @@ fun HomeFeature.State.openingParameters(
     return OpeningParameters(seen = seen, viewedMilliseconds = viewedMilliseconds, unread = wasUnread)
 }
 
-/** iOS `applyOpening(for:pending:to:)`. */
 fun HomeFeature.State.applyingOpening(
     session: OpenCodeSession,
     pending: HomeFeature.State.PendingOpenReadState? = null,
@@ -408,27 +405,25 @@ fun HomeFeature.State.applyingOpening(
     return detail.noteOpening(seen = opening.seen, viewedMilliseconds = opening.viewedMilliseconds, unread = opening.unread)
 }
 
-/** iOS `setSeenWatermark(_:for:)`. */
 fun HomeFeature.State.settingSeenWatermark(watermark: SessionSeenWatermark, sessionID: String): HomeFeature.State {
     val key = sessionKey(sessionID)
     if (sessionSeenWatermarks[key] == watermark && sessionSeenWatermarks.order.lastOrNull() == key) return this
     return updatingSessionSeenWatermarks { it.setting(watermark, key) }
 }
 
-/** iOS `clearSeenWatermark(for:)`. */
 fun HomeFeature.State.clearingSeenWatermark(sessionID: String): HomeFeature.State {
     val key = sessionKey(sessionID)
     if (sessionSeenWatermarks[key] == null) return this
     return updatingSessionSeenWatermarks { it.removing(key) }
 }
 
-/** The last row's ID, skipping the info rows the transcript adds (iOS `last(where: { !$0.id.hasPrefix("info-") })`). */
+/** The last row's ID, skipping the info rows the transcript adds. */
 private fun List<OpenCodeTranscriptItem>.lastSeenRowID(seen: (String) -> Boolean = { true }): String? =
     lastOrNull { seen(it.id) && !it.id.startsWith("info-") }?.id ?: lastOrNull { seen(it.id) }?.id
 
 /**
- * iOS `clearUnseenBaseline(for:)`: clears any unseen baseline when a session is marked read from
- * outside (the drawer, Catch Up, or another device's `session.viewed`).
+ * Clears any unseen baseline when a session is marked read from outside (the drawer, Catch Up, or
+ * another device's `session.viewed`).
  */
 fun HomeFeature.State.clearingUnseenBaseline(sessionID: String): HomeFeature.State {
     var s = copy(pendingOpenReadState = pendingOpenReadState - sessionID, unopenedSeen = unopenedSeen - sessionID)
@@ -453,14 +448,13 @@ fun HomeFeature.State.clearingUnseenBaseline(sessionID: String): HomeFeature.Sta
     return s.updatingSubagents { if (it.session?.id == sessionID && it.readsOnView) it.noteOwnSend() else it }
 }
 
-/** iOS `syncSeenItemsFromOpenDetail(sessionID:)`. */
 fun HomeFeature.State.syncingSeenItemsFromOpenDetail(sessionID: String): HomeFeature.State {
     val detail = sessionDetail ?: return this
     if (detail.session?.id != sessionID) return this
     return syncingSeenWatermark(detail, sessionID)
 }
 
-/** iOS `syncSeenWatermark(from:sessionID:)`: keeps how far the reader had seen [detail], for a cold launch into it. */
+/** Keeps how far the reader had seen [detail], for a cold launch into it. */
 fun HomeFeature.State.syncingSeenWatermark(detail: SessionFeature.State, sessionID: String): HomeFeature.State {
     if (!detail.readsOnView) return this
     val sessionViewed = maxOf(
@@ -590,7 +584,7 @@ fun HomeFeature.State.purgingSession(sessionID: String): HomeFeature.State {
     )
     val serverID = server.persistenceID
     ServerSharedKeys.cachedTranscriptSnapshots().update { it.removeEntry(serverID, sessionID) }
-    // iOS `purgePersistedComposer(sessionID:)`: the deleted session's saved draft goes too.
+    // The deleted session's saved draft goes too.
     dependency(ComposerPersistence).removeSession(serverID, sessionID)
     val key = sessionKey(sessionID)
     s = s.updatingPinnedSessionKeys { keys -> keys.filterNot { it == key } }
@@ -677,8 +671,9 @@ fun HomeFeature.State.drawerBadge(excluding: String?): DrawerBadge? {
 }
 
 /**
- * Records local activity on the family root when [action] was an accepted send on [detail] (draft
- * cleared and awaiting reply); returns the state and the root ID.
+ * Records local activity on the family root when [action] was an accepted send on [detail] (composer
+ * emptied and awaiting reply); returns the state and the root ID. Mid-run `isAwaitingReply` is
+ * already true, so a send still waiting on uploads or an answer to a docked request doesn't count.
  */
 fun HomeFeature.State.notingScreenSendIfAccepted(
     detail: SessionFeature.State?,
@@ -686,8 +681,11 @@ fun HomeFeature.State.notingScreenSendIfAccepted(
     at: () -> Instant,
 ): Pair<HomeFeature.State, String?> {
     if (detail == null || !detail.isAwaitingReply) return this to null
-    val accepted = (action == SessionFeature.Action.SendTapped && detail.draft.isEmpty()) ||
-        (action == SessionFeature.Action.Browser(BrowserFeature.Action.AskSent) && detail.browser.askDraft.isEmpty())
+    val accepted = if (action == SessionFeature.Action.Browser(BrowserFeature.Action.AskSent)) {
+        detail.browser.askDraft.isEmpty()
+    } else {
+        action.sendsComposer && !detail.hasPromptContent && !detail.isAnsweringRequest
+    }
     if (!accepted) return this to null
     val rootID = sessionDetail?.familyRootID ?: sessionDetail?.session?.id ?: detail.familyRootID ?: detail.session?.id
         ?: return this to null
@@ -724,8 +722,8 @@ fun HomeFeature.State.recordingActiveAncestry(sessionIDs: Set<String>, parents: 
 }
 
 /**
- * iOS `syncBusyAncestryFromFamily(deletedSessionID:)`: the open family's links (read by the screen)
- * join the parents kept for running sessions, so a root stays lit after a switch away.
+ * The open family's links (read by the screen) join the parents kept for running sessions, so a
+ * root stays lit after a switch away.
  */
 fun HomeFeature.State.syncingBusyAncestryFromFamily(deletedSessionID: String? = null): HomeFeature.State {
     var s = this
@@ -735,3 +733,7 @@ fun HomeFeature.State.syncingBusyAncestryFromFamily(deletedSessionID: String? = 
     if (s.activeSessionIDs.isEmpty()) return s
     return s.recordingActiveAncestry(s.activeSessionIDs)
 }
+
+internal val SessionFeature.Action.sendsComposer: Boolean
+    get() = this == SessionFeature.Action.SendTapped || this == SessionFeature.Action.QueueTapped ||
+        this is SessionFeature.Action.DeferredSendReady || this == SessionFeature.Action.SharedSendRequested

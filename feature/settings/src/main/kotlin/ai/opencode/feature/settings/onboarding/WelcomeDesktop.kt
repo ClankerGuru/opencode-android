@@ -1,6 +1,8 @@
 package ai.opencode.feature.settings.onboarding
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeIcon
+import ai.opencode.feature.settings.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -31,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.font.FontFamily
@@ -46,9 +49,9 @@ private val deskDim = WelcomeInk.hex(0x8F8F8F)
 
 /**
  * The laptop's screen: the OpenCode desktop app in its dark theme, drawn from its captures at a
- * logical 720 × 450 and scaled into the lid (iOS `WelcomeDesktop`). The session works through the
- * story, with the browser it drives in a window over it; pairing cross-fades to Settings › Pairing
- * with its code. [pairing] is the cross-fade's progress (0 the session, 1 pairing).
+ * logical 720 × 450 and scaled into the lid. The session works through the story, with the browser
+ * it drives in a window over it; pairing cross-fades to Settings › Pairing with its code. [pairing]
+ * is the cross-fade's progress (0 the session, 1 pairing).
  */
 @Composable
 internal fun WelcomeDesktop(frame: WelcomeFrame, wall: Double, pairing: Float, reduced: Boolean, targets: WelcomeTargets?) {
@@ -123,7 +126,7 @@ private fun DesktopTitleBar(working: Double, named: Double, wall: Double, reduce
             WelcomeWorkingDots(wall, Modifier.alpha(working.toFloat()), dot = 2.6f, gap = 1.4f, color = WelcomeInk.hex(0xCFCFCF), reduced = reduced)
         }
         WelcomeStack(
-            labels = listOf("New session", WelcomeStory.TITLE),
+            labels = listOf(stringResource(R.string.settings_onboarding_desktop_new_session), WelcomeStory.TITLE),
             weights = listOf(1 - named, named),
             style = ui(13f),
             color = deskText,
@@ -140,7 +143,7 @@ private fun DesktopSession(frame: WelcomeFrame, wall: Double, named: Double, wor
     // The session's header row: the screen glyph, its title and ···.
     Row(Modifier.offset(x = 14.dp).height(40.dp), horizontalArrangement = Arrangement.spacedBy(9.dp), verticalAlignment = Alignment.CenterVertically) {
         OpenCodeIcon("desktopcomputer", null, size = 11.dp, tint = WelcomeInk.hex(0x9A9A9A))
-        WelcomeStack(listOf("New session", WelcomeStory.TITLE), listOf(1 - named, named), ui(13f, FontWeight.Medium), deskText, reduced = reduced)
+        WelcomeStack(listOf(stringResource(R.string.settings_onboarding_desktop_new_session), WelcomeStory.TITLE), listOf(1 - named, named), ui(13f, FontWeight.Medium), deskText, reduced = reduced)
         Text("···", style = ui(13f), color = WelcomeInk.hex(0x8A8A8A))
     }
     val column = WelcomeDesktop.column
@@ -168,17 +171,17 @@ private fun DesktopColumn(frame: WelcomeFrame, wall: Double, reduced: Boolean, t
         Bubble(WelcomeStory.PROMPT, WelcomeTarget.DeskPrompt, targets, Modifier.welcomeShow(frame.deskPrompt, dy = 6f, scale = 0.95f, anchor = trailing, reduced = reduced).welcomeRow(frame.deskPrompt))
         ToolRow("magnifyingglass", Modifier.padding(top = 10.dp).welcomeShow(frame.explore, dy = 4f, reduced = reduced).welcomeRow(frame.explore)) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.welcomeShimmer(1 - frame.explored, wall, reduced)) {
-                WelcomeStack(listOf("Exploring", "Explored"), listOf(1 - frame.explored, frame.explored), ui(13f), deskText, reduced = reduced)
-                Text("1 read, 1 search", style = ui(13f), color = deskDim, maxLines = 1)
+                WelcomeStack(listOf(stringResource(R.string.settings_onboarding_tool_exploring), stringResource(R.string.settings_onboarding_tool_explored)), listOf(1 - frame.explored, frame.explored), ui(13f), deskText, reduced = reduced)
+                Text(stringResource(R.string.settings_onboarding_tool_explored_counts), style = ui(13f), color = deskDim, maxLines = 1)
             }
         }
         ToolRow("globe", Modifier.welcomeShow(frame.browse, dy = 4f, reduced = reduced).welcomeRow(frame.browse)) {
-            Text("Browser", style = ui(13f), color = deskText)
+            Text(stringResource(R.string.settings_onboarding_tool_browser), style = ui(13f), color = deskText)
             Text("localhost:3000", style = ui(13f), color = deskDim)
         }
         ToolRow("pencil", Modifier.welcomeShow(frame.edit, dy = 4f, reduced = reduced).welcomeRow(frame.edit)) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.welcomeShimmer(1 - frame.edited, wall, reduced)) {
-                Text("Edit", style = ui(13f), color = deskText)
+                Text(stringResource(R.string.settings_onboarding_tool_edit), style = ui(13f), color = deskText)
                 Text("Hero.tsx", style = ui(13f), color = deskDim)
                 Row(horizontalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.alpha(frame.edited.clamped01().toFloat())) {
                     Text("+6", style = ui(13f), color = WelcomeInk.hex(0x3FB950))
@@ -187,7 +190,7 @@ private fun DesktopColumn(frame: WelcomeFrame, wall: Double, reduced: Boolean, t
             }
         }
         ToolRow("camera.viewfinder", Modifier.welcomeShow(frame.screenshotRow, dy = 4f, reduced = reduced).welcomeRow(frame.screenshotRow)) {
-            Text("Screenshot", style = ui(13f), color = deskText)
+            Text(stringResource(R.string.settings_onboarding_tool_screenshot), style = ui(13f), color = deskText)
             Text(WelcomeScreenshot.NAME, style = ui(13f), color = deskDim)
         }
         Text(
@@ -197,7 +200,7 @@ private fun DesktopColumn(frame: WelcomeFrame, wall: Double, reduced: Boolean, t
         )
         Bubble(WelcomeStory.SHIP_IT, WelcomeTarget.DeskShip, targets, Modifier.padding(top = 14.dp).welcomeShow(frame.deskShip, dy = 6f, scale = 0.95f, anchor = trailing, reduced = reduced).welcomeRow(frame.deskShip))
         ToolRow("terminal", Modifier.padding(top = 10.dp).welcomeShow(frame.run, dy = 4f, reduced = reduced).welcomeRow(frame.run)) {
-            Text("Running commands", style = ui(13f), color = deskText, modifier = Modifier.welcomeShimmer(1.0, wall, reduced))
+            Text(stringResource(R.string.settings_onboarding_tool_running_commands), style = ui(13f), color = deskText, modifier = Modifier.welcomeShimmer(1.0, wall, reduced))
             Text("git push", style = ui(12.5f, family = OpenCodeFonts.monospace), color = deskDim)
         }
     }
@@ -242,7 +245,7 @@ private fun DesktopComposer(frame: WelcomeFrame, working: Double, reduced: Boole
             .border(0.5.dp, Color.White.copy(alpha = 0.06f), shape),
     ) {
         WelcomeStack(
-            labels = listOf("Ask anything, / for commands, @ for context…", "Add follow-up, / for commands, @ for context…"),
+            labels = listOf(stringResource(R.string.settings_onboarding_desktop_composer_placeholder), stringResource(R.string.settings_onboarding_desktop_composer_follow_up_placeholder)),
             weights = listOf(1 - frame.followUp, frame.followUp),
             style = ui(13f),
             color = WelcomeInk.hex(0x7E7E7E),
@@ -303,26 +306,32 @@ private fun DesktopBrowser(frame: WelcomeFrame, reduced: Boolean, targets: Welco
 
 // MARK: Settings › Pairing
 
-private val navigation: List<Pair<String, String>?> = listOf(
-    "slider.horizontal.3" to "Preferences", "paintpalette" to "Appearance", "bell" to "Notifications",
-    "keyboard" to "Shortcuts", "laptopcomputer.and.iphone" to "Pairing", null,
-    "folder" to "Projects", "arrow.triangle.branch" to "Worktrees", "cpu" to "Providers", "sparkle" to "Models",
+private val navigation: List<Pair<String, Int>?> = listOf(
+    "slider.horizontal.3" to R.string.settings_onboarding_desktop_nav_preferences,
+    "paintpalette" to R.string.settings_onboarding_desktop_nav_appearance,
+    "bell" to R.string.settings_onboarding_desktop_nav_notifications,
+    "keyboard" to R.string.settings_onboarding_desktop_nav_shortcuts,
+    "laptopcomputer.and.iphone" to R.string.settings_onboarding_desktop_pairing_title, null,
+    "folder" to R.string.settings_onboarding_desktop_nav_projects,
+    "arrow.triangle.branch" to R.string.settings_onboarding_desktop_nav_worktrees,
+    "cpu" to R.string.settings_onboarding_desktop_nav_providers,
+    "sparkle" to R.string.settings_onboarding_desktop_nav_models,
 )
 
 @Composable
 private fun DesktopSettings(pairing: Float, reduced: Boolean) {
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.offset(60.dp, 30.dp).width(150.dp)) {
-            NavRow("chevron.backward", "Back to app", WelcomeInk.hex(0xD0D0D0), Modifier.padding(bottom = 18.dp))
-            NavRow("magnifyingglass", "Search", WelcomeInk.hex(0x7A7A7A), Modifier.padding(bottom = 8.dp))
+            NavRow("chevron.backward", stringResource(R.string.settings_onboarding_desktop_back_to_app), WelcomeInk.hex(0xD0D0D0), Modifier.padding(bottom = 18.dp))
+            NavRow("magnifyingglass", stringResource(CoreR.string.common_search), WelcomeInk.hex(0x7A7A7A), Modifier.padding(bottom = 8.dp))
             for (item in navigation) {
                 if (item == null) {
                     Spacer(Modifier.height(10.dp))
                 } else {
-                    val selected = item.second == "Pairing"
+                    val selected = item.second == R.string.settings_onboarding_desktop_pairing_title
                     NavRow(
                         item.first,
-                        item.second,
+                        stringResource(item.second),
                         if (selected) Color.White else WelcomeInk.hex(0xD0D0D0),
                         if (selected) Modifier.background(WelcomeInk.hex(0x2A2A2A), RoundedCornerShape(6.dp)) else Modifier,
                     )
@@ -330,8 +339,8 @@ private fun DesktopSettings(pairing: Float, reduced: Boolean) {
             }
         }
         Column(Modifier.offset(240.dp, 30.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Pairing", style = ui(15f, FontWeight.SemiBold), color = deskText)
-            Text("Connect another device to this machine’s OpenCode server.", style = ui(13f), color = WelcomeInk.hex(0xA0A0A0))
+            Text(stringResource(R.string.settings_onboarding_desktop_pairing_title), style = ui(15f, FontWeight.SemiBold), color = deskText)
+            Text(stringResource(R.string.settings_onboarding_desktop_pairing_subtitle), style = ui(13f), color = WelcomeInk.hex(0xA0A0A0))
         }
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)))
         Box(Modifier.fillMaxWidth().offset(y = 22.dp).wrapContentSize(Alignment.Center)) {
@@ -370,12 +379,12 @@ private fun PairDialog(modifier: Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("Pair a device", style = ui(15f, FontWeight.Medium), color = deskText)
+            Text(stringResource(R.string.settings_onboarding_desktop_pair_device), style = ui(15f, FontWeight.Medium), color = deskText)
             Spacer(Modifier.weight(1f))
             OpenCodeIcon("xmark", null, size = 10.dp, tint = WelcomeInk.hex(0x9A9A9A))
         }
         Text(
-            "Scan the code with the OpenCode app on another device, or copy the link.",
+            stringResource(R.string.settings_onboarding_desktop_pair_device_message),
             style = ui(13f).copy(lineHeight = 19.sp),
             color = WelcomeInk.hex(0xA8A8A8),
             modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
@@ -389,8 +398,8 @@ private fun PairDialog(modifier: Modifier) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             OpenCodeIcon("square.on.square", null, size = 11.dp, tint = deskText)
-            Text("Copy link", style = ui(13f), color = deskText)
+            Text(stringResource(R.string.settings_onboarding_desktop_copy_link), style = ui(13f), color = deskText)
         }
-        Text("Expires in 4:52 · New code", style = ui(13f), color = WelcomeInk.hex(0xA8A8A8), modifier = Modifier.padding(top = 8.dp))
+        Text(stringResource(R.string.settings_onboarding_desktop_pair_expires), style = ui(13f), color = WelcomeInk.hex(0xA8A8A8), modifier = Modifier.padding(top = 8.dp))
     }
 }

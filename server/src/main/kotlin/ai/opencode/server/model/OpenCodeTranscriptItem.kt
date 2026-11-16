@@ -9,7 +9,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import java.util.Base64
 
-/** Bytes as a base64 string, as Swift's `Data` encodes. */
+/** Bytes as a base64 string. */
 object Base64ByteArraySerializer : KSerializer<ByteArray> {
     override val descriptor = PrimitiveSerialDescriptor("Base64ByteArray", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: ByteArray) = encoder.encodeString(Base64.getEncoder().encodeToString(value))
@@ -108,6 +108,8 @@ class OpenCodeOutgoingAttachment(
     val byteCount: Long? = null,
     /** A frame of a library video, sent as an image: its duration in seconds, for the composer thumbnail's “▶ 0:50” badge. */
     val videoDuration: Double? = null,
+    /** Local playback source for a poster; never part of the prompt URI. */
+    val localVideoURI: String? = null,
 ) {
     val isImage: Boolean get() = mime.startsWith("image/")
 
@@ -119,7 +121,7 @@ class OpenCodeOutgoingAttachment(
     override fun equals(other: Any?): Boolean = other is OpenCodeOutgoingAttachment && other.id == id &&
         other.data.contentEquals(data) && other.mime == mime && other.name == name &&
         other.pastedText == pastedText && other.pasted == pasted && other.mediaHash == mediaHash &&
-        other.byteCount == byteCount && other.videoDuration == videoDuration
+        other.byteCount == byteCount && other.videoDuration == videoDuration && other.localVideoURI == localVideoURI
 
     override fun hashCode(): Int = id.hashCode()
     override fun toString(): String = "OpenCodeOutgoingAttachment(id=$id, mime=$mime, ${data.size} bytes)"
@@ -148,11 +150,8 @@ sealed interface OpenCodePromptSource {
 }
 
 /**
- * One transcript row's content, as decoded from REST and kept in the transcript cache.
- *
- * Deviation from iOS: [AssistantMarkdown] and [OpenCodeCompaction.summary] carry the raw
- * Markdown text; iOS parses `[OpenCodeMarkdownBlock]` at decode. The Markdown model lives
- * with the transcript renderer (`:feature:transcript`), which parses (and caches) it.
+ * One transcript row's content, as decoded from REST and cached. Markdown stays raw text;
+ * `:feature:transcript` parses and caches it.
  */
 @Serializable
 sealed interface OpenCodeTranscriptItem {
@@ -161,7 +160,13 @@ sealed interface OpenCodeTranscriptItem {
 
     /** [source] is set when an agent sent it. */
     @Serializable @SerialName("userText")
-    data class UserText(override val id: String, val text: String, val source: OpenCodePromptSource? = null) : OpenCodeTranscriptItem
+    data class UserText(
+        override val id: String,
+        val text: String,
+        val source: OpenCodePromptSource? = null,
+        /** Quotes from `metadata.comments`; [text] excludes their blocks and may be empty. */
+        val quotes: List<OpenCodeQuote> = emptyList(),
+    ) : OpenCodeTranscriptItem
 
     @Serializable @SerialName("userImages")
     data class UserImages(override val id: String, val images: List<OpenCodeImageAttachment>) : OpenCodeTranscriptItem
@@ -201,7 +206,7 @@ sealed interface OpenCodeTranscriptItem {
         val kind: TranscriptNoticeKind? = null,
     ) : OpenCodeTranscriptItem
 
-    /** Legacy on iOS (older builds' failed sends); kept so the item set matches. Nothing makes it. */
+    /** Kept so the item set matches. Nothing makes it. */
     @Serializable @SerialName("sendFailure")
     data class SendFailure(override val id: String, val message: String) : OpenCodeTranscriptItem
 
@@ -224,7 +229,7 @@ data class OpenCodeCompaction(
     val status: Status,
     /** The provider compacted its own context; there is no local summary. */
     val isProvider: Boolean = false,
-    /** The local summary's Markdown (iOS keeps it parsed; see [OpenCodeTranscriptItem]). */
+    /** The local summary's Markdown. */
     val summary: String = "",
     val errorMessage: String? = null,
     /** Usage of the compaction request itself, not the resulting context size. */

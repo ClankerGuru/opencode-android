@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.strings.localized
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.PasteboardClient
 import ai.opencode.core.dependencies.dependency
@@ -24,8 +25,8 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `ShellOutputFeature`: live output of one server shell. Polls only while its
- * view is on screen, tails the newest bytes, and keeps a bounded window of the capture.
+ * Live output of one server shell. Polls only while its view is on screen, tails the newest bytes,
+ * and keeps a bounded window of the capture.
  */
 class ShellOutputFeature : Reducer<ShellOutputFeature.State, ShellOutputFeature.Action> {
     companion object {
@@ -50,10 +51,10 @@ class ShellOutputFeature : Reducer<ShellOutputFeature.State, ShellOutputFeature.
             val delay = retryInterval * (1 shl doublings)
             return minOf(delay, maximumRetryInterval)
         }
-        /** Asks the server for the capture's size without reading any of it (2^53 − 1, as iOS sends). */
+        /** Asks the server for the capture's size without reading any of it. */
         const val endOfCapture = 9_007_199_254_740_991L
 
-        /** UTF-8 length without allocating (Swift's `utf8.count`). */
+        /** UTF-8 length without allocating. */
         internal fun utf8Count(text: String): Int {
             var count = 0
             var index = 0
@@ -77,7 +78,7 @@ class ShellOutputFeature : Reducer<ShellOutputFeature.State, ShellOutputFeature.
         val shell: OpenCodeShell,
         /** The retained output; it ends at [endCursor]. */
         val output: String = "",
-        /** [output]'s UTF-8 length, kept alongside it (iOS reads `output.utf8.count`). */
+        /** [output]'s UTF-8 length, kept alongside it. */
         val outputUTF8Count: Int = 0,
         /** Absolute byte offset of the first retained byte. */
         val startCursor: Int = 0,
@@ -102,11 +103,11 @@ class ShellOutputFeature : Reducer<ShellOutputFeature.State, ShellOutputFeature.
     }
 
     sealed interface Action {
-        /** The stop confirmation was dismissed (iOS binding). */
+        /** The stop confirmation was dismissed. */
         data class IsConfirmingStopChanged(val isConfirmingStop: Boolean) : Action
         /** Sent by the view while it is on screen and the app is active; polling runs until [TaskEnded]. */
         data object Task : Action
-        /** Android: the view left the screen or the app went inactive (iOS ends `.task`). */
+        /** Android: the view left the screen or the app went inactive. */
         data object TaskEnded : Action
         data class TailLocated(val start: Int) : Action
         data class OutputReceived(val page: OpenCodeShellOutputPage) : Action
@@ -118,7 +119,7 @@ class ShellOutputFeature : Reducer<ShellOutputFeature.State, ShellOutputFeature.
         data object StopConfirmed : Action
         data class StopFinished(val error: OpenCodeClientError?) : Action
         data object CopyOutputTapped : Action
-        /** Android: Share Output (iOS `ShareLink`) goes through [SessionExportClient.shareText], not the view. */
+        /** Android: Share Output goes through [SessionExportClient.shareText], not the view. */
         data object ShareOutputTapped : Action
     }
 
@@ -172,7 +173,7 @@ class ShellOutputFeature : Reducer<ShellOutputFeature.State, ShellOutputFeature.
             if (action.error.statusCode == 404) {
                 Reduced(state.copy(isUnavailable = true, isConfirmingStop = false, errorMessage = null, endCursor = state.endCursor ?: 0))
             } else {
-                Reduced(state.copy(errorMessage = "Couldn’t refresh output"))
+                Reduced(state.copy(errorMessage = localized(R.string.session_shell_refresh_failed)))
             }
         }
 
@@ -214,7 +215,7 @@ class ShellOutputFeature : Reducer<ShellOutputFeature.State, ShellOutputFeature.
                     if (failure.asClientError().statusCode == 404) {
                         Reduced(next.copy(isUnavailable = true, isConfirmingStop = false))
                     } else {
-                        Reduced(next.copy(errorMessage = "Couldn’t load earlier output"))
+                        Reduced(next.copy(errorMessage = localized(R.string.session_shell_load_earlier_failed)))
                     }
                 },
             )
@@ -254,7 +255,7 @@ class ShellOutputFeature : Reducer<ShellOutputFeature.State, ShellOutputFeature.
             val error = action.error
             if (error != null && error.statusCode != 404) {
                 dependency(HapticsClient).play(Haptic.error)
-                val failed = next.copy(errorMessage = "Couldn’t stop shell")
+                val failed = next.copy(errorMessage = localized(R.string.session_shell_stop_failed))
                 Reduced(failed, poll(failed))
             } else {
                 Reduced(next.copy(shell = next.shell.copy(status = OpenCodeShell.Status.Killed), isUnavailable = true))

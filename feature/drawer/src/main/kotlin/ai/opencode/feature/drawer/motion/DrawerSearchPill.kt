@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer.motion
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeSurfaces
 import androidx.compose.foundation.shape.RoundedCornerShape
 import ai.opencode.core.ui.OpenCodeRadius
@@ -11,6 +12,7 @@ import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeMinTapTarget
+import ai.opencode.feature.drawer.R
 import ai.opencode.feature.drawer.style.DrawerMetrics
 import ai.opencode.feature.drawer.style.DrawerTunables
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -65,6 +67,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -75,10 +78,10 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
 /**
- * Port of `OpenCode/Drawer/DrawerSearchPill.swift`: the drawer's search. One circle at rest that
- * stretches leftward into the search field while a circular × button buds off its trailing
- * edge. Tapping × or pressing Escape clears the query, dismisses the keyboard and merges the ×
- * back into the search button. Under Reduce Motion the two states cross-fade in place.
+ * The drawer's search. One circle at rest that stretches leftward into the search field while a
+ * circular × button buds off its trailing edge. Tapping × or pressing Escape clears the query,
+ * dismisses the keyboard and merges the × back into the search button. Under Reduce Motion the two
+ * states cross-fade in place.
  *
  * Liquid Glass and its morph (`GlassEffectContainer`, `glassEffectID`) become a tonal M3
  * capsule whose width springs on [DrawerSearchPillDefaults.morph].
@@ -87,8 +90,8 @@ object DrawerSearchPillDefaults {
     /** The circle at rest and the field's height (`DrawerTunables.searchSize`, at least Android's 48 dp target). */
     val size: Dp get() = maxOf(DrawerTunables.searchSize, OpenCodeMinTapTarget)
     /**
-     * The capsule grows from its circle on `MotionRole.PanelOpen` and folds back on its exit;
-     * under Reduce Motion the two states cross-fade (iOS `morph(opening:reduceMotion:)`).
+     * The capsule grows from its circle on `MotionRole.PanelOpen` and folds back on its exit; under
+     * Reduce Motion the two states cross-fade.
      */
     fun <T> morph(opening: Boolean, reduceMotion: Boolean = false): FiniteAnimationSpec<T> =
         MotionRole.PanelOpen.animation(if (opening) MotionPhase.Enter else MotionPhase.Exit, reduceMotion)
@@ -101,9 +104,8 @@ object DrawerSearchPillDefaults {
 }
 
 /**
- * Whether the drawer's search is open or focused (iOS `DrawerSearchState`). Read by the pill and
- * the header/footer fade modifiers in their own layers, so opening and closing animate there
- * without recomposing Home.
+ * Whether the drawer's search is open or focused. Read by the pill and the header/footer fade
+ * modifiers in their own layers, so opening and closing animate there without recomposing Home.
  */
 @Stable
 class DrawerSearchState {
@@ -172,6 +174,7 @@ fun DrawerSearchPill(
     }
 
     val field: @Composable (Modifier) -> Unit = { fieldModifier ->
+        val searchDescription = stringResource(R.string.drawer_search_description)
         BasicTextField(
             value = text,
             onValueChange = onTextChange,
@@ -195,12 +198,12 @@ fun DrawerSearchPill(
                         false
                     }
                 }
-                .semantics { contentDescription = "Search sessions" }
+                .semantics { contentDescription = searchDescription }
                 .padding(end = 12.dp),
             decorationBox = { inner ->
                 Box(contentAlignment = Alignment.CenterStart) {
                     if (text.isEmpty()) {
-                        Text("Search", style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.tertiaryText, maxLines = 1)
+                        Text(stringResource(CoreR.string.common_search), style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.tertiaryText, maxLines = 1)
                     }
                     inner()
                 }
@@ -283,6 +286,7 @@ private fun SearchCapsule(
 ) {
     val leading by animateFloatAsState(leadingPadding.value, DrawerSearchPillDefaults.morph(isSearching), label = "search-leading")
     val trailing by animateFloatAsState(trailingPadding.value, DrawerSearchPillDefaults.morph(isSearching), label = "search-trailing")
+    val searchDescription = stringResource(R.string.drawer_search_description)
     Surface(
         // The drawer's floating control, as its footer buttons: popover fill, hairline ring, soft shadow.
         shape = RoundedCornerShape(OpenCodeRadius.panel),
@@ -299,7 +303,7 @@ private fun SearchCapsule(
                     Modifier.testTag("drawer-search-pill")
                 } else {
                     Modifier
-                        .clearAndSetSemantics { contentDescription = "Search sessions" }
+                        .clearAndSetSemantics { contentDescription = searchDescription }
                         .testTag("drawer-search")
                 },
             ),
@@ -318,7 +322,7 @@ private fun SearchCapsule(
                     tint = if (isSearching) OpenCodeTheme.colors.secondaryText else OpenCodeTheme.colors.text,
                 )
             }
-            // iOS `.transition(.opacity)` inside the morph's `withAnimation`: the field fades on the morph spring.
+            // The field fades on the morph spring.
             AnimatedVisibility(
                 isSearching,
                 enter = fadeIn(DrawerSearchPillDefaults.morph(opening = true)),
@@ -333,6 +337,7 @@ private fun SearchCapsule(
 
 @Composable
 private fun CancelButton(size: Dp, enabled: Boolean = true, onClick: () -> Unit) {
+    val cancelDescription = stringResource(R.string.drawer_search_cancel_description)
     Surface(
         shape = RoundedCornerShape(OpenCodeRadius.panel),
         color = OpenCodeSurfaces.color,
@@ -342,7 +347,7 @@ private fun CancelButton(size: Dp, enabled: Boolean = true, onClick: () -> Unit)
         modifier = Modifier
             .size(size)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = "Cancel Search" }
+            .semantics { contentDescription = cancelDescription }
             .testTag("drawer-search-cancel"),
     ) {
         Box(contentAlignment = Alignment.Center) {
@@ -358,7 +363,7 @@ private fun Modifier.animatedWidth(widthDp: () -> Float): Modifier = layout { me
     layout(width, placeable.height) { placeable.place(0, 0) }
 }
 
-/** Swallows touches in the `Initial` pass while [block], so nothing beneath reacts (iOS `.allowsHitTesting(false)`). */
+/** Swallows touches in the `Initial` pass while [block], so nothing beneath reacts. */
 private fun Modifier.blockingTouches(block: Boolean): Modifier = if (!block) {
     this
 } else {
@@ -371,8 +376,7 @@ private fun Modifier.blockingTouches(block: Boolean): Modifier = if (!block) {
 
 /**
  * The drawer's title fades out beneath the opening search (swap's exit, quicker than the capsule
- * grows) and back on its entrance, and stops taking touches and TalkBack focus (iOS
- * `DrawerSearchTitleFade`).
+ * grows) and back on its entrance, and stops taking touches and TalkBack focus.
  */
 fun Modifier.drawerSearchTitleFade(state: DrawerSearchState): Modifier = composed {
     val searching = state.isSearching
@@ -386,12 +390,12 @@ fun Modifier.drawerSearchTitleFade(state: DrawerSearchState): Modifier = compose
         .then(if (searching) Modifier.clearAndSetSemantics {} else Modifier)
 }
 
-/** The drawer's floating bottom controls fade out of the way while search owns the keyboard (iOS `DrawerSearchFocusFade`). */
+/** The drawer's floating bottom controls fade out of the way while search owns the keyboard. */
 fun Modifier.drawerSearchFocusFade(state: DrawerSearchState, reducedMotion: Boolean): Modifier = composed {
     val focused = state.isFocused
     val alpha by animateFloatAsState(
         if (focused) 0f else 1f,
-        // iOS 03adf07a: fades on swap (a cross-fade under Reduce Motion) instead of popping.
+        // Fades on swap (a cross-fade under Reduce Motion) instead of popping.
         MotionRole.Swap.animation(if (focused) MotionPhase.Exit else MotionPhase.Enter, reducedMotion),
         label = "drawer-search-focus",
     )
@@ -400,7 +404,7 @@ fun Modifier.drawerSearchFocusFade(state: DrawerSearchState, reducedMotion: Bool
         .then(if (focused) Modifier.clearAndSetSemantics {} else Modifier)
 }
 
-/** The raised bottom controls stop taking touches while search owns the keyboard (iOS `DrawerSearchFocusHitTesting`). */
+/** The raised bottom controls stop taking touches while search owns the keyboard. */
 fun Modifier.drawerSearchFocusHitTesting(state: DrawerSearchState): Modifier = composed {
     blockingTouches(state.isFocused)
 }

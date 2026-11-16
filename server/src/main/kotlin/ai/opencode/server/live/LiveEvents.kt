@@ -7,6 +7,7 @@ import ai.opencode.core.diagnostics.DiagnosticsFailurePhase
 import ai.opencode.core.diagnostics.DiagnosticsRecorder
 import ai.opencode.core.diagnostics.DiagnosticsStreamName
 import ai.opencode.core.diagnostics.DiagnosticsStreamProgress
+import ai.opencode.core.strings.localized
 import ai.opencode.server.EventBatcher
 import ai.opencode.server.EventBatcherHooks
 import ai.opencode.server.EventEmission
@@ -17,6 +18,7 @@ import ai.opencode.server.OpenCodeLiveContentEvent
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.OpenCodeServerEvent
 import ai.opencode.server.OpenCodeTransport
+import ai.opencode.server.R
 import ai.opencode.server.SelfViewReceipts
 import ai.opencode.server.ServerLinkClient
 import ai.opencode.core.log.AppLog
@@ -33,6 +35,8 @@ import ai.opencode.server.internal.opt
 import ai.opencode.server.internal.str
 import ai.opencode.server.model.OpenCodeJSONValue
 import ai.opencode.server.model.OpenCodeProjectIcon
+import ai.opencode.server.model.OpenCodeToolBounds
+import ai.opencode.server.model.bounded
 import ai.opencode.server.model.utf8Length
 import ai.opencode.server.retry.NetworkRetry
 import ai.opencode.server.retry.ServerContact
@@ -65,8 +69,8 @@ private const val MAX_FRAME_BYTES = 16 * 1024 * 1024
  */
 internal fun subscribeEvents(server: OpenCodeServer): Flow<OpenCodeServerEvent> = flow {
     // The events sent and not yet taken by the collector. `callbackFlow` doesn't expose its
-    // buffer's fill level, which iOS reads from each `yield`'s result; the batcher sheds deltas
-    // for sessions off screen once half the buffer is waiting.
+    // buffer's fill level; the batcher sheds deltas for sessions off screen once half the buffer is
+    // waiting.
     val waiting = AtomicInteger(0)
     emitAll(eventSource(server, waiting).onEach { waiting.decrementAndGet() })
 }
@@ -108,7 +112,7 @@ private fun eventSource(server: OpenCodeServer, waiting: AtomicInteger): Flow<Op
     val poolReset = PoolResetWatch(link)
     launch(Dispatchers.IO) {
         try {
-            val url = server.endpoint("/api/event") ?: throw OpenCodeClientError("Enter a valid HTTP or HTTPS server URL.")
+            val url = server.endpoint("/api/event") ?: throw OpenCodeClientError(localized(R.string.server_error_invalid_url))
             val builder = Request.Builder().url(url).header("Accept", "text/event-stream")
             server.authorize(builder)
             builder.header("X-OpenCode-Op", operationID).header("X-OpenCode-Req", UUID.randomUUID().toString().uppercase())
@@ -121,11 +125,11 @@ private fun eventSource(server: OpenCodeServer, waiting: AtomicInteger): Flow<Op
             call.execute().use { response ->
                 if (response.code == 401) {
                     stream.record(DiagnosticsStreamName.Disconnected, 401, DiagnosticsErrorCategory.Unauthorized, DiagnosticsFailurePhase.HttpStatus)
-                    throw OpenCodeClientError("The server rejected these credentials.", statusCode = 401)
+                    throw OpenCodeClientError(localized(R.string.server_error_credentials_rejected), statusCode = 401)
                 }
                 if (response.code !in 200..299) {
                     stream.record(DiagnosticsStreamName.Disconnected, response.code, DiagnosticsErrorCategory.of(response.code), DiagnosticsFailurePhase.HttpStatus)
-                    throw OpenCodeClientError("The event stream returned HTTP ${response.code}.", statusCode = response.code)
+                    throw OpenCodeClientError(localized(R.string.server_error_event_stream_http, response.code), statusCode = response.code)
                 }
                 stream.connected(response.code)
                 ServerContact.shared.heard(server.persistenceID)
@@ -142,7 +146,7 @@ private fun eventSource(server: OpenCodeServer, waiting: AtomicInteger): Flow<Op
                     if (line.length - 5 > MAX_FRAME_BYTES ||
                         (line.length * 3 - 5 > MAX_FRAME_BYTES && utf8Length(line) - 5 > MAX_FRAME_BYTES)
                     ) {
-                        throw OpenCodeClientError("The event stream sent an oversized frame.")
+                        throw OpenCodeClientError(localized(R.string.server_error_event_stream_oversized_frame))
                     }
                     // JSON tolerates the whitespace after `data:`.
                     val event = decodeStreamFrame(line.substring(5)) ?: continue
@@ -151,6 +155,7 @@ private fun eventSource(server: OpenCodeServer, waiting: AtomicInteger): Flow<Op
                     ) {
                         continue
                     }
+                    if (event == OpenCodeServerEvent.ModelsChanged) OpenCodeReadCache.shared.forgetModelCatalogs(server.persistenceID)
                     batches.receive(event)
                 }
             }
@@ -159,7 +164,7 @@ private fun eventSource(server: OpenCodeServer, waiting: AtomicInteger): Flow<Op
             // Before the owner hears it ended, so its next request can't count a stream that's
             // gone as live (the finally covers cancellation).
             link.noteStreamEnded(server)
-            close(OpenCodeClientError("The event stream ended."))
+            close(OpenCodeClientError(localized(R.string.server_error_event_stream_ended)))
         } catch (cancelled: CancellationException) {
             stream.record(DiagnosticsStreamName.Disconnected, errorCategory = DiagnosticsErrorCategory.Cancelled, failurePhase = DiagnosticsFailurePhase.Cancelled)
             throw cancelled
@@ -339,7 +344,7 @@ internal class PoolResetWatch(private val link: ServerLinkClient) {
     }
 }
 
-/** The event stream's diagnostics marks (iOS `DiagnosticsRecorder.stream`): line counts and timings only. */
+/** The event stream's diagnostics marks: line counts and timings only. */
 private class StreamDiagnostics(private val operationID: String) {
     private val recorder = DiagnosticsRecorder.shared
     private val requestID = UUID.randomUUID().toString().uppercase()
@@ -377,7 +382,7 @@ private class StreamDiagnostics(private val operationID: String) {
 private fun streamTransportError(error: Exception): OpenCodeClientError =
     transportError(error, ai.opencode.server.retry.TransportFailure.of(error))
 
-/** The fields events carry; any type mismatch drops `data` for the frame, as iOS's `try?` does. */
+/** The fields events carry; any type mismatch drops `data` for the frame. */
 @Serializable
 internal data class EventPayload(
     val sessionID: String? = null,
@@ -415,7 +420,8 @@ internal data class EventPayload(
     @Serializable data class Content(val type: String, val text: String? = null)
     @Serializable data class InboxItem(val type: String, val payload: PendingInputsPayload.Payload? = null, val delivery: String? = null)
 
-    val textOutput: List<String> get() = content?.filter { it.type == "text" }?.mapNotNull { it.text } ?: emptyList()
+    val textOutput: List<String> get() = OpenCodeToolBounds.output(content?.filter { it.type == "text" }?.mapNotNull { it.text } ?: emptyList())
+    val boundedMetadata: Map<String, OpenCodeJSONValue> get() = metadata?.let(OpenCodeToolBounds::metadata) ?: emptyMap()
 }
 
 internal object LenientLocationSerializer : ElementSerializer<EventPayload.Location?>(
@@ -448,6 +454,7 @@ private val HANDLED_TYPES = setOf(
     "permission.asked", "form.created", "permission.replied", "form.replied", "form.cancelled",
     "shell.created", "shell.exited", "shell.deleted",
     "project.updated",
+    "model.updated", "provider.updated", "agent.updated",
 )
 
 /**
@@ -464,7 +471,7 @@ internal fun decodeStreamFrame(text: String): OpenCodeServerEvent? {
     } catch (_: RuntimeException) {
         return null
     }
-    if (tag != null) throw OpenCodeClientError("The event stream reported a server failure.")
+    if (tag != null) throw OpenCodeClientError(localized(R.string.server_error_event_stream_server_failure))
     type ?: return null
     if (type !in HANDLED_TYPES) return null
     val data: EventPayload? = envelope["data"]?.takeUnless { it is JsonNull }?.let(::decodePayload)
@@ -532,6 +539,8 @@ private fun serverEvent(type: String, data: EventPayload?): OpenCodeServerEvent?
             val canonical = data.canonical ?: return null
             OpenCodeServerEvent.ProjectUpdated(ProjectPayload(id, canonical, data.name, data.repository, data.icon).project())
         }
+        "model.updated", "provider.updated" -> OpenCodeServerEvent.ModelsChanged
+        "agent.updated" -> OpenCodeServerEvent.AgentsChanged
         "session.inbox.cancelled" -> {
             val id = data?.sessionID ?: return null
             val inputID = data.inboxID ?: return null
@@ -565,14 +574,8 @@ private fun serverEvent(type: String, data: EventPayload?): OpenCodeServerEvent?
             ordinalContent { id, ordinal -> OpenCodeLiveContentEvent.TextEnded(id, ordinal, text) }
         }
         "session.reasoning.started" -> ordinalContent(OpenCodeLiveContentEvent::ReasoningStarted)
-        "session.reasoning.delta" -> {
-            val delta = data?.delta ?: return null
-            ordinalContent { id, ordinal -> OpenCodeLiveContentEvent.ReasoningDelta(id, ordinal, delta) }
-        }
-        "session.reasoning.ended" -> {
-            val text = data?.text ?: return null
-            ordinalContent { id, ordinal -> OpenCodeLiveContentEvent.ReasoningEnded(id, ordinal, text) }
-        }
+        "session.reasoning.delta" -> ordinalContent(OpenCodeLiveContentEvent::ReasoningDelta)
+        "session.reasoning.ended" -> ordinalContent(OpenCodeLiveContentEvent::ReasoningEnded)
         "session.tool.input.started" -> {
             val name = data?.name ?: return null
             toolContent { messageID, toolID, _ -> OpenCodeLiveContentEvent.ToolInputStarted(messageID, toolID, name) }
@@ -580,20 +583,20 @@ private fun serverEvent(type: String, data: EventPayload?): OpenCodeServerEvent?
         "session.tool.input.delta" ->
             toolContent { messageID, toolID, payload -> OpenCodeLiveContentEvent.ToolInputDelta(messageID, toolID, payload.delta ?: "") }
         "session.tool.input.ended" ->
-            toolContent { messageID, toolID, payload -> OpenCodeLiveContentEvent.ToolInputEnded(messageID, toolID, payload.text ?: "") }
+            toolContent { messageID, toolID, payload -> OpenCodeLiveContentEvent.ToolInputEnded(messageID, toolID, (payload.text ?: "").bounded(OpenCodeToolBounds.TEXT_LIMIT)) }
         "session.tool.called" -> toolContent { messageID, toolID, payload ->
-            OpenCodeLiveContentEvent.ToolCalled(messageID, toolID, payload.input ?: OpenCodeJSONValue.Object(emptyMap()))
+            OpenCodeLiveContentEvent.ToolCalled(messageID, toolID, payload.input?.bounded() ?: OpenCodeJSONValue.Object(emptyMap()))
         }
         "session.tool.progress" -> toolContent { messageID, toolID, payload ->
-            OpenCodeLiveContentEvent.ToolProgress(messageID, toolID, payload.metadata ?: emptyMap())
+            OpenCodeLiveContentEvent.ToolProgress(messageID, toolID, payload.boundedMetadata)
         }
         "session.tool.success" -> toolContent { messageID, toolID, payload ->
-            OpenCodeLiveContentEvent.ToolSucceeded(messageID, toolID, payload.textOutput, payload.metadata ?: emptyMap())
+            OpenCodeLiveContentEvent.ToolSucceeded(messageID, toolID, payload.textOutput, payload.boundedMetadata)
         }
         "session.tool.failed" -> toolContent { messageID, toolID, payload ->
             OpenCodeLiveContentEvent.ToolFailed(
-                messageID, toolID, payload.error?.message ?: "Tool failed", payload.error?.type,
-                payload.textOutput, payload.metadata ?: emptyMap(),
+                messageID, toolID, payload.error?.message ?: localized(R.string.server_tool_failed), payload.error?.type,
+                payload.textOutput, payload.boundedMetadata,
             )
         }
         "session.message.content.updated", "session.synthetic", "session.instructions.updated",

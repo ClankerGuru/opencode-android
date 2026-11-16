@@ -44,16 +44,15 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `SelectedTranscriptCancellationTests.swift`: tapping an uncached session reads its
- * transcript (`CancelID.SelectedTranscript`), riding out drops for up to the request policy's
- * window. Leaving it for anywhere else ends that read, and a late answer never lands on where the
- * reader went instead. Foreground reads step background reads (prefetch, cached refreshes, active
- * ancestry) aside and drain them once they settle.
+ * Tapping an uncached session reads its transcript (`CancelID.SelectedTranscript`), riding out
+ * drops for up to the request policy's window. Leaving it for anywhere else ends that read, and a
+ * late answer never lands on where the reader went instead. Foreground reads step background reads
+ * (prefetch, cached refreshes, active ancestry) aside and drain them once they settle.
  *
- * iOS writes shared keys through `$key.withLock` in its expectations; Android's `HomeFeature.State`
- * mirrors them as plain fields (`sessionReadDates`, `lastViewedSessionIDs`, `initializedInboxServerIDs`),
- * so expectations set those, and keys Home keeps out of state (`cachedHomeSnapshots`,
- * `cachedTranscriptSnapshots`) aren't part of the comparison.
+ * Android's `HomeFeature.State` mirrors them as plain fields (`sessionReadDates`,
+ * `lastViewedSessionIDs`, `initializedInboxServerIDs`), so expectations set those, and keys Home
+ * keeps out of state (`cachedHomeSnapshots`, `cachedTranscriptSnapshots`) aren't part of the
+ * comparison.
  */
 class SelectedTranscriptCancellationTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -82,7 +81,7 @@ class SelectedTranscriptCancellationTests {
         return state.copy(transcriptCache = state.transcriptCache + ("other" to listOf(text("o1", "Other"))))
     }
 
-    /** iOS's gate: a read that waits for its release (or its cancellation, reported to [onCancel]). */
+    /** A read that waits for its release (or its cancellation, reported to [onCancel]). */
     private class Gate {
         @Volatile private var waiting: CompletableDeferred<Unit>? = null
 
@@ -138,7 +137,6 @@ class SelectedTranscriptCancellationTests {
             }
         }
         store.receive(Action.detail(SessionFeature.Action.AcceptedTranscriptUpdated(sessionID, items))) {
-            // iOS asserts this write on the response before; it happens here, in `syncSeenItemsFromOpenDetail`.
             store.withDependencies { it.settingSeenWatermark(SessionSeenWatermark(itemID = items.lastOrNull()?.id, viewedMilliseconds = 1_000), sessionID) }
         }
     }
@@ -411,7 +409,6 @@ class SelectedTranscriptCancellationTests {
         }
         assertFalse(store.state.isInitialTranscriptInFlight)
         store.receive(Action.detail(SessionFeature.Action.AcceptedTranscriptUpdated(sessionID = "home", items = refreshedItems))) {
-            // iOS asserts this write on the response before; it happens here, in `syncSeenItemsFromOpenDetail`.
             it.copy(transcriptCache = it.transcriptCache + ("home" to refreshedItems))
                 .settingSeenWatermark(SessionSeenWatermark(itemID = "h0", viewedMilliseconds = 1_000), "home")
         }
@@ -457,9 +454,10 @@ class SelectedTranscriptCancellationTests {
         assertTrue(eventually { startedTranscripts.count { it == "other" } == 4 })
         store.send(Action.detail(SessionFeature.Action.Delegate(SessionFeature.Delegate.OpenSubagent(childSession)))) {
             store.withDependencies {
-                it.copy(refreshingTranscripts = emptySet(), dirtyCachedTranscriptIDs = listOf("other")).pushingSubagent(childSession).syncingTranscriptCover()
+                it.copy(refreshingTranscripts = emptySet(), dirtyCachedTranscriptIDs = listOf("other")).pushingSubagent(childSession).syncingTranscriptCover().syncingPollingPause().state
             }
         }
+        store.receive(Action.detail(SessionFeature.Action.PollingPauseChanged(true)))
         assertTrue(eventually { cancelledTranscripts.count { it == "other" } == 4 })
         store.skipInFlightEffects()
     }
@@ -514,7 +512,6 @@ class SelectedTranscriptCancellationTests {
             it.copy(selectedTranscriptFetch = null)
         }
         store.receive(Action.detail(SessionFeature.Action.TranscriptResponse("first", Result.failure(OpenCodeClientError("Failed"))))) {
-            // iOS `errorMessage` is Android's `loadError`.
             it.updatingDetail { d -> d.copy(initialTranscriptRequestIsExternal = false, isLoading = false, loadError = "Failed") }
         }
         store.receive(Action.detail(SessionFeature.Action.FirstContentFrameRendered))
@@ -582,8 +579,8 @@ class SelectedTranscriptCancellationTests {
             }
         }
         assertTrue(store.state.isInitialTranscriptInFlight)
-        // Android's `ImmediateClock` returns at once (swift-clocks' yields first, so iOS's cue is
-        // still waiting when the screen leaves): the resync cue shows and holds its minimum here.
+        // Android's `ImmediateClock` returns at once: the resync cue shows and holds its minimum
+        // here.
         store.receive(Action.detail(SessionFeature.Action.ResyncDelayElapsed(refreshID = 2))) {
             it.updatingDetail { d -> d.copy(resync = d.resync?.copy(isShown = true)) }
         }
@@ -818,7 +815,6 @@ class SelectedTranscriptCancellationTests {
             }
         }
         store.receive(Action.detail(SessionFeature.Action.AcceptedTranscriptUpdated(sessionID = "home", items = homeFresh))) {
-            // iOS asserts this write on the response before; it happens here, in `syncSeenItemsFromOpenDetail`.
             it.settingSeenWatermark(SessionSeenWatermark(itemID = "h0", viewedMilliseconds = 1_000), "home")
         }
 
@@ -891,8 +887,11 @@ class SelectedTranscriptCancellationTests {
                         (it.sessionKey("home") to home.updatedAt) +
                         (it.sessionKey("cached") to cached.updatedAt),
                     initializedInboxServerIDs = setOf(server.persistenceID),
-                ).updatingDetail { d -> d.copy(activeFamilySessionIDs = setOf("ses_subagent")) }.persistingSnapshot(Instant.EPOCH)
+                ).persistingSnapshot(Instant.EPOCH)
             }
+        }
+        store.receive(Action.detail(SessionFeature.Action.ActiveSessionsRead(setOf("ses_subagent")))) {
+            it.updatingDetail { d -> d.copy(activeFamilySessionIDs = setOf("ses_subagent")) }
         }
         store.receive(Action.detail(SessionFeature.Action.SessionSnapshotUpdated(home)))
         store.receive(Action.AttentionRefreshed(emptySet())) { it.copy(noticeReadiness = HomeFeature.State.NoticeReadiness.settled) }
@@ -998,7 +997,6 @@ class SelectedTranscriptCancellationTests {
             it.updatingDetail { d -> d.copy(refresh = null, initialTranscriptIsFresh = true) }
         }
         store.receive(Action.detail(SessionFeature.Action.AcceptedTranscriptUpdated(sessionID = "home", items = homeFresh))) {
-            // iOS asserts this write on the response before; it happens here, in `syncSeenItemsFromOpenDetail`.
             it.settingSeenWatermark(SessionSeenWatermark(itemID = "h0", viewedMilliseconds = 1_000), "home")
         }
         assertFalse(store.state.isInitialTranscriptInFlight)

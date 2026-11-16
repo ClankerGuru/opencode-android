@@ -14,16 +14,10 @@ import org.junit.Rule
 import org.junit.Test
 import kotlin.math.abs
 
-/**
- * Port of iOS `MotionSystemTests`' drawer shortcut tests (`DrawerShortcutSlot`,
- * `DrawerShortcutMotion`). The rest of that file is `:core`'s (`MotionSystemTests` there) and
- * `:feature:transcript`'s; `returnToDrawerDoesNotMoveLongReturnSession` is deleted: it probes a
- * hosted `UIScrollView`'s content offset through UIKit layout.
- */
 class MotionSystemTests {
     @get:Rule val isolation = TestIsolationRule()
 
-    /** iOS's display link: a frame clock that never ticks, so a started loop stays running until stopped. */
+    /** A frame clock that never ticks, so a started loop stays running until stopped. */
     private object StillFrameClock : MonotonicFrameClock {
         override suspend fun <R> withFrameNanos(onFrame: (frameTimeNanos: Long) -> R): R = awaitCancellation()
     }

@@ -1,8 +1,10 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.experiments.key
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.collectState
+import ai.opencode.core.strings.localized
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
@@ -49,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -56,13 +59,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
 /**
- * The composer: a 28 dp capsule with the message field, its attachments, and the control row
- * (+, model chip, Send), with a pending request's panel growing out of it (D-31 B), the
- * attachment menu over it, and the model sheet. Built from the ports of iOS `OpenCode/Composer/`.
+ * The composer: a 28 dp capsule with the message field, its attachments, and the control row (+,
+ * model chip, Send), with a pending request's panel growing out of it, the attachment menu
+ * over it, and the model sheet.
  *
- * Fill the session's screen with it (it draws its overlays over everything and sits the
- * capsule at the bottom, above the keyboard). The session area owns the iOS
- * `SessionView+Composer` capsule and may compose these pieces itself instead.
+ * Fill the session's screen with it (it draws its overlays over everything and sits the capsule at
+ * the bottom, above the keyboard). The session area owns the composer capsule and may compose these
+ * pieces itself instead.
  */
 @Composable
 fun ComposerView(
@@ -132,7 +135,7 @@ fun ComposerView(
                     Box {
                     if (state.draft.isEmpty()) {
                         Text(
-                            state.requestDock.requestBar(state.draft)?.placeholder ?: "Message",
+                            state.requestDock.requestBar(state.draft)?.placeholder ?: stringResource(R.string.composer_message_placeholder),
                             style = OpenCodeTextStyles.body,
                             color = OpenCodeTheme.colors.tertiaryText,
                             modifier = Modifier.padding(start = 16.dp, top = 16.dp).clearAndSetSemantics {},
@@ -148,7 +151,7 @@ fun ComposerView(
                         onLongTextPaste = if (state.isAnsweringRequest) null else { text ->
                             send(ComposerFeature.Action.Attachments(ComposerAttachmentsFeature.Action.AttachmentAdded(PastedText.attachment(text))))
                         },
-                        accessibilityLabel = state.requestDock.requestBar(state.draft)?.fieldLabel ?: "Message",
+                        accessibilityLabel = state.requestDock.requestBar(state.draft)?.fieldLabel ?: stringResource(R.string.composer_message_placeholder),
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     )
                     }
@@ -178,7 +181,7 @@ fun ComposerView(
                         Spacer(Modifier.weight(1f))
                         SendButton(
                             enabled = state.requestDock.requestBar(state.draft)?.let { it.isReady && state.requestDock.respondingRequestIDs.isEmpty() } ?: state.canSend,
-                            label = sendLabel(state),
+                            verb = sendVerb(state),
                             onClick = { send(ComposerFeature.Action.SendTapped) },
                         )
                     }
@@ -213,17 +216,18 @@ fun ComposerView(
     }
 }
 
-/** iOS's bar: Send, or the request bar's verb while answering (Next, Deny, Dismiss). */
-private fun sendLabel(state: ComposerFeature.State): String = when (val bar = state.requestDock.requestBar(state.draft)) {
-    null -> "Send"
+/** Send (null, the arrow), or the request bar's verb while answering (Next, Deny, Dismiss). */
+private fun sendVerb(state: ComposerFeature.State): String? = when (val bar = state.requestDock.requestBar(state.draft)) {
+    null -> null
     is RequestBar.Decline -> bar.verb.title
-    is RequestBar.Answer -> if (bar.isLast) "Send" else "Next"
-    is RequestBar.Choose -> if (bar.isLast) "Send" else "Next"
+    is RequestBar.Answer -> if (bar.isLast) null else localized(CoreR.string.common_next)
+    is RequestBar.Choose -> if (bar.isLast) null else localized(CoreR.string.common_next)
 }
 
 @Composable
-private fun SendButton(enabled: Boolean, label: String, onClick: () -> Unit) {
+private fun SendButton(enabled: Boolean, verb: String?, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
+    val label = verb ?: stringResource(CoreR.string.common_send)
     Box(
         Modifier
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
@@ -232,8 +236,8 @@ private fun SendButton(enabled: Boolean, label: String, onClick: () -> Unit) {
             .testTag("composer-send"),
         contentAlignment = Alignment.Center,
     ) {
-        if (label != "Send") {
-            // The request bar's verb (Deny, Dismiss, Next) reads as a word, as iOS's bar does.
+        if (verb != null) {
+            // The request bar's verb (Deny, Dismiss, Next) reads as a word.
             Box(
                 Modifier
                     .heightIn(min = 34.dp)
@@ -272,6 +276,7 @@ private fun AttachmentsRow(state: ComposerFeature.State, send: (ComposerFeature.
     val attachments = state.attachments
     if (!attachments.hasContent && !attachments.isLocating) return
     val scroll = rememberScrollState()
+    val photoDescription = stringResource(R.string.composer_attachment_photo_description)
     Row(
         Modifier
             .fillMaxWidth()
@@ -293,7 +298,7 @@ private fun AttachmentsRow(state: ComposerFeature.State, send: (ComposerFeature.
                         .clip(RoundedCornerShape(16.dp))
                         .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                         .clickable { send(ComposerFeature.Action.Attachments(ComposerAttachmentsFeature.Action.AttachmentRemoved(index))) }
-                        .semantics { contentDescription = attachment.name ?: "Photo" },
+                        .semantics { contentDescription = attachment.name ?: photoDescription },
                     contentAlignment = Alignment.Center,
                 ) {
                     AttachmentThumbnail(attachment)
@@ -338,7 +343,7 @@ private fun AttachmentThumbnail(attachment: ai.opencode.server.model.OpenCodeOut
     }
 }
 
-/** Images go inline (re-encoded); everything else stages for upload (iOS `ComposerFileRouting`). */
+/** Images go inline (re-encoded); everything else stages for upload. */
 private fun importURIs(
     uris: List<android.net.Uri>,
     images: ComposerImageImporter,

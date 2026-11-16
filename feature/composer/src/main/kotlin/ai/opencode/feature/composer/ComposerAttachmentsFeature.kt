@@ -25,13 +25,9 @@ import java.io.File
 import java.util.UUID
 
 /**
- * Port of iOS `ComposerAttachmentsFeature` (`Composer/ComposerFileAttachment.swift`): the
- * composer's pending images, files and location, and the + menu's Location.
- *
- * As on iOS, this reducer owns only Location and inline-attachment removal; the session
- * (`SessionFeature+Attachments`) handles [Action.AttachmentAdded], [Action.FilesStaged],
- * uploads, retry and removal, using the static [readInlineFile], [upload] and
- * [cancelUpload] effects here (they need the session's server, directory and model).
+ * The composer's pending images, files and location. This reducer owns only Location and
+ * inline-attachment removal; the session handles [Action.AttachmentAdded], [Action.FilesStaged],
+ * uploads, retry and removal with the static effects here.
  */
 class ComposerAttachmentsFeature : Reducer<ComposerAttachmentsFeature.State, ComposerAttachmentsFeature.Action> {
 
@@ -41,6 +37,7 @@ class ComposerAttachmentsFeature : Reducer<ComposerAttachmentsFeature.State, Com
         val pendingFiles: List<ComposerFileAttachment> = emptyList(),
         /** A location from the + menu, waiting to go with the next message. */
         val pendingLocation: SharedLocation? = null,
+        val pendingQuotes: List<ComposerQuote> = emptyList(),
         /** The + menu's Location is finding the phone. */
         val isLocating: Boolean = false,
         /** Why the last Location couldn't be shared, until dismissed. */
@@ -58,10 +55,9 @@ class ComposerAttachmentsFeature : Reducer<ComposerAttachmentsFeature.State, Com
         val isUploadingFiles: Boolean get() = pendingFiles.any { it.isUploading }
         val isWaitingForUploads: Boolean get() = sendAfterUploads != null
         val hasContent: Boolean
-            get() = pendingAttachments.isNotEmpty() || pendingFiles.isNotEmpty() || pendingLocation != null
+            get() = pendingAttachments.isNotEmpty() || pendingFiles.isNotEmpty() || pendingLocation != null || pendingQuotes.isNotEmpty()
     }
 
-    /** Swift's `Result<Success, Failure>` with a typed failure. */
     sealed interface Outcome<out T, out E> {
         data class Success<T>(val value: T) : Outcome<T, Nothing>
         data class Failure<E>(val error: E) : Outcome<Nothing, E>
@@ -85,6 +81,8 @@ class ComposerAttachmentsFeature : Reducer<ComposerAttachmentsFeature.State, Com
         data class LocationResponse(val result: Outcome<SharedLocation, LocationClientError>) : Action
         data object LocationRemoved : Action
         data object LocationErrorDismissed : Action
+        data class QuoteRemoved(val id: String) : Action
+        data class QuoteCommented(val id: String, val comment: String) : Action
         data object LocationSettingsTapped : Action
         /** Starts uploads for shared files absorbed into the composer. */
         data object QueuedUploadsStarted : Action
@@ -142,6 +140,14 @@ class ComposerAttachmentsFeature : Reducer<ComposerAttachmentsFeature.State, Com
                 Reduced(state.copy(isLocating = false, pendingLocation = null), Effect.cancel(CancelID.Location))
 
             Action.LocationErrorDismissed -> Reduced(state.copy(locationError = null))
+
+            is Action.QuoteRemoved -> {
+                Reduced(state.copy(pendingQuotes = state.pendingQuotes.filter { it.id != action.id }))
+            }
+            is Action.QuoteCommented -> {
+                val comment = action.comment.trim().ifEmpty { null }
+                Reduced(state.copy(pendingQuotes = state.pendingQuotes.map { if (it.id == action.id) it.copy(comment = comment) else it }))
+            }
 
             Action.LocationSettingsTapped -> {
                 val location = dependency(LocationClient)

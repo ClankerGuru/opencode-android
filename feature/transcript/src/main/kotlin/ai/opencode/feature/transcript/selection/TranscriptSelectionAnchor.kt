@@ -16,14 +16,12 @@ import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.text.TextLayoutResult
 
 /**
- * Port of iOS `TranscriptSelectionAnchor`: one piece of reply text (a paragraph, a list item, a
- * code block, a table cell, a display formula) reporting where its characters are drawn, so the
- * list's [TranscriptReplySelection] can hit-test touches, place handles and the menu, and read
- * across every leaf of a reply as one selection.
+ * One piece of reply text (a paragraph, a list item, a code block, a table cell, a display formula)
+ * reporting where its characters are drawn, so the list's [TranscriptReplySelection] can hit-test
+ * touches, place handles and the menu, and read across every leaf of a reply as one selection.
  *
- * The leaf draws its own part of the highlight, under its glyphs (iOS draws the highlight under
- * the rows too), reading the selection only in the draw phase: changing the selection redraws the
- * selected leaves and recomposes nothing.
+ * The leaf draws its own part of the highlight, under its glyphs, reading the selection only in the
+ * draw phase: changing the selection redraws the selected leaves and recomposes nothing.
  *
  * [layout] is the text's layout; null for a leaf drawn as an image (typeset display math), which
  * is one drawn character covering its bounds.
@@ -127,7 +125,7 @@ internal class TranscriptSelectionAnchorNode(
         return own.localPositionOf(container, point)
     }
 
-    /** iOS `distance(to:)`: vertical distance counts four times a horizontal one. */
+    /** Vertical distance counts four times a horizontal one. */
     fun distance(point: Offset): Float {
         val result = textLayout()
         val own = coordinates ?: return Float.MAX_VALUE
@@ -153,7 +151,7 @@ internal class TranscriptSelectionAnchorNode(
         return dy * 4f + dx
     }
 
-    /** iOS `drawnOffset(at:)`: the caret nearest [point] on its nearest line. */
+    /** The caret nearest [point] on its nearest line. */
     fun drawnOffset(point: Offset): Int {
         val result = textLayout()
         if (result == null) {
@@ -178,8 +176,8 @@ internal class TranscriptSelectionAnchorNode(
     }
 
     /**
-     * iOS `caretRect(for:)` as a vertical segment (x, top..bottom) in this leaf's space. An end
-     * caret at a soft wrap sits at the end of the line before it, as the system's end handle does.
+     * The caret as a vertical segment (x, top..bottom) in this leaf's space. An end caret at a soft
+     * wrap sits at the end of the line before it, as the system's end handle does.
      */
     fun caret(drawn: Int, isEnd: Boolean): Rect? {
         val own = coordinates ?: return null
@@ -213,7 +211,7 @@ internal class TranscriptSelectionAnchorNode(
         return result.getPathForRange(start, end).getBounds()
     }
 
-    /** iOS clipping band: what of this leaf the reader can see (a code band clips it). */
+    /** What of this leaf the reader can see (a code band clips it). */
     fun visibleBounds(container: LayoutCoordinates): Rect? {
         val own = coordinates ?: return null
         if (!own.isAttached || !container.isAttached) return null

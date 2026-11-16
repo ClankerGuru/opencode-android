@@ -8,9 +8,8 @@ import ai.opencode.server.UrlErrorCode
  * error's domain and code (and the network error under it), and the
  * WebSocket close code and reason when the service sent them.
  *
- * Ported from iOS `RealtimeClient.swift`. On Android an exception has no `NSError`
- * domain/code: a network exception reads as `NSURLErrorDomain` with its iOS `URLError`
- * code ([UrlErrorCode.fromThrowable]); anything else as its class name with code 0.
+ * On Android an exception has no `NSError` domain/code: a network exception reads; anything else as
+ * its class name with code 0.
  */
 data class RealtimeTransportDiagnostic(
     val domain: String,
@@ -61,10 +60,7 @@ data class RealtimeTransportDiagnostic(
             closeReason?.trim()?.takeIf { it.isNotEmpty() },
         )
 
-        /**
-         * iOS `init(error:closeCode:closeReason:)`. A transport error that already carries
-         * a diagnostic (iOS `RealtimeClientError.sessionEnded/.transportLost`) returns it.
-         */
+        /** A transport error that already carries a diagnostic returns it. */
         fun of(error: Throwable, closeCode: Int = CLOSE_CODE_INVALID, closeReason: String? = null): RealtimeTransportDiagnostic {
             (error as? CarriesRealtimeTransportDiagnostic)?.transportDiagnostic?.let { return it }
             val (domain, code) = domainAndCode(error)
@@ -98,9 +94,8 @@ data class RealtimeTransportDiagnostic(
 }
 
 /**
- * Implemented by the Realtime transport's error (iOS `RealtimeClientError`) for its cases
- * that carry a diagnostic (`sessionEnded`, `transportLost`), so [RealtimeTransportDiagnostic.of]
- * returns it unchanged.
+ * Implemented by the Realtime transport's error for its cases that carry a diagnostic
+ * (`sessionEnded`, `transportLost`), so [RealtimeTransportDiagnostic.of] returns it unchanged.
  */
 interface CarriesRealtimeTransportDiagnostic {
     val transportDiagnostic: RealtimeTransportDiagnostic?

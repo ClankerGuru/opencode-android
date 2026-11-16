@@ -3,6 +3,7 @@ package ai.opencode.server
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.strings.localized
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -12,9 +13,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Android 17 blocks the local network until the app holds `ACCESS_LOCAL_NETWORK` (Nearby
- * devices); iOS asks on its own on the first LAN connection. The visible activity registers how
- * to ask while it's resumed, as for the microphone.
+ * Android 17 blocks the local network until the app holds `ACCESS_LOCAL_NETWORK` (Nearby devices).
+ * The visible activity registers how to ask while it's resumed, as for the microphone.
  */
 class LocalNetworkPermission(private val isGranted: () -> Boolean, val openSettings: () -> Unit) {
     private val lock = Any()
@@ -37,8 +37,7 @@ class LocalNetworkPermission(private val isGranted: () -> Boolean, val openSetti
 
     companion object Key : DependencyKey<LocalNetworkPermission> {
         const val PERMISSION = "android.permission.ACCESS_LOCAL_NETWORK"
-        const val DENIED_MESSAGE =
-            "OpenCode isn’t allowed to reach devices on your local network. Turn on Nearby devices for OpenCode in Settings, then try again."
+        val DENIED_MESSAGE: String get() = localized(R.string.server_local_network_denied)
 
         override val liveValue: LocalNetworkPermission by lazy {
             val context = dependency(AppContext).applicationContext

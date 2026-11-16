@@ -1,7 +1,9 @@
 package ai.opencode.server.live
 
+import ai.opencode.core.strings.localized
 import ai.opencode.server.ConnectionRoute
 import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.R
 import ai.opencode.server.internal.ElementSerializer
 import ai.opencode.server.internal.WireJson
 import ai.opencode.server.internal.bool
@@ -34,8 +36,8 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import java.util.Base64
 
-// Wire payloads (iOS `OpenCodeClient+Payloads.swift`). Synthesized `Decodable`s are
-// `@Serializable`; custom `init(from:)`s are JSON-element walkers with the same fallbacks.
+// Wire payloads. Synthesized `Decodable`s are `@Serializable`; custom `init(from:)`s are
+// JSON-element walkers with the same fallbacks.
 
 @Serializable
 internal data class DataPayload<T>(val data: T)
@@ -262,7 +264,7 @@ internal data class MessagesPayload(val data: List<MessagePayload>, val cursor: 
     }
 }
 
-/** A message, decoding only the fields its `type` carries (iOS `MessagePayload.init(from:)`). */
+/** A message, decoding only the fields its `type` carries. */
 internal data class MessagePayload(
     val id: String,
     val type: String,
@@ -413,7 +415,7 @@ internal data class FilePayload(
          */
         const val MAX_PLACEHOLDER_DATA_LENGTH = 4096
 
-        /** The last non-empty `/` component, as Swift's `split(separator: "/").last` (nil when empty). */
+        /** The last non-empty `/` component. */
         private fun cleanName(name: String?): String? = (name ?: "").split("/").lastOrNull { it.isNotEmpty() }
 
         /** Attached images: inline base64, `media:<hash>`, or the unavailable placeholder. Indices count every file. */
@@ -467,7 +469,7 @@ internal data class FilePayload(
                     val cleanName = (placeholder.name ?: "").split("/").last()
                     return@mapIndexedNotNull OpenCodeTranscriptFile(
                         id = "$messageID-file-inline-$index",
-                        name = cleanName.ifEmpty { "File" },
+                        name = cleanName.ifEmpty { localized(R.string.server_transcript_file_fallback) },
                         mime = placeholder.mime,
                         isUnavailable = true,
                     )
@@ -478,7 +480,7 @@ internal data class FilePayload(
                 val text = file.data?.let(::decodeBase64)?.let { PastedText.text(mime, it) }
                 OpenCodeTranscriptFile(
                     id = "$messageID-file-inline-$index",
-                    name = name.ifEmpty { if (text == null) "File" else PastedText.NAME },
+                    name = name.ifEmpty { if (text == null) localized(R.string.server_transcript_file_fallback) else PastedText.NAME },
                     mime = mime,
                     text = text,
                     mediaHash = file.mediaHash,
@@ -576,7 +578,7 @@ internal data class ToolContentPayload(
                 "text" -> ToolContentPayload(type, text = c.opt("text") { it.str() })
                 "file" -> {
                     val mime = c.opt("mime") { it.str() }
-                    if (mime?.lowercase()?.startsWith("image/") == true) {
+                    if (mime != null && (mime.startsWith("image/", ignoreCase = true) || mime.startsWith("video/", ignoreCase = true))) {
                         ToolContentPayload(
                             type,
                             mime = mime,
@@ -596,7 +598,7 @@ internal data class ToolContentPayload(
     }
 }
 
-// Capabilities (iOS `OpenCodeClient+Capabilities.swift`).
+// Capabilities.
 
 @Serializable
 internal data class LocatedPayload<T>(val location: Location? = null, val data: T) {

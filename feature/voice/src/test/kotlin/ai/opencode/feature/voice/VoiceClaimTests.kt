@@ -26,9 +26,8 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `VoiceClaimTests`. The voice agent saying it's acting without
- * a delegation, on a test clock: a loaded machine stretching the wait for
- * GPT-Live's own delegation can't make the call delegate a request twice.
+ * The voice agent saying it's acting without a delegation, on a test clock: a loaded machine
+ * stretching the wait for GPT-Live's own delegation can't make the call delegate a request twice.
  */
 class VoiceClaimTests {
     private fun obj(vararg pairs: Pair<String, RealtimeJSON>) = RealtimeJSONs.obj(*pairs)
@@ -48,9 +47,8 @@ class VoiceClaimTests {
     )
 
     /**
-     * Kit's call: GPT-Live said "Opening." to "Open code iOS" without
-     * delegating, and nothing happened. The call delegates the request itself,
-     * and its answer goes out without a delegation ID GPT-Live never made.
+     * The call delegates the request itself, and its answer goes out without a delegation ID
+     * GPT-Live never made.
      */
     @Test fun aClaimWithoutADelegationIsDelegatedByTheCall() = runTest {
         val call = claimCall()
@@ -116,10 +114,9 @@ class VoiceClaimTests {
     }
 
     /**
-     * Kit's call (Oct 15): "Checking." acknowledged a delegation GPT-Live had
-     * made, the user kept talking over it, and the call delegated "Checking."
-     * again, so GAME ENGINE got the request twice. Either order of the
-     * acknowledgement and the delegation event.
+     * "Checking." acknowledged a delegation GPT-Live had made, the user kept talking over it, and
+     * the call delegated "Checking." again, so GAME ENGINE got the request twice. Either order of
+     * the acknowledgement and the delegation event.
      */
     @Test fun anAcknowledgementTheUserTalksOverIsNotDelegatedAgain() {
         for (acknowledgedFirst in listOf(false, true)) anAcknowledgementTheUserTalksOverIsNotDelegatedAgain(acknowledgedFirst)
@@ -127,7 +124,7 @@ class VoiceClaimTests {
 
     private fun anAcknowledgementTheUserTalksOverIsNotDelegatedAgain(acknowledgedFirst: Boolean) = runTest {
         val call = claimCall()
-        // iOS's consumer task over `call.events`: every event so far.
+        // Every event so far.
         val received = { call.events.remaining() }
         call.userSays("Make Dark Shroud the default", from = 1_000, to = 1_800)
         call.advance(80)
@@ -355,9 +352,8 @@ class VoiceClaimTests {
     }
 
     /**
-     * Olive call regression (PR 8d): "Just to Olive" came from a past-call tail line
-     * ("And that text to Olive went through, delivered" / "Voice: No. Just to Olive."),
-     * which continuity stripping and mid-call retarget drop at the source so it is never replayed.
+     * A past call's tail line ("Voice: No. Just to Olive.") is dropped at the source by continuity
+     * stripping and mid-call retarget, so it's never replayed.
      */
     @Test fun oliveCallPastVoiceLinesAreNotReplayedAcrossCallsOrRetarget() {
         val shared = preserveSettings()
@@ -396,7 +392,7 @@ class VoiceClaimTests {
         assertFalse(VoiceInstructions.buildRetarget(activeCall.instructionsContext, engine = VoiceEngine.gptLive).contains("Olive"))
     }
 
-    /** Ordinary capitalised prepositional answers ("Only to Swift.", "Just to Settings.") must not trigger a verify. */
+    /** Ordinary capitalised prepositional answers must not trigger a verify. */
     @Test fun ordinaryCapitalisedPrepositionalAnswersDoNotTriggerVerify() = runTest {
         val call = claimCall()
         val socket = call.socket
@@ -428,7 +424,6 @@ class VoiceClaimTests {
         }
     }
 
-    /** Sol finding 2: an open delegation (e.g. cart work still running) must not skip the outcome check. */
     @Test fun openDelegationDoesNotSkipOutcomeCheck() = runTest {
         val call = claimCall()
         val socket = call.socket
@@ -463,7 +458,6 @@ class VoiceClaimTests {
         call.coordinator.end()
     }
 
-    /** Sol finding 4: newer user words during the delay cancel the verify, and `client_verify_N` never advances watermarks. */
     @Test fun outcomeVerifyCancelsOnNewerUserWordsAndPreservesWatermarks() = runTest {
         val call = claimCall()
         val socket = call.socket
@@ -498,7 +492,10 @@ class VoiceClaimTests {
         call.coordinator.end()
     }
 
-    /** Sol findings 1 & 4: session-delegator `VERIFIED` is consumed silently with no ReplyWatch `"finished: VERIFIED"` notice and leaves `state.tail` untouched. */
+    /**
+     * The session delegator's `VERIFIED` settles with no ReplyWatch `"finished: VERIFIED"` notice
+     * and leaves `state.tail` untouched.
+     */
     @Test fun sessionDelegatorVerifiedSettlesSilentlyAndPreservesTailWatermark() = runBlocking<Unit> {
         val shared = preserveSettings()
         val now = Instant.ofEpochSecond(10_000)

@@ -3,7 +3,7 @@ package ai.opencode.feature.composer
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionTunables
 
-/** Parameters snapshot read by [AutocompleteSimulation] (iOS `AutocompleteParameters`). */
+/** Parameters snapshot read by [AutocompleteSimulation]. */
 data class AutocompleteParameters(
     val order: AutocompleteOrder = AutocompleteOrder.Bottom,
     val exitMode: AutocompleteExitMode = AutocompleteExitMode.Collapse,
@@ -56,7 +56,7 @@ data class AutocompleteParameters(
     val cornerRadius: Double = 28.0,
 ) {
     companion object {
-        /** iOS `AutocompleteParameters.current(reducedMotion:)`: the roles' timing and the tunables' values. */
+        /** The roles' timing and the tunables' values. */
         fun current(reducedMotion: Boolean = false): AutocompleteParameters = with(ComposerAutocompleteTunables) {
             AutocompleteParameters(
                 order = order,

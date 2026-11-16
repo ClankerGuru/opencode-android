@@ -27,7 +27,6 @@ import kotlinx.serialization.json.Json
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
-/** Port of iOS `ModelDisplayNameTests.swift` (p230). */
 class ModelDisplayNameTests {
     private val server = testServer
     private val model = OpenCodeModel(
@@ -35,7 +34,6 @@ class ModelDisplayNameTests {
         variants = listOf("medium", "high"),
     )
 
-    /** iOS `AsyncStream.makeStream()` feeding a `modelCatalog` read. */
     private suspend fun <T> Channel<T>.next(): T = receiveCatching().getOrNull() ?: throw OpenCodeClientError("Closed")
 
     @Test

@@ -1,14 +1,14 @@
 package ai.opencode.server
 
 import ai.opencode.core.sharing.shared
+import ai.opencode.core.strings.localized
 import ai.opencode.server.internal.UrlParts
 
 /**
- * Port of iOS `OpenCodeServer.friendlyName` (`OpenCode/Drawer/ServerSwitcher.swift`), moved down
- * to `:server` because App and Drawer both name servers with it. A name to show, never an
- * address: the user's name, else the machine's from a tailnet or Bonjour address, else the address
- * in use when it's a name ("my-mac" → "My Mac"). An IP the server hasn't named reads as "Server"
- * and its last part, as a last resort.
+ * Moved down to `:server` because App and Drawer both name servers with it. A name to show, never
+ * an address: the user's name, else the machine's from a tailnet or Bonjour address, else the
+ * address in use when it's a name ("my-mac" → "My Mac"). An IP the server hasn't named reads as
+ * "Server" and its last part, as a last resort.
  */
 val OpenCodeServer.friendlyName: String
     get() = friendlyName(among = shared(ServerSharedKeys.savedServers).value)
@@ -16,7 +16,7 @@ val OpenCodeServer.friendlyName: String
 /**
  * [friendlyName] among [among] (the saved servers): an unnamed server whose name another saved
  * server also reads, on another port, gets its port (“Server 2 · 4197”), so two servers on one
- * machine can be told apart. Android divergence (QA D-02): iOS names both alike.
+ * machine can be told apart.
  */
 fun OpenCodeServer.friendlyName(among: List<OpenCodeServer>): String {
     val base = baseFriendlyName
@@ -65,13 +65,13 @@ fun friendlyServerName(address: String): String {
     var host = (parsed ?: trimmed).trim('[', ']')
     host.indexOf('%').takeIf { it >= 0 }?.let { host = host.substring(0, it) }
     if (host.contains(":")) {
-        // Swift's `split` drops empty pieces: `fe80::` ends in "fe80".
+        // `fe80::` ends in "fe80".
         val last = host.split(":").lastOrNull { it.isNotEmpty() }.orEmpty()
-        return if (last.isEmpty()) "Server" else "Server $last"
+        return if (last.isEmpty()) localized(R.string.server_friendly_name_fallback) else localized(R.string.server_friendly_name_numbered, last)
     }
     val labels = host.split(".").filter { it.isNotEmpty() }
-    if (labels.size == 4 && labels.all { label -> label.all(Char::isDigit) }) return "Server ${labels[3]}"
-    val first = labels.firstOrNull()?.takeIf { it.isNotEmpty() } ?: return "Server"
+    if (labels.size == 4 && labels.all { label -> label.all(Char::isDigit) }) return localized(R.string.server_friendly_name_numbered, labels[3])
+    val first = labels.firstOrNull()?.takeIf { it.isNotEmpty() } ?: return localized(R.string.server_friendly_name_fallback)
     return first.split('-', '_').filter { it.isNotEmpty() }
         .joinToString(" ") { it.substring(0, 1).uppercase() + it.substring(1) }
 }

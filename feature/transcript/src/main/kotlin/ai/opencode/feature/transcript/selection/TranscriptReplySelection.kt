@@ -1,5 +1,6 @@
 package ai.opencode.feature.transcript.selection
 
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.markdown.MarkdownQuote
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -39,14 +40,15 @@ import androidx.compose.ui.node.currentValueOf
 import androidx.compose.ui.node.invalidateDraw
 import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.abs
 
 /**
- * Port of iOS `TranscriptReplySelectionView`: one selection across every paragraph, list item,
- * table cell, formula and code block of one reply, owned by the transcript list (a reply spans
- * several list rows, so no single text view can hold it).
+ * One selection across every paragraph, list item, table cell, formula and code block of one reply,
+ * owned by the transcript list (a reply spans several list rows, so no single text view can hold
+ * it).
  *
  * The leaves register as [TranscriptSelectionAnchorNode]s and draw their own highlight; this
  * holds the selection as (leaf, offset) ends, so it survives the reply's document being rebuilt
@@ -57,7 +59,7 @@ import kotlin.math.abs
  */
 @Stable
 class TranscriptReplySelection {
-    /** What the list supplies (iOS `TranscriptListViewController+TextSelection`). */
+    /** What the list supplies. */
     interface Host {
         /** The visible band of the list, in its own space: below the header, above the composer and keyboard (px). */
         val visibleTop: Float
@@ -225,7 +227,7 @@ class TranscriptReplySelection {
         if (was != now) host?.activeChanged(now, byReader)
     }
 
-    /** iOS `clearSelection`: ends the magnifier, any drag and the menu too. */
+    /** Ends the magnifier, any drag and the menu too. */
     fun clear(byReader: Boolean = false) {
         // The list's first configuration clears before the saved selection is put back.
         if (restoreAttempted) pending = null
@@ -254,8 +256,8 @@ class TranscriptReplySelection {
     }
 
     /**
-     * The reply's text changed (iOS `refreshReplySelection`): rebuild its document and keep the
-     * selection on the same leaves, or drop it when they're gone.
+     * The reply's text changed: rebuild its document and keep the selection on the same leaves, or
+     * drop it when they're gone.
      */
     fun refresh() {
         val ends = ends ?: return
@@ -278,9 +280,9 @@ class TranscriptReplySelection {
     }
 
     /**
-     * Puts back the selection [Saver] kept across the activity being recreated (iOS keeps it
-     * through a trait change), once the list has its reply; dropped if its leaves are gone, or
-     * once the reader selects, sends or jumps first. Called after each list update.
+     * Puts back the selection [Saver] kept across the activity being recreated, once the list has
+     * its reply; dropped if its leaves are gone, or once the reader selects, sends or jumps first.
+     * Called after each list update.
      */
     fun restorePending() {
         restoreAttempted = true
@@ -308,7 +310,7 @@ class TranscriptReplySelection {
 
     // MARK: Hit testing
 
-    /** iOS `hit(at:)`: the reply text nearest [point] within reach. */
+    /** The reply text nearest [point] within reach. */
     fun hit(point: Offset): Hit? {
         val container = container ?: return null
         var best: TranscriptSelectionAnchorNode? = null
@@ -337,8 +339,8 @@ class TranscriptReplySelection {
     }
 
     /**
-     * iOS `holdSelects(at:)`: a hold at [point] (in the list) selects reply text. Code and
-     * formula drag sources ask this first, so their lift can't take a hold that selects.
+     * A hold at [point] (in the list) selects reply text. Code and formula drag sources ask this
+     * first, so their lift can't take a hold that selects.
      */
     fun holdSelects(point: Offset): Boolean {
         val host = host ?: return false
@@ -408,7 +410,7 @@ class TranscriptReplySelection {
 
     // MARK: Drags
 
-    /** A hold on a word (iOS `beginSweep`): selects it and sweeps as the finger moves. */
+    /** A hold on a word: selects it and sweeps as the finger moves. */
     fun beginSweep(hit: Hit, point: Offset): Boolean {
         adopt(hit.document)
         val document = document ?: return false
@@ -426,7 +428,7 @@ class TranscriptReplySelection {
         return true
     }
 
-    /** A double tap (iOS `selectWord`): the word under it, with the menu. */
+    /** A double tap: the word under it, with the menu. */
     fun selectWord(hit: Hit) {
         adopt(hit.document)
         val document = document ?: return
@@ -445,7 +447,7 @@ class TranscriptReplySelection {
         isDragging = true
         menuWanted = false
         movesEnd = handle.isEnd
-        // A touch on a handle shows no magnifier; it comes with the first move (iOS).
+        // A touch on a handle shows no magnifier; it comes with the first move.
         hasMoved = false
         finger = point
     }
@@ -541,10 +543,7 @@ class TranscriptReplySelection {
         return Offset(x, caret.bottom + radius)
     }
 
-    /**
-     * The selection's visible bounds for the menu (iOS: above what's seen of it; when it covers
-     * most of the list, at the moved end's caret, else in the middle).
-     */
+    /** The selection's visible bounds for the menu. */
     internal fun menuBounds(): Rect? {
         val ends = ends ?: return null
         val document = document ?: return null
@@ -582,9 +581,9 @@ class TranscriptReplySelection {
 
     companion object {
         /**
-         * For the list's `rememberSaveable`: the selected ends (and whether the menu was up) outlive
-         * the activity being recreated, where iOS's selection view only redraws. A drag in
-         * progress, the magnifier and the document are rebuilt, not saved.
+         * For the list's `rememberSaveable`: the selected ends (and whether the menu was up)
+         * outlive the activity being recreated. A drag in progress, the magnifier and the document
+         * are rebuilt, not saved.
          */
         val Saver: Saver<TranscriptReplySelection, List<Any>> = Saver(
             save = { selection ->
@@ -602,19 +601,18 @@ class TranscriptReplySelection {
             },
         )
 
-        /** iOS `Hit.reach`: how far from text a hold or double tap still lands (vertical counts 4×). */
+        /** How far from text a hold or double tap still lands (vertical counts 4×). */
         const val HIT_REACH = 12f
 
-        /** iOS `BackSwipeRules.selectionHandleReach`. */
         const val HANDLE_REACH = 24f
 
         /** Material's selection handle: a 25 dp drop, as Compose draws it. */
         const val HANDLE_RADIUS = 12.5f
 
-        /** iOS: a hold selects after 0.4 s. */
+        /** A hold selects after 0.4 s. */
         const val HOLD_MILLIS = 400L
 
-        /** iOS: a selection taller than 60% of the visible list puts the menu at a caret. */
+        /** A selection taller than 60% of the visible list puts the menu at a caret. */
         const val TALL_SELECTION = 0.6f
     }
 }
@@ -687,11 +685,10 @@ internal class TranscriptReplySelectionOverlayNode(private var selection: Transc
 // MARK: Gestures
 
 /**
- * iOS `TranscriptListViewController+TextSelection` gestures, seen before the list's own: a hold
- * (0.4 s) on reply text selects its word and sweeps as the finger moves; a double tap selects a
- * word with the menu; a touch on a handle drags it; a tap elsewhere clears the selection (and
- * still reaches what it tapped). A touch under the header, or one that catches the list coasting,
- * only does what it would have done.
+ * A hold (0.4 s) on reply text selects its word and sweeps as the finger moves; a double tap
+ * selects a word with the menu; a touch on a handle drags it; a tap elsewhere clears the selection
+ * (and still reaches what it tapped). A touch under the header, or one that catches the list
+ * coasting, only does what it would have done.
  */
 internal fun Modifier.transcriptReplySelectionGestures(selection: TranscriptReplySelection): Modifier =
     pointerInput(selection) {
@@ -775,9 +772,9 @@ private suspend fun AwaitPointerEventScope.awaitLiftOrMove(id: PointerId, start:
 // MARK: Menu
 
 /**
- * The selection's menu (iOS `editMenuInteraction`): Copy, Quote and Select All in the platform's
- * floating text toolbar, above what's seen of the selection. Hidden while anything drags or the
- * list moves; shown again when it settles.
+ * The selection's menu: Copy, Quote and Select All in the platform's floating text toolbar, above
+ * what's seen of the selection. Hidden while anything drags or the list moves; shown again when it
+ * settles.
  */
 @Composable
 internal fun TranscriptReplySelectionMenu(
@@ -790,10 +787,11 @@ internal fun TranscriptReplySelectionMenu(
     val resources = LocalContext.current.resources
     val copyLabel = resources.getString(android.R.string.copy)
     val selectAllLabel = resources.getString(android.R.string.selectAll)
+    val quoteLabel = stringResource(R.string.transcript_quote)
     val currentCopy by rememberUpdatedState(onCopy)
     val currentQuote by rememberUpdatedState(onQuote)
     val currentIsScrolling by rememberUpdatedState(isScrolling)
-    val data = remember(selection, copyLabel, selectAllLabel) {
+    val data = remember(selection, copyLabel, selectAllLabel, quoteLabel) {
         object : TextContextMenuDataProvider {
             override fun position(destinationCoordinates: LayoutCoordinates): Offset {
                 val bounds = contentBounds(destinationCoordinates)
@@ -818,7 +816,7 @@ internal fun TranscriptReplySelectionMenu(
                 }
                 val quoted = selection.quotedText()
                 if (quoted != null && MarkdownQuote.blockquote(quoted) != null) {
-                    items += TextContextMenuItem(key = QuoteKey, label = "Quote") {
+                    items += TextContextMenuItem(key = QuoteKey, label = quoteLabel) {
                         selection.clear()
                         close()
                         currentQuote(quoted)

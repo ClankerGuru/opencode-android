@@ -1,8 +1,10 @@
 package ai.opencode.server.live
 
 import ai.opencode.core.diagnostics.LabMarks
+import ai.opencode.core.strings.localized
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.R
 import ai.opencode.server.TaskLocal
 import ai.opencode.server.internal.WireJson
 import ai.opencode.server.internal.bool
@@ -22,6 +24,7 @@ import ai.opencode.server.model.OpenCodePromptPresentation
 import ai.opencode.server.model.OpenCodePromptSource
 import ai.opencode.server.model.OpenCodeRunError
 import ai.opencode.server.model.OpenCodeRunRetry
+import ai.opencode.server.model.OpenCodeToolBounds
 import ai.opencode.server.model.OpenCodeToolCall
 import ai.opencode.server.model.OpenCodeTranscriptFile
 import ai.opencode.server.model.OpenCodeTranscriptItem
@@ -93,7 +96,7 @@ internal suspend fun requestHistoryPage(server: OpenCodeServer, sessionID: Strin
     return page
 }
 
-/** Records the page's context and cursor for an enclosing [TranscriptContextCapture], as iOS does. */
+/** Records the page's context and cursor for an enclosing [TranscriptContextCapture]. */
 fun decodeTranscript(data: ByteArray): List<OpenCodeTranscriptItem> =
     decodeTranscriptPage(data, TranscriptContextCapture.current.currentBlocking()).items
 
@@ -192,7 +195,7 @@ internal class ParsedMessageCache {
 private fun runErrorText(error: ErrorPayload): String {
     // Provider errors embed raw JSON; keep only the human-readable prefix.
     val raw = error.message ?: ""
-    // Swift's `split(separator:)` drops empty pieces: the first non-empty one.
+    // The first non-empty one.
     val human = raw.split("{").firstOrNull { it.isNotEmpty() }?.trim(' ', ':') ?: raw
     val kind = error.type ?: "error"
     return if (human.isEmpty()) "Run failed: $kind" else "Run failed: $kind — $human"
@@ -213,8 +216,10 @@ internal fun transcriptItems(message: MessagePayload): List<OpenCodeTranscriptIt
         } + inlineFiles
         if (files.isNotEmpty()) items += OpenCodeTranscriptItem.UserFiles("${message.id}-files", files)
         val text = OpenCodePromptPresentation.displayText(message.text ?: "", references, message.metadata)
-        text.trimmedWhitespace().nonEmpty?.let {
-            items += OpenCodeTranscriptItem.UserText(message.id, it, OpenCodePromptSource.of(message.text, message.metadata))
+        val quotes = OpenCodePromptPresentation.quotes(message.metadata)
+        val shown = text.trimmedWhitespace()
+        if (shown.isNotEmpty() || quotes.isNotEmpty()) {
+            items += OpenCodeTranscriptItem.UserText(message.id, shown, OpenCodePromptSource.of(message.text, message.metadata), quotes)
         }
         items
     }
@@ -240,13 +245,12 @@ internal fun transcriptItems(message: MessagePayload): List<OpenCodeTranscriptIt
                             name = part.name ?: "tool",
                             status = OpenCodeToolCall.Status.tool(state?.status),
                             input = (state?.input ?: OpenCodeJSONValue.Null).bounded(),
-                            output = state?.content?.mapNotNull { if (it.type == "text") it.text?.bounded(20_000) else null } ?: emptyList(),
+                            output = OpenCodeToolBounds.output(state?.content?.mapNotNull { if (it.type == "text") it.text else null } ?: emptyList()),
                             error = state?.error?.message,
                             errorType = state?.error?.type,
-                            metadata = state?.metadata?.let { meta ->
-                                if (meta.values.any { it.needsBounding(20_000, 100) }) meta.mapValues { it.value.bounded() } else meta
-                            } ?: emptyMap(),
+                            metadata = state?.metadata?.let(OpenCodeToolBounds::metadata) ?: emptyMap(),
                             images = toolImages(state?.content, partID),
+                            videos = toolVideos(state?.content, partID),
                             startedAt = (part.time?.ran ?: part.time?.created)?.let(::instantFromMillis),
                             completedAt = part.time?.completed?.let(::instantFromMillis),
                         ),
@@ -277,8 +281,8 @@ internal fun transcriptItems(message: MessagePayload): List<OpenCodeTranscriptIt
                 status = OpenCodeToolCall.Status.shell(message.status, message.exit),
                 input = OpenCodeJSONValue.Object(mapOf("command" to OpenCodeJSONValue.Str(message.command ?: ""))),
                 output = listOfNotNull(message.output?.output?.bounded(20_000)),
-                error = if (message.status == "killed") "Shell was killed"
-                else message.exit?.let { if (it == 0) null else "Command exited with code $it" },
+                error = if (message.status == "killed") localized(R.string.server_tool_shell_killed)
+                else message.exit?.let { if (it == 0) null else localized(R.string.server_tool_shell_exit_code, it) },
                 metadata = message.exit?.let { mapOf("exit" to OpenCodeJSONValue.Number(it.toDouble())) } ?: emptyMap(),
             ),
         ),
@@ -318,6 +322,14 @@ internal fun transcriptItems(message: MessagePayload): List<OpenCodeTranscriptIt
 
     else -> emptyList()
 }
+
+private fun toolVideos(content: List<ToolContentPayload>?, idPrefix: String): List<OpenCodeTranscriptFile>? =
+    content?.mapIndexedNotNull { index, part ->
+        val mime = part.mime ?: return@mapIndexedNotNull null
+        if (part.type != "file" || !mime.startsWith("video/", ignoreCase = true)) return@mapIndexedNotNull null
+        val hash = OpenCodeMediaReference.hash(part.uri) ?: return@mapIndexedNotNull null
+        OpenCodeTranscriptFile(id = "$idPrefix-video-$index", name = part.name ?: "Video", mime = mime, mediaHash = hash, byteCount = part.bytes)
+    }?.ifEmpty { null }
 
 /**
  * Tool results encode screenshots as `file` blocks with data-URI sources, decoded at the
@@ -430,9 +442,8 @@ fun assistantReply(data: ByteArray, afterMessageID: String, acrossSteers: Boolea
 }
 
 /**
- * Whether [text] is a prompt the voice delegator wrote (iOS `VoiceHandoff.parse(text) != nil`):
- * the header line, then a JSON body with a non-empty `instruction`, optionally followed by
- * `Attached file:` lines.
+ * Whether [text] is a prompt the voice delegator wrote: the header line, then a JSON body with a
+ * non-empty `instruction`, optionally followed by `Attached file:` lines.
  */
 internal fun isVoiceDelegation(text: String): Boolean {
     if (!text.startsWith("Voice delegation.") && !text.startsWith("Voice delegation (continued).")) return false
@@ -571,6 +582,6 @@ internal fun syntheticNotice(id: String, description: String?, metadata: Map<Str
             },
         )
     }
-    val label = kind?.heading(metadata?.get("agent")?.string) ?: "Session update"
+    val label = kind?.heading(metadata?.get("agent")?.string) ?: localized(R.string.server_notice_session_update)
     return OpenCodeTranscriptItem.Notice(id, "$label · $text", isError = failed, kind = kind)
 }

@@ -14,11 +14,6 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `NewMessagesReceiptTests`, the `:server` half: this phone's own read receipts
- * (`POST /view`) and the `session.viewed` echo the event stream drops. The three tests that drive
- * `HomeFeature` live in `:feature:drawer`.
- */
 class NewMessagesReceiptTests {
     @get:Rule val isolation = TestIsolationRule()
 

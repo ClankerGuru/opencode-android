@@ -1,15 +1,16 @@
 package ai.opencode.feature.system.intents
 
 import ai.opencode.core.log.SystemActionOrigin
+import ai.opencode.core.strings.localized
+import ai.opencode.feature.system.R
 import ai.opencode.feature.system.SystemAction
 import ai.opencode.feature.system.SessionDirectory
 /**
- * Port of iOS `ControlIntents.swift`: Control Center and Lock Screen controls → Android Quick
- * Settings tiles and home-screen widgets. Each tap opens the app through
- * [SystemActionActivity], which runs [perform] and posts a [SystemAction]. Start Call and Open
- * Session are set up for a session (the widget's Choose Session; a tile is Last Viewed
- * Session). Their buttons carry only the choice's ID, so a tap never reads the directory:
- * the app's router resolves it.
+ * Control Center and Lock Screen controls → Android Quick Settings tiles and home-screen widgets.
+ * Each tap opens the app through [SystemActionActivity], which runs [perform] and posts a
+ * [SystemAction]. Start Call and Open Session are set up for a session (the widget's Choose
+ * Session; a tile is Last Viewed Session). Their buttons carry only the choice's ID, so a tap never
+ * reads the directory: the app's router resolves it.
  */
 object OpenCodeControlKind {
     const val START_CALL = "ai.opencode.mobilecode.control.start-call"
@@ -39,7 +40,7 @@ fun SystemAction.Companion.controlTarget(id: String?, startsCall: Boolean): Syst
     return chosen ?: SystemAction(destination = SystemAction.Destination.LastViewed, startsCall = startsCall)
 }
 
-/** Port of iOS `SessionControlValue`: what a session control shows, its choice's name as it reads today. */
+/** What a session control shows, its choice's name as it reads today. */
 data class SessionControlValue(
     /** The choice's [SessionEntity] ID; null is Last Viewed Session. */
     val targetID: String?,
@@ -57,11 +58,11 @@ data class SessionControlValue(
         fun of(entity: SessionEntity?, directory: SessionDirectory): SessionControlValue {
             val current = entity?.let { directory.sessionEntities(listOf(it.id)).firstOrNull() }
             return when (entity?.id) {
-                null, SessionEntity.LAST_VIEWED_ID -> SessionControlValue(entity?.id, "Last Viewed Session", null)
-                SessionEntity.NEW_SESSION_ID -> SessionControlValue(entity.id, "New Session", null)
+                null, SessionEntity.LAST_VIEWED_ID -> SessionControlValue(entity?.id, localized(R.string.system_last_viewed_session), null)
+                SessionEntity.NEW_SESSION_ID -> SessionControlValue(entity.id, localized(R.string.system_new_session), null)
                 else -> {
                     val title = current?.title ?: entity.title
-                    SessionControlValue(entity.id, title.ifEmpty { "Session" }, current?.detail ?: entity.detail)
+                    SessionControlValue(entity.id, title.ifEmpty { localized(R.string.system_quick_action_session_fallback) }, current?.detail ?: entity.detail)
                 }
             }
         }

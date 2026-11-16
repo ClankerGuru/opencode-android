@@ -36,7 +36,6 @@ import org.junit.Test
 import java.time.Instant
 import kotlin.time.Duration.Companion.seconds
 
-/** Port of `VoiceSessionDelegatorEdgeTests.swift` (an extension of iOS `VoiceSessionDelegatorTests`). */
 class VoiceSessionDelegatorEdgeTests {
     private fun functionCall(callID: String) = VoiceFeature.Action.CallEvent(
         VoiceCallEvent.FunctionCall(callID = callID, name = "delegate", arguments = JsonObject(emptyMap())),
@@ -489,7 +488,6 @@ class VoiceSessionDelegatorEdgeTests {
             ),
             timeout = 5.seconds,
         ) {
-            // iOS also writes `$voiceDelegatorSessionIDs` here; that shared value is asserted below.
             it.copy(
                 sessionDelegator = it.sessionDelegator.copy(
                     turns = it.sessionDelegator.turns.map { turn ->
@@ -606,7 +604,7 @@ class VoiceSessionDelegatorEdgeTests {
         assertEquals(ReplyWatch.Outcome.Replied("Turn reply arrived."), watch.value.deferredNotices.firstOrNull()?.outcome)
     }
 
-    /** iOS: a turn in `ses_voice` waiting on [promptID], the call in [phase]. */
+    /** A turn in `ses_voice` waiting on [promptID], the call in [phase]. */
     private fun waitingTurnState(
         shared: VoiceTestShared,
         phase: VoiceFeature.State.Phase,

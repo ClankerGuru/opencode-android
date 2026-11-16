@@ -15,12 +15,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
 /**
- * iOS `HomeNotificationsFeature.NotifyPluginCheck`, as Settings shows it: Home reads the server's
- * notify plugin and passes the result in [SettingsFeature.Action.NotificationsChanged].
+ * As Settings shows it: Home reads the server's notify plugin and passes the result in
+ * [SettingsFeature.Action.NotificationsChanged].
  */
 sealed interface NotifyPluginCheck {
     data object Checking : NotifyPluginCheck
@@ -29,9 +30,8 @@ sealed interface NotifyPluginCheck {
 }
 
 /**
- * Port of iOS `Settings/NotificationSettingsView.swift`: Settings → Notifications, this phone's
- * permission, whether the server runs the notify plugin (with Set Up with OpenCode to have
- * OpenCode install it, 7969c85c), and the In-App Notices picker.
+ * Settings → Notifications, this phone's permission, whether the server runs the notify plugin
+ * (with Set Up with OpenCode to have OpenCode install it), and the In-App Notices picker.
  */
 @Composable
 fun NotificationSettingsView(store: SettingsStore) {
@@ -46,25 +46,31 @@ fun NotificationSettingsView(store: SettingsStore) {
         store.send(SettingsFeature.Action.Delegate(SettingsFeature.SettingsDelegate.NotifyPluginCheckRequested))
     }
     val enabled = permission == NotificationPermission.Enabled
+    val permissionHeader = stringResource(R.string.settings_notifications_device_header, ThisDeviceName)
+    val permissionFooter = stringResource(R.string.settings_notifications_device_footer, ThisDeviceName)
+    val serverHeader = stringResource(R.string.settings_notifications_server_header)
+    val setUpFooter = stringResource(R.string.settings_notifications_set_up_footer)
+    val pluginNeededFooter = stringResource(R.string.settings_notifications_plugin_needed_footer)
+    val inAppFooter = stringResource(R.string.settings_notifications_in_app_footer)
 
-    SettingsPageScaffold(title = "Notifications", store = store) {
+    SettingsPageScaffold(title = stringResource(R.string.settings_notifications_title), store = store) {
         settingsSection(
             key = "permission",
-            header = "This $ThisDeviceName",
+            header = permissionHeader,
             footer = if (permission == NotificationPermission.Disabled) {
                 null
             } else {
-                footerText("Notifications go through a relay that stores nothing. Only sessions started on this $ThisDeviceName notify it.")
+                footerText(permissionFooter)
             },
         ) {
             SettingsRowFrame(Modifier.semantics(mergeDescendants = true) {}) {
-                Text("Allow Notifications", style = SettingsText.title, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
-                Text(if (enabled) "On" else "Off", style = SettingsText.title, color = OpenCodeTheme.colors.secondaryText)
+                Text(stringResource(R.string.settings_notifications_allow), style = SettingsText.title, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
+                Text(if (enabled) stringResource(R.string.settings_value_on) else stringResource(R.string.settings_value_off), style = SettingsText.title, color = OpenCodeTheme.colors.secondaryText)
             }
             if (!enabled) {
                 SettingsDivider()
                 SettingsButtonRow(
-                    if (permission == NotificationPermission.Disabled) "Open Android Settings" else "Turn On Notifications",
+                    if (permission == NotificationPermission.Disabled) stringResource(R.string.settings_notifications_open_android_settings) else stringResource(R.string.settings_notifications_turn_on),
                     onClick = {
                         store.send(SettingsFeature.Action.Delegate(SettingsFeature.SettingsDelegate.EnableNotificationsTapped))
                     },
@@ -82,34 +88,34 @@ fun NotificationSettingsView(store: SettingsStore) {
             notifyPlugin == NotifyPluginCheck.Checked(OpenCodeNotifyPluginStatus.Inactive)
         settingsSection(
             key = "server",
-            header = "Server",
+            header = serverHeader,
             footer = when {
-                canSetUp -> footerText("Opens a session that asks OpenCode to install the plugin. Send it, then check again.")
+                canSetUp -> footerText(setUpFooter)
                 notifyPlugin == NotifyPluginCheck.Checked(OpenCodeNotifyPluginStatus.Active) -> null
-                else -> footerText("The server needs the OpenCode notify plugin.")
+                else -> footerText(pluginNeededFooter)
             },
         ) {
             SettingsRowFrame(Modifier.semantics(mergeDescendants = true) {}) {
-                Text("Notify Plugin", style = SettingsText.title, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.settings_notifications_notify_plugin), style = SettingsText.title, color = OpenCodeTheme.colors.text, modifier = Modifier.weight(1f))
                 when (val check = notifyPlugin) {
                     NotifyPluginCheck.Checking, null -> CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                     is NotifyPluginCheck.Checked -> Text(
                         when (check.status) {
-                            OpenCodeNotifyPluginStatus.Active -> "Installed"
-                            OpenCodeNotifyPluginStatus.Inactive -> "Not running"
-                            OpenCodeNotifyPluginStatus.Missing -> "Not installed"
+                            OpenCodeNotifyPluginStatus.Active -> stringResource(R.string.settings_notifications_plugin_installed)
+                            OpenCodeNotifyPluginStatus.Inactive -> stringResource(R.string.settings_notifications_plugin_not_running)
+                            OpenCodeNotifyPluginStatus.Missing -> stringResource(R.string.settings_notifications_plugin_not_installed)
                         },
                         style = SettingsText.title,
                         color = OpenCodeTheme.colors.secondaryText,
                     )
                     NotifyPluginCheck.Failed ->
-                        Text("Couldn’t check status", style = SettingsText.title, color = OpenCodeTheme.colors.secondaryText)
+                        Text(stringResource(R.string.settings_notifications_plugin_check_failed), style = SettingsText.title, color = OpenCodeTheme.colors.secondaryText)
                 }
             }
             if (canSetUp) {
                 SettingsDivider()
                 SettingsButtonRow(
-                    "Set Up with OpenCode",
+                    stringResource(R.string.settings_notifications_set_up),
                     onClick = {
                         store.send(SettingsFeature.Action.Delegate(SettingsFeature.SettingsDelegate.NotifyPluginSetUpTapped))
                     },
@@ -118,7 +124,7 @@ fun NotificationSettingsView(store: SettingsStore) {
             }
             SettingsDivider()
             SettingsButtonRow(
-                "Check Again",
+                stringResource(R.string.settings_notifications_check_again),
                 onClick = {
                     store.send(SettingsFeature.Action.Delegate(SettingsFeature.SettingsDelegate.NotifyPluginCheckRequested))
                 },
@@ -127,10 +133,10 @@ fun NotificationSettingsView(store: SettingsStore) {
         }
         settingsSection(
             key = "in-app",
-            footer = footerText("Shown on the drawer button."),
+            footer = footerText(inAppFooter),
         ) {
             SettingsMenuRow(
-                title = "In-App Notices",
+                title = stringResource(R.string.settings_notifications_in_app_notices),
                 value = noticeMode.title,
                 selection = noticeMode,
                 options = InAppNoticeMode.entries.map { SettingsMenuOption(it, it.title) },
@@ -140,5 +146,5 @@ fun NotificationSettingsView(store: SettingsStore) {
     }
 }
 
-/** iOS `ThisDevice.name` (“iPhone”/“iPad”): “phone” or “tablet”. */
+/** “phone” or “tablet”. */
 val ThisDeviceName: String get() = ai.opencode.core.ui.ThisDevice.name

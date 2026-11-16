@@ -30,7 +30,6 @@ import org.junit.Rule
 import org.junit.Test
 import kotlin.time.Duration.Companion.seconds
 
-/** Port of iOS `InboxSidebarTests` (`OpenCodeTests/InboxSidebarTests.swift`). */
 class InboxSidebarTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -47,7 +46,7 @@ class InboxSidebarTests {
         archivedMilliseconds = archived,
     )
 
-    /** iOS builds the blocks directly (a code block, then a paragraph); here they come from Markdown. */
+    /** They come from Markdown. */
     private fun reply(text: String) = OpenCodeTranscriptItem.AssistantMarkdown(id = "reply", text = "```\nx\n```\n\n$text")
 
     private fun state(): HomeFeature.State {

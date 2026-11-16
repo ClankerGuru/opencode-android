@@ -28,12 +28,8 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of the raise-detector half of iOS `RaiseToTalkTests.swift` ([RaiseToEarDetector] and the
- * call audio's at-ear start). Its `SessionFeature` tests are ported in `:feature:session`; the
- * audio-routing half (`RaiseToTalkTests+Routing.swift`) is [RaiseToTalkRoutingTests].
- *
- * The detector runs its dwell on the main dispatcher (iOS `@MainActor`); here that is
- * [Dispatchers.Unconfined], so a [TestClock.advance] runs the woken dwell inline.
+ * The detector runs its dwell on the main dispatcher; here that is [Dispatchers.Unconfined], so a
+ * [TestClock.advance] runs the woken dwell inline.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RaiseToTalkTests {
@@ -334,8 +330,8 @@ class RaiseToTalkTests {
     }
 
     /**
-     * iOS's `do { }` scope. Its own `runBlocking`, so no spilled local of the test's coroutine
-     * still holds the detector once it returns.
+     * Its own `runBlocking`, so no spilled local of the test's coroutine still holds the detector
+     * once it returns.
      */
     private fun raiseAndLowerReleasedDetector(clock: TestClock): WeakReference<RaiseToEarDetector> = runBlocking {
         val detector = RaiseToEarDetector(clock = clock, heldUp = { true }, onNote = {})
@@ -365,11 +361,10 @@ class RaiseToTalkTests {
     }
 
     /**
-     * iOS checks the `AVAudioSession` calls: `.playAndRecord`, active, then the `.none` port
-     * override before any playback. Android's seam activates and routes in one step
-     * ([VoiceAudioSessionControlling.activate] then [VoiceAudioSessionControlling.route]); the
-     * call's playback belongs to the external (WebRTC) owner, so the order checked is
-     * activation → route to the earpiece, with no speaker route.
+     * `.playAndRecord`, active, then the `.none` port override before any playback. Android's seam
+     * activates and routes in one step ([VoiceAudioSessionControlling.activate] then
+     * [VoiceAudioSessionControlling.route]); the call's playback belongs to the external (WebRTC)
+     * owner, so the order checked is activation → route to the earpiece, with no speaker route.
      */
     @Test fun raiseStartedCallConfiguresReceiverBeforeAnyPlayback() = routingTest {
         val fake = FakeVoiceAudioSession(builtInReceiver)
@@ -391,7 +386,6 @@ class RaiseToTalkTests {
     }
 }
 
-/** iOS `AVAudioSession.Port.builtInReceiver`. */
 internal val builtInReceiver = listOf(android.media.AudioDeviceInfo.TYPE_BUILTIN_EARPIECE)
 
 /**
@@ -407,11 +401,7 @@ internal fun routingTest(body: suspend CoroutineScope.() -> Unit): Unit = runBlo
     withContext(values.asContextElement()) { withTimeout(30.seconds) { body() } }
 }
 
-/**
- * iOS `VoiceAudioEngine(atEar:demo:clock:session:note:)`. Android's engine owns no hardware in
- * these tests: it runs with the external (WebRTC) owner, whose playback gain [RecordingAudioControl]
- * records as the iOS fake's `volumeChanged`.
- */
+/** Android's engine owns no hardware in these tests: it runs with the external (WebRTC) owner. */
 internal fun routingEngine(
     session: FakeVoiceAudioSession,
     clock: Clock,

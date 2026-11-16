@@ -7,10 +7,6 @@ import org.junit.Test
 import java.text.NumberFormat
 import java.util.Locale
 
-/**
- * Port of iOS `RequestReviewTests.swift`'s `OpenCodeFormValue` test; the rest of the suite
- * lives with the request dock (`:feature:composer`) and the session (`:feature:session`).
- */
 class RequestReviewTests {
     @Test fun typedNumbersReadMidEntryTextAndLocaleSeparators() {
         val us = Locale.forLanguageTag("en-US")

@@ -13,18 +13,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * Port of iOS `OpenCodeApp`'s DEBUG lab launch hooks for UI tests and lab runs. iOS reads launch
- * arguments and `OPENCODE_LAB_*` environment variables; Android reads the launch intent's extras
- * (`adb shell am start -n …/ai.opencode.app.MainActivity --es lab-server-url … --ez lab-fresh-install true`).
- * Debug builds only, and applied before anything reads the store, as iOS runs them before
- * `OpenCodeApp.store`.
- *
- * - `lab-fresh-install` (`OPENCODE_LAB_FRESH_INSTALL=1`): forgets the saved servers, so onboarding opens.
- * - With `lab-server-url` (`OPENCODE_LAB_SERVER_URL`) set, which identifies a lab launch:
- *   - `lab-reset-model-preferences` (`-lab-reset-model-preferences`): no favourite, recent or hidden models.
- *   - `lab-pasteboard-text` `log` | `big` | `lines` | `paragraph` (`-lab-pasteboard-text`).
- * - `lab-openai-key` / `lab-xai-key` (`OPENCODE_LAB_OPENAI_KEY` / `_XAI_KEY`, iOS `LabVoiceKeys`;
- *   empty or `NONE` clears).
+ * Debug lab launch hooks, read from the launch intent's extras (`--es lab-server-url …`). Debug
+ * builds only, applied before anything reads the store.
  */
 internal object LabLaunch {
     fun apply(intent: Intent?) {
@@ -47,7 +37,6 @@ internal object LabLaunch {
         seedVoiceKeys(intent)
     }
 
-    /** iOS `LabVoiceKeys.seed`. */
     private fun seedVoiceKeys(intent: Intent) {
         listOf("lab-openai-key" to SharedKeys.openAIAPIKey, "lab-xai-key" to SharedKeys.xaiAPIKey).forEach { (extra, key) ->
             if (!intent.hasExtra(extra)) return@forEach
@@ -57,7 +46,6 @@ internal object LabLaunch {
         }
     }
 
-    /** iOS `installLabPasteboardTextIfRequested`. */
     private fun pasteboardText(kind: String): String? = when (kind) {
         "log" -> (0 until 40).joinToString("\n") { index ->
             if (index == 0) "Fatal error: Index out of range in UploadQueue.drain()"

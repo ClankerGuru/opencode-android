@@ -7,10 +7,6 @@ import ai.opencode.server.model.OpenCodeTranscriptItem
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * The `:feature:transcript` test of iOS `OpenCodeTests/SessionFeatureTests+FailedSends.swift`
- * ([TranscriptRowIdentityPlan]); the `SessionFeature` tests are `:feature:session`'s.
- */
 class SessionFeatureTestsFailedSends {
     companion object {
         const val SENT_ID = "msg_00000000000100000000000000"

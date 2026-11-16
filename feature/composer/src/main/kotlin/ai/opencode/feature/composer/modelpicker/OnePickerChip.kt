@@ -10,6 +10,7 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.excludedFromDrawerPan
 import ai.opencode.core.ui.openCodeTapTarget
+import ai.opencode.feature.composer.R
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateContentSize
@@ -31,6 +32,7 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -48,18 +50,18 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
 /**
- * Port of iOS `OnePickerChip`: One Picker's composer chip, the provider's mark, the short model
- * name and the level word dimmed ([OnePickerTunables.LEVEL_ALPHA]). A tap opens One Picker. The
- * name rolls (a few dp of travel, a slight scale and blur) only when [ModelKey] changes, so a
- * level change rolls the word alone, and the chip's width eases with them; neither animates
- * while the picker is shown. Its root-dp frame goes to [OnePickerController.chipFrame].
+ * One Picker's composer chip, the provider's mark, the short model name and the level word dimmed
+ * ([OnePickerTunables.LEVEL_ALPHA]). A tap opens One Picker. The name rolls (a few dp of travel, a
+ * slight scale and blur) only when [ModelKey] changes, so a level change rolls the word alone, and
+ * the chip's width eases with them; neither animates while the picker is shown. Its root-dp frame
+ * goes to [OnePickerController.chipFrame].
  *
- * TalkBack: one "Choose model" button whose value is the name and level; on an adjustable model
- * it is also a slider whose steps send [ModelPickerEvent.ModelRowLevelChanged] (iOS
- * `accessibilityAdjustableAction`). Material 3 Expressive: no button chrome of its own, as the
- * composer's other chips.
+ * TalkBack: one "Choose model" button whose value is the name and level; on an adjustable model it
+ * is also a slider whose steps send [ModelPickerEvent.ModelRowLevelChanged]. Material 3 Expressive:
+ * no button chrome of its own, as the composer's other chips.
  *
  * [targetDrop]: how far its target sits below its ink (the composer's `pickerTargetDrop`).
+ * [besideAgent]: the chip shares the row with the agent chip and leaves its effort level off.
  */
 @Composable
 fun OnePickerChip(
@@ -70,9 +72,11 @@ fun OnePickerChip(
     modifier: Modifier = Modifier,
     isEnabled: Boolean = true,
     targetDrop: Dp = 0.dp,
+    besideAgent: Boolean = false,
 ) {
     val reduceMotion = rememberReduceMotion()
     val density = LocalDensity.current
+    val chooseModelDescription = stringResource(R.string.composer_model_choose_description)
     val key = OnePickerChip.ModelKey(state)
     val scale = state.currentLevelScale
     val levelLabel = state.currentChipLevelLabel
@@ -95,15 +99,15 @@ fun OnePickerChip(
                     )
                 }
             }
-            // The target sits [targetDrop] below the ink (iOS `openCodeTapTarget(lowered:)`): the
-            // chip's touch and TalkBack bounds move down and its ink moves back up.
+            // The target sits [targetDrop] below the ink: the chip's touch and TalkBack bounds move
+            // down and its ink moves back up.
             .offset(y = targetDrop)
             .clickable(enabled = isEnabled, role = Role.Button) { onOpen() }
             .openCodeTapTarget()
             .heightIn(min = 48.dp)
             .animateContentSize(if (animates) Motion.layout.animation(reduceMotion = reduceMotion) else snap())
             .clearAndSetSemantics {
-                contentDescription = "Choose model"
+                contentDescription = chooseModelDescription
                 stateDescription = value
                 role = Role.Button
                 onClick { if (isEnabled) onOpen(); isEnabled }
@@ -123,8 +127,8 @@ fun OnePickerChip(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Only the name gives way when the chip runs out of room (iOS keeps the level word, arc and
-        // chevron `fixedSize`): weighted, it's measured after them and ellipsizes into what's left.
+        // Only the name gives way when the chip runs out of room: weighted, it's measured after
+        // them and ellipsizes into what's left.
         OnePickerChipRoll(key, animates, reduceMotion, label = "onePickerName", modifier = Modifier.weight(1f, fill = false)) { rolled ->
             Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (OnePickerTunables.CHIP_SHOWS_LOGO && (state.currentModel != null || model != null)) {
@@ -145,7 +149,7 @@ fun OnePickerChip(
                 )
             }
         }
-        if (scale != null) {
+        if (scale != null && !besideAgent) {
             if (OnePickerTunables.CHIP_SHOWS_ARC) {
                 AnimatedLevelArc(scale, level, size = 14.5.dp, color = OpenCodeTheme.colors.text.copy(alpha = 0.78f))
             }
@@ -173,8 +177,8 @@ fun OnePickerChip(
 /** Names [OnePickerChip]'s identity: what changes it rolls the name. */
 object OnePickerChip {
     /**
-     * iOS `OnePickerChip.ModelKey`: the chip rolls its name only when the model, its label or its
-     * mark changes, never for a level change or the catalogue arriving with the same label.
+     * The chip rolls its name only when the model, its label or its mark changes, never for a level
+     * change or the catalogue arriving with the same label.
      */
     data class ModelKey(val id: String, val shortName: String, val icon: String) {
         constructor(state: ModelPickerState) : this(
@@ -188,7 +192,6 @@ object OnePickerChip {
     }
 }
 
-/** iOS `.subheadline.weight(.medium)`. */
 private val ChipTextStyle: TextStyle get() = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium)
 
 /**

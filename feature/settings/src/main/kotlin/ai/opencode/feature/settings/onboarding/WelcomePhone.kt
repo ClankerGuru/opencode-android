@@ -1,6 +1,7 @@
 package ai.opencode.feature.settings.onboarding
 
 import ai.opencode.core.ui.OpenCodeIcon
+import ai.opencode.feature.settings.R
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -40,6 +41,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,9 +64,8 @@ private val phoneHairline = WelcomeInk.hex(0x2D2D2D)
 
 /**
  * The phone's screen: this app's session in dark mode, at a logical 440 × 956 scaled into the
- * phone (iOS `WelcomePhone`). iOS feeds its own transcript rows and `DictationScopeBar` the story;
- * those live in modules above Settings here, so the rows, header and composer are drawn from the
- * app's metrics (Material surfaces where iOS has glass). Pairing cross-fades to the scanner.
+ * phone. The real transcript rows and scope bar live in modules above Settings, so the rows, header
+ * and composer are drawn from the app's metrics. Pairing cross-fades to the scanner.
  */
 @Composable
 internal fun WelcomePhone(frame: WelcomeFrame, pairing: Float, reduced: Boolean, voice: WelcomeVoice, wall: Double, targets: WelcomeTargets?) {
@@ -97,7 +98,7 @@ internal fun WelcomePhone(frame: WelcomeFrame, pairing: Float, reduced: Boolean,
 }
 
 internal object WelcomePhone {
-    /** The phone's logical screen (iOS draws an iPhone 17 Pro Max at the same size). */
+    /** The phone's logical screen. */
     val size = Size(440f, 956f)
 
     /** The composer's bottom edge, above the home indicator. */
@@ -108,30 +109,30 @@ internal object WelcomePhone {
     const val COLUMN_TOP = 122f
     const val COLUMN_BOTTOM = 858f
 
-    /** The transcript's gutter and half flow gap (iOS `TranscriptMetrics.contentGutter`, `flowHalf`). */
+    /** The transcript's gutter and half flow gap. */
     const val GUTTER = 16f
     const val FLOW_HALF = 8f
 
-    /** The screenshot tile's corners: the desktop card's 10 (iOS `JustifiedImageRows.cornerRadius` 14). */
+    /** The screenshot tile's corners: the desktop card's 10. */
     const val TILE_RADIUS = 10f
 
-    /** The session header's buttons (iOS `HeaderBlurTunables.buttonSize`). */
+    /** The session header's buttons. */
     const val BUTTON = 44f
 
-    /** The composer's metrics (iOS `ComposerTunables`, `DictationBarPose.slot`). */
+    /** The composer's metrics. */
     const val MARGIN = 20f
     const val INNER = 6f
     const val INNER_VERTICAL = 6f
     const val TEXT_LEADING = 52f
     const val EXPANDED_TEXT_LEADING = 10f
-    /** The composer's corners: the desktop dock's 12 (iOS 26). */
+    /** The composer's corners: the desktop dock's 12. */
     const val CORNER = 12f
     const val SLOT = 48f
 
-    /** The agent's calls so far: reads, the browser, the edit, the screenshot (iOS `tools`). */
+    /** The agent's calls so far: reads, the browser, the edit, the screenshot. */
     fun tools(count: Int): List<String> = listOf("read", "grep", "browser", "edit", "browser").take(max(1, count))
 
-    /** The reply's first `words` words, whole (iOS `reply(words:)`). */
+    /** The reply's first `words` words, whole. */
     fun reply(words: Double): String {
         val count = min(WelcomeStory.REPLY_WORDS.size, max(1, ceil(words).toInt()))
         return WelcomeStory.REPLY_WORDS.take(count).joinToString(" ").replace("`", "")
@@ -139,8 +140,8 @@ internal object WelcomePhone {
 }
 
 /**
- * An Android status bar (iOS draws the iPhone's: centred time, Dynamic Island): the time on the
- * left, a centred punch-hole camera, and Wi-Fi, signal and battery on the right.
+ * An Android status bar: the time on the left, a centred punch-hole camera, and Wi-Fi, signal and
+ * battery on the right.
  */
 @Composable
 private fun PhoneStatusBar() {
@@ -190,8 +191,8 @@ private fun PhoneStatusBar() {
 }
 
 /**
- * The session header as this app draws it on the desktop palette (iOS `header` has glass circles
- * and a title capsule): the drawer and More icons on the canvas, the title and project beside them.
+ * The session header as this app draws it on the desktop palette: the drawer and More icons on the
+ * canvas, the title and project beside them.
  */
 @Composable
 private fun PhoneHeader(frame: WelcomeFrame) {
@@ -205,7 +206,7 @@ private fun PhoneHeader(frame: WelcomeFrame) {
         }
         Column(Modifier.weight(1f).padding(start = 8.dp), verticalArrangement = Arrangement.Center) {
             WelcomeStack(
-                labels = listOf("New Session", WelcomeStory.TITLE),
+                labels = listOf(stringResource(R.string.settings_onboarding_phone_new_session), WelcomeStory.TITLE),
                 weights = if (frame.named) listOf(0.0, 1.0) else listOf(1.0, 0.0),
                 style = TextStyle(fontSize = 17.sp, lineHeight = 21.sp, fontWeight = FontWeight.Medium),
                 color = phoneText,
@@ -289,11 +290,15 @@ private fun UserBubble(text: String, modifier: Modifier) {
 /** The agent's calls, as the transcript's collapsed tool group reads them. */
 @Composable
 private fun ToolGroup(tools: List<String>, modifier: Modifier) {
+    val exploredReadSearch = stringResource(R.string.settings_onboarding_phone_tool_explored_read_search)
+    val exploredRead = stringResource(R.string.settings_onboarding_phone_tool_explored_read)
+    val browser = stringResource(R.string.settings_onboarding_tool_browser)
+    val edit = stringResource(R.string.settings_onboarding_tool_edit)
     val label = buildList {
         val reads = tools.count { it == "read" || it == "grep" }
-        if (reads > 0) add(if (tools.contains("grep")) "Explored 1 read, 1 search" else "Explored 1 read")
-        if (tools.contains("browser")) add("Browser")
-        if (tools.contains("edit")) add("Edit")
+        if (reads > 0) add(if (tools.contains("grep")) exploredReadSearch else exploredRead)
+        if (tools.contains("browser")) add(browser)
+        if (tools.contains("edit")) add(edit)
     }.joinToString(" · ")
     Row(
         modifier.fillMaxWidth().padding(horizontal = WelcomePhone.GUTTER.dp, vertical = WelcomePhone.FLOW_HALF.dp),
@@ -320,9 +325,9 @@ private fun Working(open: Double, wall: Double, reduced: Boolean) {
 }
 
 /**
- * The composer (iOS `composer`): idle it's + · Message · mic, with Stop while the agent works;
- * dictating, the + turns into the recording's ×, a scope of the story's voice takes the row, and the
- * words heard so far show over it.
+ * The composer: idle it's + · Message · mic, with Stop while the agent works; dictating, the +
+ * turns into the recording's ×, a scope of the story's voice takes the row, and the words heard so
+ * far show over it.
  */
 @Composable
 private fun PhoneComposer(frame: WelcomeFrame, reduced: Boolean, voice: WelcomeVoice, targets: WelcomeTargets?) {
@@ -362,7 +367,7 @@ private fun PhoneComposer(frame: WelcomeFrame, reduced: Boolean, voice: WelcomeV
                         ) { OpenCodeIcon("plus", null, size = 22.dp, tint = phoneText) }
                     }
                     Text(
-                        "Message",
+                        stringResource(R.string.settings_onboarding_phone_message_placeholder),
                         style = body(),
                         color = phoneTertiary,
                         modifier = Modifier.padding(start = (WelcomePhone.TEXT_LEADING - WelcomePhone.INNER - WelcomePhone.SLOT).coerceAtLeast(0f).dp).alpha(1 - dictation),
@@ -413,7 +418,7 @@ private fun PhoneComposer(frame: WelcomeFrame, reduced: Boolean, voice: WelcomeV
     }
 }
 
-/** The dictation bar's scope, listening to the story's voice as it would the mic (iOS `DictationScopeBar`'s scope). */
+/** The dictation bar's scope, listening to the story's voice as it would the mic. */
 @Composable
 private fun WelcomeScope(voice: WelcomeVoice, modifier: Modifier) {
     Canvas(modifier) {
@@ -431,7 +436,7 @@ private fun WelcomeScope(voice: WelcomeVoice, modifier: Modifier) {
     }
 }
 
-/** The pairing step: the camera finds the laptop's code (iOS `scanner`). */
+/** The pairing step: the camera finds the laptop's code. */
 @Composable
 private fun PhoneScanner(modifier: Modifier) {
     Box(
@@ -471,7 +476,7 @@ private fun PhoneScanner(modifier: Modifier) {
     }
 }
 
-/** A camera viewfinder's four rounded corners (iOS `WelcomeViewfinderCorners`). */
+/** A camera viewfinder's four rounded corners. */
 internal object WelcomeViewfinderCorners {
     fun path(rect: Rect, radius: Float): Path {
         val arm = rect.width * 0.22f

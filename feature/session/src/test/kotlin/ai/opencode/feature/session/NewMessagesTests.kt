@@ -44,11 +44,10 @@ import kotlin.time.Duration.Companion.seconds
  * shown only when it doesn't fit on screen, and the reads that bring it
  * before they're back.
  *
- * Not ported here (:feature:transcript, `NewMessagesMark` / `NewMessagesPlacement` / `TranscriptScrollBehavior` alone):
+ * Not ported here (:feature:transcript, `NewMessagesMark` / `NewMessagesPlacement` alone):
  * `firstUnseenSkipsWhatWasOnScreenAndClientNotices`, `ownMessagesNeverCountAndReadWhatsAboveThem`,
  * `placementFallsToTheNextEntryWithNewItems`, `olderRowsPagedInAboveWhatWasSeenArentNew`,
- * `placementSkipsRowsTheReaderHadAndKeepsATimeWithItsMessage`, `revealsBrowseFromTheDividerOrFollowAtTheEnd`,
- * `landingAtTheDividerDoesntPageInHistory`.
+ * `placementSkipsRowsTheReaderHadAndKeepsATimeWithItsMessage`.
  * Not ported here (:feature:drawer, `HomeFeature`): `switchingBackMarksWhatArrivedSince`,
  * `theDrawerReadsLikelySessionsBeforeATap`, `leavingTheAppHoldsTheStreamUntilTheReturn`.
  */
@@ -355,7 +354,7 @@ class NewMessagesTests {
         assertNull(fresh.newMessages)
     }
 
-    // region Ported from iOS f657969b (the read-receipt and watermark rework)
+    // region Read receipts and the watermark
 
     private val liveID = "msg_live-text-0"
     private val liveRow: OpenCodeTranscriptItem get() = OpenCodeTranscriptItem.AssistantMarkdown(id = liveID, text = "Streaming reply", inProgress = true)
@@ -395,7 +394,7 @@ class NewMessagesTests {
     }
 
     /**
-     * Kit's bug: rows that stream in front of the reader while the read
+     * Rows that stream in front of the reader while the read
      * after their return is out are seen, so that read never marks them;
      * a row it brings from while they were away still is.
      */
@@ -562,7 +561,7 @@ class NewMessagesTests {
         val store = h.store(state) {
             this[Clock] = TestClock()
         }
-        store.send(Action.ContentBatch(sessionID = "ses_away", events = listOf(OpenCodeLiveContentEvent.ReasoningDelta(messageID = "msg_a", ordinal = 0, delta = "x")))) {
+        store.send(Action.ContentBatch(sessionID = "ses_away", events = listOf(OpenCodeLiveContentEvent.ReasoningDelta(messageID = "msg_a", ordinal = 0)))) {
             it.copy(
                 isExternallyActive = true, streamIsHealthy = true, streamSupportsProjection = true,
                 workingRun = WorkingRun(counter = 1, startID = 1, key = "ses_away", sawStart = true, startTurn = "u1", baseline = "msg_a-tool-q1"),

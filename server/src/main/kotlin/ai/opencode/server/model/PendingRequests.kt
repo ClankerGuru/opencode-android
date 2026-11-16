@@ -51,6 +51,8 @@ data class OpenCodePendingInput(
     val delivery: OpenCodeDelivery = OpenCodeDelivery.Steer,
     /** Path attachments from `metadata.attachments`; [text] excludes their reference lines. */
     val files: List<OpenCodeFileReference> = emptyList(),
+    /** Quotes from `metadata.comments`; [text] excludes their blocks. */
+    val quotes: List<OpenCodeQuote> = emptyList(),
     /** Set when an agent sent it. */
     val source: OpenCodePromptSource? = null,
     /** Inline files that aren't images: chips, and Pasted Text cards. */
@@ -60,8 +62,8 @@ data class OpenCodePendingInput(
 )
 
 /**
- * Client presentation for an admitted input. Local outgoing images take precedence while in
- * flight; otherwise inbox images are shown (iOS `init(input:images:)` with `images ?? input.images`).
+ * Client presentation for an admitted input. Local outgoing images take precedence while in flight;
+ * otherwise inbox images are shown.
  */
 data class OpenCodeQueuedInput(val input: OpenCodePendingInput, val images: List<OpenCodeImageAttachment> = input.images) {
     val id: String get() = input.id
@@ -126,5 +128,5 @@ data class OpenCodeServerCapabilities(
     }
 }
 
-/** Where a project file outside the open session's directory lives (iOS `AgentFileReference.Target`). */
+/** Where a project file outside the open session's directory lives. */
 data class FileReadTarget(val location: String, val relativePath: String)

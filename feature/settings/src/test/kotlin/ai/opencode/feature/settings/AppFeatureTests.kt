@@ -4,9 +4,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * `appVersionPrefersOpenCodeVersion` of iOS `AppFeatureTests.swift` (the rest is `:app`'s and
- * `:server`'s). Android reads the package's version name and code, so there is no Info.plist key
- * to prefer; the label's format is what's shared.
+ * Android reads the package's version name and code, so there is no Info.plist key to prefer; the
+ * label's format is what's shared.
  */
 class AppFeatureTests {
     @Test

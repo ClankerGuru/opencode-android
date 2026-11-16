@@ -5,14 +5,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/*
- * The `:feature:composer` tests of iOS `OpenCodeTests/ShareComposerTests.swift`:
- * [SharedComposerDraft] (here because it carries composer types). The rest is `:feature:system`'s
- * (`share/ShareComposerTests.kt`) and `:feature:drawer`'s (`ShareComposerAppTests`). iOS's
- * `append` mutates in place; Android's [SharedComposerDraft.appending] returns the joined value.
- */
+/* Android's [SharedComposerDraft.appending] returns the joined value. */
 
-/** iOS `ShareCompositionTests` (the sheet's decisions): the one that joins drafts. */
+/** The one that joins drafts. */
 class ShareCompositionTests {
     private fun draft(text: String, send: SharedComposerDraft.Send? = null) = SharedComposerDraft(text = text, send = send)
 

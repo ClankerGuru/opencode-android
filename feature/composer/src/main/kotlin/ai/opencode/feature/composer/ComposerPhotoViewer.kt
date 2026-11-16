@@ -5,15 +5,26 @@ import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.Store
+import ai.opencode.core.strings.localized
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.composer.plusmenu.LibraryPhoto
 import ai.opencode.feature.media.CachedImage
+import ai.opencode.feature.media.ImageDrawingAdd
 import ai.opencode.feature.media.MediaFlightAccessory
 import ai.opencode.feature.media.MediaZoomSources
 import ai.opencode.feature.media.TranscriptImagePreview
-import ai.opencode.feature.media.TranscriptImageViewerFeature
+import ai.opencode.feature.media.FullscreenViewerFeature
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
+import ai.opencode.feature.media.AgentFileDestination
+import ai.opencode.feature.media.MediaReferenceResolver
+import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.model.AgentFileReference
+import android.graphics.BitmapFactory
+import android.net.Uri
+import java.io.File
+import java.nio.file.Files
+import java.util.IdentityHashMap
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -37,11 +48,10 @@ import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 /**
- * The composer's pending photos in the transcript's full-screen viewer (iOS
- * `ComposerPhotoViewer`): the same flight out of the tile and back, paging and zoom, plus each
- * photo's dimensions and size and a Remove action.
+ * The composer's pending photos in the transcript's full-screen viewer: the same flight out of the
+ * tile and back, paging and zoom, plus each photo's dimensions and size and a Remove action.
  *
- * The viewer's Remove (`TranscriptImageViewerFeature.State.allowsRemove`, `removeTapped`, the
+ * The viewer's Remove (`FullscreenViewerFeature.State.allowsRemove`, `removeTapped`, the
  * `removed` delegate, `isDiscarded`) and the flight's accessories (`MediaFlightAccessory`) are
  * `:feature:media`'s; [ComposerPhotoViewerFeature] hands a removed page back to the composer.
  */
@@ -63,7 +73,7 @@ object ComposerPhotoViewer {
     private const val REMOVE_GLYPH = 13f
     private const val REMOVE_DISC_OPACITY = 0.65f
 
-    /** The tile's ×, drawn the same on the tile and on the viewer's flight (iOS `RemoveBadge`). */
+    /** The tile's ×, drawn the same on the tile and on the viewer's flight. */
     @Composable
     fun RemoveBadge(modifier: Modifier = Modifier) {
         Box(
@@ -75,10 +85,10 @@ object ComposerPhotoViewer {
     }
 
     /**
-     * The tile's × and a video's duration, carried by the viewer's flight at their own size:
-     * they fade out as the photo flies up and back in as it flies home, while the tile itself
-     * stands aside. iOS renders the SwiftUI badges with `ImageRenderer`; here they're drawn
-     * into bitmaps with the same metrics as [RemoveBadge] and `VideoDurationBadge`.
+     * The tile's × and a video's duration, carried by the viewer's flight at their own size: they
+     * fade out as the photo flies up and back in as it flies home, while the tile itself stands
+     * aside. They're drawn into bitmaps with the same metrics as [RemoveBadge] and
+     * `VideoDurationBadge`.
      */
     fun flightAccessories(mediaID: String, attachments: List<OpenCodeOutgoingAttachment>, context: Context): List<MediaFlightAccessory> {
         val id = attachmentID(mediaID) ?: return emptyList()
@@ -119,7 +129,7 @@ object ComposerPhotoViewer {
         return bitmap
     }
 
-    /** `VideoDurationBadge` with its `VIDEO_BADGE_INSET` margin, as iOS renders the whole view. */
+    /** `VideoDurationBadge` with its `VIDEO_BADGE_INSET` margin. */
     private fun renderVideoDurationBadge(context: Context, duration: String, density: Float, fontScale: Float): Bitmap? {
         val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = android.graphics.Color.WHITE
@@ -168,28 +178,70 @@ object ComposerPhotoViewer {
         return runCatching { UUID.fromString(id) }.getOrNull()?.let { id }
     }
 
-    /** Every decodable pending photo, opened on [selected]. */
+    fun isVisualFile(file: ComposerFileAttachment): Boolean =
+        file.mime.startsWith("video/", ignoreCase = true) || AgentFileReference(file.name).kind == AgentFileReference.Kind.Video
+
+    /** Only the tapped photo is decoded. Other pages hold their original (or immutable blob address). */
     fun preview(
         attachments: List<OpenCodeOutgoingAttachment>,
         selected: String,
+        files: List<ComposerFileAttachment> = emptyList(),
+        server: OpenCodeServer? = null,
+        directory: String? = null,
         decode: (OpenCodeOutgoingAttachment) -> Bitmap? = ::decode,
     ): TranscriptImagePreview? {
-        val images = attachments.filter { it.isImage }.mapNotNull { attachment -> decode(attachment)?.let { attachment to it } }
-        if (images.none { it.first.id == selected }) return null
-        val pages = images.mapIndexed { index, (attachment, image) ->
+        val images = attachments.filter { it.isImage && (it.data.isNotEmpty() || it.mediaHash != null) }
+        val pages = images.mapIndexed { index, attachment ->
+            val original = attachment.data.takeIf { it.isNotEmpty() } ?: MediaReferenceResolver.cachedData(attachment.mediaHash)
+            val image = if (attachment.id == selected) decode(attachment) else null
+            val detail = if (image != null) detail(attachment, image) else original?.let {
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeByteArray(it, 0, it.size, bounds)
+                if (bounds.outWidth > 0 && bounds.outHeight > 0) detail(attachment, bounds.outWidth, bounds.outHeight) else null
+            }
             TranscriptImagePreview.Page(
-                id = mediaID(attachment.id),
-                image = image,
-                label = attachment.name ?: "Image attachment ${index + 1} of ${images.size}",
-                detail = detail(attachment, image),
+                mediaID(attachment.id), image, attachment.name ?: localized(R.string.composer_photo_viewer_image_label, index + 1, images.size),
+                detail = detail, mediaHash = attachment.mediaHash, original = original,
+                labelIsPlaceholder = attachment.name == null,
+                isVideo = attachment.videoDuration != null || attachment.localVideoURI != null,
+                hasDecodedOriginal = image != null,
+                videoURL = attachment.localVideoURI?.let(Uri::parse),
             )
+        }.toMutableList()
+        val leases = mutableListOf<File>()
+        for (file in files.filter(::isVisualFile)) {
+            val destination = file.reference?.let { AgentFileDestination(AgentFileReference(it.path), directory) }
+            // Upload completion unlinks the staging file. Lease a second name for its inode
+            // in the staging root, outside its per-upload folder; never copy the movie.
+            val lease = if (destination == null) leaseMovie(File(file.localPath)) ?: continue else null
+            lease?.let(leases::add)
+            pages += TranscriptImagePreview.Page(mediaID(file.id.toString()), null, file.name, name = file.name,
+                file = destination, isVideo = true, videoURL = lease?.let(Uri::fromFile))
         }
-        return TranscriptImagePreview(mediaID(selected), pages)
+        val id = mediaID(selected)
+        if (pages.none { it.id == id }) {
+            leases.forEach { it.delete() }
+            return null
+        }
+        return TranscriptImagePreview(id, pages, server).also { if (leases.isNotEmpty()) movieLinks[it] = leases }
+    }
+
+    private fun leaseMovie(staged: File): File? {
+        val root = staged.parentFile?.parentFile ?: return null
+        val link = File(root, ".viewer-${UUID.randomUUID()}.${staged.extension}")
+        return runCatching { Files.createLink(link.toPath(), staged.toPath()); link }.getOrNull()
+    }
+
+    private val movieLinks = IdentityHashMap<TranscriptImagePreview, List<File>>()
+
+    /** Called for the opening snapshot on dismissal (and when presentation was rejected). */
+    fun release(preview: TranscriptImagePreview) {
+        movieLinks.remove(preview)?.forEach { it.delete() }
     }
 
     /** “JPEG · 1568 × 1176 · 412 KB”. */
     fun detail(attachment: OpenCodeOutgoingAttachment, pixelWidth: Int, pixelHeight: Int): String {
-        val format = attachment.mime.split("/").lastOrNull()?.uppercase() ?: "Image"
+        val format = attachment.mime.split("/").lastOrNull()?.uppercase() ?: localized(R.string.composer_photo_viewer_image_format)
         val size = AttachmentFileType.byteCount(attachment.byteCount ?: attachment.data.size.toLong())
         return "$format · $pixelWidth × $pixelHeight · $size"
     }
@@ -197,35 +249,40 @@ object ComposerPhotoViewer {
     /** [detail] for a decoded [image]. */
     fun detail(attachment: OpenCodeOutgoingAttachment, image: Bitmap): String = detail(attachment, image.width, image.height)
 
-    /** The attachment's bytes, decoded (iOS `CachedImage.decoded`: a `media:<hash>` reference decodes the blob already in memory). */
+    /** The attachment's bytes, decoded. */
     private fun decode(attachment: OpenCodeOutgoingAttachment): Bitmap? =
         runCatching { CachedImage.decoded(attachment.id, attachment.data, attachment.mediaHash) }.getOrNull()
 
-    /** The viewer's store: the transcript viewer with Remove, which hands the photo back through [remove]. */
+    /**
+     * The viewer's store: the transcript viewer with Remove, which hands the photo back through
+     * [remove], and Draw on Image for [addDrawing]'s prompt.
+     */
     fun store(
         preview: TranscriptImagePreview,
+        addDrawing: ImageDrawingAdd? = null,
         remove: (String) -> Unit,
-    ): Store<TranscriptImageViewerFeature.State, TranscriptImageViewerFeature.Action> = Store(
-        TranscriptImageViewerFeature.State(preview, isShowingControls = true, allowsRemove = true),
-        ComposerPhotoViewerFeature(remove),
+    ): Store<FullscreenViewerFeature.State, FullscreenViewerFeature.Action> = Store(
+        FullscreenViewerFeature.State(preview, isShowingControls = true, allowsRemove = true, allowsDrawing = addDrawing != null),
+        ComposerPhotoViewerFeature(addDrawing, remove),
     )
 }
 
 /**
- * The transcript viewer, whose Remove hands the photo back to the composer ([remove], on the
- * main thread) (iOS `ComposerPhotoViewerFeature`).
+ * The transcript viewer, whose Remove hands the photo back to the composer ([remove], on the main
+ * thread) and whose Draw on Image adds to `addDrawing`'s prompt.
  */
 class ComposerPhotoViewerFeature(
+    addDrawing: ImageDrawingAdd? = null,
     private val remove: (String) -> Unit,
-) : Reducer<TranscriptImageViewerFeature.State, TranscriptImageViewerFeature.Action> {
-    private val viewer = TranscriptImageViewerFeature()
+) : Reducer<FullscreenViewerFeature.State, FullscreenViewerFeature.Action> {
+    private val viewer = FullscreenViewerFeature(addDrawing)
 
     override fun reduce(
-        state: TranscriptImageViewerFeature.State,
-        action: TranscriptImageViewerFeature.Action,
-    ): Reduced<TranscriptImageViewerFeature.State, TranscriptImageViewerFeature.Action> {
+        state: FullscreenViewerFeature.State,
+        action: FullscreenViewerFeature.Action,
+    ): Reduced<FullscreenViewerFeature.State, FullscreenViewerFeature.Action> {
         val reduced = viewer.reduce(state, action)
-        val removed = (action as? TranscriptImageViewerFeature.Action.Delegate)?.action as? TranscriptImageViewerFeature.Action.DelegateAction.Removed
+        val removed = (action as? FullscreenViewerFeature.Action.Delegate)?.action as? FullscreenViewerFeature.Action.DelegateAction.Removed
             ?: return reduced
         val id = ComposerPhotoViewer.attachmentID(removed.id) ?: return reduced
         return Reduced(reduced.state, Effect.merge(reduced.effect, Effect.run { _ -> remove(id) }))

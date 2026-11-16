@@ -18,10 +18,9 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * The slice of iOS `SessionFeature` the autocomplete tests drive: a draft binding and the
- * `.autocomplete` actions, each run through [ComposerAutocompleteReducer] exactly as the
- * session store hosts it (`SessionFeatureBindings.kt`: `draftChanged` on a draft edit,
- * `reduce` on an autocomplete action, the edited draft written back).
+ * A draft binding and the `.autocomplete` actions, each run through [ComposerAutocompleteReducer]
+ * exactly as the session store hosts it (`SessionFeatureBindings.kt`: `draftChanged` on a draft
+ * edit, `reduce` on an autocomplete action, the edited draft written back).
  */
 class ComposerAutocompleteTestHost :
     Reducer<ComposerAutocompleteTestHost.State, ComposerAutocompleteTestHost.Action> {
@@ -37,12 +36,10 @@ class ComposerAutocompleteTestHost :
         val host: ComposerAutocompleteHost
             get() = ComposerAutocompleteHost(draft = draft, server = server, effectiveDirectory = directory, sessionID = sessionID, projects = projects)
 
-        /** iOS `$0.autocomplete.<field> = …` inside an expectation. */
         fun autocomplete(update: ComposerAutocompleteState.() -> ComposerAutocompleteState): State = copy(autocomplete = autocomplete.update())
     }
 
     sealed interface Action {
-        /** iOS `.binding(.set(\.draft, …))`. */
         data class Draft(val draft: String) : Action
         data class Autocomplete(val action: ComposerAutocompleteAction) : Action
         data object SendTapped : Action
@@ -82,7 +79,6 @@ class ComposerAutocompleteTestHost :
     )
 }
 
-/** iOS `ComposerAutocompleteTests`' fixtures (shared with its `ComposerSessionMentionTests` extension). */
 object ComposerAutocompleteFixtures {
     val server = OpenCodeServer(url = "http://localhost:9", username = "opencode", password = "pw")
     val session = OpenCodeSession(
@@ -124,7 +120,7 @@ object ComposerAutocompleteFixtures {
         ),
     )
 
-    /** iOS `chip(_:_:)`: a chip whose ID ends in [suffix], as `UUIDGenerator.incrementing` makes them. */
+    /** A chip whose ID ends in [suffix], as `UUIDGenerator.incrementing` makes them. */
     fun chip(suffix: Long, item: AutocompleteItem) = ComposerAutocompleteChip(item = item, id = UUID(0, suffix))
 
     /** A complete generated session ID (`ses_` and 26 letters or digits). */
@@ -138,7 +134,7 @@ object ComposerAutocompleteFixtures {
             updatedAt = Instant.ofEpochSecond(1_900),
         )
 
-    /** iOS `makeStore`'s initial state: the sample session, an empty draft. */
+    /** The sample session, an empty draft. */
     fun state(
         session: OpenCodeSession = this.session,
         configure: ComposerAutocompleteTestHost.State.() -> ComposerAutocompleteTestHost.State = { this },

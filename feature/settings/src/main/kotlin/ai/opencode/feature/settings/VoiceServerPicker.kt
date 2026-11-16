@@ -12,10 +12,9 @@ import ai.opencode.feature.voice.VoiceReadiness
 import ai.opencode.feature.voice.VoiceRoute
 import ai.opencode.server.OpenCodeServer
 
-// Port of iOS `Settings/VoiceServerPicker.swift`: Settings › Voice › Voice Provider, which
-// provider calls use. Automatic by default (the connected server, this
-// phone's key, then another saved server that's ready), or one picked. The rows themselves are
-// on the Voice Provider page (`VoiceProviderPage.kt`).
+// Settings › Voice › Voice Provider, which provider calls use. Automatic by default (the connected
+// server, this phone's key, then another saved server that's ready), or one picked. The rows
+// themselves are on the Voice Provider page (`VoiceProviderPage.kt`).
 
 /** The server calls start from: Home's, else the last one used. */
 val VoiceSettingsFeature.State.connectedServer: OpenCodeServer? get() = server ?: savedServer

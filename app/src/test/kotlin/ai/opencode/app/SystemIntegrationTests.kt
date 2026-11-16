@@ -3,6 +3,8 @@ package ai.opencode.app
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.TestClock
+import ai.opencode.core.sharing.ExperimentalFeature
+import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.TestStore
@@ -51,11 +53,6 @@ private fun opened(destination: SystemAction.Destination, startsCall: Boolean = 
 
 private fun tapped(id: String) = AppFeature.Action.Home(HomeFeature.Action.SessionTapped(id))
 
-/**
- * Port of iOS `SystemIntegrationTests.swift`' `SystemRoutingTests` AppFeature section: actions
- * from shortcuts, widgets, intents and links reach the right server's Home. Home's own routing
- * tests are `:feature:drawer`'s; the directory, entities, controls and publisher `:feature:system`'s.
- */
 class SystemRoutingTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -70,7 +67,7 @@ class SystemRoutingTests {
         return shared.appStore(state, effects, dependencies)
     }
 
-    /** iOS `home()`: the list, no remembered session, and a draft open. */
+    /** The list, no remembered session, and a draft open. */
     private fun home(): HomeFeature.State = shared.run {
         HomeFeature.State(server, OpenCodeHomeSnapshot(projects = listOf(project, docs), sessions = listOf(older, newer), activeSessionIDs = emptySet()))
             .openingDraft()
@@ -147,6 +144,26 @@ class SystemRoutingTests {
     }
 
     @Test
+    fun anAddressNamesASavedServerBehindItsExperiment() = runTest {
+        saveAll(listOf(server, otherServer))
+        val action = SystemAction(serverKey = "https://other.example:443/", destination = SystemAction.Destination.Session("ses_remote"))
+        val off = store(shared.appState())
+        off.send(AppFeature.Action.SystemActionReceived(action)) {
+            it.copy(systemActionError = "This server is no longer saved on this phone. Connect to it again to open the session.")
+        }
+        off.finish()
+
+        val on = store(shared.appState().copy(home = home())) {
+            this[ExperimentalFeatures] = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.serverAddressLinks))
+            this[OpenCodeClient] = OpenCodeClient.testValue.copy(health = {}, events = { emptyFlow() }, transcript = hangingTranscript)
+        }
+        on.exhaustive = false
+        on.send(AppFeature.Action.SystemActionReceived(action))
+        assertEquals(action.copy(serverKey = SessionDirectory.serverKey(otherServer.persistenceID)), on.state.pendingSystemAction)
+        effects.skipInFlightEffects()
+    }
+
+    @Test
     fun aSessionOutsideTheListIsFetchedFirst() = runTest {
         saveAll(listOf(server))
         val state = shared.appState().copy(home = home())
@@ -204,11 +221,6 @@ class SystemRoutingTests {
     }
 }
 
-/**
- * Port of iOS `SystemIntegrationTests.swift`' `SystemColdLaunchTests` AppFeature tests: an action
- * on a cold launch waits for Home's first snapshot, and a remembered session the list doesn't have
- * is fetched, or falls back to the newest. The Home-only tests are `:feature:drawer`'s.
- */
 class SystemColdLaunchTests {
     @get:Rule val isolation = TestIsolationRule()
 

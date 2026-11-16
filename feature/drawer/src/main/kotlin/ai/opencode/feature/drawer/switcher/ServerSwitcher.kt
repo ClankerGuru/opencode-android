@@ -1,14 +1,16 @@
 package ai.opencode.feature.drawer.switcher
 
+import ai.opencode.core.strings.localized
 import ai.opencode.feature.drawer.HomeConnectionFeature
+import ai.opencode.feature.drawer.R
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.friendlyName
 import java.text.Collator
 
-// Port of iOS `OpenCode/Drawer/ServerSwitcher.swift`: the rules the drawer's title
-// (`switcher/ServerFlowTitle.kt`) reads everything it shows from, [DrawerTitle.Presentation] and
-// the texts below. `OpenCodeServer.friendlyName` was moved down to `:server`
-// (`OpenCodeServerFriendlyName.kt`): the title shows a server only by it, never by an address.
+// The rules the drawer's title (`switcher/ServerFlowTitle.kt`) reads everything it shows from,
+// [DrawerTitle.Presentation] and the texts below. `OpenCodeServer.friendlyName` was moved down to
+// `:server` (`OpenCodeServerFriendlyName.kt`): the title shows a server only by it, never by an
+// address.
 
 /**
  * Saved servers, most recent first, with the one in use even if it was never saved, and its live
@@ -22,14 +24,13 @@ fun switchableServers(current: OpenCodeServer, saved: List<OpenCodeServer>): Lis
 }
 
 /**
- * The menu's servers: [switchableServers] in a steady order, so the menu never moves as servers
- * are used (iOS sorts by `friendlyName.localizedStandardCompare`: case-insensitive, numbers by
- * value).
+ * The menu's servers: [switchableServers] in a steady order, so the menu never moves as servers are
+ * used.
  */
 fun drawerTitleServers(current: OpenCodeServer, saved: List<OpenCodeServer>): List<OpenCodeServer> =
     switchableServers(current, saved).sortedWith { a, b -> localizedStandardCompare(a.friendlyName, b.friendlyName) }
 
-/** Finder-like ordering (iOS `localizedStandardCompare`): runs of digits compare by value, text by the locale's collator. */
+/** Finder-like ordering: runs of digits compare by value, text by the locale's collator. */
 internal fun localizedStandardCompare(a: String, b: String): Int {
     val collator = Collator.getInstance().apply { strength = Collator.SECONDARY }
     val left = chunks(a)
@@ -66,17 +67,9 @@ private fun chunks(text: String): List<String> {
  * address. No status shows while all is well; a confirmed outage dims it.
  */
 object DrawerTitle {
-    /** iOS `.animation(.easeInOut(duration: 0.25), value: presentation)`. */
     const val CROSS_FADE_MILLIS = 250
 
-    /** The test tag / iOS accessibility identifier. */
     const val TAG = "drawer-title"
-
-    const val TRY_AGAIN = "Try Again"
-    const val MANAGE_SERVERS = "Manage Servers…"
-    const val OFFLINE = "Offline"
-    const val SIGN_IN_FAILED = "Sign-in failed"
-    const val EDIT_SERVER = "Edit Server…"
 
     /** What the title shows for a server count and connection status. */
     data class Presentation(
@@ -103,8 +96,8 @@ object DrawerTitle {
                 val rejected = status == HomeConnectionFeature.State.ConnectionStatus.disconnected && credentialsRejected
                 val issue = when (status) {
                     HomeConnectionFeature.State.ConnectionStatus.connected -> null
-                    HomeConnectionFeature.State.ConnectionStatus.reconnecting -> "Reconnecting"
-                    HomeConnectionFeature.State.ConnectionStatus.disconnected -> if (rejected) SIGN_IN_FAILED else OFFLINE
+                    HomeConnectionFeature.State.ConnectionStatus.reconnecting -> localized(R.string.drawer_server_reconnecting_state)
+                    HomeConnectionFeature.State.ConnectionStatus.disconnected -> if (rejected) localized(R.string.drawer_server_sign_in_failed) else localized(R.string.drawer_server_offline)
                 }
                 val listsServers = serverCount > 1
                 val offersTryAgain = status == HomeConnectionFeature.State.ConnectionStatus.disconnected && !rejected
@@ -117,17 +110,17 @@ object DrawerTitle {
                     offersTryAgain = offersTryAgain,
                     offersEdit = offersEdit,
                     issue = issue,
-                    accessibilityValue = switchingTo?.let { "Connecting to $it" } ?: issue ?: "",
+                    accessibilityValue = switchingTo?.let { localized(R.string.drawer_server_connecting_to_state, it) } ?: issue ?: "",
                     accessibilityHint = when {
-                        listsServers -> "Show your servers"
-                        offersEdit -> "Offer to edit the server"
-                        hasMenu -> "Offer to try again"
+                        listsServers -> localized(R.string.drawer_server_show_servers_hint)
+                        offersEdit -> localized(R.string.drawer_server_offer_edit_hint)
+                        hasMenu -> localized(R.string.drawer_server_offer_try_again_hint)
                         else -> null
                     },
                 )
             }
 
-            /** iOS `DrawerTitle.presentation`, from the view's inputs. */
+            /** From the view's inputs. */
             fun of(
                 servers: List<OpenCodeServer>,
                 status: HomeConnectionFeature.State.ConnectionStatus,

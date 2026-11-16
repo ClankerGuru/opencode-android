@@ -58,10 +58,8 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Port of iOS `LiveDelegationFeatureTests+Session.swift`: a GPT-Live delegation keeps running
- * across a Home session switch and a reconnect. The call runs through a real
- * [LiveCallCoordinator] over fake sockets on the test's virtual time (a small copy of
- * `:feature:voice`'s `LiveHarness`, iOS `LiveCallCoordinatorTests.Harness`).
+ * A GPT-Live delegation keeps running across a Home session switch and a reconnect. The call runs
+ * through a real [LiveCallCoordinator] over fake sockets on the test's virtual time.
  */
 class LiveDelegationFeatureTestsSession {
     @get:Rule val isolation = TestIsolationRule()
@@ -69,10 +67,8 @@ class LiveDelegationFeatureTestsSession {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
     private val session = OpenCodeSession(id = "ses_voice", serverTitle = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = HomeFeatureTestSupport.distantPast)
 
-    /** iOS `URLError(.networkConnectionLost)`. */
     private class NetworkConnectionLost : IOException("The network connection was lost.")
 
-    /** iOS `LiveCallCoordinatorTests.FakeLiveSocket`. */
     private class FakeLiveSocket(val config: LiveSessionConfig) {
         private val serverEvents = Channel<LiveServerEvent>(Channel.UNLIMITED)
         val events: Flow<LiveServerEvent> = serverEvents.consumeAsFlow()
@@ -90,7 +86,7 @@ class LiveDelegationFeatureTestsSession {
         fun record(command: LiveCommand) = synchronized(sent) { sent += command; Unit }
     }
 
-    /** iOS `LiveCallCoordinatorTests.Harness`, on the test's virtual time. */
+    /** On the test's virtual time. */
     private class LiveHarness(test: TestScope) {
         private val openedChannel = Channel<FakeLiveSocket>(Channel.UNLIMITED)
         private val values: DependencyValues = DependencyValues.testing().update {
@@ -163,7 +159,7 @@ class LiveDelegationFeatureTestsSession {
         val store = h.store(home) {
             this[DateClient] = DateClient.constant(Instant.EPOCH)
             this[Clock] = TestClock()
-            // Android: every start mints the call's notification identity (iOS's Live Activity is Home's).
+            // Android: every start mints the call's notification identity.
             this[UuidClient] = UuidClient.incrementing()
             this[RealtimePreflightClient] = RealtimePreflightClient(verify = { _, _ -> })
             this[VoiceCallClient] = VoiceCallClient(

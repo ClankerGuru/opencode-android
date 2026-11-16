@@ -33,12 +33,10 @@ import androidx.media3.common.util.Util
 import kotlin.math.roundToInt
 
 /**
- * Picture in Picture for the file viewer's video (iOS `AVPlayerViewController`
- * `allowsPictureInPicturePlayback = !isAudio`). AVKit's behaviour, on Android's activity-level
- * PiP: the controls' button starts it; going home while a video plays starts it too (iOS's
- * background `audio` mode lets AVKit do that); the small window plays and pauses; closing it
- * pauses; expanding it returns to the viewer. The viewer fills the window, so in PiP the page
- * shows only the video ([isActive]).
+ * Picture in Picture for the file viewer's video. AVKit's behaviour, on Android's activity-level
+ * PiP: the controls' button starts it; going home while a video plays starts it too; the small
+ * window plays and pauses; closing it pauses; expanding it returns to the viewer. The viewer fills
+ * the window, so in PiP the page shows only the video ([isActive]).
  *
  * A plain object the player composable owns: it keeps the activity's `PictureInPictureParams`
  * (aspect ratio, source rect, auto-enter, the play/pause action) in step with the player.
@@ -148,7 +146,7 @@ internal class AgentFilePictureInPicture(private val activity: ComponentActivity
 
     private fun playPauseAction(): RemoteAction {
         val playing = !Util.shouldShowPlayButton(player)
-        val title = if (playing) "Pause" else "Play"
+        val title = if (playing) activity.getString(R.string.media_player_pause) else activity.getString(R.string.media_player_play)
         val icon = Icon.createWithResource(activity, if (playing) ai.opencode.core.R.drawable.ms_pause_fill else ai.opencode.core.R.drawable.ms_play_arrow_fill)
         val intent = PendingIntent.getBroadcast(
             activity,

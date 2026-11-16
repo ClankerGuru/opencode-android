@@ -18,11 +18,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `SessionSheetTests.homeOpensForksAndRoutesSheetActionsThroughTheDrawerPaths`. The
- * sheet's own tests are `:feature:session`'s. iOS's `defer` clearing shared keys isn't needed:
- * each `TestStore` has its own shared store.
- */
+/** Each `TestStore` has its own shared store. */
 class SessionSheetTests {
     @get:Rule val isolation = TestIsolationRule()
 

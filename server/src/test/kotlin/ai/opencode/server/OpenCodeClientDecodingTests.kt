@@ -13,6 +13,8 @@ import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeFormRequest
 import ai.opencode.server.model.OpenCodeFormValue
 import ai.opencode.server.model.OpenCodeJSONValue
+import ai.opencode.server.model.OpenCodeModel
+import ai.opencode.server.model.OpenCodeModelCatalog
 import ai.opencode.server.model.OpenCodePermissionReply
 import ai.opencode.server.model.OpenCodePermissionRequest
 import ai.opencode.server.model.OpenCodePromptSource
@@ -73,7 +75,6 @@ class OpenCodeClientDecodingTests {
     private fun toolCalls(items: List<OpenCodeTranscriptItem>): List<OpenCodeToolCall> =
         items.filterIsInstance<OpenCodeTranscriptItem.Tool>().map { it.call }
 
-    /** iOS `OpenCodeToolCall.test(callID:name:status:input:)`. */
     private fun toolCall(
         callID: String? = null,
         name: String,
@@ -269,10 +270,7 @@ class OpenCodeClientDecodingTests {
         }
     }
 
-    /**
-     * Step 1 only. Step 2 (`VoiceDelegatorWorkspace`'s `list_sessions` on a cold cache) belongs
-     * to `:feature:voice`, where that workspace lives.
-     */
+    /** Step 1 only. */
     @Test
     fun completeHomeSnapshotResolvesActiveAncestryForOtherServersAndVoiceListing() = runTest {
         val responses = mapOf(
@@ -468,10 +466,19 @@ class OpenCodeClientDecodingTests {
         }
     }
 
-    /**
-     * iOS reads a cancelled waiter's result as an `OpenCodeClientError`; a cancelled Kotlin
-     * waiter throws `CancellationException` instead, so the waiters' jobs are checked.
-     */
+    @Test
+    fun forgettingModelCatalogsDropsOnlyThatServersCatalogs() {
+        val cache = OpenCodeReadCache()
+        val catalog = OpenCodeModelCatalog(listOf(OpenCodeModel(modelID = "m", providerID = "p", name = "M")), defaultModel = null)
+        cache.storeModelCatalog(catalog, "srv|")
+        cache.storeModelCatalog(catalog, "srv|/work/repo")
+        cache.storeModelCatalog(catalog, "other|/work/repo")
+        cache.forgetModelCatalogs("srv")
+        assertNull(cache.modelCatalog("srv|"))
+        assertNull(cache.modelCatalog("srv|/work/repo"))
+        assertEquals(catalog, cache.modelCatalog("other|/work/repo"))
+    }
+
     @Test
     fun sessionLookupRegistryPreservesRemainingWaitersOnCancelAndRestartsWhenAllWaitersCancel() = runTest {
         val serverKey = "lookup-registry-${UUID.randomUUID().toString().lowercase()}"
@@ -929,7 +936,7 @@ class OpenCodeClientDecodingTests {
 
     @Test
     fun toolResultFileBlocksProjectImageAttachments() {
-        // iOS renders an SF Symbol to PNG; any PNG bytes do here.
+        // Any PNG bytes do here.
         val png = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0x0D, 0x49, 0x48, 0x44, 0x52)
         val base64 = Base64.getEncoder().encodeToString(png)
         val payload = """
@@ -1042,7 +1049,6 @@ class OpenCodeClientDecodingTests {
         assertTrue(errors[0].second.isStop && errors[0].second.actions.isEmpty())
     }
 
-    /** The decoding half; the transcript list and Working line (`TranscriptEntry`, `WorkingActivity`) belong to `:feature:transcript`. */
     @Test
     fun aRetryingStepCountsDownOnTheWorkingLine() {
         val items = decode(
@@ -1059,10 +1065,6 @@ class OpenCodeClientDecodingTests {
         assertEquals("Rate limit reached · retrying", retryItem.retry.title(Instant.ofEpochSecond(1_760_000_031)))
     }
 
-    /**
-     * Android keeps the compaction summary as Markdown text (parsed by `:feature:transcript`);
-     * the `OpenCodeMarkdownBlock` round trip belongs there.
-     */
     @Test
     fun decodesCompactionStatesLikeTheTUI() {
         val tokens = """"tokens":{"input":1000,"output":200,"reasoning":50,"cache":{"read":300,"write":0}}"""
@@ -1208,8 +1210,8 @@ class OpenCodeClientDecodingTests {
 }
 
 /**
- * iOS `DelayedAncestryProtocol`: answers `GET /api/session/{id}` 35 ms later (on OkHttp's
- * thread) with a child of `ses_root`, counting in-flight lookups.
+ * Answers `GET /api/session/{id}` 35 ms later (on OkHttp's thread) with a child of `ses_root`,
+ * counting in-flight lookups.
  */
 private class DelayedAncestryFixture(
     val host: String,

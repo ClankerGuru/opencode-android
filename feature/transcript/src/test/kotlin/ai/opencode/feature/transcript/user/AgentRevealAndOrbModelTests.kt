@@ -11,9 +11,8 @@ import org.junit.Test
 import kotlin.math.abs
 
 /**
- * Port of iOS `AgentRevealAndOrbModelTests.swift`, the inner glow half (`AgentMessageReveal`,
- * `TranscriptAgentMessageReveal`, `TranscriptUserMessage.isFromAgent`). The status orb half
- * (`ActivityGyro`, `AgentActivityGlyphModels`, `WorkingRun`, `WorkingActivity`) is `:feature:session`'s.
+ * The inner glow half (`AgentMessageReveal`, `TranscriptAgentMessageReveal`,
+ * `TranscriptUserMessage.isFromAgent`).
  */
 class AgentRevealAndOrbModelTests {
     // MARK: Inner glow
@@ -21,7 +20,7 @@ class AgentRevealAndOrbModelTests {
     @Test fun onlyAgentsMessagesReveal() {
         fun message(text: String, source: OpenCodePromptSource? = null) =
             TranscriptUserMessage(id = "msg", text = text, images = emptyList(), files = emptyList(), pending = null, source = source)
-        // iOS `VoiceHandoff.format(instruction:transcriptDelta:)`: the header line, then the JSON body.
+        // The header line, then the JSON body.
         val voice = "Voice delegation. The user is on a voice call with a voice agent, which hands their requests to you.\n" +
             """{"instruction":"check the build","transcript_delta":["user: check the build"]}"""
         assertTrue(message(voice).isFromAgent)

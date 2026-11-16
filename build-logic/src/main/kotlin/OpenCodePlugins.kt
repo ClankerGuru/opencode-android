@@ -40,10 +40,15 @@ private fun CommonExtension.configureCommon() {
     compileOptions.targetCompatibility = JavaVersion.VERSION_17
     buildFeatures.compose = true
     testOptions.unitTests.isReturnDefaultValues = true
+    // Robolectric tests render screens that read strings.xml.
+    testOptions.unitTests.isIncludeAndroidResources = true
     lint.abortOnError = true
     lint.warningsAsErrors = false
     lint.checkDependencies = false
     lint.disable += setOf("GradleDependency", "NewerVersionAvailable", "AndroidGradlePluginVersion")
+    // A string with no translation yet shows in English (docs/translating.md), so new English
+    // text doesn't have to wait for every language.
+    lint.warning += "MissingTranslation"
 }
 
 private fun Project.addCommonDependencies() {

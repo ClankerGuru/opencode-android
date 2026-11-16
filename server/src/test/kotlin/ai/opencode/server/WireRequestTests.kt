@@ -15,6 +15,10 @@ import ai.opencode.server.model.OpenCodeShellOutputPage
 import ai.opencode.server.model.PromptContext
 import ai.opencode.server.testing.WireFixture
 import ai.opencode.server.testing.WireFixture.Reply
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
@@ -170,7 +174,10 @@ class WireRequestTests {
     fun composerPromptPostsFilesAndExplicitDelivery() = runTest {
         for (delivery in listOf(OpenCodeDelivery.Steer, OpenCodeDelivery.Queue)) {
             withFixture(WireFixture { Reply.Json(200, "{}") }) { fixture ->
-                val image = OpenCodeOutgoingAttachment(data = byteArrayOf(1, 2), mime = "image/png")
+                val image = OpenCodeOutgoingAttachment(
+                    data = byteArrayOf(1, 2), mime = "image/png", videoDuration = 4.0,
+                    localVideoURI = "content://media/example/movie",
+                )
 
                 OpenCodeClient.liveValue.sendPrompt(fixture.server, "ses_1", "hello", listOf(image), emptyList(), "msg_1", delivery)
 
@@ -303,7 +310,6 @@ class WireRequestTests {
         }
     }
 
-    /** iOS `VoiceHandoff.format(instruction:transcriptDelta: [])` (its type lives in `:feature:voice`). */
     private fun voiceHandoff(instruction: String): String =
         "Voice delegation. The user is on a voice call with a voice agent, which hands their requests to you.\n" +
             "{\n  \"instruction\" : \"$instruction\",\n  \"transcript_delta\" : [\n\n  ]\n}"
@@ -464,15 +470,61 @@ class WireRequestTests {
             val catalog = OpenCodeClient.liveValue.modelCatalog(fixture.server, "/work/cold-boot")
             assertEquals(listOf("gpt-5.4"), catalog.models.map { it.modelID })
             assertEquals("gpt-5.4", catalog.defaultModel?.modelID)
-            assertEquals(listOf("GET /api/model", "GET /api/model/default"), fixture.requests.map { it.route })
+            assertEquals(listOf("GET /api/model", "GET /api/model/default"), fixture.requests.map { it.route }.sorted())
             assertTrue(fixture.requests.all { it.queryValue("location[directory]") == "/work/cold-boot" })
             assertTrue(fixture.requests.all { it.timeoutInterval == LOCATION_BOOT_TIMEOUT.inWholeMilliseconds / 1000.0 })
         }
     }
 
+    @Test fun homeAttentionAsksHotDirectoriesAtOnce() = runBlocking {
+        val fixture = WireFixture { request ->
+            if (request.queryValue("location[directory]") == "/booting") {
+                Reply.Open(200, "")
+            } else if (request.route == "GET /api/permission/request" || request.route == "GET /api/form") {
+                Reply.Json(200, """{"data":[]}""")
+            } else {
+                Reply.Json(404, "{}")
+            }
+        }
+        withFixture(fixture) {
+            val held = launch(Dispatchers.Default) { OpenCodeClient.liveValue.homeAttention(fixture.server, emptyList(), listOf("/booting", "/ready")) }
+            for (attempt in 0 until 500) {
+                if (fixture.requests.count { it.queryValue("location[directory]") == "/ready" } >= 2) break
+                delay(10)
+            }
+            held.cancel()
+            assertEquals(2, fixture.requests.count { it.queryValue("location[directory]") == "/ready" })
+        }
+    }
+
+    @Test fun modelCatalogReadsTheListAndDefaultTogether() = runBlocking {
+        val fixture = WireFixture { request -> if (request.route == "GET /api/model") Reply.Open(200, "") else Reply.Json(200, "{}") }
+        withFixture(fixture) {
+            val held = launch(Dispatchers.Default) { OpenCodeClient.liveValue.modelCatalog(fixture.server, "/work/held") }
+            for (attempt in 0 until 500) {
+                if (fixture.requests.size >= 2) break
+                delay(10)
+            }
+            held.cancel()
+            assertEquals(setOf("GET /api/model", "GET /api/model/default"), fixture.requests.map { it.route }.toSet())
+        }
+
+        val failing = WireFixture { request ->
+            if (request.route == "GET /api/model") {
+                Reply.Json(200, """{"data":[{"id":"gpt-5.4","modelID":"gpt-5.4","providerID":"openai","name":"GPT-5.4","enabled":true,"status":"active"}]}""")
+            } else {
+                Reply.Json(404, "{}")
+            }
+        }
+        withFixture(failing) {
+            val catalog = OpenCodeClient.liveValue.modelCatalog(failing.server, "/work/no-default")
+            assertEquals(listOf("gpt-5.4"), catalog.models.map { it.modelID })
+            assertNull(catalog.defaultModel)
+        }
+    }
+
     /**
-     * iOS `AppFeatureTests.transportSecurityAllowsPrivateOverlays` (same addresses): plain HTTP
-     * reaches private networks and overlays only; the live guard refuses the rest as the
+     * Plain HTTP reaches private networks and overlays only; the live guard refuses the rest as the
      * platform's cleartext refusal, before anything is sent.
      */
     @Test

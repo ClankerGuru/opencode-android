@@ -32,11 +32,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/**
- * Port of iOS `OnboardingTunables` (`Settings/Onboarding/SignalField.swift`): the onboarding's
- * values to judge on a phone (OC-351, D-72). iOS reads them live from the Mac's tune page; here
- * they are the baked defaults.
- */
+/** The onboarding's tuning values, baked to their defaults. */
 internal object OnboardingTunables {
     /** Ripple speed (pt/s). */
     const val rippleSpeed = 120.0
@@ -91,9 +87,9 @@ internal object OnboardingTunables {
 }
 
 /**
- * What the dot field draws: the view's coarse scene. The renderer springs its own channels
- * toward it every frame, so a change mid-flight retargets from where the light is, with its
- * velocity. Lengths are dp (iOS points) in the field's own coordinates.
+ * What the dot field draws: the view's coarse scene. The renderer springs its own channels toward
+ * it every frame, so a change mid-flight retargets from where the light is, with its velocity.
+ * Lengths are dp in the field's own coordinates.
  */
 internal data class SignalFieldScene(
     val phase: Phase,
@@ -106,10 +102,10 @@ internal data class SignalFieldScene(
 )
 
 /**
- * The full-screen LED field behind the onboarding (D-67 option 5): a fixed grid of dots, the
- * EKG trace, scan ripples, the server's answering ripple and the heartbeat wipe, in one AGSL
- * pass. Text and controls stay Compose above it. Still under Reduce Motion: drawn only when
- * the scene changes. Paused while the screen isn't resumed (iOS `scenePhase != .active`).
+ * The full-screen LED field behind the onboarding: a fixed grid of dots, the EKG trace, scan
+ * ripples, the server's answering ripple and the heartbeat wipe, in one AGSL pass. Text and
+ * controls stay Compose above it. Still under Reduce Motion: drawn only when the scene changes.
+ * Paused while the screen isn't resumed.
  */
 @Composable
 internal fun SignalFieldView(scene: SignalFieldScene, modifier: Modifier = Modifier) {

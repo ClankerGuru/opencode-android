@@ -1,5 +1,6 @@
 package ai.opencode.server
 
+import ai.opencode.core.strings.localized
 import ai.opencode.server.retry.TransportFailure
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -13,8 +14,8 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
- * Port of iOS `OpenCodeClientError`: the one error every client call throws.
- * A value type (`copy` to change it); the message is user-facing copy.
+ * The one error every client call throws. A value type (`copy` to change it); the message is
+ * user-facing copy.
  */
 data class OpenCodeClientError(
     override val message: String,
@@ -32,7 +33,7 @@ data class OpenCodeClientError(
     /** A prompt whose sending ended in doubt and that the server didn't show when read back. */
     val unconfirmedPromptID: String? = null,
     val connectionFailures: List<ConnectionFailureDetail> = emptyList(),
-    /** The iOS `URLError` code equivalent of the transport exception (see [UrlErrorCode]). */
+    /** The `URLError` code equivalent of the transport exception (see [UrlErrorCode]). */
     val urlErrorCode: Int? = null,
     /** The request this answered was already settled, or is gone, on the server: trying again can't help. */
     val requestSettled: Boolean = false,
@@ -83,8 +84,8 @@ data class OpenCodeClientError(
     override fun fillInStackTrace(): Throwable = this
 
     companion object {
-        const val UNREACHABLE_MESSAGE = "Couldn’t reach the OpenCode server"
-        const val FOLDER_GONE_MESSAGE = "The folder is gone"
+        val UNREACHABLE_MESSAGE: String get() = localized(R.string.server_error_unreachable)
+        val FOLDER_GONE_MESSAGE: String get() = localized(R.string.server_error_folder_gone)
 
         /** A 404 whose body is the server's tagged `LocationNotFoundError`. */
         fun isLocationMissing(status: Int, body: ByteArray): Boolean {
@@ -99,8 +100,8 @@ data class OpenCodeClientError(
         /** A request that got no answer from the server. */
         fun unreachable(transport: TransportFailure) = OpenCodeClientError(UNREACHABLE_MESSAGE, transport = transport)
 
-        val uploadsUnsupported = OpenCodeClientError(
-            "This server doesn’t support file attachments. Update OpenCode on your computer.",
+        val uploadsUnsupported: OpenCodeClientError get() = OpenCodeClientError(
+            localized(R.string.server_error_uploads_unsupported),
             isUnsupported = true,
         )
 

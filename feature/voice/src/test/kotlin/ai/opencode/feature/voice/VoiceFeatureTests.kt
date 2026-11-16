@@ -38,14 +38,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 
-/**
- * Port of iOS `VoiceFeatureTests.swift`: the tests whose store is `VoiceFeature`.
- *
- * Not ported here (their store belongs to another module): `voiceAvailabilityRequiresBothAdvancedToggleAndAPIKey`
- * (SessionFeature, :feature:session); `delegatorMovesTheScreenSendsAVoiceMessageAndReportsTheReply`,
- * `delegatorPinsUnpinsAndOpensADraft`, `aSwitchMidDelegationStillDeliversToTheOriginalSession`
- * (HomeFeature, :feature:drawer).
- */
+/** The tests whose store is `VoiceFeature`. */
 class VoiceFeatureTests {
     private lateinit var h: Harness
 
@@ -211,12 +204,7 @@ class VoiceFeatureTests {
     private fun delegatorCall(on: OpenCodeSession): State =
         h.state { State(server, on) }.live().copy(usesDelegator = true, connectedAt = date(0))
 
-    /**
-     * From a call log: the user asked for research on one session, the screen
-     * moved a moment later, and the delegation that followed was refused as
-     * "not a new request" because the move swapped the call's conversation
-     * for the new session's old one. The conversation is the call's now.
-     */
+    /** The conversation is the call's, so moving to another session doesn't swap it. */
     @Test fun wordsSpokenBeforeASwitchDelegateAfterIt() = voiceTest { harness ->
         h = harness
         val ios = VoiceFeatureTestSupport.session("ses_switch_ios", "OpenCode iOS", "/Users/kit/ios")
@@ -348,11 +336,6 @@ class VoiceFeatureTests {
         assertEquals(listOf("user: Check the upload test"), transcripts["${server.id}:${b.id}"]?.tail)
     }
 
-    /**
-     * From a call log: a password checkout topic discussed on Home was gone
-     * after moving to another session ("I've lost the thread"), and came back
-     * only on returning to Home. The topic now follows the call.
-     */
     @Test fun aTopicFromOneSessionFollowsTheCallAndIsNeverReplayed() = voiceTest { harness ->
         h = harness
         val home = VoiceFeatureTestSupport.session("ses_topic_home", "Home", "/Users/kit/home")

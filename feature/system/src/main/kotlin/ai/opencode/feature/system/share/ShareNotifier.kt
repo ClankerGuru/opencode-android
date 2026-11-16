@@ -12,9 +12,9 @@ import androidx.core.app.NotificationManagerCompat
 import java.util.UUID
 
 /**
- * Port of iOS `ShareNotifier`: the share sheet's local notifications. Tapping "sent" opens the
- * session it went to; "continue" opens the app, which finds the share waiting. They show only
- * when the person has allowed OpenCode's notifications. Blocking; call off the main thread.
+ * The share sheet's local notifications. Tapping "sent" opens the session it went to; "continue"
+ * opens the app, which finds the share waiting. They show only when the person has allowed
+ * OpenCode's notifications. Blocking; call off the main thread.
  */
 object ShareNotifier {
     fun isAllowed(context: Context): Boolean = NotificationManagerCompat.from(context).areNotificationsEnabled()
@@ -31,7 +31,7 @@ object ShareNotifier {
      */
     fun continueInApp(context: Context, title: String): Boolean {
         val launch = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return false
-        return post(context, title, "Tap to continue in OpenCode", launch, group = null)
+        return post(context, title, context.getString(R.string.system_share_continue_notification_body), launch, group = null)
     }
 
     @SuppressLint("MissingPermission") // Checked: areNotificationsEnabled covers POST_NOTIFICATIONS.

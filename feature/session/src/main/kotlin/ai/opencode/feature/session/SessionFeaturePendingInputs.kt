@@ -5,6 +5,7 @@ import ai.opencode.core.log.AppLog
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
+import ai.opencode.core.strings.localized
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.transcript.TranscriptEntry
@@ -17,7 +18,7 @@ import ai.opencode.server.model.OpenCodeTranscriptItem
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 
-// Port of iOS `SessionFeature+PendingInputs.swift`: steering and queued messages, and the server's run state.
+// Steering and queued messages, and the server's run state.
 
 /** The inbox: queued and steering messages, and their deliveries. Null: the action passes on. */
 internal fun SessionFeature.reducePendingInputs(state: State, action: Action): Reduced<State, Action>? {
@@ -204,7 +205,7 @@ internal fun SessionFeature.reducePendingInputs(state: State, action: Action): R
                 next = next.copy(isAwaitingReply = false)
             }
             haptics.play(Haptic.error)
-            next = appendInfo(next, "Couldn’t send the pending message now: ${action.error.message}")
+            next = appendInfo(next, localized(R.string.session_pending_send_now_failed_details, action.error.message))
             return Reduced(next, fetchQueuedInputs(next.server, action.sessionID))
         }
 
@@ -219,12 +220,12 @@ internal fun SessionFeature.reducePendingInputs(state: State, action: Action): R
                 next.copy(cancelledInputIDs = next.cancelledInputIDs - action.inputID)
             }
             val message = when (restoring) {
-                null -> "Couldn’t cancel the pending message"
-                OpenCodeDelivery.Queue -> "Couldn’t send the pending message now"
-                OpenCodeDelivery.Steer -> "Couldn’t queue the pending message"
+                null -> localized(R.string.session_pending_cancel_failed_details, action.error.message)
+                OpenCodeDelivery.Queue -> localized(R.string.session_pending_send_now_failed_details, action.error.message)
+                OpenCodeDelivery.Steer -> localized(R.string.session_pending_queue_failed_details, action.error.message)
             }
             haptics.play(Haptic.error)
-            return Reduced(appendInfo(next, "$message: ${action.error.message}"))
+            return Reduced(appendInfo(next, message))
         }
 
         // The pending-work poll slows to 12 s once the stream is healthy, so requests answered
@@ -671,7 +672,7 @@ private fun appendDelivered(input: OpenCodePendingInput, state: State): State {
     val rows = SessionFeature.promptRows(
         messageID = id, text = input.text, source = input.source,
         images = localImages?.takeIf { it.isNotEmpty() } ?: input.images,
-        fileReferences = input.files, inlineFiles = input.inlineFiles,
+        fileReferences = input.files, inlineFiles = input.inlineFiles, quotes = input.quotes,
     )
     if (rows.isEmpty()) return state
     val previousFirstID = state.visibleItems.firstOrNull()?.id
@@ -715,7 +716,10 @@ internal fun SessionFeature.Companion.containsMessage(messageID: String, items: 
 internal fun SessionFeature.Companion.item(item: OpenCodeTranscriptItem, messageID: String): Boolean =
     MessageRows(messageID).contains(item)
 
-/** iOS `SessionFeature.MessageRows`: one message's rows, matched without building a string for every row a scan of the transcript passes. */
+/**
+ * One message's rows, matched without building a string for every row a scan of the transcript
+ * passes.
+ */
 internal class MessageRows(val messageID: String) {
     private val prefix = "$messageID-"
     private val images = "$messageID-images"

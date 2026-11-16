@@ -14,7 +14,7 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.input.pointer.util.addPointerInputChange
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -24,23 +24,13 @@ import androidx.compose.ui.unit.LayoutDirection
 import kotlin.math.abs
 
 /**
- * Port of `OpenCode/Drawer/DirectionalPanGestureRecognizer.swift`: the session drawer's pan and
- * what it yields to, as a Compose pointer handler ([drawerDirectionalPan], wired to the card by
- * [drawerPan]).
- *
- * It watches every touch in the `Initial` pass (before the card's own scrollers and controls),
- * waits for 8 dp of travel ([BackSwipeRules.decisionDistance]), then picks once:
- * - vertical, or leftward on a shut drawer: fails, the touch stays with the content;
- * - rightward on the open drawer's list: reveals the rows' times instead of moving the card;
- * - rightward on content whose horizontal scroller can still scroll back, or on a control that
- *   claims sideways drags, fails, except from the leading 28 dp edge, which always opens it;
- * - a finger that rested 0.45 s first, or under which a hold already began, keeps its hold.
- * Once chosen it consumes the pointer so children cancel (iOS `cancelsTouchesInView`, `isolate`).
- *
- * UIKit's hit-test walk becomes [DrawerPanRegions]: the drawer, its list, the card, Catch Up's
- * drag card, horizontal scrollers and controls register their layout nodes with the modifiers
- * below, and the pan tests the touch against them (layer transforms included). Not ported:
- * iOS's text selection handle test (Compose selection handles consume their own drags).
+ * The session drawer's pan. It watches every touch in the `Initial` pass, waits for 8 dp of travel
+ * ([BackSwipeRules.decisionDistance]), then picks once: vertical or leftward on a shut drawer stays
+ * with the content; rightward on the open drawer's list reveals the rows' times; rightward on a
+ * scroller that can still scroll back, or a control that claims sideways drags, stays with it
+ * except from the leading 28 dp edge; a finger that rested 0.45 s keeps its hold. Once chosen it
+ * consumes the pointer. Touches are tested against the layout nodes registered in
+ * [DrawerPanRegions].
  */
 object DirectionalPan {
     enum class Decision {
@@ -51,7 +41,7 @@ object DirectionalPan {
         Wait,
     }
 
-    /** Where a touch began (iOS `TouchOrigin`). */
+    /** Where a touch began. */
     sealed interface TouchOrigin {
         data object DrawerRow : TouchOrigin
         data object DrawerList : TouchOrigin
@@ -111,8 +101,7 @@ sealed interface DrawerPanEvent {
 }
 
 /**
- * The layout nodes the drawer pan tests touches against (iOS's `drawerView`, `exposedCardView`,
- * `dragCardView`, and the hit view's ancestors). Register them with [drawerPanDrawer],
+ * The layout nodes the drawer pan tests touches against. Register them with [drawerPanDrawer],
  * [drawerPanList], [drawerPanCard], [drawerPanDragCard], [drawerPanHorizontalScroller] and
  * [drawerPanClaimsDrag]; provide it as `LocalDrawerPanExclusion` so the card's controls can use
  * `Modifier.excludedFromDrawerPan()`.
@@ -120,6 +109,7 @@ sealed interface DrawerPanEvent {
 @Stable
 class DrawerPanRegions : DrawerPanExclusion {
     internal class Scroller(val coordinates: LayoutCoordinates, val canScrollBackward: () -> Boolean, val canScrollForward: () -> Boolean)
+    internal class SelectionHandles(val coordinates: LayoutCoordinates, val handleClaims: (Offset) -> Boolean)
 
     internal var drawer: LayoutCoordinates? = null
     internal var card: LayoutCoordinates? = null
@@ -129,9 +119,14 @@ class DrawerPanRegions : DrawerPanExclusion {
     internal val scrollers = HashMap<Any, Scroller>()
     internal val claims = HashMap<Any, LayoutCoordinates>()
     internal val exclusions = HashMap<Any, LayoutCoordinates>()
+    internal val selectionHandles = HashMap<Any, SelectionHandles>()
 
     override fun updateExclusion(id: Any, coordinates: LayoutCoordinates?) {
         if (coordinates == null) exclusions.remove(id) else exclusions[id] = coordinates
+    }
+
+    override fun updateSelectionHandles(id: Any, coordinates: LayoutCoordinates?, handleClaims: (Offset) -> Boolean) {
+        if (coordinates == null) selectionHandles.remove(id) else selectionHandles[id] = SelectionHandles(coordinates, handleClaims)
     }
 
     override fun updateHorizontalScroller(
@@ -150,6 +145,15 @@ class DrawerPanRegions : DrawerPanExclusion {
     internal fun isExcluded(pan: LayoutCoordinates, point: Offset): Boolean =
         exclusions.values.any { contains(it, pan, point) }
 
+    /** Whether [point] (px in [pan]) lands on a text selection's handle. */
+    internal fun selectionHandleClaims(pan: LayoutCoordinates, point: Offset): Boolean {
+        for (handles in selectionHandles.values) {
+            if (!contains(handles.coordinates, pan, point)) continue
+            if (handles.handleClaims(handles.coordinates.localPositionOf(pan, point))) return true
+        }
+        return false
+    }
+
     internal fun contains(region: LayoutCoordinates?, pan: LayoutCoordinates, point: Offset): Boolean {
         if (region == null || !region.isAttached || !pan.isAttached) return false
         val local = region.localPositionOf(pan, point)
@@ -163,19 +167,19 @@ private fun Modifier.region(regions: DrawerPanRegions, set: (Any, LayoutCoordina
     onGloballyPositioned { set(id, it) }
 }
 
-/** The drawer (iOS `drawerView`). */
+/** The drawer. */
 fun Modifier.drawerPanDrawer(regions: DrawerPanRegions): Modifier =
     region(regions) { _, c -> regions.drawer = c }
 
-/** The drawer's session list (iOS's `UICollectionView`): a rightward drag on the open drawer reveals times. */
+/** The drawer's session list: a rightward drag on the open drawer reveals times. */
 fun Modifier.drawerPanList(regions: DrawerPanRegions): Modifier =
     region(regions) { id, c -> if (c == null) regions.lists.remove(id) else regions.lists[id] = c }
 
-/** The session card (iOS `exposedCardView`). Put it on the translated card itself. */
+/** The session card. Put it on the translated card itself. */
 fun Modifier.drawerPanCard(regions: DrawerPanRegions): Modifier =
     region(regions) { _, c -> regions.card = c }
 
-/** Catch Up's top card (iOS `dragCardView`), hit only while not [isHidden]. */
+/** Catch Up's top card, hit only while not [isHidden]. */
 fun Modifier.drawerPanDragCard(regions: DrawerPanRegions, isHidden: () -> Boolean = { false }): Modifier =
     region(regions) { _, c ->
         regions.dragCard = c
@@ -195,7 +199,10 @@ fun Modifier.drawerPanHorizontalScroller(
     if (c == null) regions.scrollers.remove(id) else regions.scrollers[id] = DrawerPanRegions.Scroller(c, canScrollBackward, canScrollForward)
 }
 
-/** A control that tracks a sideways drag (a slider, a switch): keeps its touch away from the leading edge (iOS `controlClaims`). */
+/**
+ * A control that tracks a sideways drag (a slider, a switch): keeps its touch away from the leading
+ * edge.
+ */
 fun Modifier.drawerPanClaimsDrag(regions: DrawerPanRegions): Modifier =
     region(regions) { id, c -> if (c == null) regions.claims.remove(id) else regions.claims[id] = c }
 
@@ -240,12 +247,14 @@ fun Modifier.drawerDirectionalPan(
                 if (!presented && onExposedCard && regions.isExcluded(pan, point)) {
                     return@awaitEachGesture
                 }
+                // A text selection's handle drags the handle, even at the edge.
+                if (!presented && regions.selectionHandleClaims(pan, point)) return@awaitEachGesture
                 if (!presented && !cardSwipe && isContentPushed()) return@awaitEachGesture
                 val startedAtEdge = !presented && !cardSwipe &&
                     (if (rtl) point.x >= size.width - edgeWidth else point.x <= edgeWidth)
                 if (!cardSwipe) onTouchDown()
 
-                // iOS walks the hit view's ancestors; here, every registered region under the finger.
+                // Every registered region under the finger.
                 val scrollersHere = regions.scrollers.values.filter { regions.contains(it.coordinates, pan, point) }
                 val ownsRightward = scrollersHere.any { if (rtl) it.canScrollForward() else it.canScrollBackward() }
                 val ownsLeftward = scrollersHere.any { if (rtl) it.canScrollBackward() else it.canScrollForward() }
@@ -309,7 +318,7 @@ fun Modifier.drawerDirectionalPan(
                             // Children see this move next; one that consumes it before the pan chose
                             // (a long press's drag, a text selection) began a hold.
                             val final = awaitPointerEvent(PointerEventPass.Final)
-                            if (final.changes.any { it.id == pointerId && it.positionChange() != Offset.Zero && it.isConsumed }) {
+                            if (final.changes.any { it.id == pointerId && it.positionChangeIgnoreConsumed() != Offset.Zero && it.isConsumed }) {
                                 holdBegan = true
                             }
                         }
@@ -333,7 +342,6 @@ fun Modifier.drawerDirectionalPan(
 }
 
 /**
- * [drawerDirectionalPan] wired the way iOS `SessionDrawerViewController.handlePan` wires it:
  * Catch Up's card swipe goes to [onCardSwipe]; a reveal goes to [onReveal]; anything else drags
  * [motion]'s card under the finger and releases it onto its spring.
  */

@@ -1,6 +1,7 @@
 package ai.opencode.feature.media
 
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.strings.localized
 import ai.opencode.core.ui.appFormattingLocale
 import ai.opencode.server.retry.NetworkPathMonitor
 import android.icu.number.Notation
@@ -17,7 +18,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
-/** A link as a card shows it right now (iOS `LinkPreview`). */
+/** A link as a card shows it right now. */
 data class LinkPreview(
     val target: LinkPreviewTarget,
     val display: Display,
@@ -39,7 +40,7 @@ data class LinkPreview(
     val id: String get() = target.key
     val url: String get() = target.url
     val domain: String get() = LinkPreviewPolicy.displayHost(url)
-    /** iOS `url.path`: decoded, empty for the root. */
+    /** Decoded, empty for the root. */
     val path: String
         get() {
             val path = url.toHttpUrlOrNull()?.let { "/" + it.pathSegments.joinToString("/") } ?: return ""
@@ -70,7 +71,7 @@ data class LinkPreview(
                         // Its title is its caption: say it once, then its stars and language.
                         GitHubLink.Kind.Repository -> listOf(details.caption, repositoryFacts(details))
                         GitHubLink.Kind.Issue, GitHubLink.Kind.PullRequest ->
-                            listOf(details.caption, details.state?.rawValue, display.title)
+                            listOf(details.caption, details.state?.title, display.title)
                         GitHubLink.Kind.Commit -> {
                             val additions = details.additions
                             val deletions = details.deletions
@@ -79,14 +80,14 @@ data class LinkPreview(
                         }
                     }
                 }
-                is Display.Video -> listOf(display.title, display.site ?: domain, "Video")
+                is Display.Video -> listOf(display.title, display.site ?: domain, localized(R.string.media_link_preview_video))
                 Display.Pending -> when (val source = richSource) {
                     is RichLinkSource.Github -> listOf(source.link.caption, kindName(source.link.kind), domain)
-                    is RichLinkSource.Youtube -> listOf("YouTube", "Video")
-                    null -> listOf(handle?.let { "@$it" }, "Post", domain)
+                    is RichLinkSource.Youtube -> listOf("YouTube", localized(R.string.media_link_preview_video))
+                    null -> listOf(handle?.let { "@$it" }, localized(R.string.media_link_preview_post), domain)
                 }
                 Display.Plain -> when {
-                    isXPost -> listOf("Post unavailable", handle?.let { "@$it" }, domain)
+                    isXPost -> listOf(localized(R.string.media_link_preview_post_unavailable), handle?.let { "@$it" }, domain)
                     else -> readableTitle(url)?.let { listOf(it, domain) } ?: listOf(domain)
                 }
             }
@@ -112,10 +113,10 @@ data class LinkPreview(
 
         /** What a GitHub link is, before its metadata arrives. */
         fun kindName(kind: GitHubLink.Kind): String = when (kind) {
-            GitHubLink.Kind.Repository -> "Repository"
-            GitHubLink.Kind.Issue -> "Issue"
-            GitHubLink.Kind.PullRequest -> "Pull request"
-            GitHubLink.Kind.Commit -> "Commit"
+            GitHubLink.Kind.Repository -> localized(R.string.media_github_kind_repository)
+            GitHubLink.Kind.Issue -> localized(R.string.media_github_kind_issue)
+            GitHubLink.Kind.PullRequest -> localized(R.string.media_github_kind_pull_request)
+            GitHubLink.Kind.Commit -> localized(R.string.media_github_kind_commit)
         }
 
         /** A repository's stars and language, as its facts read. */
@@ -127,7 +128,7 @@ data class LinkPreview(
             return if (parts.isEmpty()) null else parts.joinToString(" · ")
         }
 
-        /** Swift's `Int.formatted()`: grouped digits in the reader's locale (a GitHub issue's comments). */
+        /** Grouped digits in the reader's locale (a GitHub issue's comments). */
         fun formatted(value: Int): String = NumberFormat.getIntegerInstance(appFormattingLocale()).format(value)
 
         /**
@@ -159,8 +160,8 @@ data class LinkPreview(
 }
 
 /**
- * Work the network path set aside (iOS `DeferredRetries`): the rows waiting on each key, its retry
- * budget when the path comes back, and the most recent [limit] keys only.
+ * Work the network path set aside: the rows waiting on each key, its retry budget when the path
+ * comes back, and the most recent [limit] keys only.
  */
 internal class DeferredRetries<Payload>(val limit: Int, val retryLimit: Int) {
     data class Entry<Payload>(val payload: Payload, val rows: Set<String>)
@@ -209,11 +210,11 @@ internal class DeferredRetries<Payload>(val limit: Int, val retryLimit: Int) {
 internal fun DeferredRetries<Unit>.record(key: String, rows: Set<String>) = record(key, Unit, rows)
 
 /**
- * The transcript list's link previews (iOS `LinkPreviewStore`): which links each finished reply
- * names, what is known about them, and which rows to reload when an answer arrives. Not
- * observed: a row redraws by being reloaded ([onArrival]) with a bumped [revision].
+ * The transcript list's link previews: which links each finished reply names, what is known about
+ * them, and which rows to reload when an answer arrives. Not observed: a row redraws by being
+ * reloaded ([onArrival]) with a bumped [revision].
  *
- * Main-thread confined, as iOS's `@MainActor`; [close] cancels its work (iOS `deinit`).
+ * Main-thread confined; [close] cancels its work.
  */
 class LinkPreviewStore(
     client: LinkPreviewClient? = null,
@@ -244,7 +245,7 @@ class LinkPreviewStore(
     /** Bumped for a row when its metadata arrives, so a reloaded row redraws. */
     private val revisions = HashMap<String, Int>()
     private val targetsByEntry = HashMap<String, Pair<List<LinkTextBlock>, List<LinkPreviewTarget>>>()
-    /** Per-row motion state (iOS `LinkPreviewRowPresentation`, owned by the transcript). */
+    /** Per-row motion state. */
     private val presentations = HashMap<String, Any>()
 
     init {
@@ -258,12 +259,12 @@ class LinkPreviewStore(
         }
     }
 
-    /** iOS `deinit`: stops observing the path and drops pending loads. */
+    /** Stops observing the path and drops pending loads. */
     fun close() = scope.cancel()
 
     /**
-     * The row's presentation, made once by [make]. iOS types it `LinkPreviewRowPresentation`; that
-     * lives in `:feature:transcript`, above media, so the transcript passes its own.
+     * The row's presentation, made once by [make]. `LinkPreviewRowPresentation` lives in
+     * `:feature:transcript`, above media, so the transcript passes its own.
      */
     @Suppress("UNCHECKED_CAST")
     fun <T : Any> presentation(row: String, make: () -> T): T = presentations.getOrPut(row, make) as T
@@ -500,8 +501,8 @@ class LinkPreviewStore(
     }
 }
 
-/** iOS `EnvironmentValues.linkPreviewStore`: the transcript's store, provided by its list host. */
+/** The transcript's store, provided by its list host. */
 val LocalLinkPreviewStore = staticCompositionLocalOf<LinkPreviewStore?> { null }
 
-/** The row's [LinkPreviewStore.revision], set when it's configured (iOS `linkPreviewRevision`). */
+/** The row's [LinkPreviewStore.revision], set when it's configured. */
 val LocalLinkPreviewRevision = compositionLocalOf { 0 }

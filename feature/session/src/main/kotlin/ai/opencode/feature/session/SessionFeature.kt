@@ -22,6 +22,7 @@ import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.scope
+import ai.opencode.feature.media.AgentFileChecks
 import ai.opencode.feature.media.BrowserFeature
 import ai.opencode.feature.composer.ComposerAttachmentsFeature
 import ai.opencode.feature.composer.ComposerAutocompleteAction
@@ -48,6 +49,7 @@ import ai.opencode.feature.composer.SharedDraftTarget
 import ai.opencode.feature.composer.SharedLocation
 import ai.opencode.feature.composer.LocationClientError
 import ai.opencode.feature.media.UniversalLinkClient
+import ai.opencode.feature.voice.LiveSocketWarmerClient
 import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.feature.voice.VoiceServerChoice
 import ai.opencode.feature.voice.ServerVoiceProvider
@@ -85,6 +87,7 @@ import ai.opencode.server.model.OpenCodeTranscriptPage
 import ai.opencode.server.retry.NetworkPathClient
 import java.time.Instant
 import java.util.UUID
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import ai.opencode.feature.transcript.list.NewMessagesFold
 import ai.opencode.feature.transcript.list.NewMessagesEarlierBaseline
@@ -99,26 +102,17 @@ object MoveToBackground {
 }
 
 /**
- * Port of iOS `SessionFeature` (`OpenCode/Session/SessionFeature.swift`): one session screen (or a
- * new session's draft) — its transcript, composer, run, requests, call and sheets.
- *
- * Layout mirrors iOS: this file keeps [State]'s stored properties (and the nested types of
- * `+State` and `+ActionSupport`), [Action], dependencies and `reduce`; the body's composition is in
- * `SessionFeatureComposition.kt`; each area's reducer lives in `SessionFeature<Area>.kt` as
- * `internal fun SessionFeature.reduceX(state, action): Reduced?` (null: the action passes to the next step, iOS's `passes = true`). Helpers that mutate state and
- * return an effect (iOS `func x(_ state: inout State) -> Effect<Action>`) return
- * `Reduced<State, Action>`; pure state mutations (iOS `mutating func`) are
- * `fun State.x(): State` extensions in `SessionFeatureState*.kt`.
- *
- * Writes to [State.draft] go through [withDraft], which keeps iOS's `didSet` (an edit drops
- * [State.nonSendNewlineDraft]).
+ * One session screen (or a new session's draft): its transcript, composer, run, requests, call and
+ * sheets. This file keeps [State], [Action], dependencies and `reduce`; composition is in
+ * `SessionFeatureComposition.kt`, each area's reducer in `SessionFeature<Area>.kt` (`reduceX`
+ * returning null passes the action on), and pure state changes in `SessionFeatureState*.kt`. Writes
+ * to [State.draft] go through [withDraft], which drops [State.nonSendNewlineDraft] on an edit.
  */
 class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
 
     /**
-     * iOS `SessionFeature.State`. Every stored property keeps its iOS name and default. Build one
-     * with [State.session] or [State.draft] (iOS's two initializers). `@Shared` properties hold a
-     * [Shared] reference (equal by key identity); read them with `.value`.
+     * Build one with [State.session] or [State.draft]. `@Shared` properties hold a [Shared]
+     * reference (equal by key identity); read them with `.value`.
      */
     data class State(
         val server: OpenCodeServer,
@@ -161,7 +155,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val session: OpenCodeSession? = null,
         val draftProject: OpenCodeProject? = null,
         val projects: List<OpenCodeProject> = emptyList(),
-        /** A new computer's first session offers these until composing retires them (iOS `starterPrompts`). */
+        /** A new computer's first session offers these until composing retires them. */
         val starterPrompts: List<String> = emptyList(),
         val items: List<OpenCodeTranscriptItem> = emptyList(),
         val isLoading: Boolean = false,
@@ -177,6 +171,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         /** The cadence of the running pending-work poll; null while it is stopped. */
         val pendingWorkPollSeconds: Int? = null,
         val watchdogSchedule: WatchdogSchedule? = null,
+        val pausedWatchdogDeadline: Duration? = null,
         val watchdogGeneration: Int = 0,
         val streamSupportsProjection: Boolean = false,
         /** Raw live text, retained separately from rendered markdown so batches append exactly once. */
@@ -201,7 +196,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         /** The optimistic row most recently appended by an explicit send. */
         val lastSentItemID: String? = null,
         val sendGeneration: Int = 0,
-        /** Write through [withDraft] (iOS `didSet`). */
+        /** Write through [withDraft]. */
         val draft: String = "",
         /** The draft produced by `⇧↩` or a single-newline paste (`nonSendNewlineInserted`). */
         val nonSendNewlineDraft: String? = null,
@@ -302,6 +297,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         val isCovered: Boolean = false,
         /** Something sits over the transcript (a pushed subagent, its browser, Settings): what arrives isn't in front of the reader. */
         val isTranscriptCovered: Boolean = false,
+        val isPollingPaused: Boolean = false,
         /** The in-app browser over this session (Experimental). */
         val browser: BrowserFeature.State = BrowserFeature.State(),
         /** A link tap waiting on the system to say whether an app claims it. */
@@ -357,7 +353,6 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         /** Work a steering send has claimed to move before it's posted, by the send's message ID. */
         val autoBackgroundClaims: Map<String, String> = emptyMap(),
     ) {
-        /** iOS `Identifiable.id`. */
         val id: Int get() = navigationID
 
         /** The authoritative read in flight. Its unique ID rejects the response of any read abandoned before it. */
@@ -372,11 +367,11 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
             val modelChanged: Boolean = false,
             /** A revert was staged, redone, or committed while it was on its way. */
             val revertChanged: Boolean = false,
-            /** The session moved folders while this read was in flight (iOS `directoryChanged`). */
+            /** The session moved folders while this read was in flight. */
             val directoryChanged: Boolean = false,
         )
 
-        // region Nested types of iOS `SessionFeature+State.swift`
+        // region Nested types
 
         /** The title's syncing cue while a page read runs. */
         data class ResyncState(
@@ -437,7 +432,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         // endregion
 
         companion object {
-            /** iOS `init(server:session:cachedItems:…)`: an existing session. */
+            /** An existing session. */
             fun session(
                 server: OpenCodeServer,
                 session: OpenCodeSession,
@@ -469,7 +464,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
                 )
             }
 
-            /** iOS `init(server:draftProject:projects:…)`: a new session's draft. */
+            /** A new session's draft. */
             fun draft(
                 server: OpenCodeServer,
                 draftProject: OpenCodeProject?,
@@ -521,8 +516,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
     }
 
     /**
-     * iOS `SessionFeature.Action`. Bindings: see [BindingAction] (`SessionFeatureBindings.kt`).
-     * Convenience constructors for child actions live in the companion.
+     * Bindings: see [BindingAction] (`SessionFeatureBindings.kt`). Convenience constructors for
+     * child actions live in the companion.
      */
     sealed interface Action {
         data class Binding(val action: BindingAction) : Action
@@ -570,6 +565,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         data class SceneActiveChanged(val isActive: Boolean) : Action
         /** The scene went to the background (not merely inactive). */
         data object SceneEnteredBackground : Action
+        data class PollingPauseChanged(val paused: Boolean) : Action
         /** The empty composer's call button: logs its trigger, then [VoiceTapped]. */
         data object CallButtonTapped : Action
         data object VoiceTapped : Action
@@ -641,6 +637,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         /** The model list has gone: its search is cleared. */
         data object ModelListClosed : Action
         data class ModelsResponse(val result: Result<OpenCodeModelCatalog>) : Action
+        /** The server's model catalog changed (`model.updated`, `provider.updated`). */
+        data object ModelsChanged : Action
         data class ModelPicked(val model: OpenCodeModel) : Action
         /** Picks a model and reasoning level together. [ticked]: a drag already played a selection per stop. */
         data class ModelPickedWithLevel(val model: OpenCodeModel, val level: String?, val ticked: Boolean = false) : Action
@@ -658,6 +656,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         /** Agent Selection (`SessionFeatureAgents.kt`). */
         data class AgentApplied(val sessionID: String, val agent: String) : Action
         data object AgentsRequested : Action
+        /** The server's agents changed (`agent.updated`). */
+        data object AgentsChanged : Action
         data class AgentsResponse(val result: Result<List<OpenCodeAutocompleteAgent>>) : Action
         data class AgentPicked(val agent: String) : Action
         data object ProjectButtonTapped : Action
@@ -676,6 +676,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         data class FamilyResponse(val result: Result<OpenCodeSessionFamily>) : Action
         data class SessionSnapshotUpdated(val session: OpenCodeSession) : Action
         data class FamilyRunStateChanged(val sessionID: String, val isRunning: Boolean) : Action
+        data class ActiveSessionsRead(val sessionIDs: Set<String>) : Action
         data class FamilySessionRenamed(val sessionID: String, val title: String) : Action
         data class FamilySessionDeleted(val sessionID: String) : Action
         data class ShellsResponse(val sessionID: String, val result: Result<List<OpenCodeShell>>) : Action
@@ -694,6 +695,12 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         /** A send's delivery ended: its claim, if it never moved the work, lapses. */
         data class AutoBackgroundClaimLapsed(val messageID: String, val requestEpoch: Int) : Action
         data class ComposerAttachments(val action: ComposerAttachmentsFeature.Action) : Action
+        /**
+         * A drawn image for the session whose viewer it came from ([from]), added by the rules a
+         * pasted image follows. A session action, since [State.TaskIdentity] is this module's,
+         * above the composer's.
+         */
+        data class DrawingAdded(val attachment: OpenCodeOutgoingAttachment, val from: State.TaskIdentity) : Action
         /** An upward swipe on the unfocused composer asks for the keyboard. */
         data object ComposerSwipedUp : Action
         /** Send a failed message again, with its ID and delivery. */
@@ -810,6 +817,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
             fun locationResponse(result: ComposerAttachmentsFeature.Outcome<SharedLocation, LocationClientError>): Action =
                 ComposerAttachments(ComposerAttachmentsFeature.Action.LocationResponse(result))
             val locationRemoved: Action get() = ComposerAttachments(ComposerAttachmentsFeature.Action.LocationRemoved)
+            fun quoteRemoved(id: String): Action = ComposerAttachments(ComposerAttachmentsFeature.Action.QuoteRemoved(id))
+            fun quoteCommented(id: String, comment: String): Action = ComposerAttachments(ComposerAttachmentsFeature.Action.QuoteCommented(id, comment))
             val locationErrorDismissed: Action get() = ComposerAttachments(ComposerAttachmentsFeature.Action.LocationErrorDismissed)
             val locationSettingsTapped: Action get() = ComposerAttachments(ComposerAttachmentsFeature.Action.LocationSettingsTapped)
             val queuedUploadsStarted: Action get() = ComposerAttachments(ComposerAttachmentsFeature.Action.QueuedUploadsStarted)
@@ -819,7 +828,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         }
     }
 
-    /** iOS `SessionFeature.Action.Delegate`: list-level changes Home owns. */
+    /** List-level changes Home owns. */
     sealed interface Delegate {
         /** [toolID]: a voice open (`android_voice_open_session`) App authorized; Home navigates only for it. */
         data class OpenSession(val session: OpenCodeSession, val toolID: String? = null) : Delegate
@@ -844,7 +853,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         data object ReportProblem : Delegate
     }
 
-    /** iOS `SessionFeature.AuthoritativeRefresh`: one authoritative read's result. */
+    /** One authoritative read's result. */
     data class AuthoritativeRefresh(
         val observed: OpenCodeSession,
         val items: List<OpenCodeTranscriptItem>,
@@ -865,9 +874,9 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
     }
 
     /**
-     * iOS `SessionFeature.SwitchSnapshot` (`+State`): presentation data only. A new visit gets a new
-     * cancellation identity; known work paints immediately while its authoritative reads run
-     * again. Build with `SwitchSnapshot.from(state)`; apply with `restore(state)`.
+     * Presentation data only. A new visit gets a new cancellation identity; known work paints
+     * immediately while its authoritative reads run again. Build with `SwitchSnapshot.from(state)`;
+     * apply with `restore(state)`.
      */
     data class SwitchSnapshot(
         val session: OpenCodeSession,
@@ -908,7 +917,6 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         data class NewSession(val directory: String) : SendTarget
     }
 
-    /** iOS `CancelID`. */
     sealed interface CancelID {
         data object UniversalLink : CancelID
         data object Models : CancelID
@@ -963,8 +971,8 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
         const val tryAgainPrompt = "Continue"
 
         /**
-         * One function per run of cases, tried in this order (iOS `coreSteps`). A step returns null
-         * when it doesn't take the action, and the next one runs.
+         * One function per run of cases, tried in this order. A step returns null when it doesn't
+         * take the action, and the next one runs.
          */
         internal val coreSteps: List<SessionFeature.(State, Action) -> Reduced<State, Action>?> = listOf(
             SessionFeature::reduceCallAndBindings,
@@ -996,6 +1004,7 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
     internal val haptics by Dependency(HapticsClient)
     internal val soundEffects by Dependency(SoundEffectsClient)
     internal val mediaReferences by Dependency(MediaReferenceClient)
+    internal val fileChecks by Dependency(AgentFileChecks)
     internal val sceneWindow by Dependency(SceneWindowClient)
     internal val markdownStream by Dependency(MarkdownStreamClient)
     internal val dictation by Dependency(DictationClient)
@@ -1008,12 +1017,13 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
     internal val universalLinks by Dependency(UniversalLinkClient)
     internal val experimentalFeatures by Dependency(ExperimentalFeatures)
     internal val sessionTimers by Dependency(SessionTimers)
+    internal val liveSocketWarmer by Dependency(LiveSocketWarmerClient)
 
     // endregion
 
     // region Body
 
-    /** iOS `builtBody`: content batches and family run changes skip the full body's hooks (the stream fast path). */
+    /** Content batches and family run changes skip the full body's hooks (the stream fast path). */
     private val builtBody: Reducer<State, Action> by lazy { composedBody() }
 
     override fun reduce(state: State, action: Action): Reduced<State, Action> = builtBody.reduce(state, action)

@@ -2,6 +2,7 @@ package ai.opencode.feature.settings.onboarding
 
 import ai.opencode.core.ui.OpenCodeFonts
 import ai.opencode.core.ui.OpenCodeIcon
+import ai.opencode.feature.settings.R
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,6 +32,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -45,9 +47,9 @@ private fun mono(size: Float, weight: FontWeight = FontWeight.Normal) =
 
 /**
  * The OpenCode website (`opencode.ai`) in dark mode, as the laptop's browser shows it on
- * `localhost:3000` (iOS `WelcomeSitePage`): warm dark canvas, architectural grid rails, the pixel
- * wordmark, monospace hero, install command, and the platform CTA that [grow] expands from a
- * modest desktop chip (0) into a full-width “Download for Android” button (1).
+ * `localhost:3000`: warm dark canvas, architectural grid rails, the pixel wordmark, monospace hero,
+ * install command, and the platform CTA that [grow] expands from a modest desktop chip (0) into a
+ * full-width “Download for Android” button (1).
  */
 @Composable
 internal fun WelcomeSitePage(modifier: Modifier = Modifier, grow: Double = 1.0, sheen: Double = 0.0) {
@@ -79,7 +81,7 @@ internal fun WelcomeSitePage(modifier: Modifier = Modifier, grow: Double = 1.0, 
                 WelcomeWordmark(Modifier.size(72.dp, 13.dp))
                 Spacer(Modifier.weight(1f))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    for (link in listOf("Docs", "Zen", "GitHub")) Text(link, style = mono(8.5f), color = WelcomeSitePage.muted)
+                    for (link in listOf(stringResource(R.string.settings_onboarding_site_docs), "Zen", "GitHub")) Text(link, style = mono(8.5f), color = WelcomeSitePage.muted)
                 }
             }
             Box(Modifier.fillMaxWidth().height(0.75.dp).background(WelcomeSitePage.grid))
@@ -92,11 +94,11 @@ internal fun WelcomeSitePage(modifier: Modifier = Modifier, grow: Double = 1.0, 
 private fun Hero(grow: Double, sheen: Double) {
     Column(Modifier.width(WelcomeSitePage.COLUMN_WIDTH.dp).padding(top = 11.dp)) {
         Text(
-            "The open source\nAI coding agent.",
+            stringResource(R.string.settings_onboarding_site_headline),
             style = mono(13.5f, FontWeight.Bold).copy(letterSpacing = (-0.25).sp, lineHeight = 18.sp),
             color = WelcomeSitePage.strong,
         )
-        Text("Claude, GPT & Gemini — terminal, desktop, or phone.", style = mono(7.5f), color = WelcomeSitePage.muted, maxLines = 1, softWrap = false, modifier = Modifier.padding(top = 4.dp))
+        Text(stringResource(R.string.settings_onboarding_site_subhead), style = mono(7.5f), color = WelcomeSitePage.muted, maxLines = 1, softWrap = false, modifier = Modifier.padding(top = 4.dp))
         InstallCard(Modifier.padding(top = 9.dp))
         Box(Modifier.padding(top = 9.dp).height(30.dp), contentAlignment = Alignment.CenterStart) { CtaButton(grow, sheen) }
     }
@@ -158,14 +160,14 @@ private fun CtaButton(grow: Double, sheen: Double) {
         )
         Row(Modifier.fillMaxWidth().alpha(beforeOut), horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally), verticalAlignment = Alignment.CenterVertically) {
             OpenCodeIcon("desktopcomputer", null, size = 8.dp, tint = WelcomeSitePage.muted)
-            Text("macOS & Linux", style = mono(8f), color = WelcomeSitePage.muted, maxLines = 1, softWrap = false)
+            Text(stringResource(R.string.settings_onboarding_site_platforms), style = mono(8f), color = WelcomeSitePage.muted, maxLines = 1, softWrap = false)
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp).alpha(afterIn), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             OpenCodeIcon("platter.filled.top.iphone", null, size = 10.5.dp, tint = WelcomeSitePage.canvas)
-            Text("Download for Android", fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold, color = WelcomeSitePage.canvas, maxLines = 1, softWrap = false)
+            Text(stringResource(R.string.settings_onboarding_site_download_android), fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold, color = WelcomeSitePage.canvas, maxLines = 1, softWrap = false)
             Spacer(Modifier.weight(1f))
             Text(
-                "couch-ready →",
+                stringResource(R.string.settings_onboarding_site_couch_ready),
                 style = mono(7.5f),
                 color = WelcomeInk.hex(0x3E3737),
                 maxLines = 1,
@@ -203,7 +205,7 @@ internal object WelcomeSitePage {
 
 /**
  * The `opencode` ornate pixel wordmark (`39 × 7` unit grid from `logo-ornate-dark.svg`): `open` in
- * warm silver, `code` in ivory, with dark inner blocks (iOS `WelcomeWordmark`).
+ * warm silver, `code` in ivory, with dark inner blocks.
  */
 @Composable
 internal fun WelcomeWordmark(modifier: Modifier = Modifier) {
@@ -237,7 +239,7 @@ private val WORDMARK_CODE = cells(
 
 /**
  * The browser OpenCode drives on the laptop: a dark window over the app with the `opencode.ai` dev
- * page, the edit's reload bar, and the capture flash (iOS `WelcomeBrowserWindow`).
+ * page, the edit's reload bar, and the capture flash.
  */
 @Composable
 internal fun WelcomeBrowserWindow(frame: WelcomeFrame, targets: WelcomeTargets?, modifier: Modifier = Modifier) {
@@ -305,10 +307,9 @@ internal object WelcomeBrowserWindow {
 }
 
 /**
- * The browser's screenshot as the agent's tool sends it back: the edited dark-mode OpenCode page
- * (iOS `WelcomeScreenshot`). iOS renders [WelcomeSitePage] once into a 3× PNG; Compose draws the
- * page itself wherever the screenshot shows (the carrier, the phone's tile), so nothing is
- * rasterised, and this keeps the attachment's name and pixel size.
+ * The browser's screenshot as the agent's tool sends it back: the edited dark-mode OpenCode page.
+ * Compose draws the page itself wherever the screenshot shows (the carrier, the phone's tile), so
+ * nothing is rasterised, and this keeps the attachment's name and pixel size.
  */
 internal object WelcomeScreenshot {
     const val NAME = "opencode.png"

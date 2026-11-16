@@ -46,10 +46,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `RequestAnswerTests.swift`'s Home tests. The rest are `:feature:session`'s
- * (`SessionFeature`/`RequestDockFeature` stores and the request bar's layout).
- */
 class RequestAnswerTests {
     @get:Rule val isolation = TestIsolationRule()
 

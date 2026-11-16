@@ -1,5 +1,7 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.core.strings.localizedPlural
+import ai.opencode.core.strings.localized
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
 import ai.opencode.core.dependencies.dependency
@@ -30,9 +32,9 @@ import kotlin.time.Duration.Companion.seconds
 
 /**
  * Inbox Sidebar (experimental): the drawer as an inbox, one item per session, sorted Needs your
- * input, then unread, then newest. Rows come from Home's state ([HomeFeature.State.inboxSidebarRows]);
- * this reducer owns Archive and Unarchive, the actions Home doesn't already have.
- * Android: archived sessions can be restored, as on desktop (iOS can't).
+ * input, then unread, then newest. Rows come from Home's state
+ * ([HomeFeature.State.inboxSidebarRows]); this reducer owns Archive and Unarchive, the actions Home
+ * doesn't already have. Android: archived sessions can be restored, as on desktop.
  */
 class InboxSidebarFeature : Reducer<InboxSidebarFeature.State, InboxSidebarFeature.Action> {
     data class Status(
@@ -110,7 +112,7 @@ class InboxSidebarFeature : Reducer<InboxSidebarFeature.State, InboxSidebarFeatu
                 Reduced(next)
             } else {
                 AppLog.network.notice { "Archive failed: ${error.logSummary}" }
-                failed(next, "Couldn’t archive “${action.title}”. ${error.message}")
+                failed(next, localized(R.string.drawer_archive_error, action.title, error.message))
             }
         }
 
@@ -203,7 +205,7 @@ class InboxSidebarFeature : Reducer<InboxSidebarFeature.State, InboxSidebarFeatu
                 )
             } else {
                 AppLog.network.notice { "Unarchive failed: ${error.logSummary}" }
-                failed(state.copy(status = status), "Couldn’t unarchive “${action.title}”. ${error.message}")
+                failed(state.copy(status = status), localized(R.string.drawer_unarchive_error, action.title, error.message))
             }
         }
     }
@@ -222,7 +224,7 @@ class InboxSidebarFeature : Reducer<InboxSidebarFeature.State, InboxSidebarFeatu
     }
 
     companion object {
-        /** The Inbox Sidebar switch (iOS `ExperimentalFeature.inboxSidebar`, off by default). */
+        /** The Inbox Sidebar switch. */
         val experiment: ExperimentalFeature get() = ExperimentalFeature.inboxSidebar
 
         /** As many archived sessions as desktop's Archived list shows. */
@@ -272,10 +274,19 @@ data class InboxSidebarRow(
         fun age(date: Instant, now: Instant, zone: ZoneId = ZoneId.systemDefault(), locale: Locale = appFormattingLocale()): String {
             val seconds = maxOf(Duration.between(date, now).toMillis() / 1_000.0, 0.0)
             return when {
-                seconds < 60 -> "now"
-                seconds < 3_600 -> "${(seconds / 60).toInt()}m"
-                seconds < 86_400 -> "${(seconds / 3_600).toInt()}h"
-                seconds < 604_800 -> "${(seconds / 86_400).toInt()}d"
+                seconds < 60 -> localized(R.string.drawer_age_now)
+                seconds < 3_600 -> {
+                    val minutes = (seconds / 60).toInt()
+                    localizedPlural(R.plurals.drawer_age_minutes, minutes, minutes)
+                }
+                seconds < 86_400 -> {
+                    val hours = (seconds / 3_600).toInt()
+                    localizedPlural(R.plurals.drawer_age_hours, hours, hours)
+                }
+                seconds < 604_800 -> {
+                    val days = (seconds / 86_400).toInt()
+                    localizedPlural(R.plurals.drawer_age_days, days, days)
+                }
                 else -> DateTimeFormatter.ofPattern("MMM d", locale).withZone(zone).format(date)
             }
         }

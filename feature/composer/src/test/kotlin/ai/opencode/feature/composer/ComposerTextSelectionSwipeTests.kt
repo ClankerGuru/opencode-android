@@ -7,16 +7,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * iOS `OpenCodeTests/ComposerTextSelectionSwipeTests.swift`. Kit: “Trying to select text in the
- * composer always actually brings it up or down because of our swipe action.” A drag the text
- * field is selecting with is never the composer's swipe.
- *
- * `onlyAFocusedNonEmptySelectionClaims` hosts a `UITextView` in a window on iOS; here it checks
- * the rule the composable's field applies (`ComposerSwipeDown.selectionClaims` with its focus and
- * selection), with the selected word's rect standing in for UIKit's `selectionRects`.
- * iOS `CGRect.null`/`.infinite` → non-finite [Rect]s.
- */
+/** A drag the text field is selecting with is never the composer's swipe. */
 class ComposerTextSelectionSwipeTests {
     @Test
     fun aSelectingDragBelongsToTheText() {

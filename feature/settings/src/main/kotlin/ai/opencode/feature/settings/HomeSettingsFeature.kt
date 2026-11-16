@@ -37,21 +37,16 @@ import ai.opencode.feature.voice.VoiceReadiness
 import ai.opencode.feature.voice.VoiceServerChoice
 import ai.opencode.feature.voice.VoiceSharedKeys
 import ai.opencode.server.OpenCodeServer
+import java.util.Locale
 
 /**
- * Port of iOS `Drawer/HomeSettingsFeature.swift` (moved down to `:feature:settings`: the Settings
- * pages are its only senders besides Home's sidebar toggle, and Android's Settings reducer owns
- * its preference writes). Preferences and their platform effects; every write goes through
- * [setShared], which skips unchanged values (iOS rule).
+ * Moved down to `:feature:settings`: preferences and their platform effects. Every write goes
+ * through [setShared], which skips unchanged values.
  *
- * Not here, by design: iOS's `developerModeChanged`, `motionWatchChanged`, `touchProbeChanged` and
- * `voiceDemoModeChanged` come from its Diagnostics page; on Android that page is `:devtools`'
- * `DevToolsView`, whose `DevToolsFeature` writes Developer Mode (turning recording on with it) and
- * Demo Call Audio itself; Motion Watch and Touch Probe are iOS-only tools. The Tuning mirrors of
- * New Plus Menu and Composer Autocomplete are n/a: the composer reads the experiment keys directly.
+ * Developer Mode and Demo Call Audio are written by `:devtools`' `DevToolsFeature` instead.
  */
 class HomeSettingsFeature : Reducer<HomeSettingsFeature.State, HomeSettingsFeature.Action> {
-    /** Home's server, for the voice broker check (iOS `State.server`); the sidebar flag is a shared key. */
+    /** Home's server, for the voice broker check; the sidebar flag is a shared key. */
     data class State(val server: OpenCodeServer? = null)
 
     sealed interface Action {
@@ -91,12 +86,16 @@ class HomeSettingsFeature : Reducer<HomeSettingsFeature.State, HomeSettingsFeatu
         data object WelcomeOpened : Action
         data class AppThemeChanged(val theme: AppTheme) : Action
         data class AppearanceColorSchemeChanged(val scheme: AppearanceColorScheme) : Action
+        /** Settings › Language: null follows the system. */
+        data class AppLanguageChanged(val locale: Locale?) : Action
         data class ReturnKeySendsChanged(val on: Boolean) : Action
+        data class AgentSelectionChanged(val on: Boolean) : Action
         /** Agent Selection: the agent new sessions start with ("" is the server's). */
         data class DefaultAgentChanged(val id: String) : Action
     }
 
     private val haptics by Dependency(HapticsClient)
+    private val appLanguage by Dependency(AppLanguageClient)
     private val serverVoice by Dependency(ServerVoiceClient)
     private val soundEffects by Dependency(SoundEffectsClient)
 
@@ -171,7 +170,7 @@ class HomeSettingsFeature : Reducer<HomeSettingsFeature.State, HomeSettingsFeatu
                     saved = VoiceFeature.savedServers,
                     readiness = readiness,
                 )
-                // iOS's Home always has a server; Android's state can be empty before one connects.
+                // The state can be empty before a server connects.
                 val home = state.server
                 val asksModels = home != null && pick.isAutomatic && provider == ServerVoiceProvider.openAI
                 val broker = pick.server
@@ -216,7 +215,14 @@ class HomeSettingsFeature : Reducer<HomeSettingsFeature.State, HomeSettingsFeatu
                 if (setShared(ThemeSharedKeys.appTheme, action.theme)) haptics.play(Haptic.selection)
             is Action.AppearanceColorSchemeChanged ->
                 if (setShared(ThemeSharedKeys.appearanceColorScheme, action.scheme)) haptics.play(Haptic.selection)
+            is Action.AppLanguageChanged -> {
+                val client = appLanguage
+                if (client.current() == action.locale) return Reduced(state)
+                haptics.play(Haptic.selection)
+                return Reduced(state, Effect.run { client.set(action.locale) })
+            }
             is Action.ReturnKeySendsChanged -> setShared(SharedKeys.returnKeySends, action.on)
+            is Action.AgentSelectionChanged -> setShared(SharedKeys.agentSelection, action.on)
             is Action.DefaultAgentChanged -> setShared(SharedKeys.defaultAgentID, action.id)
         }
         return Reduced(state, Effect.none())

@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.strings.localized
 import ai.opencode.feature.composer.RequestDockFeature
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
@@ -23,11 +24,8 @@ import kotlin.time.Duration
 import ai.opencode.feature.transcript.list.NewMessagesFold
 import ai.opencode.feature.transcript.list.TranscriptScan
 
-// Port of iOS `SessionFeature+Stream.swift`.
-
 /**
- * iOS `SessionFeature.mergeTranscript(fetched:into:…)`: splices a freshly fetched window of newest
- * messages into what we show.
+ * Splices a freshly fetched window of newest messages into what we show.
  *
  * Every fetch returns the *newest N messages*, so a poll's window is often shorter than a
  * transcript already expanded by the full-history fetch — and its item count can even shrink as
@@ -180,7 +178,7 @@ fun SessionFeature.Companion.preservingInProgressText(
     return mergeTranscript(fetched, anchorsAndText, preserveInProgressText = true)
 }
 
-/** iOS `SessionFeature.messageID(for:)`: the server message an item belongs to. */
+/** The server message an item belongs to. */
 internal fun SessionFeature.Companion.messageID(item: OpenCodeTranscriptItem): String {
     TranscriptEntry.promptID(item)?.let { return it }
     return when (item) {
@@ -195,7 +193,10 @@ internal fun SessionFeature.Companion.messageID(item: OpenCodeTranscriptItem): S
     }
 }
 
-/** iOS `SessionFeature.ids(_:in:)`: which of [ids] are rows in [items], looking from the end (live parts are recent) and stopping once all are found. */
+/**
+ * Which of [ids] are rows in [items], looking from the end (live parts are recent) and stopping
+ * once all are found.
+ */
 internal fun SessionFeature.Companion.ids(ids: Set<String>, items: List<OpenCodeTranscriptItem>): Set<String> {
     if (ids.isEmpty()) return emptySet()
     val found = HashSet<String>()
@@ -208,7 +209,6 @@ internal fun SessionFeature.Companion.ids(ids: Set<String>, items: List<OpenCode
     return found
 }
 
-/** iOS `SessionFeature.promptIDs(in:)`. */
 internal fun SessionFeature.Companion.promptIDs(items: List<OpenCodeTranscriptItem>): Set<String> =
     items.mapNotNullTo(HashSet()) { TranscriptEntry.promptID(it) }
 
@@ -223,9 +223,14 @@ internal fun SessionFeature.reduceStream(
     is Action.MessageInvalidated ->
         if (state.session?.id != action.sessionID) Reduced(state)
         else Reduced(state, Effect.send(Action.RefreshRequested(RefreshReason.Invalidation)))
-    is Action.RefreshRequested -> refreshRequested(state, action.reason)
+    is Action.RefreshRequested -> {
+        val refreshed = refreshRequested(state, action.reason)
+        Reduced(refreshed.state, Effect.merge(refreshed.effect, recheckFiles(state, action.reason)))
+    }
     is Action.RefreshResponse -> refreshResponse(state, action)
     is Action.SceneActiveChanged -> sceneActiveChanged(state, action.isActive)
+    is Action.ActiveSessionsRead -> Reduced(state.copy(activeFamilySessionIDs = action.sessionIDs))
+    is Action.PollingPauseChanged -> pollingPauseChanged(state, action.paused)
     is Action.VisibilityChanged -> visibilityChanged(state, action.isVisible)
     is Action.ResyncDelayElapsed -> resyncDelayElapsed(state, action.refreshID)
     is Action.ResyncMinimumElapsed -> {
@@ -255,6 +260,25 @@ internal fun SessionFeature.reduceStream(
     else -> null
 }
 
+private fun SessionFeature.pollingPauseChanged(
+    state: SessionFeature.State,
+    paused: Boolean,
+): Reduced<SessionFeature.State, Action> {
+    var s = state.copy(isPollingPaused = paused)
+    if (paused) s = s.copy(pausedWatchdogDeadline = s.watchdogSchedule?.deadline)
+    if (!s.pollsServer) return quietServerPolling(s)
+    val deadline = s.pausedWatchdogDeadline
+    s = s.copy(pausedWatchdogDeadline = null)
+    val clock = watchdogClock
+    val due = deadline != null && (clock == null || clock.now() >= deadline)
+    val reads = due && s.hasRenderedFirstContentFrame && s.session != null
+    val resumed = resumeServerPolling(s)
+    return Reduced(
+        resumed.state,
+        Effect.merge(resumed.effect, if (reads) Effect.send(Action.RefreshRequested(RefreshReason.Watchdog)) else Effect.none()),
+    )
+}
+
 private fun SessionFeature.eventStreamConnected(
     state: SessionFeature.State,
     action: Action.EventStreamConnected,
@@ -264,7 +288,7 @@ private fun SessionFeature.eventStreamConnected(
     if (support != null && support != ServerVoiceSupport.unknown) {
         s = s.copy(voice = s.voice?.copy(serverVoiceSupport = ServerVoiceSupport.unknown))
     }
-    val retune = retunePendingWork(s)
+    val retune = pendingWorkAfterStreamConnected(s)
     // A new socket epoch invalidates delta accumulators, not rendered parts: unfinished
     // text/tools are still absent from REST. Keep their row protection until reconciliation can
     // echo them or the run ends. Shell events are ephemeral: an exit may have been missed. The
@@ -373,6 +397,19 @@ private fun SessionFeature.contentBatch(
             watched.effect,
         ),
     )
+}
+
+/** Opening the session, and each reply the agent finishes, may leave files that weren't there before. */
+private fun SessionFeature.recheckFiles(state: SessionFeature.State, reason: RefreshReason): Effect<Action> {
+    val directory = state.session?.directory ?: return Effect.none()
+    val rechecks = when (reason) {
+        RefreshReason.Open, RefreshReason.Resume, RefreshReason.RunState, is RefreshReason.Settlement -> true
+        else -> false
+    }
+    if (!rechecks) return Effect.none()
+    val checks = fileChecks
+    val server = state.server
+    return Effect.run { checks.invalidate(server, directory) }
 }
 
 private fun SessionFeature.refreshRequested(
@@ -757,9 +794,9 @@ private fun SessionFeature.firstContentFrameRendered(state: SessionFeature.State
     )
 }
 
-/** iOS `Result.failure(OpenCodeClientError)`: a failure that isn't one reads as a generic client error. */
+/** A failure that isn't one reads as a generic client error. */
 internal fun Throwable.asClientError(): ai.opencode.server.OpenCodeClientError =
-    this as? ai.opencode.server.OpenCodeClientError ?: ai.opencode.server.OpenCodeClientError(message ?: "Something went wrong")
+    this as? ai.opencode.server.OpenCodeClientError ?: ai.opencode.server.OpenCodeClientError(message ?: localized(R.string.session_something_went_wrong))
 
 // region Live projection
 
@@ -889,10 +926,9 @@ private fun LiveProjection.upsertText(change: LiveUpsert, id: String): String? {
 internal enum class LiveUpsert { Unchanged, Replaced, Inserted }
 
 /**
- * iOS `upsertLiveText(id:text:streaming:in:)`. [streaming] text is still arriving: a last line
- * holding only a block's marker waits for its first word (`holdingPendingMarker`). iOS projects
- * Markdown blocks here (`markdownStream.blocks`); the Android item carries its text and the
- * transcript parses it. True when [items] changed.
+ * [streaming] text is still arriving: a last line holding only a block's marker waits for its first
+ * word (`holdingPendingMarker`). The Android item carries its text and the transcript parses it.
+ * True when [items] changed.
  */
 internal fun SessionFeature.upsertLiveText(
     id: String,
@@ -901,7 +937,7 @@ internal fun SessionFeature.upsertLiveText(
     items: MutableList<OpenCodeTranscriptItem>,
 ): Boolean = upsertLiveTextChange(id, text, streaming, items) != LiveUpsert.Unchanged
 
-/** [upsertLiveText], saying whether it inserted the row (iOS returns the inserted ID). */
+/** [upsertLiveText], saying whether it inserted the row. */
 internal fun SessionFeature.upsertLiveTextChange(
     id: String,
     text: String,

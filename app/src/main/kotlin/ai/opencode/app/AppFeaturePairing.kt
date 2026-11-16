@@ -9,6 +9,7 @@ import ai.opencode.core.sharing.InstallHistory
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
+import ai.opencode.core.strings.localized
 import ai.opencode.core.ui.ThisDevice
 import ai.opencode.feature.drawer.HomeFeature
 import ai.opencode.feature.drawer.notices.AccessibilityAnnouncer
@@ -20,14 +21,13 @@ import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.friendlyName
 
 /*
- * Port of iOS `App/AppFeature+Pairing.swift`: everything pairing in one place. Validating a
- * pasted or scanned code, an unsolicited link waiting for confirmation, redeeming it, and where a
- * pairing lands once its computer's sessions load (t485). The install's first computer opens a ready session, another new computer opens
- * the drawer on its sessions, and re-pairing a known one stays put. Every pairing that lands
- * plays the handshake: `success` and, for TalkBack, the computer's name.
+ * Everything pairing in one place. Validating a pasted or scanned code, an unsolicited link waiting
+ * for confirmation, redeeming it, and where a pairing lands once its computer's sessions load.
+ * The install's first computer opens a ready session, another new computer opens the drawer
+ * on its sessions, and re-pairing a known one stays put. Every pairing that lands plays the
+ * handshake: `success` and, for TalkBack, the computer's name.
  */
 
-/** iOS `AppFeature.PairingArrival`. */
 enum class PairingArrival {
     /** This install's first computer ever: a new session in its latest project. */
     firstComputer,
@@ -56,7 +56,7 @@ enum class PairingArrival {
 internal fun landPairing(arrival: PairingArrival?, server: OpenCodeServer, asked: Boolean): Effect<AppFeature.Action> {
     if (arrival == null) return Effect.none()
     dependency(HapticsClient).play(Haptic.success)
-    dependency(AccessibilityAnnouncer).announce("Connected to ${server.friendlyName}", false)
+    dependency(AccessibilityAnnouncer).announce(localized(R.string.app_pairing_connected_announcement, server.friendlyName), false)
     if (asked) return Effect.none()
     return when (arrival) {
         PairingArrival.firstComputer -> Effect.send(AppFeature.Action.Home(HomeFeature.Action.FirstComputerPaired))
@@ -162,11 +162,11 @@ internal fun redeem(link: OpenCodePairingLink, state: AppFeature.State): Reduced
     )
 }
 
-internal const val invalidPairingCodeMessage =
-    "That isn’t an OpenCode pairing code. Run opencode pair --remote on your computer, then scan its QR code or paste the link it prints."
+internal val invalidPairingCodeMessage: String
+    get() = localized(R.string.app_pairing_invalid_code)
 
 internal fun unusableAddressMessage(unusable: OpenCodePairingLink.UnusableAddress): String =
-    "Couldn’t use “${unusable.address}” from this pairing code: it ${unusable.reason}."
+    localized(R.string.app_pairing_unusable_address, unusable.address, unusable.reason)
 
 internal val loopbackPairingMessage: String
-    get() = "That server only listens on localhost, so this ${ThisDevice.casualName} can’t reach it. Run opencode pair --remote on your computer instead, which works from any network."
+    get() = localized(R.string.app_pairing_loopback, ThisDevice.casualName)

@@ -28,29 +28,8 @@ import kotlin.math.truncate
 import kotlin.random.Random
 
 /**
- * Port of iOS `Tunable` (`OpenCode/Tuning/Tunable.swift`): a visual or motion value to dial in
- * live (Settings › Developer › Tuning Panel). Declare it once, where it's used, in an
- * `object` named for its feature, and read [value]:
- *
- * ```kotlin
- * object DrawerTunables {
- *     val recedeScale = Tunable("drawer.depth.recedeScale", "List recede scale", default = 0.96, range = 0.85..1.0)
- * }
- * val scale = DrawerTunables.recedeScale.value
- * ```
- *
- * Same keys, labels, defaults, ranges and steps as iOS, so a value tuned on one phone means the
- * same on the other. While tuning is off, [value] is the default after one volatile read; on, it
- * is the phone's override, and a composable that reads it recomposes when it changes (the read
- * goes through Compose snapshot state, as iOS's goes through Observation). The key's first
- * segment is its group in the panel, the second its section.
- *
- * Types: [Double], [Float] (iOS `CGFloat` used as a plain number), [Dp] (iOS `CGFloat` points),
- * [Int], [Boolean], and string enums implementing [TunableChoice]. Pick the overload with the
- * literal: `default = 3.0` (Double), `3f` (Float), `3.dp` (Dp), `3` (Int).
- *
- * Bake: keep each declaration on ONE line in this form (`Tunable("key", "label", default = …`)
- * so `python3 scripts/tune.py bake` can rewrite its `default =` literal with a tuned value.
+ * A value to dial in live, same keys and defaults. Keep each declaration on ONE line
+ * (`Tunable("key", "label", default = …`) so `scripts/tune.py bake` can rewrite its default.
  */
 class Tunable<T> @PublishedApi internal constructor(
     val key: String,
@@ -76,7 +55,6 @@ class Tunable<T> @PublishedApi internal constructor(
         )
     }
 
-    /** This tunable at [value], in a [TuningPreset]. */
     fun preset(value: T): TunablePresetValue = TunablePresetValue(descriptor, type.encode(value))
 
     override fun toString(): String = "Tunable($key)"
@@ -101,12 +79,12 @@ fun Tunable(key: String, label: String, default: Boolean): Tunable<Boolean> =
 inline fun <reified E> Tunable(key: String, label: String, default: E): Tunable<E> where E : Enum<E>, E : TunableChoice =
     Tunable(key, label, default, null, null, TunableType.choice(enumValues<E>().toList(), E::class.java.simpleName))
 
-/** A string enum a [Tunable] can hold. [rawValue] is iOS's raw value (the wire and storage form). */
+/** A string enum a [Tunable] can hold. [rawValue] is the wire and storage form. */
 interface TunableChoice {
     val rawValue: String
 }
 
-/** What a tunable type is on the wire: Swift's `TunableValue` conformances. */
+/** What a tunable type is on the wire. */
 class TunableType<T> @PublishedApi internal constructor(
     val kind: TuneKind,
     /** The declared type ("Double", "Float", "Dp", "Int", "Boolean", or the enum's name). */
@@ -132,15 +110,11 @@ class TunableType<T> @PublishedApi internal constructor(
     }
 }
 
-/**
- * A spring in SwiftUI's terms (duration and bounce), tuned as two numbers: `<key>.duration` and
- * `<key>.bounce` (iOS `TunableSpring`). Reads as the core [MotionSpring] (exact Compose spring).
- */
+/** `<key>.duration` and `<key>.bounce`. Reads as the core [MotionSpring] (exact Compose spring). */
 class TunableSpring(key: String, label: String, duration: Double, bounce: Double) {
     val duration: Tunable<Double> = Tunable("$key.duration", "$label duration", default = duration, range = 0.05..2.0, step = 0.01)
     val bounce: Tunable<Double> = Tunable("$key.bounce", "$label bounce", default = bounce, range = -0.5..0.9, step = 0.01)
 
-    /** The live spring. */
     val spring: MotionSpring get() = MotionSpring(duration.value, bounce.value)
 
     /** The baked spring (defaults), for places that must not observe tuning. */
@@ -165,15 +139,14 @@ object TuningTitle {
 }
 
 /**
- * A screen, for the tuning panel: it lists only the groups (a key's first segment) registered
- * for what's on screen. A screen names itself with `TuningContextEffect(context)`; a context's
- * groups default to its own id (iOS `TuningContext`).
+ * A screen, for the tuning panel, which lists only its groups. Name one with
+ * `TuningContextEffect(context)`.
  */
 @Serializable
 data class TuningContext(val id: String, val label: String? = null, val groups: List<String> = listOf(id)) {
     val displayTitle: String get() = label ?: TuningTitle.format(id)
 
-    /** iOS `panelGroups`: its groups, then the global ones every screen lists ([globalGroups]). */
+    /** Its groups, then the global ones every screen lists ([globalGroups]). */
     val panelGroups: List<String>
         get() {
             val result = ArrayList(groups)
@@ -185,8 +158,8 @@ data class TuningContext(val id: String, val label: String? = null, val groups: 
 
     companion object {
         /**
-         * iOS `TuningPanelGroups.globalGroups` (here so `:core` can read it): groups every screen
-         * lists after its own. The motion roles move everything, so they're tunable wherever you are.
+         * Groups every screen lists after its own. The motion roles move everything, so they're
+         * tunable wherever you are.
          */
         val globalGroups = listOf("motion")
 
@@ -243,7 +216,7 @@ enum class TuneKind {
     @SerialName("choice") Choice,
 }
 
-/** A tunable's metadata: what the panel and a remote page show (iOS `TunableDescriptor`). */
+/** A tunable's metadata: what the panel and a remote page show. */
 data class TunableDescriptor(
     val key: String,
     val label: String,
@@ -416,11 +389,8 @@ data class TuningPreset(val name: String, val values: List<TunablePresetValue>) 
 }
 
 /**
- * Variants of a set of tunables, picked by number in the tuning panel (iOS `TuningPresets`). The
- * first is usually what shipped (no values: every default). Applying one sets every key any of
- * them names, to its value or else its default, so switching never leaves another's values
- * behind; keys none of them names are left alone. Register them where the tunables are read:
- * `TuningStore.shared.register(DrawerTunables.spacing)`.
+ * Variants of a set of tunables, picked by number. Applying one sets every key any of them names,
+ * so switching leaves nothing behind.
  */
 data class TuningPresets(
     /** Its first segment is the panel group it shows in. */
@@ -468,7 +438,7 @@ data class TuningPresets(
     }
 }
 
-/** Swift's `Double.rounded()`: to nearest, halves away from zero. */
+/** To nearest, halves away from zero. */
 internal fun swiftRounded(value: Double): Double {
     if (!value.isFinite()) return value
     // Exact: `value - whole` never rounds, unlike `floor(value + 0.5)` (0.49999999999999994 → 1).

@@ -23,8 +23,6 @@ import java.time.Instant
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `VoiceTurnStampTests.swift`.
- *
  * Every prompt counts from the delegation that sent it. GPT-Live held
  * “save this call… don't wait for it” back and handed it over with “what's
  * in Slack from Bob?”, so its late result went out without saying it

@@ -2,17 +2,19 @@ package ai.opencode.feature.settings.onboarding
 
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.SpringSolver
+import ai.opencode.core.strings.localized
 import ai.opencode.core.tuning.Tunable
 import ai.opencode.core.tuning.TunableSpring
 import ai.opencode.core.tuning.TuningContext
 import ai.opencode.core.tuning.TuningStore
+import ai.opencode.feature.settings.R
 import kotlin.math.PI
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sin
 
-/** The welcome scene's timing and springs (iOS `WelcomeTunables`, Tuning › Welcome). */
+/** The welcome scene's timing and springs. */
 object WelcomeTunables {
     val words = Tunable("welcome.story.words", "Dictation, words a second", default = 3.2, range = 1.5..6.0, step = 0.1)
     val stream = Tunable("welcome.story.stream", "Reply, words a second", default = 14.0, range = 6.0..30.0, step = 1.0)
@@ -44,16 +46,15 @@ object WelcomeTunables {
     }
 }
 
-/** iOS `TuningContext.welcome`. */
 val TuningContext.Companion.welcome: TuningContext get() = TuningContext("welcome", label = "Welcome")
 
 /**
- * The story the scene tells, as times in story seconds (iOS `WelcomeStory`): the person dictates
- * a task on the phone and sends it; OpenCode on the laptop reads the repo, opens OpenCode's own
- * dark-mode site in a browser, edits `Hero.tsx`, watches the “Download for Android” button spring
- * open and takes a screenshot; the screenshot and reply land on the phone; the person dictates
- * “Ship it” and the laptop runs `git push`. Every frame is a pure function of time, so the loop
- * never accumulates state and Reduce Motion draws the proof moment.
+ * The story the scene tells, as times in story seconds: the person dictates a task on the phone and
+ * sends it; OpenCode on the laptop reads the repo, opens OpenCode's own dark-mode site in a
+ * browser, edits `Hero.tsx`, watches the “Download for Android” button spring open and takes a
+ * screenshot; the screenshot and reply land on the phone; the person dictates “Ship it” and the
+ * laptop runs `git push`. Every frame is a pure function of time, so the loop never accumulates
+ * state and Reduce Motion draws the proof moment.
  */
 data class WelcomeStory(
     val words: Double = 3.2,
@@ -212,14 +213,14 @@ data class WelcomeStory(
     }
 
     companion object {
-        const val PROMPT = "Add an Android download button and show me"
-        const val SHIP_IT = "Ship it"
-        const val REPLY = "Done: added the Download for Android button to `Hero.tsx` on the home page."
-        const val TITLE = "Download for Android"
+        val PROMPT: String get() = localized(R.string.settings_onboarding_story_prompt)
+        val SHIP_IT: String get() = localized(R.string.settings_onboarding_story_ship_it)
+        val REPLY: String get() = localized(R.string.settings_onboarding_story_reply)
+        val TITLE: String get() = localized(R.string.settings_onboarding_story_title)
         const val PROJECT = "opencode"
-        val PROMPT_WORDS = words(PROMPT)
-        val SHIP_WORDS = words(SHIP_IT)
-        val REPLY_WORDS = words(REPLY)
+        val PROMPT_WORDS: List<String> get() = words(PROMPT)
+        val SHIP_WORDS: List<String> get() = words(SHIP_IT)
+        val REPLY_WORDS: List<String> get() = words(REPLY)
 
         fun words(text: String): List<String> = text.split(' ').filter { it.isNotEmpty() }
 
@@ -235,7 +236,7 @@ data class WelcomeStory(
                 shotScale = WelcomeTunables.shotScale.value,
             )
 
-        /** Spring progress (0 → 1, overshooting with bounce) [tau] seconds after it starts (SwiftUI `Spring.value(target:time:)`). */
+        /** Spring progress (0 → 1, overshooting with bounce) [tau] seconds after it starts. */
         fun progress(tau: Double, spring: MotionSpring): Double =
             if (tau <= 0) 0.0 else SpringSolver.evaluate(from = 0.0, to = 1.0, spring = spring, elapsed = tau).first
 
@@ -258,7 +259,7 @@ data class WelcomeStory(
     }
 }
 
-/** One drawn moment of the story (iOS `WelcomeFrame`): what each device shows, mostly 0…1 progress values. */
+/** One drawn moment of the story: what each device shows, mostly 0…1 progress values. */
 data class WelcomeFrame(
     val transcript: Double = 1.0,
     val loopBlur: Double = 0.0,
@@ -325,5 +326,5 @@ data class WelcomeFrame(
     }
 }
 
-/** Clamped to 0…1 (iOS `Double.clamped01`). */
+/** Clamped to 0…1. */
 internal fun Double.clamped01(): Double = min(max(this, 0.0), 1.0)

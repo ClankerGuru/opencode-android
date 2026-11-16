@@ -1,9 +1,11 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.motion.Motion
+import ai.opencode.core.strings.localized
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.motionPressEffect
@@ -13,6 +15,7 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.accessibilityFocusRequest
 import ai.opencode.core.ui.rememberAccessibilityFocusRequest
+import androidx.annotation.StringRes
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
@@ -56,6 +59,7 @@ import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -75,8 +79,8 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * The `ComposerTunables` defaults the + reads (iOS `Session/ComposerViews.swift`, owned by the
- * session area): `innerHorizontal` 6, `plusOffset` 28, `plusScale` 17, `buttonDiameter` 34.
+ * The `ComposerTunables` defaults the + reads: `innerHorizontal` 6, `plusOffset` 28, `plusScale`
+ * 17, `buttonDiameter` 34.
  */
 private object PlusButtonComposerTunables {
     const val INNER_HORIZONTAL = 6f
@@ -86,9 +90,9 @@ private object PlusButtonComposerTunables {
 }
 
 /**
- * The New Plus Menu's hold peek (iOS `RecentPhotoPeek`, `PlusMenu/`): a hold on + shows recent
- * photos instead of the menu; sliding picks one and letting go adds it. Implemented in
- * `ai.opencode.feature.composer.plusmenu`; points are root coordinates.
+ * The New Plus Menu's hold peek: a hold on + shows recent photos instead of the menu; sliding picks
+ * one and letting go adds it. Implemented in `ai.opencode.feature.composer.plusmenu`; points are
+ * root coordinates.
  */
 interface AttachmentPlusPeek {
     val isShown: Boolean
@@ -99,12 +103,12 @@ interface AttachmentPlusPeek {
 }
 
 /**
- * The composer's + button (iOS `AttachmentPickerButton`). A tap opens the attachment menu
- * ([ai.opencode.feature.composer.plusmenu.PlusMenuGlassSurface]), which grows up out of the button; touching down and holding
- * opens it too, and the finger can slide across the rows and release on one to choose it.
- * While the menu is open the + turns into a × that closes it. While dictating the same + turns
- * into the recording's ×, which cancels it, and a filled circle grows in behind it in the same
- * spring.
+ * The composer's + button. A tap opens the attachment menu
+ * ([ai.opencode.feature.composer.plusmenu.PlusMenuGlassSurface]), which grows up out of the button;
+ * touching down and holding opens it too, and the finger can slide across the rows and release on
+ * one to choose it. While the menu is open the + turns into a × that closes it. While dictating the
+ * same + turns into the recording's ×, which cancels it, and a filled circle grows in behind it in
+ * the same spring.
  */
 object AttachmentPickerButton {
     /** The recording the × cancels while dictating. */
@@ -115,7 +119,7 @@ object AttachmentPickerButton {
         val isEnabled: Boolean = true,
     )
 
-    /** The + menu and the photo sheet take up to 8 photos (iOS `maxPhotoSelection`). */
+    /** The + menu and the photo sheet take up to 8 photos. */
     const val MAX_PHOTO_SELECTION = 8
 
     /** How long a touch rests on + before the menu opens under it. */
@@ -210,7 +214,7 @@ fun AttachmentPickerButton(
         if (wasOpen && !isOpen) closes += 1
         wasOpen = isOpen
     }
-    // One move per close: laid out again later (the session moved into Catch Up's stack), the + doesn't take it again (QA W-05).
+    // One move per close: laid out again later (the session moved into Catch Up's stack), the + doesn't take it again.
     val closeFocus = rememberAccessibilityFocusRequest(closes.takeIf { it > 0 })
     val pop = remember { PlusPop() }
     var wasPopping by remember { mutableStateOf(popsOnClose) }
@@ -221,10 +225,10 @@ fun AttachmentPickerButton(
     }
     val glyphColor = if (cancelArmed) Color.White else OpenCodeTheme.colors.text
     val label = when {
-        isDictating -> "Cancel dictation"
-        isLoading -> "Adding attachment"
-        isOpen -> "Close"
-        else -> "Add attachment"
+        isDictating -> stringResource(R.string.composer_plus_cancel_dictation_description)
+        isLoading -> stringResource(R.string.composer_plus_adding_attachment_description)
+        isOpen -> stringResource(CoreR.string.common_close)
+        else -> stringResource(R.string.composer_plus_add_attachment_description)
     }
     val enabled = if (isDictating) dictation?.isEnabled != false else !isLoading
 
@@ -285,7 +289,7 @@ fun AttachmentPickerButton(
             }
             val end = released
             if (end == null) {
-                // The system took the touch (iOS's `isPressing` resets): it still finishes.
+                // The system took the touch: it still finishes.
                 if (isTouching) {
                     finishTouch()
                     press.cancelled()
@@ -398,8 +402,8 @@ fun AttachmentPickerButton(
 private val SystemRed = Color(0xFFFF3B30)
 
 /**
- * iOS `PlusPop`: the + arriving back as the + menu's glass collapses into it: hidden under the
- * glass, then fading in from `plusPop` and springing to full size.
+ * The + arriving back as the + menu's glass collapses into it: hidden under the glass, then fading
+ * in from `plusPop` and springing to full size.
  */
 @Stable
 internal class PlusPop {
@@ -426,22 +430,24 @@ private suspend fun AwaitPointerEventScope.waitForUpOrCancellationCompat(): Bool
     waitForUpOrCancellation()?.also { it.consume() } != null
 
 /** What the menu offers. Paste can only be tapped, never chosen by releasing a drag over it. */
-enum class AttachmentMenuItem(val title: String, val systemImage: SFSymbol) {
-    Camera("Camera", SFSymbol.Camera),
-    Photos("Photos", SFSymbol.PhotoOnRectangle),
-    Files("Files", SFSymbol.Folder),
-    Location("Location", SFSymbol.Location),
-    Paste("Paste", SFSymbol.DocOnClipboard);
+enum class AttachmentMenuItem(@StringRes private val titleRes: Int, val systemImage: SFSymbol) {
+    Camera(R.string.composer_attachment_menu_camera, SFSymbol.Camera),
+    Photos(R.string.composer_attachment_menu_photos, SFSymbol.PhotoOnRectangle),
+    Files(R.string.composer_attachment_menu_files, SFSymbol.Folder),
+    Location(R.string.composer_attachment_menu_location, SFSymbol.Location),
+    Paste(R.string.composer_attachment_menu_paste, SFSymbol.DocOnClipboard);
+
+    val title: String get() = localized(titleRes)
 
     val isDragSelectable: Boolean get() = this != Paste
 }
 
 /**
- * A touch on + and what it does: opening by hold, sliding over rows with a highlight, and
- * releasing to choose, cancel, or leave the menu open (iOS `AttachmentMenuPress`). It plays the
- * menu's haptics, each once: a light impact as the menu opens, a selection tick as the finger
- * reaches each row, and a light impact as a release chooses one. Closing plays nothing, like
- * the system's menus. A plain object: it owns per-touch state, not the reducer.
+ * A touch on + and what it does: opening by hold, sliding over rows with a highlight, and releasing
+ * to choose, cancel, or leave the menu open. It plays the menu's haptics, each once: a light impact
+ * as the menu opens, a selection tick as the finger reaches each row, and a light impact as a
+ * release chooses one. Closing plays nothing, like the system's menus. A plain object: it owns
+ * per-touch state, not the reducer.
  */
 @Stable
 class AttachmentMenuPress(private val haptics: HapticsClient = dependency(HapticsClient)) {
@@ -534,9 +540,8 @@ class AttachmentMenuPress(private val haptics: HapticsClient = dependency(Haptic
 }
 
 /**
- * Frames the attachment menu lays itself out against, in root coordinates (iOS
- * `AttachmentMenuAnchors`, in its named coordinate space). Measured after layout, so the
- * overlay never depends on the composer's layout mid-update.
+ * Frames the attachment menu lays itself out against, in root coordinates. Measured after layout,
+ * so the overlay never depends on the composer's layout mid-update.
  */
 @Stable
 class AttachmentMenuAnchors {
@@ -551,14 +556,13 @@ class AttachmentMenuAnchors {
     /** The menu's surface where it rests open: the photo sheet grows out of it. */
     var menu: Rect by mutableStateOf(Rect.Zero)
     /**
-     * Horizontal offset (px) of the + glyph's center from the menu's leading edge; invariant
-     * across vertical keyboard travel so the photo sheet morph never invalidates on every
-     * keyboard frame. iOS default 26 pt.
+     * Horizontal offset (px) of the + glyph's center from the menu's leading edge; invariant across
+     * vertical keyboard travel so the photo sheet morph never invalidates on every keyboard frame.
      */
     var buttonCenterXInMenu: Float by mutableFloatStateOf(0f)
 }
 
-/** Records this element's frame (root coordinates) into [anchors] (iOS `.attachmentMenuAnchor(_:in:)`). */
+/** Records this element's frame (root coordinates) into [anchors]. */
 @OptIn(ExperimentalLayoutApi::class)
 fun Modifier.attachmentMenuAnchor(set: (Rect) -> Unit): Modifier = composed {
     val hold = LocalAttachmentMenuAnchorHold.current
@@ -575,7 +579,7 @@ fun Modifier.attachmentMenuAnchor(set: (Rect) -> Unit): Modifier = composed {
         )
         val old = last[0]
         last[0] = sample
-        // iOS `onGeometryChange` acts only when the sample changes.
+        // Acts only when the sample changes.
         if (old == null || (!old.isEquivalent(sample) && AttachmentMenuAnchorSample.writes(old, sample))) set(sample.frame)
     }
 }
@@ -600,7 +604,7 @@ enum class AttachmentMenuAnchorHold {
     Folding,
 }
 
-/** One reading of an anchor (iOS `AttachmentMenuAnchorSample`). */
+/** One reading of an anchor. */
 data class AttachmentMenuAnchorSample(
     val hold: AttachmentMenuAnchorHold,
     val viewportWidth: Float,
@@ -612,7 +616,7 @@ data class AttachmentMenuAnchorSample(
 ) {
     private val viewport: List<Float> get() = listOf(viewportWidth, viewportHeight, keyboardHeight)
 
-    /** iOS `==`: equal when nothing about it is worth writing. */
+    /** Equal when nothing about it is worth writing. */
     fun isEquivalent(other: AttachmentMenuAnchorSample): Boolean {
         if (hold != other.hold) return false
         return when (hold) {
@@ -636,8 +640,7 @@ data class AttachmentMenuAnchorSample(
 }
 
 /**
- * iOS `EnvironmentValues.attachmentMenuAnchorHold`: the composer is sinking under the photo
- * sheet, resting under it or rising back from it. The host provides
- * [ComposerMorph.attachmentMenuAnchorHold] around the composer.
+ * The composer is sinking under the photo sheet, resting under it or rising back from it. The host
+ * provides [ComposerMorph.attachmentMenuAnchorHold] around the composer.
  */
 val LocalAttachmentMenuAnchorHold = compositionLocalOf { AttachmentMenuAnchorHold.Follows }

@@ -1,8 +1,7 @@
 package ai.opencode.feature.transcript.markdown
 
 /**
- * Foundation/Swift string semantics the Markdown port relies on, so Kotlin parses exactly the
- * lines iOS does: `CharacterSet.whitespaces` (tab and Unicode `Zs`), `.whitespacesAndNewlines`,
+ * `CharacterSet.whitespaces` (tab and Unicode `Zs`), `.whitespacesAndNewlines`,
  * `Character.isNumber`, and `split(separator: "\n")` on Characters (never inside `"\r\n"`).
  */
 internal object SwiftText {
@@ -14,13 +13,12 @@ internal object SwiftText {
 
     fun isWhitespaceOrNewline(c: Char): Boolean = isWhitespace(c) || isNewline(c)
 
-    /** Swift `Character.isNumber`: any Unicode number (`Nd`, `Nl`, `No`). */
+    /** Any Unicode number (`Nd`, `Nl`, `No`). */
     fun isNumber(c: Char): Boolean = when (Character.getType(c)) {
         Character.DECIMAL_DIGIT_NUMBER.toInt(), Character.LETTER_NUMBER.toInt(), Character.OTHER_NUMBER.toInt() -> true
         else -> false
     }
 
-    /** Swift `Character.isWhitespace` (Unicode White_Space). */
     fun isCharacterWhitespace(c: Char): Boolean = c.isWhitespace() || c == '\u0085'
 
     /** Whether [c] joins the character before it into one grapheme (a combining mark or joiner). */

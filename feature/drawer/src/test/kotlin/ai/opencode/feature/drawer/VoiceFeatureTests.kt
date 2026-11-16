@@ -47,12 +47,6 @@ import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
 
-/**
- * Port of iOS `VoiceFeatureTests.swift`'s Home tests: the delegator moving the screen, pinning
- * and opening a draft, and a switch mid-delegation. Its `VoiceFeature` tests are
- * `:feature:voice`'s (`VoiceFeatureTests.kt` there); `voiceAvailabilityRequiresBothAdvancedToggleAndAPIKey`
- * is `:feature:session`'s.
- */
 class VoiceFeatureTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -60,7 +54,7 @@ class VoiceFeatureTests {
     private val distantPast: Instant = HomeFeatureTestSupport.distantPast
     private val session = OpenCodeSession(id = "ses_voice", serverTitle = "Voice lab", projectID = "p", directory = "/Users/kit/project", updatedAt = distantPast)
 
-    /** iOS `await store.skipReceivedActions(strict: false)` once effects settle: drains until [condition] holds (bounded). */
+    /** Drains until [condition] holds (bounded). */
     private suspend fun TestStore<HomeFeature.State, HomeFeature.Action>.drain(condition: () -> Boolean) {
         repeat(400) {
             skipReceivedActions()
@@ -168,9 +162,8 @@ class VoiceFeatureTests {
     }
 
     /**
-     * "Pin this and unpin the math one, then start something new in the iOS
-     * project": the drawer's pins change (a session outside Recents too), the
-     * screen moves to a draft in that project, and the call follows.
+     * The drawer's pins change (a session outside Recents too), the screen moves to a draft in that
+     * project, and the call follows.
      */
     @Test fun delegatorPinsUnpinsAndOpensADraft() = voiceHomeTest { h ->
         val math = OpenCodeSession(id = "ses_math", serverTitle = "Math bug", projectID = "p", directory = "/Users/kit/math", updatedAt = distantPast)

@@ -21,10 +21,10 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 
 /**
- * Port of iOS `VoiceOpenSessionFeature`: one owner and one terminal outcome per server tool call
- * (`android_voice_open_session`), across MCP and SSE. App owns this reducer so moving or replacing
- * the session cannot cancel it. It reads only plain values ([Environment]) that App derives from
- * Home, so it lives here, below Home and Session.
+ * One owner and one terminal outcome per server tool call (`android_voice_open_session`), across
+ * MCP and SSE. App owns this reducer so moving or replacing the session cannot cancel it. It reads
+ * only plain values ([Environment]) that App derives from Home, so it lives here, below Home and
+ * Session.
  */
 class VoiceOpenSessionFeature : Reducer<VoiceOpenSessionFeature.State, VoiceOpenSessionFeature.Action> {
     enum class Owner { mcp, sse }

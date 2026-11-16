@@ -31,15 +31,13 @@ import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 /**
- * Port of iOS `ConnectionScopeView` (`Settings/ConnectionScope.swift`): the connection card's EKG,
- * the call scope's LED dot matrix drawing one beat per health check as a monitor sweep, with an
- * erase gap ahead of the pen and older beats fading. Green while connected and orange while slow
- * or unstable (the system colours), pearl on dark or ink on light while reconnecting or switching,
- * and red only while offline. It stops drawing off screen and when the app isn't resumed; under
- * reduce motion it's a still trace that matches the status, redrawn only when the status changes.
+ * The connection card's EKG, an LED dot matrix drawing one beat per health check as a monitor
+ * sweep, with an erase gap ahead of the pen and older beats fading. Green while connected, orange
+ * while slow or unstable, pearl or ink while reconnecting or switching, and red only while offline.
  *
- * iOS draws with Metal at 30 fps (`DotScopeMetalView`); here a Compose [Canvas] paints one AGSL
- * [RuntimeShader] rect ([ConnectionScopeShaders]) over the CPU-lit field, ticked at 30 fps.
+ * One AGSL [RuntimeShader] rect ([ConnectionScopeShaders]) over the CPU-lit field, ticked at 30
+ * fps. It stops drawing off screen and when the app isn't resumed; under reduce motion it's a still
+ * trace redrawn only when the status changes.
  */
 @Composable
 fun ConnectionScopeView(monitor: ConnectionMonitor, isHidden: Boolean, modifier: Modifier = Modifier) {
@@ -80,7 +78,7 @@ fun ConnectionScopeView(monitor: ConnectionMonitor, isHidden: Boolean, modifier:
 private const val FRAME_NANOS = 1_000_000_000L / 30
 private const val FRAME_SLACK_NANOS = 4_000_000L
 
-/** Port of iOS `DotScopeGrid` (`Voice/DotScopeSimulation.swift`): the LED grid in device pixels. */
+/** The LED grid in device pixels. */
 internal data class DotScopeGrid(
     /** Device pixels per dp. */
     val scale: Float,
@@ -120,7 +118,7 @@ internal data class DotScopeGrid(
     }
 }
 
-/** An RGBA colour as the shader takes it (iOS `SIMD4<Float>`). */
+/** An RGBA colour as the shader takes it. */
 internal data class ScopeColor(val r: Float, val g: Float, val b: Float, val a: Float = 1f) {
     operator fun plus(o: ScopeColor) = ScopeColor(r + o.r, g + o.g, b + o.b, a + o.a)
     operator fun minus(o: ScopeColor) = ScopeColor(r - o.r, g - o.g, b - o.b, a - o.a)
@@ -130,8 +128,8 @@ internal data class ScopeColor(val r: Float, val g: Float, val b: Float, val a: 
 internal data class ScopePalette(val main: ScopeColor, val mainCore: ScopeColor, val alert: ScopeColor, val alertCore: ScopeColor)
 
 /**
- * Port of iOS `ConnectionScopeRenderer`: rasterises the trace on the CPU each frame and draws the
- * lit grid. A plain object owned by the view (per-frame motion lives here, not in a reducer).
+ * Rasterises the trace on the CPU each frame and draws the lit grid. A plain object owned by the
+ * view (per-frame motion lives here, not in a reducer).
  */
 internal class ConnectionScopeRenderer {
     companion object {
@@ -171,7 +169,7 @@ internal class ConnectionScopeRenderer {
     private val shader = RuntimeShader(ConnectionScopeShaders.CONNECTION_SCOPE_FRAGMENT)
     private val brush = ShaderBrush(shader)
     private var grid: DotScopeGrid? = null
-    /** Two fields, alternated per frame, so the render thread never reads one being written (iOS's in-flight buffers). */
+    /** Two fields, alternated per frame, so the render thread never reads one being written. */
     private var fields: List<Pair<Bitmap, BitmapShader>> = emptyList()
     private var frameIndex = 0
     private var pixels = IntArray(0)
@@ -244,9 +242,9 @@ internal class ConnectionScopeRenderer {
 }
 
 /**
- * Port of iOS `ConnectionTraceRaster`: the monitor sweep on the dot grid
- * (`prototypes/settings-connection/main.js`'s `sweep`): each column is the trace at its moment,
- * the pen at the newest with an erase gap ahead of it, older beats dimmer, and per-dot afterglow.
+ * The monitor sweep on the dot grid (`prototypes/settings-connection/main.js`'s `sweep`): each
+ * column is the trace at its moment, the pen at the newest with an erase gap ahead of it, older
+ * beats dimmer, and per-dot afterglow.
  */
 internal class ConnectionTraceRaster {
     private var grid: DotScopeGrid? = null
@@ -416,14 +414,13 @@ internal class ConnectionTraceRaster {
 }
 
 /**
- * Port of iOS `ConnectionTraceTint`: the trace's colour by status: the system green while
- * connected, orange while slow or unstable; null keeps the neutral pearl or ink (reconnecting,
- * switching), and offline draws in the alert red. On light the colours are the system's
- * increased-contrast variants: plain system green is under 2:1 on the scope's well, too faint for
- * single dots (3.9:1 this way; 9.2:1 on dark).
+ * The trace's colour by status: the system green while connected, orange while slow or unstable;
+ * null keeps the neutral pearl or ink (reconnecting, switching), and offline draws in the alert
+ * red. On light the colours are the system's increased-contrast variants: plain system green is
+ * under 2:1 on the scope's well, too faint for single dots (3.9:1 this way; 9.2:1 on dark).
  */
 internal object ConnectionTraceTint {
-    // UIKit's resolved values: (light, high contrast), (dark), (dark, high contrast).
+    // (light, high contrast), (dark), (dark, high contrast).
     private val greenHighContrastLight = ScopeColor(36 / 255f, 138 / 255f, 61 / 255f)
     private val greenDark = ScopeColor(48 / 255f, 209 / 255f, 88 / 255f)
     private val greenHighContrastDark = ScopeColor(48 / 255f, 219 / 255f, 91 / 255f)

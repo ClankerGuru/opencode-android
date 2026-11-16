@@ -2,8 +2,10 @@ package ai.opencode.feature.composer
 
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.feature.media.PromptImageFormat
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.media.MediaMetadataRetriever
@@ -25,20 +27,15 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
- * The downscale and re-encode applied to every imported image (iOS `SharedImageEncoder`,
- * `System/Share/ShareHandoff.swift`): long edge at most [MAX_PIXEL_SIZE], JPEG at
- * [COMPRESSION_QUALITY]. Rendering a fresh JPEG from decoded pixels drops EXIF, GPS and other
- * metadata (`Bitmap.compress` writes none), and `ImageDecoder` applies the EXIF orientation
- * first, like `kCGImageSourceCreateThumbnailWithTransform`.
- *
- * Local to the composer until it moves down to `:server` or `:core` for the share sheet
- * (`:feature:system`), which must encode identically.
+ * The downscale and re-encode applied to every imported image: long edge at most [MAX_PIXEL_SIZE],
+ * JPEG at [COMPRESSION_QUALITY]. Re-encoding drops EXIF and GPS metadata; `ImageDecoder` applies
+ * the EXIF orientation first.
  */
 object SharedImageEncoder {
     const val MAX_SOURCE_BYTES = 20_000_000
-    const val MAX_PIXEL_SIZE = 1568
-    const val COMPRESSION_QUALITY = 0.8
-    const val MIME = "image/jpeg"
+    const val MAX_PIXEL_SIZE = PromptImageFormat.MAX_PIXEL_SIZE
+    const val COMPRESSION_QUALITY = PromptImageFormat.COMPRESSION_QUALITY
+    const val MIME = PromptImageFormat.MIME
 
     fun jpeg(data: ByteArray): ByteArray? {
         if (data.size > MAX_SOURCE_BYTES) return null
@@ -89,27 +86,38 @@ object ImageAttachmentImporter {
      * Downscale and re-encode imported images so prompts stay small. The share sheet uses the
      * same encoder, so shared and picked images match. Runs off the main thread.
      */
-    suspend fun process(data: ByteArray, id: UUID = UUID.randomUUID()): OpenCodeOutgoingAttachment? =
-        withContext(Dispatchers.Default) {
-            val jpeg = SharedImageEncoder.jpeg(data) ?: return@withContext null
-            OpenCodeOutgoingAttachment(id = id.toString(), data = jpeg, mime = SharedImageEncoder.MIME)
-        }
+    suspend fun process(
+        data: ByteArray,
+        id: UUID = UUID.randomUUID(),
+        videoDuration: Double? = null,
+        localVideoURI: String? = null,
+    ): OpenCodeOutgoingAttachment? = withContext(Dispatchers.Default) {
+        val jpeg = SharedImageEncoder.jpeg(data) ?: return@withContext null
+        OpenCodeOutgoingAttachment(
+            id = id.toString(), data = jpeg, mime = SharedImageEncoder.MIME,
+            videoDuration = videoDuration, localVideoURI = localVideoURI,
+        )
+    }
 }
 
 /**
- * Loads a picked, dropped or pasted image's bytes (iOS `ComposerItemProviderLoader`). An image
- * reads as is; a movie becomes its first frame (long edge ≤ 1600, JPEG 0.85), as iOS does for
- * a video dropped where an image is expected; anything else reads its bytes and lets the
- * encoder decide.
+ * Loads a picked, dropped or pasted image's bytes. A movie becomes its first frame (long edge ≤
+ * 1600, JPEG 0.85); anything else reads its bytes and lets the encoder decide.
  */
 object ComposerItemProviderLoader {
     private const val MOVIE_FRAME_MAX = 1600
     private const val MOVIE_FRAME_QUALITY = 85
 
-    suspend fun load(uri: Uri, context: Context = dependency(AppContext)): ByteArray? = withContext(Dispatchers.IO) {
+    suspend fun load(uri: Uri, context: Context = dependency(AppContext)): ByteArray? = loadSource(uri, context = context)?.bytes
+
+    internal suspend fun loadSource(
+        uri: Uri,
+        picked: Boolean = false,
+        context: Context = dependency(AppContext),
+    ): ImportedPoster? = withContext(Dispatchers.IO) {
         val type = context.contentResolver.getType(uri)
-        if (type?.startsWith("video/") == true) return@withContext movieFrame(uri, context)
-        readBytes(uri, context)
+        if (type?.startsWith("video/") == true) return@withContext movieFrame(uri, context, picked)
+        readBytes(uri, context)?.let { ImportedPoster(it) }
     }
 
     private fun readBytes(uri: Uri, context: Context): ByteArray? = runCatching {
@@ -129,16 +137,27 @@ object ComposerItemProviderLoader {
         }
     }.getOrNull()
 
-    private fun movieFrame(uri: Uri, context: Context): ByteArray? {
+    private fun movieFrame(uri: Uri, context: Context, picked: Boolean): ImportedPoster? {
         val retriever = MediaMetadataRetriever()
         return try {
             retriever.setDataSource(context, uri)
             val frame = retriever.getScaledFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, MOVIE_FRAME_MAX, MOVIE_FRAME_MAX)
                 ?: return null
             val out = ByteArrayOutputStream()
-            frame.compress(Bitmap.CompressFormat.JPEG, MOVIE_FRAME_QUALITY, out)
-            frame.recycle()
-            out.toByteArray()
+            try {
+                if (!frame.compress(Bitmap.CompressFormat.JPEG, MOVIE_FRAME_QUALITY, out)) return null
+            } finally {
+                frame.recycle()
+            }
+            if (!picked) return ImportedPoster(out.toByteArray())
+            val seconds = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.div(1000.0)
+            // ACTION_PICK_IMAGES grants initially last only for this app session. If the
+            // provider refuses persistence, the poster still works after access expires.
+            val original = if (uri.scheme == "content") runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                uri.toString()
+            }.getOrNull() else null
+            ImportedPoster(out.toByteArray(), seconds, original)
         } catch (_: Exception) {
             null
         } finally {
@@ -147,12 +166,14 @@ object ComposerItemProviderLoader {
     }
 }
 
+internal data class ImportedPoster(val bytes: ByteArray, val videoDuration: Double? = null, val localVideoURI: String? = null)
+
 /**
- * Where a composer image comes from (iOS `ComposerImageSource`). `NSItemProvider` and
- * `PhotosPickerItem` are both content [Uri]s on Android; `Transferable` images are [Data].
+ * Where a composer image comes from. `NSItemProvider` and `PhotosPickerItem` are both content
+ * [Uri]s on Android; `Transferable` images are [Data].
  */
 sealed interface ComposerImageSource {
-    /** A dropped or pasted item (iOS `.itemProvider`). */
+    /** A dropped or pasted item. */
     data class ItemProvider(val uri: Uri) : ComposerImageSource
 
     /** A photo-picker item; [attachmentID] chosen up front keeps it in sync with the selection. */
@@ -161,22 +182,26 @@ sealed interface ComposerImageSource {
     class Data(val data: ByteArray) : ComposerImageSource
 
     /** [attachmentID]: chosen up front, so what it becomes is known before it loads (a photo flying into its thumbnail). */
-    class Loader(override val attachmentID: UUID? = null, val load: suspend () -> ByteArray?) : ComposerImageSource
+    class Loader(
+        override val attachmentID: UUID? = null,
+        val videoDuration: Double? = null,
+        val localVideoURI: String? = null,
+        val load: suspend () -> ByteArray?,
+    ) : ComposerImageSource
 
     val attachmentID: UUID? get() = null
+}
 
-    suspend fun load(): ByteArray? = when (this) {
-        is ItemProvider -> ComposerItemProviderLoader.load(uri)
-        is PhotosPickerItem -> ComposerItemProviderLoader.load(uri)
-        is Data -> data
-        is Loader -> load.invoke()
-    }
+private suspend fun ComposerImageSource.loadPoster(): ImportedPoster? = when (this) {
+    is ComposerImageSource.ItemProvider -> ComposerItemProviderLoader.loadSource(uri)
+    is ComposerImageSource.PhotosPickerItem -> ComposerItemProviderLoader.loadSource(uri, picked = true)
+    is ComposerImageSource.Data -> ImportedPoster(data)
+    is ComposerImageSource.Loader -> load()?.let { ImportedPoster(it, videoDuration, localVideoURI) }
 }
 
 /**
- * Runs one image import at a time; starting another or cancelling supersedes the current one,
- * whose late results are discarded (iOS `ComposerImageImporter`). Callbacks run on the main
- * thread; [isLoading] is Compose state.
+ * Runs one image import at a time; starting another or cancelling supersedes the current one, whose
+ * late results are discarded. Callbacks run on the main thread; [isLoading] is Compose state.
  */
 class ComposerImageImporter(private val scope: CoroutineScope) {
     data class Result(val addedCount: Int = 0, val sawOversizedSource: Boolean = false)
@@ -188,7 +213,7 @@ class ComposerImageImporter(private val scope: CoroutineScope) {
 
     fun start(
         sources: List<ComposerImageSource>,
-        process: suspend (ByteArray, UUID) -> OpenCodeOutgoingAttachment? = { data, id -> ImageAttachmentImporter.process(data, id) },
+        process: (suspend (ByteArray, UUID) -> OpenCodeOutgoingAttachment?)? = null,
         onAttachment: (OpenCodeOutgoingAttachment) -> Unit,
         onFailure: (UUID?) -> Unit = {},
         onCancel: () -> Unit = {},
@@ -213,18 +238,23 @@ class ComposerImageImporter(private val scope: CoroutineScope) {
             var result = Result()
             for (source in kept) {
                 if (!isActive) return@launch
-                val data = source.load()
+                val poster = source.loadPoster()
                 if (!isActive) return@launch
-                if (data == null) {
+                if (poster == null) {
                     onFailure(source.attachmentID)
                     continue
                 }
-                if (data.size > ImageAttachmentImporter.MAX_SOURCE_BYTES) {
+                if (poster.bytes.size > ImageAttachmentImporter.MAX_SOURCE_BYTES) {
                     result = result.copy(sawOversizedSource = true)
                     onFailure(source.attachmentID)
                     continue
                 }
-                val attachment = process(data, source.attachmentID ?: UUID.randomUUID())
+                val id = source.attachmentID ?: UUID.randomUUID()
+                val attachment = if (process == null) {
+                    ImageAttachmentImporter.process(poster.bytes, id, poster.videoDuration, poster.localVideoURI)
+                } else {
+                    process(poster.bytes, id)
+                }
                 if (!isActive) return@launch
                 if (attachment == null) {
                     onFailure(source.attachmentID)
@@ -236,7 +266,7 @@ class ComposerImageImporter(private val scope: CoroutineScope) {
             if (!isActive) return@launch
             cancelHandler = null
             onCompletion(result)
-            // iOS's `defer`: still loading while `onCompletion` runs, unless it superseded this import.
+            // Still loading while `onCompletion` runs, unless it superseded this import.
             if (job === current && isActive) job = null
         }
         job = current

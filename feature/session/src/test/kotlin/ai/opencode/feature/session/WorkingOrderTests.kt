@@ -29,16 +29,10 @@ import org.junit.Test
 import java.time.Instant
 
 /**
- * Port of iOS `WorkingOrderTests.swift`.
- *
  * A message sent into a session from outside its composer (the voice agent,
  * another client) must show before, or with, the Working line it starts:
  * the run's start arrives over the event stream at once, while the page read
  * that has the message can take seconds on a session heavy with images.
- *
- * Not ported here (:feature:composer, `PromptOutbox` alone): `deliveryMarksARecordedSendAsSent`.
- * Not ported here (:feature:drawer, `HomeFeature`): `homeMarksDeliveriesForEverySession`,
- * `aCancelledRecordedSendIsForgotten`.
  */
 class WorkingOrderTests {
     private val server = testServer

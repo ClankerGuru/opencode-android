@@ -32,11 +32,8 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * iOS `SoundEffectsTests.swift` (Sound Effects, experimental): the session's sounds, Needs Input
- * beside a docked request's attention, Error beside a failed send's, and Send with its tap.
- * Home's and Catch Up's are `:feature:drawer`'s `SoundEffectsTests`; the live gate and playback
- * are `:core`'s, the settings test `:feature:settings`'. iOS's parameterized tests run their
- * argument rows in turn.
+ * The session's sounds, Needs Input beside a docked request's attention, Error beside a failed
+ * send's, and Send with its tap.
  */
 class SoundEffectsTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -49,7 +46,7 @@ class SoundEffectsTests {
 
     private fun features(on: Boolean) = ExperimentalFeatures.enabling(if (on) setOf(ExperimentalFeature.soundEffects) else emptySet())
 
-    /** iOS `SoundEffectsClient.recording`: each sound lands in the haptics log as `sound.<name>`. */
+    /** Each sound lands in the haptics log as `sound.<name>`. */
     private fun recording(log: LockIsolated<List<String>>) = SoundEffectsClient(
         play = { effect -> log.append("sound.${effect.rawValue}") },
         prepare = { log.append("sound.prepare") },

@@ -1,11 +1,13 @@
 package ai.opencode.feature.transcript.user
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.feature.media.TranscriptImagePreview
 import ai.opencode.feature.media.TranscriptMetrics
+import ai.opencode.feature.transcript.R
 import ai.opencode.server.model.AgentFileReference
 import ai.opencode.server.model.OpenCodeDelivery
 import androidx.compose.animation.AnimatedVisibility
@@ -29,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
@@ -83,8 +86,8 @@ fun TranscriptUserMessageView(
     }
 }
 
-/** The message's surfaces, top to bottom: images, files, a location, the bubble. */
-private enum class Surface { Images, Files, Location, Bubble }
+/** The message's surfaces, top to bottom: images, files, quotes, a location, the bubble. */
+private enum class Surface { Images, Files, Quotes, Location, Bubble }
 
 @Composable
 private fun UserMessage(
@@ -112,6 +115,7 @@ private fun UserMessage(
         when (it) {
             Surface.Images -> message.images.isNotEmpty()
             Surface.Files -> message.files.isNotEmpty()
+            Surface.Quotes -> message.quotes.isNotEmpty()
             Surface.Location -> message.location != null
             Surface.Bubble -> message.displayText.isNotEmpty()
         }
@@ -123,18 +127,17 @@ private fun UserMessage(
     // The message's state, once: a failure, or its pending label and any delivery note.
     val status = if (failedSend != null) TranscriptFailedSend.status
     else listOfNotNull(message.pending?.pendingLabel, deliveryNote).joinToString(", ")
+    val copyLabel = stringResource(CoreR.string.common_copy)
+    val revertToHereLabel = stringResource(R.string.transcript_message_revert_to_here)
     val actions = when {
         pendingActions != null -> pendingActions.accessibilityActions(copying = message.displayText)
         failedSend == null -> buildList {
-            if (message.displayText.isNotEmpty()) add(action("Copy") { onCopy(message.displayText) })
-            if (onRevertToHere != null) add(action("Revert to Here", onRevertToHere))
+            if (message.displayText.isNotEmpty()) add(action(copyLabel) { onCopy(message.displayText) })
+            if (onRevertToHere != null) add(action(revertToHereLabel, onRevertToHere))
         }
         else -> emptyList()
     }
     val noteSpec = if (reduceMotion) androidx.compose.animation.core.snap() else Motion.easeOut<Float>(0.25)
-    // iOS `SendLandingProbe`s above the bubble: its surfaces and its pending label.
-    val surfacesProbe = rememberSendLandingProbe(message.id, SendLanding.SURFACES_SUFFIX)
-    val labelProbe = rememberSendLandingProbe(message.id, SendLanding.LABEL_SUFFIX)
 
     Column(
         // A message joining or leaving a run gains or lets go of the label on the same spring
@@ -163,7 +166,6 @@ private fun UserMessage(
                         TranscriptPendingLabel(
                             it,
                             Modifier
-                                .sendLandingProbe(labelProbe)
                                 .graphicsLayer { alpha = reveal.body.toFloat() }
                                 // Its text lines up with the bubble's.
                                 .padding(end = TranscriptMetrics.contentGutter, bottom = TranscriptMetrics.clustered - TranscriptMetrics.compact / 2),
@@ -171,8 +173,6 @@ private fun UserMessage(
                     }
                 }
                 Column(
-                    // Where the message's surfaces start: what sits above the bubble lands with it.
-                    Modifier.sendLandingProbe(surfacesProbe),
                     horizontalAlignment = Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(UserMessageRun.spacing),
                 ) {
@@ -184,6 +184,13 @@ private fun UserMessage(
                             message.files,
                             onOpen = if (isPending) null else onOpenFile,
                             trailingCorners = corners(Surface.Files),
+                            modifier = Modifier.graphicsLayer { alpha = dim },
+                        )
+                    }
+                    if (message.quotes.isNotEmpty()) {
+                        TranscriptQuoteCards(
+                            message.quotes,
+                            trailingCorners = corners(Surface.Quotes),
                             modifier = Modifier.graphicsLayer { alpha = dim },
                         )
                     }

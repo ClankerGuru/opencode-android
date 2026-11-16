@@ -4,19 +4,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RenderEffect
 import androidx.compose.ui.unit.Dp
 
-/**
- * Blurs applied while content moves: SwiftUI's `.blur(radius:)` inside a transition (iOS
- * `BlurFade`, `MotionBlurReveal`, `MorphReveal`, the pickers' and menus' pop blurs, the
- * streaming text's focus sweep, caption words).
- *
- * Android divergence: Material motion moves content with opacity, scale and offset and never
- * blurs it, so these blurs are off. Callers keep iOS's blur maths (and its ported tests) so the
- * two codebases still diff side by side; the effect is switched off here, in one place. It also
- * saves an offscreen render pass on every animated frame.
- *
- * Backdrop blurs (the dimmed content behind the composer morph, the model list's edges) are not
- * transition blurs and don't go through here.
- */
+/** Blurs inside transitions, switched off here in one place: Material motion never blurs. */
 object TransitionBlur {
     /** Whether transition blurs draw. Off on Android. */
     const val enabled: Boolean = false

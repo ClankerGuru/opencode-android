@@ -1,16 +1,21 @@
 package ai.opencode.feature.transcript.markdown.ui
 
+import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.media.AgentFileCards
+import ai.opencode.feature.media.AgentFileChecks
 import ai.opencode.feature.media.AgentImageGallery
+import ai.opencode.feature.media.CheckedAgentFiles
 import ai.opencode.feature.media.LocalLinkPreviewRevision
 import ai.opencode.feature.media.LocalLinkPreviewStore
 import ai.opencode.feature.media.MermaidDiagramCard
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.TranscriptAction
+import ai.opencode.feature.transcript.markdown.InlineRun
 import ai.opencode.feature.transcript.markdown.InlineText
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock.Kind
@@ -47,32 +52,34 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * One rendered Markdown block (iOS `MarkdownBlockView`), shared by assistant replies,
- * compaction summaries, and Markdown files in the viewer. Rows read the server, directory and
- * `send` from `LocalTranscriptRowContext`: links and file links send `LinkTapped` /
- * `OpenFile`, images `PreviewImage`.
+ * One rendered Markdown block, shared by assistant replies, compaction summaries, and Markdown
+ * files in the viewer. Rows read the server, directory and `send` from `LocalTranscriptRowContext`:
+ * links and file links send `LinkTapped` / `OpenFile`, images `PreviewImage`.
  *
  * @param arrivals streamed text that just arrived, which fades in (`offset == 0`: the whole
  *   block arrived and fades in whole).
  * @param isGrowingTail the reply's last block while it can still grow: a link still streaming
  *   in at its end keeps the globe.
- * @param selectionItemID the reply row this block is in (iOS `selectionItemID`): its text joins
- *   the list's one selection across the reply instead of being selectable on its own.
+ * @param selectionItemID The reply row this block is in: its text joins the list's one selection
+ *     across the reply instead of being selectable on its own.
  */
 @Composable
 fun MarkdownBlockView(
     block: OpenCodeMarkdownBlock,
     modifier: Modifier = Modifier,
+    gap: Dp = 0.dp,
     arrivals: List<TranscriptTextReveal.Arrival> = emptyList(),
     isGrowingTail: Boolean = false,
     selectionItemID: String? = null,
@@ -82,13 +89,15 @@ fun MarkdownBlockView(
     val grown = arrivals.filter { it.offset > 0 }
     val inList = LocalTranscriptReplySelection.current != null
     val selection = if (selectionItemID != null && inList) TranscriptSelectionLeafKey(selectionItemID, block.id) else null
-    Column(modifier.fillMaxWidth().arrivalFade(whole, reveal)) {
-        BlockContent(block.kind, grown, isGrowingTail, selection)
+    // File cards carry their own gap: none shows for a file that isn't there.
+    val spaced = if (block.kind is Kind.Files) modifier else modifier.padding(top = gap)
+    Column(spaced.fillMaxWidth().arrivalFade(whole, reveal)) {
+        BlockContent(block.kind, grown, isGrowingTail, selection, gap)
     }
 }
 
 @Composable
-private fun BlockContent(kind: Kind, grown: List<TranscriptTextReveal.Arrival>, isGrowingTail: Boolean, selection: TranscriptSelectionLeafKey?) {
+private fun BlockContent(kind: Kind, grown: List<TranscriptTextReveal.Arrival>, isGrowingTail: Boolean, selection: TranscriptSelectionLeafKey?, gap: Dp) {
     val style = currentMarkdownStyle()
     val colors = style.colors
     val context = LocalTranscriptRowContext.current
@@ -114,9 +123,7 @@ private fun BlockContent(kind: Kind, grown: List<TranscriptTextReveal.Arrival>, 
             // At the prose's width, like the desktop's `hr`, with the block gap on each side.
             HairlineRule(Modifier.clearAndSetSemantics {})
         is Kind.PullRequest -> PullRequestCard(kind.title, kind.url) { send(TranscriptAction.LinkTapped(kind.url)) }
-        is Kind.Files -> FileCards(kind.files)
-        // A Markdown image outside the session's folder loads through that folder's location once
-        // it's on screen; a file that can't be shown inline falls back to its card.
+        is Kind.Files -> FileCards(kind.files, gap)
         is Kind.Image -> MarkdownImage(kind.source, kind.alt, fallbackFile = AgentFileReference.fromLink(kind.source))
         is Kind.Heading -> BlockText(
             kind, kind.text, style.headingStyle(kind.level), colors.strongText, grown, isGrowingTail, selection,
@@ -124,8 +131,8 @@ private fun BlockContent(kind: Kind, grown: List<TranscriptTextReveal.Arrival>, 
         )
         is Kind.Code -> {
             val text = remember(kind.code, colors) { PresentedText.plain(MarkdownPresentation.code(kind.code, colors)) }
-            // In a reply a hold selects the code; a hold on code already selected lifts the
-            // block to drag (iOS `.transcriptDragSource(.code(...))`; the selection owns the hold).
+            // In a reply a hold selects the code; a hold on code already selected lifts the block
+            // to drag.
             var drag: Modifier = Modifier
             if (selection != null) {
                 drag = Modifier.transcriptDragSource(
@@ -146,7 +153,7 @@ private fun BlockContent(kind: Kind, grown: List<TranscriptTextReveal.Arrival>, 
         }
         is Kind.Table -> MarkdownTable(kind.header, kind.rows, selection)
         is Kind.Math -> MathDisplayView(kind.math, selection)
-        // The diagram drags out as `diagram.png` (iOS `.transcriptDragSource(.image(...))`).
+        // The diagram drags out as `diagram.png`.
         is Kind.Mermaid -> androidx.compose.runtime.CompositionLocalProvider(
             ai.opencode.feature.media.LocalTranscriptImageDragSource provides MermaidImageDragSource,
         ) {
@@ -179,8 +186,7 @@ private fun BlockText(
     val density = LocalDensity.current
     val sessionLinks = LocalSessionLinks.current
     val linkStyle = LocalInlineLinkStyle.current
-    // iOS `linkPreviewStore` / `linkPreviewRevision` / `linkPreviewRow`: the list's store, read
-    // for Link Icons; the revision redraws the row when an icon arrives.
+    // The list's store, read for Link Icons; the revision redraws the row when an icon arrives.
     val linkStore = LocalLinkPreviewStore.current
     val linkRevision = LocalLinkPreviewRevision.current
     val linkRow = LocalLinkPreviewRow.current
@@ -195,8 +201,9 @@ private fun BlockText(
         linkStyle = linkStyle,
         isGrowing = isGrowingTail,
     )
-    val presented = remember(inline, options, sessionLinks.targets, style.colors, density, siteIcon, linkRevision) {
-        MarkdownPresentation.present(inline, options, style, sessionLinks.targets, density, listener, siteIcon)
+    val shownInline = withoutMissingFiles(inline)
+    val presented = remember(shownInline, options, sessionLinks.targets, style.colors, density, siteIcon, linkRevision) {
+        MarkdownPresentation.present(shownInline, options, style, sessionLinks.targets, density, listener, siteIcon)
     }
     QuoteSelectionContainer(kind, inReply = selection != null, modifier) {
         ArrivingText(presented, presented.mapArrivals(grown), textStyle, tint, selectionKey = selection)
@@ -206,6 +213,23 @@ private fun BlockText(
     if (fetchable.isNotEmpty() && linkStore != null && linkRow != null) {
         LaunchedEffect(linkStore, fetchable, linkRow) { linkStore.inlineLinksAppeared(fetchable, linkRow) }
     }
+}
+
+/** A file that isn't there keeps its name in code, without a link. */
+@Composable
+private fun withoutMissingFiles(inline: InlineText): InlineText {
+    val context = LocalTranscriptRowContext.current
+    val server = context.server ?: return inline
+    val checks = remember { dependency(AgentFileChecks) }
+    var runs: MutableList<InlineRun>? = null
+    for ((index, run) in inline.runs.withIndex()) {
+        val link = run.link ?: continue
+        val file = MarkdownLinks.fileReference(link) ?: continue
+        if (checks.status(server, context.directory, file) != AgentFileChecks.Status.Missing) continue
+        if (runs == null) runs = inline.runs.toMutableList()
+        runs[index] = run.copy(link = null)
+    }
+    return if (runs == null) inline else InlineText(runs)
 }
 
 /** The marker hangs, so wrapped lines align with the text, not under it. */
@@ -235,7 +259,7 @@ private fun ListItem(
                 Text(" ", style = bodyStyle, color = Color.Transparent)
                 OpenCodeIcon(
                     if (done) SFSymbol.CheckmarkSquareFill else SFSymbol.Square,
-                    contentDescription = if (done) "Done" else "Not done",
+                    contentDescription = if (done) stringResource(R.string.transcript_task_done_description) else stringResource(R.string.transcript_task_not_done_description),
                     size = iconSize,
                     tint = colors.secondaryText,
                     modifier = Modifier.align(Alignment.CenterEnd),
@@ -262,7 +286,7 @@ private val MermaidImageDragSource = { image: android.graphics.Bitmap, name: Str
     )
 }
 
-/** iOS's pull request link card: purple branch glyph, the title, and an outward arrow. */
+/** Purple branch glyph, the title, and an outward arrow. */
 @Composable
 private fun PullRequestCard(title: String, url: String, onOpen: () -> Unit) {
     val colors = currentMarkdownStyle().colors
@@ -295,19 +319,23 @@ private fun PullRequestCard(title: String, url: String, onOpen: () -> Unit) {
 }
 
 /**
- * A `.files` block (iOS `MarkdownBlockView.fileCards`): image previews in the transcript, file
- * cards on other Markdown surfaces (and without a server to read the images from).
+ * A `.files` block: image previews in the transcript, file cards on other Markdown surfaces (and
+ * without a server to read the images from).
  */
 @Composable
-private fun FileCards(files: List<AgentFileReference>) {
+private fun FileCards(files: List<AgentFileReference>, gap: Dp) {
     val context = LocalTranscriptRowContext.current
     val server = context.server
     val onOpenFile = { file: AgentFileReference -> context.send(TranscriptAction.OpenFile(file)) }
-    // iOS `\.transcriptDragContext`: media's gallery tiles and file cards drag their files
-    // (`.agentFile`) and read the server and folder from here.
+    // Media's gallery tiles and file cards drag their files (`.agentFile`) and read the server and
+    // folder from here.
     val directory = context.directory
     androidx.compose.runtime.CompositionLocalProvider(ai.opencode.feature.media.LocalMediaDragContext provides ai.opencode.feature.media.MediaDragContext(server, directory)) {
-        FileCardsContent(files, server, context.imagePreviews, directory, onOpenFile)
+        CheckedAgentFiles(files, server, directory) { shown ->
+            Column(Modifier.padding(top = gap)) {
+                FileCardsContent(shown, server, context.imagePreviews, directory, onOpenFile)
+            }
+        }
     }
 }
 

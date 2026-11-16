@@ -49,10 +49,7 @@ import java.time.Instant
 import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `VoiceOpenLinkTests.swift`, its feature tests (MARK: Feature) and its
- * `VoiceFeatureTests` extension. The app tests are in `:app`, the protocol test in `:server`.
- */
+/** Its feature tests (MARK: Feature) and its `VoiceFeatureTests` extension. */
 class VoiceOpenLinkTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -282,7 +279,7 @@ class VoiceOpenLinkTests {
         tool = ClientTool.voiceOpenURL, sessionID = "ses_voice", url = "https://m.uber.com/ul/", title = "Uber",
     )
 
-    /** iOS `startExhaustiveCall`: a live call (Android asserts what each step changes by hand). */
+    /** A live call (Android asserts what each step changes by hand). */
     private suspend fun startLiveCall(
         configure: DependencyValues.Builder.() -> Unit,
     ): TestStore<VoiceFeature.State, VoiceFeature.Action> {

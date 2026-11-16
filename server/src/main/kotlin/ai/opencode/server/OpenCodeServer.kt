@@ -1,5 +1,6 @@
 package ai.opencode.server
 
+import ai.opencode.core.strings.localized
 import ai.opencode.server.internal.UrlParts
 import ai.opencode.server.internal.percentEncodePath
 import ai.opencode.server.internal.percentEncodeQueryComponent
@@ -14,7 +15,7 @@ import java.net.URI
 import java.util.Base64
 
 /**
- * A saved server: where it is, and how to authorize. Port of iOS `OpenCodeServer`.
+ * A saved server: where it is, and how to authorize.
  *
  * Manual entry: `OpenCodeServer(url = "http://192.168.1.5:4096", username = "opencode", password = "…",
  * headers = listOf(OpenCodeServer.Header("CF-Access-Client-Id", "…")))`. From a pairing code:
@@ -253,9 +254,8 @@ data class OpenCodeServer(
     }
 
     /**
-     * An OkHttp client (sharing [base]'s pools) that authorizes every request to this
-     * server's origins, for image loaders and media players. The Android counterpart of
-     * iOS's per-request `authorize`; requests elsewhere go out untouched.
+     * An OkHttp client (sharing [base]'s pools) that authorizes every request to this server's
+     * origins, for image loaders and media players. Requests elsewhere go out untouched.
      */
     fun httpClient(base: OkHttpClient): OkHttpClient = base.newBuilder()
         .addInterceptor(Interceptor { chain ->
@@ -314,6 +314,15 @@ enum class ConnectionRoute(val rawValue: String) {
     LocalNetwork("Local Network"),
     Loopback("Loopback"),
     Internet("Internet");
+
+    /** What the route reads as on screen; [rawValue] stays English for logs. */
+    val title: String
+        get() = when (this) {
+            Tailscale -> rawValue
+            LocalNetwork -> localized(R.string.server_connection_route_local_network)
+            Loopback -> localized(R.string.server_connection_route_loopback)
+            Internet -> localized(R.string.server_connection_route_internet)
+        }
 
     /** Straight to the computer (a LAN or tailnet address), not through a relay or the internet. */
     val isDirect: Boolean get() = this == Tailscale || this == LocalNetwork

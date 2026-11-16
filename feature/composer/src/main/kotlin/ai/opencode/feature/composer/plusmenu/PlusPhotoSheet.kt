@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer.plusmenu
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeSheetHandleDefaults
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.dependency
@@ -28,6 +29,7 @@ import ai.opencode.feature.composer.ComposerMorphTunables
 import ai.opencode.feature.composer.LocalComposerMorphContentActive
 import ai.opencode.feature.composer.PickerTunables
 import ai.opencode.feature.composer.PlusMenuTunables
+import ai.opencode.feature.composer.R
 import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.res.Configuration
@@ -113,6 +115,8 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -146,10 +150,10 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * The newest photos for the New Plus Menu (OC-354), shared by the photo sheet and the recent
- * strip a hold on + shows, and the photos picked in the sheet, in tap order. iOS
- * `PlusPhotoLibrary`. A plain object with snapshot state, created by the session screen
- * (`remember { PlusPhotoLibrary() }`); call [stop] when the screen goes.
+ * The newest photos for the New Plus Menu, shared by the photo sheet and the recent strip
+ * a hold on + shows, and the photos picked in the sheet, in tap order. A plain object with snapshot
+ * state, created by the session screen (`remember { PlusPhotoLibrary() }`); call [stop] when the
+ * screen goes.
  */
 class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(PhotoLibraryClient)) {
     private val haptics: HapticsClient = dependency(HapticsClient)
@@ -177,7 +181,7 @@ class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(Photo
     /** Top visible photo ID when the user scrolled the library, so reopening the sheet in the same session returns there. */
     var savedScrollPhotoID: String? = null
 
-    /** Pixels per dp of the display (iOS `defaultDisplayScale`); views keep it current. */
+    /** Pixels per dp of the display; views keep it current. */
     var displayScale: Float = Resources.getSystem()?.displayMetrics?.density?.takeIf { it > 0 } ?: 3f
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -191,7 +195,6 @@ class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(Photo
     private val thumbnailOrder = ArrayList<ThumbnailCacheKey>()
     private var memoryObserver: Pair<Context, ComponentCallbacks2>? = null
 
-    /** iOS `didReceiveMemoryWarningNotification` → [purgeCache]: Android's memory trim. */
     private fun installMemoryObserverIfNeeded() {
         if (memoryObserver != null) return
         val context = runCatching { dependency(AppContext) }.getOrNull() ?: return
@@ -236,7 +239,6 @@ class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(Photo
         if (access != PhotoLibraryAccess.NotDetermined) client.stopCaching()
     }
 
-    /** iOS memory-warning purge. */
     fun purgeCache() {
         generation += 1
         clearCache()
@@ -272,8 +274,7 @@ class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(Photo
         val expected = generation
         val now = client.access()
         if (access != now) access = now
-        // Never asked: watching the library raises nothing on Android, but iOS's would raise the
-        // access alert over whatever screen is up; the sheet asks ([load]), as on iOS.
+        // Never asked: watching the library raises nothing on Android; the sheet asks ([load]).
         if (now == PhotoLibraryAccess.NotDetermined) return
         reload(expected)
         if (!currentCoroutineContext().isActive || generation != expected) return
@@ -428,10 +429,10 @@ class PlusPhotoLibrary(private val client: PhotoLibraryClient = dependency(Photo
 }
 
 /**
- * Pure detent state and 1:1 finger-tracking geometry for the two-detent photo sheet (compact
- * over the keyboard's place, expanded up to the header ceiling). iOS `PlusPhotoSheetDetent`.
- * Units are whatever the caller measures in (dp for the iOS-matching thresholds). The M3
- * [PlusPhotoSheet] uses `SheetState`'s own detents; this stays for a custom morph surface.
+ * Pure detent state and 1:1 finger-tracking geometry for the two-detent photo sheet (compact over
+ * the keyboard's place, expanded up to the header ceiling). Units are whatever the caller measures
+ * in. The M3 [PlusPhotoSheet] uses `SheetState`'s own detents; this stays for a custom morph
+ * surface.
  */
 data class PlusPhotoSheetDetent(
     var isExpanded: Boolean = false,
@@ -517,7 +518,7 @@ data class PlusPhotoSheetDetent(
     }
 
     companion object {
-        /** UIKit's rubber band (`MotionRubberBand`), never more than [limit]. */
+        /** A rubber band (`MotionRubberBand`), never more than [limit]. */
         fun rubberBand(excess: Float, limit: Float, factor: Float): Float {
             if (excess <= 0 || limit <= 0 || factor <= 0) return 0f
             return MotionRubberBand(limit.toDouble(), factor.toDouble()).stretch(excess.toDouble()).toFloat()
@@ -531,17 +532,16 @@ data class PlusPhotoSheetDetent(
             return min(normalized, 18f)
         }
 
-        /** iOS `ComposerMorph.closes(translation:predicted:velocity:)`. */
         fun closes(translation: Float, predicted: Float, velocity: Float): Boolean =
             ComposerMorph.closes(translation.toDouble(), predicted.toDouble(), velocity.toDouble())
     }
 }
 
 /**
- * Cancels tile and camera taps while a sheet drag is in flight and for 80 ms after it ends,
- * without sticking if a drag begins and ends within one frame or clearing mid-drag if a
- * second drag starts within 80 ms. iOS `PlusPhotoSheetTapSuppression`. (Compose already
- * cancels a click when its pointer turns into a drag; this covers drags owned elsewhere.)
+ * Cancels tile and camera taps while a sheet drag is in flight and for 80 ms after it ends, without
+ * sticking if a drag begins and ends within one frame or clearing mid-drag if a second drag starts
+ * within 80 ms. (Compose already cancels a click when its pointer turns into a drag; this covers
+ * drags owned elsewhere.)
  */
 class PlusPhotoSheetTapSuppression(private val scope: CoroutineScope) {
     var isSuppressed: Boolean by mutableStateOf(false)
@@ -574,17 +574,14 @@ class PlusPhotoSheetTapSuppression(private val scope: CoroutineScope) {
     }
 }
 
-/** A node's bounds in screen pixels (iOS `frame(in: .global)` in window points). */
+/** A node's bounds in screen pixels. */
 internal fun LayoutCoordinates.boundsOnScreen(): Rect =
     Rect(positionOnScreen(), Size(size.width.toFloat(), size.height.toFloat()))
 
 /**
- * The photo sheet (iOS `PlusPhotoSheetContent` + `PlusPhotoSheetFoot` inside
- * `ComposerMorphSurface`): an M3 modal bottom sheet whose partial detent is iOS's compact
- * detent and whose expanded detent is the header ceiling. The camera tile, then the newest
- * photos three across, with Back and All Photos / Add along its foot. Tapping photos picks
- * them (up to four, in order); Add hands the picks over ([onAdd]) for the session to reserve
- * slots, launch [PhotoFlights] and close the sheet.
+ * The photo sheet. The camera tile, then the newest photos three across, with Back and All Photos /
+ * Add along its foot. Tapping photos picks them (up to four, in order); Add hands the picks over
+ * ([onAdd]) for the session to reserve slots, launch [PhotoFlights] and close the sheet.
  *
  * @param onBack ‹ Back: return to the + menu.
  * @param onAdd the picked photo IDs, in tap order ([PlusPhotoLibrary.takePicks] already ran).
@@ -652,9 +649,9 @@ fun PlusPhotoSheet(
 }
 
 /**
- * iOS's grabber header: a 36 × 5 capsule in a 22 pt band; tap toggles Half/Full. Hosted in the
- * morph ([onDrag] non-null), a vertical drag past 4 dp moves the sheet too (screen coordinates,
- * so the band moving with the sheet doesn't feed back), and its release settles it.
+ * A 36 × 5 capsule in a 22 pt band; tap toggles Half/Full. Hosted in the morph ([onDrag] non-null),
+ * a vertical drag past 4 dp moves the sheet too (screen coordinates, so the band moving with the
+ * sheet doesn't feed back), and its release settles it.
  */
 @Composable
 private fun PlusPhotoSheetGrabber(
@@ -671,6 +668,9 @@ private fun PlusPhotoSheetGrabber(
     val currentOnDragEnded by rememberUpdatedState(onDragEnded)
     val currentOnDragCancelled by rememberUpdatedState(onDragCancelled)
     val inset = PlusMenuTunables.GRID_INSET
+    val grabberDescription = stringResource(R.string.composer_sheet_grabber_description)
+    val fullText = stringResource(R.string.composer_photo_sheet_full)
+    val halfText = stringResource(R.string.composer_photo_sheet_half)
     Box(
         Modifier
             // Over the photos it takes only its own width, so the top row keeps its taps.
@@ -691,8 +691,8 @@ private fun PlusPhotoSheetGrabber(
             )
             .clickable(onClickLabel = null, role = Role.Button, onClick = onToggle)
             .clearAndSetSemantics {
-                contentDescription = "Sheet Grabber"
-                stateDescription = if (isExpanded) "Full" else "Half"
+                contentDescription = grabberDescription
+                stateDescription = if (isExpanded) fullText else halfText
                 role = Role.Button
                 testTag = "plus-photo-grabber"
                 onClick { onToggle(); true }
@@ -715,10 +715,9 @@ private class CoordinatesHolder {
 }
 
 /**
- * iOS `DragGesture(minimumDistance:, coordinateSpace: .global)`, observed beside the node's own
- * gestures (`simultaneousGesture`): it watches the initial pass without taking the pointer until
- * [onMove] consumes a change. Translations are root-space dp from the touch's start, so a sheet
- * that moves under the finger doesn't feed back; velocity is dp/s.
+ * Observed beside the node's own gestures (`simultaneousGesture`): it watches the initial pass
+ * without taking the pointer until [onMove] consumes a change. Translations are root-space dp from
+ * the touch's start, so a sheet that moves under the finger doesn't feed back; velocity is dp/s.
  */
 private fun Modifier.sheetDrag(
     coords: CoordinatesHolder,
@@ -766,19 +765,19 @@ private const val GRID_SPACING = 2f
 private const val GRABBER_HEIGHT = 22f
 private const val CAMERA_KEY = "__camera__"
 
-/** UIKit's normal deceleration: a throw's predicted travel is velocity × 0.499 s (SwiftUI `predictedEndTranslation`). */
+/** A throw's predicted travel is velocity × 0.499 s. */
 private const val PREDICT_SECONDS = 0.499f
 
 /**
- * The sheet's content (iOS `PlusPhotoSheetContent`): the camera, then the newest photos, three
- * across. Tapping photos picks them. Laid out once where the sheet rests and revealed by the
- * sheet's surface, so nothing reflows as it grows.
+ * The sheet's content: the camera, then the newest photos, three across. Tapping photos picks them.
+ * Laid out once where the sheet rests and revealed by the sheet's surface, so nothing reflows as it
+ * grows.
  *
  * In the M3 [PlusPhotoSheet] the sheet owns its drag handle and detents. Hosted in the morph
- * ([ComposerMorphPhotoSheet], [onDrag] non-null), it draws its own grabber and drives the
- * sheet as iOS does: compact, the grid doesn't scroll and a drag anywhere moves the sheet;
- * expanded, it scrolls, and a pull down from its top collapses it (a baseline taken when the
- * pull starts mid-scroll). Taps are suppressed while a sheet drag runs and 80 ms after.
+ * ([ComposerMorphPhotoSheet], [onDrag] non-null), it draws its own grabber and drives the sheet:
+ * compact, the grid doesn't scroll and a drag anywhere moves the sheet; expanded, it scrolls, and a
+ * pull down from its top collapses it (a baseline taken when the pull starts mid-scroll). Taps are
+ * suppressed while a sheet drag runs and 80 ms after.
  *
  * @param onDrag the sheet drag's translation (dp).
  * @param onDragEnded predicted end translation and velocity (dp, dp/s).
@@ -829,7 +828,8 @@ fun PlusPhotoSheetContent(
                 if (index == 0 && offset <= 4 * density) {
                     library.savedScrollPhotoID = null
                 } else if (library.photos.isNotEmpty()) {
-                    // iOS: the first visible row (at least the second), its first photo after the camera.
+                    // The first visible row (at least the second), its first photo after the
+                    // camera.
                     val photoIndex = (max(index, 3) - 1).coerceIn(0, library.photos.size - 1)
                     library.savedScrollPhotoID = library.photos[photoIndex].id
                 }
@@ -847,6 +847,7 @@ fun PlusPhotoSheetContent(
     // Over the grid: the photos sit `gridInset` from the glass on every side and the grabber
     // floats on the top row. Otherwise in its own band above the grid.
     val grabberOver = PickerTunables.PHOTO_GRABBER_OVER_GRID
+    val photosDescription = stringResource(R.string.composer_photo_grid_description)
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
@@ -854,7 +855,7 @@ fun PlusPhotoSheetContent(
             horizontalArrangement = Arrangement.spacedBy(GRID_SPACING.dp),
             verticalArrangement = Arrangement.spacedBy(GRID_SPACING.dp),
             contentPadding = PaddingValues(bottom = bottomPadding),
-            // iOS `scrollDisabled(!isExpanded)`: compact, a drag moves the sheet instead.
+            // Compact, a drag moves the sheet instead.
             userScrollEnabled = !hosted || isExpanded,
             modifier = Modifier
                 .fillMaxSize()
@@ -917,7 +918,7 @@ fun PlusPhotoSheetContent(
                     ),
                 )
                 .semantics {
-                    contentDescription = "Photos"
+                    contentDescription = photosDescription
                     testTag = "plus-photo-grid"
                 },
         ) {
@@ -958,6 +959,7 @@ fun PlusPhotoSheetContent(
 
 @Composable
 private fun PlusCameraTile(camera: PlusCameraPresentation, active: Boolean, onCamera: () -> Unit) {
+    val cameraDescription = stringResource(R.string.composer_photo_camera_description)
     DisposableEffect(camera, active) {
         camera.mounted = active
         onDispose { camera.mounted = false }
@@ -968,7 +970,7 @@ private fun PlusCameraTile(camera: PlusCameraPresentation, active: Boolean, onCa
             .background(MaterialTheme.colorScheme.surfaceContainerHighest)
             .onGloballyPositioned { if (active) camera.tile = it.boundsOnScreen() }
             .clickable(onClickLabel = null, role = Role.Button, onClick = onCamera)
-            .semantics { contentDescription = "Camera" },
+            .semantics { contentDescription = cameraDescription },
         contentAlignment = Alignment.Center,
     ) {
         OpenCodeIcon(SFSymbol.Camera, contentDescription = null, size = 28.dp, tint = OpenCodeTheme.colors.text)
@@ -984,18 +986,17 @@ private fun DeniedNotice(onOpenSettings: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text("Photo access is off", style = OpenCodeTextStyles.headline, color = OpenCodeTheme.colors.text)
+        Text(stringResource(R.string.composer_photo_access_off_title), style = OpenCodeTextStyles.headline, color = OpenCodeTheme.colors.text)
         Text(
-            "Allow access in Settings to pick photos here.",
+            stringResource(R.string.composer_photo_access_off_message),
             style = OpenCodeTextStyles.subheadline,
             color = OpenCodeTheme.colors.secondaryText,
             textAlign = TextAlign.Center,
         )
-        OpenCodeSecondaryButton(text = "Open Settings", onClick = onOpenSettings)
+        OpenCodeSecondaryButton(text = stringResource(CoreR.string.common_open_settings), onClick = onOpenSettings)
     }
 }
 
-/** iOS `PlusPhotoSheetFoot.height` / `inset` (dp). */
 object PlusPhotoSheetFootDefaults {
     /** The floating toolbar's height (Material 3 Expressive's, around a 48 dp button). */
     const val HEIGHT = 64f
@@ -1005,10 +1006,10 @@ object PlusPhotoSheetFootDefaults {
 }
 
 /**
- * The photo sheet's foot (iOS `PlusPhotoSheetFoot`) as a floating toolbar, like the system photo
- * picker's, on the desktop's floating surface (fill, hairline and raised shadow): Back on the leading edge and the trailing [PlusPhotoPillControl]:
- * All Photos with no picks (expands the sheet), Add N Photos once photos are picked; a long press
- * offers All Photos and, under limited access, Select More Photos….
+ * The photo sheet's foot as a floating toolbar, like the system photo picker's, on the desktop's
+ * floating surface (fill, hairline and raised shadow): Back on the leading edge and the trailing
+ * [PlusPhotoPillControl]: All Photos with no picks (expands the sheet), Add N Photos once photos
+ * are picked; a long press offers All Photos and, under limited access, Select More Photos….
  */
 @Composable
 fun PlusPhotoSheetFoot(
@@ -1030,20 +1031,21 @@ fun PlusPhotoSheetFoot(
         border = OpenCodeSurfaces.border,
         shadowElevation = OpenCodeSurfaces.raisedShadow,
     ) {
+        val returnText = stringResource(R.string.composer_photo_return_action)
         Row(
             Modifier.padding(horizontal = PlusPhotoSheetFootDefaults.PADDING.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             OpenCodeIconButton(
                 symbol = SFSymbol.ChevronBackward,
-                contentDescription = "Back",
+                contentDescription = stringResource(CoreR.string.common_back),
                 onClick = onBack,
                 // A bare glyph: the toolbar is its surface.
                 style = OpenCodeIconButtonStyle.Standard,
-                // iOS `accessibilityHint("Returns to attachment options")`: TalkBack reads “Double-tap to return…”.
+                // TalkBack reads “Double-tap to return…”.
                 modifier = Modifier.semantics {
                     testTag = "plus-photo-back"
-                    onClick(label = "Return to attachment options") { onBack(); true }
+                    onClick(label = returnText) { onBack(); true }
                 },
             )
             Spacer(Modifier.weight(1f).width(12.dp))
@@ -1062,8 +1064,8 @@ fun PlusPhotoSheetFoot(
 }
 
 /**
- * “▶ 0:50” in a video's corner, on the grid and on its composer thumbnail (iOS `VideoDurationBadge`,
- * `composer.plusMenu.videoBadge*`): a dark backdrop so it reads on light and dark frames; decorative.
+ * “▶ 0:50” in a video's corner, on the grid and on its composer thumbnail: a dark backdrop so it
+ * reads on light and dark frames; decorative.
  */
 @Composable
 fun VideoDurationBadge(duration: String, compact: Boolean = false, modifier: Modifier = Modifier) {
@@ -1078,7 +1080,8 @@ fun VideoDurationBadge(duration: String, compact: Boolean = false, modifier: Mod
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(if (compact) 3.dp else 4.dp),
     ) {
-        // iOS: play.fill at 7 pt (strip) / 8 pt (grid), the duration at 10 pt / caption2, semibold, tabular.
+        // Play.fill at 7 pt (strip) / 8 pt (grid), the duration at 10 pt / caption2, semibold,
+        // tabular.
         OpenCodeIcon(SFSymbol.PlayFill, contentDescription = null, size = if (compact) 7.dp else 8.dp, tint = Color.White)
         Text(
             duration,
@@ -1094,7 +1097,10 @@ fun VideoDurationBadge(duration: String, compact: Boolean = false, modifier: Mod
 private val tileDateFormatter: DateTimeFormatter =
     DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT).withZone(ZoneId.systemDefault())
 
-/** One photo or video in the sheet: its square thumbnail, a duration badge for videos, and its place in the picks. iOS `PlusPhotoTile`. */
+/**
+ * One photo or video in the sheet: its square thumbnail, a duration badge for videos, and its place
+ * in the picks.
+ */
 @Composable
 private fun PlusPhotoTile(
     photo: LibraryPhoto,
@@ -1141,10 +1147,10 @@ private fun PlusPhotoTile(
         animationSpec = if (inFlight) androidx.compose.animation.core.snap() else Motion.swap.animation(reduceMotion = reduceMotion),
         label = "tile-in-flight",
     )
-    // iOS `PhotoSelectionButtonStyle`: press feedback changes only overlays. A press only dims
-    // (previewing the next number flashed a "1" on any tile a sheet drag started on). Picked, the
-    // photo draws inset with rounded corners under its number, as the system photo picker marks a
-    // selection; the number shows at once, with the selection haptic, and the inset springs.
+    // Press feedback changes only overlays. A press only dims (previewing the next number flashed a
+    // "1" on any tile a sheet drag started on). Picked, the photo draws inset with rounded corners
+    // under its number, as the system photo picker marks a selection; the number shows at once,
+    // with the selection haptic, and the inset springs.
     val interaction = remember { MutableInteractionSource() }
     val isPressed by interaction.collectIsPressedAsState()
     val dim = if (isPressed && !picked) PlusMenuTunables.SELECTION_DIM.toFloat() * 0.5f else 0f
@@ -1163,6 +1169,9 @@ private fun PlusPhotoTile(
     )
     val washColor = MaterialTheme.colorScheme.background
     val description = listOfNotNull(photo.formattedDuration, photo.created?.let(tileDateFormatter.withLocale(appFormattingLocale())::format)).joinToString(", ")
+    val videoText = stringResource(R.string.composer_photo_tile_video_description)
+    val photoText = stringResource(R.string.composer_photo_tile_photo_description)
+    val limitText = pluralStringResource(R.plurals.composer_photo_limit, AttachmentPickerButton.MAX_PHOTO_SELECTION, AttachmentPickerButton.MAX_PHOTO_SELECTION)
     Box(
         Modifier
             .aspectRatio(1f)
@@ -1193,9 +1202,9 @@ private fun PlusPhotoTile(
             }
             .clickable(interactionSource = interaction, indication = null, enabled = !inFlight, role = Role.Button, onClick = onTap)
             .clearAndSetSemantics {
-                contentDescription = if (photo.isVideo) "Video" else "Photo"
+                contentDescription = if (photo.isVideo) videoText else photoText
                 stateDescription = if (full) {
-                    listOf(description, "${AttachmentPickerButton.MAX_PHOTO_SELECTION} photos is the most you can add")
+                    listOf(description, limitText)
                         .filter { it.isNotEmpty() }.joinToString(", ")
                 } else {
                     description

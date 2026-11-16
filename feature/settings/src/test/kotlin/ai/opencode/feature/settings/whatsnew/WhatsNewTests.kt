@@ -28,23 +28,6 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * Port of iOS `WhatsNewTests.swift` (`WhatsNewTests`, `WhatsNewDotSymbolTests`,
- * `WhatsNewTryItTests`).
- *
- * On Android What’s New's page lives on Settings' stack ([SettingsFeature] with `root = whatsNew`
- * when the drawer's row opens it), so iOS's Home tests split: the Settings half (the page, the
- * Settings pages it pushes, Settings closing marking what was read) is ported here against
- * [SettingsFeature]; the Home half (`isSettingsShown`, the drawer closing, the new-session draft,
- * Catch Up, subagents) belongs to `:feature:drawer`'s port. Each Settings-half test says which iOS
- * test it comes from.
- *
- * Not here:
- * - Home only (`:feature:drawer`): `tryItTypesAPromptInANewSessionWithoutSendingIt`,
- *   `closingSettingsWithoutWhatsNewSendsNothingMore`, `closingWhatsNewDropsItsSettingsPage` (Home
- *   drops Settings' state, and with it the page), the five `tryIt…Draft…`/`…OnThisServer…` tests,
- *   and `WhatsNewTryItTests`' four `modelList…` tests.
- * - `WhatsNewTryItTests.whatsNewSurvivesAHomeReplacement`: `WhatsNewAcrossHomes` (`:app`).
- *
  * `WhatsNewDotSymbolTests` rasterizes the symbol's vector drawable on a `Canvas` ([DotField]), so it
  * runs under Robolectric (native graphics, the app's resources).
  */
@@ -60,7 +43,7 @@ class WhatsNewTests {
     private fun smaller(id: String, day: String = "2026-10-06") =
         WhatsNewEntry.smaller(id = id, day = day, title = id, symbol = "sparkles", summary = "s")
 
-    /** iOS's What's New push from the drawer: Settings' state with What's New as its root, open. */
+    /** Settings' state with What's New as its root, open. */
     private fun whatsNewSettings(entries: List<WhatsNewEntry>) =
         SettingsFeature.State.whatsNew(server).copy(whatsNew = WhatsNewFeature.State(entries = entries, isPresented = true))
 
@@ -191,9 +174,8 @@ class WhatsNewTests {
     }
 
     /**
-     * Settings half of iOS `homePushesWhatsNewFromTheDrawerAndClosingMarksItSeen`: the page the
-     * drawer's row pushes keeps its row until it closes; Back at its root closes it (Home then
-     * drops Settings) and marks what was read seen.
+     * The page the drawer's row pushes keeps its row until it closes; Back at its root closes it
+     * (Home then drops Settings) and marks what was read seen.
      */
     @Test
     fun homePushesWhatsNewFromTheDrawerAndClosingMarksItSeen() = runTest {
@@ -213,7 +195,6 @@ class WhatsNewTests {
         store.finish()
     }
 
-    /** Settings half of iOS `readingItInSettingsMarksItSeenWhenSettingsCloses`. */
     @Test
     fun readingItInSettingsMarksItSeenWhenSettingsCloses() = runTest {
         val shared = SettingsTestShared()
@@ -358,8 +339,8 @@ class WhatsNewTests {
         )
 
         /**
-         * Every ID What’s New listed before features and smaller changes, as of anomaly/main
-         * 275b42b3. Seen state is stored by these IDs.
+         * Every ID What’s New listed before features and smaller changes.
+         * Seen state is stored by these IDs.
          */
         val previousIDs: Set<String> = setOf(
             "transcript-keyboard-space", "share-sheet-sends", "run-error-line", "model-list-and-level-meter",
@@ -377,10 +358,7 @@ class WhatsNewTests {
     }
 }
 
-/**
- * Port of iOS `WhatsNewTryItTests`, the Settings half: Try It keeps the page for what can't go
- * now. The Home half (Catch Up, subagents, the draft) belongs to `:feature:drawer`'s port.
- */
+/** The Settings half: Try It keeps the page for what can't go now. */
 class WhatsNewTryItTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -393,7 +371,7 @@ class WhatsNewTryItTests {
     private fun TestScope.store(state: SettingsFeature.State, shared: SettingsTestShared = SettingsTestShared()) =
         TestStore(state, SettingsFeature(), this) { this[SharedStore] = shared.store }
 
-    /** Settings half of iOS `aNewSessionWhileOfflineKeepsThePage`: nothing leaves for Home. */
+    /** Nothing leaves for Home. */
     @Test
     fun aNewSessionWhileOfflineKeepsThePage() = runTest {
         val store = store(whatsNewSettings().copy(connectionStatus = ConnectionStatus.disconnected))
@@ -405,7 +383,6 @@ class WhatsNewTryItTests {
         store.finish()
     }
 
-    /** Settings half of iOS `aCallBeforeVoiceIsSetUpPushesVoiceSettingsOnThePage`. */
     @Test
     fun aCallBeforeVoiceIsSetUpPushesVoiceSettingsOnThePage() = runTest {
         val shared = SettingsTestShared()
@@ -422,7 +399,7 @@ class WhatsNewTryItTests {
         store.finish()
     }
 
-    /** iOS `settingsAskedForOverWhatsNewShowsSettings`: the push shows Settings' root. */
+    /** The push shows Settings' root. */
     @Test
     fun settingsAskedForOverWhatsNewShowsSettings() = runTest {
         val store = store(whatsNewSettings())
@@ -433,7 +410,7 @@ class WhatsNewTryItTests {
     }
 }
 
-/** iOS `WhatsNewDotSymbolTests`: the page's [DotField] over the symbol's Material Symbol drawable. */
+/** The page's [DotField] over the symbol's Material Symbol drawable. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)

@@ -1,6 +1,8 @@
 package ai.opencode.server.live
 
+import ai.opencode.core.strings.localized
 import ai.opencode.server.OpenCodeClientError
+import ai.opencode.server.R
 import ai.opencode.server.model.OpenCodeModelCatalog
 import ai.opencode.server.model.OpenCodeSession
 import kotlinx.coroutines.CancellationException
@@ -20,9 +22,9 @@ import kotlin.time.Duration.Companion.seconds
 internal data class KnownParent(val parent: String?)
 
 /**
- * Process-wide decoded reads shared by every screen (iOS `OpenCodeReadCache` actor):
- * model catalogs for 30 s, session parents for the app's lifetime, missing sessions for 5 s,
- * in-flight session lookups joined, and a per-server lookup permit pool.
+ * Process-wide decoded reads shared by every screen: model catalogs for 30 s, session parents for
+ * the app's lifetime, missing sessions for 5 s, in-flight session lookups joined, and a per-server
+ * lookup permit pool.
  */
 internal class OpenCodeReadCache {
     private val lock = Any()
@@ -45,6 +47,10 @@ internal class OpenCodeReadCache {
         synchronized(lock) {
             if (catalog.models.isEmpty()) modelCatalogs.remove(key) else modelCatalogs[key] = CatalogEntry(catalog, now())
         }
+    }
+
+    fun forgetModelCatalogs(server: String) {
+        synchronized(lock) { modelCatalogs.keys.removeAll { it.startsWith("$server|") } }
     }
 
     private val sessionParents = HashMap<String, HashMap<String, String?>>()
@@ -149,6 +155,6 @@ internal class OpenCodeReadCache {
         private const val SESSION_PARENT_LIMIT = 4_096
         private val MISSING_SESSION_TTL = 5.seconds
 
-        val ancestryError get() = OpenCodeClientError("Couldn’t load active session ancestry")
+        val ancestryError get() = OpenCodeClientError(localized(R.string.server_error_load_session_ancestry))
     }
 }

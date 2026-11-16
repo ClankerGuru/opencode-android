@@ -37,22 +37,20 @@ import kotlinx.coroutines.launch
 import kotlin.math.max
 
 /**
- * Port of the wide-window metrics `SessionDrawerContainer` uses (iOS `SidebarMetrics` in
- * `DrawerRowInteraction.swift`): a window at least [minimumWindowWidth] wide lists the sessions
- * in a [width]-wide sidebar beside the session instead of a drawer under it.
+ * Port of the wide-window metrics `SessionDrawerContainer` uses: a window at least
+ * [minimumWindowWidth] wide lists the sessions in a [width]-wide sidebar beside the session instead
+ * of a drawer under it.
  */
 object SidebarMetrics {
-    /** iOS `SidebarMetrics.minimumWindowWidth` (700 pt). */
     val minimumWindowWidth: Dp = 700.dp
-    /** iOS `SidebarMetrics.width` (320 pt). */
     val width: Dp = 320.dp
 }
 
 /**
- * Mutes the session card while the drawer is open (iOS `DrawerScrim`). Its alpha is the drawer's
- * progress, so it follows the drag and the settle exactly. Light darkens the white card toward
- * grey; a black scrim would vanish on the black dark-mode card, so dark blends toward grey.
- * The returned colour carries the iOS alpha; draw it at `alpha = progress`.
+ * Mutes the session card while the drawer is open. Its alpha is the drawer's progress, so it
+ * follows the drag and the settle exactly. Light darkens the white card toward grey; a black scrim
+ * would vanish on the black dark-mode card, so dark blends toward grey. Draw it at `alpha =
+ * progress`.
  */
 object DrawerScrim {
     fun color(isDark: Boolean, highContrast: Boolean): Color =
@@ -63,7 +61,9 @@ object DrawerScrim {
         }
 }
 
-/** Whether closing the drawer gives the keyboard back to the composer that had it when it opened (iOS `DrawerKeyboard`). */
+/**
+ * Whether closing the drawer gives the keyboard back to the composer that had it when it opened.
+ */
 object DrawerKeyboard {
     /** The session the drawer closes onto: one just chosen in it (maybe still loading behind the old card), else the one shown. */
     fun closingSession(chosen: String?, shown: String?): String? = chosen ?: shown
@@ -76,10 +76,7 @@ object DrawerKeyboard {
     }
 }
 
-/**
- * What a Catch Up mode change is morphing (iOS `setCatchingUp(_:animated:)`'s three paths and
- * `returnToDrawer(animated:)`).
- */
+/** What a Catch Up mode change is morphing. */
 enum class CatchUpModeMorph {
     /** The card insets into the stack from wherever it was (the open drawer's offset, or full screen). */
     EnterCatchUp,
@@ -92,17 +89,16 @@ enum class CatchUpModeMorph {
 }
 
 /**
- * The plain object behind [SessionDrawerContainer] (iOS `SessionDrawerViewController`): owns the
- * drawer's motion ([motion]), Catch Up's stack ([catchUpStack]), the Catch Up mode morphs and the
- * wide-window sidebar, and drives the keyboard hold at iOS's points. Everything per frame is
- * snapshot state read in layer/draw blocks; Home hears only coarse callbacks.
+ * The plain object behind [SessionDrawerContainer]: owns the drawer's motion ([motion]), Catch Up's
+ * stack ([catchUpStack]), the Catch Up mode morphs and the wide-window sidebar. Everything per
+ * frame is snapshot state read in layer/draw blocks; Home hears only coarse callbacks.
  *
  * Create it with [rememberSessionDrawerController]. Units: dp unless a name says px.
  */
 @Stable
 class SessionDrawerController internal constructor(
     private val scope: CoroutineScope,
-    /** The drawer's drag, settle and open state (iOS `apply(offset:)`, `settle`, `DrawerSpring`). */
+    /** The drawer's drag, settle and open state. */
     val motion: DrawerMotionState,
     /** Catch Up's card stack. */
     val catchUpStack: CatchUpStackController,
@@ -148,7 +144,7 @@ class SessionDrawerController internal constructor(
 
     // region Card snapshot
 
-    /** Records the card's content each frame, for the morphs' outgoing pictures (iOS `snapshotView`). */
+    /** Records the card's content each frame, for the morphs' outgoing pictures. */
     internal var cardLayer: GraphicsLayer? = null
     /** Records Catch Up's stage, which fades as a picture of itself when Catch Up ends. */
     internal var chromeLayer: GraphicsLayer? = null
@@ -167,8 +163,8 @@ class SessionDrawerController internal constructor(
     }
 
     /**
-     * Captures the card, then runs [then] (which changes what the card shows): the next morph
-     * fades that picture out over the new content (iOS `pendingExitSnapshot`).
+     * Captures the card, then runs [then] (which changes what the card shows): the next morph fades
+     * that picture out over the new content.
      */
     fun captureCardThen(then: () -> Unit) {
         // Finishing Catch Up: the last card already handed over to its flying snapshot (`live.alpha == 0`),
@@ -231,14 +227,14 @@ class SessionDrawerController internal constructor(
         }
     }
 
-    /** A subagent pushed over the session lets go of the session's keyboard (iOS `pagesChanged`). */
+    /** A subagent pushed over the session lets go of the session's keyboard. */
     fun pagesChanged(pushed: Boolean) {
         if (pushed) keyboardHold?.letGo()
     }
 
     private var lastPushed = false
 
-    /** The pushed stack changed (iOS `pageStack.update` + `pagesChanged`). */
+    /** The pushed stack changed. */
     internal fun updatePushed(pushed: Boolean) {
         if (pushed == lastPushed) return
         lastPushed = pushed
@@ -249,7 +245,7 @@ class SessionDrawerController internal constructor(
 
     // region Motion callbacks
 
-    /** Mode changes place the drawer without a haptic or an arrival (iOS sets `isPresented`/`restsOpen` directly). */
+    /** Mode changes place the drawer without a haptic or an arrival. */
     private var quiet = false
 
     private inline fun quietly(block: () -> Unit) {
@@ -275,8 +271,8 @@ class SessionDrawerController internal constructor(
     }
 
     /**
-     * Home's `isPresented` (iOS `setPresented(_:animated:)`, called after the Catch Up update): every
-     * programmatic open and close animates; Reduce Motion lands at once.
+     * Home's `isPresented`: every programmatic open and close animates; Reduce Motion lands at
+     * once.
      */
     fun setPresented(presented: Boolean, animated: Boolean = true) {
         if (catchUp != null) return
@@ -286,17 +282,17 @@ class SessionDrawerController internal constructor(
         motion.setPresented(presented, animated)
     }
 
-    /** A drag began on the card: a morph still landing lands now (iOS `beginDrag` → `finishModeTransition`). */
+    /** A drag began on the card: a morph still landing lands now. */
     internal fun panBegan() = finishModeTransition()
 
     /**
      * A drag that began before Catch Up opened or closed: its remaining events belong to neither
-     * the stack nor the drawer (iOS `isPanInFlight` / `ignoresPanUntilItEnds`).
+     * the stack nor the drawer.
      */
     private var isPanInFlight = false
     private var ignoresPanUntilItEnds = false
 
-    /** Whether the drawer takes this pan event (iOS `handlePan`'s gate). */
+    /** Whether the drawer takes this pan event. */
     internal fun acceptsPan(event: DrawerPanEvent): Boolean {
         when (event) {
             is DrawerPanEvent.Began -> {
@@ -321,7 +317,7 @@ class SessionDrawerController internal constructor(
         ignoresPanUntilItEnds = true
     }
 
-    /** Closing by hand: a tap on the card, back, TalkBack's escape (iOS `closeDrawer`). */
+    /** Closing by hand: a tap on the card, back, TalkBack's escape. */
     fun closeDrawer(): Boolean {
         if (!motion.isPresented && motion.offset <= 0f) return false
         finishModeTransition()
@@ -348,7 +344,6 @@ class SessionDrawerController internal constructor(
     /** The sidebar shows beside the card, except while catching up. */
     val isSidebarVisible: Boolean get() = sidebarShown == true && catchUp == null
 
-    /** iOS `setSidebar(_:animated:)`. */
     fun setSidebar(shown: Boolean?, animated: Boolean) {
         if (sidebarInitialized && shown == sidebarShown) return
         val wasSidebar = sidebarInitialized && sidebarShown != null
@@ -391,7 +386,7 @@ class SessionDrawerController internal constructor(
         }
     }
 
-    /** The sidebar's width changed (iOS `update(width:)` beside a sidebar). */
+    /** The sidebar's width changed. */
     internal fun sidebarWidthChanged() {
         if (sidebarShown != null) layoutSidebar(animated = false)
     }
@@ -400,11 +395,11 @@ class SessionDrawerController internal constructor(
 
     // region Catch Up mode
 
-    /** The stage on screen; `null` outside Catch Up (iOS `catchUp`). */
+    /** The stage on screen; `null` outside Catch Up. */
     var catchUp: CatchUpStage? = null
         private set
 
-    /** The last stage shown, kept mounted while an exit morph plays (iOS keeps the stack's views). */
+    /** The last stage shown, kept mounted while an exit morph plays. */
     internal var lastStage: CatchUpStage? = null
 
     /** The morph running, if any. Composition reads it to keep the stage and drawer mounted. */
@@ -436,12 +431,15 @@ class SessionDrawerController internal constructor(
     internal val cardAlpha = mutableFloatStateOf(1f)
     internal val cardRadius = mutableFloatStateOf(0f)
     internal val borderAlpha = mutableFloatStateOf(0f)
-    /** The card's visible frame (iOS's card mask) runs from [cardMaskStart] to [cardMaskEnd] in its own px; `null` is the whole card. */
+    /**
+     * The card's visible frame runs from [cardMaskStart] to [cardMaskEnd] in its own px; `null` is
+     * the whole card.
+     */
     internal var cardMaskStart: Rect? = null
     internal var cardMaskEnd: Rect? = null
     internal val maskProgress = mutableFloatStateOf(1f)
 
-    /** The outgoing session's picture, fading over the card (iOS `outgoing` snapshot). */
+    /** The outgoing session's picture, fading over the card. */
     internal var outgoing by mutableStateOf<ImageBitmap?>(null)
         private set
     /** Where [outgoing] is drawn, in the card's px; `null` fills the card. */
@@ -450,9 +448,8 @@ class SessionDrawerController internal constructor(
     internal val outgoingAlpha = mutableFloatStateOf(0f)
 
     /**
-     * iOS `updateCatchUp(_:returnsToDrawer:animated:)`. [returnsToDrawer]: the stack ends by going
-     * back to the open drawer it was opened from (Back, or finishing the stack), rather than onto
-     * the session.
+     * [returnsToDrawer]: the stack ends by going back to the open drawer it was opened from (Back,
+     * or finishing the stack), rather than onto the session.
      */
     fun updateCatchUp(stage: CatchUpStage?, returnsToDrawer: Boolean, animated: Boolean) {
         val previous = catchUp
@@ -480,11 +477,11 @@ class SessionDrawerController internal constructor(
         }
         catchUp = stage
         if (stage != null) lastStage = stage
-        // iOS `wasShowingCard = cardView.alpha > 0.01`: once the last card hands over to its flying
-        // snapshot (`live.alpha == 0`), there is no live card left to linger as `outgoing`.
+        // Once the last card hands over to its flying snapshot (`live.alpha == 0`), there is no
+        // live card left to linger as `outgoing`.
         val wasShowingCard = previous != null && previous.cardID != null && catchUpStack.live.alpha > 0.01f
-        // iOS `stack.end(...)` on leaving: a card drag under way is nobody's now. (The stack keeps
-        // its stage until the exit morph unmounts it, so its preview fades with the stage.)
+        // A card drag under way is nobody's now. (The stack keeps its stage until the exit morph
+        // unmounts it, so its preview fades with the stage.)
         if (previous != null && stage == null) catchUpStack.dropDrag()
         // Catching up takes the whole screen; afterwards the sidebar returns.
         if (sidebarShown != null) {
@@ -500,13 +497,13 @@ class SessionDrawerController internal constructor(
         }
     }
 
-    /** The chrome's Keep Unread / Mark as Read: a morph still landing lands first (iOS `dismissCard`). */
+    /** The chrome's Keep Unread / Mark as Read: a morph still landing lands first. */
     fun dismissCard(disposition: CatchUpDisposition) {
         finishModeTransition()
         catchUpStack.fling(disposition)
     }
 
-    /** The chrome's Undo (iOS `undoCard`). */
+    /** The chrome's Undo. */
     fun undoCard() {
         finishModeTransition()
         catchUpStack.undo()
@@ -577,9 +574,9 @@ class SessionDrawerController internal constructor(
     }
 
     /**
-     * The stack card's composer strip while the opened session grows from it (iOS `composerSlice`):
-     * a picture of the stack card's bottom, sliding from the stack's bottom to where the session's
-     * composer rests, over [composerCoverTop]'s canvas, which hides the live composer meanwhile.
+     * The stack card's composer strip while the opened session grows from it: a picture of the
+     * stack card's bottom, sliding from the stack's bottom to where the session's composer rests,
+     * over [composerCoverTop]'s canvas, which hides the live composer meanwhile.
      */
     internal var composerSlice by mutableStateOf<ImageBitmap?>(null)
         private set
@@ -624,8 +621,8 @@ class SessionDrawerController internal constructor(
             cardMaskStart = startRect
             cardMaskEnd = Rect(0f, 0f, fullW, fullH)
             if (snapshot != null) {
-                // iOS: a 68 pt strip of the stack card's bottom (its composer) slides to the
-                // session's composer, inset from the stack's 12 pt clearance to the composer's margin.
+                // A 68 pt strip of the stack card's bottom (its composer) slides to the session's
+                // composer, inset from the stack's 12 pt clearance to the composer's margin.
                 val sliceHeight = minOf(COMPOSER_STRIP_HEIGHT * density, stack.height)
                 val scaledSliceHeight = sliceHeight / scale
                 val startTop = startRect.bottom - scaledSliceHeight
@@ -852,7 +849,7 @@ class SessionDrawerController internal constructor(
 
     /**
      * Hands ownership from a morph to whatever comes next (a drag, a card's flight, Catch Up again,
-     * the sidebar): the morph lands at its end now (iOS `finishModeTransition`).
+     * the sidebar): the morph lands at its end now.
      */
     fun finishModeTransition() {
         if (morph == null) return
@@ -884,17 +881,16 @@ class SessionDrawerController internal constructor(
         val SWAP_IN: MotionCurve get() = MotionRole.Swap.curve(MotionPhase.Enter)
         /** What leaves fades on `swap`'s exit. */
         val SWAP_OUT: MotionCurve get() = MotionRole.Swap.curve(MotionPhase.Exit)
-        /** iOS `composerStripHeight` (68 pt): the stack card's composer strip that slides into the session. */
+        /** The stack card's composer strip that slides into the session. */
         const val COMPOSER_STRIP_HEIGHT = 68f
         /** The finished session rises from 18 pt below. */
         const val FINISH_RISE = 18f
-        /** iOS `TranscriptMetrics.clustered` (8 pt): the stack card's top sits that far into the session. */
+        /** The stack card's top sits that far into the session. */
         const val CARD_TOP_CLUSTER = 8f
 
         /**
-         * UIKit's `UIViewPropertyAnimator(duration:dampingRatio:)`: a spring whose envelope has
-         * decayed to ~0.1 % at [duration], landing exactly at 1 when it ends (the same model as
-         * `CatchUpStackController`'s flights).
+         * A spring whose envelope has decayed to ~0.1 % at [duration], landing exactly at 1 when it
+         * ends (the same model as `CatchUpStackController`'s flights).
          */
         fun durationSpring(t: Double, duration: Double, damping: Double): Float {
             if (t >= duration) return 1f
@@ -903,10 +899,7 @@ class SessionDrawerController internal constructor(
             return SpringSolver.evaluate(from = 0.0, to = 1.0, initialVelocity = 0.0, omega = omega, zeta = zeta, elapsed = t).first.toFloat()
         }
 
-        /**
-         * How far along [curve] the morph is at [t] (iOS `MotionRole.propertyAnimator`): a spring
-         * as UIKit's `UIViewPropertyAnimator(duration:dampingRatio: 1 - bounce)`, or its ease.
-         */
+        /** How far along [curve] the morph is at [t]: a spring, or its ease. */
         fun progress(t: Double, curve: MotionCurve): Float {
             val fraction = (t / max(curve.duration, 0.01)).coerceIn(0.0, 1.0).toFloat()
             return when (curve) {
@@ -916,7 +909,7 @@ class SessionDrawerController internal constructor(
             }
         }
 
-        /** iOS `CatchUpMotionStart.holdFadeIn`: from `prerenderAlpha` to 1 on `Motion.swap`, from the start. */
+        /** From `prerenderAlpha` to 1 on `Motion.swap`, from the start. */
         fun fadeIn(t: Double): Float {
             val p = progress(t, MotionRole.Swap.curve())
             return PRERENDER_ALPHA + (1f - PRERENDER_ALPHA) * p
@@ -924,5 +917,5 @@ class SessionDrawerController internal constructor(
     }
 }
 
-/** iOS `CatchUpMotionStart.prerenderAlpha`: too faint to see over what covers it, but drawn. */
+/** Too faint to see over what covers it, but drawn. */
 private const val PRERENDER_ALPHA = 0.02f

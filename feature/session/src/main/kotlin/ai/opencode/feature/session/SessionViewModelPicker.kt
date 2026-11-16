@@ -54,15 +54,13 @@ import kotlin.math.max
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineScope
 
-// Port of iOS `Session/SessionView+ModelPicker.swift`: the session's glue for :feature:composer's
-// model pickers. The pickers read a `ModelPickerState` built from `SessionFeature.State` and send
-// `ModelPickerEvent`s, which map to the `SessionFeature` actions of the same names. The composer's
-// `OnePickerChip` grows One Picker out of the composer ([SessionModelPanels],
-// [SessionModelPickerOverlays]); while the composer is covered it opens in `ModelPickerDetents`'
-// sheet ([SessionModelPicker]). One Picker graduated in iOS d0b24aaa: the plain picker and its
-// Experimental switch are gone.
+// The session's glue for:feature:composer's model pickers. The pickers read a `ModelPickerState`
+// built from `SessionFeature.State` and send `ModelPickerEvent`s, which map to the `SessionFeature`
+// actions of the same names. The composer's `OnePickerChip` grows One Picker out of the composer
+// ([SessionModelPanels], [SessionModelPickerOverlays]); while the composer is covered it opens in
+// `ModelPickerDetents`' sheet ([SessionModelPicker]). The plain picker and its Experimental switch
+// are gone.
 
-/** iOS's picker inputs on `SessionFeature.State`, as the composer's pickers read them. */
 internal fun SessionFeature.State.modelPickerState(
     favorites: Set<String> = favoriteModelIDs.value,
     recents: List<String> = recentModelIDs.value,
@@ -91,7 +89,7 @@ internal fun modelPickerAction(event: ModelPickerEvent): SessionFeature.Action? 
     is ModelPickerEvent.VariantPicked -> SessionFeature.Action.VariantPicked(event.variant)
     is ModelPickerEvent.ToggleFavoriteModel -> SessionFeature.Action.ToggleFavoriteModel(event.model)
     is ModelPickerEvent.FilterChanged -> SessionFeature.Action.Binding(BindingAction.ModelFilter(event.text))
-    // Never sent; iOS 8069f6e9 removed the reducer action as dead.
+    // Never sent.
     ModelPickerEvent.ModelSearchSubmitted -> null
     ModelPickerEvent.ShowAllModelsToggled -> SessionFeature.Action.ShowAllModelsToggled
     ModelPickerEvent.ModelListOpened -> SessionFeature.Action.ModelListOpened
@@ -131,16 +129,15 @@ internal fun rememberModelPickerState(store: StoreOf<SessionFeature.State, Sessi
 }
 
 /**
- * The model picker, shown by `SessionView` while `activePicker == model` (iOS `modelPicker`):
- * `OnePickerSheetHost` (only while a call or a docked request covers the composer; otherwise the route opens One Picker out of the composer instead,
- * iOS `activeSheetPicker`). Dismissing it sets `activePicker` to null; however it goes, its search
- * is cleared (`modelListClosed`).
+ * The model picker, shown by `SessionView` while `activePicker == model`: `OnePickerSheetHost`.
+ * Dismissing it sets `activePicker` to null; however it goes, its search is cleared
+ * (`modelListClosed`).
  */
 @Composable
 fun SessionModelPicker(store: StoreOf<SessionFeature.State, SessionFeature.Action>) {
     val state = rememberModelPickerState(store)
     val onEvent: (ModelPickerEvent) -> Unit = { event -> modelPickerAction(event)?.let(store::send) }
-    // iOS `activeSheetPicker`: with the composer on screen the route opens One Picker out of it
+    // With the composer on screen the route opens One Picker out of it
     // ([SessionModelPickerOverlays]), so no sheet shows meanwhile.
     val panels = LocalSessionComposerHost.current?.modelPanels
     if (panels?.canPresentOnePickerMorph != true) {
@@ -154,11 +151,8 @@ fun SessionModelPicker(store: StoreOf<SessionFeature.State, SessionFeature.Actio
 }
 
 /**
- * One Picker's panel grown out of the composer (iOS `SessionView`'s `onePicker` and its
- * `@State`s, with `restoreFocusAfterModelList`, `openOnePicker`, `closeOnePicker`,
- * `closeOthersForModelPanel` and `closeModelPanels`). A plain object, as on iOS (per-frame motion
- * stays out of reducers); [SessionModelPickerOverlays] creates it and hands it to the composer
- * through [SessionComposerHost.modelPanels].
+ * One Picker's panel grown out of the composer. A plain object; [SessionModelPickerOverlays]
+ * creates it and hands it to the composer through [SessionComposerHost.modelPanels].
  */
 @Stable
 internal class SessionModelPanels(
@@ -174,43 +168,43 @@ internal class SessionModelPanels(
     var talkBackOn = false
     var sceneActive = true
 
-    /** iOS `onePicker`: One Picker's controller. */
+    /** One Picker's controller. */
     val onePicker = OnePickerController()
 
     /** One Picker's space: the session's root box, its origin in root px. */
     var spaceOrigin = Offset.Zero
-    /** iOS `headerHeight + 8` in One Picker's space: how high it may grow. */
+    /** How high it may grow. */
     var onePickerCeiling = 0.0
 
-    /** iOS `sessionSheetComposer`: where the focused composer sat as the session sheet opened (One Picker's space). */
+    /** Where the focused composer sat as the session sheet opened (One Picker's space). */
     var sessionSheetComposer: Rect? = null
 
     /**
-     * iOS `sheetRestoresFocus`: the model chip put the field's keyboard away for the picker sheet,
-     * so the sheet's dismissal hands it back ([SessionSheets]).
+     * The model chip put the field's keyboard away for the picker sheet, so the sheet's dismissal
+     * hands it back ([SessionSheets]).
      */
     var sheetRestoresFocus = false
 
-    /** iOS `canPresentOnePickerMorph` (`!docksRequest`): the composer is on screen to morph from. */
+    /** The composer is on screen to morph from. */
     val canPresentOnePickerMorph: Boolean get() = !store.state.isAnsweringRequest
 
-    /** iOS `OnePickerComposerFade`: the composer fades as One Picker's glass grows out of it. */
+    /** The composer fades as One Picker's glass grows out of it. */
     val composerOpacity: Float
         get() = if (onePicker.isShown) onePicker.motion.pose.composerOpacity.toFloat().coerceIn(0f, 1f) else 1f
 
-    /** iOS `composerPanelCovers` (its model half): One Picker stands over what sits above the composer. */
+    /** One Picker stands over what sits above the composer. */
     val covers: Boolean get() = onePicker.isOpen
 
-    /** The composer stays expanded while One Picker is drawn (iOS `composerPresentation`). */
+    /** The composer stays expanded while One Picker is drawn. */
     val keepsComposerExpanded: Boolean get() = onePicker.isShown
 
-    /** iOS `composerSwipeYields`' model half: One Picker owns downward drags. */
+    /** One Picker owns downward drags. */
     val swipeYields: Boolean get() = onePicker.isShown
 
-    /** iOS `allowsMergedComposerGlass`' model half: One Picker isn't drawn. */
+    /** One Picker isn't drawn. */
     val holdsComposerGlass: Boolean get() = onePicker.isOpen || onePicker.isShown
 
-    /** The composer is behind One Picker: hidden from TalkBack (iOS `accessibilityHidden`). */
+    /** The composer is behind One Picker: hidden from TalkBack. */
     val hidesComposer: Boolean get() = onePicker.isOpen
 
     /**
@@ -238,11 +232,10 @@ internal class SessionModelPanels(
     }
 
     /**
-     * iOS `openOnePicker(restoringFocusTo:)`: One Picker grows out of the composer, taking the
-     * keyboard's place. [keyboardComposer] is the composer with its keyboard up, when One Picker
-     * opens with the keyboard already down but owes it back (the session sheet). iOS first holds
-     * the transcript's bottom obstruction (`holdKeyboardPlace`); the Android transcript has no
-     * such hold, so the keyboard's leaving moves it as any dismissal does.
+     * One Picker grows out of the composer, taking the keyboard's place. [keyboardComposer] is the
+     * composer with its keyboard up, when One Picker opens with the keyboard already down but owes
+     * it back (the session sheet). The Android transcript has no such hold, so the keyboard's
+     * leaving moves it as any dismissal does.
      */
     fun openOnePicker(keyboardComposer: Rect? = null) {
         if (onePicker.isOpen) return
@@ -269,24 +262,23 @@ internal class SessionModelPanels(
         )
     }
 
-    /** iOS `pickOnePickerModel`. */
     fun pickOnePickerModel(model: OpenCodeModel, level: String?) {
         store.send(SessionFeature.Action.ModelPickedWithLevel(model, level))
         closeOnePicker()
     }
 
     /**
-     * iOS `closeOnePicker`: One Picker folds back onto the composer. If the message field had the
-     * keyboard as it opened, it folds onto the composer as it sat with the keyboard up and the
-     * field takes the keyboard back (straight from Search Models when that has it); otherwise it
-     * folds onto the resting composer, and a keyboard Search Models raised goes down with it.
+     * One Picker folds back onto the composer. If the message field had the keyboard as it opened,
+     * it folds onto the composer as it sat with the keyboard up and the field takes the keyboard
+     * back (straight from Search Models when that has it); otherwise it folds onto the resting
+     * composer, and a keyboard Search Models raised goes down with it.
      */
     fun closeOnePicker() {
         val restores = onePicker.restoresComposerFocus
         val searchHad = onePicker.searchFocused
         onePicker.restoresComposerFocus = false
         val screen = store.state.taskIdentity
-        // iOS d0b24aaa: the rows already built for the open list, not a fresh catalogue.
+        // The rows already built for the open list, not a fresh catalogue.
         val freeze = { onePicker.catalogCache.shownSections ?: emptyList() }
         val composer = composerInSpace()
         val bottomDest = when {
@@ -360,8 +352,8 @@ internal class SessionModelPanels(
 }
 
 /**
- * One Picker over the session (iOS `SessionView`'s One Picker overlay): the picker grown out of
- * the composer. Also creates the screen's [SessionModelPanels] and hands it to the composer.
+ * One Picker over the session: the picker grown out of the composer. Also creates the screen's
+ * [SessionModelPanels] and hands it to the composer.
  */
 @Composable
 internal fun SessionModelPickerOverlays(
@@ -379,7 +371,7 @@ internal fun SessionModelPickerOverlays(
     val sceneActive = lifecycle.isAtLeast(Lifecycle.State.RESUMED)
     val statusTop = WindowInsets.statusBars.inContainer().getTop(density)
     var screenOrigin by remember { mutableStateOf(Offset.Zero) }
-    // iOS `headerHeight + 8`, in One Picker's space (the session's box, under the status bar).
+    // In One Picker's space (the session's box, under the status bar).
     val onePickerCeiling = statusTop / density.density + headerHeight + 8.0
 
     SideEffect {
@@ -392,23 +384,22 @@ internal fun SessionModelPickerOverlays(
         host.modelPanels = panels
     }
     DisposableEffect(panels) { onDispose { if (host.modelPanels === panels) host.modelPanels = null } }
-    // iOS `onChange(of: scenePhase)`: leaving the foreground settles a drag the system took mid-way.
+    // Leaving the foreground settles a drag the system took mid-way.
     LaunchedEffect(sceneActive) {
         if (!sceneActive) panels.onePicker.settleInteraction()
     }
-    // One Picker opening out of the composer taps, like the attachment menu (iOS `.haptic(.tap)`).
+    // One Picker opening out of the composer taps, like the attachment menu.
     HapticEffect(Haptic.tap, panels.onePicker.isOpen) { _, open -> open }
-    // Folded away (settled, or reset at once), its search is cleared (iOS `onChange(of: onePicker.isShown)`).
+    // Folded away (settled, or reset at once), its search is cleared.
     val onePickerShown = panels.onePicker.isShown
     var onePickerWasShown by remember { mutableStateOf(false) }
     LaunchedEffect(onePickerShown) {
         if (onePickerWasShown && !onePickerShown) store.send(SessionFeature.Action.ModelListClosed)
         onePickerWasShown = onePickerShown
     }
-    // iOS `onChange(of: store.activePicker)`: with the composer on screen, the model route (the
-    // header, the session sheet's Model row) opens One Picker out of it instead of a sheet. iOS
-    // remembers the focused composer as the session sheet opens (`showSessionInfo`), so One
-    // Picker's close hands the keyboard back to it.
+    // With the composer on screen, the model route (the header, the session sheet's Model row)
+    // opens One Picker out of it instead of a sheet. Remembers the focused composer as the session
+    // sheet opens, so One Picker's close hands the keyboard back to it.
     val activePicker by store.observe { it.activePicker }
     var previousPicker by remember { mutableStateOf(activePicker) }
     LaunchedEffect(activePicker) {
@@ -427,7 +418,7 @@ internal fun SessionModelPickerOverlays(
         }
         if (activePicker != SessionFeature.State.ActivePicker.session) panels.sessionSheetComposer = null
     }
-    // iOS `onChange(of: taskIdentity)`: another screen in place closes what grew out of the composer.
+    // Another screen in place closes what grew out of the composer.
     val taskIdentity by store.observe { it.taskIdentity }
     var seenIdentity by remember { mutableStateOf(taskIdentity) }
     LaunchedEffect(taskIdentity) {
@@ -435,8 +426,7 @@ internal fun SessionModelPickerOverlays(
         seenIdentity = taskIdentity
         panels.closeModelPanels()
     }
-    // Android-ify: system back folds an open One Picker away first, as it would close any sheet
-    // (iOS has no back; the tap outside and the grabber's pull stay as they are).
+    // Android-ify: system back folds an open One Picker away first, as it would close any sheet.
     BackHandler(enabled = panels.onePicker.isOpen) { panels.closeOnePicker() }
 
     Box(Modifier.fillMaxSize().onGloballyPositioned { screenOrigin = it.boundsInRoot().topLeft })
@@ -454,8 +444,8 @@ internal fun SessionModelPickerOverlays(
 }
 
 /**
- * iOS `OnePickerGlassBackdropModifier`: One Picker's surface, mounted over the transcript and
- * under the composer, so the composer's controls and the picker's rows draw over it.
+ * One Picker's surface, mounted over the transcript and under the composer, so the composer's
+ * controls and the picker's rows draw over it.
  */
 @Composable
 internal fun SessionOnePickerBackdrop(host: SessionComposerHost, modifier: Modifier = Modifier) {
@@ -465,9 +455,8 @@ internal fun SessionOnePickerBackdrop(host: SessionComposerHost, modifier: Modif
 }
 
 /**
- * The composer under a model panel: it fades as One Picker's glass grows out of it (iOS
- * `OnePickerComposerFade`) and is hidden from TalkBack while a panel stands over it (iOS
- * `accessibilityHidden`).
+ * The composer under a model panel: it fades as One Picker's glass grows out of it and is hidden
+ * from TalkBack while a panel stands over it.
  */
 internal fun Modifier.modelPanelsComposer(host: SessionComposerHost): Modifier = composed {
     val hides = host.modelPanels?.hidesComposer == true

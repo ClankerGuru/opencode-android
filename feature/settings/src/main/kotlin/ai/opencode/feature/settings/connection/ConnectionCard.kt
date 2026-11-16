@@ -7,9 +7,12 @@ import ai.opencode.core.ui.OpenCodeTextField
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.observe
+import ai.opencode.core.strings.localized
+import ai.opencode.core.strings.localizedPlural
 import ai.opencode.core.ui.AlertTextFields
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.RollingNumberAlignment
@@ -21,6 +24,7 @@ import ai.opencode.core.ui.accessibilityFocusRequest
 import ai.opencode.core.ui.accessibilityFocusTarget
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.settings.ConnectionStatus
+import ai.opencode.feature.settings.R
 import ai.opencode.feature.settings.SettingsButtonRow
 import ai.opencode.feature.settings.SettingsDivider
 import ai.opencode.feature.settings.SettingsFeature
@@ -35,6 +39,7 @@ import ai.opencode.feature.settings.SettingsText
 import ai.opencode.feature.settings.SettingsValueRow
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.friendlyName
+import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
@@ -85,6 +90,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -104,12 +110,12 @@ import java.util.WeakHashMap
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
-/** iOS `HomeFeature.State.credentialsRejectedStatus`: the HTTP status a refused sign-in comes back with. */
+/** The HTTP status a refused sign-in comes back with. */
 const val credentialsRejectedStatus = 401
 
 /**
- * The card's geometry (iOS `ConnectionCard.cornerRadius`, `boxInset`, `textInset`). On this branch
- * the card takes the Settings groups' desktop card radius, so it reads as one of them.
+ * The card's geometry. On this branch the card takes the Settings groups' desktop card radius, so
+ * it reads as one of them.
  */
 private object ConnectionCardMetrics {
     val cornerRadius = OpenCodeRadius.card
@@ -120,13 +126,13 @@ private object ConnectionCardMetrics {
     val scopeHeight = 96.dp
 }
 
-/** iOS `dynamicTypeSize.isAccessibilitySize`: the largest font scales (1.8× and 2×). */
+/** The largest font scales (1.8× and 2×). */
 @Composable
 private fun isAccessibilitySize(): Boolean = LocalDensity.current.fontScale > 1.5f
 
 /**
- * One monitor per Settings store, shared by the card and the server page pushed from it (iOS hands
- * the card's `ConnectionMonitor` to `ServerPage`). Weakly keyed: it goes with the store.
+ * One monitor per Settings store, shared by the card and the server page pushed from it. Weakly
+ * keyed: it goes with the store.
  */
 private val monitors = WeakHashMap<SettingsStore, ConnectionMonitor>()
 
@@ -138,7 +144,7 @@ private fun rememberConnectionMonitor(store: SettingsStore, server: OpenCodeServ
     return monitor
 }
 
-/** Runs the monitor's checks while this view is composed and the app is resumed (iOS `.task(id: isLive)`). */
+/** Runs the monitor's checks while this view is composed and the app is resumed. */
 @Composable
 private fun RunWhileResumed(monitor: ConnectionMonitor) {
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
@@ -149,11 +155,10 @@ private fun RunWhileResumed(monitor: ConnectionMonitor) {
 }
 
 /**
- * Port of iOS `ConnectionCard` (`Settings/ConnectionCard.swift`; D-21 · A · Monitor sweep, text
- * layout A2): the health checks as an EKG in an inset box, then the server's name with the status
- * trailing on the same line, then the address and route, quietest. The whole card is the button
- * (no chevron) and opens the server page; Retry sits inline while Offline, and Edit Server… when
- * the server refused the saved password, which no retry can fix.
+ * The health checks as an EKG in an inset box, then the server's name with the status trailing on
+ * the same line, then the address and route, quietest. The whole card is the button (no chevron)
+ * and opens the server page; Retry sits inline while Offline, and Edit Server… when the server
+ * refused the saved password, which no retry can fix.
  */
 @Composable
 fun ConnectionCard(
@@ -198,21 +203,24 @@ private fun ConnectionCardContent(
     val presentation = ConnectionStatusPresentation(monitor.display)
     val action = CardAction.of(presentation.status)
     val reduceMotion = rememberReduceMotion()
-    // Android divergence: a ripple answers the press (iOS shrinks the card to 97.5 % and tints it).
+    // A ripple answers the press.
     val interaction = remember { MutableInteractionSource() }
     val cardShape = RoundedCornerShape(ConnectionCardMetrics.cornerRadius)
     val wellShape = RoundedCornerShape(ConnectionCardMetrics.cornerRadius - ConnectionCardMetrics.boxInset)
     val wellFill = if (colors.isDark) Color.Black.copy(alpha = if (colors.highContrast) 0.5f else 0.32f) else colors.groupedCanvas
     val wellEdge = (if (colors.isDark) Color.White else Color.Black).copy(alpha = if (colors.highContrast) 0.16f else 0.06f)
-    // Android divergence: iOS's value carries the round trip, and VoiceOver leaves a focused element's
-    // changing value unspoken. TalkBack re-reads the focused card whenever anything it speaks changes
-    // (state, label or a merged child), so the card speaks the status word, not the live milliseconds:
-    // a new word is still read; the number stays on screen and on the server page's Status row.
-    val accessibilityValue = listOf(rememberSettledSpokenWord(presentation.spokenWord), monitor.server.host, monitor.route.rawValue)
-        .joinToString(", ")
+// TalkBack re-reads the focused card whenever anything it speaks changes, so the card speaks the
+// status word, not the live milliseconds; the number stays on screen and on the Status row.
+    val accessibilityValue = stringResource(
+        R.string.settings_connection_card_value_description,
+        rememberSettledSpokenWord(presentation.spokenWord),
+        monitor.server.host,
+        monitor.route.title,
+    )
+    val showServerLabel = stringResource(R.string.settings_connection_show_server_label)
 
     // Where the inline action sits: reserved after the status, the real button drawn over the card
-    // (outside its click and its merged semantics), as iOS's `RetryReservation`.
+    // (outside its click and its merged semantics).
     var root by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var slot by remember { mutableStateOf<Rect?>(null) }
 
@@ -234,7 +242,7 @@ private fun ConnectionCardContent(
                     contentDescription = monitor.name
                     stateDescription = accessibilityValue
                     role = Role.Button
-                    onClick(label = "Show the server") { onOpen(); true }
+                    onClick(label = showServerLabel) { onOpen(); true }
                 },
         ) {
             ConnectionScopeView(
@@ -266,7 +274,7 @@ private fun ConnectionCardContent(
         val anchor = slot
         AnimatedVisibility(
             visible = action != null && anchor != null,
-            // iOS: the retry arrives on micro.
+            // The retry arrives on micro.
             enter = MotionTransition.micro(reduceMotion).enter,
             exit = MotionTransition.micro(reduceMotion).exit,
             modifier = Modifier.matchParentSize().layout { measurable, constraints ->
@@ -283,8 +291,7 @@ private fun ConnectionCardContent(
             val shown = remember { mutableStateOf(action) }
             if (action != null) shown.value = action
             shown.value?.let { current ->
-                // iOS `RetryStyle` with a 44 pt (here 48 dp) target. Android divergence: a ripple
-                // inside the capsule answers the press (iOS dims it to 55 %).
+                // A ripple inside the capsule answers the press.
                 val actionInteraction = remember { MutableInteractionSource() }
                 RetryLabel(
                     title = current.title,
@@ -352,7 +359,7 @@ private fun CardAddress(monitor: ConnectionMonitor, stacked: Boolean) {
     if (stacked) {
         Column(Modifier.padding(top = 1.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(monitor.server.host, style = mono, color = color, maxLines = 2, overflow = TextOverflow.MiddleEllipsis)
-            Text(monitor.route.rawValue, style = caption, color = color, maxLines = 1)
+            Text(monitor.route.title, style = caption, color = color, maxLines = 1)
         }
     } else {
         Row(Modifier.padding(top = 1.dp), verticalAlignment = Alignment.Bottom) {
@@ -365,19 +372,21 @@ private fun CardAddress(monitor: ConnectionMonitor, stacked: Boolean) {
                 modifier = Modifier.weight(1f, fill = false).alignByBaseline(),
             )
             Text(" · ", style = caption, color = color, modifier = Modifier.alignByBaseline())
-            Text(monitor.route.rawValue, style = caption, color = color, maxLines = 1, modifier = Modifier.alignByBaseline())
+            Text(monitor.route.title, style = caption, color = color, maxLines = 1, modifier = Modifier.alignByBaseline())
         }
     }
 }
 
 /**
- * Port of iOS `CardAction`: what the card offers inline beside its status: Retry while Offline,
- * and Edit Server… when the password was refused (Retry couldn't help).
+ * What the card offers inline beside its status: Retry while Offline, and Edit Server… when the
+ * password was refused (Retry couldn't help).
  */
-private enum class CardAction(val title: String) {
-    retry("Retry"),
-    editServer("Edit Server…"),
+private enum class CardAction(@StringRes private val titleRes: Int) {
+    retry(CoreR.string.common_retry),
+    editServer(R.string.settings_server_edit_server),
     ;
+
+    val title: String get() = localized(titleRes)
 
     companion object {
         fun of(status: ConnectionHealth.Status): CardAction? = when (status) {
@@ -389,9 +398,8 @@ private enum class CardAction(val title: String) {
 }
 
 /**
- * Port of iOS `ConnectionStatusPresentation`: the status as shown: a symbol for its kind, then the
- * live round trip. A measured state needs no word: the glyph names it and the trace shows it.
- * States without a number say their word.
+ * The status as shown: a symbol for its kind, then the live round trip. A measured state needs no
+ * word: the glyph names it and the trace shows it. States without a number say their word.
  */
 data class ConnectionStatusPresentation(
     val status: ConnectionHealth.Status,
@@ -410,22 +418,22 @@ data class ConnectionStatusPresentation(
         ;
 
         companion object {
-            /** iOS reads a DEBUG lab default (`lab-connection-status-style`); Android has no lab launch arguments. */
+            /** Android has no lab launch arguments. */
             val current: Style = glyph
         }
     }
 
     val spokenStatus: String
         get() {
-            if (code != null) return "$word, HTTP $code"
-            return milliseconds?.let { "$word, $it milliseconds" } ?: word
+            if (code != null) return localized(R.string.settings_connection_status_http_description, word, code)
+            return milliseconds?.let { localizedPlural(R.plurals.settings_connection_status_milliseconds_description, it, word, it) } ?: word
         }
 
     /** [spokenStatus] without the round trip, for the card (see `ConnectionCard`). */
-    val spokenWord: String get() = code?.let { "$word, HTTP $it" } ?: word
+    val spokenWord: String get() = code?.let { localized(R.string.settings_connection_status_http_description, word, it) } ?: word
 
     /** The word, with a refused sign-in's status code. */
-    val text: String get() = code?.let { "$word · $it" } ?: word
+    val text: String get() = code?.let { localized(R.string.settings_connection_status_code, word, it) } ?: word
 
     /** Offline and a refused sign-in read red. */
     val isAlert: Boolean get() = status == ConnectionHealth.Status.offline || status == ConnectionHealth.Status.signInFailed
@@ -434,17 +442,17 @@ data class ConnectionStatusPresentation(
         operator fun invoke(display: ConnectionHealth.Display): ConnectionStatusPresentation {
             var code: Int? = null
             val (symbol, word) = when (display.status) {
-                ConnectionHealth.Status.connected -> SFSymbol.WaveformPathEcg to "Connected"
-                ConnectionHealth.Status.slow -> SFSymbol.TortoiseFill to "Slow"
-                ConnectionHealth.Status.unstable -> SFSymbol.WifiExclamationmark to "Unstable"
-                ConnectionHealth.Status.reconnecting -> SFSymbol.ArrowTrianglehead2Clockwise to "Reconnecting"
-                ConnectionHealth.Status.offline -> SFSymbol.NetworkSlash to "Offline"
+                ConnectionHealth.Status.connected -> SFSymbol.WaveformPathEcg to localized(R.string.settings_connection_status_connected)
+                ConnectionHealth.Status.slow -> SFSymbol.TortoiseFill to localized(R.string.settings_connection_status_slow)
+                ConnectionHealth.Status.unstable -> SFSymbol.WifiExclamationmark to localized(R.string.settings_connection_status_unstable)
+                ConnectionHealth.Status.reconnecting -> SFSymbol.ArrowTrianglehead2Clockwise to localized(R.string.settings_connection_status_reconnecting)
+                ConnectionHealth.Status.offline -> SFSymbol.NetworkSlash to localized(R.string.settings_connection_status_offline)
                 ConnectionHealth.Status.signInFailed -> {
                     code = credentialsRejectedStatus
-                    SFSymbol.LockSlash to "Sign-in failed"
+                    SFSymbol.LockSlash to localized(R.string.settings_connection_status_sign_in_failed)
                 }
                 ConnectionHealth.Status.switching ->
-                    SFSymbol.ArrowLeftArrowRight to (display.target?.let { "Switching to $it" } ?: "Switching")
+                    SFSymbol.ArrowLeftArrowRight to (display.target?.let { localized(R.string.settings_connection_status_switching_to, it) } ?: localized(R.string.settings_connection_status_switching))
             }
             val measured = display.status == ConnectionHealth.Status.connected ||
                 display.status == ConnectionHealth.Status.slow ||
@@ -465,11 +473,10 @@ data class ConnectionStatusPresentation(
 private const val SPOKEN_STATUS_SETTLE_MS = 500L
 
 /**
- * [word] once it has held for [SPOKEN_STATUS_SETTLE_MS]; until then the word before it. Android
- * divergence (iOS's VoiceOver leaves a focused element's value changes unspoken): TalkBack speaks
- * each new word on a focused node, and a dropped server passes through Reconnecting for a moment
- * (~150 ms) on its way to Offline. TalkBack read both changes after the second, so "Offline, …"
- * was spoken twice (QA F-62); a word that doesn't last isn't given to it. The screen still shows
+ * [word] once it has held for [SPOKEN_STATUS_SETTLE_MS]; until then the word before it. TalkBack
+ * speaks each new word on a focused node, and a dropped server passes through Reconnecting for a
+ * moment (~150 ms) on its way to Offline. TalkBack read both changes after the second, so "Offline,
+ * …" was spoken twice; a word that doesn't last isn't given to it. The screen still shows
  * every word at once.
  */
 @Composable
@@ -488,14 +495,14 @@ private fun rememberSettledSpokenWord(word: String): String {
 private fun ConnectionStatusPresentation.foreground(): Color =
     if (isAlert) OpenCodeTheme.colors.destructive else OpenCodeTheme.colors.secondaryText
 
-/** The round trip rolls on the layout role (iOS `Motion.layout`: 0.34 s, no bounce). */
+/** The round trip rolls on the layout role. */
 private val millisecondsRoll = RollingNumberStyle(duration = MotionTunables.layoutSpring.duration.value, bounce = 0.0)
 
 /**
- * Port of iOS `ConnectionStatusLabel`: a measured line keeps its identity, so its glyph swaps and
- * its digits roll in place. Any other change replaces the whole line where it stands on the
- * trailing edge (rising, as iOS's blur-replace up), so the glyph never slides across words; under
- * reduce motion, a cross-fade. Followed by the reserved width of the inline action.
+ * A measured line keeps its identity, so its glyph swaps and its digits roll in place. Any other
+ * change replaces the whole line where it stands on the trailing edge, so the glyph never slides
+ * across words; under reduce motion, a cross-fade. Followed by the reserved width of the inline
+ * action.
  */
 @Composable
 private fun ConnectionStatusLabel(
@@ -510,7 +517,7 @@ private fun ConnectionStatusLabel(
         AnimatedContent(
             targetState = presentation,
             contentKey = { if (it.milliseconds == null) it.word else "measured" },
-            // iOS `ConnectionMonitor`: the status line swaps in place on the swap role.
+            // The status line swaps in place on the swap role.
             transitionSpec = { MotionTransition.swap(reduceMotion).content },
             contentAlignment = Alignment.CenterEnd,
             label = "ConnectionStatus-$identity",
@@ -546,7 +553,7 @@ private fun StatusLine(presentation: ConnectionStatusPresentation, style: Connec
                 Text("·", style = textStyle, color = OpenCodeTheme.colors.tertiaryText)
             }
             RollingNumber(
-                text = "$milliseconds ms",
+                text = stringResource(R.string.settings_connection_milliseconds, milliseconds),
                 style = textStyle,
                 color = color,
                 motion = millisecondsRoll,
@@ -574,7 +581,7 @@ private fun StatusGlyph(presentation: ConnectionStatusPresentation, color: Color
     }
 }
 
-/** The inline action's capsule (iOS `RetryLabel`): subheadline semibold on a faint fill, 30 tall. */
+/** The inline action's capsule: subheadline semibold on a faint fill, 30 tall. */
 @Composable
 private fun RetryLabel(
     title: String,
@@ -600,9 +607,9 @@ private fun RetryLabel(
 }
 
 /**
- * Port of iOS `ServerPage`: the server in use: its connection, address, route and version, then
- * the one place to manage servers ([SettingsServersSection]: switch, add, rename, edit, remove),
- * and Rename. Opened from the connection card or the drawer's Manage Servers….
+ * The server in use: its connection, address, route and version, then the one place to manage
+ * servers ([SettingsServersSection]: switch, add, rename, edit, remove), and Rename. Opened from
+ * the connection card or the drawer's Manage Servers….
  */
 @Composable
 fun ServerPage(store: SettingsStore) {
@@ -613,7 +620,7 @@ fun ServerPage(store: SettingsStore) {
     val error by store.observe { it.connectionErrorMessage }
     val current = server
     if (current == null) {
-        SettingsPageScaffold(title = "Server", store = store) {}
+        SettingsPageScaffold(title = stringResource(R.string.settings_server_title), store = store) {}
         return
     }
     val monitor = rememberConnectionMonitor(store, current, ConnectionMonitor.link(status, switchingTo, credentialsRejected))
@@ -622,6 +629,7 @@ fun ServerPage(store: SettingsStore) {
     val send = { delegate: SettingsDelegate -> store.send(SettingsFeature.Action.Delegate(delegate)) }
     var renaming by remember { mutableStateOf(false) }
     var nameDraft by remember { mutableStateOf("") }
+    val addressLabel = stringResource(R.string.settings_server_address)
 
     SettingsPageScaffold(title = monitor.name, store = store) {
         item(key = "server-status", contentType = "settings-section") {
@@ -633,10 +641,10 @@ fun ServerPage(store: SettingsStore) {
                 StatusRow(presentation)
                 SettingsDivider()
                 SettingsRowFrame(Modifier.clearAndSetSemantics {
-                    contentDescription = "Address"
+                    contentDescription = addressLabel
                     stateDescription = monitor.server.host
                 }) {
-                    LabeledContent("Address", Modifier.weight(1f)) {
+                    LabeledContent(addressLabel, Modifier.weight(1f)) {
                         SelectionContainer {
                             Text(
                                 monitor.server.host,
@@ -649,19 +657,19 @@ fun ServerPage(store: SettingsStore) {
                     }
                 }
                 SettingsDivider()
-                SettingsValueRow("Connection", monitor.route.rawValue)
+                SettingsValueRow(stringResource(R.string.settings_server_connection), monitor.route.title)
                 monitor.version?.let { version ->
                     SettingsDivider()
-                    SettingsValueRow("Version", version)
+                    SettingsValueRow(stringResource(R.string.settings_server_version), version)
                 }
                 when (presentation.status) {
                     ConnectionHealth.Status.offline -> {
                         SettingsDivider()
-                        SettingsButtonRow("Retry", onClick = { monitor.retry { send(SettingsDelegate.RetryConnection) } })
+                        SettingsButtonRow(stringResource(CoreR.string.common_retry), onClick = { monitor.retry { send(SettingsDelegate.RetryConnection) } })
                     }
                     ConnectionHealth.Status.signInFailed -> {
                         SettingsDivider()
-                        SettingsButtonRow("Edit Server…", onClick = { send(SettingsDelegate.EditServer(current)) })
+                        SettingsButtonRow(stringResource(R.string.settings_server_edit_server), onClick = { send(SettingsDelegate.EditServer(current)) })
                     }
                     else -> Unit
                 }
@@ -685,7 +693,7 @@ fun ServerPage(store: SettingsStore) {
         }
         item(key = "server-rename", contentType = "settings-section") {
             SettingsSection {
-                SettingsButtonRow("Rename Server…", onClick = {
+                SettingsButtonRow(stringResource(R.string.settings_server_rename_server_ellipsis), onClick = {
                     nameDraft = current.name ?: ""
                     renaming = true
                 })
@@ -696,10 +704,10 @@ fun ServerPage(store: SettingsStore) {
     if (renaming) {
         OpenCodeAlertDialog(
             onDismissRequest = { renaming = false },
-            title = { Text("Rename Server") },
+            title = { Text(stringResource(R.string.settings_server_rename_title)) },
             text = {
                 Column {
-                    Text("Only this ${ai.opencode.core.ui.ThisDevice.name} uses the name. Leave it blank for “${current.friendlyName}”.")
+                    Text(stringResource(R.string.settings_server_rename_message, ai.opencode.core.ui.ThisDevice.name, current.friendlyName))
                     OpenCodeTextField(
                         value = nameDraft,
                         onValueChange = { nameDraft = it },
@@ -715,22 +723,17 @@ fun ServerPage(store: SettingsStore) {
                 TextButton(onClick = {
                     renaming = false
                     send(SettingsDelegate.RenameServer(current, nameDraft))
-                }) { Text("Save") }
+                }) { Text(stringResource(CoreR.string.common_save)) }
             },
-            dismissButton = { TextButton(onClick = { renaming = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { renaming = false }) { Text(stringResource(CoreR.string.common_cancel)) } },
         )
     }
 }
 
 /**
- * The page's Status row (iOS `LabeledContent("Status")`): glyph, then the word and round trip.
- *
- * Android divergence: iOS's value is the word and the live round trip, and VoiceOver reads it as
- * it is when the row is reached but leaves its changes unspoken. TalkBack re-reads a focused node
- * whenever what it speaks changes, so it read the row again on every check (QA F-61). The spoken
- * round trip follows the live one while TalkBack is elsewhere, so the row still reads the current
- * number when reached, and holds while TalkBack is on it; a new status word (settled, as the
- * card's) is still read. The screen updates on every check.
+ * The page's Status row: glyph, then the word and round trip. TalkBack re-reads a focused node
+ * whenever what it speaks changes, so the spoken round trip follows the live one only while
+ * TalkBack is elsewhere and holds while TalkBack is on it; a new status word is still read.
  */
 @Composable
 private fun StatusRow(presentation: ConnectionStatusPresentation) {
@@ -744,18 +747,19 @@ private fun StatusRow(presentation: ConnectionStatusPresentation) {
         spoken.text = live
     }
     val text = spoken.text
+    val statusLabel = stringResource(R.string.settings_server_status)
     SettingsRowFrame(Modifier.accessibilityFocusTarget(focus).clearAndSetSemantics {
-        contentDescription = "Status"
+        contentDescription = statusLabel
         stateDescription = text
     }) {
-        LabeledContent("Status", Modifier.weight(1f)) {
+        LabeledContent(statusLabel, Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 OpenCodeIcon(presentation.symbol, contentDescription = null, size = 18.dp, tint = color)
                 val body = SettingsText.title.copy(fontFeatureSettings = "tnum")
                 val milliseconds = presentation.milliseconds
                 if (milliseconds != null) {
                     RollingNumber(
-                        text = "${presentation.word} · $milliseconds ms",
+                        text = stringResource(R.string.settings_server_status_milliseconds, presentation.word, milliseconds),
                         style = body,
                         color = color,
                         motion = millisecondsRoll,
@@ -776,11 +780,10 @@ private class SpokenStatus {
 }
 
 /**
- * iOS `LabeledContent` in a list: the label leading and the value trailing on one line when both
- * fit at their full widths; otherwise the value stacks under the label, leading, so the label
- * never breaks inside a word (QA D-01). Once stacked it stays stacked while shown at that width
- * and text size, so a value that changes width (Status's round trip, 9 ↔ 10 ms) can't flip the
- * row and move every row below it (QA H-02).
+ * The label leading and the value trailing on one line when both fit at their full widths;
+ * otherwise the value stacks under the label, leading, so the label never breaks inside a word.
+ * Once stacked it stays stacked while shown at that width and text size, so a value that
+ * changes width (Status's round trip, 9 ↔ 10 ms) can't flip the row and move every row below it.
  */
 @Composable
 private fun LabeledContent(label: String, modifier: Modifier = Modifier, value: @Composable () -> Unit) {

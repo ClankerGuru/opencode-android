@@ -20,29 +20,20 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 
 /*
- * Port of iOS `DrawerRowInteraction.swift`: a drawer row's touches. A tap opens the session; a
- * finger resting on the row for [DRAWER_ROW_PRESS_DELAY_MS], or a tap, tells Home first (`pressed`,
- * so its transcript warms), but never a finger that scrolls the list or lands on a moving one
- * (iOS `Coordinator.pressDelay`); a hold chooses the row (Android: selection mode, where iOS
- * opens a menu); moving the held finger lifts the row to pin, unpin or reorder it
- * ([DrawerPinDrag]), as iOS's context menu and drag interactions share one view.
+ * A drawer row's touches. A tap opens the session; a finger resting on the row for
+ * [DRAWER_ROW_PRESS_DELAY_MS], or a tap, tells Home first (`pressed`, so its transcript warms), but
+ * never a finger that scrolls the list or lands on a moving one; a hold chooses the row for
+ * selection mode; moving the held finger lifts the row to pin, unpin or reorder it ([DrawerPinDrag]).
  *
- * UIKit's `UIContextMenuInteraction` + `UIDragInteraction` become one pointer handler:
+ * One pointer handler:
  * - a tap lands on touch-up and only if the drawer's pan never chose the touch (the pan consumes
- *   it in the `Initial` pass, iOS's `shouldRequireFailureOf: DirectionalPanGestureRecognizer`);
+ *   it in the `Initial` pass);
  * - the hold (the platform long-press timeout) plays `Haptic.tap` and chooses the row ([held]);
- * - moving the held finger past the touch slop starts the drag (iOS's drag growing out of the
- *   menu's lift), which the finger then owns: the list never scrolls under it; the row shows
- *   lifted on a raised surface (iOS `DrawerHoldStyle.inPlace`).
- * iOS's frozen-bitmap lift (`liftView`, `cover`, `LiftTouchObserver`'s late release) exists only
- * because UIKit lifts a snapshot; Compose draws the live row raised, so none of that is needed.
- * Not ported: the menu (selection mode's bar holds its actions), tapping the lifted preview, the
- * lift trace.
- * iOS has no swipe actions on drawer rows (a sideways drag reveals the rows' times), so neither
- * does Android.
+ * - moving the held finger past the touch slop starts the drag, which the finger then owns: the
+ *   list never scrolls under it; the row shows lifted on a raised surface.
  */
 
-/** One of selection mode's actions (iOS `rowMenu`'s `UIAction`). */
+/** One of selection mode's actions. */
 data class DrawerRowMenuItem(
     val title: String,
     val symbol: SFSymbol,
@@ -67,7 +58,7 @@ class DrawerRowInteraction(
      * menu; a drag growing out of the hold takes it back.
      */
     val held: () -> Unit,
-    /** The list is scrolling or flinging (iOS `Coordinator.isMoving`). */
+    /** The list is scrolling or flinging. */
     val isListMoving: () -> Boolean = { false },
     /** The held finger moved: the drag begins at [fingerInList] (dp, the list's coordinates). */
     val beginDrag: ((fingerInList: Offset) -> Unit)? = null,
@@ -80,14 +71,14 @@ class DrawerRowInteraction(
 
 /**
  * How long a finger rests on a row before it's a press (the session's transcript starts loading),
- * unless the list starts scrolling first (iOS `Coordinator.pressDelay`).
+ * unless the list starts scrolling first.
  */
 const val DRAWER_ROW_PRESS_DELAY_MS = 80L
 
 /** How a finger's first moments on a row ended. */
 private enum class DrawerRowTouch { Tapped, Taken, Rested }
 
-/** A row's hold: a drag under way (iOS `Coordinator.isDragActive`). */
+/** A row's hold: a drag under way. */
 @Stable
 class DrawerRowHoldState {
     var isDragActive: Boolean by mutableStateOf(false)
@@ -95,9 +86,8 @@ class DrawerRowHoldState {
 }
 
 /**
- * The row's touches (iOS `DrawerRowInteraction.install(on:coordinator:)`). [list] and [row]
- * convert the finger into the list's coordinates for the drag; [density] is read from the
- * pointer scope.
+ * The row's touches. [list] and [row] convert the finger into the list's coordinates for the drag;
+ * [density] is read from the pointer scope.
  */
 fun Modifier.drawerRowInteraction(
     interaction: DrawerRowInteraction,

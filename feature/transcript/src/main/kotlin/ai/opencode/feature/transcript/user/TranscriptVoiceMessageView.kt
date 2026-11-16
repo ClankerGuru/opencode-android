@@ -1,9 +1,11 @@
 package ai.opencode.feature.transcript.user
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeFonts
+import ai.opencode.feature.transcript.R
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -43,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
@@ -114,17 +117,21 @@ fun TranscriptVoiceMessageView(
 ) {
     val reduceMotion = rememberReduceMotion()
     val morphs = LocalPromotionMorph.current
-    val value = listOfNotNull(delegation.displayText, if (delegation.callLogAttached) "Call log attached" else null, pending?.pendingLabel).joinToString(", ")
+    val callLogAttachedLabel = stringResource(R.string.transcript_voice_call_log_attached)
+    val copyLabel = stringResource(CoreR.string.common_copy)
+    val copyFullMessageLabel = stringResource(R.string.transcript_voice_copy_full_message)
+    val voiceMessageDescription = stringResource(R.string.transcript_voice_message_description)
+    val value = listOfNotNull(delegation.displayText, if (delegation.callLogAttached) callLogAttachedLabel else null, pending?.pendingLabel).joinToString(", ")
     val actions = buildList {
-        add(action("Copy") { onCopy(delegation.displayText) })
-        add(action("Copy Full Message") { onCopy(prompt) })
-        pendingActions?.let { addAll(it.accessibilityActions().filter { a -> a.label != "Copy" }) }
+        add(action(copyLabel) { onCopy(delegation.displayText) })
+        add(action(copyFullMessageLabel) { onCopy(prompt) })
+        pendingActions?.let { addAll(it.accessibilityActions()) }
     }
     Box(
         modifier
             .fillMaxWidth()
             .clearAndSetSemantics {
-                contentDescription = "Voice message"
+                contentDescription = voiceMessageDescription
                 stateDescription = value
                 customActions = actions
             },
@@ -158,11 +165,6 @@ private fun VoiceMessage(
     val overhang = VoiceMessageBadge.overhang(badgeDiameter)
     val pendingAlpha by animateFloatAsState(if (isPending) 0.6f else 1f, PromotionMotion.animation(reduceMotion, morphs), label = "pending")
     var menu by remember { mutableStateOf(false) }
-    // Marks its bubble, the surfaces above it (the badge's overhang included) and its label, so a
-    // send's flight and a promotion's morph carry it like any message (iOS `SendLandingProbe`).
-    val bubbleProbe = rememberSendLandingProbe(messageID.ifEmpty { null })
-    val surfacesProbe = rememberSendLandingProbe(messageID.ifEmpty { null }, SendLanding.SURFACES_SUFFIX)
-    val labelProbe = rememberSendLandingProbe(messageID.ifEmpty { null }, SendLanding.LABEL_SUFFIX)
     val badgeRoom by animateDpAsState(if (chrome.badge && !run.joinsAbove) overhang else 0.dp, PromotionMotion.animation(reduceMotion, morphs), label = "badge")
     Column(
         horizontalAlignment = Alignment.End,
@@ -188,15 +190,14 @@ private fun VoiceMessage(
             Row(
                 Modifier
                     .graphicsLayer { alpha = reveal.body.toFloat() }
-                    .padding(end = TranscriptMetrics.contentGutter)
-                    .sendLandingProbe(labelProbe),
+                    .padding(end = TranscriptMetrics.contentGutter),
                 horizontalArrangement = Arrangement.spacedBy(TranscriptMetrics.clustered),
             ) {
                 for (part in shownLabels.value) {
                     when (part) {
                         is VoiceMessageIndicator.LabelPart.Pending -> TranscriptPendingLabel(part.delivery)
                         VoiceMessageIndicator.LabelPart.Voice -> SmallGlyphLabel(
-                            "Voice",
+                            stringResource(R.string.transcript_voice_label),
                             "waveform",
                             style = OpenCodeTextStyles.caption1,
                             color = OpenCodeTheme.colors.secondaryText,
@@ -211,13 +212,12 @@ private fun VoiceMessage(
             TranscriptMetrics.maximumUserBubbleFraction,
             Modifier.padding(top = badgeRoom),
         ) {
-            Box(Modifier.extendTop(if (chrome.badge) overhang else 0.dp).sendLandingProbe(surfacesProbe).insetTop(if (chrome.badge) overhang else 0.dp)) {
+            Box {
                 Text(
                     delegation.displayText,
                     style = UserBubbleTextStyle,
                     color = OpenCodeTheme.colors.text,
                     modifier = Modifier
-                        .sendLandingProbe(bubbleProbe)
                         // Long press opens the menu (with the prompt above it), not text selection.
                         .transcriptDragSource(payload = null, onLift = { menu = true })
                         .voiceMessageBackground(style, isPending, reveal, corners)
@@ -236,15 +236,15 @@ private fun VoiceMessage(
                     val dismiss = { menu = false }
                     VoicePromptPreview(prompt)
                     HorizontalDivider(color = OpenCodeTheme.colors.border)
-                    UserMenuItem("Copy", "square.on.square", dismiss) { onCopy(delegation.displayText) }
-                    UserMenuItem("Copy Full Message", "doc.plaintext", dismiss) { onCopy(prompt) }
+                    UserMenuItem(stringResource(CoreR.string.common_copy), "square.on.square", dismiss) { onCopy(delegation.displayText) }
+                    UserMenuItem(stringResource(R.string.transcript_voice_copy_full_message), "doc.plaintext", dismiss) { onCopy(prompt) }
                     pendingActions?.QueueAndDelete(dismiss)
                 }
             }
         }
         if (chrome.callLogCaption) {
             SmallGlyphLabel(
-                "Call log attached",
+                stringResource(R.string.transcript_voice_call_log_attached),
                 "paperclip",
                 style = OpenCodeTextStyles.caption1,
                 color = OpenCodeTheme.colors.secondaryText,
@@ -314,22 +314,4 @@ private fun VoicePromptPreview(prompt: String) {
             modifier = Modifier.fillMaxWidth().padding(16.dp),
         )
     }
-}
-
-/**
- * Lays the content out as before but makes this node [extra] taller, reaching above it: with
- * [insetTop] inside, a marker between the two covers what overhangs the top (the badge).
- */
-private fun Modifier.extendTop(extra: Dp): Modifier = layout { measurable, constraints ->
-    val px = extra.roundToPx()
-    val placeable = measurable.measure(constraints.copy(maxHeight = if (constraints.hasBoundedHeight) constraints.maxHeight + px else constraints.maxHeight))
-    val height = (placeable.height - px).coerceAtLeast(0)
-    layout(placeable.width, height) { placeable.placeRelative(0, -px) }
-}
-
-/** The inner half of [extendTop]: the content sits [extra] down in the taller node. */
-private fun Modifier.insetTop(extra: Dp): Modifier = layout { measurable, constraints ->
-    val px = extra.roundToPx()
-    val placeable = measurable.measure(constraints.copy(minHeight = (constraints.minHeight - px).coerceAtLeast(0), maxHeight = if (constraints.hasBoundedHeight) (constraints.maxHeight - px).coerceAtLeast(0) else constraints.maxHeight))
-    layout(placeable.width, placeable.height + px) { placeable.placeRelative(0, px) }
 }

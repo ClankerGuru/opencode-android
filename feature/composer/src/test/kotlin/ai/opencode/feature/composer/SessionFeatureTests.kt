@@ -16,12 +16,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.ByteArrayOutputStream
 
-/**
- * The `:feature:composer` test of iOS `OpenCodeTests/SessionFeatureTests.swift`
- * ([ImageAttachmentImporter]); the rest is `:feature:session`'s. Robolectric native graphics:
- * real PNG encode and `ImageDecoder` decode. iOS's source is SF Symbol `photo` as PNG; here a
- * small drawn PNG.
- */
+/** Robolectric native graphics: real PNG encode and `ImageDecoder` decode. A small drawn PNG. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)

@@ -4,15 +4,9 @@ import ai.opencode.core.files.AttachmentFileType
 import kotlinx.serialization.Serializable
 
 /**
- * A file the agent named in its reply, a tool row, or a sent attachment: the phone opens it
- * through the server's file reader (iOS `Media/AgentFiles/AgentFileReference.swift`). Mirrors
- * desktop's local-link handling (session-ui `markdown-image.ts` `localLinkPath`,
- * `markdown-inline-code-kind.ts` `inlineCodeKind`, gui-extensions file `renderer.tsx`
- * LinkHandler), which also strips a `:line:col` suffix.
- *
- * Moved down to `:server` because the transcript's Markdown parser (`:feature:transcript`) and
- * the media viewer (`:feature:media`) both need it. Pure Kotlin (no `android.*`): iOS's
- * `UTType` fallbacks are replaced by extension sets and a small MIME table below.
+ * A file the agent named in its reply, a tool row, or a sent attachment, opened through the
+ * server's file reader. Follows desktop's local-link handling, which also strips a `:line:col`
+ * suffix.
  */
 @Serializable
 data class AgentFileReference(
@@ -20,6 +14,8 @@ data class AgentFileReference(
     val path: String,
     /** The 1-based line a `path:42` reference points at, for text files. */
     val line: Int? = null,
+    /** When set, path is a media URI, never a workspace path. */
+    val media: MediaFileOriginal? = null,
 ) {
     val id: String get() = path
 
@@ -27,12 +23,18 @@ data class AgentFileReference(
     val zoomSourceID: String get() = "file:$path"
 
     val name: String
-        get() = path.split('/', '\\').lastOrNull { it.isNotEmpty() } ?: path
+        get() = media?.name ?: path.split('/', '\\').lastOrNull { it.isNotEmpty() } ?: path
 
-    val kind: Kind get() = Kind.of(name)
+    val kind: Kind
+        get() = when {
+            media?.mime?.startsWith("video/") == true -> Kind.Video
+            media?.mime?.startsWith("audio/") == true -> Kind.Audio
+            media?.mime == "application/pdf" -> Kind.Pdf
+            else -> Kind.of(name)
+        }
 
     /** The MIME type implied by the extension; the server guesses the same way. */
-    val mime: String get() = mimeForExtension(AttachmentFileType.fileExtension(name)) ?: "application/octet-stream"
+    val mime: String get() = media?.mime ?: mimeForExtension(AttachmentFileType.fileExtension(name)) ?: "application/octet-stream"
 
     val typeLabel: String
         get() = when (kind) {
@@ -58,6 +60,8 @@ data class AgentFileReference(
         /** Media and documents earn a card under the reply; code paths stay inline links so a code-heavy answer doesn't sprout a row of cards. */
         val showsCard: Boolean get() = this != Text
 
+        val isVisual: Boolean get() = this == Image || this == Video
+
         /** Streams through range requests when the server supports them. */
         val isTimeBased: Boolean get() = this == Video || this == Audio
 
@@ -72,8 +76,7 @@ data class AgentFileReference(
                 if (suffix in imageExtensions) return Image
                 if (suffix in videoExtensions) return Video
                 if (suffix in audioExtensions) return Audio
-                // iOS falls back to `UTType` conformance here; these are the system types it
-                // recognizes that the sets above don't list.
+                // System types recognized beyond the sets above.
                 return when (suffix) {
                     in fallbackVideoExtensions -> Video
                     in fallbackAudioExtensions -> Audio
@@ -101,6 +104,7 @@ data class AgentFileReference(
     data class Target(val location: String, val relativePath: String, val absolutePath: String)
 
     fun target(directory: String?): Target? {
+        if (media != null) return null
         if (isWindowsAbsolute(path) || (directory != null && isWindowsAbsolute(directory))) return windowsTarget(directory)
         var path = this.path
         if (path.startsWith("~/") || path == "~") {
@@ -171,7 +175,7 @@ data class AgentFileReference(
         const val LINK_SCHEME = "opencode-file"
         val linkScheme: String get() = LINK_SCHEME
 
-        /** iOS `init?(linkURL:)`: the reference an `opencode-file://open?path=…&line=…` link carries. */
+        /** The reference an `opencode-file://open?path=…&line=…` link carries. */
         fun fromLinkURL(url: String): AgentFileReference? {
             if (urlScheme(url) != LINK_SCHEME) return null
             val items = queryItems(url) ?: return null
@@ -206,8 +210,8 @@ data class AgentFileReference(
                 // `file:///C:/Users/kit/a.pdf` names a Windows path.
                 if (windowsDriveInFileURL.containsMatchIn(value)) value = value.drop(1)
             } else if (!isWindowsAbsolute(value) && schemePrefix.containsMatchIn(value)) {
-                // A scheme, but not `SessionView.swift:42` (a dot is legal in schemes) or a
-                // Windows drive (`C:/Users/kit/a.pdf`).
+                // A scheme, but not `SessionView.swift:42` (a dot is legal in schemes) or a Windows
+                // drive (`C:/Users/kit/a.pdf`).
                 return null
             } else {
                 // Keep a GitHub-style `#L42` for `withLocation`; drop other fragments.
@@ -347,7 +351,7 @@ data class AgentFileReference(
             "makefile", "podfile", "procfile", "readme", "vagrantfile",
         )
 
-        // Stand-ins for the `UTType` conformance iOS consults for other extensions.
+        // Stand-ins for system type conformance, for other extensions.
         private val fallbackVideoExtensions = setOf("3g2", "3gp", "flv", "m2ts", "m2v", "mpeg", "mpg", "mp2", "ts2", "vob", "wmv")
         private val fallbackAudioExtensions = setOf("amr", "au", "m4b", "m4r", "mid", "midi", "snd", "wma")
         private val fallbackImageExtensions = setOf(
@@ -359,8 +363,8 @@ data class AgentFileReference(
         )
 
         /**
-         * The preferred MIME type for an extension (iOS `UTType(filenameExtension:).preferredMIMEType`),
-         * or null when the table doesn't know it. A fixed table so JVM tests and every device agree.
+         * The preferred MIME type for an extension, or null when the table doesn't know it. A fixed
+         * table so JVM tests and every device agree.
          */
         fun mimeForExtension(suffix: String): String? = mimeTypes[suffix.lowercase()]
 
@@ -490,7 +494,7 @@ data class AgentFileReference(
                 rest = rest.substring(end)
             }
             val rawPath = rest.substringBefore('#').substringBefore('?')
-            // iOS 17's `URL(string:)` encodes characters a URL can't hold instead of failing.
+            // Characters a URL can't hold are encoded instead of failing.
             val path = percentDecode(rawPath) ?: return null
             return host to path
         }

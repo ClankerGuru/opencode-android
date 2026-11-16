@@ -35,7 +35,6 @@ import ai.opencode.feature.session.SessionFeatureTestsSendingSupport.assertNull
 import ai.opencode.feature.session.SessionFeatureTestsSendingSupport.assertTrue
 import org.junit.Test
 
-/** Port of iOS `SessionFeatureTests+ModelPicks.swift`. */
 class SessionFeatureTestsModelPicks {
     /**
      * A retry that finds its message already landed still applies the model

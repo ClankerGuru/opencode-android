@@ -13,11 +13,7 @@ import kotlinx.serialization.encoding.Encoder
 import java.time.Instant
 import java.util.UUID
 
-/**
- * A composer's draft (iOS `SessionFeature.State.DraftState`, `Session/SessionFeature+State.swift`).
- * Moved down from the session area because [ComposerPersistence] stores it; the session area
- * uses this type for its composer state rather than redeclaring it.
- */
+/** A composer's draft. Lives here because [ComposerPersistence] stores it. */
 data class DraftState(
     val text: String = "",
     val attachments: List<OpenCodeOutgoingAttachment> = emptyList(),
@@ -26,10 +22,10 @@ data class DraftState(
     val location: SharedLocation? = null,
     val chips: List<ComposerAutocompleteChip> = emptyList(),
     val undoSnapshot: UndoSnapshot? = null,
+    val quotes: List<ComposerQuote> = emptyList(),
 ) {
-    /** iOS `DraftState.isEmpty` (`ComposerPersistence.swift`). */
     val isEmpty: Boolean
-        get() = text.isEmpty() && attachments.isEmpty() && files.isEmpty() && location == null && undoSnapshot == null
+        get() = text.isEmpty() && attachments.isEmpty() && files.isEmpty() && location == null && undoSnapshot == null && quotes.isEmpty()
 
     fun appending(other: DraftState): DraftState {
         val joinedText = SharedComposerDraft.joined(text, other.text)
@@ -41,20 +37,20 @@ data class DraftState(
             files = files + other.files,
             location = location ?: other.location,
             chips = mergedChips,
+            quotes = quotes + other.quotes,
             undoSnapshot = if (restored != null && joinedText != restored) null else undoSnapshot,
         )
     }
 }
 
 /**
- * The composer as an undo/revert left it, plus the pre-undo snapshot that Undo/Redo restores
- * when the reverted draft is still untouched (iOS `SessionFeature.State.UndoSnapshot`). Moved
- * down with [DraftState].
+ * The composer as an undo/revert left it, plus the pre-undo snapshot Undo/Redo restores while the
+ * reverted draft is untouched.
  */
 @Serializable
 data class UndoSnapshot(
     val restoredDraft: String,
-    // Swift's synthesized `Decodable` ignores property defaults: these keys are required, as on iOS.
+    // These keys are required: decoding ignores property defaults.
     @Required val priorDraft: String = "",
     @Serializable(with = SharedLocationSerializer::class) val restoredLocation: SharedLocation? = null,
     @Serializable(with = SharedLocationSerializer::class) val priorLocation: SharedLocation? = null,
@@ -63,10 +59,8 @@ data class UndoSnapshot(
 )
 
 /**
- * What a share adds to one composer (iOS `SharedComposerDraft`, `System/Share/ShareInbox.swift`).
- * Here because it carries composer types ([ComposerFileAttachment], chips) that `:feature:system`
- * can't see; the drawer/session area builds one from a received share
- * (iOS `init(_ share: ReceivedShare, projectID:)`).
+ * What a share adds to one composer. Here because it carries composer types `:feature:system` can't
+ * see.
  */
 data class SharedComposerDraft(
     val text: String = "",
@@ -77,6 +71,7 @@ data class SharedComposerDraft(
     val parkedFiles: List<ComposerFileAttachment> = emptyList(),
     val location: SharedLocation? = null,
     val chips: List<ComposerAutocompleteChip> = emptyList(),
+    val quotes: List<ComposerQuote> = emptyList(),
     /** Where a New Session draft should start. */
     val projectID: String? = null,
     /** Continue in OpenCode: the composer takes the keyboard when it opens. */
@@ -90,7 +85,6 @@ data class SharedComposerDraft(
         val sessionID: String? = null,
     )
 
-    /** iOS `init(composer:projectID:)`. */
     constructor(composer: DraftState, projectID: String? = null) : this(
         text = composer.text,
         attachments = composer.attachments,
@@ -98,17 +92,17 @@ data class SharedComposerDraft(
         parkedFiles = composer.files,
         location = composer.location,
         chips = composer.chips,
+        quotes = composer.quotes,
         projectID = projectID,
     )
 
-    /** iOS `init(restored:)`. */
     constructor(restored: RestoredComposerDraft) : this(restored.draft, restored.project?.id)
 
     val isEmpty: Boolean
-        get() = text.isEmpty() && attachments.isEmpty() && files.isEmpty() && parkedFiles.isEmpty() && location == null
+        get() = text.isEmpty() && attachments.isEmpty() && files.isEmpty() && parkedFiles.isEmpty() && location == null && quotes.isEmpty()
 
     val draftState: DraftState
-        get() = DraftState(text = text, attachments = attachments, files = parkedFiles, location = location, chips = chips)
+        get() = DraftState(text = text, attachments = attachments, files = parkedFiles, location = location, chips = chips, quotes = quotes)
 
     /**
      * Shares for one composer join into one message. Send Later shares still send (without
@@ -127,6 +121,7 @@ data class SharedComposerDraft(
             parkedFiles = parkedFiles + other.parkedFiles,
             location = other.location ?: location,
             chips = chips + other.chips.filter { chip -> chips.none { it.id == chip.id } },
+            quotes = quotes + other.quotes,
             projectID = other.projectID ?: projectID,
             focusesComposer = focusesComposer || other.focusesComposer || (sending && nextSend == null),
             send = nextSend,
@@ -142,7 +137,7 @@ data class SharedComposerDraft(
     }
 }
 
-/** Which composer a share lands in (iOS `SharedDraftTarget`). */
+/** Which composer a share lands in. */
 sealed interface SharedDraftTarget {
     data class Session(val id: String) : SharedDraftTarget
     data object NewSession : SharedDraftTarget
@@ -174,7 +169,7 @@ data class RestoredOutboxEntry(
     val updatedAt: Instant,
 )
 
-/** iOS `SharedLocation: Codable` (`ComposerPersistence.swift`): the same keys, `capturedAt` in `JSONEncoder`'s date shape. */
+/** The same keys, `capturedAt` in `JSONEncoder`'s date shape. */
 internal object SharedLocationSerializer : KSerializer<SharedLocation> {
     @Serializable
     private class Surrogate(

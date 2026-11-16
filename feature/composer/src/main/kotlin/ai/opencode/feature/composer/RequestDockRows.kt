@@ -2,11 +2,13 @@ package ai.opencode.feature.composer
 
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.strings.localized
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.server.OpenCodeClientError
+import ai.opencode.server.R as ServerR
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -40,7 +42,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.min
 
-/** A choice: its mark on the title's baseline, the title 12 dp after it (iOS `RequestOptionRow`). */
+/** A choice: its mark on the title's baseline, the title 12 dp after it. */
 @Composable
 fun RequestOptionRow(
     title: String,
@@ -72,7 +74,7 @@ fun RequestOptionRow(
     }
 }
 
-/** Hairlines start at the titles (iOS `RequestOptionRow.divider`). */
+/** Hairlines start at the titles. */
 @Composable
 fun RequestOptionRowDivider() {
     HorizontalDivider(Modifier.padding(start = SelectionMarkWidth + 12.dp), color = OpenCodeTheme.colors.border)
@@ -126,8 +128,7 @@ fun SelectionMark(selected: Boolean, multiple: Boolean) {
 
 /**
  * One quiet line in the panel's footnote size: “Couldn’t send answer”, with the server's reason
- * after it unless it only says the server couldn't be reached (Retry says as much) (iOS
- * `RequestErrorLine`).
+ * after it unless it only says the server couldn't be reached (Retry says as much).
  */
 @Composable
 fun RequestErrorLine(text: String, modifier: Modifier = Modifier, detail: String? = null) {
@@ -156,10 +157,13 @@ object RequestErrorLine {
         return brief(detail)
     }
 
+    private val httpStatus = Regex("HTTP (\\d{3})")
+
     /** The server's reason short enough to fit the line: “The server returned HTTP 500.” reads “HTTP 500”. */
     fun brief(detail: String): String {
         var brief = detail.trim()
-        if (brief.startsWith("The server returned HTTP ")) brief = brief.removePrefix("The server returned ")
+        val status = httpStatus.find(brief)?.groupValues?.get(1)?.toIntOrNull()
+        if (status != null && brief == localized(ServerR.string.server_error_http_status, status)) return "HTTP $status"
         if (brief.endsWith(".")) brief = brief.dropLast(1)
         return brief
     }

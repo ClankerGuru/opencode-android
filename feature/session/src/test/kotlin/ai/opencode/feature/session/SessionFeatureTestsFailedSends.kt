@@ -40,13 +40,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Port of iOS `SessionFeatureTests+FailedSends.swift`. Parameterized tests loop over their
- * arguments.
- *
- * Not ported here (`:feature:transcript`): `aFailedMessageRetriedMidRunKeepsItsRowIdentity`
- * (its subject is `TranscriptRowIdentityPlan` alone; ported there).
- */
+/** Parameterized tests loop over their arguments. */
 class SessionFeatureTestsFailedSends {
     /**
      * A send store whose POSTs follow `attempt` (by its 1-based number) and
@@ -351,7 +345,7 @@ class SessionFeatureTestsFailedSends {
             it.movedTo("/work/repo")
                 .withRequestLoadAttempt(RequestDockFeature.State.LoadAttempt.Initial)
                 .withRequestLoadError(null)
-                .copy(pendingWorkPollSeconds = 12, isLoadingModels = true)
+                .copy(pendingWorkPollSeconds = 60, isLoadingModels = true)
         }
         store.receive(Action.PendingInputsRequested(sessionID = "ses_1"))
         store.receive(Action.PendingInputsResponse(sessionID = "ses_1", inputs = emptyList()))

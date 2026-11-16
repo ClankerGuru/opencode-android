@@ -45,9 +45,9 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * The camera viewfinder opened from the photo sheet's camera tile: inactive while browsing
- * photos so opening the sheet never starts the camera, and expanded from the tile's measured
- * frame on tap. iOS `PlusCameraPresentation`. Frames are in screen pixels.
+ * The camera viewfinder opened from the photo sheet's camera tile: inactive while browsing photos
+ * so opening the sheet never starts the camera, and expanded from the tile's measured frame on tap.
+ * Frames are in screen pixels.
  */
 class PlusCameraPresentation {
     /** The camera tile's frame; written on layout, read only when the viewfinder opens. */
@@ -65,7 +65,7 @@ class PlusCameraPresentation {
 
     fun shouldActivateCamera(sheetIsOpen: Boolean): Boolean = sheetIsOpen && expanded
 
-    /** iOS `handleScenePhase(.background)`: going to the background folds the viewfinder. */
+    /** Going to the background folds the viewfinder. */
     fun handleBackground() {
         expanded = false
     }
@@ -84,7 +84,6 @@ class PlusCameraPresentation {
     }
 }
 
-/** iOS `PlusCameraTunables` (keys `composer.camera.*`). */
 object PlusCameraTunables {
     /** `composer.camera.captureInset` (dp): the shutter flight's inset. */
     const val captureInset = 20f
@@ -94,17 +93,17 @@ object PlusCameraTunables {
 }
 
 /**
- * The sheet's inline viewfinder (iOS `PlusCameraSurface`): when [PlusCameraPresentation.expanded]
- * it grows from the camera tile to full screen over the sheet and only then activates the
- * camera ([PlusCameraPresentation.shouldActivateCamera]); a capture goes straight to
- * [onCapture] with no review and folds the viewfinder back. Reduce Motion fades it in place.
+ * The sheet's inline viewfinder: when [PlusCameraPresentation.expanded] it grows from the camera
+ * tile to full screen over the sheet and only then activates the camera
+ * ([PlusCameraPresentation.shouldActivateCamera]); a capture goes straight to [onCapture] with no
+ * review and folds the viewfinder back. Reduce Motion fades it in place.
  */
 @Composable
 fun PlusCameraSurface(
     presentation: PlusCameraPresentation,
     sheetIsOpen: Boolean,
     onCapture: (ByteArray) -> Unit,
-    /** The sheet's content reveal (iOS `sheet.content`): the viewfinder fades with the sheet's content. */
+    /** The sheet's content reveal: the viewfinder fades with the sheet's content. */
     sheetContent: () -> Float = { 1f },
 ) {
     val reduceMotion = rememberReduceMotion()
@@ -164,7 +163,6 @@ fun PlusCameraSurface(
                 Modifier
                     .offset { IntOffset(mask.left.roundToInt(), mask.top.roundToInt()) }
                     .size(with(dp) { max(mask.width, 1f).toDp() }, with(dp) { max(mask.height, 1f).toDp() })
-                    // iOS `.opacity(active ? sheet.content : 0)` on the expand/collapse animation.
                     .graphicsLayer { alpha = p.coerceIn(0f, 1f) * sheetContent().coerceIn(0f, 1f) }
                     .clip(RoundedCornerShape(radius.dp)),
             ) {

@@ -20,11 +20,10 @@ import kotlin.time.Duration.Companion.seconds
 import ai.opencode.core.sound.SoundEffect
 import ai.opencode.core.experiments.ExperimentalFeature
 
-// Port of iOS `SessionFeature+Requests.swift`: pending requests (permissions, questions, forms).
+// Pending requests (permissions, questions, forms).
 
 /**
- * iOS `protocol PendingRequest` (adopted by `OpenCodePermissionRequest` and `OpenCodeFormRequest`):
- * a permission or form awaiting an answer from some session. Kotlin can't add a supertype to
+ * A permission or form awaiting an answer from some session. Kotlin can't add a supertype to
  * `:server` types, so each request is wrapped.
  */
 sealed interface PendingRequest {
@@ -42,7 +41,7 @@ sealed interface PendingRequest {
     }
 }
 
-/** iOS `SessionFeature.VoiceSessionName`: the call's session and its title, for renames. */
+/** The call's session and its title, for renames. */
 data class VoiceSessionName(
     val sessionID: String?,
     val title: String?,
@@ -80,8 +79,8 @@ internal fun SessionFeature.reduceRequests(state: State, action: Action): Reduce
                 next = next.copy(liveText = emptyMap())
                 val abandon = abandonRefresh(next)
                 // Nothing here asks a server that isn't answering: retrying reads into a dead route
-                // can stall a VPN tunnel (tailscale/tailscale#21773). Home's connection loop finds
-                // it again, and the reconnect re-reads.
+                // can stall a VPN tunnel. Home's connection loop finds it again, and the reconnect
+                // re-reads.
                 val quiet = quietServerPolling(abandon.state)
                 return Reduced(quiet.state, Effect.merge(abandon.effect, quiet.effect))
             }

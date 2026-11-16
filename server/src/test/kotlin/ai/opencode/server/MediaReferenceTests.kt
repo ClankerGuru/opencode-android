@@ -23,9 +23,8 @@ import org.junit.Test
 import java.util.Base64
 
 /**
- * The server half of iOS `MediaReferenceTests`: the capabilities header, decoding inline and
- * `media:<hash>` shapes and unavailable placeholders, and the live fetch. The loader and its
- * caches are tested in `:feature:media`; the tool mosaic in `:feature:transcript`.
+ * The capabilities header, decoding inline and `media:<hash>` shapes and unavailable placeholders,
+ * and the live fetch.
  */
 class MediaReferenceTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -50,6 +49,30 @@ class MediaReferenceTests {
     private fun List<OpenCodeTranscriptItem>.userImages() = filterIsInstance<OpenCodeTranscriptItem.UserImages>().first().images
     private fun List<OpenCodeTranscriptItem>.userFiles() = filterIsInstance<OpenCodeTranscriptItem.UserFiles>().first().files
     private fun List<OpenCodeTranscriptItem>.toolImages() = filterIsInstance<OpenCodeTranscriptItem.Tool>().mapNotNull { it.call.images }.first()
+
+    @Test
+    fun videoBlobToolResultDoesNotMasqueradeAsAMosaicImage() {
+        val payload = """
+            {"data":[{"id":"msg","type":"assistant","content":[{"id":"demo","type":"tool","name":"render","state":{"content":[
+              {"type":"text","text":"Done"},
+              {"type":"file","mime":"video/mp4","uri":"media:invalid"},
+              {"type":"file","mime":"Video/QuickTime","uri":"media:$hashA","bytes":9876},
+              {"type":"file","mime":"video/mp4","uri":"data:video/mp4;base64,AQID"}
+            ]}}]}, {"id":"prompt","type":"user","files":[
+              {"name":"clip.mov","mime":"video/quicktime","uri":"media:$hashA","source":{"type":"inline"}}
+            ]}]}
+        """.trimIndent().toByteArray()
+        val items = decodeTranscript(payload)
+        val call = items.filterIsInstance<OpenCodeTranscriptItem.Tool>().single().call
+        assertTrue(call.imageAttachments.isEmpty())
+        assertEquals(listOf("Done"), call.output)
+        val video = requireNotNull(call.videos).single()
+        assertEquals("msg-tool-demo-video-2", video.id)
+        assertEquals("Video", video.name)
+        assertEquals(9876L, video.byteCount)
+        assertEquals(hashA, video.mediaViewerReference?.media?.hash)
+        assertEquals(video.mediaViewerReference?.id, items.userFiles().single().mediaViewerReference?.id)
+    }
 
     @Test
     fun capabilityHeaderIsAlwaysSent() = runTest {
@@ -297,9 +320,8 @@ class MediaReferenceTests {
     }
 
     /**
-     * iOS also asserts the session's `urlCache == nil` and each request's
-     * `.reloadIgnoringLocalCacheData`: OkHttp has no per-request cache policy, so the `media`
-     * pool having no cache is the whole of it (`WireFixture` records no `cachePolicy`).
+     * OkHttp has no per-request cache policy, so the `media` pool having no cache is the whole
+     * check.
      */
     @Test
     fun liveFetchUsesUncachedMediaSessionAndReloadIgnoringLocalCacheData() = runTest {

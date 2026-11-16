@@ -4,10 +4,12 @@ import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionTunables
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.strings.localized
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.composer.R
 import ai.opencode.server.model.OpenCodeModel
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -64,6 +66,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -83,13 +87,11 @@ import kotlin.math.max
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.distinctUntilChanged
 
-// Port of iOS `Composer/ModelPicker/OnePickerListView.swift`: One Picker's model list. iOS backs
-// it with a UIKit compositional collection view (for frame rate and native swipe actions); here
-// it's a `LazyColumn` of immutable row snapshots (no store in a row), with the same rows,
+// One Picker's model list. A `LazyColumn` of immutable row snapshots (no store in a row): rows,
 // sections, footer, swipe and long-press favorites, level menu, and the pull-down-from-the-top
 // sheet drag reported to the panel through [OnePickerListActions].
 
-/** iOS `OnePickerRowItem`: one row's immutable snapshot. */
+/** One row's immutable snapshot. */
 data class OnePickerRowItem(
     val sectionID: String,
     val idPrefix: String,
@@ -114,22 +116,21 @@ data class OnePickerRowItem(
         get() = buildList {
             add(providerTitle)
             if (isAdjustable) add(levelLabel)
-            if (isFavorite) add("Favorite")
+            if (isFavorite) add(localized(R.string.composer_model_favorite_description))
         }.joinToString(", ")
 }
 
-/** iOS `OnePickerSectionSnapshot`. */
 data class OnePickerSectionSnapshot(val id: String, val title: String, val rows: List<OnePickerRowItem>)
 
-/** iOS `OnePickerScrollEdges`: whether rows overflow above or below the visible list. */
+/** Whether rows overflow above or below the visible list. */
 data class OnePickerScrollEdges(val topOverflow: Boolean = false, val bottomOverflow: Boolean = false)
 
-/** iOS `OnePickerListView.OnePickerFooterSnapshot`: the Show All Models row. */
+/** The Show All Models row. */
 data class OnePickerFooterSnapshot(val hiddenCount: Int, val showsAll: Boolean)
 
 /**
- * iOS `OnePickerListActions`: the list's callbacks, held stable across redraws and refreshed by
- * the panel, so the list always calls the latest ones.
+ * The list's callbacks, held stable across redraws and refreshed by the panel, so the list always
+ * calls the latest ones.
  */
 @Stable
 class OnePickerListActions {
@@ -144,9 +145,8 @@ class OnePickerListActions {
 }
 
 /**
- * iOS `OnePickerListView`. A new [openGeneration] scrolls back to the top and drops a pull in
- * progress; [scrollDisabled] freezes the list (mid-morph). Structural changes (favoriting)
- * animate, except while searching, as iOS's diffable snapshot does.
+ * A new [openGeneration] scrolls back to the top and drops a pull in progress; [scrollDisabled]
+ * freezes the list (mid-morph). Structural changes (favoriting) animate, except while searching.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -178,11 +178,11 @@ fun OnePickerListView(
         userScrollEnabled = !scrollDisabled,
         modifier = modifier
             .pointerInput(listState) {
-                // Whether this drag began with the list at its top (iOS `startedAtTop`).
+                // Whether this drag began with the list at its top.
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                     pull.startedAtTop = !listState.canScrollBackward
-                    // A gesture torn down before its release (iOS `.cancelled`) settles the pull.
+                    // A gesture torn down before its release settles the pull.
                     try {
                         do {
                             val event = awaitPointerEvent(PointerEventPass.Initial)
@@ -222,9 +222,9 @@ fun OnePickerListView(
 }
 
 /**
- * iOS's `scrollViewWillBeginDragging`/`DidScroll`/`WillEndDragging` sheet pull: a drag that
- * began at the top and pulls down moves the sheet instead of the list, reporting its translation
- * (dp) until released (with its velocity) or pushed back up past its anchor (which cancels).
+ * Sheet pull: a drag that began at the top and pulls down moves the sheet instead of the list,
+ * reporting its translation (dp) until released (with its velocity) or pushed back up past its
+ * anchor (which cancels).
  */
 @Stable
 internal class OnePickerPullDown(
@@ -265,7 +265,7 @@ internal class OnePickerPullDown(
             if (source != NestedScrollSource.UserInput) return Offset.Zero
             if (listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 4f * density()) startedAtTop = false
             if (pulling || !startedAtTop || available.y <= 2f) return Offset.Zero
-            // iOS anchors the pull where the list first overscrolls: the sheet starts from 0.
+            // The sheet starts from 0.
             pulling = true
             pullPx = 0f
             actions.onBeginSheetDrag()
@@ -289,7 +289,7 @@ private fun rememberOnePickerPullDown(listState: LazyListState, actions: OnePick
     return pull
 }
 
-/** iOS's section header: footnote semibold on the 22 pt spine, not pinned. */
+/** Footnote semibold on the 22 pt spine, not pinned. */
 @Composable
 private fun OnePickerSectionHeader(title: String, isFirst: Boolean) {
     Text(
@@ -306,10 +306,12 @@ private fun OnePickerSectionHeader(title: String, isFirst: Boolean) {
     )
 }
 
-/** iOS `OnePickerRowCell`: provider mark, name (and provider), favorite badge, level menu. */
+/** Provider mark, name (and provider), favorite badge, level menu. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun OnePickerRowCell(item: OnePickerRowItem, actions: OnePickerListActions, modifier: Modifier = Modifier) {
+    val removeFavoriteText = stringResource(R.string.composer_model_remove_favorite_action)
+    val addFavoriteText = stringResource(R.string.composer_model_add_favorite_action)
     val colors = OpenCodeTheme.colors
     val reduceMotion = rememberReduceMotion()
     val interaction = remember { MutableInteractionSource() }
@@ -322,7 +324,7 @@ private fun OnePickerRowCell(item: OnePickerRowItem, actions: OnePickerListActio
         bounce.animateTo(1f, Motion.press.animation(MotionPhase.Exit, reduceMotion = false))
     }
     val toggleFavorite = { actions.onToggleFavorite(item.model) }
-    // Android divergence: a ripple in the row's rounded inset answers the press (iOS tints it).
+    // A ripple in the row's rounded inset answers the press.
     val highlight = if (item.isCurrent) colors.text.copy(alpha = if (colors.highContrast) 0.16f else if (colors.isDark) 0.10f else 0.07f) else null
     val panelColor = OnePickerSurfaceDefaults.color
 
@@ -379,7 +381,7 @@ private fun OnePickerRowCell(item: OnePickerRowItem, actions: OnePickerListActio
                                 selected = item.isCurrent
                                 onClick { actions.onPickModel(item); true }
                                 customActions = listOf(
-                                    CustomAccessibilityAction(if (item.isFavorite) "Remove from Favorites" else "Add to Favorites") {
+                                    CustomAccessibilityAction(if (item.isFavorite) removeFavoriteText else addFavoriteText) {
                                         toggleFavorite(); true
                                     },
                                 )
@@ -422,12 +424,12 @@ private fun OnePickerRowCell(item: OnePickerRowItem, actions: OnePickerListActio
     }
 }
 
-/** iOS's 0.35 s row hold (Android's long press is a little longer by default). */
+/** A 0.35 s row hold (Android's long press is a little longer by default). */
 private fun rowHoldConfiguration(base: ViewConfiguration): ViewConfiguration = object : ViewConfiguration by base {
     override val longPressTimeoutMillis: Long get() = 350L
 }
 
-/** iOS's level button: the level word (a menu of every level, highest first) at the row's end. */
+/** The level word (a menu of every level, highest first) at the row's end. */
 @Composable
 private fun OnePickerLevelButton(item: OnePickerRowItem, onPickLevel: (String?) -> Unit) {
     val colors = OpenCodeTheme.colors
@@ -436,6 +438,9 @@ private fun OnePickerLevelButton(item: OnePickerRowItem, onPickLevel: (String?) 
     var menuOpen by remember { mutableStateOf(false) }
     val tint = if (item.hasParsedSearchLevel) colors.text else colors.text.copy(alpha = item.levelAlpha.toFloat())
     val step = { by: Int -> onPickLevel(scale.stepped(item.shownLevel, by)) }
+    val levelDescription = stringResource(R.string.composer_model_level_description, item.shortName)
+    val higherLevelText = stringResource(R.string.composer_model_level_higher_action)
+    val lowerLevelText = stringResource(R.string.composer_model_level_lower_action)
     Box {
         Row(
             Modifier
@@ -444,11 +449,11 @@ private fun OnePickerLevelButton(item: OnePickerRowItem, onPickLevel: (String?) 
                 .padding(end = 10.dp)
                 .clickable(role = Role.Button) { menuOpen = true }
                 .semantics {
-                    contentDescription = "${item.shortName} thinking level"
+                    contentDescription = levelDescription
                     stateDescription = item.levelLabel
                     customActions = listOf(
-                        CustomAccessibilityAction("Higher Thinking Level") { step(1); true },
-                        CustomAccessibilityAction("Lower Thinking Level") { step(-1); true },
+                        CustomAccessibilityAction(higherLevelText) { step(1); true },
+                        CustomAccessibilityAction(lowerLevelText) { step(-1); true },
                     )
                 }
                 .testTag("${item.idPrefix}-level-${item.model.id}")
@@ -483,21 +488,22 @@ private fun OnePickerLevelButton(item: OnePickerRowItem, onPickLevel: (String?) 
     }
 }
 
-/** iOS `OnePickerShowAllCell`: a neutral Show All / Show Fewer row with the hidden count. */
+/** A neutral Show All / Show Fewer row with the hidden count. */
 @Composable
 private fun OnePickerShowAllRow(footer: OnePickerFooterSnapshot, onTap: () -> Unit) {
-    val title = if (footer.showsAll) "Show Fewer Models" else "Show All Models"
+    val title = if (footer.showsAll) stringResource(R.string.composer_model_show_fewer) else stringResource(R.string.composer_model_show_all)
+    val hiddenText = pluralStringResource(R.plurals.composer_model_hidden_count, footer.hiddenCount, footer.hiddenCount)
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 44.dp)
             .clickable(role = Role.Button, onClick = onTap)
-            .semantics { contentDescription = title; stateDescription = "${footer.hiddenCount} hidden" }
+            .semantics { contentDescription = title; stateDescription = hiddenText }
             .testTag("model-show-all")
             .padding(horizontal = 22.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(title, style = OpenCodeTextStyles.subheadline, fontWeight = FontWeight.Medium, color = OpenCodeTheme.colors.secondaryText, modifier = Modifier.weight(1f))
-        Text("${footer.hiddenCount} hidden", style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.tertiaryText)
+        Text(hiddenText, style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.tertiaryText)
     }
 }

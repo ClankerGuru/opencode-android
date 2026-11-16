@@ -29,10 +29,9 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.ByteArrayOutputStream
 
 /**
- * Port of iOS `ImageLinkPreviewTests.swift`: the link policy, the read queue and [ImageLinkLoader].
- * iOS's replies are Markdown (`:feature:transcript`); here they're the [LinkTextBlock]s the
- * transcript hands media. Runs under Robolectric: bare-URL detection reads the framework's
- * `Patterns.WEB_URL`, and the loader decodes real PNGs (native graphics) into the pixel cache.
+ * The link policy, the read queue and [ImageLinkLoader]. Runs under Robolectric: bare-URL detection
+ * reads the framework's `Patterns.WEB_URL`, and the loader decodes real PNGs (native graphics) into
+ * the pixel cache.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -74,7 +73,6 @@ class ImageLinkPreviewTests {
         }
     }
 
-    /** The growing-block half of iOS's test; its streaming half drives `MarkdownStream` (`:feature:transcript`). */
     @Test
     fun completedLinkAndBlockIdentitySurviveEveryLaterDelta() {
         assertTrue(links(text("https://example.com/shot.png"), growing = true).isEmpty())
@@ -101,7 +99,7 @@ class ImageLinkPreviewTests {
         assertEquals(listOf("b.png"), links(text("example.com/a.png and https://example.com/b.png")).map { it.substringAfterLast('/') })
     }
 
-    /** iOS checks `AgentImageDownload`'s data-task delegate; Android checks the response before reading its body. */
+    /** Android checks the response before reading its body. */
     @Test
     fun rejectsMissingOrNonImageMIMEBeforeReceivingTheBody() {
         val request = Request.Builder().url("https://example.com/shot.png").build()

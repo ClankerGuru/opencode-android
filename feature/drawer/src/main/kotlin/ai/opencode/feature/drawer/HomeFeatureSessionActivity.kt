@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.core.strings.localized
 import ai.opencode.core.dependencies.BackgroundTaskClient
 import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DateClient
@@ -33,11 +34,10 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.selects.select
 
 /*
- * Port of iOS `HomeFeature+SessionActivity.swift`. Session Live Activity (Experimental): a send
- * from this phone starts the run's activity (Android: an ongoing notification) while the app is on
- * screen, and Home keeps it current while the app runs. Away, the stream's half minute and one
- * background wait are all it gets: there is no push, so a run still going after that shows its last
- * state until the app runs again.
+ * Session Live Activity (Experimental): a send from this phone starts the run's activity (Android:
+ * an ongoing notification) while the app is on screen, and Home keeps it current while the app
+ * runs. Away, the stream's half minute and one background wait are all it gets: there is no push,
+ * so a run still going after that shows its last state until the app runs again.
  */
 
 internal fun State.sessionActivityTitle(sessionID: String, fallback: String): String =
@@ -80,8 +80,8 @@ val State.sessionActivityRun: SessionLiveActivity.Run?
     }
 
 /**
- * A reply's paragraph, list item, numbered item, blockquote and heading texts in order (iOS reads
- * them off the parsed blocks), for the Done preview.
+ * A reply's paragraph, list item, numbered item, blockquote and heading texts in order, for the
+ * Done preview.
  */
 internal fun markdownProseLines(markdown: String): Sequence<String> =
     OpenCodeMarkdownBlock.blocks(markdown, inlineCache = null).asSequence().mapNotNull { block ->
@@ -124,7 +124,7 @@ private val sessionLiveActivityOn: Boolean
 /** An accepted send from the open screen (or the session a draft's send created) starts following its run, replacing any run before. */
 internal fun HomeFeature.startSessionActivity(state: State, sessionID: String): HomeReduced {
     if (!sessionLiveActivityOn) return Reduced(state)
-    val title = state.sessionActivityTitle(sessionID, fallback = "New session")
+    val title = state.sessionActivityTitle(sessionID, fallback = localized(R.string.drawer_session_activity_new_session))
     val attributes = SessionActivityAttributes(serverKey = SessionDirectory.serverKey(state.server.persistenceID), sessionID = sessionID)
     val content = SessionLiveActivity.Content(title = title, phase = Phase.working, startedAt = dependency(DateClient).now())
     val client = dependency(SessionLiveActivityClient)
@@ -186,7 +186,7 @@ internal fun HomeFeature.waitToSettleSessionActivity(state: State): Effect<Actio
     }.cancellable(CancelID.SessionActivityWait, cancelInFlight = true)
 }
 
-/** iOS `(try? await …) != nil`, rethrowing cancellation. */
+/** Rethrowing cancellation. */
 private suspend inline fun succeeds(block: () -> Unit): Boolean = try {
     block()
     true

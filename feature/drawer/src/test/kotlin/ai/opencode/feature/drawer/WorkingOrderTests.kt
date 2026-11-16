@@ -13,10 +13,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `WorkingOrderTests`' Home tests: Home hears every session's `input.queue`
- * deliveries and cancellations. The rest of that file is `:feature:session`'s.
- */
 class WorkingOrderTests {
     @get:Rule val isolation = TestIsolationRule()
 

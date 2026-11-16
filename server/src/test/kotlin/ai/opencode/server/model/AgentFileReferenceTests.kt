@@ -11,10 +11,8 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Recognizing files the agent mentions, mirroring desktop's local-link rules
- * (session-ui markdown-image.ts, markdown-inline-code-kind.ts). Port of iOS
- * `AgentFileTests.swift` › `AgentFileReferenceTests`. Link URLs are strings on Android, and
- * iOS `init?(linkURL:)` is [AgentFileReference.fromLinkURL].
+ * Recognizing files the agent mentions, mirroring desktop's local-link rules (session-ui
+ * markdown-image.ts, markdown-inline-code-kind.ts). Link URLs are strings on Android.
  */
 class AgentFileReferenceTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -48,7 +46,7 @@ class AgentFileReferenceTests {
         )
         assertEquals(AgentFileReference("main.go", 10), AgentFileReference.fromInlineCode("main.go:10:4"))
         assertEquals(AgentFileReference("src/app.ts", 7), AgentFileReference.fromLink("src/app.ts#L7"))
-        // A dot is legal in a URL scheme; `name.swift:42` is still a path.
+        // A dot is legal in a URL scheme.
         assertEquals(AgentFileReference("SessionView.swift", 42), AgentFileReference.fromLink("SessionView.swift:42"))
         assertEquals(AgentFileReference("README.md", 7), AgentFileReference.fromLink("README.md?plain=1#L7"))
     }
@@ -100,8 +98,8 @@ class AgentFileReferenceTests {
     }
 
     /**
-     * A Windows server reports `C:\…` directories (opencode-ios #62): files inside the session
-     * read from its location as the server spelled it.
+     * A Windows server reports `C:\…` directories: files inside the session read from its location
+     * as the server spelled it.
      */
     @Test
     fun windowsServersResolveDriveAndBackslashPaths() {
@@ -154,10 +152,6 @@ class AgentFileReferenceTests {
     }
 }
 
-/**
- * The `:server` test of iOS `AgentFileTests.swift` › `AgentFileMarkdownTests`
- * (`OpenCodeToolCall.fileReference`); its Markdown tests are `:feature:transcript`'s.
- */
 class AgentFileMarkdownTests {
     @get:Rule val isolation = TestIsolationRule()
 

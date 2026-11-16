@@ -38,12 +38,6 @@ import org.junit.Test
 import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `VoiceOpenSessionTests.swift` (its `VoiceSessionDelegatorTests` extension's feature
- * test) and the feature tests of `VoiceOpenSessionAcknowledgementTests.swift`. The Home test
- * (`voiceOpenOutsideRecentsClosesTheDrawerAndKeepsTheCall`) is in `:feature:drawer`, the
- * protocol tests in `:server`, the app tests in `:app`.
- */
 class VoiceOpenSessionTests {
     @get:Rule val isolation = TestIsolationRule()
 

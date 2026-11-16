@@ -53,15 +53,8 @@ import org.junit.Test
 import java.time.Instant
 
 /**
- * Port of the `SessionFeature` (and session-module `SessionSheetFeature` / `ShellOutputFeature`) tests of the
- * `HapticsAuditTests` suite in iOS `HapticsAuditTests.swift`: which interactions play which haptics.
- *
- * Not ported here (:feature:drawer, `HomeFeature`): `homeHaptics`.
- * Not ported here (:app, `AppFeature`): the `AppFeature.copyTextTapped` step of `copyingPlaysATapWhileOpeningLocationSettingsStaysQuiet`
- * (its expected log here leaves that one tap out).
- * UIKit-only: the `SessionView.composerSwipeYields` / `performSwipeUpFocus` window and text-view checks of
+ * The `SessionView.composerSwipeYields` / `performSwipeUpFocus` window and text-view checks of
  * `swipingUpOnTheComposerTapsAndRequestsFocusUnlessDictating` (its reducer half is here).
- * Not ported here (:core, :feature:voice): the `LiveHapticsTests` suite (see docs/parity/core.md).
  */
 class HapticsAuditTests {
     private val server = OpenCodeServer(url = "http://127.0.0.1:9", username = "opencode", password = "pw")
@@ -95,7 +88,7 @@ class HapticsAuditTests {
 
     private val HapticsRecorder.names: List<String> get() = log.map { it.name }
 
-    /** iOS `log.setValue([])`: the names played from here on. */
+    /** The names played from here on. */
     private class Since(private val log: HapticsRecorder) {
         private var start = log.log.size
         fun reset() { start = log.log.size }
@@ -112,7 +105,6 @@ class HapticsAuditTests {
 
     private val dictationReady: (Action) -> Boolean = { it == Action.dictationReady }
 
-    /** iOS `@Test(arguments: [.sendTapped, .queueTapped])`. */
     @Test fun sendingSteeredOrQueuedIsOneTap() {
         for (action in listOf(Action.SendTapped, Action.QueueTapped)) sessionTest { h ->
             val log = HapticsRecorder()
@@ -124,8 +116,7 @@ class HapticsAuditTests {
     }
 
     /**
-     * iOS `withDependencies { $0.haptics = .recording(log) } operation: { PlusPhotoLibrary() }`. The library's scope binds
-     * `Dispatchers.Main` when it's made; these tests never launch on it.
+     * The library's scope binds `Dispatchers.Main` when it's made; these tests never launch on it.
      */
     private fun plusPhotoLibrary(log: HapticsRecorder): PlusPhotoLibrary {
         Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -156,7 +147,7 @@ class HapticsAuditTests {
         h.skipInFlightEffects()
     }
 
-    /** Eight photos at most (Kit: “a limit of eight or something”); a tap past it warns instead of silently doing nothing. */
+    /** Eight photos at most; a tap past it warns instead of silently doing nothing. */
     @Test fun pickingPastTheLimitWarns() {
         val log = HapticsRecorder()
         val library = plusPhotoLibrary(log)
@@ -356,6 +347,7 @@ class HapticsAuditTests {
     private fun Harness.newSessionStore(log: HapticsRecorder, picker: Boolean = false): TestStore<SessionFeature.State, Action> {
         var state = state { SessionFeature.State.draft(server = server, draftProject = projects[0], projects = projects) }
         if (picker) state = state.openProjectPicker()
+        state.agentSelection.isEnabled.set(false)
         return store(state) { this[HapticsClient] = log.client }
     }
 
@@ -397,7 +389,7 @@ class HapticsAuditTests {
         store.finish()
     }
 
-    /** The reducer half (the `SessionView` swipe gating with a `UIWindow` is UIKit-only). */
+    /** The reducer half. */
     @Test fun swipingUpOnTheComposerTapsAndRequestsFocusUnlessDictating() = sessionTest { h ->
         val log = HapticsRecorder()
         val store = h.sessionStore(null, log)

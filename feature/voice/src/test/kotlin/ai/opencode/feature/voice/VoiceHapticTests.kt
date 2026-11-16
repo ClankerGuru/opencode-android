@@ -44,9 +44,9 @@ private fun <T> required(value: T?, message: String = "Expected a value"): T {
 }
 
 /**
- * Port of iOS `VoiceHapticTests.swift`: the call's haptics land with its sounds and its sweep.
- * `patternsBecomeCorePatterns` is dropped: Core Haptics splits a pattern into players, while
- * Android's `VoiceHapticEngine` mixes every pattern into one vibrator waveform.
+ * The call's haptics land with its sounds and its sweep. `patternsBecomeCorePatterns` is dropped:
+ * Core Haptics splits a pattern into players, while Android's `VoiceHapticEngine` mixes every
+ * pattern into one vibrator waveform.
  */
 class VoiceHapticTests {
     private val widths = listOf(360f, 408f, 440f)
@@ -70,7 +70,6 @@ class VoiceHapticTests {
 
     // MARK: Sounds
 
-    /** iOS `@Test(arguments: [VoiceCallCue.connect, .hangUp])`. */
     @Test fun envelopeFindsEachCuesAttack() {
         for (cue in listOf(VoiceCallCue.connect, VoiceCallCue.hangUp)) {
             val samples = VoiceCallSoundBank.samples(cue)
@@ -460,7 +459,7 @@ class VoiceCallTeardownFrameworkTests {
     }
 }
 
-/** The haptics engine double (iOS `VoiceHangUpEngineTests.Engine`). */
+/** The haptics engine double. */
 class FakeVoiceHapticEngine : VoiceHapticPlaying {
     override var isCallActive = false
     val plays = mutableListOf<VoiceHapticPattern>()
@@ -476,7 +475,7 @@ class FakeVoiceHapticEngine : VoiceHapticPlaying {
 
 /**
  * Runs a `VoiceCallSounds` test on virtual time: the call clock is a [TestClock] and its loop and
- * fallbacks run on the test's scheduler (iOS waits on the continuous clock).
+ * fallbacks run on the test's scheduler.
  */
 private class SoundsHarness(val test: TestScope) {
     val clock = TestClock()
@@ -490,7 +489,7 @@ private class SoundsHarness(val test: TestScope) {
 
     val now: Duration get() = clock.now()
 
-    /** iOS `Task.sleep(until:)`: moves the call clock to [deadline], letting the call's loop run. */
+    /** Moves the call clock to [deadline], letting the call's loop run. */
     suspend fun waitUntil(deadline: Duration) {
         test.runCurrent()
         while (clock.now() < deadline) {
@@ -505,7 +504,6 @@ private class SoundsHarness(val test: TestScope) {
 /** A tick requested a pass ahead must not play once the call has moved on. */
 class VoiceTickRaceTests {
     private fun SoundsHarness.connecting(): Pair<VoiceCallSounds, UUID> {
-        // iOS `LiveHaptics(isActive: { true }, sounds:)` on the simulator falls back to UIKit ticks.
         val sounds = sounds()
         val id = UUID.randomUUID()
         with { sounds.startCallClock(id) {} }
@@ -662,7 +660,6 @@ class VoiceCallStartupTests {
         assertTrue(snapshot.hapticEvents.isEmpty())
     }
 
-    /** iOS `@Test(arguments: [VoiceAudioError.microphoneDenied, CancellationError()])`. */
     @Test fun aDeniedMicrophoneOrCancelledStartEndsThePendingStart() = runTest {
         for (failure in listOf<Throwable>(VoiceAudioError.microphoneDenied, CancellationException())) {
             val harness = SoundsHarness(this)
@@ -747,7 +744,7 @@ class VoiceHangUpEngineTests {
         val engine = FakeVoiceHapticEngine()
         val sounds = harness.sounds(engine)
         harness.with {
-            // An earlier call created and released the engine (iOS `prepareVoice`/`endVoiceCall`).
+            // An earlier call created and released the engine.
             engine.prepare()
             engine.endCall()
             // The next call is hung up during preflight or the microphone prompt.

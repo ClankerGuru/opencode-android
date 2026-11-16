@@ -56,12 +56,8 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `SendOutboxTests.swift`.
- *
  * Sending never waits for the server: each send shows at once, and the
  * outbox delivers a session's sends one at a time, in order.
- *
- * Not ported here (:server, `OpenCodeClientError.retryAfter` alone): `retryAfterIsReadAsSecondsOrADate`.
  */
 class SendOutboxTests {
     private val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
@@ -90,14 +86,10 @@ class SendOutboxTests {
         fun open() { opened.complete(Unit) }
     }
 
-    /** iOS `Issue.record` from the default PATCH/DELETE stubs: failed at the end of the test. */
+    /** Failed at the end of the test. */
     private val issues = LockIsolated(listOf<String>())
 
-    /**
-     * iOS's outbox works on the main actor, so a test's yields and `TestClock.advance` see each
-     * step its lanes take (a post starting, a sleep re-armed after a wake). Here each test's
-     * outboxes run their lanes on the test's own thread for the same order.
-     */
+    /** Here each test's outboxes run their lanes on the test's own thread for the same order. */
     private lateinit var lanes: CoroutineScope
 
     private fun newOutbox() = PromptOutbox(scope = lanes)
@@ -258,10 +250,9 @@ class SendOutboxTests {
     }
 
     /**
-     * The actual TestFlight 341 error: an immediate ATS -1022 from an HTTP
-     * origin that answered other requests, then success on manual Retry.
-     * Drive the live client's error translation under the outbox's `.once`
-     * scope, so this pins quiet recovery and one owner of the retry together.
+     * An immediate ATS -1022 from an HTTP origin that answered other requests, then success on
+     * manual Retry. Drives the live client's error translation under the outbox's `.once` scope,
+     * pinning quiet recovery and one owner of the retry together.
      */
     @Test fun anATSFailureOnAWorkingHTTPOriginRetriesSilentlyThroughTheLiveClient() = outboxTest { h ->
         val admissions = LockIsolated(listOf<String>())
@@ -937,7 +928,6 @@ class SendOutboxTests {
 
     private val offline = OpenCodeClientError.unreachable(TransportFailure.NotSent)
 
-    /** iOS `networkPath.isOffline = { true }` and `available` never returning. */
     private fun DependencyValues.Builder.offlinePath() {
         this[NetworkPathClient] = this[NetworkPathClient].copy(isOffline = { true }, available = { awaitCancellation() })
     }
@@ -1035,12 +1025,11 @@ class SendOutboxTests {
 
     // endregion
 
-    // region Riding out an outage (OC-231)
+    // region Riding out an outage
 
     /**
-     * A server down for two minutes (a Mac waking, a restart, a tunnel
-     * finding its way back) no longer turns the send into a failed send: it
-     * keeps trying past the old five attempts and goes once the server answers.
+     * A server down for two minutes (a Mac waking, a restart, a tunnel finding its way back)
+     * doesn't fail the send: it keeps trying and goes once the server answers.
      */
     @Test fun aSendOutlastsAnOutageLongerThanTheOldBudget() = outboxTest { h ->
         val posts = Posts()
@@ -1062,10 +1051,7 @@ class SendOutboxTests {
         h.skipInFlightEffects()
     }
 
-    /**
-     * Validation, auth, and other answers sending again can't change still
-     * fail at once. (iOS `@Test(arguments: [400, 401, 404, 409, 422, 500])`.)
-     */
+    /** Validation, auth, and other answers sending again can't change still fail at once. */
     @Test fun aFailureThatCantPassStillFailsAtOnce() {
         for (status in listOf(400, 401, 404, 409, 422, 500)) {
             outboxTest { h ->

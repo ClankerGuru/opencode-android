@@ -1,5 +1,6 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.observe
 import ai.opencode.core.ui.OpenCodeIcon
@@ -47,6 +48,7 @@ import androidx.compose.ui.layout.MeasurePolicy
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -85,10 +87,10 @@ data class FloatingCallStageContentLayout(
 )
 
 /**
- * What the card and the full sheet show, laid out at the size it's given (iOS
- * `FloatingCallStageContent`): the session and duration above the bloom, the call's details (full
- * sheet only) and status below it, the live transcript, and the controls. The shape's surface and
- * dot field are drawn by the floating call's surface. Sizes in dp.
+ * What the card and the full sheet show, laid out at the size it's given: the session and duration
+ * above the bloom, the call's details (full sheet only) and status below it, the live transcript,
+ * and the controls. The shape's surface and dot field are drawn by the floating call's surface.
+ * Sizes in dp.
  *
  * [layout] is read while measuring and drawing, not composing: a drag between the card and the
  * sheet moves and resizes it every frame without recomposing anything inside it.
@@ -185,6 +187,7 @@ private fun floatingCallControlDiameter(fullness: Float): Float = lerp(CONTROL_D
 private fun FloatingCallStageHeader(store: VoiceStoreOf, status: String, onMinimize: () -> Unit, modifier: Modifier = Modifier) {
     val title by store.observe { it.sessionTitle }
     val connectedAt by store.observe { it.connectedAt }
+    val minimizeDescription = stringResource(R.string.voice_stage_minimize_description)
     Row(
         modifier.padding(start = 18.dp, end = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -196,9 +199,9 @@ private fun FloatingCallStageHeader(store: VoiceStoreOf, status: String, onMinim
                 .semantics(mergeDescendants = true) {},
             verticalArrangement = Arrangement.spacedBy(1.dp),
         ) {
-            Text("Talking in", style = OpenCodeTextStyles.caption1, color = OpenCodeTheme.colors.secondaryText)
+            Text(stringResource(R.string.voice_stage_talking_in), style = OpenCodeTextStyles.caption1, color = OpenCodeTheme.colors.secondaryText)
             Text(
-                title,
+                if (title == VoiceFeature.State.newSessionTitle) stringResource(R.string.voice_session_new_title) else title,
                 style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
                 color = OpenCodeTheme.colors.text,
                 maxLines = 1,
@@ -211,7 +214,7 @@ private fun FloatingCallStageHeader(store: VoiceStoreOf, status: String, onMinim
                 .size(48.dp)
                 .clickable(role = Role.Button, onClick = onMinimize)
                 .openCodeTapTarget()
-                .semantics { contentDescription = "Minimize" },
+                .semantics { contentDescription = minimizeDescription },
             contentAlignment = Alignment.Center,
         ) {
             OpenCodeIcon(SFSymbol.ChevronDown, null, tint = OpenCodeTheme.colors.secondaryText, size = 20.dp)
@@ -227,17 +230,17 @@ private fun FloatingCallStageControls(store: VoiceStoreOf, scale: () -> Float, m
     val isLive by store.observe { it.phase == VoiceFeature.State.Phase.Live }
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         FloatingCallControl(
-            name = if (isMuted) "Unmute" else "Mute",
+            name = if (isMuted) stringResource(R.string.voice_unmute) else stringResource(R.string.voice_mute),
             symbol = if (isMuted) SFSymbol.MicSlashFill else SFSymbol.MicFill,
             diameter = diameter,
             scale = scale,
             isOn = isMuted,
             isEnabled = isLive,
         ) { store.send(VoiceFeature.Action.MuteTapped) }
-        FloatingCallControl(name = "Pause", symbol = SFSymbol.PauseFill, diameter = diameter, scale = scale, isPlaceholder = true) {}
-        FloatingCallControl(name = "Camera", symbol = SFSymbol.VideoFill, diameter = diameter, scale = scale, isPlaceholder = true) {}
-        FloatingCallControl(name = "Add", symbol = SFSymbol.Plus, diameter = diameter, scale = scale, isPlaceholder = true) {}
-        FloatingCallControl(name = "End voice call", symbol = SFSymbol.PhoneDownFill, diameter = diameter, scale = scale, isDestructive = true) {
+        FloatingCallControl(name = stringResource(R.string.voice_stage_pause), symbol = SFSymbol.PauseFill, diameter = diameter, scale = scale, isPlaceholder = true) {}
+        FloatingCallControl(name = stringResource(R.string.voice_stage_camera), symbol = SFSymbol.VideoFill, diameter = diameter, scale = scale, isPlaceholder = true) {}
+        FloatingCallControl(name = stringResource(CoreR.string.common_add), symbol = SFSymbol.Plus, diameter = diameter, scale = scale, isPlaceholder = true) {}
+        FloatingCallControl(name = stringResource(R.string.voice_floating_end_description), symbol = SFSymbol.PhoneDownFill, diameter = diameter, scale = scale, isDestructive = true) {
             store.send(VoiceFeature.Action.EndPressed)
         }
     }
@@ -254,10 +257,9 @@ private fun smooth(low: Float, high: Float, value: Float): Float {
 private fun transcriptNow(): Double = System.nanoTime() / 1e9
 
 /**
- * The call so far, you and the agent, newest at the bottom (iOS `FloatingCallTranscript`): the
- * column is anchored to the bottom and older lines rise out under a fade. The agent's words
- * arrive one by one as they stream ([CaptionWordRenderer]). It never scrolls, so a vertical drag
- * anywhere moves the sheet.
+ * The call so far, you and the agent, newest at the bottom: the column is anchored to the bottom
+ * and older lines rise out under a fade. The agent's words arrive one by one as they stream
+ * ([CaptionWordRenderer]). It never scrolls, so a vertical drag anywhere moves the sheet.
  */
 @Composable
 fun FloatingCallTranscript(store: VoiceStoreOf, modifier: Modifier = Modifier) {
@@ -341,14 +343,14 @@ fun FloatingCallTranscript(store: VoiceStoreOf, modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (lines.isEmpty()) {
-                Text("Say something to your session.", style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.secondaryText)
+                Text(stringResource(R.string.voice_transcript_empty), style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.secondaryText)
             }
             for (line in lines) {
                 androidx.compose.runtime.key(line.id) {
                     Column {
                         if (line.isUser) {
                             Text(
-                                "You",
+                                stringResource(R.string.voice_transcript_you),
                                 style = OpenCodeTextStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
                                 color = OpenCodeTheme.colors.tertiaryText,
                                 modifier = Modifier.clearAndSetSemantics {},
@@ -410,8 +412,9 @@ private fun FloatingCallCaptionLine(line: CaptionReveal.Line, now: () -> Double,
     val color = if (line.isUser) OpenCodeTheme.colors.secondaryText else OpenCodeTheme.colors.text
     val density = LocalDensity.current.density
     val composedAt = transcriptNow()
+    val userLineDescription = stringResource(R.string.voice_transcript_user_line_description, line.text)
     Layout(
-        modifier = Modifier.clearAndSetSemantics { contentDescription = if (line.isUser) "You: ${line.text}" else line.text },
+        modifier = Modifier.clearAndSetSemantics { contentDescription = if (line.isUser) userLineDescription else line.text },
         content = {
             for (index in line.revealedAt.indices) {
                 val at = line.revealedAt[index]
@@ -432,7 +435,7 @@ private fun FloatingCallCaptionLine(line: CaptionReveal.Line, now: () -> Double,
     )
 }
 
-/** Words wrapped greedily, one view each (iOS `CaptionWordFlow`): a word never moves once placed. */
+/** Words wrapped greedily, one view each: a word never moves once placed. */
 private fun floatingCallWordFlow(spaceWidth: Int) = MeasurePolicy { measurables, constraints ->
     val width = constraints.maxWidth
     var x = 0

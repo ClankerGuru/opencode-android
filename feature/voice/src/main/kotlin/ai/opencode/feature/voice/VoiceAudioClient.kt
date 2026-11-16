@@ -4,6 +4,7 @@ import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.asContextElement
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.strings.localized
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -233,13 +234,22 @@ class VoiceAudioPrestart(
 }
 
 sealed class VoiceAudioError(message: String) : Exception(message) {
-    data object microphoneDenied : VoiceAudioError("Allow microphone access in Settings to talk to your session.")
+    data object microphoneDenied : VoiceAudioError("Allow microphone access in Settings to talk to your session.") {
+        /** [message] as the person reads it; [message] itself stays English for comparisons. */
+        val displayMessage: String get() = localized(R.string.voice_error_microphone_denied)
+    }
     data object formatUnavailable : VoiceAudioError("The audio hardware format is not supported.")
-    class engineRejected(val operation: String, val reason: String) : VoiceAudioError("Couldn’t start call audio. Try again in a moment.")
+    class engineRejected(val operation: String, val reason: String) : VoiceAudioError(engineRejectedMessage)
+
+    companion object {
+        const val engineRejectedMessage = "Couldn’t start call audio. Try again in a moment."
+    }
 }
 object AudioEngineGuard {
-    /** The framework's `IllegalStateException`s (iOS: raised `NSException`s) become errors; a
-     * cancellation (itself an `IllegalStateException` on the JVM) passes through, as iOS's does. */
+    /**
+     * The framework's `IllegalStateException`s become errors; a cancellation (itself an
+     * `IllegalStateException` on the JVM) passes through.
+     */
     fun <T> perform(operation: String, body: () -> T): T = try { body() } catch (error: IllegalStateException) {
         if (error is CancellationException) throw error
         val reason = error.message ?: "no reason given"

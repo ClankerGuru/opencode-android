@@ -2,6 +2,8 @@
 
 package ai.opencode.feature.session
 
+import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.strings.localized
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionPhase
@@ -18,9 +20,12 @@ import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.appFormattingLocale
 import ai.opencode.core.ui.inContainer
 import ai.opencode.feature.composer.PastedTextViewer
-import ai.opencode.feature.media.AgentFileViewer
+import ai.opencode.feature.media.TranscriptImagePreview
+import ai.opencode.feature.media.AgentFileChecks
+import ai.opencode.feature.media.AgentFileDestination
 import ai.opencode.feature.media.LinkMenuAction
 import ai.opencode.feature.media.LocalMediaPresenter
+import ai.opencode.feature.media.MermaidTheme
 import ai.opencode.feature.media.MediaPresenter
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.session.SessionFeature.Action
@@ -107,6 +112,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -117,6 +123,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -181,8 +189,9 @@ fun SessionTranscriptView(
     val latestProjection by rememberUpdatedState(projection)
     val showsMoveToBackground by store.observe { it.showsMoveToBackground }
 
-    val send: (TranscriptAction) -> Unit = remember(store, context, host, presenter, reducedMotion) {
-        { action -> SessionTranscriptView.handle(action, store, context, host, presenter, reducedMotion) }
+    val theme = if (OpenCodeTheme.colors.isDark) MermaidTheme.Dark else MermaidTheme.Light
+    val send: (TranscriptAction) -> Unit = remember(store, context, host, presenter, reducedMotion, theme) {
+        { action -> SessionTranscriptView.handle(action, store, context, host, presenter, reducedMotion, theme) }
     }
     val slots = remember(store) {
         TranscriptSlots(
@@ -245,18 +254,12 @@ fun SessionTranscriptView(
     val safeTop = WindowInsets.statusBarsIgnoringVisibility.inContainer().asPaddingValues().calculateTopPadding()
     val bottomObstruction = WindowInsets.ime.union(WindowInsets.bottomSafeArea).inContainer().asPaddingValues().calculateBottomPadding()
     // Separate from the projection, so geometry and jumps never rebuild the configuration.
-    CompositionLocalProvider(
-        LocalTranscriptRowSlots provides rowSlots,
-        ai.opencode.feature.transcript.user.LocalSendLanding provides scrollEdgeBridge.sendLanding,
-    ) {
+    CompositionLocalProvider(LocalTranscriptRowSlots provides rowSlots) {
         TranscriptList(
             configuration = projection.configuration,
             send = send,
             modifier = modifier.fillMaxSize().nestedScroll(dismissOnDrag),
-            contentPadding = PaddingValues(
-                top = safeTop + top.contentTop.dp,
-                bottom = bottomObstruction + scrollEdgeBridge.composerHeight.dp,
-            ),
+            contentPadding = AboveComposerPadding(safeTop + top.contentTop.dp, bottomObstruction, scrollEdgeBridge),
             jumpRequest = scrollEdgeBridge.jumpRequest,
             onShowsJumpButtonChanged = {
                 host?.showsJumpButton = it
@@ -540,7 +543,7 @@ object SessionTranscriptView {
                         putIfAbsent(
                             failed.id,
                             TranscriptSendFailure(
-                                reason = failed.reason,
+                                reason = failed.displayReason,
                                 moveTo = if (failed.isFolderGone) moveTo else null,
                                 // The whole session is moving: every row whose folder is gone waits.
                                 isMoving = failed.isFolderGone && state.movingFailedSendID != null,
@@ -568,8 +571,7 @@ object SessionTranscriptView {
      * Maps what a row or the list asks for to the `SessionFeature` action of the same name (iOS
      * rows send them directly). Share, files and image previews are the screen's: Share opens
      * the system share sheet with the link; files and images end text focus first, as iOS does
-     * before presenting their viewers (media's [MediaPresenter]: the image viewer, or
-     * [AgentFileViewer] for a file, iOS `presentImage` / `presentFile`).
+     * before presenting their viewers (media's [MediaPresenter]: one fullscreen viewer for an image or file, iOS `presentImage` / `presentFile`).
      */
     fun handle(
         action: TranscriptAction,
@@ -578,6 +580,7 @@ object SessionTranscriptView {
         host: SessionComposerHost?,
         presenter: MediaPresenter? = null,
         reducedMotion: Boolean = false,
+        theme: MermaidTheme = MermaidTheme.Light,
     ) {
         when (action) {
             is TranscriptAction.LinkMenu -> {
@@ -594,29 +597,33 @@ object SessionTranscriptView {
             is TranscriptAction.PreviewImage -> {
                 // The keyboard would stay up over the image.
                 host?.dismissComposerKeyboard()
-                presenter?.presentImage(action.preview)
+                val state = store.state
+                presenter?.presentPreview(
+                    SessionVisualMedia.preview(action.preview, state.items, state.server, state.session?.directory, theme) {
+                        dependency(AgentFileChecks).shown(state.server, state.session?.directory, it)
+                    },
+                    drawingHandler(store),
+                    flightAccessories = drawingAccessories(store, context),
+                )
             }
             is TranscriptAction.OpenFile -> {
                 host?.dismissComposerKeyboard()
-                val file = action.file
+                val addDrawing = drawingHandler(store)
                 val server = store.state.server
                 val directory = store.state.session?.directory
-                presenter?.present(sourceID = file.zoomSourceID, isMedia = file.kind.isMedia, reducesMotion = reducedMotion) { viewer ->
-                    AgentFileViewer(
-                        reference = file,
-                        server = server,
-                        directory = directory,
-                        onDone = { viewer.dismiss() },
-                        isInMediaViewer = true,
-                        onImageShown = { sourceID, image -> viewer.show(sourceID, image) },
-                        onZoomChange = { viewer.isZoomed = it },
-                        onImageFrame = { sourceID, frame -> viewer.mediaFrames[sourceID] = frame },
-                    )
+                val checks = dependency(AgentFileChecks)
+                val file = checks.shown(server, directory, action.file) ?: action.file
+                val target = AgentFileDestination(file, directory)
+                val items = store.state.items
+                val gallery = { destination: AgentFileDestination ->
+                    SessionVisualMedia.preview(destination, items, server, directory, theme) { checks.shown(server, directory, it) }
                 }
+                val preview = gallery(target) ?: TranscriptImagePreview(target, server)
+                presenter?.presentPreview(preview, addDrawing, gallery, drawingAccessories(store, context))
             }
             is TranscriptAction.OpenPastedText -> {
                 host?.dismissComposerKeyboard()
-                presenter?.present(sourceID = action.sourceID, isMedia = false, reducesMotion = reducedMotion, screenName = "Pasted Text Viewer") { viewer ->
+                presenter?.present(sourceID = action.sourceID, isMedia = false, reducesMotion = reducedMotion, screenName = localized(R.string.session_pasted_text_viewer_screen_title)) { viewer ->
                     PastedTextViewer(
                         text = action.text,
                         summary = action.summary,
@@ -927,6 +934,7 @@ private fun WorkingLine(
 ) {
     val copyLayer = rememberGraphicsLayer()
     val indicatorLayer = rememberGraphicsLayer()
+    val moveToBackgroundLabel = stringResource(R.string.session_move_to_background)
     Box {
         ReplyCopyGlyph.Glyph(
             Modifier
@@ -972,7 +980,7 @@ private fun WorkingLine(
                     }
                 }
                 .semantics(mergeDescendants = true) {
-                    if (offersMove) customActions = listOf(CustomAccessibilityAction("Move to Background") { onMove(); true })
+                    if (offersMove) customActions = listOf(CustomAccessibilityAction(moveToBackgroundLabel) { onMove(); true })
                 },
         )
     }
@@ -986,15 +994,18 @@ private fun MoveToBackgroundAction(activity: WorkingActivity, onMove: () -> Unit
     val workingStyle = TranscriptFonts.metaFont(FontWeight.Medium)
     val labelStyle = TranscriptFonts.metaFont()
     val iconSize = 16.dp
+    val moveToBackgroundLabel = stringResource(R.string.session_move_to_background)
+    val moveToBackgroundHint = stringResource(R.string.session_move_to_background_hint)
     BoxWithConstraints {
         val density = LocalDensity.current
         // Working's footprint (orb slot + its text) and the 12 dp before the action, without a
         // second animating orb; the title shows only where the whole label fits beside it
         // (iOS `ViewThatFits`).
-        val working = remember(activity.needsInput, workingStyle, density) {
-            measurer.measure(if (activity.needsInput) "Needs your input" else "Working", workingStyle).size.width
+        val workingText = stringResource(if (activity.needsInput) R.string.session_status_needs_input else R.string.session_status_working)
+        val working = remember(workingText, workingStyle, density) {
+            measurer.measure(workingText, workingStyle).size.width
         }
-        val title = remember(labelStyle, density) { measurer.measure("Move to Background", labelStyle, maxLines = 1).size.width }
+        val title = remember(labelStyle, moveToBackgroundLabel, density) { measurer.measure(moveToBackgroundLabel, labelStyle, maxLines = 1).size.width }
         val showsTitle = with(density) {
             val reserved = (26 * fontScale).dp + working.toDp() + 12.dp
             val label = iconSize + 6.dp + title.toDp()
@@ -1007,10 +1018,10 @@ private fun MoveToBackgroundAction(activity: WorkingActivity, onMove: () -> Unit
                 .clickable(
                     role = Role.Button,
                     // iOS `accessibilityHint`: TalkBack's click label.
-                    onClickLabel = "Keep the running work going in the background so the agent reads your next message",
+                    onClickLabel = moveToBackgroundHint,
                     onClick = onMove,
                 )
-                .semantics { contentDescription = "Move to Background" }
+                .semantics { contentDescription = moveToBackgroundLabel }
                 .testTag("move-to-background"),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End),
@@ -1018,7 +1029,7 @@ private fun MoveToBackgroundAction(activity: WorkingActivity, onMove: () -> Unit
             OpenCodeIcon(SFSymbol.TrayAndArrowDown, contentDescription = null, size = iconSize, tint = OpenCodeTheme.colors.secondaryText)
             if (showsTitle) {
                 Text(
-                    "Move to Background",
+                    moveToBackgroundLabel,
                     style = labelStyle,
                     color = OpenCodeTheme.colors.secondaryText,
                     maxLines = 1,
@@ -1026,4 +1037,16 @@ private fun MoveToBackgroundAction(activity: WorkingActivity, onMove: () -> Unit
             }
         }
     }
+}
+
+/** Reads the composer's height while the list measures, after the composer has measured in the same frame. */
+private class AboveComposerPadding(
+    private val top: Dp,
+    private val bottomObstruction: Dp,
+    private val bridge: SessionScrollEdgeBridge,
+) : PaddingValues {
+    override fun calculateTopPadding(): Dp = top
+    override fun calculateBottomPadding(): Dp = bottomObstruction + bridge.composerHeight.dp
+    override fun calculateLeftPadding(layoutDirection: LayoutDirection): Dp = 0.dp
+    override fun calculateRightPadding(layoutDirection: LayoutDirection): Dp = 0.dp
 }

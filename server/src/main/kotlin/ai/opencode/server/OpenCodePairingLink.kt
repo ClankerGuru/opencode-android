@@ -1,5 +1,6 @@
 package ai.opencode.server
 
+import ai.opencode.core.strings.localized
 import ai.opencode.server.internal.UrlParts
 import ai.opencode.server.internal.WireJson
 import ai.opencode.server.internal.parseQueryItems
@@ -11,9 +12,9 @@ import kotlinx.serialization.builtins.serializer
 import java.util.Base64
 
 /**
- * A one-time `opencode pair` code: JSON `{"code","urls"}`, the `https://opencode.ai/pair#…`
- * page, an `opencode(-ios)://pair?code=…&url=…` deep link, or one `…/auth/connect/<code>` link.
- * Port of iOS `OpenCodePairingLink`. Never log [code].
+ * A one-time `opencode pair` code: JSON `{"code","urls","name"?}`, the `https://opencode.ai/pair#…` page,
+ * an `opencode(-ios)://pair?code=…&url=…` deep link, or one `…/auth/connect/<code>` link. Never log
+ * [code].
  */
 data class OpenCodePairingLink(
     /** Scheme, host and port only; the first listed address. */
@@ -21,6 +22,8 @@ data class OpenCodePairingLink(
     val code: String,
     /** The other addresses a QR payload listed, redeemed concurrently with [origin]. */
     val alternateOrigins: List<String> = emptyList(),
+    /** The name the link suggests for the server it pairs, such as “Anomaly Box”. */
+    val name: String? = null,
 ) {
     /** Every address to redeem at, in listed order, deduplicated. */
     val candidateOrigins: List<String> get() = (listOf(origin) + alternateOrigins).distinct()
@@ -31,7 +34,7 @@ data class OpenCodePairingLink(
      */
     val deepLinkURL: String
         get() {
-            val items = listOf("code" to code) + candidateOrigins.map { "url" to it }
+            val items = listOf("code" to code) + candidateOrigins.map { "url" to it } + listOfNotNull(name?.let { "name" to it })
             return "opencode-ios://pair?" + items.joinToString("&") {
                 percentEncodeQueryComponent(it.first) + "=" + percentEncodeQueryComponent(it.second)
             }
@@ -54,14 +57,14 @@ data class OpenCodePairingLink(
         get() {
             val origins = redeemOrigins
             val first = origins.firstOrNull() ?: return this
-            return OpenCodePairingLink(first, code, origins.drop(1))
+            return OpenCodePairingLink(first, code, origins.drop(1), name)
         }
 
     /** The unauthenticated server descriptor for this link's reachable addresses. */
     val server: OpenCodeServer
         get() {
             val candidates = redeemOrigins
-            return OpenCodeServer(url = candidates[0], username = "opencode", password = "", alternateURLs = candidates.drop(1))
+            return OpenCodeServer(url = candidates[0], username = "opencode", password = "", alternateURLs = candidates.drop(1), name = name)
         }
 
     /** Every saved server entry this pairing link would replace. */
@@ -121,13 +124,12 @@ data class OpenCodePairingLink(
         private val userInfo = Regex("""://[^/]*@""")
 
         /**
-         * [decode], or else the pairing link in text as people copy it (QA FB-02): wrapped across
+         * [decode], or else the pairing link in text as people copy it: wrapped across
          * lines by a terminal (`opencode pair --remote`'s 88-character link plus its indent passes
          * 80 columns, and the TUI's `/pair` box is 29 wide), inside the command's whole output or a
          * sentence, or with brackets or punctuation around it. Every link in it with the first
-         * one's code becomes one link with all their addresses (the TUI lists one per address).
-         * For pasted, scanned and typed text; opened URLs are exact ([decode]). iOS decodes only
-         * the trimmed text.
+         * one's code becomes one link with all their addresses (the TUI lists one per address). For
+         * pasted, scanned and typed text; opened URLs are exact ([decode]).
          */
         fun decodeCopied(text: String): OpenCodePairingLink? {
             decode(text)?.let { return it }
@@ -211,7 +213,7 @@ data class OpenCodePairingLink(
 
         /** A code and its addresses as listed, before [validatedLink] checks them. */
         @Serializable
-        private data class Payload(val code: String, val urls: List<String>)
+        private data class Payload(val code: String, val urls: List<String>, val name: String? = null)
 
         private fun decodePayload(text: String): Payload? {
             val payload = try { WireJson.decodeFromString(Payload.serializer(), text) } catch (_: Exception) { return null }
@@ -231,6 +233,7 @@ data class OpenCodePairingLink(
             }
             var queryCode: String? = null
             val rawURLs = mutableListOf<String>()
+            var linkName: String? = null
             for ((name, value) in queryItems) {
                 when (name.lowercase()) {
                     "code" -> {
@@ -253,6 +256,10 @@ data class OpenCodePairingLink(
                             rawURLs += trimmed
                         }
                     }
+                    "name" -> {
+                        if (linkName != null) return null
+                        linkName = value.orEmpty()
+                    }
                     // Reject credential-bearing (`username`, `password`, `token`) or unknown parameters.
                     else -> return null
                 }
@@ -260,16 +267,17 @@ data class OpenCodePairingLink(
             if (pathCode != null && queryCode != null && pathCode != queryCode) return null
             val code = queryCode ?: pathCode ?: return null
             if (!isCode(code)) return null
-            return Payload(code, rawURLs)
+            return Payload(code, rawURLs, linkName)
         }
 
-        /** One malformed address rejects the whole code. */
+        /** One malformed address rejects the whole code. A blank name counts as none. */
         private fun validatedLink(listed: Payload): OpenCodePairingLink? {
             val code = listed.code
             val addresses = listed.urls.map(::normalizedOrigin)
             if (addresses.isEmpty() || addresses.any { it == null }) return null
             val origins = addresses.filterNotNull().distinct()
-            return OpenCodePairingLink(origins[0], code, origins.drop(1))
+            val name = listed.name?.trimmedWhitespace()?.ifEmpty { null }
+            return OpenCodePairingLink(origins[0], code, origins.drop(1), name)
         }
 
         private fun decodeLink(text: String): OpenCodePairingLink? {
@@ -296,14 +304,14 @@ data class OpenCodePairingLink(
 
         /** Why [address] can't be a server's base URL, finishing “it …”; null when it can. */
         private fun originProblem(address: String): String? {
-            val parts = UrlParts.parse(address) ?: return "isn’t a web address"
+            val parts = UrlParts.parse(address) ?: return localized(R.string.server_pairing_origin_not_web_address)
             val scheme = parts.scheme?.lowercase()
-            if (scheme != "http" && scheme != "https") return "doesn’t start with http:// or https://"
-            if (parts.host.isNullOrEmpty() || parts.rawAuthority == null) return "has no host name"
-            if (parts.user != null || parts.password != null) return "includes a user name or password"
-            if (parts.rawQuery != null || parts.rawFragment != null) return "has a query or fragment"
-            parts.port?.let { if (it !in 1..65535) return "has a port outside 1–65535" }
-            if (parts.path.isNotEmpty() && parts.path != "/") return "has a path, and the server must be at the root of its address"
+            if (scheme != "http" && scheme != "https") return localized(R.string.server_pairing_origin_bad_scheme)
+            if (parts.host.isNullOrEmpty() || parts.rawAuthority == null) return localized(R.string.server_pairing_origin_no_host)
+            if (parts.user != null || parts.password != null) return localized(R.string.server_pairing_origin_credentials)
+            if (parts.rawQuery != null || parts.rawFragment != null) return localized(R.string.server_pairing_origin_query)
+            parts.port?.let { if (it !in 1..65535) return localized(R.string.server_pairing_origin_port) }
+            if (parts.path.isNotEmpty() && parts.path != "/") return localized(R.string.server_pairing_origin_path)
             return null
         }
 

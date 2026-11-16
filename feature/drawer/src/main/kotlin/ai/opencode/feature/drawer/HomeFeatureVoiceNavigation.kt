@@ -3,8 +3,8 @@ package ai.opencode.feature.drawer
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.session.reconcileInvariants
 
-// Port of iOS `HomeFeature+VoiceNavigation.swift`: pending-subagent navigation, call retargeting
-// and the covers a voice open (`android_voice_open_session`) clears on every mounted session.
+// Pending-subagent navigation, call retargeting and the covers a voice open
+// (`android_voice_open_session`) clears on every mounted session.
 
 fun HomeFeature.State.pushingPendingSubagent(reason: String? = null): HomeFeature.State {
     val child = pendingSubagentPush ?: return this
@@ -12,7 +12,7 @@ fun HomeFeature.State.pushingPendingSubagent(reason: String? = null): HomeFeatur
     return copy(pendingSubagentPush = null).pushingSubagent(child, reason = reason)
 }
 
-/** The call follows the screen on top, as it follows a drawer switch (iOS `retargetCallToTop(reason:)`). */
+/** The call follows the screen on top, as it follows a drawer switch. */
 fun HomeFeature.State.retargetingCallToTop(reason: String): HomeFeature.State {
     val voice = sessionDetail?.voice ?: return this
     if (voice.phase.isTerminal) return this
@@ -25,7 +25,7 @@ fun HomeFeature.State.retargetingCallToTop(reason: String): HomeFeature.State {
     }
 }
 
-/** A sheet presented by any mounted ancestor can cover the destination (iOS `clearSessionCovers`). */
+/** A sheet presented by any mounted ancestor can cover the destination. */
 internal fun HomeFeature.State.clearingSessionCovers(): HomeFeature.State =
     updatingDetail { it.clearingVoiceNavigationCovers() }
         .updatingSubagents { it.clearingVoiceNavigationCovers() }

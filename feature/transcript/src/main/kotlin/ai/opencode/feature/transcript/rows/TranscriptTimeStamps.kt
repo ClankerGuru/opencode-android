@@ -1,6 +1,8 @@
 package ai.opencode.feature.transcript.rows
 
+import ai.opencode.core.strings.localized
 import ai.opencode.core.ui.appFormattingLocale
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.TranscriptEntry
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import android.icu.text.DateFormat
@@ -17,10 +19,9 @@ import java.util.Locale
 import kotlin.math.roundToLong
 
 /**
- * Centred times over the messages that open a new day or resume after a pause (iOS
- * `TranscriptTimeStamps`, D-45): the day over the first message of each day (“Wednesday
- * 8:24 AM”) and the time alone (“2:10 PM”) over one sent an hour or more after the session last
- * moved.
+ * Centred times over the messages that open a new day or resume after a pause: the day over the
+ * first message of each day (“Wednesday 8:24 AM”) and the time alone (“2:10 PM”) over one sent an
+ * hour or more after the session last moved.
  *
  * Times come from OpenCode's ascending IDs. A message this phone sent has a client-made ID that
  * carries no time, so it takes its reply's (seconds later); one still waiting for its reply was
@@ -260,15 +261,15 @@ object TranscriptTimeStamps {
         }
 
     private fun uncachedText(time: Instant, showsDay: Boolean, now: Instant, zone: ZoneId, locale: Locale, hour24: Boolean?): String {
-        // iOS `.shortened` time: the locale's hour cycle unless the device overrides it.
+        // The locale's hour cycle unless the device overrides it.
         val skeleton = when (hour24) {
             true -> "Hm"
             false -> "hm"
             null -> "jm"
         }
         val clockFormat = format(skeleton, zone, locale, DisplayContext.CAPITALIZATION_FOR_STANDALONE)
-        // iOS `.shortened` writes the hour at its default digits (“8:24”, never “08:24”), where
-        // ICU's best pattern for some locales pads it (de: “HH:mm”).
+        // Writes the hour at its default digits (“8:24”, never “08:24”), where ICU's best pattern
+        // for some locales pads it (de: “HH:mm”).
         (clockFormat as? SimpleDateFormat)?.let { it.applyPattern(it.toPattern().replace("HH", "H").replace("hh", "h")) }
         val clock = clockFormat.format(Date.from(time))
         if (!showsDay) return clock
@@ -305,10 +306,14 @@ object TranscriptTimeStamps {
     }
 
     /** What TalkBack reads: “Wednesday, 8:24 AM”. */
-    fun accessibilityLabel(text: String): String = text.split("\t", limit = 2).joinToString(", ")
+    fun accessibilityLabel(text: String): String {
+        val parts = text.split("\t", limit = 2)
+        if (parts.size < 2) return text
+        return localized(R.string.transcript_spoken_pair, parts[0], parts[1])
+    }
 }
 
-/** Bounded minute-and-day string cache shared by transcript and drawer timestamps (iOS `MinuteTimestampCache`). */
+/** Bounded minute-and-day string cache shared by transcript and drawer timestamps. */
 class MinuteTimestampCache {
     private val storage = HashMap<String, String>()
 

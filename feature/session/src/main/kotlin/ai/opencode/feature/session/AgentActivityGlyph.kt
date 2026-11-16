@@ -24,6 +24,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -35,24 +36,22 @@ import androidx.lifecycle.compose.currentStateAsState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 
-// Port of the view half of iOS `Session/AgentActivity/AgentActivityGlyph.swift`. The models and
-// the orb renderer live in `agentactivity/`.
+// The models and the orb renderer live in `agentactivity/`.
 
 /**
- * Scopes cached glyph models (iOS `EnvironmentValues.agentActivityScope`): with a scope, a glyph
- * whose source has an animation key keeps its motion across remounts under `scope|key`.
+ * Scopes cached glyph models: with a scope, a glyph whose source has an animation key keeps its
+ * motion across remounts under `scope|key`.
  */
 val LocalAgentActivityScope = compositionLocalOf<String?> { null }
 
-/** Kit's glyph frame rate (Oct 17): 60 Hz looks better than 30; Apple would allow lower. */
+/** 60 Hz looks better than 30; Apple would allow lower. */
 internal const val GLYPH_FRAME_INTERVAL = 1.0 / 60.0
 
 /**
- * The agent activity glyph: a small round LED orb whose dots draw one of Kit's designs per state
- * (`ActivityGyro`), morphing with momentum from one to the next. The dots and glow are the dot
- * orb's (`prototypes/ios-kit/dot-orb/layer.js`): a 7 × 7 grid masked to a disc. It redraws only
- * while something moves or cools; Done and Failed flash, settle and stop, and Reduce Motion shows
- * each state's still pose.
+ * The agent activity glyph. The dots and glow are the dot orb's
+ * (`prototypes/ios-kit/dot-orb/layer.js`): a 7 × 7 grid masked to a disc. It redraws only while
+ * something moves or cools; Done and Failed flash, settle and stop, and Reduce Motion shows each
+ * state's still pose.
  *
  * @param source where its state comes from ([AgentActivitySource.Running] for work with no finer signal).
  * @param size the layout box. The orb is 2 dp narrower (4 dp from 24 dp up), and its glow spills past it.
@@ -71,8 +70,8 @@ fun AgentActivityGlyph(
     val model = if (scope != null && key != null) remember(scope, key) { AgentActivityGlyphModels.model("$scope|$key") } else localModel
     val still = rememberReduceMotion() || rememberTouchExplorationEnabled()
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
-    // Hosted transcript rows also hold while the list's timelines are paused (covered, off
-    // screen, not drawn), as iOS's `transcriptTimelineGate`.
+    // Hosted transcript rows also hold while the list's timelines are paused (covered, off screen,
+    // not drawn).
     val active = lifecycle.isAtLeast(Lifecycle.State.RESUMED) && !LocalTranscriptTimelinePaused.current
     val dark = OpenCodeTheme.colors.isDark
     val lab = AgentActivityLab.override
@@ -127,11 +126,12 @@ fun AgentActivityGlyph(
 
     val label = shown.label
     val isFinal = shown.isFinal
+    val runningDescription = stringResource(R.string.session_activity_running_description)
     Canvas(
         modifier
             .size(size)
             .semantics {
-                contentDescription = if (isFinal) label else "Running"
+                contentDescription = if (isFinal) label else runningDescription
                 stateDescription = if (isFinal) "" else label
             },
     ) {

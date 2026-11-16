@@ -9,6 +9,7 @@ import ai.opencode.core.haptics.HapticEffect
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.strings.localized
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
@@ -62,6 +63,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.customActions
@@ -86,10 +88,9 @@ import kotlin.math.roundToInt
 /**
  * What holding a web link in a reply offers (Markdown links, bare URLs, and link cards): Open in
  * Browser, Open in App, Copy Link, and Share…; a tap still opens it as before. With the In-App
- * Browser on, a public page also offers Open in App Browser first, since a tap tries the app
- * that claims the link before the browser. TalkBack gets the same as custom actions.
- * Port of iOS `LinkMenuAction`. iOS's “Open in Safari” reads “Open in Browser” here (it opens the
- * default browser); the case keeps iOS's name and raw value so the two codebases diff side by side.
+ * Browser on, a public page also offers Open in App Browser first, since a tap tries the app that
+ * claims the link before the browser. TalkBack gets the same as custom actions. Reads “Open in
+ * Browser”: it opens the default browser.
  */
 enum class LinkMenuAction(val rawValue: String) {
     OpenInAppBrowser("openInAppBrowser"),
@@ -103,13 +104,13 @@ enum class LinkMenuAction(val rawValue: String) {
 
     val title: String
         get() = when (this) {
-            OpenInAppBrowser -> "Open in App Browser"
-            OpenInSafari -> "Open in Browser"
-            OpenInApp -> "Open in App"
-            Copy -> "Copy Link"
-            Share -> "Share…"
-            OpenSession -> "Open Session"
-            CopySessionID -> "Copy ID"
+            OpenInAppBrowser -> localized(R.string.media_link_open_in_app_browser)
+            OpenInSafari -> localized(R.string.media_link_open_in_browser)
+            OpenInApp -> localized(R.string.media_link_open_in_app)
+            Copy -> localized(R.string.media_link_copy)
+            Share -> localized(R.string.media_link_share)
+            OpenSession -> localized(R.string.media_link_open_session)
+            CopySessionID -> localized(R.string.media_link_copy_session_id)
         }
 
     val systemImage: String
@@ -157,7 +158,7 @@ enum class LinkMenuAction(val rawValue: String) {
 
 /**
  * A link tap asking the system whether an app claims it: one tap, from one session. Its answer
- * opens the fallback only while it is still the latest. Port of iOS `LinkProbe`.
+ * opens the fallback only while it is still the latest.
  */
 data class LinkProbe(
     val id: java.util.UUID,
@@ -167,8 +168,7 @@ data class LinkProbe(
 
 /**
  * Hands a web link to the installed app that claims it (GitHub, X, YouTube…), for Open Links in
- * Apps. Opens nothing when no app claims it, so the caller falls back to the browser. Port of
- * iOS `UniversalLinkClient` (`.universalLinksOnly`): Android's `FLAG_ACTIVITY_REQUIRE_NON_BROWSER`.
+ * Apps. Opens nothing when no app claims it, so the caller falls back to the browser.
  */
 class UniversalLinkClient(
     /** Whether an app took the link. */
@@ -200,7 +200,7 @@ class UniversalLinkClient(
             throw AssertionError("Unimplemented: UniversalLinkClient.open")
         }
 
-        /** iOS `OPENCODE_LAB_UNIVERSAL_LINKS`, debuggable builds only. */
+        /** Debuggable builds only. */
         private fun labUniversalLinks(): String? {
             val context = runCatching { dependency(AppContext) }.getOrNull() ?: return null
             if (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE == 0) return null
@@ -214,10 +214,10 @@ class UniversalLinkClient(
 }
 
 /**
- * Opens a URL in the system (iOS `\.openURL` / `ActiveScene.open`): [open] hands it to whatever
- * claims it (an app or the browser); [openInBrowser] is “Open in Browser”: the default browser
- * as a Custom Tab. Both return whether something took it. Lives here because no lower module has
- * a URL opener yet; the session reducer reads it too.
+ * Opens a URL in the system: [open] hands it to whatever claims it (an app or the browser);
+ * [openInBrowser] is “Open in Browser”: the default browser as a Custom Tab. Both return whether
+ * something took it. Lives here because no lower module has a URL opener yet; the session reducer
+ * reads it too.
  */
 class OpenURLClient(
     val open: suspend (String) -> Boolean,
@@ -257,8 +257,8 @@ class OpenURLClient(
 }
 
 /**
- * Presents the share sheet for a link (iOS `LinkShareSheet`): `ACTION_SEND` through the system
- * chooser. Pairing links share only their shareable form, as on iOS.
+ * Presents the share sheet for a link: `ACTION_SEND` through the system chooser. Pairing links
+ * share only their shareable form.
  */
 class LinkShareSheet(val present: (String) -> Unit) {
     companion object Key : DependencyKey<LinkShareSheet> {
@@ -279,8 +279,8 @@ class LinkShareSheet(val present: (String) -> Unit) {
 }
 
 /**
- * How a row's links run their menu: set by the transcript row ([LocalLinkMenu]), read by the
- * text overlay and the link cards. Port of iOS `LinkMenuHandler`.
+ * How a row's links run their menu: set by the transcript row ([LocalLinkMenu]), read by the text
+ * overlay and the link cards.
  */
 class LinkMenuHandler(val perform: (LinkMenuAction, String) -> Unit) {
     /** Read as the menu opens, so it follows the Experimental switches. */
@@ -291,7 +291,6 @@ class LinkMenuHandler(val perform: (LinkMenuAction, String) -> Unit) {
         (if (SessionLink.id(url) != null) listOf(LinkMenuAction.OpenSession) else emptyList()) + actions(url)
 }
 
-/** iOS `EnvironmentValues.linkMenu`. */
 val LocalLinkMenu = staticCompositionLocalOf<LinkMenuHandler?> { null }
 
 /** The most custom actions one node may carry: past it Android throws as the tree is read (VoiceOver has no cap). */
@@ -301,7 +300,6 @@ const val MAX_CUSTOM_ACCESSIBILITY_ACTIONS = 32
 fun List<CustomAccessibilityAction>.withinNodeLimit(): List<CustomAccessibilityAction> =
     if (size <= MAX_CUSTOM_ACCESSIBILITY_ACTIONS) this else take(MAX_CUSTOM_ACCESSIBILITY_ACTIONS)
 
-/** Port of iOS `LinkMenuText`. */
 object LinkMenuText {
     /** The text's web links, once each, in order. */
     fun webLinks(text: AnnotatedString): List<String> {
@@ -329,25 +327,25 @@ object LinkMenuText {
         if (id != null) {
             val name = SessionLink.title(url) ?: SessionLink.shortID(id)
             return when (action) {
-                LinkMenuAction.CopySessionID -> if (among.size > 1) "Copy ID of $name" else "Copy ID"
-                else -> "Open session $name"
+                LinkMenuAction.CopySessionID -> if (among.size > 1) localized(R.string.media_link_copy_session_id_of_description, name) else localized(R.string.media_link_copy_session_id)
+                else -> localized(R.string.media_link_open_session_named_description, name)
             }
         }
         if (among.size <= 1) return action.title.replace("…", "")
         val host = accessibilityTarget(url, among, linkText)
         return when (action) {
-            LinkMenuAction.OpenInAppBrowser -> "Open $host in App Browser"
-            LinkMenuAction.OpenInSafari -> "Open $host in Browser"
-            LinkMenuAction.OpenInApp -> "Open $host in App"
-            LinkMenuAction.Copy -> "Copy Link to $host"
-            LinkMenuAction.Share -> "Share Link to $host"
+            LinkMenuAction.OpenInAppBrowser -> localized(R.string.media_link_open_host_in_app_browser_description, host)
+            LinkMenuAction.OpenInSafari -> localized(R.string.media_link_open_host_in_browser_description, host)
+            LinkMenuAction.OpenInApp -> localized(R.string.media_link_open_host_in_app_description, host)
+            LinkMenuAction.Copy -> localized(R.string.media_link_copy_host_description, host)
+            LinkMenuAction.Share -> localized(R.string.media_link_share_host_description, host)
             LinkMenuAction.OpenSession, LinkMenuAction.CopySessionID -> action.title
         }
     }
 
     /**
-     * What names a web link among the text's links: its host (as iOS), or, when another link has
-     * the same host, also what tells it apart: its own text if that isn't its address (“docs on
+     * What names a web link among the text's links: its host, or, when another link has the same
+     * host, also what tells it apart: its own text if that isn't its address (“docs on
      * example.com”), else its path (“example.net/n-3”), else its place (“example.net link 3”).
      * Android-only: TalkBack shows one of several actions with the same label, VoiceOver all.
      */
@@ -362,9 +360,9 @@ object LinkMenuText {
             val bare = text.lowercase().removePrefix("https://").removePrefix("http://").removePrefix("www.")
             return text.takeUnless { bare.startsWith(host.lowercase().removePrefix("www.")) }
         }
-        ownText(url)?.let { text -> if (sameHost.count { ownText(it) == text } == 1) return "$text on $host" }
+        ownText(url)?.let { text -> if (sameHost.count { ownText(it) == text } == 1) return localized(R.string.media_link_text_on_host_description, text, host) }
         path(url)?.let { path -> if (sameHost.count { path(it) == path } == 1) return "$host$path" }
-        return "$host link ${among.indexOf(url) + 1}"
+        return localized(R.string.media_link_host_numbered_description, host, among.indexOf(url) + 1)
     }
 
     /** [url]'s path and query, without a trailing slash; null when it has none. */
@@ -378,16 +376,17 @@ object LinkMenuText {
     private val invisibleLinkChars = setOf('\u2060', '\uFFFC', '\uFFFD', '\u200B')
 
     /** TalkBack's name for the action that lists the links whose actions don't fit on the text. */
-    const val moreLinks = "More Links"
+    val moreLinks: String
+        get() = localized(R.string.media_link_more_links_description)
 
     /** What the text's links give TalkBack: [actions] on the text, and the links behind [moreLinks]. */
     data class AccessibilityActions(val actions: List<Pair<LinkMenuAction, String>>, val more: List<String>)
 
     /**
-     * Every link's actions, in order, as iOS puts them on the text. Android allows one node only
+     * Every link's actions, in order. Android allows one node only
      * [MAX_CUSTOM_ACCESSIBILITY_ACTIONS], less the [reserved] slots the caller's own actions
-     * (Quote) take, so when they don't all fit, the first links keep all of theirs and the rest
-     * are listed behind one [moreLinks] action, whose chooser opens a link's own menu.
+     * (Quote) take, so when they don't all fit, the first links keep all of theirs and the rest are
+     * listed behind one [moreLinks] action, whose chooser opens a link's own menu.
      */
     fun accessibilityActions(
         links: List<String>,
@@ -413,10 +412,9 @@ object LinkMenuText {
     }
 
     /**
-     * The text's TalkBack actions on its one node: the links' ([accessibilityActions]), More
-     * Links when they don't all fit, then the caller's [trailing] ones (the block's Quote, which
-     * iOS adds on the block around the text: `MarkdownBlockView.swift:50` around
-     * `ArrivingText.swift:119`'s `linkMenu`), never more than [MAX_CUSTOM_ACCESSIBILITY_ACTIONS].
+     * The text's TalkBack actions on its one node: the links' ([accessibilityActions]), More Links
+     * when they don't all fit, then the caller's [trailing] ones, never more than
+     * [MAX_CUSTOM_ACCESSIBILITY_ACTIONS].
      */
     fun accessibilityCustomActions(
         links: List<String>,
@@ -475,15 +473,14 @@ object LinkMenuText {
 }
 
 /**
- * Finds which link, if any, is under a point of laid-out text (iOS `LinkHitLayout`, which lays
- * the text out again with TextKit; Compose hands over the [TextLayoutResult] the text drew with,
- * inline icon slots included). [links] and [fileLinks] are character ranges in the laid-out text.
+ * Finds which link, if any, is under a point of laid-out text. [links] and [fileLinks] are
+ * character ranges in the laid-out text.
  */
 class LinkHitLayout(
     private val layout: TextLayoutResult,
     private val links: List<Pair<IntRange, String>>,
     private val fileLinks: List<Pair<IntRange, AgentFileReference>> = emptyList(),
-    /** Touch slop around each line rect, in pixels (iOS 6 × 5 points). */
+    /** Touch slop around each line rect, in pixels. */
     private val slopX: Float,
     private val slopY: Float,
 ) {
@@ -495,7 +492,7 @@ class LinkHitLayout(
     /** The inline `opencode-file://` link under [point], with the rects it covers. */
     fun fileLink(point: Offset): Hit<AgentFileReference>? = hit(fileLinks, point)
 
-    /** The em session chips are sized by: the text's base font size (iOS `sessionChipEm`, 17 before any font). */
+    /** The em session chips are sized by: the text's base font size. */
     val sessionChipEm: Float
         get() {
             val size = layout.layoutInput.style.fontSize
@@ -504,7 +501,7 @@ class LinkHitLayout(
 
     /**
      * The session chip under [point]: its box on each line it covers, as the transcript's chip
-     * renderer draws it (iOS `SessionChipRenderer`), for the pressed highlight.
+     * renderer draws it, for the pressed highlight.
      */
     fun sessionChipRects(point: Offset): List<Rect>? {
         val rects = hit(links, point) { SessionLink.id(it) != null }?.rects ?: return null
@@ -532,11 +529,11 @@ class LinkHitLayout(
     fun rects(range: IntRange): List<Rect> = rects(range, leadingBelow = false)
 
     /**
-     * With [leadingBelow], each line's rect starts at its glyphs' top and carries the leading
-     * down to the next line's glyphs, as TextKit's line fragments do (iOS hit-tests those). Compose
-     * spreads the leading mostly above each line, so the slop around a wrapped link's second line
-     * reached into the words of the line above (QA F-55). The text's first line is trimmed to its
-     * glyphs, so its baseline gives the ascent.
+     * With [leadingBelow], each line's rect starts at its glyphs' top and carries the leading down
+     * to the next line's glyphs, as TextKit's line fragments do. Compose spreads the leading mostly
+     * above each line, so the slop around a wrapped link's second line reached into the words of
+     * the line above. The text's first line is trimmed to its glyphs, so its baseline
+     * gives the ascent.
      */
     private fun rects(range: IntRange, leadingBelow: Boolean): List<Rect> {
         val textLength = layout.layoutInput.text.length
@@ -577,9 +574,8 @@ class LinkHitLayout(
  * opens it as before ([onOpen], the row's link opener). Touches anywhere else go to the text
  * underneath (selection included). TalkBack gets the menu's actions on the text; when they pass
  * Android's 32-per-node cap, the rest of the links sit behind More Links, a chooser that opens a
- * link's menu ([LinkMenuText.accessibilityActions]; Compose's own link nodes take no custom actions). Port of iOS
- * `View.linkMenu(for:…)` (`LinkMenuModifier` + `LinkMenuOverlay` + `LinkMenuView`); wrap the
- * text's `Text` in it and pass its latest [TextLayoutResult].
+ * link's menu ([LinkMenuText.accessibilityActions]; Compose's own link nodes take no custom
+ * actions). Wrap the text's `Text` in it and pass its latest [TextLayoutResult].
  */
 @Composable
 fun LinkMenu(
@@ -630,9 +626,9 @@ fun LinkMenu(
 
     Box(
         modifier
-            // Remembered, so a streaming paragraph's chunks leave the node's semantics alone (AH-01).
+            // Remembered, so a streaming paragraph's chunks leave the node's semantics alone.
             .semantics(properties = accessibilitySemantics)
-            // A session chip darkens while a finger is on it: over the text, as iOS's press layer.
+            // A session chip darkens while a finger is on it: over the text.
             .drawWithContent {
                 drawContent()
                 val alpha = pressAlpha.value
@@ -674,8 +670,8 @@ fun LinkMenu(
                         false -> Unit
                         null -> {
                             menu = hit
-                            // Held: the rest of the touch belongs to the menu, until the finger moves
-                            // and drags the link out instead (iOS's context menu and drag interaction).
+                            // Held: the rest of the touch belongs to the menu, until the finger
+                            // moves and drags the link out instead.
                             val drag = linkDrag(hit, layout)
                             var dragged = false
                             while (true) {
@@ -741,12 +737,11 @@ fun LinkMenu(
 
 /**
  * The chip's box around a run of text, shared by the transcript's chip renderer and the pressed
- * highlight ([LinkHitLayout.sessionChipRects]) so both agree. Port of iOS `SessionChipMetrics`
- * with `SessionLinkTunables`' defaults; it lives here, below the transcript, so the transcript's
- * renderer can adopt it.
+ * highlight ([LinkHitLayout.sessionChipRects]) so both agree. Lives here, below the transcript, so
+ * the transcript's renderer can adopt it.
  */
 object SessionChipMetrics {
-    /** SF's ascent plus descent, in ems (iOS derives a run's em from its typographic bounds; Android's em is the font size). */
+    /** SF's ascent plus descent, in ems. */
     const val lineEms = 1.178f
     /** The chip's height and how far its centre sits above the baseline, in ems. */
     const val height = 1.16f
@@ -765,14 +760,14 @@ object SessionChipMetrics {
         return Rect(minX, centre - h / 2, maxX, centre + h / 2)
     }
 
-    /** Rounded corners, the radius scaled with the text (iOS continuous corners). */
+    /** Rounded corners, the radius scaled with the text. */
     fun shape(box: Rect, em: Float): Path {
         val r = minOf(cornerRadius(em), box.height / 2)
         return Path().apply { addRoundRect(RoundRect(box, CornerRadius(r, r))) }
     }
 }
 
-/** A held web link's drag: its URL out to other apps, lifting the link's own lines (iOS `LinkMenuView`'s drag interaction). */
+/** A held web link's drag: its URL out to other apps, lifting the link's own lines. */
 private class LinkDrag(
     private val url: String,
     private val layout: TextLayoutResult,
@@ -785,13 +780,13 @@ private class LinkDrag(
     }
 }
 
-/** Session links don't drag (iOS returns no items for them). */
+/** Session links don't drag. */
 private fun linkDrag(hit: LinkHitLayout.Hit<String>, layout: TextLayoutResult): LinkDrag? =
     if (SessionLink.id(hit.value) != null || hit.rects.isEmpty()) null else LinkDrag(hit.value, layout, hit.rects)
 
 /**
- * The lifted link (iOS `UIPreviewParameters(textLineRects:)`): each line it covers, a little
- * outset (4 × 2 points), on the surface, with the link's text drawn in it.
+ * The lifted link: each line it covers, a little outset (4 × 2 points), on the surface, with the
+ * link's text drawn in it.
  */
 private class LinkDragShadow(
     private val layout: TextLayoutResult,
@@ -823,8 +818,8 @@ private class LinkDragShadow(
 }
 
 /**
- * The hold menu: the link's preview card (a tap opens the link, as iOS's preview commit does)
- * over its actions. Anchor it in a box covering the held link or card.
+ * The hold menu: the link's preview card over its actions. Anchor it in a box covering the held
+ * link or card.
  */
 @Composable
 fun LinkMenuPopup(
@@ -850,8 +845,8 @@ fun LinkMenuPopup(
 }
 
 /**
- * The menu's preview: the site and the address, like a browser's link preview without loading
- * the page. Port of iOS `LinkPreviewCardContent` (`LinkPreviewCardController` sizes it 320 wide).
+ * The menu's preview: the site and the address, like a browser's link preview without loading the
+ * page.
  */
 @Composable
 fun LinkPreviewCardContent(url: String, modifier: Modifier = Modifier) {
@@ -874,7 +869,7 @@ fun LinkPreviewCardContent(url: String, modifier: Modifier = Modifier) {
         }
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
             if (sessionID != null) {
-                Text(SessionLink.title(url) ?: "Session", style = OpenCodeTextStyles.headline, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(SessionLink.title(url) ?: stringResource(R.string.media_link_session_fallback_title), style = OpenCodeTextStyles.headline, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(
                     sessionID,
                     style = OpenCodeTextStyles.footnote.copy(fontFamily = OpenCodeFonts.monospace),

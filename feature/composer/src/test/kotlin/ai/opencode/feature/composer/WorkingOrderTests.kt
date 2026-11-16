@@ -4,11 +4,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The `:feature:composer` test of iOS `OpenCodeTests/WorkingOrderTests.swift` ([PromptOutbox]
- * alone); the `SessionFeature` tests are `:feature:session`'s, the `HomeFeature` ones
- * `:feature:drawer`'s.
- */
 class WorkingOrderTests {
     @Test fun deliveryMarksARecordedSendAsSent() {
         val outbox = PromptOutbox()

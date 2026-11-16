@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.strings.localized
 import ai.opencode.feature.composer.UndeliveredPrompts
 import ai.opencode.feature.composer.PromptOutbox
 import ai.opencode.feature.composer.DeliveryOutcome
@@ -31,9 +32,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlin.time.TimeSource
 
-// Port of iOS `SessionFeature+Delivery.swift`.
-
-/** iOS `SessionFeature.FailedSend`: a message whose send failed. Retry reuses its ID, which the server admits at most once. */
+/** A message whose send failed. Retry reuses its ID, which the server admits at most once. */
 data class FailedSend(
     val pending: PendingPrompt,
     val reason: String,
@@ -46,26 +45,28 @@ data class FailedSend(
      */
     val isFolderGone: Boolean get() = reason == OpenCodeClientError.FOLDER_GONE_MESSAGE || reason == moveFailedReason
 
+    /** [reason] as the transcript shows it: the saved English [moveFailedReason] reads in the app's language. */
+    val displayReason: String get() = if (reason == moveFailedReason) localized(R.string.session_move_failed_reason) else reason
+
     companion object {
+        /** Saved with the send and compared in [isFolderGone], so it stays English; [displayReason] shows it. */
         const val moveFailedReason = "Couldn’t move session"
     }
 }
 
-/** iOS `SessionFeature.DeliveryNote`: why a send hasn't reached the server yet, when the reader needs to know. */
+/** Why a send hasn't reached the server yet, when the reader needs to know. */
 enum class DeliveryNote {
     /** An earlier send failed, and this one waits behind it. */
     waiting;
 
     val label: String
         get() = when (this) {
-            waiting -> "Waiting to send"
+            waiting -> localized(R.string.session_delivery_waiting_to_send)
         }
 }
 
-/** iOS `IdentifiedArrayOf<FailedSend>.ids`. */
 val List<FailedSend>.ids: List<String> get() = map { it.id }
 
-/** iOS `failedSends[id: id]`. */
 fun List<FailedSend>.withID(id: String): FailedSend? = firstOrNull { it.id == id }
 
 /**
@@ -89,7 +90,7 @@ internal fun SessionFeature.Companion.deliveryJob(
     pageReader: PageReaderClient,
 ): PromptOutbox.Job {
     suspend fun deliver(handle: PromptOutbox.Handle): DeliveryOutcome {
-        // The send's backoff (iOS `sendRetryPolicy`, `RetryPolicy.send`).
+        // The send's backoff.
         val schedule = RetrySchedule(RetryPolicy.send, clock, networkPath.retryEnvironment)
         val log = AppLog.send
         val sendID = handle.current().messageID
@@ -260,7 +261,7 @@ internal fun SessionFeature.Companion.deliveryJob(
                                 handle.networkOperation.retried()
                             }
                         }
-                        val session = created ?: return failed(null, null, OpenCodeClientError("Couldn’t create the session."))
+                        val session = created ?: return failed(null, null, OpenCodeClientError(localized(R.string.session_create_failed)))
                         sessionID = session.id
                     }
                 }
@@ -323,7 +324,7 @@ internal fun SessionFeature.Companion.deliveryJob(
                     } catch (thrown: OpenCodeClientError) {
                         attempts += 1
                         log.notice { "$sendID couldn’t apply its agent to $sessionID: ${thrown.logSummary}" }
-                        val error = if (thrown.isLocationMissing) thrown else thrown.copy(message = "Couldn’t switch agent: ${thrown.message}")
+                        val error = if (thrown.isLocationMissing) thrown else thrown.copy(message = localized(R.string.session_switch_agent_failed, thrown.message))
                         if (!waitToRetry(error)) return failed(sessionID, created, error)
                         handle.networkOperation.retried()
                         continue
@@ -341,7 +342,7 @@ internal fun SessionFeature.Companion.deliveryJob(
                         // A failed switch is a failed attempt of the send.
                         attempts += 1
                         log.notice { "$sendID couldn’t apply its model to $sessionID: ${thrown.logSummary}" }
-                        val error = if (thrown.isLocationMissing) thrown else thrown.copy(message = "Couldn’t switch model: ${thrown.message}")
+                        val error = if (thrown.isLocationMissing) thrown else thrown.copy(message = localized(R.string.session_switch_model_failed, thrown.message))
                         if (!waitToRetry(error)) return failed(sessionID, created, error)
                         handle.networkOperation.retried()
                         continue
@@ -353,14 +354,16 @@ internal fun SessionFeature.Companion.deliveryJob(
                 val posted: OpenCodeClientError? = PromptContext.notificationCallbackURL.withValue(callbackURL) {
                     PromptContext.page.withValue(page) {
                         PromptContext.mentions.withValue(pending.mentions) {
-                            try {
-                                openCodeClient.sendPrompt(
-                                    server, sessionID, pending.text, attachments,
-                                    pending.files.mapNotNull { it.reference }, pending.messageID, pending.delivery,
-                                )
-                                null
-                            } catch (error: OpenCodeClientError) {
-                                error
+                            PromptContext.quotes.withValue(pending.quotes.map { it.quote }) {
+                                try {
+                                    openCodeClient.sendPrompt(
+                                        server, sessionID, pending.text, attachments,
+                                        pending.files.mapNotNull { it.reference }, pending.messageID, pending.delivery,
+                                    )
+                                    null
+                                } catch (error: OpenCodeClientError) {
+                                    error
+                                }
                             }
                         }
                     }

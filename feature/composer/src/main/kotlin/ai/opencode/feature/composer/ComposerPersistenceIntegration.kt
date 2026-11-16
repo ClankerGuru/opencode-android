@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.strings.localized
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeSession
@@ -7,15 +8,14 @@ import ai.opencode.server.model.SessionTitle
 import ai.opencode.server.model.learningFirstPrompt
 import java.util.UUID
 
-// The "Feature Integration" half of iOS `ComposerPersistence.swift` (`extension SessionFeature`,
-// `extension SessionFeature.State`, `extension HomeFeature(.State)`). Those reducers live in the
-// session and drawer areas, above this module, so their logic is here as plain functions over
-// values; the session/drawer areas call them from their reducers and apply the results.
+// Those reducers live in the session and drawer areas, above this module, so their logic is here as
+// plain functions over values; the session/drawer areas call them from their reducers and apply the
+// results.
 
 /**
- * What the persisted composer watches for changes (iOS `SessionFeature.PersistedComposerWatch`):
- * the session's draft and where it belongs. The session reducer compares the old and new watch
- * (`onChange`) and calls [reconcilePersistedComposer].
+ * What the persisted composer watches for changes: the session's draft and where it belongs. The
+ * session reducer compares the old and new watch (`onChange`) and calls
+ * [reconcilePersistedComposer].
  */
 data class PersistedComposerWatch(
     val serverID: String,
@@ -28,6 +28,7 @@ data class PersistedComposerWatch(
     val location: SharedLocation?,
     val chips: List<ComposerAutocompleteChip>,
     val undoSnapshot: UndoSnapshot?,
+    val quotes: List<ComposerQuote> = emptyList(),
 ) {
     sealed interface FilePhase {
         data object Uploading : FilePhase
@@ -47,7 +48,7 @@ data class PersistedComposerWatch(
     }
 
     companion object {
-        /** iOS `SessionFeature.State.persistedComposerWatch`; [project] is the draft's project, kept only without a session. */
+        /** [project] is the draft's project, kept only without a session. */
         fun of(
             serverID: String,
             session: OpenCodeSession?,
@@ -65,13 +66,14 @@ data class PersistedComposerWatch(
             location = composer.location,
             chips = composer.chips,
             undoSnapshot = composer.undoSnapshot,
+            quotes = composer.quotes,
         )
     }
 }
 
 /**
- * iOS `SessionFeature.reconcilePersistedComposer(from:in:)`: a draft that became a session
- * moves its persisted draft there; otherwise the draft is scheduled (or cleared when empty).
+ * A draft that became a session moves its persisted draft there; otherwise the draft is scheduled
+ * (or cleared when empty).
  */
 fun ComposerPersistence.reconcilePersistedComposer(
     old: PersistedComposerWatch,
@@ -93,7 +95,7 @@ fun ComposerPersistence.reconcilePersistedComposer(
     }
 }
 
-/** iOS `SessionFeature.persistedDraftDirectory(for:isRetry:in:)`: where a retried draft send creates its session. */
+/** Where a retried draft send creates its session. */
 fun persistedDraftDirectory(
     messageID: String,
     isRetry: Boolean,
@@ -107,8 +109,8 @@ fun persistedDraftDirectory(
 }
 
 /**
- * iOS `syncAndFlushPersistedComposer` / `HomeFeature.flushPersistedComposer`: schedules every
- * on-screen composer that reads on view and isn't empty, then writes at once (backgrounding).
+ * Schedules every on-screen composer that reads on view and isn't empty, then writes at once
+ * (backgrounding).
  */
 suspend fun ComposerPersistence.syncAndFlush(composers: List<Pair<PersistedComposerWatch, DraftState>>) {
     for ((watch, composer) in composers) {
@@ -119,25 +121,21 @@ suspend fun ComposerPersistence.syncAndFlush(composers: List<Pair<PersistedCompo
 
 /** What [restorePersistedComposer] changed; the session reducer applies it to its state. */
 data class PersistedComposerRestore(
-    /** The draft to put in the composer (iOS `applyPersistedDraft`: `restoreDraft`), if one was restored. */
+    /** The draft to put in the composer, if one was restored. */
     val restoredDraft: RestoredComposerDraft?,
     val session: OpenCodeSession?,
     val draftProject: OpenCodeProject?,
     val outboxDraftID: String?,
-    /**
-     * A draft whose outbox already created its session: the screen becomes that session
-     * (iOS sets `draftBecameSessionID`, `session`, `familySessions = [it]`, `familyRootID`,
-     * clears `outboxDraftID` and sets `pendingModel = currentModel`).
-     */
+    /** A draft whose outbox already created its session: the screen becomes that session. */
     val draftBecameSession: OpenCodeSession?,
 )
 
 /**
- * iOS `SessionFeature.restorePersistedComposer(_:)`: binds the outbox and failed sends to
- * persistence, restores the screen's draft, and seeds unsent sends from a previous process
- * into [PromptOutbox] (held ones also into [UndeliveredPrompts] as “Couldn’t send message”),
- * each under its original message and new-session IDs. Sends the transcript already has
- * ([existingMessageIDs]: prompt IDs in the items, less optimistic ones) are settled.
+ * Binds the outbox and failed sends to persistence, restores the screen's draft, and seeds unsent
+ * sends from a previous process into [PromptOutbox] (held ones also into [UndeliveredPrompts] as
+ * “Couldn’t send message”), each under its original message and new-session IDs. Sends the
+ * transcript already has ([existingMessageIDs]: prompt IDs in the items, less optimistic ones) are
+ * settled.
  *
  * [makeJob] is the session area's `restoredDeliveryJob`: the delivery job for the entry's
  * existing session ID, or a new session in `newSessionDirectory`, with `reconcileFirst: true`.
@@ -225,7 +223,7 @@ fun restorePersistedComposer(
         if (entry.isHeld) {
             val existing = undelivered.entries(serverID, effectiveSessionID)
             if (existing.none { it.pending.messageID == id }) {
-                undelivered.keep(entry.pending, "Couldn’t send message", serverID, effectiveSessionID)
+                undelivered.keep(entry.pending, localized(R.string.composer_send_failed), serverID, effectiveSessionID)
             }
         }
         if (!alreadyInOutbox) {
@@ -243,9 +241,8 @@ fun restorePersistedComposer(
 }
 
 /**
- * A session family's drafts (iOS `SessionFeature.State.FamilyDrafts`): read and written through
- * [ComposerPersistence] when the screen reads on view, else kept in [catchUpDrafts] (a Catch
- * Up card, whose drafts persist only once promoted).
+ * A session family's drafts: read and written through [ComposerPersistence] when the screen reads
+ * on view, else kept in [catchUpDrafts] (a Catch Up card, whose drafts persist only once promoted).
  */
 class FamilyDrafts(
     val serverID: String,
@@ -281,9 +278,9 @@ class FamilyDrafts(
 }
 
 /**
- * Shares waiting for a composer, by target (iOS `HomeFeature.State.SharedDrafts`), read and
- * written through [ComposerPersistence]. [liveTargets] are composers on screen with a draft
- * (iOS `liveComposerTargets`), whose persisted draft isn't read back as a share.
+ * Shares waiting for a composer, by target, read and written through [ComposerPersistence].
+ * [liveTargets] are composers on screen with a draft, whose persisted draft isn't read back as a
+ * share.
  */
 class SharedDrafts(
     val serverID: String,
@@ -308,7 +305,7 @@ class SharedDrafts(
         persistence.setSharedDraft(serverID, target.sessionID, project, value)
     }
 
-    /** iOS `subscript(target, default:)` get: what a new share appends to. */
+    /** What a new share appends to. */
     fun getOrDefault(target: SharedDraftTarget, defaultValue: () -> SharedComposerDraft): SharedComposerDraft {
         val existing = persistence.sharedDraftForAppend(serverID, target.sessionID, target in liveTargets)
         return if (existing.isEmpty) defaultValue() else existing
@@ -317,11 +314,11 @@ class SharedDrafts(
     fun removeValue(target: SharedDraftTarget): SharedComposerDraft? = persistence.takeSharedDraft(serverID, target.sessionID)
 }
 
-/** iOS `HomeFeature.State.parkPersistedDraft(_:for:)`: a New Session draft keeps its project. */
+/** A New Session draft keeps its project. */
 fun ComposerPersistence.parkPersistedDraft(serverID: String, composer: DraftState, sessionID: String?, draftProject: OpenCodeProject?) =
     parkDraft(serverID, sessionID, if (sessionID == null) draftProject else null, composer)
 
-/** iOS `HomeFeature.State.syncAbsorbedDraft(for:)` for a detail that reads on view (and no Catch Up is open). */
+/** Syncs the absorbed draft for a detail that reads on view (and no Catch Up is open). */
 fun ComposerPersistence.syncAbsorbedDraft(serverID: String, session: OpenCodeSession?, draftProject: OpenCodeProject?, composer: DraftState) {
     if (composer.isEmpty) {
         clearDraft(serverID, session?.id, false)

@@ -1,12 +1,12 @@
 package ai.opencode.feature.session
 
-import ai.opencode.core.experiments.key
+import ai.opencode.core.strings.localized
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.MotionTransition
 import ai.opencode.core.motion.rememberReduceMotion
-import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
@@ -29,7 +29,6 @@ import ai.opencode.feature.composer.ComposerAutocompleteTextBridge
 import ai.opencode.feature.composer.ComposerFileSource
 import ai.opencode.feature.composer.ComposerImageSource
 import ai.opencode.feature.composer.ComposerKeyboardMorph
-import ai.opencode.feature.composer.ComposerSendTransition
 import ai.opencode.feature.composer.ComposerSideMargins
 import ai.opencode.feature.composer.ComposerSwipeDown
 import ai.opencode.feature.composer.ComposerSwipeOwnership
@@ -54,8 +53,8 @@ import ai.opencode.feature.composer.handsGlassOver
 import ai.opencode.feature.composer.layoutProgress
 import ai.opencode.feature.composer.plusmenu.PhotoFlightTunables
 import ai.opencode.feature.composer.requestPanelCap
-import ai.opencode.feature.composer.sentImageDeparture
-import ai.opencode.feature.media.SendImageTunables
+import ai.opencode.feature.media.LocalMediaPresenter
+import ai.opencode.feature.media.MediaReferenceResolver
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.transcript.TranscriptTunables
 import ai.opencode.feature.transcript.list.TranscriptBorrowedDrag
@@ -66,8 +65,10 @@ import ai.opencode.feature.voice.ComposerSurface as VoiceComposerSurface
 import ai.opencode.feature.voice.VoiceStoreOf
 import ai.opencode.feature.voice.hiddenUnderFloatingCall
 import ai.opencode.feature.voice.holdsClientToolCard
+import ai.opencode.server.model.OpenCodeImageAttachment
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeQueuedInput
+import ai.opencode.server.model.OpenCodeTranscriptItem
 import ai.opencode.server.model.PastedText
 import android.content.res.Configuration
 import android.os.Process
@@ -154,6 +155,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.customActions
@@ -187,6 +190,7 @@ import kotlinx.coroutines.launch
  */
 @Stable
 class SessionComposerHost {
+    internal val sendReset = ComposerSendReset()
     /** Server Flow: the server dropped; a pill above the composer says so (iOS `listContext.connection`). */
     var connection: ServerConnectionNotice? by mutableStateOf(null)
     /** iOS `onConnectionAction`: the connection pill was acted on. */
@@ -194,8 +198,8 @@ class SessionComposerHost {
     /** iOS `scrollEdgeBridge.showsJumpButton`. */
     var showsJumpButton by mutableStateOf(false)
     /**
-     * Android (V-01): the transcript stays invisible while a row saved across process death loads.
-     * The jump pill keeps its state but isn't drawn or touchable, so it shows with the rows (AI-01).
+     * Android: the transcript stays invisible while a row saved across process death loads.
+     * The jump pill keeps its state but isn't drawn or touchable, so it shows with the rows.
      */
     var veilsJumpButton by mutableStateOf(false)
     /** iOS `scrollEdgeBridge.jumpRequest += 1`. */
@@ -214,6 +218,10 @@ class SessionComposerHost {
     var orbClearance by mutableFloatStateOf(0f)
     /** The composer surface's top in the window, in px (NaN when it isn't shown), for `SessionBottomScrollEdge`. */
     var surfaceTopInWindow by mutableFloatStateOf(Float.NaN)
+    /** The composer surface's bounds in the window (null when it isn't shown), which a quote's comment panel spans. */
+    var surfaceInWindow by mutableStateOf<Rect?>(null)
+    /** The quote whose comment panel is open over the composer. */
+    var commentingQuoteID by mutableStateOf<String?>(null)
     /** iOS `toggleAttachmentMenu` (VIEW-PICKERS); null opens nothing. */
     var onPlusTapped: (() -> Unit)? by mutableStateOf(null)
     /** The attachment menu is open (iOS `attachmentMenu != .closed`): + shows open, the composer stays expanded. */
@@ -249,13 +257,7 @@ class SessionComposerHost {
 
     /** The screen's imports (iOS `imageImporter`/`fileImporter`): pastes and drops on the field start them. */
     var importer: SessionAttachmentImporter? by mutableStateOf(null)
-    /**
-     * iOS `scrollEdgeBridge.sendTransition`: the field's words captured as a send leaves, for the
-     * screen's send flight (`SessionSendFlightOverlay`).
-     */
-    val sendTransition = ai.opencode.feature.composer.ComposerSendTransition()
-    /** iOS `scrollEdgeBridge.queuedPillFrame`: the queued pill (window px) while it shows. */
-    var queuedPillFrame: Rect? = null
+    val fieldLink = ai.opencode.feature.composer.ComposerFieldLink()
     /** iOS `attachmentMenuAnchors`: the + button, the composer, the menu's rows (root px). */
     val attachmentAnchors = AttachmentMenuAnchors()
     /** iOS `attachmentMenuPress`; set by the screen's attachment menu. */
@@ -471,7 +473,7 @@ internal data class ComposerSnapshot(
                 isUploadingFiles = state.isUploadingFiles,
                 isWaitingForUploads = state.isWaitingForUploads,
                 hasFailedFiles = state.pendingFiles.any { it.isFailed },
-                hasNonLocationAttachments = state.pendingAttachments.isNotEmpty() || state.pendingFiles.isNotEmpty(),
+                hasNonLocationAttachments = state.pendingAttachments.isNotEmpty() || state.pendingFiles.isNotEmpty() || state.pendingQuotes.isNotEmpty(),
                 wantsLocationAttachment = state.pendingLocation != null || state.isLocating,
                 dictationHold = state.dictationHold,
                 dictationPhase = state.dictationPhase,
@@ -530,8 +532,7 @@ fun SessionComposer(
     val view = remember { SessionComposerViewState() }
     val snapshot by store.observe { ComposerSnapshot.of(it) }
     val returnKeySends by remember(store) { store.state.returnKeySends.flow }.collectAsState(store.state.returnKeySends.value)
-    val agentSelection by remember { shared(ExperimentalFeature.agentSelection.key).flow }
-        .collectAsState(false)
+    val agentSelection by remember(store) { store.state.agentSelection.isEnabled.flow }.collectAsState(store.state.agentSelection.isEnabled.value)
     val autocomplete by store.observe { it.autocomplete }
     val reducedMotion = rememberReduceMotion()
     val focusManager = LocalFocusManager.current
@@ -549,7 +550,7 @@ fun SessionComposer(
         s = snapshot,
         reducedMotion = reducedMotion,
         returnKeySends = returnKeySends,
-        agentSelection = ExperimentalFeature.agentSelection.isActive(agentSelection),
+        agentSelection = agentSelection,
         autocomplete = autocomplete,
         focus = {
             // The field follows `messageFieldFocused` (iOS `focusComposer()`); the keyboard comes up even if it already had focus.
@@ -674,7 +675,7 @@ fun SessionComposer(
 private fun chipLevelLabel(state: SessionFeature.State): String? {
     val model = state.currentModelInfo ?: return null
     if (model.variants.none { it != "default" }) return null
-    val level = state.currentModel?.variant?.takeIf { it != "default" } ?: return "Default"
+    val level = state.currentModel?.variant?.takeIf { it != "default" } ?: return localized(R.string.session_model_level_default)
     return ai.opencode.server.model.ModelVariant.label(level)
 }
 
@@ -841,45 +842,27 @@ internal class SessionComposerEnv(
 
     /** iOS `sendMessage(_:)`. */
     fun sendMessage(action: Action = Action.SendTapped) {
-        host.sendTransition.input?.flushEdits()
+        host.fieldLink.input?.flushEdits()
         if (action == Action.ReturnKeyTapped && !canSend) {
             store.send(action)
             return
         }
         val state = store.state
         if (!state.canSendPrompt || state.hasPendingRequests) return
-        // A send that waits for uploads lands later; the flight would capture now.
-        val flies = !state.isUploadingFiles && (state.session != null || state.draftProject != null)
-        val transition = host.sendTransition
-        if (flies) {
-            transition.prepare(
-                reduceMotion = reducedMotion,
-                attachments = if (photoSheet != null) state.pendingAttachments else emptyList(),
-                window = Rect(0f, 0f, windowSize.width.toFloat(), windowSize.height.toFloat()),
-            )
-        }
-        // The list lands it: on its bubble, its dim steering row, or the pill.
-        val generation = state.sendGeneration
-        // Only a send that clears text: an attachment-only send leaves no clear to take the spring.
-        if (state.draft.isNotEmpty()) {
-            transition.shrinkOnNextClear(
-                if (transition.images.isActive) {
-                    // The field clears under the same critical spring as the photos' copies
-                    // (iOS `sendImageDuration` is the 99.5% time: ω = 7.43 / duration).
-                    7.43 / SendImageTunables.duration
-                } else {
-                    // A multiline draft's clear shrinks the composer on the flight's spring.
-                    ComposerSendTransition.sendShrinkOmega(TranscriptTunables.arrivalOmega)
-                },
-            )
-        }
+        // Decoded under the IDs the bubble reads, so its first frame shows the photos.
+        val sentData = state.pendingAttachments.map { it.data }
+        if (!reducedMotion) host.sendReset.start()
         store.send(action)
-        host.sendTransition.input?.takeParentText()
-        // Nothing went (a failed upload): the capture and the shrink mustn't linger (iOS scopes
-        // the shrink to the send's own transaction).
-        if (store.state.sendGeneration == generation) {
-            host.sendTransition.cancelShrink()
-            if (flies) host.sendTransition.cancelPrepared()
+        host.fieldLink.input?.takeParentText()
+        if (sentData.isEmpty()) return
+        val sent = store.state
+        val images = ArrayList<OpenCodeImageAttachment>()
+        val newest = sent.items.lastOrNull { it is OpenCodeTranscriptItem.UserImages }
+        if (newest is OpenCodeTranscriptItem.UserImages) images += newest.images
+        for (queued in sent.queuedInputImages.values) images += queued
+        for (image in images) {
+            if (sentData.none { it === image.data }) continue
+            MediaReferenceResolver.decodedImage(image)
         }
     }
 
@@ -998,6 +981,7 @@ private fun SessionComposerEnv.ComposerArea(modifier: Modifier) {
         expanded = composerPresentation.expanded,
         pinned = composerPinnedExpanded,
         reducedMotion = reducedMotion,
+        snapsUnpin = host.sendReset.isResetting,
     ) {
         ComposerAreaContent(modifier)
     }
@@ -1039,8 +1023,8 @@ private fun SessionComposerEnv.ComposerAreaContent(modifier: Modifier) {
     ) {
         ai.opencode.feature.composer.RequestDockPrewarm()
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(pillGap.dp)) {
-            // iOS 812b9ab5: the pill row joining or leaving moves the composer's top, and the transcript
-            // riding it, on the row's own curve; at once, Working jumped a row's height in one frame.
+            // The pill row joining or leaving moves the composer's top, and the transcript riding
+            // it, on the row's own curve.
             AnimatedVisibility(
                 visible = s.hasBackgroundWork || s.queuedMessages.isNotEmpty(),
                 enter = expandVertically(composerColumnAnimation(opening = true, IntSize.VisibilityThreshold), Alignment.Bottom, clip = false),
@@ -1063,9 +1047,9 @@ private fun SessionComposerEnv.ComposerAreaContent(modifier: Modifier) {
                     ComposerBanner(
                         symbol = SFSymbol.ExclamationmarkTriangleFill,
                         iconTint = androidx.compose.ui.graphics.Color(0xFFFF9500),
-                        title = "Couldn’t Load Requests",
+                        title = stringResource(R.string.session_requests_load_failed_title),
                         detail = shownError.orEmpty(),
-                        action = "Retry",
+                        action = stringResource(CoreR.string.common_retry),
                         onClick = { store.send(Action.refreshRequestsTapped) },
                         modifier = Modifier.semantics { testTag = "request-load-error" },
                     )
@@ -1172,9 +1156,8 @@ private fun SessionComposerEnv.DraftProjectsOverlay(modifier: Modifier) {
         contentAlignment = Alignment.BottomCenter,
     ) {
         AnimatedVisibility(visible = showsDraftProjects, enter = enter, exit = exit) {
-            // Android: in a short window (landscape with the keys up, a split screen) the list
-            // would stand over the header and under the status bar. It gives way there, as the
-            // header gives way to the composer (its A-10 cap). iOS phones are portrait-only.
+            // In a short window (landscape with the keys up, a split screen) the list gives way to
+            // the header, as the header gives way to the composer.
             val density = LocalDensity.current
             val headerBottom = WindowInsets.statusBarsIgnoringVisibility.getTop(density) + with(density) { host.headerHeight.dp.toPx() }
             var listTop by remember { mutableFloatStateOf(Float.POSITIVE_INFINITY) }
@@ -1264,21 +1247,18 @@ private fun SessionComposerEnv.BackgroundActivity() {
 @Composable
 private fun SessionComposerEnv.QueuedActivity(hasQueued: Boolean) {
     val count = s.queuedMessages.size
-    DisposableEffect(Unit) { onDispose { host.queuedPillFrame = null } }
     AnimatedVisibility(
         visible = hasQueued,
         enter = if (reducedMotion) fadeIn(composerColumnAnimation(opening = true)) else scaleIn(composerColumnAnimation(opening = true), initialScale = 0.92f) + fadeIn(composerColumnAnimation(opening = true)),
         exit = if (reducedMotion) fadeOut(composerColumnAnimation(opening = false)) else slideOutVertically(composerColumnAnimation(opening = false)) { -it } + fadeOut(composerColumnAnimation(opening = false)),
     ) {
         ComposerPillLabel(
-            title = "$count queued",
+            title = pluralStringResource(R.plurals.session_queued_count, count, count),
             rolls = true,
             onClick = { view.showsQueuedMessages = true },
-            onClickLabel = "Show messages waiting for this response to finish",
-            accessibilityLabel = if (count == 1) "1 queued message" else "$count queued messages",
+            onClickLabel = stringResource(R.string.session_queued_show_label),
+            accessibilityLabel = pluralStringResource(R.plurals.session_queued_messages_description, count, count),
             modifier = Modifier
-                // A queued send's words shrink into it (iOS `scrollEdgeBridge.queuedPillFrame`).
-                .onGloballyPositioned { host.queuedPillFrame = it.boundsInWindow() }
                 .passesDragsToTranscript(host.borrowedDrag)
                 .coveredByBackgroundWork()
                 .semantics { testTag = "queued-messages" },
@@ -1310,11 +1290,20 @@ private fun SessionComposerEnv.ComposerCapsule() {
     val cap = { requestPanelCap() }
     val activeHeight = { activeRequestPanelHeight(cap()) }
     val room = { if (showsRequestPanel) activeHeight() else 0f }
-    DisposableEffect(Unit) { onDispose { host.surfaceTopInWindow = Float.NaN } }
+    DisposableEffect(Unit) {
+        onDispose {
+            host.surfaceTopInWindow = Float.NaN
+            host.surfaceInWindow = null
+        }
+    }
     Box(
         Modifier
             .fillMaxWidth()
-            .onGloballyPositioned { host.surfaceTopInWindow = it.boundsInWindow().top }
+            .onGloballyPositioned {
+                val bounds = it.boundsInWindow()
+                host.surfaceTopInWindow = bounds.top
+                host.surfaceInWindow = bounds
+            }
             .layout { measurable, constraints ->
                 val bar = measurable.measure(constraints.offset(vertical = -room().dp.roundToPx()))
                 // Measuring a self-animating permission updates its height. Reserve that
@@ -1369,7 +1358,7 @@ private val SessionComposerEnv.lingersRequestPanel: Boolean
 
 /**
  * iOS `requestPanelMaxHeight`: the tallest the request panel may be so the composer stays under
- * the header (OC-471), from the room between the top safe area and the keyboard, the header and
+ * the header, from the room between the top safe area and the keyboard, the header and
  * the composer's chrome outside the panel.
  */
 private fun SessionComposerEnv.requestPanelCap(): Float? {
@@ -1722,9 +1711,9 @@ private fun Modifier.composerSwipes(envNow: () -> SessionComposerEnv, density: F
                     val predicted = translation + Offset(velocity.x, velocity.y) / density * 0.5f
                     val focused = env.messageFieldFocused
                     val beganFocused = ownership.beganFocused(start, focused)
-                    // iOS 573770b6: a touch the field's selecting owns (a handle, a drag from the
-                    // selection, a rest first) stays the text's, even just outside the field.
-                    val input = env.host.sendTransition.input
+                    // A touch the field's selecting owns (a handle, a drag from the selection, a
+                    // rest first) stays the text's, even just outside the field.
+                    val input = env.host.fieldLink.input
                     val yields = ownership.yields(start, focused, textClaims = input?.isSwipeYieldedToText == true) {
                         env.composerSwipeYields(start) || input?.selectionClaims(start) == true || change.isConsumed
                     }
@@ -1775,6 +1764,7 @@ private fun SessionComposerEnv.composerTapped(recording: Boolean) {
 
 @Composable
 private fun SessionComposerEnv.Composer() {
+    val dismissLabel = stringResource(CoreR.string.common_dismiss)
     val (composerExpanded, composerControls) = composerPresentation
     val recording = s.dictationHold != null
     val bar = s.requestBar
@@ -1818,7 +1808,18 @@ private fun SessionComposerEnv.Composer() {
         if (holdsRow) rowReveal.snapTo(0f)
         else if (rowReveal.value < 1f) rowReveal.animateTo(1f, PhotoFlightTunables.rowAnimation())
     }
-    val attachmentReveal = if (holdsRow) 0f else rowReveal.value
+    // A drawing added from the full-screen viewer opens the row on its flight's spring.
+    val presenter = LocalMediaPresenter.current
+    val hasAttachments = hasComposerAttachments
+    val handOffReveal = remember(hasAttachments) {
+        Animatable(if (hasAttachments && presenter?.isPresenting == true && !reducedMotion) 0f else 1f)
+    }
+    LaunchedEffect(handOffReveal) {
+        if (handOffReveal.value < 1f) handOffReveal.animateTo(1f, Motion.flight.animation(reduceMotion = reducedMotion))
+    }
+    val attachmentReveal = if (holdsRow) 0f else rowReveal.value * handOffReveal.value
+    val sendReset = host.sendReset
+    sendReset.Animate()
     val current by rememberUpdatedState(this)
     Box(
         Modifier
@@ -1832,12 +1833,13 @@ private fun SessionComposerEnv.Composer() {
                     current.composerTapped(recording)
                 }
             }
-            // A send's shrink is the field's one spring (iOS animates both in the send's one
-            // transaction): the card hugs it, so the controls ride its bottom edge. Its own resize
-            // spring would chase the field's, lifting the controls off that edge.
+            .composerSendReset(sendReset)
             .then(
-                if (reducedMotion || morphMoving || holdsRow || rowReveal.isRunning || host.sendTransition.isShrinking) Modifier
-                else Modifier.animateContentSize(MotionSpring(0.25).spec()),
+                    if (reducedMotion || (morphMoving && !sendReset.isResetting) || holdsRow || rowReveal.isRunning) Modifier
+                else Modifier.animateContentSize(
+                    (if (sendReset.isResetting) SEND_RESET_SLIDE else MotionSpring(0.25)).spec(),
+                    alignment = Alignment.BottomStart,
+                ),
             )
             // iOS `ComposerKeyboardSpacing(top: true, recording:)`: the top inset is taken back as
             // the row opens, unless folded for dictation.
@@ -1854,7 +1856,7 @@ private fun SessionComposerEnv.Composer() {
             .semantics {
                 // Answering, escape from the bar's controls dismisses as the panel's × does.
                 if (s.isAnsweringRequest) {
-                    customActions = listOf(CustomAccessibilityAction("Dismiss") { store.send(Action.requestDismissTapped); true })
+                    customActions = listOf(CustomAccessibilityAction(dismissLabel) { store.send(Action.requestDismissTapped); true })
                 }
             },
     ) {
@@ -1866,9 +1868,7 @@ private fun SessionComposerEnv.Composer() {
                     Modifier
                         .composerFolds()
                         .alpha(rowAlpha)
-                        .then(if (recording) Modifier.clearAndSetSemantics { }.blockTouches() else Modifier)
-                        // iOS `SentImageDeparture`: the sent photos leave as their copies take off.
-                        .sentImageDeparture(host.sendTransition.images),
+                        .then(if (recording) Modifier.clearAndSetSemantics { }.blockTouches() else Modifier),
                 ) { row(composerExpanded) }
             }
             Box {
@@ -1959,7 +1959,7 @@ private fun SessionComposerEnv.Composer() {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
-                    Text("Preparing dictation…", style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.secondaryText)
+                    Text(stringResource(R.string.session_dictation_preparing), style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.secondaryText)
                 }
             } else {
                 val error = s.dictationError
@@ -1984,8 +1984,8 @@ private fun SessionComposerEnv.Composer() {
  */
 @Composable
 private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boolean, bar: RequestBar?) {
-    val placeholder = bar?.placeholder ?: "Message"
-    // iOS `ComposerFieldScope` (3fa29077): the text is read here alone, so a keystroke recomposes
+    val placeholder = bar?.placeholder ?: stringResource(R.string.session_message_placeholder)
+    // iOS `ComposerFieldScope`: the text is read here alone, so a keystroke recomposes
     // the field and not the composer around it.
     val draft by store.observe { it.draft }
     // iOS `KeyboardDrivenTextInset`: the keyboard morph scrubs the expanded top inset (none
@@ -1996,14 +1996,6 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
         val bounds = coordinates.boundsInRoot()
         view.textFieldBounds = if (surface == Rect.Zero) Rect.Zero else bounds
     }) {
-        // iOS hides the placeholder while sent images fly out (at once) and fades it back after;
-        // a draft change shows or hides it at once.
-        val imagesSending = host.sendTransition.images.isSending
-        val placeholderAlpha by animateFloatAsState(
-            if (imagesSending) 0f else 1f,
-            if (imagesSending) snap() else Motion.swap.animation(reduceMotion = reducedMotion),
-            label = "composer-placeholder",
-        )
         if (s.draftShape.isEmpty) {
             Text(
                 placeholder,
@@ -2012,19 +2004,18 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
                 maxLines = 1,
                 modifier = Modifier
                     .padding(top = ComposerTunables.expandedTopInset.dp * (topInsetFraction ?: if (expanded) 1f else 0f))
-                    .alpha(placeholderAlpha)
                     .clearAndSetSemantics { },
             )
         }
         val takesPaste = s.takesPasteAttachments
         ComposerTextInput(
             text = draft,
-            // The reducer's draft now, not the snapshot this composition captured (iOS 02e85073).
+            // The reducer's draft now, not the snapshot this composition captured.
             currentText = { store.state.draft },
             focusRequest = s.composerFocusRequest,
             // Folded while dictating: keys typed into the hidden field don't reach the draft.
             onTextChange = { new -> onDraftEdited(new, recording) },
-            // A keystroke is one action: the draft and the caret it left (iOS d0b24aaa).
+            // A keystroke is one action: the draft and the caret it left.
             onEdit = { new, caret -> onDraftEdited(new, recording, caret) },
             isFocused = host.messageFieldFocused,
             onFocusedChange = { host.messageFieldFocused = it },
@@ -2052,9 +2043,9 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
             returnKeySends = returnKeySends,
             autocompleteBridge = view.autocompleteBridge,
             lineLimit = if (bar == null) null else 4,
-            accessibilityLabel = bar?.fieldLabel ?: "Message",
+            accessibilityLabel = bar?.fieldLabel ?: stringResource(R.string.session_message_placeholder),
             isHoldingMic = s.dictationHold != null,
-            sendTransition = host.sendTransition,
+            fieldLink = host.fieldLink,
             // One Picker in the keyboard's place keeps the field from taking it back.
             refusesFocus = { host.modelPanels?.onePicker?.isOpen == true },
             // The + menu and its photo sheet draw over the field, which keeps the keyboard.
@@ -2082,7 +2073,7 @@ private fun SessionComposerEnv.onDraftEdited(
         store.send(Action.Autocomplete(ComposerAutocompleteAction.TextEdited(new, caret)))
     }
     // The photo sheet rests on the keyboard over the field: typing folds it away so the text shows
-    // where it lands (iOS d82670c2).
+    // where it lands.
     if (photoSheet?.morph?.isOpen == true) photoSheet.closePhotoSheet()
     val state = store.state
     if (!returnKeySends || state.nonSendNewlineDraft == new || new != old + "\n") return

@@ -7,23 +7,17 @@ import java.nio.file.StandardCopyOption
 import java.util.UUID
 
 /**
- * The bytes behind [ComposerPersistence] (iOS `ComposerPersistenceStorage`): the state file
- * and one blob per inline attachment.
- *
- * Live storage sits in `filesDir/support/` (iOS Application Support/OpenCode), like
- * `TranscriptCachePersistence`: `composer-state.json` and `ComposerAttachments/<uuid>`. Android
- * app-private files are already encrypted at rest (file-based encryption, credential-encrypted
- * storage = iOS `completeUntilFirstUserAuthentication`), so there is no per-file protection
- * attribute; iOS's `isExcludedFromBackup` is the app's backup rules excluding
- * `support/composer-state.json` and `support/ComposerAttachments/` (owned by `:app`).
+ * The bytes behind [ComposerPersistence]: `filesDir/support/composer-state.json` and one blob per
+ * inline attachment in `ComposerAttachments/<uuid>`. App-private files are encrypted at rest;
+ * `:app`'s backup rules exclude both.
  */
 class ComposerPersistenceStorage(
     val identity: String,
     val readStateData: () -> ByteArray?,
-    val writeStateData: (ByteArray?) -> Unit,
+    val writeStateData: (ByteArray?) -> Boolean,
     val readAttachment: (UUID) -> ByteArray?,
-    /** Writes [writes], then removes every blob not in `keeping`. */
-    val writeAttachments: (writes: Map<UUID, ByteArray>, keeping: Set<UUID>) -> Unit,
+    val writeAttachment: (id: UUID, data: ByteArray) -> Boolean,
+    val removeAttachments: (keeping: Set<UUID>) -> Unit,
     val removeAll: () -> Unit,
 ) {
     companion object {
@@ -38,27 +32,28 @@ class ComposerPersistenceStorage(
                 readStateData = { runCatching { stateFile.takeIf(File::exists)?.readBytes() }.getOrNull() },
                 writeStateData = { data ->
                     if (data == null) {
-                        stateFile.delete()
+                        stateFile.delete() || !stateFile.exists()
                     } else {
                         try {
                             writeAtomically(stateFile, data, baseDirectory)
+                            true
                         } catch (error: Exception) {
                             AppLog.app.error { "Couldn’t write composer state: ${error::class.java.simpleName}" }
+                            false
                         }
                     }
                 },
                 readAttachment = { id -> runCatching { File(attachmentsDirectory, id.toString()).takeIf(File::exists)?.readBytes() }.getOrNull() },
-                writeAttachments = { writes, keeping ->
-                    if (writes.isNotEmpty()) {
-                        attachmentsDirectory.mkdirs()
-                        for ((id, data) in writes) {
-                            try {
-                                writeAtomically(File(attachmentsDirectory, id.toString()), data, baseDirectory)
-                            } catch (error: Exception) {
-                                AppLog.app.error { "Couldn’t write composer attachment (${data.size} bytes): ${error::class.java.simpleName}" }
-                            }
-                        }
+                writeAttachment = { id, data ->
+                    try {
+                        writeAtomically(File(attachmentsDirectory, id.toString()), data, baseDirectory)
+                        true
+                    } catch (error: Exception) {
+                        AppLog.app.error { "Couldn’t write composer attachment (${data.size} bytes): ${error::class.java.simpleName}" }
+                        false
                     }
+                },
+                removeAttachments = { keeping ->
                     attachmentsDirectory.listFiles()?.let { files ->
                         for (file in files) {
                             val id = runCatching { UUID.fromString(file.name) }.getOrNull()
@@ -82,13 +77,17 @@ class ComposerPersistenceStorage(
             return ComposerPersistenceStorage(
                 identity = "in-memory-${UUID.randomUUID()}",
                 readStateData = { synchronized(lock) { stateData } },
-                writeStateData = { data -> synchronized(lock) { stateData = data } },
+                writeStateData = { data ->
+                    synchronized(lock) { stateData = data }
+                    true
+                },
                 readAttachment = { id -> synchronized(lock) { attachments[id] } },
-                writeAttachments = { writes, keeping ->
-                    synchronized(lock) {
-                        attachments.putAll(writes)
-                        attachments.keys.retainAll(keeping)
-                    }
+                writeAttachment = { id, data ->
+                    synchronized(lock) { attachments[id] = data }
+                    true
+                },
+                removeAttachments = { keeping ->
+                    synchronized(lock) { attachments.keys.retainAll(keeping) }
                 },
                 removeAll = {
                     synchronized(lock) {
@@ -100,10 +99,9 @@ class ComposerPersistenceStorage(
         }
 
         /**
-         * iOS `Data.write(options: .atomic)`: a uniquely named temporary file, moved over [target]
-         * in one step. The temporary file sits in [tempDirectory] (the base directory, never the
-         * attachments folder, whose sweep removes every non-UUID name), so a flush and a debounced
-         * write racing each other never share or delete one another's temporary file.
+         * Writes a uniquely named temporary file and moves it over [target]. The temp file sits in
+         * [tempDirectory] (never the attachments folder, whose sweep removes non-UUID names), so
+         * racing writes never clash.
          */
         private fun writeAtomically(target: File, data: ByteArray, tempDirectory: File) {
             target.parentFile?.mkdirs()

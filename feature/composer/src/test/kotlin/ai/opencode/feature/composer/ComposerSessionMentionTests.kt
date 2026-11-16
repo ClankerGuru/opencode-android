@@ -28,16 +28,9 @@ import java.time.Instant
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Port of iOS `ComposerSessionMentionTests.swift`, an extension of `ComposerAutocompleteTests`
- * (session mentions: desktop beta `composer/model.ts`, `session-match.ts`, `prompt-parts.ts`).
- * The store test drives [ComposerAutocompleteTestHost] like `ComposerAutocompleteTests`.
- *
- * Skipped → `:feature:session`: `sendingASessionChipSendsDesktopsTokenAndShiftsLaterMentionSpans`,
- * `failedSessionMentionRetriesTheSameTextAndEditBringsTheChipBack` and the
- * `ComposerPersistenceTests.sessionMentionRidesTheOutboxAcrossRelaunchAsItsToken` extension
- * (they send, retry and persist through `SessionFeature`).
- * Skipped → `:server`/`:feature:transcript`: `sentSessionTokensRenderAsSessionLinks`
- * (`SessionLink`, `SessionLinkText`; ported in `:feature:transcript`).
+ * An extension of `ComposerAutocompleteTests` (session mentions: desktop beta `composer/model.ts`,
+ * `session-match.ts`, `prompt-parts.ts`). The store test drives [ComposerAutocompleteTestHost] like
+ * `ComposerAutocompleteTests`.
  */
 class ComposerSessionMentionTests {
     @Test fun sessionTitleMatchingAndServerSearchFollowDesktop() {

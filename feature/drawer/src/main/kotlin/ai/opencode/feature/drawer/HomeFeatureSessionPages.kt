@@ -22,11 +22,11 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CancellationException
 
 /*
- * Port of iOS `HomeFeature+SessionPages.swift`: the drawer's list beyond Home's snapshot page,
- * older pages as the list scrolls to its end, and a search the server runs over every session.
+ * The drawer's list beyond Home's snapshot page, older pages as the list scrolls to its end, and a
+ * search the server runs over every session.
  */
 
-/** The drawer's older pages and the server's search results (iOS `SessionPages`). */
+/** The drawer's older pages and the server's search results. */
 data class SessionPages(
     val older: SessionPageCursor = SessionPageCursor(),
     /**
@@ -61,7 +61,7 @@ data class SessionPages(
         return copy(search = found.copy(results = results))
     }
 
-    /** iOS `markGone(_:)`: deleted or archived, so answers to page reads already in flight leave it out. */
+    /** Deleted or archived, so answers to page reads already in flight leave it out. */
     fun markingGone(sessionID: String): SessionPages {
         var pages = this
         if (older.isLoading) pages = pages.copy(olderGoneIDs = pages.olderGoneIDs + sessionID)
@@ -91,7 +91,6 @@ data class SessionSearch(
 /** What the drawer shows under its last row. */
 enum class DrawerListFooter { loading, failed }
 
-/** iOS `HomeFeature.SessionPagesAction`. */
 sealed interface SessionPagesAction {
     /** The list's last row came into view. */
     data object LoadMoreRequested : SessionPagesAction
@@ -245,7 +244,7 @@ private fun loadMoreSessions(state: State): HomeReduced {
     return Reduced(s, effect)
 }
 
-/** One page read, its failure kept as a value (iOS `Result<OpenCodeSessionPage, OpenCodeClientError>`). */
+/** One page read, its failure kept as a value. */
 private suspend fun readSessionPage(
     client: OpenCodeClient,
     server: OpenCodeServer,
@@ -278,8 +277,8 @@ val State.drawerListFooter: DrawerListFooter?
     }
 
 /**
- * iOS `appendListedSessions(_:)`: sessions from an older page, or a search result the person acted
- * on, joining the list. Sessions already listed keep their fresher copy.
+ * Sessions from an older page, or a search result the person acted on, joining the list. Sessions
+ * already listed keep their fresher copy.
  */
 internal fun State.appendingListedSessions(listed: List<OpenCodeSession>): State {
     val known = HashSet<String>()
@@ -294,8 +293,8 @@ internal fun State.appendingListedSessions(listed: List<OpenCodeSession>): State
 }
 
 /**
- * iOS `seedReadDates(_:)`: sessions older than the first page were there when the inbox began.
- * Without the server's idle time, they start read, as the first page did.
+ * Sessions older than the first page were there when the inbox began. Without the server's idle
+ * time, they start read, as the first page did.
  */
 internal fun State.seedingReadDates(listed: List<OpenCodeSession>): State {
     val missing = mutableMapOf<String, Instant>()
@@ -307,7 +306,10 @@ internal fun State.seedingReadDates(listed: List<OpenCodeSession>): State {
     return updatingSessionReadDates { it + missing }
 }
 
-/** iOS `adoptSearchResult(_:)`: a search result the person acts on (opens, pins, marks) joins the list, so the drawer's actions find it. */
+/**
+ * A search result the person acts on (opens, pins, marks) joins the list, so the drawer's actions
+ * find it.
+ */
 internal fun State.adoptingSearchResult(sessionID: String): State {
     if (sessions.any { it.id == sessionID }) return this
     val found = sessionPages.search?.results?.firstOrNull { it.id == sessionID } ?: return this
@@ -316,7 +318,7 @@ internal fun State.adoptingSearchResult(sessionID: String): State {
     return s.copy(sessionPages = s.sessionPages.copy(adoptedIDs = s.sessionPages.adoptedIDs + sessionID))
 }
 
-/** The drawer actions that adopt the search result they act on (iOS `HomeFeature+Core`). */
+/** The drawer actions that adopt the search result they act on. */
 internal fun State.adoptingSearchResultFor(action: Action): State {
     val sessionID = when (action) {
         is Action.SessionTapped -> action.sessionID

@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeSwitch
@@ -50,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -60,9 +62,8 @@ import androidx.compose.ui.unit.dp
 
 /**
  * The fallback for a form too large for the dock (several fields, or an external step), as a
- * Material bottom sheet (iOS's medium/large detents → partially expanded/expanded). Questions
- * and permissions answer in the dock. The session presents it while its `activePicker` is
- * the requests sheet; [onClose] clears that.
+ * Material bottom sheet. Questions and permissions answer in the dock. The session presents it
+ * while its `activePicker` is the requests sheet; [onClose] clears that.
  *
  * @param dismissMessage what the composer's row holds while answering (it goes with Dismiss, as with the panel's ×), else null.
  * @param onOpenURL opens an external step's link (through the session's URL-opening dependency).
@@ -91,7 +92,7 @@ fun RequestReviewSheet(
     }
 }
 
-/** The request sheet's content (iOS `RequestReviewView`). */
+/** The request sheet's content. */
 @Composable
 fun RequestReviewView(
     dock: RequestDockFeature.State<*>,
@@ -116,7 +117,7 @@ fun RequestReviewView(
         Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
             OpenCodeIconButton(
                 SFSymbol.Xmark,
-                contentDescription = "Close",
+                contentDescription = stringResource(CoreR.string.common_close),
                 onClick = onClose,
                 style = OpenCodeIconButtonStyle.Standard,
                 modifier = Modifier.align(Alignment.CenterStart).testTag("request-review-close"),
@@ -144,7 +145,7 @@ fun RequestReviewView(
                     FormField(field, form, dock, responding, numberDrafts, send, onOpenURL)
                 }
                 RequestDockAnswer.origin(form, context.currentSessionID, context.familySessions)?.let { origin ->
-                    Text("Requested by $origin", style = OpenCodeTextStyles.footnote, color = colors.secondaryText)
+                    Text(stringResource(R.string.composer_review_requested_by, origin), style = OpenCodeTextStyles.footnote, color = colors.secondaryText)
                 }
             }
         }
@@ -159,7 +160,7 @@ fun RequestReviewView(
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     OpenCodeSecondaryButton(
-                        text = "Dismiss",
+                        text = stringResource(CoreR.string.common_dismiss),
                         enabled = !responding,
                         onClick = {
                             focusManager.clearFocus()
@@ -180,7 +181,7 @@ fun RequestReviewView(
                         if (responding) {
                             CircularProgressIndicator(Modifier.size(18.dp), color = LocalContentColor.current, strokeWidth = 2.dp)
                         } else {
-                            Text("Send", style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium), maxLines = 1)
+                            Text(stringResource(CoreR.string.common_send), style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium), maxLines = 1)
                         }
                     }
                 }
@@ -219,10 +220,10 @@ private fun FormField(
             OpenCodeFormFieldType.Boolean -> OptionRows(options, field, form.id, answers[field.key], dock, enabled, ::set)
             OpenCodeFormFieldType.External -> {
                 field.url?.let { url ->
-                    OpenCodeSecondaryButton(text = "Open Step", enabled = enabled, onClick = { onOpenURL(url) })
+                    OpenCodeSecondaryButton(text = stringResource(R.string.composer_review_open_step), enabled = enabled, onClick = { onOpenURL(url) })
                 }
                 Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Completed", style = OpenCodeTextStyles.body, color = colors.text, modifier = Modifier.weight(1f))
+                    Text(stringResource(R.string.composer_review_completed), style = OpenCodeTextStyles.body, color = colors.text, modifier = Modifier.weight(1f))
                     OpenCodeSwitch(
                         checked = answers[field.key] == OpenCodeFormValue.Boolean(true),
                         onCheckedChange = { set(OpenCodeFormValue.Boolean(it)) },
@@ -231,7 +232,7 @@ private fun FormField(
                 }
             }
             OpenCodeFormFieldType.Multiselect -> {
-                Text("Choose one or more", style = OpenCodeTextStyles.footnote, color = colors.secondaryText)
+                Text(stringResource(R.string.composer_request_choose_multiple), style = OpenCodeTextStyles.footnote, color = colors.secondaryText)
                 OptionRows(options, field, form.id, answers[field.key], dock, enabled, ::set)
                 if (field.custom == true) {
                     AnswerField(
@@ -314,7 +315,8 @@ private fun AnswerField(
     onChange: (String) -> Unit,
 ) {
     val colors = OpenCodeTheme.colors
-    val placeholder = if (hasOptions) (if (multiple) "Add your own" else "Answer in your own words") else "Your answer"
+    val placeholder = if (hasOptions) (if (multiple) stringResource(R.string.composer_review_add_own_placeholder) else stringResource(R.string.composer_review_own_words_placeholder)) else stringResource(R.string.composer_review_answer_placeholder)
+    val answerDescription = stringResource(R.string.composer_review_answer_description)
     Column(Modifier.fillMaxWidth()) {
         HorizontalDivider(color = colors.border)
         TextField(
@@ -337,11 +339,11 @@ private fun AnswerField(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 48.dp)
-                .semantics { contentDescription = "Your answer" },
+                .semantics { contentDescription = answerDescription },
         )
     }
 }
 
-/** Swift's `Double.formatted()` for a number answer shown back in its field. */
+/** A number answer as shown back in its field. */
 private fun formatTypedNumber(value: Double): String =
     java.text.DecimalFormat("#,##0.######", java.text.DecimalFormatSymbols.getInstance(appFormattingLocale())).format(value)

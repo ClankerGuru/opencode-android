@@ -25,8 +25,8 @@ import kotlin.math.abs
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `CatchUpFinishTests.swift`: Catch Up closing itself after its last card, and the
- * drawer row's All Caught Up moment (`CatchUpFinish.kt`).
+ * Catch Up closing itself after its last card, and the drawer row's All Caught Up moment
+ * (`CatchUpFinish.kt`).
  */
 class CatchUpFinishTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -192,7 +192,7 @@ class CatchUpFinishTests {
 
 /**
  * The same moment through `HomeFeature`: only a finished stack with nothing left to catch up on
- * celebrates, and either way Catch Up hands back to the drawer (iOS `CatchUpFinishHomeTests`).
+ * celebrates, and either way Catch Up hands back to the drawer.
  */
 class CatchUpFinishHomeTests {
     @get:Rule val isolation = TestIsolationRule()

@@ -1,5 +1,6 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.motion.MotionTransition
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.motion.rememberReduceMotion
@@ -67,6 +68,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -85,12 +88,12 @@ import java.time.Duration
 import java.time.Instant
 
 /**
- * Port of iOS `ShellOutputView`: a shell's live output in a bottom sheet. Tails while running,
- * follows the bottom unless the reader scrolls up, and ends with the command's exit status.
- * Polls only while on screen and the app is resumed.
+ * A shell's live output in a bottom sheet. Tails while running, follows the bottom unless the
+ * reader scrolls up, and ends with the command's exit status. Polls only while on screen and the
+ * app is resumed.
  *
  * @param onClose Close (or swipe away): the parent dismisses the presentation (quietly).
- * @param runningGlyph the running shell's glyph (iOS `ShellGlyph(shellIDs:)`).
+ * @param runningGlyph The running shell's glyph.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -102,7 +105,7 @@ fun ShellOutputView(
     val state by store.collectState()
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
     val isActive = lifecycle.isAtLeast(Lifecycle.State.RESUMED)
-    // Polls only while on screen and the app is active (iOS `.task(id: scenePhase == .active)`).
+    // Polls only while on screen and the app is active.
     DisposableEffect(isActive) {
         if (isActive) store.send(ShellOutputFeature.Action.Task)
         onDispose { if (isActive) store.send(ShellOutputFeature.Action.TaskEnded) }
@@ -117,10 +120,9 @@ fun ShellOutputView(
     ) {
         var isFollowing by remember { mutableStateOf(true) }
         var jumpRequest by remember { mutableIntStateOf(0) }
-        // iOS `.medium` keeps the status bar (`safeAreaBar(edge: .bottom)`) at the sheet's visible
-        // foot: the column is as tall as the part of the sheet on screen, not the whole sheet.
-        // The column's top below the sheet's (the drag handle), so the visible part is the window
-        // below the sheet's top less that.
+        // The column is as tall as the part of the sheet on screen, not the whole sheet. The
+        // column's top below the sheet's (the drag handle), so the visible part is the window below
+        // the sheet's top less that.
         var headerInSheet by remember { mutableFloatStateOf(0f) }
         // A drag moves the sheet every frame: only the output box takes the new height. The
         // toolbar, earlier-output bar and status bar keep constant constraints, so they're
@@ -181,15 +183,15 @@ fun ShellOutputView(
     if (state.isConfirmingStop) {
         OpenCodeAlertDialog(
             onDismissRequest = { store.send(ShellOutputFeature.Action.IsConfirmingStopChanged(false)) },
-            title = { Text("Stop This Shell?") },
-            text = { Text("The command ends now. The output shown here stays until you close it.") },
+            title = { Text(stringResource(R.string.session_shell_stop_confirm_title)) },
+            text = { Text(stringResource(R.string.session_shell_stop_confirm_message)) },
             confirmButton = {
                 TextButton(onClick = { store.send(ShellOutputFeature.Action.StopConfirmed) }, modifier = Modifier.testTag("shell-output-stop-confirm")) {
-                    Text("Stop Shell", color = OpenCodeTheme.colors.destructive)
+                    Text(stringResource(R.string.session_shell_stop), color = OpenCodeTheme.colors.destructive)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { store.send(ShellOutputFeature.Action.IsConfirmingStopChanged(false)) }) { Text("Cancel") }
+                TextButton(onClick = { store.send(ShellOutputFeature.Action.IsConfirmingStopChanged(false)) }) { Text(stringResource(CoreR.string.common_cancel)) }
             },
         )
     }
@@ -206,13 +208,13 @@ private fun Toolbar(state: ShellOutputFeature.State, onClose: () -> Unit, send: 
     Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         OpenCodeIconButton(
             SFSymbol.Xmark,
-            contentDescription = "Close",
+            contentDescription = stringResource(CoreR.string.common_close),
             onClick = onClose,
             style = OpenCodeIconButtonStyle.Standard,
             modifier = Modifier.testTag("shell-output-close"),
         )
-        // The title is centred on the sheet (iOS `.principal`): the leading side holds one
-        // control and the trailing two, so it gives the difference back.
+        // The title is centred on the sheet: the leading side holds one control and the trailing
+        // two, so it gives the difference back.
         Spacer(Modifier.width(48.dp))
         Text(
             state.shell.title,
@@ -225,7 +227,7 @@ private fun Toolbar(state: ShellOutputFeature.State, onClose: () -> Unit, send: 
         )
         OpenCodeIconButton(
             if (didCopy) SFSymbol.Checkmark else SFSymbol.SquareOnSquare,
-            contentDescription = if (didCopy) "Copied" else "Copy Output",
+            contentDescription = if (didCopy) stringResource(CoreR.string.common_copied) else stringResource(R.string.session_shell_copy_output),
             onClick = {
                 send(ShellOutputFeature.Action.CopyOutputTapped)
                 didCopy = true
@@ -235,7 +237,7 @@ private fun Toolbar(state: ShellOutputFeature.State, onClose: () -> Unit, send: 
         )
         OpenCodeIconButton(
             SFSymbol.SquareAndArrowUp,
-            contentDescription = "Share Output",
+            contentDescription = stringResource(R.string.session_shell_share_output),
             onClick = { send(ShellOutputFeature.Action.ShareOutputTapped) },
             style = OpenCodeIconButtonStyle.Standard,
             enabled = state.output.isNotEmpty(),
@@ -252,7 +254,7 @@ private fun EarlierOutputBar(state: ShellOutputFeature.State, onLoadEarlier: () 
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
-            if (state.canLoadEarlier) "Earlier output hidden" else "Showing the last 4 MB",
+            if (state.canLoadEarlier) stringResource(R.string.session_shell_earlier_output_hidden) else stringResource(R.string.session_shell_showing_last_output),
             style = OpenCodeTextStyles.footnote,
             color = OpenCodeTheme.colors.secondaryText,
             modifier = Modifier.weight(1f),
@@ -266,7 +268,7 @@ private fun EarlierOutputBar(state: ShellOutputFeature.State, onLoadEarlier: () 
                 if (state.isLoadingEarlier) {
                     CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                 } else {
-                    Text("Load Earlier", style = OpenCodeTextStyles.footnote.copy(fontWeight = FontWeight.SemiBold))
+                    Text(stringResource(R.string.session_shell_load_earlier), style = OpenCodeTextStyles.footnote.copy(fontWeight = FontWeight.SemiBold))
                 }
             }
         }
@@ -277,11 +279,11 @@ private fun EarlierOutputBar(state: ShellOutputFeature.State, onLoadEarlier: () 
 private fun Content(state: ShellOutputFeature.State, isFollowing: Boolean, jumpRequest: Int, onFollowingChanged: (Boolean) -> Unit) {
     when {
         state.output.isNotEmpty() -> ShellOutputTextView(state.output, state.startCursor, isFollowing, jumpRequest, onFollowingChanged)
-        state.isUnavailable -> EmptyState("Output Unavailable", "The server no longer has this shell’s output.")
+        state.isUnavailable -> EmptyState(stringResource(R.string.session_shell_output_unavailable_title), stringResource(R.string.session_shell_output_unavailable_message))
         !state.isLoaded -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         else -> EmptyState(
-            if (state.isRunning) "No Output Yet" else "No Output",
-            if (state.isRunning) "Output appears here as the command writes it." else null,
+            if (state.isRunning) stringResource(R.string.session_shell_no_output_yet_title) else stringResource(R.string.session_shell_no_output_title),
+            if (state.isRunning) stringResource(R.string.session_shell_no_output_yet_message) else null,
         )
     }
 }
@@ -356,9 +358,9 @@ private class OutputLines {
 }
 
 /**
- * Port of iOS `ShellOutputTextView`: monospaced, wrapped, selectable output. Lines are lazy rows
- * keyed by byte offset, so new output appends in place instead of re-laying out the capture.
- * Following: the reader's own scrolling within 32 dp of the bottom follows; anything else stops.
+ * Monospaced, wrapped, selectable output. Lines are lazy rows keyed by byte offset, so new output
+ * appends in place instead of re-laying out the capture. Following: the reader's own scrolling
+ * within 32 dp of the bottom follows; anything else stops.
  */
 @Composable
 private fun ShellOutputTextView(text: String, startCursor: Int, isFollowing: Boolean, jumpRequest: Int, onFollowingChanged: (Boolean) -> Unit) {
@@ -390,14 +392,13 @@ private fun ShellOutputTextView(text: String, startCursor: Int, isFollowing: Boo
             if (userScrolling && it != following) reportFollowing(it)
         }
     }
-    // Every render while following ends at the bottom: new lines, or more of the last one
-    // (iOS `render(text:startCursor:in:)` scrolls after every append).
+    // Every render while following ends at the bottom: new lines, or more of the last one.
     LaunchedEffect(lines, isFollowing) {
         if (isFollowing && lines.isNotEmpty()) listState.scrollToItem(lines.size - 1, Int.MAX_VALUE / 2)
     }
     // A resize (the sheet dragged or settling on a detent) keeps a following reader at the bottom
-    // in the same layout pass (iOS `onResize`): the bottom is asked for before the list measures
-    // at its new height, so its last lines never lag a frame behind the status bar.
+    // in the same layout pass: the bottom is asked for before the list measures at its new height,
+    // so its last lines never lag a frame behind the status bar.
     val lineCount by rememberUpdatedState(lines.size)
     val measuredHeight = remember { intArrayOf(-1) }
     LaunchedEffect(jumpRequest) {
@@ -444,13 +445,12 @@ private fun JumpToLatest(visible: Boolean, modifier: Modifier, onClick: () -> Un
     AnimatedVisibility(
         visible = visible,
         modifier = modifier.padding(16.dp),
-        // iOS `.motionMicroTransition()`.
         enter = MotionTransition.micro(reduceMotion).enter,
         exit = MotionTransition.micro(reduceMotion).exit,
     ) {
         OpenCodeIconButton(
             SFSymbol.ArrowDown,
-            contentDescription = "Scroll to latest",
+            contentDescription = stringResource(R.string.session_scroll_to_latest_description),
             onClick = onClick,
             iconSize = 20.dp,
             modifier = Modifier.testTag("shell-output-scroll-to-latest"),
@@ -467,7 +467,7 @@ private fun StatusBar(state: ShellOutputFeature.State, runningGlyph: @Composable
     ) {
         ShellStatusLabel(state, runningGlyph, Modifier.weight(1f))
         if (state.isRunning || state.isStopping) {
-            // iOS `.bordered` capsule tinted red: a tonal red fill.
+            // A tonal red fill.
             val red = OpenCodeTheme.colors.destructive
             FilledTonalButton(
                 onClick = { send(ShellOutputFeature.Action.StopTapped) },
@@ -482,7 +482,7 @@ private fun StatusBar(state: ShellOutputFeature.State, runningGlyph: @Composable
                 shape = OpenCodeShape.control,
             ) {
                 if (state.isStopping) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                else Text("Stop Shell")
+                else Text(stringResource(R.string.session_shell_stop))
             }
         }
     }
@@ -496,12 +496,12 @@ private val warningOrange = Color(0xFFFF9500)
 private fun ShellStatusLabel(state: ShellOutputFeature.State, runningGlyph: @Composable (String) -> Unit, modifier: Modifier) {
     val shell = state.shell
     val title = when {
-        state.isStopping -> "Stopping…"
-        shell.status == OpenCodeShell.Status.Running && state.isUnavailable -> "Unavailable"
-        shell.status == OpenCodeShell.Status.Running -> "Running"
-        shell.status == OpenCodeShell.Status.Killed -> "Interrupted"
-        shell.status == OpenCodeShell.Status.Timeout -> "Timed out"
-        else -> shell.exitCode?.takeIf { it != 0 }?.let { "Exited with code $it" } ?: "Exited"
+        state.isStopping -> stringResource(R.string.session_shell_status_stopping)
+        shell.status == OpenCodeShell.Status.Running && state.isUnavailable -> stringResource(R.string.session_shell_status_unavailable)
+        shell.status == OpenCodeShell.Status.Running -> stringResource(R.string.session_activity_running_description)
+        shell.status == OpenCodeShell.Status.Killed -> stringResource(R.string.session_shell_status_interrupted)
+        shell.status == OpenCodeShell.Status.Timeout -> stringResource(R.string.session_shell_status_timed_out)
+        else -> shell.exitCode?.takeIf { it != 0 }?.let { stringResource(R.string.session_shell_status_exited_with_code, it) } ?: stringResource(R.string.session_shell_status_exited)
     }
     Row(modifier.semantics(mergeDescendants = true) {}.testTag("shell-output-status"), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Box(Modifier.width(18.dp), contentAlignment = Alignment.Center) {
@@ -531,7 +531,7 @@ private fun ShellStatusLabel(state: ShellOutputFeature.State, runningGlyph: @Com
     }
 }
 
-/** The elapsed time, ticking each second while [until] is null (iOS `ShellElapsedTime`). */
+/** The elapsed time, ticking each second while [until] is null. */
 @Composable
 private fun ElapsedTime(since: Instant, until: Instant?, style: androidx.compose.ui.text.TextStyle) {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -548,10 +548,16 @@ private fun ElapsedTime(since: Instant, until: Instant?, style: androidx.compose
     val locale = appFormattingLocale()
     val text = if (seconds >= 3600) "%d:%02d:%02d".format(locale, seconds / 3600, seconds % 3600 / 60, seconds % 60)
     else "%d:%02d".format(locale, seconds / 60, seconds % 60)
+    val hours = (seconds / 3600).toInt()
+    val minutes = (seconds % 3600 / 60).toInt()
+    val secs = (seconds % 60).toInt()
+    val hoursText = pluralStringResource(R.plurals.session_shell_elapsed_hours, hours, hours)
+    val minutesText = pluralStringResource(R.plurals.session_shell_elapsed_minutes, minutes, minutes)
+    val secondsText = pluralStringResource(R.plurals.session_shell_elapsed_seconds, secs, secs)
     val spoken = buildList {
-        if (seconds >= 3600) add("${seconds / 3600} ${if (seconds / 3600 == 1L) "hour" else "hours"}")
-        if (seconds >= 60) add("${seconds % 3600 / 60} ${if (seconds % 3600 / 60 == 1L) "minute" else "minutes"}")
-        add("${seconds % 60} ${if (seconds % 60 == 1L) "second" else "seconds"}")
+        if (seconds >= 3600) add(hoursText)
+        if (seconds >= 60) add(minutesText)
+        add(secondsText)
     }.joinToString(", ")
     Text(text, style = style.copy(fontFeatureSettings = "tnum"), color = OpenCodeTheme.colors.text, modifier = Modifier.semantics { contentDescription = spoken })
 }

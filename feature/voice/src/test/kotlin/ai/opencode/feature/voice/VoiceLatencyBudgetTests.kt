@@ -54,13 +54,12 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 
 /**
- * Port of iOS `VoiceLatencyBudgetTests.swift`. A voice call waits on the delegator's tools
- * and its reply watch, so their network work has one latency budget: optional steps are
- * bounded, required ones share the request policy's window once, and a reply wait's loop is
- * its only retry layer.
+ * A voice call waits on the delegator's tools and its reply watch, so their network work has one
+ * latency budget: optional steps are bounded, required ones share the request policy's window once,
+ * and a reply wait's loop is its only retry layer.
  *
- * As on iOS, the bounded optional steps run on real time (short slices); the retry windows
- * run on a scripted clock.
+ * As, the bounded optional steps run on real time (short slices); the retry windows run on a
+ * scripted clock.
  */
 class VoiceLatencyBudgetTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
@@ -113,7 +112,7 @@ class VoiceLatencyBudgetTests {
         return start.elapsedNow()
     }
 
-    /** A test container on real time (iOS's `ContinuousClock`), with the client's transport. */
+    /** A test container on real time, with the client's transport. */
     private suspend fun <R> real(transport: OpenCodeTransport? = null, block: suspend () -> R): R = withTestDependencies({
         this[Clock] = Clock.liveValue
         this[DateClient] = DateClient.liveValue
@@ -122,7 +121,7 @@ class VoiceLatencyBudgetTests {
 
     /** The tool under the shared policy, on a scripted clock with fixed jitter. */
     private suspend fun <R> scripted(clock: ScriptedClock, transport: OpenCodeTransport, block: suspend () -> R): R = withTestDependencies({
-        // The workspace's budget is measured on the dependency clock (iOS: `NetworkRetry.clock` when set).
+        // The workspace's budget is measured on the dependency clock.
         this[Clock] = clock
         this[DateClient] = DateClient.liveValue
         this[OpenCodeTransport] = transport
@@ -381,7 +380,7 @@ class VoiceLatencyBudgetTests {
         assertEquals(2, prompts.value)
     }
 
-    // MARK: Riding out a drop (OC-236)
+    // MARK: Riding out a drop
 
     /** The tool under the shared policy, on a scripted clock with fixed jitter. */
     private suspend fun riding(tools: VoiceDelegatorWorkspace, fixture: WireFixture, name: String, arguments: String, clock: ScriptedClock = ScriptedClock()): String =
@@ -390,8 +389,8 @@ class VoiceLatencyBudgetTests {
     private val earSession = """{"data":{"id":"ses_ear","title":"Fix the earpiece routing","projectID":"ios","location":{"directory":"/p"},"time":{"created":1,"updated":2}}}"""
 
     @Test fun aSendRidesOutADroppedConnectionUnderOneID() = voiceTest {
-        // Kit's call: the link to the Mac dropped as the delegator sent. The
-        // prompt goes again under the same ID once the connection is back.
+        // The link to the Mac dropped as the delegator sent. The prompt goes again under the same
+        // ID once the connection is back.
         val prompts = LockIsolated(0)
         val fixture = WireFixture { request ->
             when (request.route) {

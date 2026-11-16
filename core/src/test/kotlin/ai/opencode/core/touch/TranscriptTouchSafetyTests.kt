@@ -7,12 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of the [TouchRecovery] cases in iOS `TranscriptTouchSafetyTests`
- * (`OpenCodeTests/TranscriptTouchSafetyTests.swift`). The rest of that suite audits UIKit's view
- * hierarchy (`TranscriptTouchSafety`, `TouchProbe`), which Compose doesn't have: see the row in
- * `docs/parity/devtools.md`.
- */
+/** See the row in `docs/parity/devtools.md`. */
 class TranscriptTouchSafetyTests {
     @get:Rule val isolation = TestIsolationRule()
 

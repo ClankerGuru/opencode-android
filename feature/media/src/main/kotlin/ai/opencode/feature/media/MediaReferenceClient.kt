@@ -41,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -51,13 +52,14 @@ import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import okhttp3.Request
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** What a `media:<hash>` load gave (iOS `MediaReferenceLoadResult`). */
+/** What a `media:<hash>` load gave. */
 sealed interface MediaReferenceLoadResult {
     class Loaded(val data: ByteArray) : MediaReferenceLoadResult {
         override fun equals(other: Any?): Boolean = other is Loaded && data.contentEquals(other.data)
@@ -72,9 +74,9 @@ sealed interface MediaReferenceLoadResult {
 }
 
 /**
- * Content-addressed media blobs (`media:<sha256>`) by hash (iOS `MediaReferenceClient`): bytes
- * are the same on every server, so memory and disk are shared; a 404 is remembered per server,
- * in memory only. The test value loads nothing and answers [MediaReferenceLoadResult.Unavailable].
+ * Content-addressed media blobs (`media:<sha256>`) by hash: bytes are the same on every server, so
+ * memory and disk are shared; a 404 is remembered per server, in memory only. The test value loads
+ * nothing and answers [MediaReferenceLoadResult.Unavailable].
  */
 class MediaReferenceClient(
     /** Memory only, without waiting, so a redrawn row shows its image at once. */
@@ -107,8 +109,7 @@ class MediaReferenceClient(
 }
 
 /**
- * Where memory warnings arrive (iOS posting `didReceiveMemoryWarningNotification` to a
- * `NotificationCenter`). [default] is Android's memory trim (`onTrimMemory` ≥ RUNNING_LOW /
+ * Where memory warnings arrive. [default] is Android's memory trim (`onTrimMemory` ≥ RUNNING_LOW /
  * `onLowMemory`); tests make their own so another test's warning never purges theirs.
  */
 class MemoryWarningCenter {
@@ -140,15 +141,15 @@ class MemoryWarningCenter {
 
 /**
  * Memory (LRU, [MAX_MEMORY_BYTES] / [MAX_MEMORY_ENTRIES]) and disk (`<hash>.blob`) tiers over one
- * coalesced fetch per server and hash (iOS `MediaReferenceLoader`). A memory warning drops the
- * memory tier; the disk tier and the per-server 404s stay.
+ * coalesced fetch per server and hash. A memory warning drops the memory tier; the disk tier and
+ * the per-server 404s stay.
  */
 class MediaReferenceLoader(
     private val directory: File?,
     private val fetch: Fetch = Fetch(MediaReferenceFetch::live),
     memoryWarnings: MemoryWarningCenter = MemoryWarningCenter.default,
 ) : CoalescedLoaderActor<MediaReferenceLoadResult>() {
-    /** Throws [OpenCodeClientError] (iOS's typed `throws(OpenCodeClientError)`). */
+    /** Throws [OpenCodeClientError]. */
     fun interface Fetch {
         suspend operator fun invoke(server: OpenCodeServer, hash: String): MediaReferenceFetch.Response
     }
@@ -294,7 +295,7 @@ class MediaReferenceLoader(
         val directory = directory ?: return
         try {
             directory.mkdirs()
-            // Atomic, as iOS's `.atomic` write: a reader never sees a half-written blob.
+            // Atomic: a reader never sees a half-written blob.
             val partial = File.createTempFile("$hash.", ".partial", directory)
             try {
                 partial.writeBytes(data)
@@ -318,18 +319,17 @@ class MediaReferenceLoader(
 
         fun shortHash(hash: String): String = MediaReferenceFetch.shortHash(hash)
 
-        /** iOS `OpenCodeClient.logDescription`: the error's kind, never its message. */
+        /** The error's kind, never its message. */
         private fun logDescription(error: OpenCodeClientError): String =
             error.transport?.let { "OpenCodeClientError ${it.rawValue}" } ?: "OpenCodeClientError"
     }
 }
 
-/** Why an attachment shows no image (iOS `MediaAttachmentFailure`). */
+/** Why an attachment shows no image. */
 enum class MediaAttachmentFailure { Unavailable, Failed }
 
 /**
- * A tile's load state (iOS `MediaAttachmentRetryState`): a failed load offers Retry, which
- * bumps [attempt] so the load runs again.
+ * A tile's load state: a failed load offers Retry, which bumps [attempt] so the load runs again.
  */
 data class MediaAttachmentRetryState(val failure: MediaAttachmentFailure? = null, val attempt: Int = 0) {
     val isTransientFailure: Boolean get() = failure == MediaAttachmentFailure.Failed
@@ -340,11 +340,10 @@ data class MediaAttachmentRetryState(val failure: MediaAttachmentFailure? = null
 }
 
 /**
- * iOS `CachedImage` (the view, in its `SessionTranscriptView.swift`): an attachment's image,
- * decoded once and cached, filling its bounds and cropping. A `media:<hash>` reference with no
- * bytes in memory loads from [server] behind a spinner; one the server no longer has shows
- * [MediaAttachmentUnavailableView] (with Retry after a transient failure). Lives here, beside
- * [CachedImage.decoded], so the composer's queued messages and the session share it.
+ * An attachment's image, decoded once and cached, filling its bounds and cropping. A `media:<hash>`
+ * reference with no bytes in memory loads from [server] behind a spinner; one the server no longer
+ * has shows [MediaAttachmentUnavailableView] (with Retry after a transient failure). Lives here,
+ * beside [CachedImage.decoded], so the composer's queued messages and the session share it.
  */
 @Composable
 fun CachedImage(
@@ -392,10 +391,9 @@ fun CachedImage(
 }
 
 /**
- * iOS `CachedImage.decoded(id:data:mediaHash:)`: an attachment's decoded original, from the
- * shared [DecodedImageCache]. A reference with no inline bytes decodes the blob already in
- * memory. Moved down from the session (iOS keeps it in `SessionTranscriptView.swift`) because
- * the media resolver needs it.
+ * An attachment's decoded original, from the shared [DecodedImageCache]. A reference with no inline
+ * bytes decodes the blob already in memory. Moved down from the session because the media resolver
+ * needs it.
  */
 object CachedImage {
     fun decoded(id: String, data: ByteArray, mediaHash: String? = null): Bitmap? {
@@ -410,18 +408,22 @@ object CachedImage {
     }
 
     /**
-     * [decoded]'s cache hit alone, without decoding: what a tile shows on its first frame
-     * while it decodes off the main thread (Android decodes eagerly; UIKit decodes lazily on draw).
+     * [decoded]'s cache hit alone, without decoding: what a tile shows on its first frame while it
+     * decodes off the main thread.
      */
     fun cached(id: String, mediaHash: String? = null): Bitmap? =
         dependency(DecodedImageCache).image(mediaHash?.let { "media:$it" } ?: "attachment:$id")
 }
 
-/**
- * Reads and loads `media:<hash>` blobs for views without each holding the client (iOS
- * `MediaReferenceResolver`).
- */
+/** Reads and loads `media:<hash>` blobs for views without each holding the client. */
 object MediaReferenceResolver {
+    /** Authenticated original for a range probe, playback, or export; never a workspace read. */
+    fun originalRequest(server: OpenCodeServer, hash: String): Request? {
+        if (!OpenCodeMediaReference.isValidHash(hash)) return null
+        val url = server.endpoint("/api/experimental/media/$hash") ?: return null
+        return server.authorize(Request.Builder().url(url).header("Accept", "*/*")).build()
+    }
+
     fun cachedData(hash: String?): ByteArray? {
         hash ?: return null
         return dependency(MediaReferenceClient).cachedData(hash)
@@ -448,7 +450,7 @@ object MediaReferenceResolver {
     suspend fun loadData(server: OpenCodeServer, hash: String): MediaReferenceLoadResult =
         dependency(MediaReferenceClient).load(server, hash)
 
-    /** The attachment's image, or why there is none (iOS's `Result<UIImage, MediaAttachmentFailure>`). */
+    /** The attachment's image, or why there is none. */
     suspend fun loadImage(server: OpenCodeServer?, attachment: OpenCodeImageAttachment): MediaImageResult {
         if (attachment.isUnavailable) return MediaImageResult.Failure(MediaAttachmentFailure.Unavailable)
         decodedImage(attachment)?.let { return MediaImageResult.Success(it) }
@@ -471,9 +473,8 @@ sealed interface MediaImageResult {
 }
 
 /**
- * What a tile shows instead of an image the server no longer has, or couldn't send (iOS
- * `MediaAttachmentUnavailableView`). A transient failure with [onRetry] is a button that loads
- * again; a [compact] tile is the glyph alone.
+ * What a tile shows instead of an image the server no longer has, or couldn't send. A transient
+ * failure with [onRetry] is a button that loads again; a [compact] tile is the glyph alone.
  */
 @Composable
 fun MediaAttachmentUnavailableView(
@@ -483,8 +484,9 @@ fun MediaAttachmentUnavailableView(
     onRetry: (() -> Unit)? = null,
     isTransientFailure: Boolean = false,
 ) {
-    val displayTitle = name?.trim()?.takeIf { it.isNotEmpty() } ?: "Image"
-    val subtitle = if (isTransientFailure) "Couldn’t load image" else "Media unavailable"
+    val displayTitle = name?.trim()?.takeIf { it.isNotEmpty() } ?: stringResource(R.string.media_image_title)
+    val subtitle = if (isTransientFailure) stringResource(R.string.media_image_load_failed) else stringResource(R.string.media_unavailable)
+    val tryAgainLabel = stringResource(R.string.media_try_again_label)
     val fill = MaterialTheme.colorScheme.surfaceContainerHigh
     val secondary = OpenCodeTheme.colors.secondaryText
     val retry = onRetry?.takeIf { isTransientFailure }
@@ -494,7 +496,7 @@ fun MediaAttachmentUnavailableView(
         testTag = "media-unavailable"
         if (retry != null) {
             role = Role.Button
-            onClick(label = "Try again") { retry(); true }
+            onClick(label = tryAgainLabel) { retry(); true }
         }
     }
     if (compact) {

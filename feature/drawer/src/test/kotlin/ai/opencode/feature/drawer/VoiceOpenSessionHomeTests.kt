@@ -31,13 +31,7 @@ import org.junit.Rule
 import org.junit.Test
 import java.util.UUID
 
-/**
- * Home's half of iOS `VoiceOpenSessionTests.voiceOpenOutsideRecentsClosesTheDrawerAndKeepsTheCall`
- * and `VoiceOpenSessionReviewTests.subagentMovesKeepTheAgentReasonAndDeduplicate`. The iOS
- * parameterised tests run one Android test per argument. Non-exhaustive like the neighbouring
- * `SubagentStackTests`: Home's switch carries reads and value-state actions the iOS test pins by
- * hand; the assertions are iOS's.
- */
+/** Non-exhaustive like the neighbouring `SubagentStackTests`. */
 class VoiceOpenSessionHomeTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -69,7 +63,7 @@ class VoiceOpenSessionHomeTests {
             )
         }.also { it.exhaustive = false }
 
-    /** A live session-delegator call on the root, as iOS's fixture. */
+    /** A live session-delegator call on the root. */
     private fun Harness.callOnRoot(listed: List<OpenCodeSession>): HomeFeature.State = state {
         var home = HomeFeature.State(server, snapshot(listed))
         home = home.copy(transcriptCache = mapOf(root.id to emptyList()))

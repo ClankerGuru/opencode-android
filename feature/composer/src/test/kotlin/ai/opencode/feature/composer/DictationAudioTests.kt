@@ -23,20 +23,15 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `DictationAudioTests.swift`.
- *
  * Dictation's audio session against a fake: which mic it picks, how long it's
  * held after each kind of press, and what lets it go.
  *
- * Android has no app-wide audio session (see [DictationAudioSessionControlling]):
- * there is no category, mode or options to set, no
- * `allowHapticsAndSystemSoundsDuringRecording`, no
- * `prefersNoInterruptionsFromSystemAlerts`, and deactivation has no
- * `.notifyOthersOnDeactivation`. Assertions on those are dropped (the fake
- * records `inactive` for iOS's `inactive notify=true`); everything else is
- * kept. Dropped whole for the same reason: `aStoppedMicUnderACallLeavesItsSettings`
- * and `anOlderRecordingsStopNeverTouchesTheNewerOne` (each only checks
- * `prefersNoInterruptionsFromSystemAlerts`).
+ * Android has no app-wide audio session (see [DictationAudioSessionControlling]): there is no
+ * category, mode or options to set, no `allowHapticsAndSystemSoundsDuringRecording`, no
+ * `prefersNoInterruptionsFromSystemAlerts`, and deactivation has no `.notifyOthersOnDeactivation`.
+ * Assertions on those are dropped; everything else is kept. Dropped whole for the same reason:
+ * `aStoppedMicUnderACallLeavesItsSettings` and `anOlderRecordingsStopNeverTouchesTheNewerOne` (each
+ * only checks `prefersNoInterruptionsFromSystemAlerts`).
  */
 class DictationAudioTests {
     class FakeSession : DictationAudioSessionControlling {
@@ -47,7 +42,7 @@ class DictationAudioTests {
         override var isOtherAudioPlaying = false
         override var sampleRate = 44_100.0
         override var ioBufferDuration = 0.010
-        /** Settable backing for [preferredSampleRate] (iOS sets the fake's property directly). */
+        /** Settable backing for [preferredSampleRate]. */
         var preferredRate = 0.0
         var preferredBuffer = 0.0
         override val preferredSampleRate: Double get() = preferredRate
@@ -137,7 +132,6 @@ class DictationAudioTests {
             ),
         )
 
-        /** iOS posting a notification on the harness's `NotificationCenter`. */
         fun post(event: DictationAudioEvent) = observer!!.invoke(event)
 
         /** One press: the mic on for [seconds], then released as [end]. */
@@ -169,11 +163,8 @@ class DictationAudioTests {
     }
 
     /**
-     * iOS drives a `VoiceAudioEngine` through an interruption for the call; its
-     * recovery is covered by the voice suite (`VoiceAudioAndTranscriptTests`).
-     * Here the call is a holder on the same shared [AudioSessionOwner]: dictation
-     * coming and going never releases the call's session, and the call's own
-     * release deactivates it once.
+     * Here the call is a holder on the same shared [AudioSessionOwner]: dictation coming and going
+     * never releases the call's session, and the call's own release deactivates it once.
      */
     @Test fun aCallRecoversAndReleasesAfterNewerDictationComesAndGoes() {
         val owner = AudioSessionOwner(schedule = { _, _ -> })
@@ -342,7 +333,6 @@ class DictationAudioTests {
         assertEquals("dictation_session_released reason=expired end=send held=12s other=0", harness.lines.last())
     }
 
-    /** iOS also checks the held session isn't re-categorized: Android sets no category at all. */
     @Test fun aNewPressTakesTheHeldSessionAsItIs() {
         val harness = Harness()
         harness.press(DictationEnd.Insert)
@@ -386,11 +376,7 @@ class DictationAudioTests {
         }
     }
 
-    /**
-     * iOS's silence-secondary-audio hint also has an `.end`, which changes
-     * nothing; Android only reports other audio beginning
-     * ([DictationAudioEvent.OtherAudioBegan]).
-     */
+    /** Android only reports other audio beginning ([DictationAudioEvent.OtherAudioBegan]). */
     @Test fun anotherAppStartingToPlayEndsTheHold() {
         val harness = Harness()
         harness.press(DictationEnd.Insert)
@@ -454,7 +440,7 @@ class DictationAudioTests {
         assertEquals(listOf("inactive"), harness.session.calls)
         assertTrue(harness.session.isActive)
         assertEquals(48_000.0, harness.session.preferredSampleRate, 0.0)
-        // iOS logs the OSStatus (560030580); Android has no status code, so the exception's type.
+        // Android has no status code, so the exception's type.
         assertTrue(harness.lines.any { it.startsWith("audio_session_deactivate_failed source=dictation code=") })
     }
 
@@ -665,14 +651,7 @@ class DictationAudioTests {
     }
 }
 
-/**
- * Port of iOS `DictationHoldReportingTests` (in `DictationAudioTests.swift`):
- * how the reducer tells the client a press ended, which picks its hold.
- *
- * Skipped → `:feature:session` (they drive `SessionFeature`):
- * `theComposerLetsAHeldSessionGo`, `aCallStartsOnlyOnceDictationHasLetGo`,
- * `raiseToTalkWaitsForDictationToo`.
- */
+/** How the reducer tells the client a press ended, which picks its hold. */
 class DictationHoldReportingTests {
     data class Ended(val press: Int, val end: DictationEnd)
 

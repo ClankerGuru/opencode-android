@@ -15,11 +15,8 @@ import kotlin.math.abs
 import kotlin.math.max
 
 /**
- * Drives [AutocompleteSimulation] per frame (iOS `AutocompleteMotionController`, which steps it
- * on a 60–120 Hz `CADisplayLink`). A plain object: it publishes [currentFrame] as Compose
- * state and asks for frames through [needsFrames]; [AutocompleteMotionDriver] runs the
- * frame loop ([motionFrameLoop]) while it does. iOS's per-frame glass trace
- * (`-lab-glass-trace`) and Motion X-Ray reporting are lab tooling and not ported.
+ * Drives [AutocompleteSimulation] per frame. Publishes [currentFrame] as Compose state and asks for
+ * frames through [needsFrames]; [AutocompleteMotionDriver] runs the frame loop while it does.
  */
 @Stable
 class AutocompleteMotionController {
@@ -39,7 +36,7 @@ class AutocompleteMotionController {
         private set
     private var lastChooseGeneration = 0
 
-    /** The landing slot of an inline chip in composer-local dp (iOS `chipSlotProvider`). */
+    /** The landing slot of an inline chip in composer-local dp. */
     var chipSlotProvider: ((UUID) -> AutocompleteRect?)? = null
 
     /**
@@ -48,7 +45,7 @@ class AutocompleteMotionController {
      */
     var composerAnchor: (() -> androidx.compose.ui.layout.LayoutCoordinates?)? = null
 
-    /** Called when a chip flight lands, so the text field shows the inline chip (iOS `onChipFlightLanded`). */
+    /** Called when a chip flight lands, so the text field shows the inline chip. */
     var onChipFlightLanded: (() -> Unit)? = null
 
     val isOpen: Boolean get() = currentFrame.isOpen
@@ -128,13 +125,13 @@ class AutocompleteMotionController {
         updateCurrentFrame()
     }
 
-    /** The finger let go: a list held past its end springs home (iOS `endScroll`). */
+    /** The finger let go: a list held past its end springs home. */
     fun endScroll() {
         simulation.endScroll()
         if (simulation.isAnimating) needsFrames = true
     }
 
-    /** Steps one frame of [dt] seconds; returns whether more frames are needed (iOS `tick`). */
+    /** Steps one frame of [dt] seconds; returns whether more frames are needed. */
     fun tick(dt: Double): Boolean {
         // Keep in-flight chip targets synced with the text field's live layout.
         val provider = chipSlotProvider
@@ -157,13 +154,13 @@ class AutocompleteMotionController {
     }
 }
 
-/** Remembers one [AutocompleteMotionController] (iOS `@State var autocompleteController`). */
+/** Remembers one [AutocompleteMotionController]. */
 @Composable
 fun rememberAutocompleteMotionController(): AutocompleteMotionController = remember { AutocompleteMotionController() }
 
 /**
- * Runs [controller]'s frame loop while it animates (iOS's `CADisplayLink` start/stop). Place
- * it once where the controller lives; leaving composition stops it.
+ * Runs [controller]'s frame loop while it animates. Place it once where the controller lives;
+ * leaving composition stops it.
  */
 @Composable
 fun AutocompleteMotionDriver(controller: AutocompleteMotionController) {
@@ -171,7 +168,7 @@ fun AutocompleteMotionDriver(controller: AutocompleteMotionController) {
     val needsFrames = controller.needsFrames
     LaunchedEffect(controller, needsFrames, frameDuration) {
         if (!needsFrames) return@LaunchedEffect
-        // iOS clamps each tick to 1/20 s; let the loop pass that through (the simulation clamps too).
+        // Let the loop pass that through (the simulation clamps too).
         val maxFrames = max(2.0, (1.0 / 20.0) / frameDuration)
         motionFrameLoop(frameDurationSeconds = frameDuration, maxFrames = maxFrames) { tick ->
             if (controller.tick(tick.dt)) MotionFrameAction.Continue else MotionFrameAction.Stop

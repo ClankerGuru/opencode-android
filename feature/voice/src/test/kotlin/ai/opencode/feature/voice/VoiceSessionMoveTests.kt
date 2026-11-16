@@ -19,13 +19,10 @@ import org.junit.Test
 import java.time.Instant
 
 /**
- * From Kit's Oct 24 call: switching sessions with the orb flashed “Now
- * talking in SEER”, “Now talking in HOME” (“I'm the one to switch
- * sessions”).
+ * Switching sessions with the orb flashed “Now talking in SEER”, “Now talking in HOME” (“I'm the
+ * one to switch sessions”).
  *
- * iOS's `forgetTranscripts()` clears the records from the process-wide
- * shared store; each [Harness] has its own in-memory one, so there is
- * nothing to forget.
+ * Each [Harness] has its own in-memory one, so there is nothing to forget.
  */
 class VoiceSessionMoveTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")

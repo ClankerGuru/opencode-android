@@ -15,13 +15,7 @@ import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
 
-/**
- * Port of iOS `OnePickerTests`: catalog, provider-mark and 120 Hz motion-audit tests for One
- * Picker. Not ported: the reducer test (`pickingModelAndChangingInlineLevel…`, session's
- * `SessionFeature`), `tunablesRegisterAndUnregisterCleanly` (Tuning Panel), and the UIKit
- * controller/window rigs (`motionXRay…`, `overlapDetectors…`, `transcriptHoldsKeyboardPlace…`,
- * `openAndCloseRedrawOnly…`, `rowGlyphsRenderOncePerParameterSet`).
- */
+/** Catalog, provider-mark and 120 Hz motion-audit tests for One Picker. */
 class OnePickerTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -105,8 +99,7 @@ class OnePickerTests {
         assertTrue("Non-adjustable models never invent a level", !parsedHaiku.matched && parsedHaiku.level == null)
     }
 
-    // Provider marks & filled fallback. iOS's `templateImage` size/rendering-mode checks are
-    // UIKit: the Compose mark draws the same squircle directly.
+    // Provider marks & filled fallback. The Compose mark draws the same squircle directly.
 
     @Test
     fun providerMarksUseRealAssetsAndFilledFallbackForUnknownProviders() {

@@ -1,10 +1,11 @@
 package ai.opencode.feature.media
 
+import ai.opencode.core.store.Store
+
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionRole
-import ai.opencode.core.touch.TouchRecovery
-import ai.opencode.core.touch.rememberTouchRecovery
+import ai.opencode.core.strings.localized
 import ai.opencode.core.ui.AppearanceColorScheme
 import ai.opencode.core.ui.OpenCodeAppTheme
 import ai.opencode.core.ui.OpenCodeTheme
@@ -46,6 +47,11 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.LayoutDirection
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -60,8 +66,10 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -96,6 +104,7 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
@@ -108,8 +117,8 @@ import kotlin.math.roundToInt
 // MARK: - Sources
 
 /**
- * Which corners of a source are rounded (iOS `CACornerMask`): a collage tile rounds only the
- * collage's own. Absolute (not start/end), like the mask and the flight's window frame.
+ * Which corners of a source are rounded: a collage tile rounds only the collage's own. Absolute
+ * (not start/end), like the mask and the flight's window frame.
  */
 data class MediaCorners(
     val topLeft: Boolean = true,
@@ -148,14 +157,13 @@ data class MediaCorners(
 }
 
 /**
- * The views full-screen media zooms out of and back into (iOS `MediaZoomSources`). Thumbnails
- * register their layout coordinates by media ID; lists reuse items, so each source carries the
- * media it shows now and lookups check it. A UI registry like iOS's `MediaZoomSources.shared`
- * (not a business service), only touched on the main thread.
+ * The views full-screen media zooms out of and back into. Thumbnails register their layout
+ * coordinates by media ID; lists reuse items, so each source carries the media it shows now and
+ * lookups check it. A UI registry, only touched on the main thread.
  */
 @Stable
 class MediaZoomSources internal constructor() {
-    /** A registered view (iOS `MediaZoomSourceView`). */
+    /** A registered view. */
     class Source internal constructor() {
         /** The first is the media this view shows; the rest are pages it stands in for, like the collage's “+2” tile. */
         var mediaIDs: List<String> = emptyList()
@@ -164,6 +172,8 @@ class MediaZoomSources internal constructor() {
         internal var cornerRadius: Dp = 0.dp
         internal var corners: MediaCorners = MediaCorners.All
         internal var density: Float = 1f
+        /** It draws the media itself (a thumbnail), so the viewer lands on it without a fade; a card only stands in for it. */
+        internal var showsMedia: Boolean = false
 
         /** Its exact frame in the window, unclipped. */
         val windowRect: Rect?
@@ -179,6 +189,15 @@ class MediaZoomSources internal constructor() {
                 val coordinates = coordinates?.takeIf { it.isAttached } ?: return false
                 val visible = coordinates.boundsInWindow()
                 return visible.width > 0f && visible.height > 0f
+            }
+
+        /** Nothing of it clipped away, so the media can land on all of it. */
+        internal val isFullyVisible: Boolean
+            get() {
+                val coordinates = coordinates?.takeIf { it.isAttached } ?: return false
+                val visible = coordinates.boundsInWindow()
+                val area = coordinates.size.width.toFloat() * coordinates.size.height
+                return area > 0f && visible.width * visible.height >= area * 0.98f
             }
 
         val cornerRadiusPx: Float get() = cornerRadius.value * density
@@ -214,7 +233,7 @@ class MediaZoomSources internal constructor() {
     }
 
     companion object {
-        /** The process's one registry (iOS `MediaZoomSources.shared`). */
+        /** The process's one registry. */
         val shared: MediaZoomSources = MediaZoomSources()
     }
 }
@@ -223,13 +242,15 @@ private class MediaZoomSourceElement(
     val ids: List<String>,
     val cornerRadius: Dp,
     val corners: MediaCorners,
+    val showsMedia: Boolean,
 ) : ModifierNodeElement<MediaZoomSourceNode>() {
-    override fun create() = MediaZoomSourceNode(ids, cornerRadius, corners)
+    override fun create() = MediaZoomSourceNode(ids, cornerRadius, corners, showsMedia)
 
     override fun update(node: MediaZoomSourceNode) {
         node.source.mediaIDs = ids
         node.source.cornerRadius = cornerRadius
         node.source.corners = corners
+        node.source.showsMedia = showsMedia
     }
 
     override fun InspectorInfo.inspectableProperties() {
@@ -238,20 +259,23 @@ private class MediaZoomSourceElement(
     }
 
     override fun equals(other: Any?) =
-        other is MediaZoomSourceElement && other.ids == ids && other.cornerRadius == cornerRadius && other.corners == corners
+        other is MediaZoomSourceElement && other.ids == ids && other.cornerRadius == cornerRadius && other.corners == corners &&
+            other.showsMedia == showsMedia
 
-    override fun hashCode() = (ids.hashCode() * 31 + cornerRadius.hashCode()) * 31 + corners.hashCode()
+    override fun hashCode() = ((ids.hashCode() * 31 + cornerRadius.hashCode()) * 31 + corners.hashCode()) * 31 + showsMedia.hashCode()
 }
 
 private class MediaZoomSourceNode(
     ids: List<String>,
     cornerRadius: Dp,
     corners: MediaCorners,
+    showsMedia: Boolean,
 ) : Modifier.Node(), GlobalPositionAwareModifierNode, CompositionLocalConsumerModifierNode {
     val source = MediaZoomSources.Source().also {
         it.mediaIDs = ids
         it.cornerRadius = cornerRadius
         it.corners = corners
+        it.showsMedia = showsMedia
     }
 
     override fun onAttach() {
@@ -270,18 +294,17 @@ private class MediaZoomSourceNode(
 }
 
 /**
- * Marks a card or row that opens full-screen media, so the viewer zooms out of it and back
- * into it (iOS `.mediaZoomSource(id:cornerRadius:)`). Only its frame and shape are used; the
- * card itself stays visible.
+ * Marks a card or row that opens full-screen media, so the viewer zooms out of it and back into it.
+ * Only its frame and shape are used. [showsMedia]: it draws the media itself (cropped to fill), so
+ * the media lands on it without fading.
  */
-fun Modifier.mediaZoomSource(id: String, cornerRadius: Dp = 0.dp): Modifier =
-    this then MediaZoomSourceElement(listOf(id), cornerRadius, MediaCorners.All)
+fun Modifier.mediaZoomSource(id: String, cornerRadius: Dp = 0.dp, showsMedia: Boolean = false): Modifier =
+    this then MediaZoomSourceElement(listOf(id), cornerRadius, MediaCorners.All, showsMedia)
 
 /**
- * An image the full-screen viewer zooms out of and back into (iOS `MediaThumbnail`), so the
- * flight can start and land on exactly its frame and shape. It leaves the transcript (alpha 0)
- * while its media is up full screen. Decorative: the button around it carries the label and
- * takes the taps.
+ * An image the full-screen viewer zooms out of and back into, so the flight can start and land on
+ * exactly its frame and shape. It leaves the transcript (alpha 0) while its media is up full
+ * screen. Decorative: the button around it carries the label and takes the taps.
  *
  * @param ids the media this shows, then any pages it stands in for.
  * @param fits fill crops to the frame; fit sizes itself to the image, at most [maxHeight] tall.
@@ -307,7 +330,7 @@ fun MediaThumbnail(
         filterQuality = FilterQuality.High,
         modifier = modifier
             .thumbnailSize(image, fits, maxHeight)
-            .then(MediaZoomSourceElement(ids, cornerRadius, corners))
+            .then(MediaZoomSourceElement(ids, cornerRadius, corners, showsMedia = true))
             .graphicsLayer {
                 alpha = if (sources.isHidden(ids)) 0f else 1f
                 this.shape = shape
@@ -316,9 +339,12 @@ fun MediaThumbnail(
     )
 }
 
-/** iOS `sizeThatFits`: fill takes the proposal (the image's size where unspecified); fit fits the image, at most [maxHeight] tall. */
+/**
+ * Fill takes the proposal (the image's size where unspecified); fit fits the image, at most
+ * [maxHeight] tall.
+ */
 private fun Modifier.thumbnailSize(image: Bitmap, fits: Boolean, maxHeight: Dp): Modifier = layout { measurable, constraints ->
-    // iOS sizes decoded originals at scale 1: pixels as points.
+    // Pixels as points.
     val imageSize = Size(image.width.dp.toPx(), image.height.dp.toPx())
     val width = if (constraints.hasBoundedWidth) constraints.maxWidth.toFloat() else imageSize.width
     val proposedHeight = if (constraints.hasBoundedHeight) constraints.maxHeight.toFloat() else Float.POSITIVE_INFINITY
@@ -329,7 +355,7 @@ private fun Modifier.thumbnailSize(image: Bitmap, fits: Boolean, maxHeight: Dp):
         Size(width, if (proposedHeight.isInfinite()) imageSize.height else proposedHeight)
     }
     // The image keeps its own frame (its clip, and where flights start and land) even when the
-    // caller insists on a larger one (`fillMaxWidth`): centred in it, as a SwiftUI frame does.
+    // caller insists on a larger one (`fillMaxWidth`): centred in it.
     val w = size.width.roundToInt().coerceIn(0, constraints.maxWidth)
     val h = size.height.roundToInt().coerceIn(0, constraints.maxHeight)
     val placeable = measurable.measure(androidx.compose.ui.unit.Constraints.fixed(w, h))
@@ -341,8 +367,8 @@ private fun Modifier.thumbnailSize(image: Bitmap, fits: Boolean, maxHeight: Dp):
 // MARK: - Viewer
 
 /**
- * What the presentation needs from the full-screen content, and what the content needs from
- * the presentation (iOS `MediaViewerState`). Content reads it from [LocalMediaViewer].
+ * What the presentation needs from the full-screen content, and what the content needs from the
+ * presentation. Content reads it from [LocalMediaViewer].
  */
 @Stable
 class MediaViewerState(sourceID: String?) {
@@ -350,9 +376,16 @@ class MediaViewerState(sourceID: String?) {
     var sourceID: String? by mutableStateOf(sourceID)
         private set
 
-    /** The image on screen, flown in and out in place of the content (not observed). */
-    var image: Bitmap? = null
+    /** The image on screen: its page draws it where the motion places it ([placeImage]). */
+    var image: Bitmap? by mutableStateOf(null)
         private set
+
+    /** The page on screen plays a video, which opens once its first frame is up ([videoRendered]). */
+    var isVideo by mutableStateOf(false)
+        private set
+
+    /** The video whose first frame is up. */
+    internal var renderedID: String? by mutableStateOf(null)
 
     /** A zoomed-in image pans instead of dismissing. */
     var isZoomed by mutableStateOf(false)
@@ -369,8 +402,15 @@ class MediaViewerState(sourceID: String?) {
     var statusBarHidden by mutableStateOf(false)
         internal set
 
-    /** The image on screen is drawn by the flight above the content: while it flies in, while it's dragged, and while it flies home. */
+    /** The image on screen is drawn by the hand-off's flight instead. */
     var mediaHidden by mutableStateOf(false)
+        internal set
+
+    /**
+     * Where the selected image page draws an image laid out at a frame, while the presentation
+     * moves it (open, drag, close); null draws it in place.
+     */
+    var placeImage: (frame: Rect) -> MediaPlacement? = { null }
         internal set
 
     /** Where each page lays its image out, by media ID, so flights land exactly on it. */
@@ -388,15 +428,27 @@ class MediaViewerState(sourceID: String?) {
     /** Puts the media away without flying it home, for media that's gone (a composer photo removed from the viewer). */
     var discard: () -> Unit = {}
         internal set
+
+    var handOff: (handOff: DrawingHandOff, frame: Rect?) -> Unit = { _, _ -> }
+        internal set
+
+    var handOffCovered by mutableStateOf(false)
+        internal set
     internal var onShow: () -> Unit = {}
 
     /** The content moved to another page or finished loading its image. */
-    fun show(sourceID: String?, image: Bitmap?) {
+    fun show(sourceID: String?, image: Bitmap?, isVideo: Boolean = false) {
         val moved = sourceID != this.sourceID
         this.sourceID = sourceID
         this.image = image
+        this.isVideo = isVideo
         isZoomed = false
         if (moved) onShow()
+    }
+
+    /** A video page's first frame is up ([id]), or gone (null). */
+    fun videoRendered(id: String?) {
+        renderedID = id
     }
 
     fun setStatusBarHidden(hidden: Boolean) {
@@ -405,13 +457,12 @@ class MediaViewerState(sourceID: String?) {
     }
 }
 
-/** iOS `EnvironmentValues.mediaViewer`. */
 val LocalMediaViewer = staticCompositionLocalOf<MediaViewerState?> { null }
 
 /**
- * A badge on a thumbnail's corner (a composer photo's ×, a video's duration). It rides the
- * flight pinned to that corner at its own size (the bitmap's pixels), fading out as the image
- * flies in and back in as it flies home (iOS `MediaFlightAccessory`).
+ * A badge on a thumbnail's corner (a composer photo's ×, a video's duration). It rides the flight
+ * pinned to that corner at its own size (the bitmap's pixels), fading out as the image flies in and
+ * back in as it flies home.
  */
 class MediaFlightAccessory(
     val image: Bitmap,
@@ -423,16 +474,15 @@ class MediaFlightAccessory(
 }
 
 /**
- * Full-screen media and files (iOS `MediaPresenter`). Media opens the Photos way: it flies out
- * of what was tapped, follows a drag down while shrinking, rounding toward the thumbnail's
- * corners and letting the session show through, and flies back on release (or springs back
- * from a short drag). Documents zoom out of their source, and a swipe down (from anywhere a
- * scroll view doesn't take it) shrinks them toward it and zooms them home, as the system zoom's
- * does. Under Reduce Motion both cross-fade, and a drag down fades them out. One viewer at a
- * time.
+ * Full-screen media and files. Media opens the Photos way: it flies out of what was tapped, follows
+ * a drag down while shrinking, rounding toward the thumbnail's corners and letting the session show
+ * through, and flies back on release (or springs back from a short drag). Documents zoom out of
+ * their source, and a swipe down (from anywhere a scroll view doesn't take it) shrinks them toward
+ * it and zooms them home, as the system zoom's does. Under Reduce Motion both cross-fade, and a
+ * drag down fades them out. One viewer at a time.
  *
  * [MediaView] owns the presenter and provides it as [LocalMediaPresenter] to the content it
- * hosts; the transcript image viewer goes through the store ([presentImage]).
+ * hosts; the transcript image viewer goes through the store ([presentPreview]).
  */
 @Stable
 class MediaPresenter internal constructor() {
@@ -447,10 +497,9 @@ class MediaPresenter internal constructor() {
     )
 
     internal var presentation: Presentation? by mutableStateOf(null)
-    internal var imageViewerIsUp: () -> Boolean = { false }
-    internal var sendImage: (TranscriptImagePreview) -> Unit = {}
+    internal var reducesMotion = false
 
-    val isPresenting: Boolean get() = presentation != null || imageViewerIsUp()
+    val isPresenting: Boolean get() = presentation != null
 
     /**
      * Presents [content] full screen; ignored while a viewer is up. [flightAccessories] are the
@@ -472,7 +521,7 @@ class MediaPresenter internal constructor() {
             sourceID,
             isMedia,
             reducesMotion,
-            screenName ?: if (isMedia) "Media Viewer" else "File Viewer",
+            screenName ?: if (isMedia) localized(R.string.media_viewer_screen_title) else localized(R.string.media_file_viewer_screen_title),
             flightAccessories,
             onDismiss,
             content,
@@ -480,17 +529,26 @@ class MediaPresenter internal constructor() {
         return true
     }
 
-    /** iOS `SessionView.presentImage`: the transcript image viewer, through [MediaFeature]. */
-    fun presentImage(preview: TranscriptImagePreview) {
-        if (presentation != null) return
-        sendImage(preview)
+    /** A store per presentation, so the opening prompt and its cancellable effects end together. */
+    fun presentPreview(
+        preview: TranscriptImagePreview,
+        addDrawing: ImageDrawingAdd? = null,
+        documentGallery: (AgentFileDestination) -> TranscriptImagePreview? = { null },
+        flightAccessories: ((String) -> List<MediaFlightAccessory>)? = null,
+    ) {
+        if (isPresenting) return
+        val file = preview.pages.firstOrNull { it.id == preview.id }?.file
+        val store = Store(
+            FullscreenViewerFeature.State(preview, allowsDrawing = addDrawing != null),
+            FullscreenViewerFeature(addDrawing),
+        )
+        present(preview.id, file?.reference?.kind?.isMedia ?: true, reducesMotion, flightAccessories = flightAccessories, onDismiss = store::close) { viewer ->
+            CompositionLocalProvider(LocalDocumentVisualGallery provides documentGallery) { FullscreenViewer(store, viewer) }
+        }
     }
 
     companion object {
-        /**
-         * Media plays in a dark room; documents and text viewers follow the app's appearance
-         * (iOS `interfaceStyle(isMedia:)`; the DEBUG lab override is iOS-only).
-         */
+        /** Media plays in a dark room; documents and text viewers follow the app's appearance. */
         fun isDarkRoom(isMedia: Boolean): Boolean = isMedia
     }
 }
@@ -499,9 +557,8 @@ class MediaPresenter internal constructor() {
 val LocalMediaPresenter = staticCompositionLocalOf<MediaPresenter?> { null }
 
 /**
- * The Photos drag (iOS `MediaDismissDrag`): how media shrinks, rounds, and lets the session
- * show through as it's pulled down, and when letting go puts it away. Distances in one unit;
- * [dismisses] takes dp and dp/s (iOS points).
+ * The Photos drag: how media shrinks, rounds, and lets the session show through as it's pulled
+ * down, and when letting go puts it away. Distances in one unit; [dismisses] takes dp and dp/s.
  */
 data class MediaDismissDrag(val screenHeight: Float) {
     /** How far down the media is at its smallest and the session fully shows. */
@@ -542,10 +599,9 @@ internal object MediaBackPreview {
 }
 
 /**
- * The viewer's motion roles (iOS `MediaViewerController` on `Motion`): fly in, content open and
- * the zoom dismissal on surface; a short drag back to the photo on panel open (its slight bounce
- * keeps Photos' cushion); home to the thumbnail on flight; nowhere to land, carried on and faded
- * on panel close; the backdrop's fade in on dim.
+ * The viewer's motion roles: open and the documents' close on surface; a short drag back on panel
+ * open; home to the thumbnail on flight; nowhere to land,
+ * carried on and faded on panel close; the backdrop's fade in on dim.
  */
 internal object MediaMotion {
     val open = MotionRole.Surface
@@ -553,332 +609,360 @@ internal object MediaMotion {
     val home = MotionRole.Flight
     val away = MotionRole.PanelClose
     val backdropIn = MotionRole.Dim
-    /** Fade style's open (0.2 s). */
+    /** Reduce Motion's open (0.2 s). */
     const val fade = 0.2
 }
 
-/** The content's transform about the host's centre (iOS `host.view.transform`). */
-internal data class HostTransform(val scale: Float = 1f, val tx: Float = 0f, val ty: Float = 0f) {
-    companion object {
-        val Identity = HostTransform()
+/**
+ * Where the viewer draws media laid out at a frame: scaled by [scale] about the origin, moved by
+ * [offset], and clipped to [clip] (rounded by [radius] on [corners]).
+ */
+class MediaPlacement internal constructor(
+    val scale: Float,
+    val offset: Offset,
+    val clip: Rect?,
+    val radius: Float,
+    val corners: MediaCorners,
+    val alpha: Float,
+) {
+    fun map(rect: Rect): Rect = Rect(
+        rect.left * scale + offset.x,
+        rect.top * scale + offset.y,
+        rect.right * scale + offset.x,
+        rect.bottom * scale + offset.y,
+    )
+}
+
+/** Draws [content] where [placement] puts it. */
+internal fun DrawScope.drawPlaced(placement: MediaPlacement, content: DrawScope.() -> Unit) {
+    if (placement.alpha <= 0f) return
+    val moved: DrawScope.() -> Unit = {
+        withTransform({
+            translate(placement.offset.x, placement.offset.y)
+            scale(placement.scale, placement.scale, pivot = Offset.Zero)
+        }, content)
+    }
+    val clip = placement.clip
+    if (clip == null) {
+        moved()
+    } else {
+        val path = Path().apply { addRoundRect(placement.corners.roundRect(clip, placement.radius)) }
+        clipPath(path, block = moved)
     }
 }
 
-/** The image in flight, under the content's chrome; the content hides its own copy meanwhile. */
-internal class Flight(image: Bitmap, frame: Rect) {
-    var image: Bitmap by mutableStateOf(image)
+/** The drawn image flying from the editor into its composer slot. */
+internal class Flight(image: Bitmap, frame: Rect, val drawing: ImageDrawing?) {
+    val bitmap: ImageBitmap = image.asImageBitmap()
     var frame: Rect by mutableStateOf(frame)
     var radius by mutableFloatStateOf(0f)
     var corners: MediaCorners by mutableStateOf(MediaCorners.All)
     var alpha by mutableFloatStateOf(1f)
     var scale by mutableFloatStateOf(1f)
-}
-
-/** The source's corner badges riding the flight ([MediaFlightAccessory]), pinned to [frame]. */
-internal class FlightAccessories(val badges: List<MediaFlightAccessory>, frame: Rect, alpha: Float) {
-    var frame: Rect by mutableStateOf(frame)
-    var alpha by mutableFloatStateOf(alpha)
+    var badges: List<Pair<MediaFlightAccessory, ImageBitmap>> = emptyList()
+    var badgeAlpha by mutableFloatStateOf(0f)
 }
 
 /**
- * Drives one presentation (iOS `MediaViewerController`): the flight, the backdrop, the
- * content's transform, the dismiss drag and the status bar. A plain object owning per-frame
- * motion; the host composable draws its state.
+ * Drives one presentation. The media keeps its own layout; the motion is a transform of it: the
+ * drag's (`x → dragScale · x + dragOffset`), carried [progress] of the way onto [home] and clipped
+ * to its shape. An image page draws itself with it ([MediaViewerState.placeImage]); other content
+ * (video, documents, a file still loading) moves as a whole layer. Under Reduce Motion it
+ * cross-fades instead, and a drag down fades it out.
  */
 @Stable
 internal class MediaViewerController(
     val state: MediaViewerState,
     private val isMedia: Boolean,
-    /** Only the Fade style runs under Reduce Motion, so the flights see false; the roles still take it. */
     private val reducesMotion: Boolean,
     private val scope: CoroutineScope,
     private val density: Density,
     private val onDismissed: () -> Unit,
 ) {
-    enum class Style {
-        /** Flies out of its source and is dragged down to dismiss. */
-        Photos,
-        /** The system zoom, for documents. */
-        Zoom,
-        /** Reduce Motion: cross-fades, and a drag down fades it out. */
-        Fade,
-    }
-
-    val style: Style = if (reducesMotion) Style.Fade else if (isMedia) Style.Photos else Style.Zoom
-
-    var backdropAlpha by mutableFloatStateOf(1f)
-    var hostAlpha by mutableFloatStateOf(1f)
-    var hostTransform by mutableStateOf(HostTransform.Identity)
-    /**
-     * Zoom style: the page's corner radius in its own (unscaled) pixels, so on screen it rounds
-     * toward its source's corners as it shrinks (the system zoom's rounded page).
-     */
-    var hostCornerRadius by mutableFloatStateOf(0f)
-    /** Zoom style: the corners [hostCornerRadius] rounds (the source's). */
-    var hostCorners: MediaCorners by mutableStateOf(MediaCorners.All)
-    /** Where the finger is, for a dismissal a scroll view hands over (nested scroll has no position). */
-    internal var lastPointer = Offset.Zero
-    /** Fade style: the whole viewer's opacity. */
-    var viewAlpha by mutableFloatStateOf(1f)
-    var flight: Flight? by mutableStateOf(null)
-    /** The source's badges, riding the flight. */
-    var accessories: FlightAccessories? by mutableStateOf(null)
-    /** Light over the dark room; the session's own once it shows through. */
-    var statusBarLight by mutableStateOf(isMedia && reducesMotion)
-    var isLeaving by mutableStateOf(false)
-        private set
+    /** Where the media flies to (open: from): a source's live frame, or a fixed one when there's nowhere to land. */
+    private class Home(
+        val source: MediaZoomSources.Source?,
+        val frame: Rect,
+        val radius: Float,
+        val corners: MediaCorners,
+        /** The source shows this very media, so nothing needs to fade. */
+        val showsMedia: Boolean,
+        val badges: List<Pair<MediaFlightAccessory, ImageBitmap>>,
+    )
 
     /** The host's size and where it sits in the window (sources are in window coordinates). */
     var bounds by mutableStateOf(Rect.Zero)
     var originInWindow = Offset.Zero
+    /** Where the finger is, for a dismissal a scroll view hands over (nested scroll has no position). */
+    internal var lastPointer = Offset.Zero
 
-    private var hasOpened = false
+    var backdropAlpha by mutableFloatStateOf(if (reducesMotion) 1f else 0f)
+    /** Reduce Motion: the whole viewer's opacity. */
+    var viewAlpha by mutableFloatStateOf(if (reducesMotion) 0f else 1f)
+    /** Light over the dark room; the session's own once it shows through. */
+    var statusBarLight by mutableStateOf(isMedia && reducesMotion)
+    var isLeaving by mutableStateOf(false)
+        private set
+    var flight: Flight? by mutableStateOf(null)
+        private set
+
+    private val photos = isMedia && !reducesMotion
+    private var shown by mutableStateOf(reducesMotion)
+    private var dragScale by mutableFloatStateOf(1f)
+    private var dragOffset by mutableStateOf(Offset.Zero)
+    private var dragRadius by mutableFloatStateOf(0f)
+    private var dragCorners: MediaCorners = MediaCorners.All
+    private var progress by mutableFloatStateOf(0f)
+    private var home: Home? by mutableStateOf(null)
+
     private var finished = false
-    /** Bumped by each flight animation, so an interrupted one's end doesn't hand the image back to the content. */
-    private var flightGeneration = 0
-    private var flightJob: Job? = null
+    private var motionJob: Job? = null
     private var backdropJob: Job? = null
 
-    // A drag, relative to where the image was when it began.
+    // A drag: the point of the media under the finger, where the finger was, and how far down it already was.
     private var dragAnchor = Offset.Zero
-    private var dragStart = Rect.Zero
+    private var dragFinger = Offset.Zero
     private var dragStartDistance = 0f
-    private var dragCarry = Offset.Zero
     private var lastFadeDistance = 0f
-
-    private val trace = MediaTransitionTrace()
 
     init {
         state.dismiss = { close() }
         state.discard = { close(home = false) }
-        when (style) {
-            Style.Photos -> {
-                // The image flies in first; the content shows it once it lands.
-                state.mediaHidden = true
-                state.chromeHidden = true
-                backdropAlpha = 0f
-                hostAlpha = 0f
-                state.onShow = { hideSource() }
-            }
-            Style.Fade -> viewAlpha = 0f
-            Style.Zoom -> hostAlpha = 0f
+        state.handOff = { handOff, frame -> handOff(handOff, frame) }
+        state.placeImage = { frame -> if (drawsImage) placement(frame) else null }
+        if (photos) {
+            state.chromeHidden = true
+            state.onShow = { MediaZoomSources.shared.hide(state.sourceID) }
         }
     }
 
-    /** Whether the status bar is hidden (iOS `prefersStatusBarHidden`). */
+    /** Whether the status bar is hidden. */
     val statusBarHidden: Boolean
         get() {
             if (isLeaving || !state.statusBarHidden) return false
-            return if (style == Style.Photos) statusBarLight else true
+            return if (photos) statusBarLight else true
         }
 
+    /** The image page draws itself where the motion has it; anything else moves as a whole. */
+    private val drawsImage: Boolean get() = photos && state.image != null
+
     private fun updateStatusBarLight(light: Boolean) {
-        if (style != Style.Photos) return
+        if (!photos) return
         if (statusBarLight != light) statusBarLight = light
     }
 
-    /** iOS `viewDidAppear`: the presentation runs once the content has laid out. */
-    fun open() {
-        if (hasOpened) return
-        hasOpened = true
-        when (style) {
-            Style.Photos -> flyIn()
-            Style.Fade -> scope.launch { animate(viewAlpha, 1f, animationSpec = tween(millis(MediaMotion.fade))) { v, _ -> viewAlpha = v } }
-            Style.Zoom -> zoomIn()
-        }
-    }
-
-    // MARK: Photos
-
-    private val source: MediaZoomSources.Source? get() = MediaZoomSources.shared.view(state.sourceID)
-
-    /** Like Photos, the thumbnail leaves the transcript while its media is up. */
-    private fun hideSource() {
-        MediaZoomSources.shared.hide(state.sourceID)
-    }
+    // MARK: Placement
 
     /** Where the image rests: where the page lays it out, or else fitted to the screen. */
     private val restingFrame: Rect
         get() {
+            state.mediaFrame?.let { return it }
             val image = state.image ?: return bounds
             if (image.width <= 0 || image.height <= 0) return bounds
-            state.mediaFrame?.let { return it }
             val fitted = MediaZoomGeometry.fittedSize(Size(image.width.toFloat(), image.height.toFloat()), bounds.size)
             return Rect(Offset(bounds.center.x - fitted.width / 2, bounds.center.y - fitted.height / 2), fitted)
         }
 
+    /** The frame the layer's motion follows: the video where it plays, else the whole page. */
+    private val layerFrame: Rect get() = if (isMedia) state.mediaFrame ?: bounds else bounds
+
+    private fun dragged(rect: Rect): Rect = Rect(
+        rect.left * dragScale + dragOffset.x,
+        rect.top * dragScale + dragOffset.y,
+        rect.right * dragScale + dragOffset.x,
+        rect.bottom * dragScale + dragOffset.y,
+    )
+
+    /** Where media laid out at [frame] is drawn now. */
+    fun placement(frame: Rect): MediaPlacement {
+        if (!shown) return MediaPlacement(1f, Offset.Zero, null, 0f, MediaCorners.All, alpha = 0f)
+        val drawn = dragged(frame)
+        val visible = drawn.intersect(dragged(bounds))
+        val home = home
+        if (home == null) {
+            val clip = if (dragRadius > 0.5f) visible else null
+            return MediaPlacement(dragScale, dragOffset, clip, dragRadius, dragCorners, alpha = 1f)
+        }
+        val p = progress
+        val target = homeFrame(home)
+        val image = lerp(drawn, cover(frame.size, target, topAligned = !isMedia), p)
+        val scale = image.width / max(frame.width, 1f)
+        val offset = Offset(image.left - frame.left * scale, image.top - frame.top * scale)
+        val alpha = if (home.showsMedia) 1f else (1 - p).coerceIn(0f, 1f)
+        return MediaPlacement(scale, offset, lerp(visible, target, p), dragRadius + (home.radius - dragRadius) * p, home.corners, alpha)
+    }
+
+    /** The content layer's placement: still while an image page draws its own. */
+    fun layerPlacement(): MediaPlacement {
+        if (reducesMotion || drawsImage) return MediaPlacement(1f, Offset.Zero, null, 0f, MediaCorners.All, alpha = if (shown) 1f else 0f)
+        val placement = placement(layerFrame)
+        // At rest, chrome outside the video stays.
+        if (isMedia && home == null && dragRadius <= 0.5f) return MediaPlacement(placement.scale, placement.offset, null, 0f, MediaCorners.All, placement.alpha)
+        return placement
+    }
+
+    private fun homeFrame(home: Home): Rect = home.source?.let(::sourceFrame) ?: home.frame
+
     private fun sourceFrame(source: MediaZoomSources.Source): Rect? =
         source.windowRect?.translate(-originInWindow.x, -originInWindow.y)
 
-    private fun shape(source: MediaZoomSources.Source?): Pair<Float, MediaCorners> =
-        if (source == null) 0f to MediaCorners.All else source.cornerRadiusPx to source.corners
+    /** [size] scaled to fill [target], centred on it (a page: its top on the target's). */
+    private fun cover(size: Size, target: Rect, topAligned: Boolean): Rect {
+        val scale = max(target.width / max(size.width, 1f), target.height / max(size.height, 1f))
+        val width = size.width * scale
+        val height = size.height * scale
+        val top = if (topAligned) target.top else target.center.y - height / 2
+        return Rect(Offset(target.center.x - width / 2, top), Size(width, height))
+    }
 
-    /** The image in flight, created at [frame] the first time it's needed; caught where it is otherwise. */
-    private fun flightView(image: Bitmap, frame: Rect): Flight {
-        flightJob?.cancel()
-        flight?.let {
-            if (it.image !== image) it.image = image
-            return it
+    private val source: MediaZoomSources.Source? get() = MediaZoomSources.shared.view(state.sourceID)
+
+    /** The source, if it's fully on screen; else a fixed frame about [from]: [scale]d and dropped by [drop]. */
+    private fun homeFor(source: MediaZoomSources.Source?, from: Rect, scale: Float, drop: Float): Home {
+        val frame = source?.takeIf { it.isFullyVisible }?.let(::sourceFrame)
+        if (source != null && frame != null) {
+            val id = state.sourceID
+            val badges = id?.let(state.flightAccessories).orEmpty().map { it to it.image.asImageBitmap() }
+            val showsMedia = source.showsMedia && source.mediaIDs.firstOrNull() == id
+            return Home(source, frame, source.cornerRadiusPx, source.corners, showsMedia, badges)
         }
-        return Flight(image, frame).also { flight = it }
+        val size = Size(from.width * scale, from.height * scale)
+        val fallback = Rect(Offset(from.center.x - size.width / 2, from.center.y - size.height / 2 + drop), size)
+        return Home(null, fallback, 0f, MediaCorners.All, showsMedia = false, badges = emptyList())
     }
 
-    /** The content draws the image again; the flight goes once it has. */
-    private fun land(generation: Int) {
-        if (generation != flightGeneration || isLeaving) return
-        state.mediaHidden = false
-        flight = null
-        dropAccessories()
+    /** Folds a flight caught midway into the drag, so a drag or a close carries on from what's on screen. */
+    private fun settle() {
+        motionJob?.cancel()
+        val home = home ?: return
+        val frame = if (drawsImage) restingFrame else layerFrame
+        val placed = placement(frame)
+        dragScale = placed.scale
+        dragOffset = placed.offset
+        dragRadius = max(placed.radius, 0f)
+        dragCorners = home.corners
+        this.home = null
+        progress = 0f
     }
 
-    /** The source's badges over the flight at [frame], each pinned to its corner at its own size, so they follow the flight's frame. */
-    private fun pinAccessories(frame: Rect, alpha: Float): FlightAccessories? {
-        dropAccessories()
-        if (flight == null) return null
-        val id = state.sourceID ?: return null
-        val badges = state.flightAccessories(id)
-        if (badges.isEmpty()) return null
-        return FlightAccessories(badges, frame, alpha).also { accessories = it }
+    // MARK: Open
+
+    /** A video waits (up to a second) for its first frame, so it grows out of its source showing it. */
+    suspend fun awaitMedia() {
+        if (!photos || !state.isVideo) return
+        withTimeoutOrNull(1_000) { snapshotFlow { state.renderedID == state.sourceID }.first { it } }
     }
 
-    private fun dropAccessories() {
-        accessories = null
-    }
-
-    private fun catchBackdrop() {
-        backdropJob?.cancel()
-        backdropJob = null
-    }
-
-    private fun flyIn() {
-        val source = source
-        hideSource()
-        hostAlpha = 1f
-        updateStatusBarLight(true)
-        setChromeHidden(false, flightDuration = MediaMotion.open.curve().duration)
-        backdropJob = scope.launch {
-            animate(backdropAlpha, 1f, animationSpec = MediaMotion.backdropIn.animation(reduceMotion = reducesMotion)) { v, _ -> backdropAlpha = v }
-        }
-        val image = state.image
-        val from = source?.let(::sourceFrame)
-        if (source != null && from != null && image != null) {
-            val (radius, corners) = shape(source)
-            val rest = restingFrame
-            val flight = flightView(image, from)
-            flight.radius = radius
-            flight.corners = corners
-            val badges = pinAccessories(flight.frame, alpha = 1f)
-            flightGeneration += 1
-            val generation = flightGeneration
-            trace.begin("open", scope, density, source = from to radius, rest = rest, state = state, sample = ::traceSample)
-            flightJob = scope.launch {
-                spring(MediaMotion.open) { p ->
-                    flight.frame = lerp(from, rest, p)
-                    flight.radius = radius + (0f - radius) * p
-                    badges?.frame = flight.frame
-                    badges?.alpha = 1 - p
-                }
-                trace.end("open")
-                land(generation)
+    /** The presentation runs once the content has laid out. */
+    fun open() {
+        if (reducesMotion) {
+            motionJob = scope.launch {
+                animate(viewAlpha, 1f, animationSpec = tween(millis(MediaMotion.fade))) { v, _ -> viewAlpha = v }
             }
-        } else {
-            state.mediaHidden = false
-            hostAlpha = 0f
-            val start = from?.let { transform(restingFrame, it) } ?: HostTransform(scale = 0.94f)
-            hostTransform = start
-            flightJob = scope.launch {
-                spring(MediaMotion.open) { p ->
-                    hostTransform = lerp(start, HostTransform.Identity, p)
-                    hostAlpha = p.coerceIn(0f, 1f)
-                }
+            return
+        }
+        if (shown) return
+        val from = if (drawsImage) restingFrame else layerFrame
+        home = homeFor(source, from, scale = 0.94f, drop = 0f)
+        progress = 1f
+        shown = true
+        if (isMedia) {
+            MediaZoomSources.shared.hide(state.sourceID)
+            updateStatusBarLight(true)
+            if (drawsImage) setChromeHidden(false, flightDuration = MediaMotion.open.curve().duration)
+            backdropJob = scope.launch {
+                animate(backdropAlpha, 1f, animationSpec = MediaMotion.backdropIn.animation(reduceMotion = false)) { v, _ -> backdropAlpha = v }
             }
         }
-    }
-
-    /** Documents: the system zoom out of their source (or a small scale-up without one). */
-    private fun zoomIn() {
-        val source = source
-        val from = source?.let(::sourceFrame)
-        val start = from?.let { transform(bounds, it) } ?: HostTransform(scale = 0.94f)
-        val (radius, corners) = shape(source.takeIf { from != null })
-        val startRadius = radius / max(start.scale, 0.01f)
-        hostTransform = start
-        hostCorners = corners
-        hostCornerRadius = startRadius
-        hostAlpha = 0f
-        flightJob = scope.launch {
-            spring(MediaMotion.open) { p ->
-                hostTransform = lerp(start, HostTransform.Identity, p)
-                hostCornerRadius = startRadius * (1 - p)
-                hostAlpha = p.coerceIn(0f, 1f)
-            }
+        motionJob = scope.launch {
+            spring(MediaMotion.open) { p -> progress = 1 - p }
+            home = null
+            progress = 0f
+            if (isMedia) setChromeHidden(false)
         }
     }
-
-    /** The transform about the view's centre that maps [rect] onto [target]. */
-    private fun transform(rect: Rect, target: Rect): HostTransform {
-        val scale = min(target.width / max(rect.width, 1f), target.height / max(rect.height, 1f))
-        val center = bounds.center
-        return HostTransform(
-            scale = scale,
-            tx = target.center.x - center.x - scale * (rect.center.x - center.x),
-            ty = target.center.y - center.y - scale * (rect.center.y - center.y),
-        )
-    }
-
-    private val drag: MediaDismissDrag get() = MediaDismissDrag(screenHeight = bounds.height)
 
     // MARK: Drag
 
+    private val drag: MediaDismissDrag get() = MediaDismissDrag(screenHeight = bounds.height)
+
     /**
-     * iOS `gestureRecognizerShouldBegin`: down and steeper than sideways; never on a zoomed image.
-     * Media claims the drag before its content ([fromContent] false: pages turn only once a drag
-     * has shown it isn't a dismissal). Documents (the system zoom's swipe down, or the fade) take
-     * only a drag their content left alone ([fromContent] true): a scroll view scrolled away from
-     * its top keeps it, and one at its top hands it over through [documentDismissConnection].
+     * Down and steeper than sideways; never on a zoomed image. Media claims the drag before its
+     * content ([fromContent] false: pages turn only once a drag has shown it isn't a dismissal).
+     * Documents take only a drag their content left alone ([fromContent] true): a scroll view
+     * scrolled away from its top keeps it, and one at its top hands it over through
+     * [documentDismissConnection].
      */
     fun shouldBegin(translation: Offset, fromContent: Boolean): Boolean {
-        if (isLeaving) return false
+        if (isLeaving || !shown) return false
         if (translation.y <= abs(translation.x)) return false
         if (!isMedia) return fromContent
         if (fromContent) return false
         return !state.isZoomed
     }
 
+    /** The media shrinks about the finger, so the spot it holds stays under it, and rounds toward its source. */
     fun dragBegan(anchor: Offset) {
-        when (style) {
-            Style.Photos -> if (state.image != null) dragImageBegan(anchor) else dragContentBegan(anchor)
-            Style.Fade -> lastFadeDistance = 0f
-            Style.Zoom -> zoomDragBegan(anchor)
+        if (reducesMotion) {
+            lastFadeDistance = 0f
+            return
         }
+        settle()
+        backdropJob?.cancel()
+        dragAnchor = Offset((anchor.x - dragOffset.x) / dragScale, (anchor.y - dragOffset.y) / dragScale)
+        dragFinger = anchor
+        dragStartDistance = drag.distance(atScale = dragScale)
+        source?.let { dragCorners = it.corners }
+        if (isMedia) setChromeHidden(true)
     }
 
     fun dragChanged(translation: Offset) {
-        when (style) {
-            Style.Photos -> if (state.image != null) dragImageChanged(translation) else dragContentChanged(translation)
-            Style.Fade -> fadeChanged(max(0f, translation.y))
-            Style.Zoom -> zoomDragChanged(translation)
+        if (reducesMotion) {
+            fadeChanged(max(0f, translation.y))
+            return
+        }
+        val distance = translation.y + dragStartDistance
+        val scale = drag.scale(distance)
+        dragScale = scale
+        dragOffset = Offset(
+            dragFinger.x + translation.x - dragAnchor.x * scale,
+            dragFinger.y + translation.y - dragAnchor.y * scale,
+        )
+        dragRadius = drag.cornerRadius(distance, toward = source?.cornerRadiusPx ?: 0f)
+        if (isMedia) {
+            backdropAlpha = drag.backdropAlpha(distance)
+            updateStatusBarLight(backdropAlpha > 0.5f)
         }
     }
 
     /** [velocity] in px/s. */
     fun dragEnded(translation: Offset, velocity: Velocity) {
-        when (style) {
-            Style.Photos -> {
-                if (state.image != null) trace.end("drag")
-                val distance = translation.y + dragStartDistance
-                if (MediaDismissDrag.dismisses(toDp(distance), toDp(velocity.y))) {
-                    flyOut(velocity)
-                } else if (state.image != null) {
-                    springBack(velocity)
-                } else {
-                    contentSpringBack()
-                }
-            }
-            Style.Fade -> fadeEnded(max(0f, translation.y), velocity.y)
-            Style.Zoom -> {
-                val distance = translation.y + dragStartDistance
-                if (MediaDismissDrag.dismisses(toDp(distance), toDp(velocity.y))) zoomOut(velocity) else zoomSpringBack(velocity)
+        if (reducesMotion) {
+            fadeEnded(max(0f, translation.y), velocity.y)
+            return
+        }
+        val distance = translation.y + dragStartDistance
+        if (MediaDismissDrag.dismisses(toDp(distance), toDp(velocity.y))) close(velocity) else springBack(velocity)
+    }
+
+    private fun springBack(velocity: Velocity) {
+        val rest = if (drawsImage) restingFrame else layerFrame
+        val scale = dragScale
+        val offset = dragOffset
+        val radius = dragRadius
+        val backdrop = backdropAlpha
+        val speed = springVelocity(velocity, dragged(rest), rest)
+        if (isMedia) {
+            setChromeHidden(false)
+            updateStatusBarLight(true)
+        }
+        motionJob?.cancel()
+        motionJob = scope.launch {
+            spring(MediaMotion.springBack, speed) { p ->
+                dragScale = scale + (1 - scale) * p
+                dragOffset = offset * (1 - p)
+                dragRadius = radius * (1 - p)
+                if (isMedia) backdropAlpha = backdrop + (1 - backdrop) * p
             }
         }
     }
@@ -894,7 +978,7 @@ internal class MediaViewerController(
      * the commit still closes.
      */
     fun backBegan(): Boolean {
-        if (isLeaving) return false
+        if (isLeaving || !shown) return false
         if (isMedia && state.isZoomed) return false
         dragBegan(bounds.center)
         backPreviewing = true
@@ -915,7 +999,6 @@ internal class MediaViewerController(
 
     /** The gesture (or a button) committed: the media goes away from wherever it is. */
     fun backCommitted() {
-        if (backPreviewing && style == Style.Photos && state.image != null) trace.end("drag")
         backPreviewing = false
         close()
     }
@@ -924,180 +1007,12 @@ internal class MediaViewerController(
     fun backCancelled() {
         if (!backPreviewing) return
         backPreviewing = false
-        when (style) {
-            Style.Photos -> {
-                if (state.image != null) {
-                    trace.end("drag")
-                    springBack(Velocity.Zero)
-                } else {
-                    contentSpringBack()
-                }
-            }
-            Style.Fade -> fadeEnded(distance = 0f, velocity = 0f)
-            Style.Zoom -> zoomSpringBack(Velocity.Zero)
-        }
+        if (reducesMotion) fadeEnded(distance = 0f, velocity = 0f) else springBack(Velocity.Zero)
     }
 
     // endregion
 
     private fun toDp(px: Float): Float = px / density.density
-
-    /** An image is dragged as the flight: it shrinks about the finger, so the spot it holds stays under it, and rounds toward the thumbnail. */
-    private fun dragImageBegan(anchor: Offset) {
-        val image = state.image ?: return
-        val rest = restingFrame
-        flightGeneration += 1
-        val flight = flightView(image, rest)
-        dropAccessories()
-        catchBackdrop()
-        state.mediaHidden = true
-        flight.corners = shape(source).second
-        dragAnchor = anchor
-        dragStart = flight.frame
-        dragStartDistance = drag.distance(atScale = flight.frame.width / max(rest.width, 1f))
-        setChromeHidden(true)
-        trace.begin("drag", scope, density, source = source?.let { s -> sourceFrame(s)?.let { it to s.cornerRadiusPx } }, rest = rest, state = state, sample = ::traceSample)
-    }
-
-    private fun dragImageChanged(translation: Offset) {
-        val flight = flight ?: return
-        val rest = restingFrame
-        val distance = translation.y + dragStartDistance
-        val scale = drag.scale(distance)
-        val relative = scale * rest.width / max(dragStart.width, 1f)
-        val center = Offset(
-            dragAnchor.x + translation.x + (dragStart.center.x - dragAnchor.x) * relative,
-            dragAnchor.y + translation.y + (dragStart.center.y - dragAnchor.y) * relative,
-        )
-        val size = Size(rest.width * scale, rest.height * scale)
-        flight.frame = Rect(Offset(center.x - size.width / 2, center.y - size.height / 2), size)
-        flight.radius = drag.cornerRadius(distance, toward = shape(source).first)
-        backdropAlpha = drag.backdropAlpha(distance)
-        updateStatusBarLight(backdropAlpha > 0.5f)
-    }
-
-    private fun springBack(velocity: Velocity) {
-        val flight = flight ?: return
-        val rest = restingFrame
-        flightGeneration += 1
-        val generation = flightGeneration
-        setChromeHidden(false)
-        updateStatusBarLight(true)
-        trace.begin("spring", scope, density, source = null, rest = rest, state = state, sample = ::traceSample)
-        val speed = springVelocity(velocity, flight.frame, rest)
-        val from = flight.frame
-        val radius = flight.radius
-        val backdrop = backdropAlpha
-        flightJob = scope.launch {
-            spring(MediaMotion.springBack, speed) { p ->
-                flight.frame = lerp(from, rest, p)
-                flight.radius = radius * (1 - p)
-                backdropAlpha = backdrop + (1 - backdrop) * p
-            }
-            if (generation == flightGeneration) trace.end("spring")
-            land(generation)
-        }
-    }
-
-    /** Other content (video, a file still loading) moves as a whole. */
-    private fun dragContentBegan(anchor: Offset) {
-        // Catch a spring-back where it is.
-        flightJob?.cancel()
-        val current = hostTransform
-        catchBackdrop()
-        dragAnchor = anchor
-        val center = bounds.center
-        dragStartDistance = drag.distance(atScale = current.scale)
-        dragCarry = Offset(
-            current.tx - (dragAnchor.x - center.x) * (1 - current.scale),
-            current.ty - (dragAnchor.y - center.y) * (1 - current.scale),
-        )
-        setChromeHidden(true)
-    }
-
-    private fun dragContentChanged(translation: Offset) {
-        val distance = translation.y + dragStartDistance
-        val scale = drag.scale(distance)
-        val center = bounds.center
-        hostTransform = HostTransform(
-            scale = scale,
-            tx = (dragAnchor.x - center.x) * (1 - scale) + translation.x + dragCarry.x,
-            ty = (dragAnchor.y - center.y) * (1 - scale) + translation.y + dragCarry.y,
-        )
-        backdropAlpha = drag.backdropAlpha(distance)
-        updateStatusBarLight(backdropAlpha > 0.5f)
-    }
-
-    private fun contentSpringBack() {
-        val start = hostTransform
-        val backdrop = backdropAlpha
-        flightJob = scope.launch {
-            spring(MediaMotion.springBack) { p ->
-                hostTransform = lerp(start, HostTransform.Identity, p)
-                backdropAlpha = backdrop + (1 - backdrop) * p
-            }
-        }
-        setChromeHidden(false)
-        updateStatusBarLight(true)
-    }
-
-    // MARK: Zoom
-
-    /**
-     * Documents: the system zoom's interactive swipe down. The page follows the finger, shrinking
-     * about it (the spot it holds stays under it, as [dragContentBegan]) and rounding toward its
-     * source's corners; a release past [MediaDismissDrag.dismisses] zooms it home, else it springs
-     * back. Chrome stays put, as the system zoom leaves the presented page alone.
-     */
-    private fun zoomDragBegan(anchor: Offset) {
-        // Catch an opening zoom or a spring-back where it is.
-        flightJob?.cancel()
-        val current = hostTransform
-        dragAnchor = anchor
-        val center = bounds.center
-        dragStartDistance = drag.distance(atScale = current.scale)
-        dragCarry = Offset(
-            current.tx - (dragAnchor.x - center.x) * (1 - current.scale),
-            current.ty - (dragAnchor.y - center.y) * (1 - current.scale),
-        )
-        hostCorners = shape(source).second
-        hostAlpha = 1f
-    }
-
-    private fun zoomDragChanged(translation: Offset) {
-        val distance = translation.y + dragStartDistance
-        val scale = drag.scale(distance)
-        val center = bounds.center
-        hostTransform = HostTransform(
-            scale = scale,
-            tx = (dragAnchor.x - center.x) * (1 - scale) + translation.x + dragCarry.x,
-            ty = (dragAnchor.y - center.y) * (1 - scale) + translation.y + dragCarry.y,
-        )
-        hostCornerRadius = drag.cornerRadius(distance, toward = shape(source).first) / max(scale, 0.01f)
-    }
-
-    private fun zoomSpringBack(velocity: Velocity) {
-        val start = hostTransform
-        val radius = hostCornerRadius
-        val speed = springVelocity(velocity, transformed(bounds, start), bounds)
-        flightJob?.cancel()
-        flightJob = scope.launch {
-            spring(MediaMotion.springBack, speed) { p ->
-                hostTransform = lerp(start, HostTransform.Identity, p)
-                hostCornerRadius = radius * (1 - p)
-            }
-        }
-    }
-
-    /** Where [rect] lands under [transform] (about the host's centre). */
-    private fun transformed(rect: Rect, transform: HostTransform): Rect {
-        val center = bounds.center
-        fun map(point: Offset) = Offset(
-            center.x + (point.x - center.x) * transform.scale + transform.tx,
-            center.y + (point.y - center.y) * transform.scale + transform.ty,
-        )
-        return Rect(map(rect.topLeft), map(rect.bottomRight))
-    }
 
     /** [flightDuration]: the chrome changes on the flight's own spring, so nothing arrives or lingers after the image. */
     private fun setChromeHidden(hidden: Boolean, flightDuration: Double? = null) {
@@ -1106,118 +1021,119 @@ internal class MediaViewerController(
         state.chromeHidden = hidden
     }
 
-    private fun close(home: Boolean = true) {
-        when (style) {
-            Style.Photos -> flyOut(Velocity.Zero, home)
-            Style.Zoom -> zoomOut()
-            Style.Fade -> fadeOut()
+    // MARK: Close
+
+    /**
+     * Home into the source, carrying a release's [velocity]. With nowhere to land, media carries
+     * on down and fades (panel close), and a document shrinks a little as it fades.
+     */
+    private fun close(velocity: Velocity = Velocity.Zero, home: Boolean = true) {
+        if (isLeaving) return
+        isLeaving = true
+        if (reducesMotion) {
+            fadeOut()
+            return
+        }
+        settle()
+        backdropJob?.cancel()
+        val rest = if (drawsImage) restingFrame else layerFrame
+        val from = dragged(rest)
+        val target = if (isMedia) {
+            homeFor(if (home) source else null, from, scale = 0.8f, drop = bounds.height * 0.25f)
+        } else {
+            homeFor(if (home) source else null, from, scale = 0.94f, drop = 0f)
+        }
+        val lands = target.source != null
+        if (!lands) MediaZoomSources.shared.hide(null)
+        val role = if (!isMedia) MediaMotion.open else if (lands) MediaMotion.home else MediaMotion.away
+        val phase = if (isMedia && !lands) MotionPhase.Exit else MotionPhase.Enter
+        setChromeHidden(true, flightDuration = role.curve(phase).duration)
+        updateStatusBarLight(false)
+        val speed = if (lands) springVelocity(velocity, from, homeFrame(target)) else 0f
+        val backdrop = backdropAlpha
+        this.home = target
+        progress = 0f
+        motionJob = scope.launch {
+            spring(role, speed, phase) { p ->
+                progress = p
+                if (isMedia) backdropAlpha = backdrop * (1 - p)
+            }
+            finishHome()
         }
     }
 
-    /** A spring's initial velocity, in units of the distance to travel. */
-    private fun springVelocity(velocity: Velocity, frame: Rect, target: Rect): Float {
-        val dx = target.center.x - frame.center.x
-        val dy = target.center.y - frame.center.y
-        val length = dx * dx + dy * dy
-        if (length <= 1f) return 0f
-        return min(max((velocity.x * dx + velocity.y * dy) / length, 0f), 8f)
+    /** The source's badges, riding the media home and fading in as it lands. */
+    fun DrawScope.drawHomeBadges() {
+        val home = home ?: return
+        if (home.badges.isEmpty() || progress <= 0f || !isLeaving) return
+        val frame = placement(if (drawsImage) restingFrame else layerFrame).clip ?: return
+        drawBadges(home.badges, frame, progress * progress)
     }
 
-    private fun flyOut(velocity: Velocity, home: Boolean = true) {
+    // MARK: Hand-off
+
+    /**
+     * A drawn image goes into its composer slot: a copy flies under the editor, which goes once
+     * the copy covers it, then on to the slot (re-read each frame, as the attachment row opens and
+     * scrolls), growing its corners and badges.
+     */
+    private fun handOff(handOff: DrawingHandOff, frame: Rect?) {
         if (isLeaving) return
+        state.mediaHidden = true
+        val from = frame?.translate(-originInWindow.x, -originInWindow.y)
+        if (!photos || from == null) {
+            state.handOffCovered = true
+            close(home = false)
+            return
+        }
         isLeaving = true
-        flightGeneration += 1
-        val source = if (home) source else null
-        val target = source?.let(::sourceFrame)
-        // Home to its thumbnail on flight; with nowhere to land it carries on down and fades on
-        // panel close. Neither bounces on the way out.
-        val role = if (target == null) MediaMotion.away else MediaMotion.home
-        setChromeHidden(true, flightDuration = role.curve().duration)
+        motionJob?.cancel()
+        backdropJob?.cancel()
+        setChromeHidden(true, flightDuration = 0.0)
         updateStatusBarLight(false)
-        catchBackdrop()
+        val flight = Flight(handOff.image, from, handOff.drawing)
+        this.flight = flight
+        MediaZoomSources.shared.hide(handOff.target)
         val backdrop = backdropAlpha
-        val image = state.image
-        if (image != null) {
-            val flight = flightView(image, restingFrame)
-            dropAccessories()
-            state.mediaHidden = true
-            val (radius, corners) = shape(source)
-            flight.corners = corners
-            trace.begin("close", scope, density, source = target?.let { it to radius }, rest = restingFrame, state = state, sample = ::traceSample)
-            val from = flight.frame
-            val fromRadius = flight.radius
-            if (target != null) {
-                val speed = springVelocity(velocity, from, target)
-                val badges = pinAccessories(flight.frame, alpha = 0f)
-                flightJob = scope.launch {
-                    spring(MediaMotion.home, speed) { p ->
-                        flight.frame = lerp(from, target, p)
-                        flight.radius = fromRadius + (radius - fromRadius) * p
-                        badges?.frame = flight.frame
-                        badges?.alpha = p
-                        backdropAlpha = backdrop * (1 - p)
-                    }
-                    finishHome()
-                }
-            } else {
-                // Nowhere to land: carry on the way it was thrown and fade.
+        motionJob = scope.launch {
+            // The editor's window goes only once the copy is drawn under it.
+            repeat(2) { withFrameNanos { } }
+            state.handOffCovered = true
+            var target = MediaZoomSources.shared.view(handOff.target)?.let(::sourceFrame)
+            var waited = 0
+            while (target == null && waited < 30) {
+                withFrameNanos { }
+                waited += 1
+                target = MediaZoomSources.shared.view(handOff.target)?.let(::sourceFrame)
+            }
+            if (target == null) {
                 val drop = bounds.height * 0.25f
-                flightJob = scope.launch {
-                    spring(MediaMotion.away, phase = MotionPhase.Exit) { p ->
-                        flight.frame = from.translate(0f, drop * p)
-                        flight.scale = 1 - 0.2f * p
-                        flight.alpha = 1 - p
-                        backdropAlpha = backdrop * (1 - p)
-                    }
-                    finishHome()
-                }
-            }
-        } else {
-            flightJob?.cancel()
-            val current = hostTransform
-            val end = if (target != null) {
-                transform(restingFrame, target)
-            } else {
-                current.copy(ty = current.ty + current.scale * (bounds.height * 0.25f / max(current.scale, 0.1f)))
-            }
-            val alpha = hostAlpha
-            flightJob = scope.launch {
-                spring(role, phase = if (target == null) MotionPhase.Exit else MotionPhase.Enter) { p ->
-                    hostTransform = lerp(current, end, p)
-                    hostAlpha = alpha * (1 - p)
+                spring(MediaMotion.away, phase = MotionPhase.Exit) { p ->
+                    flight.frame = from.translate(0f, drop * p)
+                    flight.scale = 1 - 0.2f * p
+                    flight.alpha = 1 - p
                     backdropAlpha = backdrop * (1 - p)
                 }
                 finishHome()
+                return@launch
             }
+            val source = MediaZoomSources.shared.view(handOff.target)
+            val radius = source?.cornerRadiusPx ?: 0f
+            flight.corners = source?.corners ?: MediaCorners.All
+            if (source != null) flight.badges = state.flightAccessories(handOff.target).map { it to it.image.asImageBitmap() }
+            var to: Rect = target
+            spring(MediaMotion.home) { p ->
+                MediaZoomSources.shared.view(handOff.target)?.let(::sourceFrame)?.let { to = it }
+                flight.frame = lerp(from, to, p)
+                flight.radius = radius * p
+                flight.badgeAlpha = p * p
+                backdropAlpha = backdrop * (1 - p)
+            }
+            finishHome()
         }
     }
 
-    /** Documents: back into their source (the system zoom's dismissal), carrying a release's velocity. */
-    private fun zoomOut(velocity: Velocity = Velocity.Zero) {
-        if (isLeaving) return
-        isLeaving = true
-        val source = source
-        val target = source?.let(::sourceFrame)
-        val start = hostTransform
-        val end = target?.let { transform(bounds, it) } ?: HostTransform(scale = 0.94f)
-        val (radius, corners) = shape(source.takeIf { target != null })
-        if (target != null) hostCorners = corners
-        val fromRadius = hostCornerRadius
-        val toRadius = radius / max(end.scale, 0.01f)
-        val speed = target?.let { springVelocity(velocity, transformed(bounds, start), it) } ?: 0f
-        val alpha = hostAlpha
-        flightJob?.cancel()
-        flightJob = scope.launch {
-            spring(MediaMotion.open, speed) { p ->
-                hostTransform = lerp(start, end, p)
-                hostCornerRadius = fromRadius + (toRadius - fromRadius) * p
-                hostAlpha = alpha * (1 - p)
-            }
-            finish()
-        }
-    }
-
-    // MARK: Fade
+    // MARK: Reduce Motion
 
     private fun fadeChanged(distance: Float) {
         lastFadeDistance = distance
@@ -1227,35 +1143,31 @@ internal class MediaViewerController(
 
     private fun fadeEnded(distance: Float, velocity: Float) {
         if (MediaDismissDrag.dismisses(toDp(distance), toDp(velocity))) {
-            fadeOut()
+            close()
         } else {
             val alpha = viewAlpha
-            flightJob?.cancel()
-            // Back on the release role (the reduced fade: Fade only runs under Reduce Motion).
-            flightJob = scope.launch {
-                animate(alpha, 1f, animationSpec = MotionRole.Release.animation(reduceMotion = reducesMotion)) { v, _ -> viewAlpha = v }
+            motionJob?.cancel()
+            motionJob = scope.launch {
+                animate(alpha, 1f, animationSpec = MotionRole.Release.animation(reduceMotion = true)) { v, _ -> viewAlpha = v }
             }
             setChromeHidden(false)
         }
     }
 
     private fun fadeOut() {
-        if (isLeaving) return
-        isLeaving = true
         val alpha = viewAlpha
-        flightJob?.cancel()
-        flightJob = scope.launch {
+        motionJob?.cancel()
+        motionJob = scope.launch {
             animate(alpha, 0f, animationSpec = tween(millis(Motion.reducedFade), easing = Motion.EaseInOut)) { v, _ -> viewAlpha = v }
             finish()
         }
     }
 
     /**
-     * Documents (zoom or fade): a drag down their scroll view can't take. iOS begins the
-     * dismissal only when the scroll view under the finger is at its top as the drag starts
-     * (`gestureRecognizerShouldBegin`); here a scroll view at its top hands over the downward
-     * delta it can't use. A drag that already scrolled keeps scrolling. Once dismissing, the
-     * scroll view gets nothing (the finger drives the page) and the fling is the release.
+     * Documents (zoom or fade): a drag down their scroll view can't take. A scroll view at its top
+     * hands over the downward delta it can't use. A drag that already scrolled keeps scrolling.
+     * Once dismissing, the scroll view gets nothing (the finger drives the page) and the fling is
+     * the release.
      */
     val documentDismissConnection: NestedScrollConnection = object : NestedScrollConnection {
         private var dragging = false
@@ -1292,11 +1204,10 @@ internal class MediaViewerController(
     // MARK: Lifecycle
 
     /**
-     * The thumbnail comes back under the landed flight. A thumbnail redraws on its next frame,
-     * so the flight stays two frames longer: never a frame with neither on screen.
+     * The thumbnail comes back under the landed media. A thumbnail redraws on its next frame, so
+     * the viewer stays two frames longer: never a frame with neither on screen.
      */
     private suspend fun finishHome() {
-        trace.end("close")
         MediaZoomSources.shared.hide(null)
         repeat(2) { withFrameNanos { } }
         finish()
@@ -1305,59 +1216,32 @@ internal class MediaViewerController(
     private fun finish() {
         if (finished) return
         finished = true
-        trace.end("close")
-        // The thumbnail comes back in the same frame the viewer leaves.
         MediaZoomSources.shared.hide(null)
         onDismissed()
     }
 
-    /**
-     * iOS `MediaViewerController.touchRecovery` inspect: a dismissal whose surface has already
-     * faded out (the backdrop, or the page for documents and Reduce Motion) but never finished
-     * still covers the session and takes its touches.
-     */
-    fun strandedExitFault(): TouchRecovery.Fault? {
-        if (!isLeaving || finished) return null
-        val shown = when (style) {
-            Style.Photos -> backdropAlpha
-            Style.Zoom -> hostAlpha
-            Style.Fade -> viewAlpha
-        }
-        if (shown > 0.01f) return null
-        return TouchRecovery.Fault(TouchRecovery.Reason.Closed, this)
-    }
-
-    /** iOS `touchRecovery` release: drops the flight and leaves at once. */
-    fun recoverStrandedExit() {
-        flightGeneration += 1
-        flightJob?.cancel()
-        finish()
-    }
-
-    /** iOS `viewDidDisappear`. */
     fun disposed() {
-        flightJob?.cancel()
+        motionJob?.cancel()
         backdropJob?.cancel()
-        trace.cancel()
-        if (style == Style.Photos || MediaZoomSources.shared.hiddenID == state.sourceID) MediaZoomSources.shared.hide(null)
-    }
-
-    // MARK: Trace
-
-    private fun traceSample(): MediaTransitionTrace.Sample? {
-        val flight = flight ?: return null
-        val frame = flight.frame.translate(originInWindow.x, originInWindow.y)
-        val sourceAlpha = MediaZoomSources.shared.view(state.sourceID)?.let { if (MediaZoomSources.shared.isHidden(it.mediaIDs)) 0f else 1f } ?: -1f
-        return MediaTransitionTrace.Sample(frame, flight.radius, backdropAlpha, sourceAlpha)
+        if (photos || MediaZoomSources.shared.hiddenID == state.sourceID) MediaZoomSources.shared.hide(null)
     }
 
     // MARK: Animation
 
-    /** iOS `role.animate(phase, reduceMotion:velocity:)`: one curve of progress 0 → 1 for every property. */
+    /** One curve of progress 0 → 1 for every property. */
     private suspend fun spring(role: MotionRole, velocity: Float = 0f, phase: MotionPhase = MotionPhase.Enter, update: (Float) -> Unit) {
         val spec = role.animation(phase, reducesMotion, visibilityThreshold = 0.0005f)
         animate(0f, 1f, initialVelocity = role.initialVelocity(velocity, reducesMotion), animationSpec = spec) { value, _ -> update(value) }
         update(1f)
+    }
+
+    /** A spring's initial velocity, in units of the distance to travel. */
+    private fun springVelocity(velocity: Velocity, frame: Rect, target: Rect): Float {
+        val dx = target.center.x - frame.center.x
+        val dy = target.center.y - frame.center.y
+        val length = dx * dx + dy * dy
+        if (length <= 1f) return 0f
+        return min(max((velocity.x * dx + velocity.y * dy) / length, 0f), 8f)
     }
 
     private fun millis(seconds: Double): Int = (seconds * 1000).roundToInt()
@@ -1368,19 +1252,26 @@ internal class MediaViewerController(
         a.right + (b.right - a.right) * p,
         a.bottom + (b.bottom - a.bottom) * p,
     )
+}
 
-    private fun lerp(a: HostTransform, b: HostTransform, p: Float) = HostTransform(
-        a.scale + (b.scale - a.scale) * p,
-        a.tx + (b.tx - a.tx) * p,
-        a.ty + (b.ty - a.ty) * p,
-    )
+private fun DrawScope.drawBadges(badges: List<Pair<MediaFlightAccessory, ImageBitmap>>, frame: Rect, alpha: Float) {
+    for ((badge, image) in badges) {
+        val x = when (badge.corner) {
+            MediaFlightAccessory.Corner.TopTrailing -> frame.right - image.width + badge.offset.x
+            MediaFlightAccessory.Corner.BottomLeading -> frame.left + badge.offset.x
+        }
+        val y = when (badge.corner) {
+            MediaFlightAccessory.Corner.TopTrailing -> frame.top + badge.offset.y
+            MediaFlightAccessory.Corner.BottomLeading -> frame.bottom - image.height + badge.offset.y
+        }
+        drawImage(image, topLeft = Offset(x, y), alpha = alpha.coerceIn(0f, 1f))
+    }
 }
 
 /**
- * The presented viewer (iOS `MediaViewerController`'s view): a black backdrop (hidden for
- * documents), the flight, and the content with its chrome above it, over the whole window. It takes
- * every touch while up, hides the content below from TalkBack (the host does), dismisses on
- * back, and runs the dark room's status bar.
+ * The presented viewer: a black backdrop (hidden for documents) and the content with its chrome
+ * above it, over the whole window. It takes every touch while up, hides the content below from
+ * TalkBack (the host does), dismisses on back, and runs the dark room's status bar.
  */
 @Composable
 internal fun MediaViewerHost(
@@ -1401,11 +1292,6 @@ internal fun MediaViewerHost(
     val controller = remember {
         MediaViewerController(state, isMedia, reducesMotion, scope, density) { currentDismissed() }
     }
-    rememberTouchRecovery(
-        owner = TouchRecovery.Owner.Zoom,
-        inspect = { controller.strandedExitFault() },
-        release = { controller.recoverStrandedExit() },
-    )
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = LocalFocusManager.current
     val slop = LocalViewConfiguration.current.touchSlop
@@ -1417,6 +1303,7 @@ internal fun MediaViewerHost(
         snapshotFlow { controller.bounds }.first { it.width > 0f && it.height > 0f }
         // One frame for the pages to lay out and report where their images rest.
         withFrameNanos { }
+        controller.awaitMedia()
         controller.open()
     }
     DisposableEffect(controller) { onDispose { controller.disposed() } }
@@ -1431,6 +1318,7 @@ internal fun MediaViewerHost(
     StatusBarEffect(controller)
 
     val dark = MediaPresenter.isDarkRoom(isMedia)
+    val page = !isMedia && !reducesMotion
     Box(
         Modifier
             .fillMaxSize()
@@ -1447,7 +1335,7 @@ internal fun MediaViewerHost(
             .pointerInput(controller) { dismissDrag(controller, slop, fromContent = true) }
             .nestedScroll(controller.documentDismissConnection),
     ) {
-        if (controller.style != MediaViewerController.Style.Zoom) {
+        if (!page) {
             Box(
                 Modifier
                     .fillMaxSize()
@@ -1460,41 +1348,40 @@ internal fun MediaViewerHost(
                 Modifier
                     .fillMaxSize()
                     .graphicsLayer {
-                        val transform = controller.hostTransform
-                        alpha = controller.hostAlpha
-                        scaleX = transform.scale
-                        scaleY = transform.scale
-                        translationX = transform.tx
-                        translationY = transform.ty
-                        transformOrigin = TransformOrigin.Center
-                        val radius = controller.hostCornerRadius
-                        if (radius > 0.5f) {
-                            val c = controller.hostCorners
-                            shape = RoundedCornerShape(
-                                topStart = if (c.topLeft) radius else 0f,
-                                topEnd = if (c.topRight) radius else 0f,
-                                bottomEnd = if (c.bottomRight) radius else 0f,
-                                bottomStart = if (c.bottomLeft) radius else 0f,
+                        val placement = controller.layerPlacement()
+                        alpha = placement.alpha
+                        scaleX = placement.scale
+                        scaleY = placement.scale
+                        translationX = placement.offset.x
+                        translationY = placement.offset.y
+                        transformOrigin = TransformOrigin(0f, 0f)
+                        val clip = placement.clip
+                        if (clip != null) {
+                            // The clip in the layer's own (unscaled) pixels.
+                            val local = Rect(
+                                (clip.left - placement.offset.x) / placement.scale,
+                                (clip.top - placement.offset.y) / placement.scale,
+                                (clip.right - placement.offset.x) / placement.scale,
+                                (clip.bottom - placement.offset.y) / placement.scale,
                             )
-                            clip = true
+                            shape = MediaClipShape(placement.corners.roundRect(local, placement.radius / placement.scale))
+                            this.clip = true
                         } else {
                             shape = RectangleShape
-                            clip = false
+                            this.clip = false
                         }
                     }
-                    .then(
-                        if (controller.style == MediaViewerController.Style.Zoom) {
-                            Modifier.background(MaterialTheme.colorScheme.background)
-                        } else {
-                            Modifier
-                        },
-                    ),
+                    .then(if (page) Modifier.background(MaterialTheme.colorScheme.background) else Modifier)
+                    .drawWithContent {
+                        drawContent()
+                        with(controller) { drawHomeBadges() }
+                    },
             ) {
                 CompositionLocalProvider(LocalMediaViewer provides state) { content(state) }
             }
         }
-        // The flight flies under the content's chrome, which hides its own copy meanwhile.
-        FlightLayer(controller)
+        // The hand-off's copy flies under the content's chrome.
+        Canvas(Modifier.fillMaxSize()) { controller.flight?.let { drawFlight(it) } }
         if (dark) {
             val appearance = rememberAppAppearance()
             OpenCodeTheme(theme = appearance.theme, appearance = AppearanceColorScheme.Dark, content = themed)
@@ -1504,71 +1391,66 @@ internal fun MediaViewerHost(
     }
 }
 
-/**
- * The image in flight, and the source's badges riding it, drawn under the content's chrome in
- * the host's coordinates (only the draw phase reads their frames).
- */
-@Composable
-private fun FlightLayer(controller: MediaViewerController) {
-    val flight = controller.flight ?: return
-    val bitmap: ImageBitmap = remember(flight.image) { flight.image.asImageBitmap() }
-    val accessories = controller.accessories
-    val badges = remember(accessories) { accessories?.badges?.map { it to it.image.asImageBitmap() }.orEmpty() }
-    Canvas(Modifier.fillMaxSize()) {
-        drawFlight(flight, bitmap)
-        if (accessories != null && accessories.alpha > 0f) {
-            val frame = accessories.frame
-            for ((badge, image) in badges) {
-                val x = when (badge.corner) {
-                    MediaFlightAccessory.Corner.TopTrailing -> frame.right - image.width + badge.offset.x
-                    MediaFlightAccessory.Corner.BottomLeading -> frame.left + badge.offset.x
+/** A rounded rectangle anywhere in the layer, for a clip smaller than the layer itself. */
+private class MediaClipShape(private val rect: RoundRect) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline =
+        Outline.Rounded(rect)
+
+    override fun equals(other: Any?) = other is MediaClipShape && other.rect == rect
+
+    override fun hashCode() = rect.hashCode()
+}
+
+/** The hand-off's copy: the drawn image, aspect-filled into its frame with its strokes, and the slot's badges. */
+private fun DrawScope.drawFlight(flight: Flight) {
+    val frame = flight.frame
+    if (frame.width <= 0f || frame.height <= 0f || flight.alpha <= 0f) return
+    val bitmap = flight.bitmap
+    withTransform({ scale(flight.scale, flight.scale, pivot = frame.center) }) {
+        val path = Path().apply { addRoundRect(flight.corners.roundRect(frame, flight.radius)) }
+        clipPath(path) {
+            val imageW = bitmap.width.toFloat()
+            val imageH = bitmap.height.toFloat()
+            val scale = max(frame.width / imageW, frame.height / imageH)
+            val srcW = frame.width / scale
+            val srcH = frame.height / scale
+            val srcOffset = IntOffset(((imageW - srcW) / 2).roundToInt(), ((imageH - srcH) / 2).roundToInt())
+            drawImage(
+                image = bitmap,
+                srcOffset = srcOffset,
+                srcSize = IntSize(srcW.roundToInt().coerceAtMost(bitmap.width), srcH.roundToInt().coerceAtMost(bitmap.height)),
+                dstOffset = IntOffset(frame.left.roundToInt(), frame.top.roundToInt()),
+                dstSize = IntSize(frame.width.roundToInt(), frame.height.roundToInt()),
+                alpha = flight.alpha,
+                filterQuality = FilterQuality.High,
+            )
+            val drawing = flight.drawing
+            if (drawing != null) {
+                drawIntoCanvas { canvas ->
+                    val native = canvas.nativeCanvas
+                    val saved = native.saveLayerAlpha(null, (flight.alpha * 255).roundToInt())
+                    native.translate(frame.left - (imageW - srcW) / 2 * scale, frame.top - (imageH - srcH) / 2 * scale)
+                    native.scale(scale, scale)
+                    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+                    val width = min(imageW, imageH) * 0.01f
+                    for (stroke in drawing.strokes) {
+                        stroke.draw(native, width, paint)
+                    }
+                    native.restoreToCount(saved)
                 }
-                val y = when (badge.corner) {
-                    MediaFlightAccessory.Corner.TopTrailing -> frame.top + badge.offset.y
-                    MediaFlightAccessory.Corner.BottomLeading -> frame.bottom - image.height + badge.offset.y
-                }
-                drawImage(image, topLeft = Offset(x, y), alpha = accessories.alpha.coerceIn(0f, 1f))
             }
         }
     }
-}
-
-private fun DrawScope.drawFlight(flight: Flight, bitmap: ImageBitmap) {
-    run {
-        val frame = flight.frame
-        if (frame.width <= 0f || frame.height <= 0f || flight.alpha <= 0f) return
-        withTransform({ scale(flight.scale, flight.scale, pivot = frame.center) }) {
-            val path = Path().apply { addRoundRect(flight.corners.roundRect(frame, flight.radius)) }
-            clipPath(path) {
-                // Aspect fill (iOS `.scaleAspectFill`).
-                val imageW = bitmap.width.toFloat()
-                val imageH = bitmap.height.toFloat()
-                val scale = max(frame.width / imageW, frame.height / imageH)
-                val srcW = frame.width / scale
-                val srcH = frame.height / scale
-                val srcOffset = IntOffset(((imageW - srcW) / 2).roundToInt(), ((imageH - srcH) / 2).roundToInt())
-                drawImage(
-                    image = bitmap,
-                    srcOffset = srcOffset,
-                    srcSize = IntSize(srcW.roundToInt().coerceAtMost(bitmap.width), srcH.roundToInt().coerceAtMost(bitmap.height)),
-                    dstOffset = IntOffset(frame.left.roundToInt(), frame.top.roundToInt()),
-                    dstSize = IntSize(frame.width.roundToInt(), frame.height.roundToInt()),
-                    alpha = flight.alpha,
-                    filterQuality = FilterQuality.High,
-                )
-            }
-        }
-    }
+    if (flight.badgeAlpha > 0f) drawBadges(flight.badges, frame, flight.badgeAlpha)
 }
 
 /**
- * The dismiss pan (iOS `dismissPan`, one finger). For media ([fromContent] false) it looks at
- * every touch before the content (the initial pass), and claims a drag heading down more than
- * sideways once it passes the touch slop, unless the image is zoomed. Claimed drags are
- * consumed, so the pager and the zoom never see them: pages turn only once a drag has shown it
- * isn't a dismissal. For documents ([fromContent] true) it looks after the content (the main
- * pass) and claims only a drag nothing in it took: a scroll view (scrolled or not) consumes
- * its drags, and one at its top hands its overscroll over through
+ * The dismiss pan. For media ([fromContent] false) it looks at every touch before the content (the
+ * initial pass), and claims a drag heading down more than sideways once it passes the touch slop,
+ * unless the image is zoomed. Claimed drags are consumed, so the pager and the zoom never see them:
+ * pages turn only once a drag has shown it isn't a dismissal. For documents ([fromContent] true) it
+ * looks after the content (the main pass) and claims only a drag nothing in it took: a scroll view
+ * (scrolled or not) consumes its drags, and one at its top hands its overscroll over through
  * [MediaViewerController.documentDismissConnection].
  */
 private suspend fun PointerInputScope.dismissDrag(controller: MediaViewerController, slop: Float, fromContent: Boolean) {
@@ -1630,10 +1512,10 @@ private suspend fun PointerInputScope.trackPointer(controller: MediaViewerContro
 }
 
 /**
- * The dark room's status bar (iOS `preferredStatusBarStyle` / `prefersStatusBarHidden`): light
- * icons over the black backdrop, the session's own once it shows through, hidden while the
- * photo viewer's controls are hidden. When the viewer goes the bar follows the app's current
- * appearance (as [ai.opencode.core.ui.OpenCodeAppTheme] sets it), not the one it opened over.
+ * The dark room's status bar: light icons over the black backdrop, the session's own once it shows
+ * through, hidden while the photo viewer's controls are hidden. When the viewer goes the bar
+ * follows the app's current appearance (as [ai.opencode.core.ui.OpenCodeAppTheme] sets it), not the
+ * one it opened over.
  */
 @Composable
 private fun StatusBarEffect(controller: MediaViewerController) {
@@ -1646,19 +1528,20 @@ private fun StatusBarEffect(controller: MediaViewerController) {
     val hidden = controller.statusBarHidden
     LaunchedEffect(light, hidden, appLight) {
         insets.isAppearanceLightStatusBars = if (light) false else appLight
-        if (hidden) insets.hide(WindowInsetsCompat.Type.statusBars()) else insets.show(WindowInsetsCompat.Type.statusBars())
+        insets.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        if (hidden) insets.hide(WindowInsetsCompat.Type.systemBars()) else insets.show(WindowInsetsCompat.Type.systemBars())
     }
     DisposableEffect(window) {
         onDispose {
             insets.isAppearanceLightStatusBars = currentAppLight
-            insets.show(WindowInsetsCompat.Type.statusBars())
+            insets.show(WindowInsetsCompat.Type.systemBars())
         }
     }
 }
 
 /**
- * Back dismisses the viewer (iOS's accessibility escape). The platform's back dispatcher at
- * overlay priority, so it wins over the app's own handlers while the viewer is up.
+ * Back dismisses the viewer. The platform's back dispatcher at overlay priority, so it wins over
+ * the app's own handlers while the viewer is up.
  */
 @Composable
 internal fun MediaBackHandler(enabled: Boolean, onBack: () -> Unit) {

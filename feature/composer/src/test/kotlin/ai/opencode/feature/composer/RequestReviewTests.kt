@@ -7,12 +7,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Port of iOS `RequestReviewTests.swift`: the answer-reading helpers the dock owns. The
- * `SessionFeature` reply/refresh flows live with `:feature:session`, typed numbers with
- * `:server` (`OpenCodeFormValue`), and the settled-question row with `:feature:transcript`
- * (see docs/parity/composer.md "Tests").
- */
+/** The answer-reading helpers the dock owns. */
 class RequestReviewTests {
     // MARK: Reading answers
 

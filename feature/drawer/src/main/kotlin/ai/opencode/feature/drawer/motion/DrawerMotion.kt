@@ -2,7 +2,6 @@ package ai.opencode.feature.drawer.motion
 
 import ai.opencode.core.diagnostics.PerfTimeline
 import ai.opencode.core.log.AppLog
-import ai.opencode.feature.transcript.list.TranscriptMotionTrace
 import ai.opencode.core.motion.MotionFrameAction
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionRelease
@@ -145,7 +144,7 @@ class DrawerShortcutSlot(isOpen: Boolean = false) {
             if (began2 != null) generation = began2
         }
         delayRemaining = max(0.0, delay)
-        // Opens on layout, closes on collapse (iOS 03adf07a).
+        // Opens on layout, closes on collapse.
         solver.retarget(if (open) 1.0 else 0.0, role = MotionRole.Layout, phase = if (open) MotionPhase.Enter else MotionPhase.Exit, reduceMotion = reducedMotion)
     }
 
@@ -537,7 +536,6 @@ class DrawerMotionState(
             if (value == movingState.value) return
             movingState.value = value
             PerfTimeline.cardMoving(value)
-            if (TranscriptMotionTrace.isActive) TranscriptMotionTrace.noteDrawerMoving(value)
         }
 
     /** Where the drawer is headed (iOS `isPresented`). */
@@ -659,7 +657,7 @@ class DrawerMotionState(
     }
 
     /**
-     * A predictive back gesture on the shut card committed (Android only, QA FB-07): the drawer
+     * A predictive back gesture on the shut card committed (Android only): the drawer
      * opens from wherever the gesture left the card, as the drawer button opens it.
      */
     fun endBackOpen() {

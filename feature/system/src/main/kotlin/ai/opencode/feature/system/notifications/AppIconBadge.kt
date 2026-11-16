@@ -8,14 +8,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Port of iOS `AppIconBadgeClient`: the app icon's badge, how many sessions Catch Up holds on
- * the server in use.
+ * The app icon's badge, how many sessions Catch Up holds on the server in use.
  *
- * Android has no app-set icon count: launchers draw a dot while notifications show, and a
- * count from the notifications' `number`. So the count rides on the session notifications:
- * the push handler posts new ones with the ledger's count, and each publish re-posts the ones
- * still showing with the new count ([SessionPushNotifications.applyBadge]). The ledger keeps
- * it close between launches exactly as iOS's does.
+ * Android has no app-set icon count: launchers draw a dot while notifications show, and a count
+ * from the notifications' `number`. So the count rides on the session notifications: the push
+ * handler posts new ones with the ledger's count, and each publish re-posts the ones still showing
+ * with the new count ([SessionPushNotifications.applyBadge]). The ledger keeps it close between
+ * launches.
  */
 class AppIconBadgeClient(
     /**
@@ -37,7 +36,6 @@ class AppIconBadgeClient(
     }
 }
 
-/** Port of iOS `AppIconBadge`. */
 internal class AppIconBadge private constructor() {
     private var generation = 0
     private var shownCount: Int? = null

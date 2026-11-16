@@ -17,10 +17,7 @@ import org.junit.Test
 import java.time.Instant
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * iOS `VoiceRequestDockTests`: the voice half. The suite's two session tests (the docked request
- * the session screen shows) are in `:feature:session`'s `VoiceRequestDockTests.kt`.
- */
+/** The voice half. */
 class VoiceRequestDockTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
     private val session = OpenCodeSession(id = "ses_home", serverTitle = "HOME", projectID = "p", directory = "/Users/kit/home", updatedAt = VoiceFeatureTestSupport.distantPast)

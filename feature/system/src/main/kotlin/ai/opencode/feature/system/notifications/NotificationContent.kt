@@ -1,5 +1,7 @@
 package ai.opencode.feature.system.notifications
 
+import ai.opencode.core.strings.localized
+import ai.opencode.feature.system.R
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -8,8 +10,7 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 
 /**
- * Port of iOS `System/Notifications/NotificationContent.swift` (1ddd36b2): a notification is
- * rebuilt from authenticated fields only, never from clear routing siblings.
+ * A notification is rebuilt from authenticated fields only, never from clear routing siblings.
  *
  * FCM data values are strings, so a push carries the envelope as a JSON object string under
  * `opencode` (`{"v":2,"ref":…,"box":…}`), as APNs carries it as a dictionary. [Shown] stands in
@@ -19,7 +20,7 @@ import kotlinx.serialization.json.jsonObject
 object NotificationContent {
     const val ENVELOPE_KEY = "opencode"
     const val PLACEHOLDER_TITLE = "OpenCode"
-    const val PLACEHOLDER_BODY = "New activity"
+    val PLACEHOLDER_BODY: String get() = localized(R.string.system_notification_placeholder_body)
 
     data class Verified(val ref: String, val box: String, val payload: NotificationCrypto.Payload)
 
@@ -43,7 +44,7 @@ object NotificationContent {
         }
     }
 
-    /** What a session notification shows (iOS `UNMutableNotificationContent`). */
+    /** What a session notification shows. */
     data class Shown(val title: String, val body: String, val thread: String?, val envelope: JsonObject?)
 
     fun placeholder(): Shown = Shown(PLACEHOLDER_TITLE, PLACEHOLDER_BODY, thread = null, envelope = null)

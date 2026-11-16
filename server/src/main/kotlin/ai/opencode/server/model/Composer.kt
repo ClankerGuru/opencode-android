@@ -1,6 +1,10 @@
 package ai.opencode.server.model
 
 import ai.opencode.core.files.AttachmentFileType
+import ai.opencode.core.strings.localized
+import ai.opencode.core.strings.localizedPlural
+import ai.opencode.core.ui.appFormattingLocale
+import ai.opencode.server.R
 import ai.opencode.server.TaskLocal
 import ai.opencode.server.internal.ElementSerializer
 import ai.opencode.server.internal.obj
@@ -10,6 +14,7 @@ import ai.opencode.server.internal.str
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.Serializable
+import java.text.DecimalFormatSymbols
 import java.util.Locale
 
 /**
@@ -18,6 +23,13 @@ import java.util.Locale
  */
 @Serializable
 data class OpenCodeFileReference(val name: String, val mime: String, val path: String)
+
+/**
+ * Text quoted from the transcript, as desktop sends it: a block in the model text and a
+ * `{"type":"quote"}` entry in `metadata.comments`.
+ */
+@Serializable
+data class OpenCodeQuote(val text: String, val comment: String? = null)
 
 /**
  * How desktop folds path attachments into a prompt: the model reads a reference line per
@@ -32,9 +44,25 @@ object OpenCodePromptPresentation {
         return (typed + files.map(::referenceLine)).joinToString("\n")
     }
 
-    /** The typed text and file references, then the page block. */
-    fun modelText(text: String, files: List<OpenCodeFileReference>, page: OpenCodePageContext?): String {
-        val base = modelText(text, files)
+    fun quoteBlock(quote: OpenCodeQuote): String {
+        val lines = quote.text.split("\n").joinToString("\n") { "> $it" }
+        val block = "The user quoted the following from earlier in the conversation:\n$lines"
+        val comment = quote.comment?.trimmedWhitespace()?.nonEmpty ?: return block
+        return "$block\n\nThe user made the following comment regarding this quote: $comment"
+    }
+
+    /** The typed text and file references, then each quote's block, then the page block. */
+    fun modelText(
+        text: String,
+        files: List<OpenCodeFileReference>,
+        page: OpenCodePageContext?,
+        quotes: List<OpenCodeQuote> = emptyList(),
+    ): String {
+        val parts = ArrayList<String>()
+        val typed = modelText(text, files)
+        if (typed.isNotEmpty()) parts += typed
+        for (quote in quotes) parts += quoteBlock(quote)
+        val base = parts.joinToString("\n")
         page ?: return base
         return if (base.isEmpty()) pageBlock(page) else base + "\n\n" + pageBlock(page)
     }
@@ -51,6 +79,18 @@ object OpenCodePromptPresentation {
         }
     }
 
+    fun quotes(metadata: Map<String, OpenCodeJSONValue>?): List<OpenCodeQuote> {
+        val items = (metadata?.get("comments") as? OpenCodeJSONValue.Array)?.values ?: return emptyList()
+        val quotes = ArrayList<OpenCodeQuote>()
+        for (item in items) {
+            val o = item.obj ?: continue
+            if (o["type"]?.string != "quote") continue
+            val text = o["text"]?.string ?: continue
+            quotes += OpenCodeQuote(text, o["comment"]?.string?.trimmedWhitespace()?.nonEmpty)
+        }
+        return quotes
+    }
+
     /** The text a client shows: the model text without its reference lines. */
     fun displayText(text: String, files: List<OpenCodeFileReference>): String {
         if (files.isEmpty()) return text
@@ -60,6 +100,8 @@ object OpenCodePromptPresentation {
 
     /** No reference lines, and no page block when the message says it carries one (`metadata.page`). */
     fun displayText(text: String, files: List<OpenCodeFileReference>, metadata: Map<String, OpenCodeJSONValue>?): String {
+        // The quote blocks are the model's; `displayText` is what was typed.
+        if (quotes(metadata).isNotEmpty()) metadata?.get("displayText")?.string?.let { return it.trimmedWhitespace() }
         val stripped = if (metadata?.get("page") == null) text else removingPageBlock(text)
         return displayText(stripped, files)
     }
@@ -150,7 +192,18 @@ data class OpenCodeTranscriptFile(
     /** A `media:<hash>` reference whose bytes the server no longer has. */
     val isUnavailable: Boolean = false,
 ) {
-    val typeLabel: String get() = if (isUnavailable) "Media unavailable" else AttachmentFileType.label(name, mime)
+    val mediaViewerReference: AgentFileReference?
+        get() {
+            val hash = mediaHash?.takeIf(OpenCodeMediaReference::isValidHash) ?: return null
+            val normalizedMime = mime.lowercase()
+            if (isUnavailable || PastedText.isText(mime) || normalizedMime.startsWith("image/")) return null
+            return AgentFileReference(
+                path = OpenCodeMediaReference.uri(hash),
+                media = MediaFileOriginal(hash, AttachmentFileType.sanitizedName(name), normalizedMime, byteCount),
+            )
+        }
+
+    val typeLabel: String get() = if (isUnavailable) localized(R.string.server_media_unavailable) else AttachmentFileType.label(name, mime)
     val symbolName: String get() = if (isUnavailable) "exclamationmark.triangle" else AttachmentFileType.symbolName(name, mime)
 }
 
@@ -162,7 +215,11 @@ sealed interface OpenCodeUploadEvent {
 
 /** A long paste, sent as an inline `text/plain` file named “Pasted Text”. */
 object PastedText {
+    /** The file name the paste is sent under; it is data, so it stays English. */
     const val NAME = "Pasted Text"
+
+    /** What a paste is called on screen. */
+    val title: String get() = localized(R.string.server_pasted_text_title)
     const val MIME = "text/plain"
     const val LINE_LIMIT = 12
     const val CHARACTER_LIMIT = 1_000
@@ -245,10 +302,10 @@ data class PastedTextSummary(
     )
 
     /** “42 lines · 3 KB”. */
-    val summary: String get() = "$lineCount ${if (lineCount == 1) "line" else "lines"} · $size"
+    val summary: String get() = localizedPlural(R.plurals.server_pasted_text_summary, lineCount, lineCount, size)
 
     /** “42 lines”, or the size of one long line. */
-    val length: String get() = if (lineCount > 1) "$lineCount lines" else size
+    val length: String get() = if (lineCount > 1) localizedPlural(R.plurals.server_pasted_text_lines, lineCount, lineCount) else size
 
     /** Like `ByteCountFormatter` `.file`: decimal units. */
     val size: String get() = formatFileSize(byteCount.toLong())
@@ -280,17 +337,23 @@ data class PastedTextSummary(
         }
 
         internal fun formatFileSize(bytes: Long): String {
-            if (bytes == 0L) return "Zero KB"
-            if (bytes < 1000) return "$bytes ${if (bytes == 1L) "byte" else "bytes"}"
-            val units = listOf("KB", "MB", "GB", "TB")
+            if (bytes == 0L) return localized(R.string.server_file_size_zero)
+            if (bytes < 1000) return localizedPlural(R.plurals.server_file_size_bytes, bytes.toInt(), bytes)
+            val units = listOf(
+                R.string.server_file_size_kilobytes,
+                R.string.server_file_size_megabytes,
+                R.string.server_file_size_gigabytes,
+                R.string.server_file_size_terabytes,
+            )
             var value = bytes / 1000.0
             var unit = 0
             while (value >= 1000 && unit < units.lastIndex) {
                 value /= 1000
                 unit++
             }
-            val text = if (unit == 0) Math.round(value).toString() else String.format(Locale.US, "%.1f", value).removeSuffix(".0")
-            return "$text ${units[unit]}"
+            val separator = DecimalFormatSymbols.getInstance(appFormattingLocale()).decimalSeparator
+            val text = if (unit == 0) Math.round(value).toString() else String.format(Locale.US, "%.1f", value).removeSuffix(".0").replace('.', separator)
+            return localized(units[unit], text)
         }
     }
 }
@@ -338,7 +401,7 @@ data class OpenCodeAutocompleteFile(val relativePath: String, val absolutePath: 
             val parent = if (trimmed.contains('/')) trimmed.substringBeforeLast('/') else ""
             if (parent.isEmpty() || parent == ".") {
                 val dirName = directory.trimEnd('/').substringAfterLast('/')
-                return dirName.ifEmpty { "Project" }
+                return dirName.ifEmpty { localized(R.string.server_autocomplete_folder_project) }
             }
             return parent
         }
@@ -375,16 +438,13 @@ data class OpenCodeAutocompleteMentions(
     val isEmpty: Boolean get() = files.isEmpty() && agents.isEmpty() && skills.isEmpty()
 }
 
-/**
- * Per-send context the prompt body folds in without changing every client signature
- * (iOS task locals `PromptPageContext.current`, `PromptNotification.callbackURL`,
- * `PromptAutocompleteMentions.current`, `PromptMessageID.current`, `FormLocationDirectory.current`).
- */
+/** Per-send context the prompt body folds in without changing every client signature. */
 object PromptContext {
     val page = TaskLocal<OpenCodePageContext?> { null }
     /** The notify plugin's callback: POSTs here when this run ends. */
     val notificationCallbackURL = TaskLocal<String?> { null }
     val mentions = TaskLocal<OpenCodeAutocompleteMentions?> { null }
+    val quotes = TaskLocal<List<OpenCodeQuote>> { emptyList() }
     /** The ID a prompt sent with `sendDeliveredPrompt` is admitted under; unset, each call makes a fresh one. */
     val messageID = TaskLocal<String?> { null }
     /** The directory a `"global"` (MCP elicitation) form reply or cancellation targets. */
@@ -417,9 +477,8 @@ internal object OpenCodeAutocompleteAgentSerializer : ElementSerializer<OpenCode
 )
 
 /**
- * What a send asks of the in-app browser's open page (iOS `PageShareRequest`,
- * `Browser/BrowserFeature.swift`). Here because the composer's `PendingPrompt` carries it
- * and `:feature:composer` sits beside, not above, the browser's module.
+ * What a send asks of the in-app browser's open page. Here because the composer's `PendingPrompt`
+ * carries it and `:feature:composer` sits beside, not above, the browser's module.
  */
 data class PageShareRequest(
     val pageID: java.util.UUID,

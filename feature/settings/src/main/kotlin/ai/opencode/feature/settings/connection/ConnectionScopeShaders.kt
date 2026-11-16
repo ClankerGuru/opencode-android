@@ -1,10 +1,8 @@
 package ai.opencode.feature.settings.connection
 
 /**
- * Port of iOS `Settings/ConnectionScopeShaders.metal` (`connectionScopeFragment`) to AGSL: the
- * call scope's LEDs in a rounded box instead of a capsule, with one trace colour (pearl on dark,
- * ink on light) and an alert colour for Offline. The CPU lights each dot
- * ([ConnectionTraceRaster]); this draws them.
+ * The call scope's LEDs in a rounded box, with one trace colour (pearl on dark, ink on light) and
+ * an alert colour for Offline. The CPU lights each dot ([ConnectionTraceRaster]); this draws them.
  *
  * Metal reads the field from a buffer; here it is a `columns × rows` bitmap sampled at cell
  * centres ([ConnectionScopeRenderer.FIELD_SCALE] packs light above 1 into a byte). Coordinates are

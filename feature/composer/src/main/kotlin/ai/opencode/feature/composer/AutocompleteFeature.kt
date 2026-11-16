@@ -29,19 +29,18 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 
 /**
- * iOS `ComposerCommandFailure`: a `/command` that failed and the draft to restore. The
- * draft is the session area's `SessionFeature.State.DraftState` (a type above this
- * module), so it travels as [D] and the session reducer reads it back.
+ * A `/command` that failed and the draft to restore. The draft is the session area's
+ * `SessionFeature.State.DraftState` (a type above this module), so it travels as [D] and the
+ * session reducer reads it back.
  */
 data class ComposerCommandFailure<out D>(val error: OpenCodeClientError, val draft: D)
 
-/** iOS `Result<String, ComposerCommandFailure>` for [ComposerAutocompleteAction.CommandFinished]. */
 sealed interface ComposerCommandResult {
     data class Success(val sessionID: String) : ComposerCommandResult
     data class Failure(val failure: ComposerCommandFailure<*>) : ComposerCommandResult
 }
 
-/** Durable composer autocomplete state owned by `SessionFeature.State` (iOS `ComposerAutocompleteState`). */
+/** Durable composer autocomplete state owned by `SessionFeature.State`. */
 data class ComposerAutocompleteState(
     val skills: List<OpenCodeAutocompleteSkill> = emptyList(),
     val agents: List<OpenCodeAutocompleteAgent> = emptyList(),
@@ -185,7 +184,7 @@ data class ComposerAutocompleteState(
     )
 }
 
-/** iOS `ComposerAutocompleteAction`, embedded in `SessionFeature.Action.autocomplete`. */
+/** Embedded in `SessionFeature.Action.autocomplete`. */
 sealed interface ComposerAutocompleteAction {
     data class CatalogLoaded(
         val directoryKey: String,
@@ -208,8 +207,7 @@ sealed interface ComposerAutocompleteAction {
 
     /**
      * A keystroke in the field: the new draft, and the caret when the edit left it somewhere the
-     * draft's change doesn't account for. One action, where a binding and [CaretChanged] were two
-     * passes (handled with the draft binding in `SessionFeatureBindings`).
+     * draft's change doesn't account for.
      */
     data class TextEdited(val text: String, val caret: CaretUpdate) : ComposerAutocompleteAction
     data class MoveHighlight(val delta: Int) : ComposerAutocompleteAction
@@ -219,7 +217,7 @@ sealed interface ComposerAutocompleteAction {
     data class ChipDeleted(val chipID: UUID) : ComposerAutocompleteAction
     data class CommandFinished(val result: ComposerCommandResult) : ComposerAutocompleteAction
 
-    /** iOS `ComposerAutocompleteAction.CaretUpdate`: where an edit left the caret, as [CaretChanged] would have reported it. */
+    /** Where an edit left the caret, as [CaretChanged] would have reported it. */
     sealed interface CaretUpdate {
         /** Where the draft's change moves it, or a composition is still open. */
         data object Unchanged : CaretUpdate
@@ -228,9 +226,9 @@ sealed interface ComposerAutocompleteAction {
 }
 
 /**
- * The slice of iOS `SessionFeature.State` the autocomplete reducer reads. The session area
- * builds it from its state (`draft`, `server`, `effectiveDirectory`, `isAnsweringRequest`,
- * `session?.id`, `projects`) before each call.
+ * The slice of the session's state the autocomplete reducer reads. The session area builds it from
+ * its state (`draft`, `server`, `effectiveDirectory`, `isAnsweringRequest`, `session?.id`,
+ * `projects`) before each call.
  */
 data class ComposerAutocompleteHost(
     val draft: String,
@@ -242,16 +240,19 @@ data class ComposerAutocompleteHost(
 )
 
 /**
- * What the session reducer must apply to `SessionFeature.State` after a [ComposerAutocompleteAction.CommandFinished]
- * (the parts of iOS's `commandFinished` case that touch session fields).
+ * What the session reducer must apply to `SessionFeature.State` after a
+ * [ComposerAutocompleteAction.CommandFinished].
  */
 sealed interface ComposerCommandOutcome {
-    /** iOS: `if state.session != nil { state.pendingModel = nil }` (the refresh and idle wait are in the effect). */
+    /**
+     * `if state.session != nil { state.pendingModel = nil }` (the refresh and idle wait are in the
+     * effect).
+     */
     data object Succeeded : ComposerCommandOutcome
 
     /**
-     * iOS: `state.isAwaitingReply = false; state.keepAsDraft(failure.draft);
-     * state.dictationError = failure.error.message` (the error haptic and log already happened).
+     * `state.isAwaitingReply = false; state.keepAsDraft(failure.draft); state.dictationError =
+     * failure.error.message` (the error haptic and log already happened).
      */
     data class Failed(val failure: ComposerCommandFailure<*>) : ComposerCommandOutcome
 }
@@ -265,11 +266,10 @@ data class ComposerAutocompleteOutcome<A>(
 )
 
 /**
- * The dependencies, cancel IDs and parent actions iOS passes to every
- * `ComposerAutocompleteReducer` call. [embed] wraps an autocomplete action into the parent's
- * (`SessionFeature.Action.autocomplete`); [sendTapped], [refreshRequestedOpen] and
- * [replyCompleted] are the session actions the effects send (`.sendTapped`,
- * `.refreshRequested(.open)`, `.replyCompleted(sessionID:)`).
+ * The dependencies, cancel IDs and parent actions every autocomplete reducer call takes. [embed]
+ * wraps an autocomplete action into the parent's (`SessionFeature.Action.autocomplete`);
+ * [sendTapped], [refreshRequestedOpen] and [replyCompleted] are the session actions the effects
+ * send (`.sendTapped`, `.refreshRequested(.open)`, `.replyCompleted(sessionID:)`).
  */
 class ComposerAutocompleteEnvironment<A>(
     val client: OpenCodeClient,
@@ -288,7 +288,7 @@ class ComposerAutocompleteEnvironment<A>(
     val replyCompleted: (sessionID: String) -> A,
 )
 
-/** Pure reducer helpers for Composer Autocomplete, called from `SessionFeature` (iOS `ComposerAutocompleteReducer`). */
+/** Pure reducer helpers for Composer Autocomplete, called from `SessionFeature`. */
 object ComposerAutocompleteReducer {
     val fileSearchDebounce: Duration = 120.milliseconds
     const val fileSearchLimit = 20
@@ -456,7 +456,7 @@ object ComposerAutocompleteReducer {
         return outcome(state, draft, Effect.merge(effects))
     }
 
-    /** iOS `try? await`: the value, or null on any failure but cancellation. */
+    /** The value, or null on any failure but cancellation. */
     private suspend fun <T> attempt(block: suspend () -> T): T? = try {
         block()
     } catch (cancellation: CancellationException) {

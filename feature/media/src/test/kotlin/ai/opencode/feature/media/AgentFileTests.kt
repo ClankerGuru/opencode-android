@@ -1,8 +1,17 @@
 package ai.opencode.feature.media
 
+import ai.opencode.core.dependencies.withDependenciesSuspending
 import ai.opencode.core.testing.TestIsolationRule
+import ai.opencode.server.OpenCodeClient
+import ai.opencode.server.model.OpenCodeAutocompleteFile
+import ai.opencode.server.model.AgentFileReference
+import ai.opencode.server.model.OpenCodeTranscriptFile
+import ai.opencode.server.testing.WireFixture
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.retry.ServerContact
+import androidx.media3.datasource.DataSpec
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
@@ -21,13 +30,15 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.io.File
 
 /**
- * Port of iOS `AgentFileLoadingTests` (`AgentFileTests.swift`): probing, streaming ranges,
- * errors, text documents, JSON formatting and folding, highlight budgets, cache keys and the
- * loader's credentials. Requests are answered by an OkHttp interceptor (iOS passes the transport
- * as a closure), so nothing reaches the network.
+ * Probing, streaming ranges, errors, text documents, JSON formatting and folding, highlight
+ * budgets, cache keys and the loader's credentials. Requests are answered by an OkHttp interceptor,
+ * so nothing reaches the network.
  */
 class AgentFileLoadingTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -52,6 +63,62 @@ class AgentFileLoadingTests {
         val builder = Response.Builder().request(request).protocol(Protocol.HTTP_1_1).code(status).message("")
         headers.forEach { (name, value) -> builder.header(name, value) }
         return builder.body(body.toResponseBody(headers["Content-Type"]?.toMediaType())).build()
+    }
+
+    @Test
+    fun hashOriginalIsNeverAWorkspacePath() = runTest {
+        val hash = "a".repeat(64)
+        val tag = "\"$hash\""
+        val movie = OpenCodeTranscriptFile(id = "m", name = "clip.mp4", mime = "video/mp4", mediaHash = hash)
+        val reference = requireNotNull(movie.mediaViewerReference)
+        val cache = temporaryDirectory("blob-original")
+        try {
+            WireFixture { request ->
+                if (request.header("If-None-Match") == tag) WireFixture.Reply.status(304)
+                else WireFixture.Reply.Json(200, "movie bytes", mapOf("ETag" to tag, "Content-Type" to "application/octet-stream"))
+            }.use { wire ->
+                val server = wire.server
+                val blob = requireNotNull(AgentFileLoader.original(server, reference, "/work"))
+                val workspace = requireNotNull(AgentFileLoader.original(server, AgentFileReference("clip.mp4"), "/work"))
+                assertEquals("/work/clip.mp4", workspace.cacheKey)
+                assertEquals("media:$hash", blob.cacheKey)
+                assertNull(MediaReferenceResolver.originalRequest(server, "../fs/read"))
+                assertNull(AgentFileLoader.original(server, reference.copy(media = reference.media!!.copy(hash = "invalid")), "/work"))
+                // Current media.get ignores Range. Only a real 206 can select the player’s streaming source.
+                val probe = AgentFileLoader.probe(blob.request, server)
+                assertFalse(probe.supportsRanges)
+                assertEquals(11L, probe.size)
+                val file = AgentFileLoader.cacheURL(server, blob.cacheKey, reference.name, cache)
+                repeat(2) {
+                    AgentFileLoader.download(blob.request, file, server, maxBytes = 11) { _, _ -> }
+                    assertEquals("movie bytes", file.readText())
+                }
+                assertEquals(listOf("bytes=0-1", null, null), wire.requests.map { it.header("Range") })
+                assertEquals(listOf(null, null, tag), wire.requests.map { it.header("If-None-Match") })
+                assertTrue(wire.requests.all { it.path == "/api/experimental/media/$hash" && it.header("Authorization") == server.basicAuthorization })
+            }
+        } finally {
+            cache.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun oversizedChunkedOriginalDoesNotReplaceCachedFile() = runTest {
+        val directory = temporaryDirectory("bounded-original").apply { mkdirs() }
+        val file = File(directory, "original").apply { writeText("prior") }
+        try {
+            val request = Request.Builder().url("https://box/file").build()
+            val error = runCatching {
+                AgentFileLoader.download(request, file, maxBytes = 4, client = client {
+                    answered(it, 200, emptyMap()).newBuilder().body(Buffer().writeUtf8("oversize").asResponseBody(null, -1)).build()
+                }) { _, _ -> }
+            }.exceptionOrNull()
+            assertEquals(AgentFileLoader.overLimit, error)
+            assertEquals("prior", file.readText())
+            assertEquals(listOf(file), directory.listFiles()?.toList())
+        } finally {
+            directory.deleteRecursively()
+        }
     }
 
     @Test
@@ -181,9 +248,8 @@ class AgentFileLoadingTests {
     }
 
     /**
-     * The build half of iOS's test (format, fold and highlight off the main thread within
-     * budget). Its paint, wrap-toggle and memory-footprint probes drive `UIHostingController`
-     * and `drawHierarchy` (UIKit-only).
+     * Its paint, wrap-toggle and memory-footprint probes drive `UIHostingController` and
+     * `drawHierarchy`.
      */
     @Test
     fun largeFilesFormatAndHighlightOffMainActorAndRenderWithinBudget() = runTest {
@@ -300,7 +366,7 @@ class AgentFileLoadingTests {
         assertNotEquals(AgentFileLoader.cacheURL(a, absolutePath = "/var/x.mp4", name = "x.mp4", cacheDirectory = cache), first)
     }
 
-    /** iOS also asserts `NetworkRetry.policy == .once`; the loader's client sends once by construction ([AgentFileLoader.client]). */
+    /** The loader's client sends once by construction ([AgentFileLoader.client]). */
     @Test
     fun probeAndDownloadAttachCustomServerHeadersAndRecordContact() = runTest {
         val server = OpenCodeServer(
@@ -362,10 +428,7 @@ class AgentFileLoadingTests {
         }
     }
 
-    /**
-     * iOS also covers IPv6 zone-scoped origins (`http://[fe80::1%25en0]:4096`); OkHttp's `HttpUrl`
-     * rejects zone IDs, so such a request can't be built on Android.
-     */
+    /** OkHttp's `HttpUrl` rejects zone IDs, so such a request can't be built on Android. */
     @Test
     fun foreignOriginRequestsExcludeServerAuthAndCustomHeaders() = runTest {
         val server = OpenCodeServer(
@@ -409,5 +472,189 @@ class AgentFileLoadingTests {
             assertNull("leaked custom header to $foreign", request.header("CF-Access-Client-Secret"))
             assertFalse(contact.hasAnsweredHTTPOrigin(url))
         }
+    }
+}
+
+/** Exercise the same Media3 DataSource that the remote gallery player reads after a seek. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
+class AgentMovieRangeTests {
+    @get:Rule val isolation = TestIsolationRule()
+
+    @Test
+    fun rangePlaybackSeeksTheAuthenticatedOriginal() = runTest {
+        val hash = "e".repeat(64)
+        val file = OpenCodeTranscriptFile(id = "movie", name = "clip", mime = "video/mp4", mediaHash = hash)
+        WireFixture { request ->
+            val (range, body) = when (request.header("Range")) {
+                "bytes=0-1" -> "0-1" to "ab"
+                "bytes=4-6" -> "4-6" to "efg"
+                else -> error("Unexpected range")
+            }
+            WireFixture.Reply.Json(206, body, mapOf("Content-Range" to "bytes $range/10", "Content-Type" to "application/octet-stream"))
+        }.use { wire ->
+            val server = wire.server
+            val original = requireNotNull(AgentFileLoader.original(server, requireNotNull(file.mediaViewerReference), null))
+            val probe = AgentFileLoader.probe(original.request, server)
+            assertTrue(probe.supportsRanges)
+            assertEquals(10L, probe.size)
+            val loader = StreamingFileLoader(original.request, server, file.mime, file.name)
+            val source = loader.dataSourceFactory.createDataSource()
+            try {
+                val item = loader.makeMediaItem().localConfiguration!!
+                assertEquals("video/mp4", item.mimeType)
+                val spec = DataSpec.Builder().setUri(item.uri).setPosition(4).setLength(3).build()
+                assertEquals(3L, source.open(spec))
+                val bytes = ByteArray(3)
+                assertEquals(3, source.read(bytes, 0, bytes.size))
+                assertEquals("efg", bytes.decodeToString())
+            } finally {
+                source.close()
+                loader.invalidate()
+            }
+            assertEquals(2, wire.requests.size)
+            assertTrue(wire.requests.all { it.path == "/api/experimental/media/$hash" && it.header("Authorization") == server.basicAuthorization })
+        }
+    }
+}
+
+/** Whether a file the agent names in its folder is there before its card shows. */
+class AgentFileCheckTests {
+    @get:Rule val isolation = TestIsolationRule()
+
+    private val directory = "/work/app"
+    private val server = OpenCodeServer(url = "https://box:4096", username = "opencode", password = "")
+
+    private fun file(path: String) = requireNotNull(AgentFileReference.fromInlineCode(path))
+
+    private fun found(vararg paths: String): (OpenCodeServer, String, String, Int) -> List<OpenCodeAutocompleteFile> =
+        { _, location, _, _ -> paths.map { OpenCodeAutocompleteFile(it, "$location/$it", location) } }
+
+    private suspend fun check(
+        path: String,
+        status: Int,
+        finds: MutableList<String> = mutableListOf(),
+        matches: List<String> = emptyList(),
+    ): AgentFileChecks.Result = WireFixture { WireFixture.Reply.status(status) }.use { wire ->
+        val find = found(*matches.toTypedArray())
+        withDependenciesSuspending({
+            this[OpenCodeClient] = OpenCodeClient.testValue.copy(findFiles = { s, location, query, limit ->
+                finds += query
+                find(s, location, query, limit)
+            })
+        }) {
+            AgentFileChecks.check(wire.server, directory, file(path))
+        }
+    }
+
+    @Test
+    fun bareNameInOneSubfolderResolvesToIt() = runTest {
+        val finds = mutableListOf<String>()
+        val result = check("spec.pdf", 404, finds, listOf("docs/spec.pdf", "docs/spec.pdf.bak", "spec.pdfx"))
+        assertEquals(AgentFileChecks.Result.Found(file("docs/spec.pdf")), result)
+        assertEquals(listOf("spec.pdf"), finds)
+    }
+
+    @Test
+    fun bareNameInTwoFoldersOrNoneIsMissing() = runTest {
+        assertEquals(AgentFileChecks.Result.Missing, check("notes.pdf", 404, matches = listOf("a/notes.pdf", "b/notes.pdf")))
+        assertEquals(AgentFileChecks.Result.Missing, check("ghost.mp4", 404))
+    }
+
+    @Test
+    fun missingPathIsMissingWithoutALookup() = runTest {
+        val finds = mutableListOf<String>()
+        assertEquals(AgentFileChecks.Result.Missing, check("recordings/take.mp4", 404, finds))
+        assertTrue(finds.isEmpty())
+    }
+
+    @Test
+    fun fileAtTheRootOrAnErrorKeepsTheCard() = runTest {
+        assertEquals(AgentFileChecks.Result.Found(file("clip.mp4")), check("clip.mp4", 200))
+        assertEquals(AgentFileChecks.Result.Found(file("clip.mp4")), check("clip.mp4", 500))
+    }
+
+    @Test
+    fun onlyFilesInTheFolderOtherThanImagesAreChecked() {
+        assertTrue(AgentFileChecks.checks(file("clip.mp4"), directory))
+        assertTrue(AgentFileChecks.checks(file("/work/app/docs/spec.pdf"), directory))
+        assertFalse(AgentFileChecks.checks(file("/elsewhere/clip.mp4"), directory))
+        assertFalse(AgentFileChecks.checks(file("shot.png"), directory))
+        assertFalse(AgentFileChecks.checks(file("Main.kt"), directory))
+    }
+
+    @Test
+    fun checksRunFourAtATimeOncePerFile() {
+        val started = mutableListOf<String>()
+        val gates = mutableMapOf<String, CompletableDeferred<AgentFileChecks.Result>>()
+        val checks = AgentFileChecks(checker = { _, _, reference ->
+            started += reference.path
+            gates.getOrPut(reference.path) { CompletableDeferred() }.await()
+        }, dispatcher = Dispatchers.Unconfined)
+        val files = listOf("a.mp4", "b.mp4", "c.mp4", "d.mp4", "e.mp4", "f.mp4").map(::file)
+        val outside = file("/elsewhere/x.mp4")
+
+        checks.watch(server, directory, files + outside)
+        checks.watch(server, directory, files)
+        assertEquals(listOf("a.mp4", "b.mp4", "c.mp4", "d.mp4"), started)
+        assertEquals(AgentFileChecks.Status.Pending, checks.status(server, directory, files[0]))
+        assertNull(checks.shown(server, directory, files[0]))
+        assertEquals(AgentFileChecks.Status.Found(outside), checks.status(server, directory, outside))
+
+        gates.getValue("a.mp4").complete(AgentFileChecks.Result.Found(file("clips/a.mp4")))
+        gates.getValue("b.mp4").complete(AgentFileChecks.Result.Missing)
+        assertEquals(listOf("a.mp4", "b.mp4", "c.mp4", "d.mp4", "e.mp4", "f.mp4"), started)
+        assertEquals(AgentFileChecks.Status.Found(file("clips/a.mp4")), checks.status(server, directory, files[0]))
+        assertEquals(file("clips/a.mp4"), checks.shown(server, directory, files[0]))
+        assertEquals(AgentFileChecks.Status.Missing, checks.status(server, directory, files[1]))
+        assertNull(checks.shown(server, directory, files[1]))
+
+        checks.watch(server, directory, files.take(2))
+        assertEquals(6, started.size)
+
+        gates.getValue("c.mp4").complete(AgentFileChecks.Result.Missing)
+        checks.invalidate(server, directory)
+        checks.watch(server, directory, files.take(2))
+        assertEquals(listOf("a.mp4", "b.mp4", "c.mp4", "d.mp4", "e.mp4", "f.mp4", "b.mp4"), started)
+    }
+
+    @Test
+    fun aFolderChangedDuringACheckIsCheckedAgain() {
+        val gates = mutableListOf<CompletableDeferred<AgentFileChecks.Result>>()
+        val checks = AgentFileChecks(checker = { _, _, _ ->
+            val gate = CompletableDeferred<AgentFileChecks.Result>()
+            gates += gate
+            gate.await()
+        }, dispatcher = Dispatchers.Unconfined)
+        val clip = file("clip.mp4")
+
+        checks.watch(server, directory, listOf(clip))
+        checks.invalidate(server, directory)
+        gates[0].complete(AgentFileChecks.Result.Missing)
+        assertEquals(2, gates.size)
+        gates[1].complete(AgentFileChecks.Result.Found(clip))
+        assertEquals(AgentFileChecks.Status.Found(clip), checks.status(server, directory, clip))
+    }
+
+    @Test
+    fun aCheckNoRowWatchesAnyMoreIsSkipped() {
+        val started = mutableListOf<String>()
+        val checks = AgentFileChecks(checker = { _, _, reference ->
+            started += reference.path
+            CompletableDeferred<AgentFileChecks.Result>().await()
+        }, dispatcher = Dispatchers.Unconfined)
+        val release = checks.watch(server, directory, listOf("a.mp4", "b.mp4", "c.mp4", "d.mp4", "e.mp4").map(::file))
+        release()
+        checks.watch(server, directory, listOf(file("f.mp4")))
+        assertEquals(listOf("a.mp4", "b.mp4", "c.mp4", "d.mp4"), started)
+    }
+
+    @Test
+    fun aFileTheViewerCouldNotFindLosesItsCard() {
+        val checks = AgentFileChecks(checker = { _, _, reference -> AgentFileChecks.Result.Found(reference) }, dispatcher = Dispatchers.Unconfined)
+        val outside = file("/elsewhere/x.mp4")
+        assertEquals(AgentFileChecks.Status.Found(outside), checks.status(server, directory, outside))
+        checks.markMissing(server, "/elsewhere/x.mp4")
+        assertEquals(AgentFileChecks.Status.Missing, checks.status(server, directory, outside))
     }
 }

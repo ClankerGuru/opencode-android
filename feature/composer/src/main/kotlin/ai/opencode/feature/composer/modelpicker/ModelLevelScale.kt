@@ -1,13 +1,13 @@
 package ai.opencode.feature.composer.modelpicker
 
+import ai.opencode.core.strings.localized
+import ai.opencode.feature.composer.R
 import ai.opencode.server.model.ModelVariant
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.sign
 
 /**
- * Port of iOS `ModelLevelScale` (`Composer/ModelPicker/ModelLevelScale.swift`).
- *
  * The thinking levels a model offers, as the level panel and the meter's slide step through
  * them: the model's default first, then its variants lowest to highest. A null level is the
  * default.
@@ -38,7 +38,7 @@ class ModelLevelScale(variants: List<String>) {
 
     /**
      * Holding the meter and sliding: every [step] points (dp) from where the hold began is one
-     * level, rounded (half away from zero, as Swift's `rounded()`), kept within the scale.
+     * level, rounded, kept within the scale.
      */
     fun scrubIndex(from: Int, translation: Double, step: Double = SCRUB_STEP): Int {
         val moved = roundHalfAwayFromZero(translation / step).toInt()
@@ -51,7 +51,7 @@ class ModelLevelScale(variants: List<String>) {
 
     companion object {
         fun label(level: String?): String {
-            if (level == null || level == "default") return "Default"
+            if (level == null || level == "default") return localized(R.string.composer_model_level_default)
             return ModelVariant.label(level)
         }
 
@@ -60,5 +60,4 @@ class ModelLevelScale(variants: List<String>) {
     }
 }
 
-/** Swift's `FloatingPoint.rounded()` (`.toNearestOrAwayFromZero`). */
 internal fun roundHalfAwayFromZero(value: Double): Double = sign(value) * floor(abs(value) + 0.5)

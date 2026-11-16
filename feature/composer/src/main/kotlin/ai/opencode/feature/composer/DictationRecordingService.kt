@@ -15,19 +15,16 @@ import android.content.pm.ServiceInfo
 import android.os.IBinder
 
 /**
- * Keeps a recording's microphone alive while the app is away: iOS's `audio` background mode,
- * which lets [DictationAudio]'s session keep recording after `didEnterBackground`. Android
- * silences a background app's microphone unless a microphone foreground service runs, so
- * [LiveCapture] starts this one with every recording (the app is on screen then: a press
- * started it) and stops it with the recorder.
+ * Keeps a recording's microphone alive while the app is away. Android silences a background app's
+ * microphone unless a microphone foreground service runs, so [LiveCapture] starts this one with
+ * every recording (the app is on screen then: a press started it) and stops it with the recorder.
  *
  * Its notification is the recording's Live Update slot: it posts under the id and channel the
  * system area's `LiveUpdateNotifications.dictation` uses (`DICTATION_ID` 4102, channel
- * `dictation`), so when a hands-free recording raises its Live Update the service's
- * notification becomes it, and there is never a second one. Until then (a press held on
- * screen) Android defers a new foreground service's notification by ten seconds, so a short
- * dictation shows nothing, as on iOS. The ids are repeated here because `:feature:system` sits
- * beside this module, not under it.
+ * `dictation`), so when a hands-free recording raises its Live Update the service's notification
+ * becomes it, and there is never a second one. Until then (a press held on screen) Android defers a
+ * new foreground service's notification by ten seconds, so a short dictation shows nothing. The ids
+ * are repeated here because `:feature:system` sits beside this module, not under it.
  */
 class DictationRecordingService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
@@ -68,7 +65,7 @@ class DictationRecordingService : Service() {
         if (manager.getNotificationChannel(CHANNEL) == null) {
             // Same channel the system area creates (`SystemNotificationChannels.DICTATION`).
             manager.createNotificationChannel(
-                NotificationChannel(CHANNEL, "Recording", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                NotificationChannel(CHANNEL, getString(R.string.composer_dictation_channel_name), NotificationManager.IMPORTANCE_DEFAULT).apply {
                     setSound(null, null)
                     enableVibration(false)
                     setShowBadge(false)
@@ -82,7 +79,7 @@ class DictationRecordingService : Service() {
             .setOnlyAlertOnce(true)
             .setOngoing(true)
             .setContentTitle("OpenCode")
-            .setContentText("Recording")
+            .setContentText(getString(R.string.composer_dictation_notification_text))
             .setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_DEFERRED)
         packageManager.getLaunchIntentForPackage(packageName)?.let { launch ->
             launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)

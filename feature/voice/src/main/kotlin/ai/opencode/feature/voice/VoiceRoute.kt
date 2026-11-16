@@ -1,5 +1,6 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.strings.localized
 import ai.opencode.server.OpenCodeServer
 
 /** The only precedence table for a new call. Never contains a phone key. */
@@ -8,14 +9,13 @@ sealed interface VoiceRoute {
     data class PhoneKey(override val engine: VoiceEngine) : VoiceRoute
     data class Unavailable(val reason: Reason) : VoiceRoute
 
-    /** iOS `VoiceRoute.OpenAI`. */
     enum class OpenAI {
         gptLive, realtime;
 
         val engine: VoiceEngine get() = if (this == gptLive) VoiceEngine.gptLive else VoiceEngine.realtime
     }
 
-    /** iOS `VoiceRoute.Server` (named `ServerRoute` here: Kotlin can't nest it beside the `Server` case). */
+    /** Named `ServerRoute`: Kotlin can't nest it beside the `Server` case. */
     sealed interface ServerRoute {
         data class OpenAI(val model: VoiceRoute.OpenAI) : ServerRoute
         data object GeminiLive : ServerRoute
@@ -89,10 +89,8 @@ sealed interface VoiceRoute {
     )
 
     companion object {
-        /** iOS `.server(.openAI(model))`. */
         fun serverOpenAI(model: OpenAI): VoiceRoute = Server(ServerRoute.OpenAI(model))
 
-        /** iOS `.server(.geminiLive)`. */
         val serverGeminiLive: VoiceRoute = Server(ServerRoute.GeminiLive)
 
         fun resolve(
@@ -123,9 +121,8 @@ sealed interface VoiceRoute {
 }
 
 /**
- * Who pays for a call (iOS `VoiceKeySource`, `Settings/VoiceKeySource.swift`), moved down to
- * Voice because [VoiceRoute.keySource] returns it and Settings sits above Voice. Settings'
- * `VoiceKeyStatus` stays in Settings.
+ * Who pays for a call, moved down to Voice because [VoiceRoute.keySource] returns it and Settings
+ * sits above Voice. Settings' `VoiceKeyStatus` stays in Settings.
  */
 sealed interface VoiceKeySource {
     data class Phone(val provider: VoiceProvider) : VoiceKeySource
@@ -140,15 +137,15 @@ sealed interface VoiceKeySource {
     val rowTitle: String
         get() = when (this) {
             is Phone -> provider.keyRowTitle
-            is Server, OpenCode -> "Key on Your Server"
+            is Server, OpenCode -> localized(R.string.voice_key_source_server_row_title)
         }
 
     /** Settings › Voice's footer: whose key, or which workspace, pays for calls. */
     val footer: String
         get() = when (this) {
-            is Phone -> "Calls use your own OpenAI or xAI key."
-            is Server -> "Calls use your server’s $providerName key."
-            OpenCode -> "Calls are billed to your OpenCode Console workspace."
+            is Phone -> localized(R.string.voice_key_source_phone_footer)
+            is Server -> localized(R.string.voice_key_source_server_footer, providerName)
+            OpenCode -> localized(R.string.voice_key_source_opencode_footer)
         }
 
     val isPhoneKey: Boolean get() = this is Phone
@@ -194,7 +191,7 @@ class VoiceBroker(
     }
 
     companion object {
-        /** The broker and the readiness it was resolved with (iOS `resolve(…)` returning a tuple). */
+        /** The broker and the readiness it was resolved with. */
         fun resolve(
             choice: VoiceServerChoice,
             provider: ServerVoiceProvider = ServerVoiceProvider.openAI,

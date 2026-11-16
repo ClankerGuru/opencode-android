@@ -10,6 +10,7 @@ import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.cancellable
 import ai.opencode.core.store.map
+import ai.opencode.core.strings.localized
 import ai.opencode.feature.composer.modelpicker.ModelPickerEvent
 import ai.opencode.feature.composer.modelpicker.ModelPickerState
 import ai.opencode.server.OpenCodeClient
@@ -34,29 +35,27 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * The composer's host reducer: the pieces ported from iOS `OpenCode/Composer/` composed into
- * one working composer (draft, attachments, the request dock, the model picker).
+ * The composer's host reducer.
  *
- * iOS keeps this state on `SessionFeature` (`SessionFeature+Send/+Requests/+Models/+Attachments`,
- * the session area's port). Until the session area wires the composer pieces into its own
- * reducer, this feature keeps the composer usable on its own: the parent tells it which
- * session it's on with [Action.Configure]. The session's real send path goes through
- * [PromptOutbox] and the session's delivery job; this host posts directly under
- * [RetryPolicy.send] (same IDs, same retry policy) so the composer can be exercised end to end.
+ * Until the session area wires the composer pieces into its own reducer, this feature keeps the
+ * composer usable on its own: the parent tells it which session it's on with [Action.Configure].
+ * The session's real send path goes through [PromptOutbox] and the session's delivery job; this
+ * host posts directly under [RetryPolicy.send] (same IDs, same retry policy) so the composer can be
+ * exercised end to end.
  */
 class ComposerFeature : Reducer<ComposerFeature.State, ComposerFeature.Action> {
     data class State(
         val server: OpenCodeServer? = null,
         val sessionID: String? = null,
         val directory: String? = null,
-        /** The session and its subagents: requests from any of them dock here (iOS `familySessionIDs`). */
+        /** The session and its subagents: requests from any of them dock here. */
         val familySessionIDs: Set<String> = emptySet(),
         val draft: String = "",
         val isFocused: Boolean = false,
         val attachments: ComposerAttachmentsFeature.State = ComposerAttachmentsFeature.State(),
         val requestDock: RequestDockFeature.State<DraftState> = RequestDockFeature.State(),
         val modelPicker: ModelPickerState = ModelPickerState(),
-        /** The waiting pick (iOS `pendingModel`), applied with `POST …/model` just before the next send. */
+        /** The waiting pick, applied with `POST …/model` just before the next send. */
         val pendingModel: OpenCodeModelRef? = null,
         val isModelPickerOpen: Boolean = false,
         val isAttachmentMenuOpen: Boolean = false,
@@ -92,9 +91,7 @@ class ComposerFeature : Reducer<ComposerFeature.State, ComposerFeature.Action> {
     private enum class CancelID { Requests, Models, Send }
 
     private companion object {
-        /** iOS `pendingWorkPollSeconds(streamIsHealthy: true)`. */
         val PENDING_WORK_HEALTHY = 12.seconds
-        /** iOS `pendingWorkPollSeconds(streamIsHealthy: false)`. */
         val PENDING_WORK_UNHEALTHY = 2.seconds
     }
 
@@ -131,7 +128,7 @@ class ComposerFeature : Reducer<ComposerFeature.State, ComposerFeature.Action> {
             val haptics = dependency(HapticsClient)
             if (action.error != null) {
                 haptics.play(Haptic.error)
-                Reduced(state.copy(isSending = false, sendError = "Couldn’t send message: ${action.error.message}"))
+                Reduced(state.copy(isSending = false, sendError = localized(R.string.composer_send_failed_with_reason, action.error.message)))
             } else {
                 Reduced(state.copy(isSending = false, pendingModel = null))
             }
@@ -181,7 +178,7 @@ class ComposerFeature : Reducer<ComposerFeature.State, ComposerFeature.Action> {
         }
     }
 
-    /** The dock takes the composer while a request waits (iOS `wantsRequestDock`), and gives it back after. */
+    /** The dock takes the composer while a request waits, and gives it back after. */
     private fun handOver(state: State): State {
         val dock = state.requestDock
         if (dock.hasPendingRequests && !dock.isAnswering) {
@@ -270,7 +267,7 @@ class ComposerFeature : Reducer<ComposerFeature.State, ComposerFeature.Action> {
         }
     }
 
-    /** The session's half of attachments (iOS `SessionFeature+Attachments.swift`, without a parked composer). */
+    /** The session's half of attachments. */
     private fun reduceAttachments(state: State, action: ComposerAttachmentsFeature.Action): Reduced<State, Action> {
         val haptics = dependency(HapticsClient)
         val attachments = state.attachments
@@ -302,7 +299,7 @@ class ComposerFeature : Reducer<ComposerFeature.State, ComposerFeature.Action> {
                     Reduced(updateFile(action.id) { it.copy(status = ComposerFileAttachment.Status.Uploaded(result.value)) })
                 is ComposerAttachmentsFeature.Outcome.Failure -> {
                     haptics.play(Haptic.error)
-                    Reduced(updateFile(action.id) { it.copy(status = ComposerFileAttachment.Status.Failed("Couldn’t upload")) })
+                    Reduced(updateFile(action.id) { it.copy(status = ComposerFileAttachment.Status.Failed(localized(R.string.composer_upload_failed))) })
                 }
             }
             is ComposerAttachmentsFeature.Action.FileRetryTapped -> {
@@ -382,11 +379,11 @@ class ComposerFeature : Reducer<ComposerFeature.State, ComposerFeature.Action> {
     }
 
     /**
-     * The session's pending requests, as iOS's session keeps them: read now, again whenever the
-     * server's event stream says a request was asked or settled (`permission.*`/`form.*` →
+     * The session's pending requests: read now, again whenever the server's event stream says a
+     * request was asked or settled (`permission.*`/`form.*` →
      * [OpenCodeServerEvent.AttentionChanged]) or the stream (re)connects, and otherwise every
      * [PENDING_WORK_HEALTHY] while the stream is healthy or [PENDING_WORK_UNHEALTHY] while it
-     * isn't (iOS `pollPendingWork`/`pendingWorkPollSeconds`). [watches] false reads once.
+     * isn't. [watches] false reads once.
      */
     private fun refreshRequests(state: State, watches: Boolean = false): Effect<Action> {
         val server = state.server ?: return Effect.none()

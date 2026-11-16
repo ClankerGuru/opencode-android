@@ -41,8 +41,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 
 /**
- * One message from the share sheet: its text, images and files, to a session, or to a new one in
- * a project (iOS `ShareSendRequest`).
+ * One message from the share sheet: its text, images and files, to a session, or to a new one in a
+ * project.
  */
 data class ShareSendRequest(
     val target: Target,
@@ -79,7 +79,7 @@ data class ShareSendRequest(
     }
 }
 
-/** Why a send from the share sheet didn't go (iOS `ShareSendFailure`). */
+/** Why a send from the share sheet didn't go. */
 sealed class ShareSendFailure : Exception() {
     /** No answer, or only answers worth trying again, within the sheet's budget. */
     data object Unreachable : ShareSendFailure()
@@ -92,15 +92,15 @@ sealed class ShareSendFailure : Exception() {
 }
 
 /**
- * Port of iOS `ShareSender`: the share sheet's whole conversation with the server, in the app's
- * wire format: `POST /api/session` for New Session (client-made ID), uploads through
- * `/api/experimental/fs/write`, then `POST /api/session/{id}/prompt` with a client-made message ID.
+ * The share sheet's whole conversation with the server, in the app's wire format: `POST
+ * /api/session` for New Session (client-made ID), uploads through `/api/experimental/fs/write`,
+ * then `POST /api/session/{id}/prompt` with a client-made message ID.
  *
  * Every request it makes is safe to repeat (a GET, writes to one path, creates and prompts the
  * server dedupes by ID), so it retries connection failures and 408/429/502–504/520–530 on its own
- * short budget: the sheet is in front of the person, who gets Try Again and Send Later once it
- * runs out. It deliberately doesn't use the app's `NetworkRetry` (iOS: unavailable in the
- * extension); Send Later hands the message to the app, whose outbox sends it under the full policy.
+ * short budget: the sheet is in front of the person, who gets Try Again and Send Later once it runs
+ * out. It deliberately doesn't use the app's `NetworkRetry`; Send Later hands the message to the
+ * app, whose outbox sends it under the full policy.
  */
 class ShareSender(
     server: OpenCodeServer,
@@ -302,9 +302,9 @@ class ShareSender(
     // Wire format
 
     /**
-     * `OpenCodeClient.promptBody` for what the share sheet sends: the typed text with one
-     * reference line per uploaded file, images inline, and the steering delivery the composer
-     * sends by default. Same JSON as iOS `ShareSender.PromptBody` (absent optionals omitted).
+     * `OpenCodeClient.promptBody` for what the share sheet sends: the typed text with one reference
+     * line per uploaded file, images inline, and the steering delivery the composer sends by
+     * default, with absent optionals omitted.
      */
     @Serializable
     data class PromptBody(
@@ -354,8 +354,8 @@ class ShareSender(
             is PortUnreachableException, is SocketException, is SSLException -> true
             // OkHttp's whole-call timeout.
             is InterruptedIOException -> true
-            // A connection lost mid-request ("unexpected end of stream", a reset stream): iOS
-            // `.networkConnectionLost` and the bare POSIX errors. A malformed reply isn't one.
+            // A connection lost mid-request ("unexpected end of stream", a reset stream). A
+            // malformed reply isn't one.
             is java.net.ProtocolException -> false
             is java.io.IOException -> true
             else -> false
@@ -430,6 +430,6 @@ class ShareSender(
     }
 }
 
-/** `OpenCodeFileReference`'s shape (iOS `ShareFileReference`). */
+/** `OpenCodeFileReference`'s shape. */
 @Serializable
 data class ShareFileReference(val name: String, val mime: String, val path: String)

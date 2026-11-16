@@ -33,18 +33,12 @@ import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `ComposerItemProviderLoaderTests.swift` ([ComposerImageImporter]).
- *
  * Runs under Robolectric (native graphics) so `loadsFileBackedAndUIImageProviders` reads real
  * `ContentResolver` streams and encodes/decodes real JPEGs: a `file:` Uri stands in for the
- * file-backed provider and a `content:` Uri for the file-URL one; iOS's in-memory `UIImage`
- * provider is `ComposerImageSource.Data` on Android, which never goes through the loader.
- * Dropped: `textViewRoutesImagePasteWithoutChangingText` (UIKit `ImagePasteTextView.paste`;
- * Android routes pastes through the field's `contentReceiver`).
- * `imageImportPreservesMixedSourceOrder` keeps its mixed order with a loader in place of the
- * item provider (the importer resolves item providers through the `AppContext` dependency).
- * Skipped → `:feature:session`: `composerOffersACallWhenVoiceIsSetUp`,
- * `composerControlPresentation` (`ComposerControls` lives in `SessionViewComposerControls.kt`).
+ * file-backed provider and a `content:` Uri for the file-URL one. Dropped:
+ * `textViewRoutesImagePasteWithoutChangingText`. `imageImportPreservesMixedSourceOrder` keeps its
+ * mixed order with a loader in place of the item provider (the importer resolves item providers
+ * through the `AppContext` dependency).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -88,6 +82,26 @@ class ComposerItemProviderLoaderTests {
         } finally {
             file.delete()
         }
+    }
+
+    @Test fun libraryMovieAttachesOnlyTheEncodedPoster() = runTest {
+        val uri = "content://media/external/video/media/42"
+        val bitmap = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888)
+        val poster = java.io.ByteArrayOutputStream().use { bytes ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, bytes)
+            bytes.toByteArray()
+        }
+        val importer = importer()
+        val added = mutableListOf<OpenCodeOutgoingAttachment>()
+        importer.start(listOf(ComposerImageSource.Loader(videoDuration = 14.0, localVideoURI = uri) { poster }), onAttachment = { added += it })
+        waitForImport(importer)
+
+        val attachment = added.single()
+        assertEquals(uri, attachment.localVideoURI)
+        assertEquals(14.0, attachment.videoDuration)
+        assertEquals("image/jpeg", attachment.mime)
+        assertTrue(attachment.promptURI.startsWith("data:image/jpeg;base64,"))
+        assertTrue(BitmapFactory.decodeByteArray(attachment.data, 0, attachment.data.size) != null)
     }
 
     @Test fun imageImportPreservesMixedSourceOrder() = runTest {

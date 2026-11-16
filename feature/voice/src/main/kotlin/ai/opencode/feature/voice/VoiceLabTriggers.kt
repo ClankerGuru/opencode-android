@@ -1,8 +1,7 @@
 package ai.opencode.feature.voice
 
 /**
- * UI tests post these to start a call while something covers the call button (iOS `VoiceLabTrigger`, `VoiceLabTriggers.swift`, DEBUG only). iOS
- * delivers them as Darwin notifications (`"OpenCodeLab." + rawValue`); on Android a debug
+ * UI tests post these to start a call while something covers the call button. On Android a debug
  * build can deliver them as broadcasts with the same names.
  *
  * The `VoiceLabTriggers` view modifier (it sends `SessionFeature` actions: `voiceTapped`,
@@ -29,6 +28,6 @@ enum class VoiceLabTrigger(val rawValue: String) {
     openLink("ai.opencode.lab.voice-open-link"),
     ;
 
-    /** iOS `notification`: `Notification.Name("OpenCodeLab." + rawValue)`. */
+    /** `Notification.Name("OpenCodeLab." + rawValue)`. */
     val notification: String get() = "OpenCodeLab.$rawValue"
 }

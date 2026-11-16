@@ -11,9 +11,8 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
-// The glyphs' per-frame simulations: plain objects stepped from the glyph view's frame loop,
-// kept across recompositions and remounts (iOS `AgentActivityGlyphModel`, `ShellGlyphModel`,
-// `GlyphModelCache`, from `AgentActivityGlyph.swift` and `ShellGlyph.swift`).
+// The glyphs' per-frame simulations: plain objects stepped from the glyph view's frame loop, kept
+// across recompositions and remounts.
 
 /**
  * Visual state outlives a mounted glyph, not a reducer or its effects. A returning session

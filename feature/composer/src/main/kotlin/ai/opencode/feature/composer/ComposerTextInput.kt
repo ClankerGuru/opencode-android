@@ -97,6 +97,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.WindowInfo
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextLayoutResult
@@ -131,14 +132,14 @@ import kotlin.math.roundToInt
 /** How long a recreated window's inherited keys stay up over the restored field before they count as its own. */
 private const val INHERITED_KEYS_SETTLE_MILLIS = 1_000L
 
-/** How long a recreated field waits for its draft to put its saved selection back (QA AG-01). */
+/** How long a recreated field waits for its draft to put its saved selection back. */
 private const val SELECTION_RESTORE_MILLIS = 1_000L
 
-/** How long keys must stay hidden before they count as having left the focused field (A-01). */
+/** How long keys must stay hidden before they count as having left the focused field. */
 private const val KEYS_LEFT_SETTLE_MILLIS = 250L
 
 /**
- * The field's selection, saved across an activity recreation (QA AG-01). Restored only in the same
+ * The field's selection, saved across an activity recreation. Restored only in the same
  * process and for a draft of the same length; after process death the caret starts at the end.
  */
 internal class ComposerSavedSelection(private val saved: List<Int>? = null) {
@@ -189,22 +190,15 @@ object ComposerTextInputTunables {
 
     /** `composer.lines.grow`: a typed line's growth or shrink (0.28 s, no bounce). */
     val lineGrowth: MotionSpring = MotionSpring(duration = 0.28, bounce = 0.0)
-
-    /** `composer.lines.sendShrinkSpeed`: the send shrink's ω as a multiple of the list's arrival ω. */
-    const val SEND_SHRINK_SPEED = 1.25
 }
 
 /**
- * iOS `ImagePasteTextView`'s line growth (`lineGrowthAnimation`, `beginLineGrowth`,
- * `holdLineGrowth`, `sendShrinkAnimation`) as the plain rules [ComposerTextInput]'s layout follows.
- * Heights and offsets are px; a hold is iOS `contentOffset.y`, how far the text (laid out at the
- * target height) sits above the field's top while the field's height springs.
+ * The line growth [ComposerTextInput]'s layout follows. Heights and offsets are px; a hold is how
+ * far the text (laid out at the target height) sits above the field's top while the field's height
+ * springs.
  *
- * iOS 60dddffa also holds no line mid-composition (`markedTextRange == nil`): there, setting
- * `contentOffset` committed an IME's marked text where the line wrapped (#190). Android has no such
- * hazard (the hold is a placement in a layout modifier, which never touches the IME's composing
- * region), and Android keyboards compose every Latin word (Gboard's suggestions), so gating on the
- * composing region would stop ordinary typing's line growth, which iOS keeps.
+ * Growth doesn't wait out the IME's composing region: Android keyboards compose every Latin word,
+ * so it would stop ordinary typing's line growth.
  */
 object ComposerLineGrowth {
     /**
@@ -213,20 +207,6 @@ object ComposerLineGrowth {
      */
     fun typedLineSpring(old: String, new: String, returnKeySends: Boolean, reduceMotion: Boolean): MotionSpring? =
         if (reduceMotion || (returnKeySends && new == old + "\n")) null else ComposerTextInputTunables.lineGrowth
-
-    /**
-     * iOS `sendShrinkAnimation`: a send's clear rides a critical spring of ω [omega]
-     * ([ComposerSendTransition.sendShrinkOmega]); under reduce motion (or with no send) it lands at once.
-     */
-    fun sendShrinkSpring(omega: Double?, reduceMotion: Boolean): MotionSpring? =
-        omega?.takeIf { !reduceMotion && it > 0 }?.let { MotionSpring(duration = 2 * PI / it, bounce = 0.0) }
-
-    /**
-     * Whether a height change from [from] rides [spring]: a typed line's, any change; a send's
-     * shrink ([shrinks]), only a field taller than one line ([oneLine]).
-     */
-    fun rides(spring: MotionSpring?, shrinks: Boolean, from: Float, oneLine: Float): Boolean =
-        spring != null && (!shrinks || from - oneLine > 0.5f)
 
     /**
      * iOS `holdLineGrowth`: while the field is [height] tall on its way to [target], the text is
@@ -435,7 +415,6 @@ class ComposerTextInputController {
      */
     var heightSpring: MotionSpring? = null
     var heightSpringText: String? = null
-    var heightSpringShrinks = false
 
     /** iOS `measuredHeight` (px): the height the field's lines last laid out to, without the top inset. */
     var measuredHeight: Float? = null
@@ -444,12 +423,12 @@ class ComposerTextInputController {
 
     /**
      * iOS `ComposerTextInput.updateUIView`'s text sync: brings the parent's draft into [state].
-     * [currentText] reads the parent's draft now, not the [text] an earlier composition captured
-     * (02e85073), so a recomposition that lands between the reader's edit and the parent taking
+     * [currentText] reads the parent's draft now, not the [text] an earlier composition captured,
+     * so a recomposition that lands between the reader's edit and the parent taking
      * it can't write the older draft back. A sync while the field publishes an edit does nothing.
      *
      * The caret: a new [focusRequest] (Quote, a restored draft) puts it at the end; otherwise
-     * Composer Autocomplete's caret wins (null means the end, 6b8772f3); otherwise a focused
+     * Composer Autocomplete's caret wins (null means the end); otherwise a focused
      * field keeps its selection, clamped to the new text; otherwise the caret goes to the end.
      * [onNewText] runs for a draft the field hasn't seen yet, before it lands.
      */
@@ -478,7 +457,7 @@ class ComposerTextInputController {
             (caret == null || caret in 0..draft.length)
         bridge?.beginProgrammaticTextUpdate()
         try {
-            // iOS `finishCompositionIfNeeded` (60dddffa): an open composition (an IME's composing
+            // iOS `finishCompositionIfNeeded`: an open composition (an IME's composing
             // region, voice typing) must finish before the text changes under it (a send's clear),
             // or it lands in a stale range. A programmatic `edit` commits the composing region where
             // it is and restarts the IME's input, so the words it held don't come back.
@@ -631,9 +610,8 @@ private class ComposerFieldSwipeInput : ComposerSwipeInput {
  *   (a held mic, [isHoldingMic]) owns the touch.
  * - **Line growth.** A typed line's growth or shrink rides [ComposerTextInputTunables.lineGrowth]
  *   with the text held to the field's bottom, so the caret's line stays put while the top
- *   moves; none under reduce motion or for a Return that sends. A send's clear shrinks on
- *   [ComposerSendTransition.shrinkOnNextClear]'s spring, the one animation the composer around
- *   it follows ([ComposerSendTransition.isShrinking]).
+ *   moves; none under reduce motion or for a Return that sends. Any other change takes its
+ *   height at once.
  * - **Selecting.** A drag the text is selecting with (it starts on or near the selection, or
  *   rests first) is never a swipe ([ComposerSwipeDown.textOwnsDrag]).
  * - **Keyboard insets.** The field only takes and drops focus; the session's composer docks
@@ -671,10 +649,10 @@ fun ComposerTextInput(
     onNonSendNewline: ((String) -> Unit)? = null,
     onDropTargetedChange: ((Boolean) -> Unit)? = null,
     returnKeySends: Boolean = false,
-    sendTransition: ComposerSendTransition? = null,
+    fieldLink: ComposerFieldLink? = null,
     autocompleteBridge: ComposerAutocompleteTextBridge? = null,
     lineLimit: Int? = null,
-    accessibilityLabel: String = "Message",
+    accessibilityLabel: String = stringResource(R.string.composer_message_placeholder),
     isKeyboardHeld: Boolean = false,
     isHoldingMic: Boolean = false,
     canTakeFocus: Boolean = true,
@@ -685,7 +663,7 @@ fun ComposerTextInput(
     onEdit: ((String, ComposerAutocompleteAction.CaretUpdate) -> Unit)? = null,
     isCovered: Boolean = false,
 ) {
-    // QA AG-01: a dark/light or language switch recreates the activity, where iOS's text view keeps
+    // A dark/light or language switch recreates the activity, where iOS's text view keeps
     // its selection (and rotation, handled in place, keeps it here): the caret or selection comes
     // back where it was, for the same draft in the same process.
     val savedSelection = rememberSaveable(saver = ComposerSavedSelection.Saver) { ComposerSavedSelection() }
@@ -730,11 +708,9 @@ fun ComposerTextInput(
     val growthScope = rememberCoroutineScope()
 
     fun syncFromParent() {
-        controller.syncText(state, text, currentText, focusRequest, hasFocus, autocompleteBridge) { newText ->
-            // A send's clear shrinks on its own spring (`sendShrinkAnimation`); any other change lands at once.
-            controller.heightSpring = ComposerLineGrowth.sendShrinkSpring(sendTransition?.takeShrinkOmega(), reduceMotion)
-            controller.heightSpringText = newText
-            controller.heightSpringShrinks = true
+        controller.syncText(state, text, currentText, focusRequest, hasFocus, autocompleteBridge) {
+            controller.heightSpring = null
+            controller.heightSpringText = null
         }
     }
 
@@ -872,7 +848,6 @@ fun ComposerTextInput(
                 val new = asCharSequence().toString()
                 controller.heightSpring = ComposerLineGrowth.typedLineSpring(old, new, currentReturnKeySends, currentReduceMotion)
                 controller.heightSpringText = new
-                controller.heightSpringShrinks = false
             }
         }
     }
@@ -909,9 +884,9 @@ fun ComposerTextInput(
         delay(INHERITED_KEYS_SETTLE_MILLIS)
         keysInherited = false
     }
-    // Each time the app leaves the foreground (Home, Recents): A-01's wait below doesn't outlive it.
+    // Each time the app leaves the foreground (Home, Recents): the wait below doesn't outlive it.
     var pauses by remember { mutableIntStateOf(0) }
-    // [pauses] when the keys were last seen coming up (QA AJ-01).
+    // [pauses] when the keys were last seen coming up.
     var pausesWhenShown by remember { mutableIntStateOf(0) }
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_PAUSE) pauses++ }
@@ -933,9 +908,9 @@ fun ComposerTextInput(
         // then as hidden while they rise for this field: keys on their way up aren't leaving.
         if (imeTarget.getBottom(density) > 0) return@LaunchedEffect
         // Keys the background took (Home, Recents) haven't left: the field keeps its focus and the
-        // keys come back with the app, as iOS's text view stays first responder (QA AG-02).
+        // keys come back with the app, as iOS's text view stays first responder.
         if (!windowInfo.isWindowFocused || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return@LaunchedEffect
-        // After a quick return (QA AJ-01) the background's hide can reach the field only once the app
+        // After a quick return the background's hide can reach the field only once the app
         // is back in front: keys last seen up before the app left went with it, not with the reader.
         if (pauses != pausesWhenShown) return@LaunchedEffect
         // Keys that take no room (Gboard floating, or its toolbar over a hardware keyboard) keep
@@ -947,7 +922,7 @@ fun ComposerTextInput(
         if (pauses != pausesBefore) return@LaunchedEffect
         if (!hasFocus || drawerHold?.isHeld(fieldKey) == true || isKeyboardHeld) return@LaunchedEffect
         if (!windowInfo.isWindowFocused || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return@LaunchedEffect
-        // QA AF-02: on the drawer's card the drawer takes the focus (`releaseFocus`) instead of it
+        // On the drawer's card the drawer takes the focus (`releaseFocus`) instead of it
         // being cleared. `clearFocus` also drops the window's view focus, and after a key (Back,
         // or TalkBack's Back) the window gives it straight back: an input-focus event TalkBack
         // follows to the screen's first element ("Open sessions"). VoiceOver stays on the text
@@ -988,7 +963,7 @@ fun ComposerTextInput(
         }
     }
     val caretHandleHeightPx = with(density) { 25.dp.toPx() }
-    // QA J-02: the + menu or the drawer taking the interaction ends the text toolbar (iOS's edit
+    // The + menu or the drawer taking the interaction ends the text toolbar (iOS's edit
     // menu, Android's own fields), rather than just hiding it until it comes back over what moved in.
     val toolbar = remember(windowInfo) { CoverDismissedTextToolbar({ covered }, { windowInfo.isWindowFocused }) }
 
@@ -1016,7 +991,7 @@ fun ComposerTextInput(
         }
     }
 
-    // The keyboard rising squeezes a field (A-10's cap): a handle that fit can end up hanging out.
+    // The keyboard rising squeezes a field: a handle that fit can end up hanging out.
     // Checked once the field has settled and scrolled its caret back into view.
     LaunchedEffect(scroll) {
         snapshotFlow { scroll.viewportSize }.collectLatest { viewport ->
@@ -1058,11 +1033,11 @@ fun ComposerTextInput(
      */
     fun takesDoubleTap(now: Long): Boolean {
         val tap = controller.lastTap ?: return false
-        val latest = sendTransition?.windowTouches?.latest
+        val latest = fieldLink?.windowTouches?.latest
         if (latest != null && latest.time <= tap.began) return false
         controller.lastTap = null
         val coordinates = controller.swipeCoordinates?.takeIf { it.isAttached } ?: return false
-        val second = sendTransition?.windowTouches?.latest ?: return false
+        val second = fieldLink?.windowTouches?.latest ?: return false
         val secondPoint = coordinates.localPositionOf(coordinates.findRootCoordinates(), second.rootPoint)
         val tapViewportX = tap.point.x
         val isSecondHalf = ComposerDoubleTap.isSecondHalf(
@@ -1119,7 +1094,7 @@ fun ComposerTextInput(
         return false
     }
 
-    // iOS `sendTransition.input` (573770b6): the capsule's swipe asks the field whether a touch is
+    // iOS `sendTransition.input`: the capsule's swipe asks the field whether a touch is
     // the text's, even one that starts just outside it, where a selection's handle hangs.
     val swipeInput = remember { ComposerFieldSwipeInput() }
     SideEffect {
@@ -1143,13 +1118,13 @@ fun ComposerTextInput(
         swipeInput.sync = {
             if (controller.isPublishingText) controller.syncsAfterPublish = true else syncFromParent()
         }
-        sendTransition?.input = swipeInput
+        fieldLink?.input = swipeInput
     }
-    DisposableEffect(sendTransition, swipeInput) {
+    DisposableEffect(fieldLink, swipeInput) {
         onDispose {
             // iOS `didMoveToWindow`: a field leaving the screen forgets its tap.
             controller.lastTap = null
-            if (sendTransition?.input === swipeInput) sendTransition.input = null
+            if (fieldLink?.input === swipeInput) fieldLink.input = null
         }
     }
 
@@ -1209,12 +1184,6 @@ fun ComposerTextInput(
 
     Box(
         modifier
-            .onGloballyPositioned { coordinates ->
-                sendTransition?.let {
-                    it.inputText = state.text.toString()
-                    it.inputBounds = coordinates.boundsInWindow()
-                }
-            }
             // iOS `beginLineGrowth`/`holdLineGrowth`: the field's height springs to the laid-out
             // one with the text held to its bottom; the line coming or going passes under the top.
             .layout { measurable, constraints ->
@@ -1236,18 +1205,12 @@ fun ComposerTextInput(
                     controller.heightSpring = null
                     val running = controller.heightAnimation?.isActive == true
                     val from = if (running) controller.animatedHeight.value else previous
-                    // A send's shrink takes a field taller than one line; a typed line, any change.
-                    if (spring != null && ComposerLineGrowth.rides(spring, controller.heightSpringShrinks, from, lineHeightPx)) {
+                    if (spring != null) {
                         height = (from + inset).roundToInt()
-                        val shrinks = controller.heightSpringShrinks
                         controller.heightAnimation = growthScope.launch(start = CoroutineStart.UNDISPATCHED) {
-                            try {
-                                // A retarget keeps the running spring's velocity, as SwiftUI's does.
-                                if (!running) controller.animatedHeight.snapTo(from)
-                                controller.animatedHeight.animateTo(lines, spring.spec(visibilityThreshold = 0.5f))
-                            } finally {
-                                if (shrinks) sendTransition?.endShrink()
-                            }
+                            // A retarget keeps the running spring's velocity, as SwiftUI's does.
+                            if (!running) controller.animatedHeight.snapTo(from)
+                            controller.animatedHeight.animateTo(lines, spring.spec(visibilityThreshold = 0.5f))
                         }
                     } else {
                         controller.heightAnimation?.cancel()
@@ -1255,12 +1218,6 @@ fun ComposerTextInput(
                     }
                 } else if (controller.heightAnimation?.isActive == true) {
                     height = (controller.animatedHeight.value + inset).roundToInt()
-                }
-                sendTransition?.let { transition ->
-                    transition.inputIsMultiline = height - (lineHeightPx + insetPx) > 0.5f
-                    // A send's clear that rode no spring leaves the composer to resize as usual.
-                    val shrinking = Snapshot.withoutReadObservation { transition.isShrinking }
-                    if (shrinking && controller.heightAnimation?.isActive != true) transition.endShrink()
                 }
                 val caretLineTop = if (height < target) {
                     Snapshot.withoutReadObservation {
@@ -1388,7 +1345,6 @@ fun ComposerTextInput(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = appliedTopInset)
-                .onGloballyPositioned { coordinates -> sendTransition?.textOrigin = coordinates.positionInWindow() }
                 .focusRequester(focusRequester)
                 .drawerKeyboardField(fieldKey)
                 .onFocusChanged { focus ->
@@ -1448,7 +1404,6 @@ fun ComposerTextInput(
                 // layout result is the field's input; the rest is bookkeeping for other readers.
                 Snapshot.withoutReadObservation {
                     controller.layout = result
-                    sendTransition?.textLayout = result
                     autocompleteBridge?.textLayout = result
                     if (result != null) autocompleteBridge?.updateLineBreaks(result)
                     controller.layoutTick += 1

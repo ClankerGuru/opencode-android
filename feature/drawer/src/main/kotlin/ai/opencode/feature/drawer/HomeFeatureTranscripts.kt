@@ -28,9 +28,9 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /*
- * Port of iOS `HomeFeature+Transcripts.swift`: background transcript reads (prefetch, cached
- * refreshes), the selected session's first read, active-ancestry discovery, and view receipts.
- * Everything here steps aside while the open session reads its own transcript.
+ * Background transcript reads (prefetch, cached refreshes), the selected session's first read,
+ * active-ancestry discovery, and view receipts. Everything here steps aside while the open session
+ * reads its own transcript.
  */
 
 /**

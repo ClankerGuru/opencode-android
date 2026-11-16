@@ -5,11 +5,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Port of iOS `DictationInputTests.swift`.
- *
- * The microphone starts before the speech model is ready; [DictationInput]
- * holds what it hears until the recognizer connects. Android's microphone
- * delivers 16-bit PCM already (iOS: Float32 converted to Int16), so a buffer
+ * The microphone starts before the speech model is ready; [DictationInput] holds what it hears
+ * until the recognizer connects. Android's microphone delivers 16-bit PCM already, so a buffer
  * "whose samples all convert to `value`" is simply filled with it.
  */
 class DictationInputTests {
@@ -19,7 +16,7 @@ class DictationInputTests {
     /** A microphone buffer whose samples are all [value], to tell buffers apart. */
     private fun buffer(value: Short) = DictationBuffer(ShortArray(480) { value }, micFormat)
 
-    /** The analyzer's input stream (iOS `AsyncStream<AnalyzerInput>`). */
+    /** The analyzer's input stream. */
     private class Stream : DictationInputSink {
         val buffers = mutableListOf<ShortArray>()
         var finished = false
@@ -76,10 +73,8 @@ class DictationInputTests {
     }
 
     /**
-     * `BufferConverter` always converts to mono 16-bit PCM even when handed a
-     * multi-channel target or stereo microphone input, passes matching mono
-     * through, and drops route-mismatched buffers. (iOS 27's `AnalyzerInput`
-     * traps on Float32 or multi-channel PCM; the recognizer here takes mono too.)
+     * `BufferConverter` always converts to mono 16-bit PCM even when handed a multi-channel target
+     * or stereo microphone input, passes matching mono through, and drops route-mismatched buffers.
      */
     @Test fun convertsFloat32AndStereoInputToMonoInt16ForAnalyzerInput() {
         val stereoMic = DictationAudioFormat(sampleRate = 48_000, channelCount = 2)

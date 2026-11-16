@@ -17,7 +17,6 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.IOException
 
-/** Port of iOS `SiteIconDomainTests` (`SiteIconTests.swift`). */
 class SiteIconDomainTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -81,7 +80,7 @@ class SiteIconDomainTests {
     fun theRequestCarriesOnlyTheDomain() {
         val request = SiteIconService.request("exe.dev")!!
         assertEquals("https://icons.duckduckgo.com/ip3/exe.dev.ico", request.url.toString())
-        // iOS `httpShouldHandleCookies == false`: the preview transport has no cookie jar.
+        // The preview transport has no cookie jar.
         assertNull(request.header("Cookie"))
         assertNull("Never a subdomain", SiteIconService.request("docs.exe.dev"))
         assertNull(SiteIconService.request("evil.com/secret"))
@@ -90,9 +89,8 @@ class SiteIconDomainTests {
 }
 
 /**
- * Port of iOS `SiteIconLoaderTests` (`SiteIconTests.swift`): the loader's caching and coalescing.
- * Runs under Robolectric's native graphics so the service answers real icons ([IconFixture]).
- * `linkPreviewSessionReusesNoRedirectTransport` (URLSession delegate identity) isn't ported.
+ * The loader's caching and coalescing. Runs under Robolectric's native graphics so the service
+ * answers real icons ([IconFixture]).
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -199,7 +197,10 @@ class SiteIconLoaderTests {
     }
 }
 
-/** Port of iOS `SiteIconStoreTests` (`SiteIconTests.swift`). Icons are [stubSiteIcon]s; `aSuppliedIconWins` decodes a real one in [SiteIconStoreFrameworkTests]. */
+/**
+ * Icons are [stubSiteIcon]s; `aSuppliedIconWins` decodes a real one in
+ * [SiteIconStoreFrameworkTests].
+ */
 class SiteIconStoreTests {
     @get:Rule val isolation = TestIsolationRule()
 

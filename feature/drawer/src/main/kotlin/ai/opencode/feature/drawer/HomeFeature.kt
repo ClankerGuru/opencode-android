@@ -58,34 +58,22 @@ import kotlin.time.Duration.Companion.seconds
 import ai.opencode.feature.composer.restorePersistedPick
 
 /**
- * Port of iOS `HomeFeature` (`OpenCode/Drawer/HomeFeature.swift` and its `HomeFeature+*.swift`
- * extensions): one server's Home. The open session ([State.sessionDetail], a draft when none is
- * open) under the session drawer, pushed subagents, Catch Up, Settings, In-App Notices and the
- * server's live list (REST snapshots authoritative, SSE projecting).
- *
- * The reducer body is assembled in `HomeFeatureComposition.kt`; Home's own actions route through
- * `HomeFeatureCore.kt`. Child features (`HomeConnectionFeature`, `HomeNotificationsFeature`,
- * `HomeSettingsFeature`, `CatchUpFeature`) are scoped there.
- *
- * Session screens are `:feature:session`'s [SessionFeature]: the open one presented (`ifLet`) and
- * pushed subagents identified by their `navigationID` (`forEach`); Home matches their actions after
- * they've reduced, as iOS's `HomeFeature` does on `.sessionDetail(.presented(…))`.
+ * One server's Home. The body is assembled in `HomeFeatureComposition.kt`; Home's own actions route
+ * through `HomeFeatureCore.kt`. Home matches session screens' actions after they've reduced.
  */
 class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
     /**
-     * This window's key for [ai.opencode.server.EventStreamFocusClient] (iOS `sceneWindow.id`):
-     * each window's store builds its own Home reducer.
+     * This window's key for [ai.opencode.server.EventStreamFocusClient]: each window's store builds
+     * its own Home reducer.
      */
     internal val streamFocusOwner: java.util.UUID = java.util.UUID.randomUUID()
 
     /**
-     * Mirrors of iOS `@Shared` keys ([pinnedSessionKeys], [lastViewedSessionIDs], [sessionReadDates],
-     * [manuallyUnreadSessionKeys], [mutedSessionKeys], [isSidebarShown], [initializedInboxServerIDs])
-     * are plain values so state comparisons and views see their changes; the reducer writes each
-     * through to its shared key (`HomeFeatureDrawerState.kt`). The big caches
-     * (`cachedHomeSnapshots`, `cachedTranscriptSnapshots`) are read from their keys on demand.
+     * The reducer writes each through to its shared key (`HomeFeatureDrawerState.kt`). The big
+     * caches (`cachedHomeSnapshots`, `cachedTranscriptSnapshots`) are read from their keys on
+     * demand.
      *
-     * Build one with `State(server, snapshot, loaded)` (iOS `init(server:snapshot:loaded:)`).
+     * Build one with `State(server, snapshot, loaded)`.
      */
     data class State(
         val connection: HomeConnectionFeature.State,
@@ -157,9 +145,8 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         /** Mirror of `SharedKeys.sidebarShown`: beside a wide window's sidebar, whether it shows. */
         val isSidebarShown: Boolean = true,
         /**
-         * A further window's Home (Multiple Windows, iOS `AppFeature.State(window:)`): its
-         * [lastViewedSessionIDs] and [isSidebarShown] live in memory, so switching sessions or
-         * hiding the sidebar here never changes the first window's.
+         * A further window's Home: its [lastViewedSessionIDs] and [isSidebarShown] live in memory,
+         * so switching sessions or hiding the sidebar here never changes the first window's.
          */
         val isWindowLocal: Boolean = false,
         /** Mirror of `SharedKeys.initializedInboxServerIDs`. */
@@ -167,7 +154,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         /** Device-local read receipts not yet in an authoritative snapshot: a stale list must not resurrect unread. */
         val locallyViewedMilliseconds: Map<String, Long> = emptyMap(),
         val catchUpState: CatchUpFeature.State = CatchUpFeature.State(),
-        /** Developer Mode problem reports (iOS `traces`, `TraceUploadsFeature`). */
+        /** Developer Mode problem reports. */
         val traces: TraceUploadsFeature.State = TraceUploadsFeature.State(),
         /** Sends the server's session list has not reflected yet. */
         val localActivity: Map<String, LocalActivity> = emptyMap(),
@@ -176,18 +163,18 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         val recentlyDeletedIDs: Set<String> = emptySet(),
         /**
          * Settings, pushed full screen over the drawer and the session; Back returns to whichever
-         * was showing (iOS `isSettingsShown` and `SettingsPresentation`'s state). Presented: its
-         * effects end when it closes. What's New from the drawer's row is this with `root = whatsNew`.
+         * was showing. Presented: its effects end when it closes. What's New from the drawer's row
+         * is this with `root = whatsNew`.
          */
         val settings: SettingsFeature.State? = null,
         /**
-         * The Voice page Settings opens at, when a call asked for it (iOS `settingsVoicePage`); the
-         * cog and What's New open Settings' root.
+         * The Voice page Settings opens at, when a call asked for it; the cog and What's New open
+         * Settings' root.
          */
         val settingsVoicePage: VoiceSettingsPage? = null,
         /**
          * Settings › Experimental › Show Welcome (Welcome Preview): the first-run welcome over the
-         * paired app, closed back to it with nothing unpaired (iOS `@Presents var welcome`).
+         * paired app, closed back to it with nothing unpaired.
          */
         val welcome: WelcomeFeature.State? = null,
         /** The run the Session Live Activity follows (Experimental), from an accepted send until it settles or another send takes over. */
@@ -206,9 +193,8 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         /** A tapped link being looked up, and the screen it was tapped on. */
         val pendingLinkedSessionOpen: PendingLinkedSessionOpen? = null,
         /**
-         * The drawer's What's New row (iOS `whatsNew.showsButton`): its switch is on and some
-         * feature is unseen. Read from What's New's shared keys at start, when Settings closes and
-         * when the row is hidden.
+         * The drawer's What's New row: its switch is on and some feature is unseen. Read from
+         * What's New's shared keys at start, when Settings closes and when the row is hidden.
          */
         val showsWhatsNewButton: Boolean = false,
         /** Bumped when an action takes the screen to the session from over the open drawer; the drawer closes as it changes. */
@@ -217,17 +203,17 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         val drawerOpenRequest: Int? = null,
         /**
          * Where arriving shares are taking the screen. The shares themselves wait for their
-         * composer in `:feature:composer`'s persistence ([sharedDrafts], iOS `sharedDrafts`), as
-         * do composers parked while their screen is away (iOS `composerPersistence`).
+         * composer in `:feature:composer`'s persistence, as do composers parked while their screen
+         * is away.
          */
         val shareNavigationTarget: SharedDraftTarget? = null,
         /** False while a cold launch without a cached list waits for its first snapshot. */
         val snapshotLoaded: Boolean = true,
         /** Whether Voice is set up, as last observed. */
         val systemVoiceAvailable: Boolean = false,
-        /** What the voice call's ongoing notification (iOS Live Activity) last showed. */
+        /** What the voice call's ongoing notification last showed. */
         val voiceCallActivity: VoiceCallActivityAttributes.ContentState? = null,
-        /** What the recording's ongoing notification (iOS Live Activity) last showed. */
+        /** What the recording's ongoing notification last showed. */
         val dictationActivity: DictationActivityAttributes.ContentState? = null,
         /** In-App Notices (Experimental): the drawer button's label for another session's update, while it shows. */
         val inAppNotice: InAppNotice? = null,
@@ -247,8 +233,8 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         /** Why the next screen change happens, when the action that asks for it isn't the one that makes it. */
         val nextMoveReason: String? = null,
         /**
-         * App refreshes this from the shared open-session operation before Home handles an action
-         * (iOS `voiceNavigationToolID`). A queued navigation cannot outlive its authorization.
+         * App refreshes this from the shared open-session operation before Home handles an action.
+         * A queued navigation cannot outlive its authorization.
          */
         val voiceNavigationToolID: String? = null,
     ) {
@@ -310,10 +296,10 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
             }
         }
 
-        /** iOS `PendingOpenReadState`: the server read and unread state a drawer read replaced. */
+        /** The server read and unread state a drawer read replaced. */
         data class PendingOpenReadState(val viewedMilliseconds: Long?, val wasUnread: Boolean)
 
-        /** What the reader views (iOS `Viewing`): equal when the threads are. */
+        /** What the reader views: equal when the threads are. */
         data class Viewing(val sessionID: String? = null, val rootID: String? = null) {
             val threads: Set<String> get() = setOfNotNull(sessionID, rootID)
             override fun equals(other: Any?): Boolean =
@@ -335,7 +321,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
             val activeFamilyIDs: Set<String>,
         )
 
-        /** What `knownParents` merges (iOS `ParentSources`). */
+        /** What `knownParents` merges. */
         data class ParentSources(
             val activeSessionParents: Map<String, String>,
             val sessionSnapshots: Map<String, SessionFeature.SwitchSnapshot>,
@@ -407,7 +393,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
                 return activeSessionIDs.filterTo(LinkedHashSet()) { !isAttributed(it, parents) }
             }
 
-        /** Top-most busy ancestors and busy listed sessions (iOS `observedBusyTopIDs`). */
+        /** Top-most busy ancestors and busy listed sessions. */
         val busyTopIDs: Set<String>
             get() {
                 if (activeSessionIDs.isEmpty()) return emptySet()
@@ -482,7 +468,6 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
                 pendingLinkedSessionOpen != null ||
                 subagentStack.isNotEmpty()
 
-        /** iOS `isSettingsShown`. */
         val isSettingsShown: Boolean get() = settings != null
 
         /**
@@ -498,9 +483,8 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         }
 
         /**
-         * The pages a call's card opens Settings at (iOS `SettingsView`'s `voicePage` and
-         * `VoiceSettingsView`'s `opensPage`, which push on appearing): Voice, then Voice Provider
-         * (with Your Account over it) when the provider row stands in for the key row (not Grok).
+         * The pages a call's card opens Settings at: Voice, then Voice Provider (with Your Account
+         * over it) when the provider row stands in for the key row (not Grok).
          */
         private fun voiceSettingsPath(voicePage: VoiceSettingsPage?): List<SettingsPage> {
             voicePage ?: return emptyList()
@@ -531,15 +515,15 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         val hasLiveCall: Boolean get() = sessionDetail?.voice?.phase?.isTerminal == false
 
         /**
-         * A call or a recording owns an ongoing notification (iOS `voiceCallActivity != nil ||
-         * dictationActivity != nil`): `AppFeature` keeps this Home through a server switch only without one.
+         * A call or a recording owns an ongoing notification: `AppFeature` keeps this Home through
+         * a server switch only without one.
          */
         val hasLiveCallOrRecording: Boolean get() = voiceCallActivity != null || dictationActivity != null
 
-        /** The open session drew its first content frame (iOS `isColdLaunchContentReady` reads it). */
+        /** The open session drew its first content frame. */
         val hasRenderedFirstContentFrame: Boolean get() = sessionDetail?.hasRenderedFirstContentFrame == true
 
-        /** The open session shows a sheet, alert or page over itself (iOS `sessionDetail?.presentsOverSession`). */
+        /** The open session shows a sheet, alert or page over itself. */
         val presentsOverSession: Boolean get() = sessionDetail?.presentsOverSession == true
 
         /** What the reader is looking at: the screen on top, the session it shows, and Catch Up's card. */
@@ -567,9 +551,9 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
 
         companion object {
             /**
-             * iOS `init(server:snapshot:loaded:)`: the cached or loaded list, the transcript cache
-             * restored, and the remembered session (or a draft) open. Reads shared keys, so call it
-             * from a reducer or effect (a dependency context).
+             * The cached or loaded list, the transcript cache restored, and the remembered session
+             * (or a draft) open. Reads shared keys, so call it from a reducer or effect (a
+             * dependency context).
              */
             operator fun invoke(server: OpenCodeServer, snapshot: OpenCodeHomeSnapshot, loaded: Boolean = true): State {
                 val base = State(
@@ -621,7 +605,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         val navigationID: Int?,
         val sessionID: String?,
         val stackDepth: Int,
-        /** iOS `catchUpCard: String??`: whether Catch Up is open, and its open card (null once it ran out). */
+        /** Whether Catch Up is open, and its open card (null once it ran out). */
         val catchUpOpen: Boolean,
         val catchUpCard: String?,
     )
@@ -632,7 +616,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         data class Screen(val sessionID: String?, val navigationID: Int, val visit: Int, val depth: Int)
     }
 
-    /** What Home asks its parent (`AppFeature`) to do; iOS handles these cases in `AppFeature`. */
+    /** What Home asks its parent (`AppFeature`) to do. */
     sealed interface DelegateAction {
         /** Connects to another saved server. */
         data class ServerSwitchTapped(val server: OpenCodeServer) : DelegateAction
@@ -661,9 +645,8 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         data class SettingsScreen(val action: PresentationAction<SettingsFeature.Action>) : Action
         /** Show Welcome over Home ([State.welcome]); its pairing requests go to the app. */
         data class Welcome(val action: PresentationAction<WelcomeFeature.Action>) : Action
-        /** iOS `.binding(.set(\.search, …))`. */
         data class SearchChanged(val text: String) : Action
-        /** iOS `.binding(.set(\.isSettingsShown, …))`: the view popped (or pushed) Settings. */
+        /** The view popped (or pushed) Settings. */
         data class SettingsShownChanged(val isShown: Boolean) : Action
         data object Task : Action
         data object TranscriptCacheFlushRequested : Action
@@ -795,7 +778,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         }
     }
 
-    /** Cancellation identities (iOS `HomeFeature.CancelID`), shared with `HomeConnectionFeature`. */
+    /** Cancellation identities, shared with `HomeConnectionFeature`. */
     sealed interface CancelID {
         data object Events : CancelID
         data object Refresh : CancelID
@@ -841,7 +824,6 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         /** Mark All as Read receipts in flight at once. */
         const val receiptConcurrency = CatchUpFeature.receiptConcurrency
 
-        /** iOS `State.credentialsRejectedStatus`. */
         const val credentialsRejectedStatus = 401
 
         /** How long last-known running state is shown without a live connection. */
@@ -882,7 +864,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
 
 /**
  * Stamps Home's cached snapshot and times how long last-known running state shows while
- * reconnecting (iOS `\.homeSnapshotDate`). Tests read a fixed instant unless they set one.
+ * reconnecting. Tests read a fixed instant unless they set one.
  */
 object HomeSnapshotDate : DependencyKey<DateClient> {
     override val liveValue: DateClient = DateClient { Instant.now() }
@@ -892,17 +874,16 @@ object HomeSnapshotDate : DependencyKey<DateClient> {
 /** The `RefreshReason`s that make a foreground read (`.open`, `.resume`, `.reconnect`). */
 internal val foregroundRefreshReasons: Set<RefreshReason> = setOf(RefreshReason.Open, RefreshReason.Resume, RefreshReason.Reconnect)
 
-// region State navigation (iOS `HomeFeature.State` methods in `HomeFeature.swift`)
+// region State navigation
 
 /**
- * Shares waiting for their composer, by target, kept by `:feature:composer`'s persistence (iOS
- * `HomeFeature.State.sharedDrafts`, `ComposerPersistence.swift`): a share outlives the app. Reads
- * the [ComposerPersistence] dependency, so call it from a reducer.
+ * Shares waiting for their composer, by target, kept by `:feature:composer`'s persistence: a share
+ * outlives the app. Reads the [ComposerPersistence] dependency, so call it from a reducer.
  */
 val HomeFeature.State.sharedDrafts: SharedDrafts
     get() = SharedDrafts(server.persistenceID, projects, liveComposerTargets, dependency(ComposerPersistence))
 
-/** Composers on screen holding a draft, whose persisted draft isn't read back as a share (iOS `liveComposerTargets`). */
+/** Composers on screen holding a draft, whose persisted draft isn't read back as a share. */
 private val HomeFeature.State.liveComposerTargets: Set<SharedDraftTarget>
     get() {
         val targets = HashSet<SharedDraftTarget>()
@@ -949,13 +930,13 @@ fun HomeFeature.State.absorbingSharedDrafts(): HomeFeature.State {
     return s
 }
 
-/** iOS `syncAbsorbedDraft(for:)`: a composer that took a share is saved (or cleared) at once. */
+/** A composer that took a share is saved (or cleared) at once. */
 internal fun HomeFeature.State.syncAbsorbedDraft(detail: SessionFeature.State) {
     if (catchUp != null || !detail.readsOnView) return
     dependency(ComposerPersistence).syncAbsorbedDraft(server.persistenceID, detail.session, detail.draftProject, detail.sessionComposer)
 }
 
-/** Opens the remembered session for this server, else a draft (iOS `restoreInitialSession`). */
+/** Opens the remembered session for this server, else a draft. */
 fun HomeFeature.State.restoringInitialSession(): HomeFeature.State {
     val rememberedID = lastViewedSessionIDs[server.persistenceID]
     val session = rememberedID?.let { id -> sessions.firstOrNull { it.id == id } }
@@ -969,7 +950,7 @@ fun HomeFeature.State.restoringInitialSession(): HomeFeature.State {
     return s.openingDraft(reason = "the app restored a draft")
 }
 
-/** iOS `makeDetail(for:cachedItems:externalTranscript:reason:)`: the next state (outgoing screen remembered) and the new screen. */
+/** The next state (outgoing screen remembered) and the new screen. */
 fun HomeFeature.State.makeDetail(
     session: OpenCodeSession,
     cachedItems: List<OpenCodeTranscriptItem>? = null,
@@ -1019,7 +1000,6 @@ fun HomeFeature.State.openingDetail(
     return s.copy(sessionDetail = detail)
 }
 
-/** iOS `makeDraft(directory:reason:)`. */
 fun HomeFeature.State.makeDraft(directory: String? = null, reason: String = "you started a new session"): Pair<HomeFeature.State, SessionFeature.State> {
     val outgoingDirectory = sessionDetail?.session?.directory
     val (begun, transition) = beginningDetailTransition(defaultReason = reason, targetIsDraft = true)
@@ -1134,10 +1114,10 @@ private fun HomeFeature.State.finishingDetailTransition(
 }
 
 /**
- * A recording follows the screen to the next session, as a call does: the new detail keeps the
- * old one's identity (see [makeDetail]), so the recording's effect lives on, and it is sent
- * wherever it is when Send is tapped. What was typed beside it stays with its own session and is
- * back in the composer there. Catch Up keeps its own composer. (iOS `carryDictation(into:)`.)
+ * A recording follows the screen to the next session, as a call does: the new detail keeps the old
+ * one's identity (see [makeDetail]), so the recording's effect lives on, and it is sent wherever it
+ * is when Send is tapped. What was typed beside it stays with its own session and is back in the
+ * composer there. Catch Up keeps its own composer.
  */
 private fun HomeFeature.State.carryingDictation(detail: SessionFeature.State): SessionFeature.State {
     val old = sessionDetail ?: return detail
@@ -1147,9 +1127,8 @@ private fun HomeFeature.State.carryingDictation(detail: SessionFeature.State): S
 }
 
 /**
- * The outgoing screen's composer waits for its session (iOS `syncOutgoingDetailDraft`). New
- * Session over a draft starts empty: the old draft's words go. A screen carrying a recording
- * leaves its composer to [carryingDictation].
+ * The outgoing screen's composer waits for its session. New Session over a draft starts empty: the
+ * old draft's words go. A screen carrying a recording leaves its composer to [carryingDictation].
  */
 private fun HomeFeature.State.syncingOutgoingDetailDraft(targetIsDraft: Boolean = false): HomeFeature.State {
     val old = sessionDetail ?: return this
@@ -1169,8 +1148,8 @@ private fun HomeFeature.State.syncingOutgoingDetailDraft(targetIsDraft: Boolean 
 }
 
 /**
- * iOS `restorePersistedPick(into:)`: a relaunch brings back the session's waiting model pick,
- * unless the server's list (once loaded) no longer offers it.
+ * A relaunch brings back the session's waiting model pick, unless the server's list (once loaded)
+ * no longer offers it.
  */
 internal fun HomeFeature.State.restoringPersistedPick(detail: SessionFeature.State): SessionFeature.State =
     dependency(ComposerPersistence).restorePersistedPick(
@@ -1182,8 +1161,8 @@ internal fun HomeFeature.State.restoringPersistedPick(detail: SessionFeature.Sta
     )?.let { pick -> detail.copy(currentModel = pick, pendingModel = pick) } ?: detail
 
 /**
- * A parked or persisted composer comes back with its session (iOS `restorePersistedDraft(into:)`),
- * and a draft whose send already created its session becomes that session.
+ * A parked or persisted composer comes back with its session, and a draft whose send already
+ * created its session becomes that session.
  */
 private fun HomeFeature.State.restoringPersistedDraft(
     detail: SessionFeature.State,
@@ -1391,8 +1370,8 @@ fun HomeFeature.State.seedingSessionSnapshot(detail: SessionFeature.State): Sess
 }
 
 /**
- * Parks [composer] for [sessionID] (or the draft) until its screen comes back (iOS `parkDraft` →
- * `parkPersistedDraft`): `:feature:composer`'s persistence keeps it, a New Session draft with its project.
+ * Parks [composer] for [sessionID] (or the draft) until its screen comes back:
+ * `:feature:composer`'s persistence keeps it, a New Session draft with its project.
  */
 fun HomeFeature.State.parkingDraft(composer: DraftState?, sessionID: String?): HomeFeature.State {
     if (composer == null) return this
@@ -1402,5 +1381,5 @@ fun HomeFeature.State.parkingDraft(composer: DraftState?, sessionID: String?): H
 
 // endregion
 
-/** What Home's helpers return (iOS helpers mutate `inout State` and return an `Effect`). */
+/** What Home's helpers return. */
 internal typealias HomeReduced = Reduced<HomeFeature.State, HomeFeature.Action>

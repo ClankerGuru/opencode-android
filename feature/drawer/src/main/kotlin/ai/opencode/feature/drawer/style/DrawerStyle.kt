@@ -9,6 +9,7 @@ import ai.opencode.core.ui.OpenCodeIconSize
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.drawer.R
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -48,6 +49,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -59,11 +61,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * The drawer's grid (iOS `DrawerMetrics`). Row surfaces (highlights, search, the floating
- * controls) stand [rowEdge] in from the drawer's sides, and everything at a row's start
- * (titles, headers, shortcut symbols) begins [textInset] inside that, on one leading edge
- * 20 dp in. Status sits at the trailing end, [trailingInset] inside the row, under the
- * search button.
+ * The drawer's grid. Row surfaces (highlights, search, the floating controls) stand [rowEdge] in
+ * from the drawer's sides, and everything at a row's start (titles, headers, shortcut symbols)
+ * begins [textInset] inside that, on one leading edge 20 dp in. Status sits at the trailing end,
+ * [trailingInset] inside the row, under the search button.
  */
 object DrawerMetrics {
     val rowEdge: Dp get() = DrawerTunables.rowEdge
@@ -81,13 +82,13 @@ object DrawerMetrics {
 }
 
 /**
- * A Dynamic Type style for the drawer's text (iOS `DrawerTextStyle`). The styles are in sp,
- * so a tuned size keeps following the system font scale.
+ * A Dynamic Type style for the drawer's text. The styles are in sp, so a tuned size keeps following
+ * the system font scale.
  */
 enum class DrawerTextStyle {
     Title, Title2, Title3, Headline, Body, Callout, Subheadline, Footnote;
 
-    /** iOS `font`: the style at its own weight. */
+    /** The style at its own weight. */
     val font: TextStyle
         get() = when (this) {
             Title -> OpenCodeTextStyles.title1
@@ -106,8 +107,8 @@ enum class DrawerTextStyle {
 }
 
 /**
- * A drawer label's tone (iOS `DrawerTone`): the theme's label colours, so high contrast and
- * both appearances come with them.
+ * A drawer label's tone: the theme's label colours, so high contrast and both appearances come with
+ * them.
  */
 enum class DrawerTone {
     Primary, Secondary, Tertiary;
@@ -123,7 +124,7 @@ enum class DrawerTone {
         @Composable @ReadOnlyComposable get() = color(OpenCodeTheme.colors)
 }
 
-/** A drawer row title's weight (iOS `DrawerFontWeight`). */
+/** A drawer row title's weight. */
 enum class DrawerFontWeight(val weight: FontWeight) {
     Regular(FontWeight.Normal),
     Medium(FontWeight.Medium),
@@ -132,7 +133,7 @@ enum class DrawerFontWeight(val weight: FontWeight) {
 }
 
 /**
- * How a session row's title reads (D-51, Quiet Hierarchy): the selected row semibold;
+ * How a session row's title reads: the selected row semibold;
  * unread, waiting and running rows at `unreadWeight` in full primary; read rows regular,
  * dimmed to `readOpacity` (full primary under high contrast); muted rows secondary.
  */
@@ -156,8 +157,8 @@ enum class DrawerRowEmphasis {
 
     companion object {
         /**
-         * iOS `init(selected:muted:indicator:)`. [hasIndicator] is
-         * `indicator != HomeFeature.State.Indicator.none` (attention, running or unread).
+         * [hasIndicator] is `indicator != HomeFeature.State.Indicator.none` (attention, running or
+         * unread).
          */
         fun of(selected: Boolean, muted: Boolean, hasIndicator: Boolean): DrawerRowEmphasis = when {
             selected -> Selected
@@ -187,21 +188,17 @@ enum class DrawerHoldStyle { Card, InPlace, Flat }
 enum class DrawerSectionBreak { Header, Gap, Hairline }
 
 /**
- * The drawer's tunables (iOS `DrawerTunables` in `DrawerStyle.swift` and
- * `DrawerBackdrops.swift`) as their shipped defaults. iOS exposes them in Developer Mode's
- * Tuning Panel with presets (Spacing, Sidebar Style, Footer, Top/Bottom Edge); Android has
- * no Tuning Panel (`:devtools` is Android-native), so only the defaults are ported. iOS
- * points are dp; text sizes come from [DrawerTextStyle] in sp.
+ * The drawer's tunables as their shipped defaults. Android has no Tuning Panel (`:devtools` is
+ * Android-native), so only the defaults are ported. Text sizes come from [DrawerTextStyle] in sp.
  *
- * The motion tunables (`recedeScale`, `dim*`, `shortcut*`) live
- * with their owners (`DrawerMotion.swift`, `DrawerSearchPill.swift`).
+ * The motion tunables (`recedeScale`, `dim*`, `shortcut*`) live with their owners.
  */
 object DrawerTunables {
     private val registeredStores = java.util.Collections.newSetFromMap(java.util.WeakHashMap<TuningStore, Boolean>())
 
     /**
-     * iOS `DrawerTuningRegistration.registerIfNeeded`: [register] once per store while tuning is
-     * on, so the list's every pass doesn't list the knobs again.
+     * [register] once per store while tuning is on, so the list's every pass doesn't list the knobs
+     * again.
      */
     fun registerIfNeeded(store: TuningStore = TuningStore.shared) {
         if (!store.isEnabled) return
@@ -212,16 +209,16 @@ object DrawerTunables {
     }
 
     /**
-     * iOS `DrawerTunables.register(in:)`: lists the drawer's tunable knobs (the pin drag's shadow
-     * and edge scroll; motion runs on the shared motion roles, the rest stay constants).
+     * Lists the drawer's tunable knobs (the pin drag's shadow and edge scroll; motion runs on the
+     * shared motion roles, the rest stay constants).
      */
     fun register(store: TuningStore = TuningStore.shared) {
         if (!store.isEnabled) return
         store.register(pinLiftShadow, pinLiftShadowY, pinLiftShadowRadius, pinEdgeBand, pinEdgeSpeed)
     }
 
-    // Spacing (DrawerStyle.swift). The leading edge is derived (`rowEdge + textInset`).
-    /** Row height: Android's 48 dp minimum touch target (iOS 44 pt); rows touch, so the row is the target. */
+    // Spacing. The leading edge is derived (`rowEdge + textInset`).
+    /** Row height: Android's 48 dp minimum touch target; rows touch, so the row is the target. */
     val rowHeight: Dp = 48.dp
     /** Gap between rows. */
     val rowGap: Dp = 0.dp
@@ -269,8 +266,7 @@ object DrawerTunables {
     val footerPadding: Dp = 18.dp
     /**
      * New Session's symbol starts as far from the pill's end as it sits from the top:
-     * `(height − glyph) / 2` less the symbol's own side bearing, both scaled with the text
-     * (OC-477).
+     * `(height − glyph) / 2` less the symbol's own side bearing, both scaled with the text.
      */
     val footerGlyphBearing: Dp = 2.75.dp
     /** New Session glyph lift. */
@@ -281,7 +277,7 @@ object DrawerTunables {
     val headerWeight: DrawerFontWeight = DrawerFontWeight.Semibold
     /** Header case. */
     val headerCase: DrawerHeaderCase = DrawerHeaderCase.TitleCase
-    /** Header tracking (iOS points of tracking, as sp of letter spacing). */
+    /** Header tracking. */
     const val headerTracking: Float = 0f
     /** Pinned and Recents. */
     val sectionBreak: DrawerSectionBreak = DrawerSectionBreak.Header
@@ -304,8 +300,8 @@ object DrawerTunables {
     /** Project icon to title. */
     val projectIconGap: Dp = 9.dp
     /**
-     * The tile's lighting (iOS D-137 Lit Glass Edge, a0fc7375): a highlight from the top,
-     * a 0.5 dp white edge fading toward the bottom, a contact shadow.
+     * The tile's lighting: a highlight from the top, a 0.5 dp white edge fading toward the bottom,
+     * a contact shadow.
      */
     const val projectIconHighlight: Float = 0.3f
     /** Project icon edge. */
@@ -326,12 +322,12 @@ object DrawerTunables {
      */
     val revealFadeRamp: Dp = 32.dp
     /**
-     * The dragged row (iOS `DrawerLiftedRow`): it grows by [pinLiftScale] as it lifts
-     * (`MotionRole.MicroIn`), then springs from the finger's release into its slot (`MotionRole.Release`).
+     * The dragged row: it grows by [pinLiftScale] as it lifts (`MotionRole.MicroIn`), then springs
+     * from the finger's release into its slot (`MotionRole.Release`).
      */
     /** Dragged row grow. */
     const val pinLiftScale: Float = 1.03f
-    /** Dragged row shadow: its opacity at full lift (iOS `DrawerLiftedRowView.apply(lift:)`). */
+    /** Dragged row shadow: its opacity at full lift. */
     val pinLiftShadow = Tunable("drawer.pin.liftShadow", "Dragged row shadow", default = 0.3, range = 0.0..0.8, step = 0.01)
     /** Dragged row shadow drop, dp. */
     val pinLiftShadowY = Tunable("drawer.pin.liftShadowY", "Dragged row shadow drop", default = 6f, range = 0.0..24.0, step = 0.5)
@@ -347,15 +343,15 @@ object DrawerTunables {
     /** Held row. */
     val holdStyle: DrawerHoldStyle = DrawerHoldStyle.InPlace
     /**
-     * How much of the system's grow to undo: the held row's preview starts this much
-     * smaller. iOS grows a drawer row about 9.2 %, so 1.09 leaves it about 1 %.
+     * How much of the system's grow to undo: the held row's preview starts this much smaller. The
+     * system grows a drawer row about 9.2 %, so 1.09 leaves it about 1 %.
      */
     const val holdLift: Float = 1.09f
 
-    // The drawer's top and bottom edges (DrawerBackdrops.swift).
+    // The drawer's top and bottom edges.
     /** Fade below the title. */
     val fade: Dp = 19.dp
-    /** Blur radius (iOS's progressive blur; Android draws the wash only, see `DrawerHeaderBackdrop`). */
+    /** Blur radius. */
     val blurRadius: Dp = 2.5.dp
     /** Blur falloff. */
     val blurCurve: DrawerEdgeCurve = DrawerEdgeCurve.Smoothstep
@@ -386,8 +382,8 @@ object DrawerTunables {
 }
 
 /**
- * Pinned or Recents, in the header's size, weight, tone, case and tracking (iOS
- * `DrawerSectionTitle`). At the defaults: a semibold heading in secondary.
+ * Pinned or Recents, in the header's size, weight, tone, case and tracking. At the defaults: a
+ * semibold heading in secondary.
  */
 @Composable
 fun DrawerSectionTitle(title: String, modifier: Modifier = Modifier) {
@@ -408,9 +404,9 @@ fun DrawerSectionTitle(title: String, modifier: Modifier = Modifier) {
 }
 
 /**
- * A drawer shortcut row in the session rows’ style (iOS `DrawerShortcutLabel`): a tinted
- * symbol that starts on the drawer's leading edge, its title, and a trailing accessory in the
- * session rows' status place. The caller adds the click and the row's highlight.
+ * A drawer shortcut row in the session rows’ style: a tinted symbol that starts on the drawer's
+ * leading edge, its title, and a trailing accessory in the session rows' status place. The caller
+ * adds the click and the row's highlight.
  */
 @Composable
 fun DrawerShortcutLabel(
@@ -420,7 +416,7 @@ fun DrawerShortcutLabel(
     accessory: @Composable () -> Unit = {},
 ) {
     val fontScale = LocalDensity.current.fontScale
-    // The symbol stops growing at XXXL (iOS `dynamicTypeSize(...xxxLarge)`), and its slot at 30.
+    // The symbol stops growing at XXXL, and its slot at 30.
     val symbolScale = fontScale.coerceAtMost(XXXL_FONT_SCALE)
     Row(
         modifier = modifier
@@ -463,9 +459,9 @@ fun DrawerShortcutLabel(
 }
 
 /**
- * The Catch Up row's hold menu (Mark All as Read), offered only while [enabled]: a long
- * press opens [items]; a tap runs [onClick]. Session rows use `DrawerRowInteraction` instead.
- * The menu's open state is view-local, as iOS's `contextMenu`.
+ * The Catch Up row's hold menu (Mark All as Read), offered only while [enabled]: a long press opens
+ * [items]; a tap runs [onClick]. Session rows use `DrawerRowInteraction` instead. The menu's open
+ * state is view-local.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -492,12 +488,12 @@ fun RecentRowMenu(
     }
 }
 
-/** A Pinned or Recents section header (iOS `DrawerSectionHeaderKind`). */
+/** A Pinned or Recents section header. */
 enum class DrawerSectionHeaderKind { Pinned, Recents }
 
 /**
- * The empty-pins drop zone shown at the top of the session list while dragging an unpinned
- * row upward when nothing is pinned yet (iOS `DrawerEmptyPinDropZone`). Takes no touches.
+ * The empty-pins drop zone shown at the top of the session list while dragging an unpinned row
+ * upward when nothing is pinned yet. Takes no touches.
  */
 @Composable
 fun DrawerEmptyPinDropZone(
@@ -514,11 +510,12 @@ fun DrawerEmptyPinDropZone(
     val accent = colors.accent
     val primary = colors.text
     val rowFont = DrawerTunables.rowFont.font
+    val dropToPin = stringResource(R.string.drawer_drop_to_pin)
     Column(
         modifier
             .fillMaxSize()
             .testTag("drawer-empty-pin-drop-zone")
-            .clearAndSetSemantics { contentDescription = "Drop to Pin" },
+            .clearAndSetSemantics { contentDescription = dropToPin },
     ) {
         EmptyPinHeader(progress = openProgress, headerHeight = headerHeight)
         Row(
@@ -562,7 +559,7 @@ fun DrawerEmptyPinDropZone(
                 )
             }
             Text(
-                "Drop to Pin",
+                dropToPin,
                 style = rowFont.copy(fontWeight = if (hovered) FontWeight.Medium else FontWeight.Normal),
                 color = if (hovered) primary else colors.secondaryText,
                 maxLines = 1,
@@ -591,7 +588,7 @@ private fun EmptyPinHeader(progress: Float, headerHeight: Dp) {
                 Modifier.heightIn(min = DrawerTunables.sectionHeight).graphicsLayer { alpha = progress.coerceIn(0f, 1f) },
                 contentAlignment = Alignment.BottomStart,
             ) {
-                DrawerSectionTitle("Pinned")
+                DrawerSectionTitle(stringResource(R.string.drawer_section_pinned))
             }
         }
     } else {
@@ -602,7 +599,7 @@ private fun EmptyPinHeader(progress: Float, headerHeight: Dp) {
 /** A row highlight's shape at [DrawerMetrics.rowCornerRadius]. */
 val DrawerRowShape: RoundedCornerShape get() = RoundedCornerShape(DrawerMetrics.rowCornerRadius)
 
-/** iOS XXXL body (23 pt) over Large (17 pt): where shortcut symbols stop growing. */
+/** Where shortcut symbols stop growing. */
 internal const val XXXL_FONT_SCALE = 23f / 17f
 
 /**

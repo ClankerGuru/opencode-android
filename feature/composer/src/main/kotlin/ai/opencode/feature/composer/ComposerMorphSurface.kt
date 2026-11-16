@@ -65,34 +65,10 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * Port of iOS `ComposerMorphSurface`: the morph on screen, the backdrop, the glass and its
- * content. Always mounted (it draws nothing closed), so opening grows it from the source instead
- * of arriving open. Everything is placed from the morph's progress, so opening and closing in
- * any order only retargets its springs.
- *
- * - **Backdrop**: everything above the sheet dims as it grows (a Material scrim: iOS's dark 0.3 /
- *   light 0.12 at its no-blur strength, ×1.6), and a tap closes it. iOS also blurs the content
- *   behind (`ProgressiveBlur`, 18); Android never blurs what's behind a sheet, so it doesn't.
- * - **Glass**: one M3 tonal surface (Liquid Glass → `surfaceContainerHigh`) on one rect from the
- *   source to the rest, the width leading, its corners interpolating, drawn down (or, with
- *   [stretchesUpward], its top stretched) by the morph's drag, cross-fading with the source over
- *   the first tenth ([ComposerMorphGeometry.glassFade]).
- * - **Content**: laid out once where it rests and revealed by the glass's shape, arriving out of
- *   a real blur (14) and leaving into one (10) on its own clock ([ComposerMorph.content]).
- * - **Outgoing**: what it grows out of, drawn in the glass at the source's frame, dissolving
- *   into a blur (10) and growing 12 % as the content arrives; folding back with
- *   [outgoingReturns], it returns as the content leaves.
- * - **Downward dismissal** ([dismissesDown]): the photo sheet folds straight into [seed] (or
- *   [landsOn]), its content scaled with the glass and its glass gone below
- *   [ComposerMorphTunables.photoGlassOut]; a clear layer takes the dismissing tap (the + menu's
- *   own surface is `PlusMenuGlassSurface` now).
- * - **Foot**: controls riding the glass's bottom edge outside its mask (`MorphFootPlacement`).
- * - **Keyboard**: with [contentHasKeyboard], the rest stands on the IME, read from
- *   `WindowInsets.ime` every frame so it rides the IME's own animation; switching on or off
- *   without the IME moving rides iOS's keyboard spring.
- *
- * Under Reduce Motion it doesn't travel; it cross-fades in place. Frames are root px; radii dp.
- * [target] receives the surface's frame and the keyboard's top (or null), root px.
+ * The morph on screen, with its backdrop, glass and content. Always mounted (it draws nothing
+ * closed), so opening grows it from the source; under Reduce Motion it cross-fades in place. Frames
+ * are root px, radii dp. [target] receives the surface's frame and the keyboard's top (or null),
+ * root px.
  */
 @Composable
 fun ComposerMorphSurface(
@@ -113,15 +89,14 @@ fun ComposerMorphSurface(
     contentHasKeyboard: Boolean = false,
     /**
      * The keyboard stays as it folds (the photo sheet's, which never took it): its rest stays on
-     * the keyboard. Measured from the floor instead, its bottom dropped behind the keys in the
-     * fold's first frame and hadn't landed when the menu took its glass back.
+     * the keyboard.
      */
     keyboardStaysAsItFolds: Boolean = false,
     /** The photo sheet stretches its top toward the expanded detent, its bottom anchored. */
     stretchesUpward: Boolean = false,
     /** A dismissal drag from compact carries the whole sheet rather than compressing it. */
     translatesDownward: Boolean = false,
-    /** Backdrop dim override (iOS `backdropDim`); iOS's `backdropBlur` has no Android counterpart. */
+    /** Backdrop dim override. */
     backdropDim: Double? = null,
     /** Controls along the sheet's foot, over its content but outside its mask; they arrive and leave with the content. */
     foot: (@Composable () -> Unit)? = null,
@@ -137,10 +112,8 @@ fun ComposerMorphSurface(
     /** Dismissing slides it down and fades it out while the composer rises back from behind it. */
     dismissesDown: Boolean = false,
     /**
-     * Keep [content] composed while closed (warmed once the surface has been up a moment), so
-     * opening doesn't rebuild it. Closed, it stands off screen, transparent and outside
-     * semantics, so it takes no touches and TalkBack can't reach it; it reads
-     * [LocalComposerMorphContentActive] false meanwhile and should start nothing then.
+     * Keep [content] composed while closed so opening doesn't rebuild it. Closed, it's off screen,
+     * transparent and outside semantics, and reads [LocalComposerMorphContentActive] false.
      */
     retainsContent: Boolean = false,
     content: @Composable () -> Unit,
@@ -209,7 +182,7 @@ fun ComposerMorphSurface(
         )
         val minHeight = 120 * px
         val dimBase = backdropDim ?: if (dark) ComposerMorphTunables.dimDark else ComposerMorphTunables.dimLight
-        // No backdrop blur on Android, so the scrim takes iOS's no-blur strength.
+        // No backdrop blur on Android.
         val dim = (dimBase * ComposerMorphTunables.noBlurDimBoost).toFloat()
 
         // A zero-dim backdrop may draw nothing: the modal target still covers the whole session
@@ -217,8 +190,8 @@ fun ComposerMorphSurface(
         Box(
             Modifier
                 .fillMaxSize()
-                // iOS `accessibilityHidden(true)`. Ahead of the clickable: after it, the clearing
-                // would leave the click's own semantics, a full-screen "Unlabelled" button.
+                // Before the clickable, or its semantics would stay as a full-screen "Unlabelled"
+                // button.
                 .clearAndSetSemantics {}
                 .then(
                     if (morph.isOpen) {
@@ -301,7 +274,7 @@ fun ComposerMorphSurface(
                 CompositionLocalProvider(LocalComposerMorphContentActive provides true) {
                     if (retainsContent) movableContent() else content()
                 }
-                // Taps reach the content only once it has mostly grown (iOS `allowsHitTesting(progress > 0.5)`).
+                // Taps reach the content only once it has mostly grown.
                 if (progress <= 0.5f) {
                     Box(
                         Modifier
@@ -382,7 +355,7 @@ fun ComposerMorphSurface(
             ) {
                 Box {
                     foot()
-                    // iOS `allowsHitTesting(morph.isOpen)`: folding, its controls take no taps.
+                    // Folding, its controls take no taps.
                     if (!morph.isOpen) {
                         Box(
                             Modifier
@@ -439,14 +412,14 @@ internal fun Modifier.inertToFocus(focusManager: FocusManager): Modifier = this
     .focusProperties { onEnter = { cancelFocusChange() } }
     .focusGroup()
 
-/** UIKit's normal deceleration (0.998 per ms): a throw's predicted travel is velocity × 0.499 s (SwiftUI `predictedEndTranslation`). */
+/** A throw's predicted travel is velocity × 0.499 s. */
 internal const val PREDICT_SECONDS = 0.499f
 
 /**
- * iOS `MorphReveal`: the content arriving out of a blur and leaving into one on its own clock
- * ([reveal]), whole by [lead] of it (`photoContentLead`; 1 follows it); under Reduce Motion (or a
- * downward dismissal) [fade], the glass's own, instead.
- * No blur on content all but gone or all but whole: it costs a pass and shows nothing.
+ * The content arriving out of a blur and leaving into one on its own clock ([reveal]), whole by
+ * [lead] of it (`photoContentLead`; 1 follows it); under Reduce Motion (or a downward dismissal)
+ * [fade], the glass's own, instead. No blur on content all but gone or all but whole: it costs a
+ * pass and shows nothing.
  */
 internal fun Modifier.morphReveal(reveal: () -> Float, fade: Float?, blurPx: Float, lead: Float = 1f): Modifier = graphicsLayer {
     val showing = fade ?: (reveal() / max(lead, 0.01f)).coerceIn(0f, 1f)
@@ -456,9 +429,9 @@ internal fun Modifier.morphReveal(reveal: () -> Float, fade: Float?, blurPx: Flo
 }
 
 /**
- * iOS `MorphDissolve`: what the morph grows out of, leaving into a blur as the content arrives
- * and returning as it leaves (`1 − reveal`, on the content's clock, so the two add up to a
- * whole); [scales] shrinks it 4 % toward its foot as it goes.
+ * What the morph grows out of, leaving into a blur as the content arrives and returning as it
+ * leaves (`1 − reveal`, on the content's clock, so the two add up to a whole); [scales] shrinks it
+ * 4 % toward its foot as it goes.
  */
 internal fun Modifier.morphDissolve(reveal: () -> Float, shown: Boolean, fade: Float, scales: Boolean, blurPx: Float): Modifier = graphicsLayer {
     val r = reveal()
@@ -473,7 +446,9 @@ internal fun Modifier.morphDissolve(reveal: () -> Float, shown: Boolean, fade: F
     alpha = ComposerMorphGeometry.outgoingOpacity(r, shown, fade)
 }
 
-/** iOS `UnevenRoundedRectangle` with equal top and equal bottom corners, optionally at [offset] / [size] inside the layer (a mask). */
+/**
+ * Equal top and equal bottom corners, optionally at [offset] / [size] inside the layer (a mask).
+ */
 private class MorphShape(
     private val top: Float,
     private val bottom: Float,

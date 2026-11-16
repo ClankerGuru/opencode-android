@@ -7,11 +7,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 
 /**
- * Live assistant text as Markdown blocks, keyed by part ID (iOS `MarkdownStreamClient`). The
- * event batcher prepares each flushed text off the reducer's path ([prepare], installed with
- * [withMarkdownStream]), so a row's [blocks] for the same text is a lookup. Any other text (a
- * reconnect, a refresh, a part opened mid-stream) projects incrementally from the part's
- * [MarkdownStream] without disturbing the batcher's.
+ * Live assistant text as Markdown blocks, keyed by part ID. The event batcher prepares each flushed
+ * text off the reducer's path ([prepare], installed with [withMarkdownStream]), so a row's [blocks]
+ * for the same text is a lookup. Any other text (a reconnect, a refresh, a part opened mid-stream)
+ * projects incrementally from the part's [MarkdownStream] without disturbing the batcher's.
  */
 class MarkdownStreamClient(
     /** The blocks of `text`, already held back by `holdingPendingMarker` while streaming. */
@@ -33,11 +32,11 @@ class MarkdownStreamClient(
 }
 
 /**
- * [EventBatcherHooks] with [EventBatcherHooks.prepareMarkdown] projecting through [client]
- * (iOS `EventBatcher.prepareMarkdown`): a streaming part's accumulated text is held back by
- * `holdingPendingMarker` first, exactly as the row asks for it, so the row's lookup hits. Other
- * hooks are kept. Install at startup:
- * `DependencyValues.installRoot { this[EventBatcherHooks] = this[EventBatcherHooks].withMarkdownStream() }`.
+ * [EventBatcherHooks] with [EventBatcherHooks.prepareMarkdown] projecting through [client]: a
+ * streaming part's accumulated text is held back by `holdingPendingMarker` first, exactly as the
+ * row asks for it, so the row's lookup hits. Other hooks are kept. Install at startup:
+ * `DependencyValues.installRoot { this[EventBatcherHooks] =
+ * this[EventBatcherHooks].withMarkdownStream() }`.
  */
 fun EventBatcherHooks.withMarkdownStream(client: MarkdownStreamClient = dependency(MarkdownStreamClient)): EventBatcherHooks =
     EventBatcherHooks(
@@ -48,12 +47,12 @@ fun EventBatcherHooks.withMarkdownStream(client: MarkdownStreamClient = dependen
     )
 
 /**
- * The parts' streams and their latest projections (iOS `MarkdownStreamStore`). Parsing happens
- * outside the lock: a projection that loses a race is still returned, and its stream is kept
- * only when nothing newer was stored meanwhile and it doesn't roll the stream back to an older
- * text. A part keeps two streams, since a session opened mid-reply accumulates only the text
- * after it opened while the batcher holds the whole reply; each text continues the stream it
- * shares the most with. Stored streams are never mutated: an update works on a copy.
+ * The parts' streams and their latest projections. Parsing happens outside the lock: a projection
+ * that loses a race is still returned, and its stream is kept only when nothing newer was stored
+ * meanwhile and it doesn't roll the stream back to an older text. A part keeps two streams, since a
+ * session opened mid-reply accumulates only the text after it opened while the batcher holds the
+ * whole reply; each text continues the stream it shares the most with. Stored streams are never
+ * mutated: an update works on a copy.
  */
 class MarkdownStreamStore(
     private val maximumParts: Int = 16,
@@ -138,12 +137,11 @@ class MarkdownStreamStore(
 }
 
 /**
- * The parsed blocks of an assistant text part. iOS parses in the reducer and keeps
- * `[OpenCodeMarkdownBlock]` on the item; Android items keep raw text, so rows ask here: a
+ * The parsed blocks of an assistant text part. Android items keep raw text, so rows ask here: a
  * lookup in [MarkdownStreamClient] (usually prepared by the event batcher), else an incremental
- * projection that re-parses only the live tail. [isStreaming] text is still arriving: a last
- * line holding only a block's marker waits for its first word (`holdingPendingMarker`) and the
- * tail's last block is healed. Recomposition with the same text is free.
+ * projection that re-parses only the live tail. [isStreaming] text is still arriving: a last line
+ * holding only a block's marker waits for its first word (`holdingPendingMarker`) and the tail's
+ * last block is healed. Recomposition with the same text is free.
  */
 @Composable
 fun rememberMarkdownBlocks(partID: String, text: String, isStreaming: Boolean = false): List<OpenCodeMarkdownBlock> {

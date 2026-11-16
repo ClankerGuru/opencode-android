@@ -50,10 +50,8 @@ import kotlin.math.abs
  * - `catchingCardMidSettle…`'s step 4 (a weak display-link target lets the view controller
  *   deallocate): UIKit/ARC lifetime; Android's loops are coroutines cancelled with their scope.
  *
- * Other modules:
- * - `ComposerSendTransitionTests.interruptedSendRestoresTheBubbleAndRemovesBothSnapshots`
- *   (`ComposerSendTransition`, `SendLandingMarker`) belongs to `:feature:composer` /
- *   `:feature:transcript`.
+ * Dropped: `ComposerSendTransitionTests.interruptedSendRestoresTheBubbleAndRemovesBothSnapshots`.
+ *   Android sends without a flight (deliberate divergence, docs/parity/session.md).
  *
  * UIKit-only assertions dropped inside ported tests: subview/snapshot counts, `CALayer` masks
  * and animation keys, `safeAreaRegions`, first responders and `UIAccessibility` screen changes
@@ -570,7 +568,7 @@ class SessionDrawerSettleTests {
         assertEquals(listOf(true, false), harness.settled)
     }
 
-    /** Android only (QA FB-07): predictive back on the shut card pulls it part way open; the commit opens it from there. */
+    /** Android only: predictive back on the shut card pulls it part way open; the commit opens it from there. */
     @Test
     fun aBackGestureOpensTheShutDrawerFromWhereItLeftTheCard() = runTest {
         val harness = Harness(this)

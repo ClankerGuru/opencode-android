@@ -17,18 +17,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `VoiceRouteTests.swift`, the `:feature:settings` part: the Settings and
- * `VoiceRoutePreferences` checks of `inactiveGeminiNeverDisablesThePhoneKeyAcrossEntryPoints` and
- * `grokSuppressesUnrelatedServerErrors`. Their `SessionFeature.State` checks are
- * `:feature:session`'s; the rest of the file is `:feature:voice`'s port.
- */
 class VoiceRouteTests {
     @get:Rule val isolation = TestIsolationRule()
 
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
 
-    /** iOS `preserveSettings()`: each test's in-memory shared store starts from these values. */
+    /** Each test's in-memory shared store starts from these values. */
     private fun preserveSettings(): SettingsTestShared {
         val shared = SettingsTestShared()
         shared.set(SharedKeys.voiceModeEnabled, true)

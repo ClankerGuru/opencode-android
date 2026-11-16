@@ -8,13 +8,11 @@ import androidx.compose.runtime.setValue
 import java.util.UUID
 
 /**
- * The inline photo picker's continuous selection, mirrored onto composer attachments (iOS
- * `InlinePhotoSelection`). Every picked item gets a stable ID that becomes its image
- * attachment's or video upload's ID, so either side can remove the other: deselecting removes
- * the chip, and removing the chip deselects the item.
+ * The inline photo picker's continuous selection, mirrored onto composer attachments. Every picked
+ * item gets a stable ID that becomes its image attachment's or video upload's ID, so either side
+ * can remove the other: deselecting removes the chip, and removing the chip deselects the item.
  *
- * Items are the picker's content [Uri]s (iOS `PhotosPickerItem`; [Item] so the bookkeeping
- * runs without the framework). [items] is Compose state, so the grid observes it; it is
+ * Items are the picker's content [Uri]s. [items] is Compose state, so the grid observes it; it is
  * ordered as the user tapped.
  */
 @Stable
@@ -81,5 +79,5 @@ class InlinePhotoSelection<Item>(private val isVideo: (Item) -> Boolean) {
     private fun pick(item: Item): Pick<Item>? = ids[item]?.let { Pick(item, it, isVideo(item)) }
 }
 
-/** The picker's selection over content [Uri]s, typed by the resolver (iOS `InlinePhotoSelection()`). */
+/** The picker's selection over content [Uri]s, typed by the resolver. */
 fun InlinePhotoSelection(): InlinePhotoSelection<Uri> = InlinePhotoSelection { ComposerPickers.isVideo(it) }

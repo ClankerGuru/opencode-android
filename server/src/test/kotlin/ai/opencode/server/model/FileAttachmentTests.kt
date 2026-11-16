@@ -17,13 +17,6 @@ import org.junit.Test
 import java.io.File
 import java.nio.file.Files
 
-/**
- * Port of iOS `FileAttachmentTests.swift`' `PromptPresentationTests`: the model text's
- * desktop reference lines, and user messages decoded into file chips. `fileOnlyMessagesHaveNoBubble`'s
- * last check (`TranscriptEntry.build`) is `:feature:transcript`'s; here it checks the decoded items.
- * `AttachmentFileTypeTests` are `:core`'s, `FileAttachmentFeatureTests` `:feature:session`'s and
- * `:feature:composer`'s, `ShareHandoffFileTests` `:feature:system`'s.
- */
 class PromptPresentationTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -98,7 +91,6 @@ class PromptPresentationTests {
     }
 }
 
-/** Port of iOS `FileAttachmentTests.swift`' `FileAttachmentWireTests`: the prompt and upload wire formats. */
 class FileAttachmentWireTests {
     @get:Rule val isolation = TestIsolationRule()
 

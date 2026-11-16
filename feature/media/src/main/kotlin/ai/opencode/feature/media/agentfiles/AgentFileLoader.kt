@@ -2,9 +2,11 @@ package ai.opencode.feature.media
 
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.strings.localized
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.OpenCodeTransport
+import ai.opencode.server.model.OpenCodeMediaReference
 import ai.opencode.server.model.AgentFileReference
 import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.server.retry.ServerContact
@@ -27,7 +29,8 @@ import okhttp3.Callback
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
-import org.json.JSONObject
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -42,11 +45,10 @@ import kotlin.coroutines.coroutineContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-/** iOS `OpenCodeServer.fileReadRequest(_ target:)`. */
 fun OpenCodeServer.fileReadRequest(target: AgentFileReference.Target): Request? =
     fileReadRequest(location = target.location, relativePath = target.relativePath)
 
-/** Why a file the agent named couldn't open (iOS `AgentFileError`). */
+/** Why a file the agent named couldn't open. */
 sealed class AgentFileError : Exception() {
     data object Unreadable : AgentFileError()
     data object NotFound : AgentFileError()
@@ -56,16 +58,16 @@ sealed class AgentFileError : Exception() {
 
     val title: String
         get() = when (this) {
-            NotFound -> "File Not Found"
-            else -> "Couldn’t Open File"
+            NotFound -> localized(R.string.media_file_error_not_found_title)
+            else -> localized(R.string.media_file_error_open_failed_title)
         }
 
     val detail: String
         get() = when (this) {
-            Unreadable -> "This path can’t be read from the server."
-            NotFound -> "It may have been moved or deleted."
-            Unauthorized -> "The server didn’t accept this device’s password."
-            is Server -> "The server couldn’t read it (HTTP $status). It may be a folder."
+            Unreadable -> localized(R.string.media_file_error_unreadable)
+            NotFound -> localized(R.string.media_file_error_not_found)
+            Unauthorized -> localized(R.string.media_file_error_unauthorized)
+            is Server -> localized(R.string.media_file_error_server, status)
             is Network -> description
         }
 
@@ -78,21 +80,21 @@ sealed class AgentFileError : Exception() {
         }
 
         /**
-         * A transport failure in words the viewer shows (iOS shows `localizedDescription`).
-         * Never the address: Android exception messages carry hosts and paths.
+         * A transport failure in words the viewer shows. Never the address: Android exception
+         * messages carry hosts and paths.
          */
         fun network(error: Throwable): AgentFileError = Network(
             when (error) {
-                is SocketTimeoutException -> "The request timed out."
+                is SocketTimeoutException -> localized(R.string.media_file_error_timed_out)
                 else -> OpenCodeClientError.UNREACHABLE_MESSAGE
             },
         )
 
-        internal val unexpectedResponse = Network("The server sent an unexpected response.")
+        internal val unexpectedResponse: Network get() = Network(localized(R.string.media_file_error_unexpected_response))
     }
 }
 
-/** What the server says about a file before the phone commits to it (iOS `AgentFileProbe`). */
+/** What the server says about a file before the phone commits to it. */
 data class AgentFileProbe(
     val size: Long?,
     val mime: String?,
@@ -114,7 +116,7 @@ data class AgentFileProbe(
                 response.code == 416 -> contentRange?.let(::totalLength) ?: 0L
                 else -> response.body.contentLength().takeIf { it >= 0 } ?: response.header("Content-Length")?.trim()?.toLongOrNull()
             }
-            // iOS `mimeType`: the media type without parameters.
+            // The media type without parameters.
             val mime = response.header("Content-Type")?.substringBefore(';')?.trim()?.lowercase()?.ifEmpty { null }
             return AgentFileProbe(size, mime, supportsRanges, response.header("ETag"), response.header("Last-Modified"))
         }
@@ -129,8 +131,8 @@ data class AgentFileProbe(
 }
 
 /**
- * Downloads into the cache with progress, revalidating with the server's validators when it
- * sends them (iOS `AgentFileLoader`). One read per call; the viewer owns trying again.
+ * Downloads into the cache with progress, revalidating with the server's validators when it sends
+ * them. One read per call; the viewer owns trying again.
  */
 object AgentFileLoader {
     /** Above this, a file that can't stream asks before downloading. */
@@ -141,6 +143,19 @@ object AgentFileLoader {
 
     /** Text above this opens as a document rather than the lazy text viewer. */
     const val maxTextBytes = 16 * 1024 * 1024
+
+    internal data class Original(val request: Request, val cacheKey: String)
+
+    internal fun original(server: OpenCodeServer, reference: AgentFileReference, directory: String?): Original? {
+        reference.media?.let { media ->
+            val request = MediaReferenceResolver.originalRequest(server, media.hash) ?: return null
+            return Original(request, OpenCodeMediaReference.uri(media.hash))
+        }
+        val target = reference.target(directory) ?: return null
+        return Original(server.fileReadRequest(target) ?: return null, target.absolutePath)
+    }
+
+    internal val overLimit get() = AgentFileError.Network(localized(R.string.media_file_error_over_limit))
 
     /** Adds the server's credentials to a request for one of its origins. */
     fun authorizedRequest(request: Request, server: OpenCodeServer?): Request {
@@ -154,11 +169,13 @@ object AgentFileLoader {
     }
 
     /**
-     * The transport's pool with iOS `URLSession`'s 60 s idle interval. Sent once, like iOS's
-     * reads under `NetworkRetry.$policy.withValue(.once)`: the viewer's Try Again is the retry.
+     * The transport's pool with a 60 s idle interval. Sent once: the viewer's Try Again is the
+     * retry.
      */
     internal fun client(transport: OpenCodeTransport = dependency(OpenCodeTransport)): OkHttpClient =
         transport.request.newBuilder()
+            // A redirected original could forward custom server credentials to another host.
+            .followRedirects(false)
             .connectTimeout(60, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             .build()
@@ -190,11 +207,11 @@ object AgentFileLoader {
         }
     }
 
-    private data class Validators(val entityTag: String?, val lastModified: String?)
+    @Serializable
+    private data class Validators(val entityTag: String? = null, val lastModified: String? = null)
 
     private fun readValidators(sidecar: File): Validators? = runCatching {
-        val json = JSONObject(sidecar.readText())
-        Validators(json.optString("entityTag").ifEmpty { null }, json.optString("lastModified").ifEmpty { null })
+        Json.decodeFromString(Validators.serializer(), sidecar.readText())
     }.getOrNull()
 
     /** `<cache>/AgentFiles/<hash of server + path>/<name>`. */
@@ -215,6 +232,7 @@ object AgentFileLoader {
         contact: ServerContact = ServerContact.shared,
         client: OkHttpClient = client(),
         temporaryDirectory: File = destination.parentFile ?: File("."),
+        maxBytes: Long = Long.MAX_VALUE,
         progress: (received: Long, expected: Long?) -> Unit,
     ): File = withContext(Dispatchers.IO) {
         val sidecar = File(destination.path + ".validators")
@@ -237,13 +255,18 @@ object AgentFileLoader {
                 throw AgentFileError.network(error)
             }
             response.use {
-                if (response.code == 304 && destination.exists()) {
+                if (response.code == 304) {
+                    if (!destination.isFile || (authorized.header("If-None-Match") == null && authorized.header("If-Modified-Since") == null)) {
+                        throw AgentFileError.unexpectedResponse
+                    }
+                    if (destination.length() > maxBytes) throw overLimit
                     noteContact(contact, server, authorized, response)
                     return@withContext destination
                 }
                 AgentFileError.from(response.code)?.let { throw it }
                 try {
-                    transfer(response, temporary, progress)
+                    if (response.code == 206) throw AgentFileError.unexpectedResponse
+                    transfer(response, temporary, maxBytes, progress)
                 } catch (error: CancellationException) {
                     throw error
                 } catch (error: IOException) {
@@ -252,6 +275,7 @@ object AgentFileLoader {
                 }
                 noteContact(contact, server, authorized, response)
                 destination.parentFile?.mkdirs()
+                sidecar.delete() // Never associate stale validators with the replacement.
                 destination.delete()
                 if (!temporary.renameTo(destination)) {
                     temporary.copyTo(destination, overwrite = true)
@@ -259,15 +283,8 @@ object AgentFileLoader {
                 val probe = AgentFileProbe.of(response)
                 if (probe.entityTag != null || probe.lastModified != null) {
                     runCatching {
-                        sidecar.writeText(
-                            JSONObject().apply {
-                                probe.entityTag?.let { put("entityTag", it) }
-                                probe.lastModified?.let { put("lastModified", it) }
-                            }.toString(),
-                        )
+                        sidecar.writeText(Json.encodeToString(Validators.serializer(), Validators(probe.entityTag, probe.lastModified)))
                     }
-                } else {
-                    sidecar.delete()
                 }
                 destination
             }
@@ -278,9 +295,10 @@ object AgentFileLoader {
     }
 
     /** Writes the body, reporting progress at most every 0.5 % (at least every 128 KB) and at the end. */
-    private suspend fun transfer(response: Response, file: File, progress: (Long, Long?) -> Unit) {
+    private suspend fun transfer(response: Response, file: File, maxBytes: Long, progress: (Long, Long?) -> Unit) {
         val body = response.body
         val expected = body.contentLength().takeIf { it > 0 }
+        if (expected != null && expected > maxBytes) throw overLimit
         val step = maxOf((expected ?: 0) / 200, 128L * 1024)
         var written = 0L
         var lastReported = -1L
@@ -292,6 +310,7 @@ object AgentFileLoader {
                     coroutineContext.ensureActive()
                     val read = input.read(buffer)
                     if (read < 0) break
+                    if (read > maxBytes - written) throw overLimit
                     output.write(buffer, 0, read)
                     written += read
                     if (written == expected || written - lastReported >= step) {
@@ -337,9 +356,9 @@ internal suspend fun Call.await(): Response = suspendCancellableCoroutine { cont
 }
 
 /**
- * Streams a file to ExoPlayer through authenticated range requests (iOS `StreamingFileLoader`,
- * an `AVAssetResourceLoaderDelegate`). Each byte range ExoPlayer asks for is one request with
- * the server's credentials; only 206 answers stream, anything else fails the load.
+ * Streams a file to ExoPlayer through authenticated range requests. Each byte range ExoPlayer asks
+ * for is one request with the server's credentials; only 206 answers stream, anything else fails
+ * the load.
  */
 @OptIn(UnstableApi::class)
 class StreamingFileLoader(

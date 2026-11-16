@@ -15,19 +15,10 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Typed drafts, unsent outbox lanes and failed sends that outlive the process (iOS
- * `ComposerPersistence`, `Composer/ComposerPersistence.swift`), keyed by server persistence ID
- * and session ID (null: the New Session draft).
- *
- * Typing is debounced (500 ms) off the main path and written at once by [flush] (the app
- * backgrounding). Inline attachments (images, Pasted Text) are stored as blobs beside the
- * state; uploaded files keep only their server path, and staged files still uploading stay in
- * memory across in-process session switches. Entries untouched for 30 days, and every entry
- * of a deleted session ([removeSession]) or server ([removeServer]), are removed with their
- * blobs. Draft text is never logged.
- *
- * The session and drawer areas own the iOS `SessionFeature`/`HomeFeature` extensions in the
- * same Swift file; their logic is in `ComposerPersistenceIntegration.kt` as plain functions.
+ * Typed drafts, unsent outbox lanes and failed sends that outlive the process, keyed by server
+ * persistence ID and session ID (null: the New Session draft). Typing is debounced (500 ms) and
+ * written at once by [flush]. Entries untouched for 30 days, or of a deleted session or server, are
+ * removed with their blobs. Draft text is never logged.
  */
 class ComposerPersistence(
     val identity: String = "",
@@ -66,14 +57,14 @@ class ComposerPersistence(
     val removeServer: (serverID: String) -> Unit = {},
     val flush: suspend () -> Unit = {},
     val removeAll: () -> Unit = {},
+    val retainedAttachmentBytes: () -> Int = { 0 },
 ) {
     companion object Key : DependencyKey<ComposerPersistence> {
-        /** `filesDir/support` (iOS Application Support/OpenCode), where `TranscriptCachePersistence` also writes. */
+        /** `filesDir/support`, where `TranscriptCachePersistence` also writes. */
         fun defaultDirectory(): File = File(dependency(AppContext).applicationContext.filesDir, "support")
 
         override val liveValue: ComposerPersistence by lazy {
-            // iOS DEBUG lab switches, read as debug system properties (`VoiceLabEnvironment`):
-            // a lab server run keeps drafts in memory unless asked to persist them.
+            // A lab server run keeps drafts in memory unless asked to persist them.
             if (VoiceLabEnvironment.string("OPENCODE_LAB_SERVER_URL") != null && !VoiceLabEnvironment.flag("OPENCODE_LAB_PERSIST_COMPOSER")) {
                 return@lazy inMemory()
             }
@@ -119,9 +110,10 @@ class ComposerPersistence(
                 scheduleSessionState = writer::scheduleSessionState,
                 removeSession = writer::removeSession,
                 removeServer = writer::removeServer,
-                // iOS `await writer.flush()` runs off the main actor; the write never blocks the caller's thread.
+                // The write never blocks the caller's thread.
                 flush = { withContext(Dispatchers.IO) { writer.flush() } },
                 removeAll = writer::removeAll,
+                retainedAttachmentBytes = writer::retainedAttachmentBytes,
             )
         }
     }

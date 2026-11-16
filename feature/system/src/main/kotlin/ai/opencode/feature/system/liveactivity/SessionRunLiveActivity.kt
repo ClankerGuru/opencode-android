@@ -1,6 +1,8 @@
 package ai.opencode.feature.system.liveactivity
 
+import ai.opencode.core.strings.localized
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.system.R
 import ai.opencode.feature.system.liveactivity.SessionActivityAttributes.ContentState.Phase
 import ai.opencode.feature.system.notifications.SystemNotificationChannels
 import android.app.Notification
@@ -13,15 +15,13 @@ import java.time.Instant
 import kotlin.time.Duration
 
 /**
- * Port of `OpenCodeWidgets/SessionRunLiveActivity.swift`: a run a send from this phone started,
- * while the app is away: the session, what the agent is on and for how long, then Done with the
- * reply's opening line or Needs your input. Tapping it opens the session, where a pending
- * request docks. No message text while it works.
+ * A run a send from this phone started, while the app is away: the session, what the agent is on
+ * and for how long, then Done with the reply's opening line or Needs your input. Tapping it opens
+ * the session, where a pending request docks. No message text while it works.
  *
- * iOS draws it on the Lock Screen and in the Dynamic Island; Android draws a promoted ongoing
- * notification (a Live Update) in the status bar chip, the shade and on the lock screen. The
- * preview is `.privacySensitive()` on iOS: here the lock screen shows a public version with the
- * title and status only.
+ * Drawn as a promoted ongoing notification (a Live Update) in the status bar chip, the shade and on
+ * the lock screen. The preview is `.privacySensitive()`: here the lock screen shows a public
+ * version with the title and status only.
  */
 object SessionRunLiveActivity {
     const val NOTIFICATION_ID = 4103
@@ -68,7 +68,7 @@ object SessionRunLiveActivity {
             .build()
     }
 
-    /** iOS `widgetURL(context.attributes.url)`: the session's `opencode://session` link, routed like a tapped notification. */
+    /** The session's `opencode://session` link, routed like a tapped notification. */
     private fun open(context: Context, attributes: SessionActivityAttributes): PendingIntent? {
         val url = attributes.url ?: return null
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
@@ -79,9 +79,9 @@ object SessionRunLiveActivity {
 }
 
 /**
- * Port of iOS `SessionRunDisplay`: what the row shows. An activity the app stopped refreshing
- * while it worked reads as its last known state, without a timer that would claim it's still
- * going (Android removes it at its timeout, so [isStale] is for parity and tests).
+ * What the row shows. An activity the app stopped refreshing while it worked reads as its last
+ * known state, without a timer that would claim it's still going (Android removes it at its
+ * timeout, so [isStale] is for parity and tests).
  */
 data class SessionRunDisplay(
     val title: String,
@@ -105,20 +105,20 @@ data class SessionRunDisplay(
     val status: String
         get() = when (phase) {
             Phase.working -> {
-                val working = if (isStale) "Last seen working" else "Working"
-                step?.let { "$working · $it" } ?: working
+                val working = if (isStale) localized(R.string.system_session_last_seen_working) else localized(R.string.system_session_working)
+                step?.let { localized(R.string.system_session_status_with_step, working, it) } ?: working
             }
-            Phase.needsInput -> "Needs your input"
-            Phase.done -> "Done"
-            Phase.failed -> "Failed"
+            Phase.needsInput -> localized(R.string.system_session_needs_input)
+            Phase.done -> localized(R.string.system_session_done)
+            Phase.failed -> localized(R.string.system_session_failed)
         }
 
     val shortStatus: String
         get() = when (phase) {
-            Phase.working -> "Working"
-            Phase.needsInput -> "Input"
-            Phase.done -> "Done"
-            Phase.failed -> "Failed"
+            Phase.working -> localized(R.string.system_session_working)
+            Phase.needsInput -> localized(R.string.system_session_input)
+            Phase.done -> localized(R.string.system_session_done)
+            Phase.failed -> localized(R.string.system_session_failed)
         }
 
     val symbol: SFSymbol
@@ -129,7 +129,10 @@ data class SessionRunDisplay(
             Phase.failed -> SFSymbol.XmarkCircleFill
         }
 
-    /** iOS system colours (blue, orange, green, red; secondary when stale), as notification accent colours. */
+    /**
+     * System colours (blue, orange, green, red; secondary when stale), as notification accent
+     * colours.
+     */
     val tint: Int
         get() = when (phase) {
             Phase.working -> if (isStale) SECONDARY else BLUE

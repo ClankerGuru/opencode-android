@@ -39,10 +39,9 @@ import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.core.tuning.DeveloperMode
 
 /*
- * Port of iOS `HomeFeature+Connection.swift`: what Home does as the connection comes and goes
- * (before `HomeConnectionFeature` settles the same action), the authoritative snapshot's
- * reconciliation into the list and the open screens, the active-ancestry merge, and the attention
- * read.
+ * What Home does as the connection comes and goes (before `HomeConnectionFeature` settles the same
+ * action), the authoritative snapshot's reconciliation into the list and the open screens, the
+ * active-ancestry merge, and the attention read.
  */
 
 internal fun HomeFeature.reduceConnection(state: State, action: Action): HomeReduced = when (action) {
@@ -77,7 +76,7 @@ internal fun HomeFeature.reduceConnection(state: State, action: Action): HomeRed
         val sharedStore = dependency(SharedStore)
         val flush = Effect.run<Action> {
             persistence.flush()
-            // Home's snapshots and read dates still waiting for the writer land too (iOS 24057173).
+            // Home's snapshots and read dates still waiting for the writer land too.
             withContext(Dispatchers.IO) { sharedStore.flush() }
         }
         Reduced(state, Effect.merge(flush, flushPersistedComposer(state)))
@@ -255,13 +254,20 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
     val unattributed = runChanges.any { (sessionID, isRunning) ->
         isRunning && sessionID !in readActiveIDs && !s.isAttributed(sessionID, knownParents)
     }
-    if (s.sessionDetail?.session != null) s = s.updatingDetail { it.copy(activeFamilySessionIDs = snapshotActive) }
-    s = s.updatingSubagents { it.copy(activeFamilySessionIDs = snapshotActive) }
+    val activeDetail = s.sessionDetail
+    val detailActivity: Effect<Action> =
+        if (activeDetail?.session != null && activeDetail.activeFamilySessionIDs != snapshotActive) {
+            Effect.send(Action.detail(SessionFeature.Action.ActiveSessionsRead(snapshotActive)))
+        } else {
+            Effect.none()
+        }
     val subagentRuns = Effect.merge(
         s.subagentStack.mapNotNull { child ->
             val childID = child.session?.id ?: return@mapNotNull null
             val running = childID in snapshotActive
             Effect.merge(
+                if (child.activeFamilySessionIDs == snapshotActive) Effect.none()
+                else Effect.send(Action.SubagentStack(child.navigationID, SessionFeature.Action.ActiveSessionsRead(snapshotActive))),
                 if (child.isExternallyActive == running) Effect.none()
                 else Effect.send(Action.SubagentStack(child.navigationID, SessionFeature.Action.ExternalRunStateChanged(running))),
                 if (wasConnected) Effect.none()
@@ -319,7 +325,7 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
     val needsAttentionRefresh = !wasConnected ||
         !s.isEventStreamLive ||
         s.noticeReadiness != State.NoticeReadiness.settled ||
-        HomeFeature.attentionDirectories(s) != previousAttentionDirectories
+        HomeFeature.attentionDirectories(s).toSet() != previousAttentionDirectories.toSet()
     val attention = if (needsAttentionRefresh) refreshAttention(s) else Effect.none()
     val ancestry = resolveActiveAncestry(s)
     // A few at a time, behind the open session's own read.
@@ -365,6 +371,7 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
                 prefetch,
                 drained.effect,
                 voiceSnapshot,
+                detailActivity,
                 subagentRuns,
                 searchesServer,
                 update,
@@ -374,7 +381,7 @@ private fun HomeFeature.snapshotRefreshed(state: State, action: Action.SnapshotR
             ),
         )
     }
-    return Reduced(s, Effect.merge(attention, ancestry, prefetch, drained.effect, voiceSnapshot, subagentRuns, searchesServer, detailReconnected))
+    return Reduced(s, Effect.merge(attention, ancestry, prefetch, drained.effect, voiceSnapshot, detailActivity, subagentRuns, searchesServer, detailReconnected))
 }
 
 private fun HomeFeature.activeAncestryResolved(state: State, resolved: Map<String, String>): HomeReduced {
@@ -396,7 +403,7 @@ private fun HomeFeature.activeAncestryResolved(state: State, resolved: Map<Strin
     val detailReread = s.sessionDetail?.let {
         if (reread(it)) sendToDetail(s, SessionFeature.Action.FamilyRefreshRequested) else Effect.none()
     } ?: Effect.none()
-    val attention = if (HomeFeature.attentionDirectories(s) == previousDirectories) Effect.none() else refreshAttention(s)
+    val attention = if (HomeFeature.attentionDirectories(s).toSet() == previousDirectories.toSet()) Effect.none() else refreshAttention(s)
     return Reduced(s, Effect.merge(attention, pushed, detailReread))
 }
 
@@ -429,15 +436,13 @@ internal fun HomeFeature.refreshSnapshot(state: State): HomeReduced {
     )
 }
 
-/** Upper bound on directories one attention refresh may query (iOS `HomeFeature.attentionDirectoryLimit`). */
+/** Upper bound on directories one attention refresh may query. */
 internal const val attentionDirectoryLimit = 8
 
 /**
- * Directories that can actually hold a pending request. Every location-scoped read makes the
- * server boot that directory's full service graph (MCP servers, watchers, plugins) and keep it for
- * an hour, so asking about all historical directories on each Home refresh once booted 152 graphs
- * and ~900 child processes. A request can only pend inside a booted graph, and a session blocked
- * on one is still running, so running roots, roots already flagged, and the open session cover it.
+ * Directories that can actually hold a pending request. Every location-scoped read makes the server
+ * boot that directory's full service graph (MCP servers, watchers, plugins) for an hour, so only
+ * running roots, roots already flagged and the open session are asked.
  */
 internal fun HomeFeature.Companion.attentionDirectories(state: State): List<String> {
     val busy = state.busySessionIDs
@@ -475,10 +480,7 @@ internal fun HomeFeature.refreshAttention(state: State): Effect<Action> {
     }.cancellable(HomeFeature.CancelID.Attention, cancelInFlight = true)
 }
 
-/**
- * iOS `HomeFeature.flushPersistedComposer(_:)` (`ComposerPersistence.swift`): leaving the app
- * saves every composer on screen that keeps its draft, then writes at once.
- */
+/** Leaving the app saves every composer on screen that keeps its draft, then writes at once. */
 internal fun HomeFeature.flushPersistedComposer(state: State): Effect<Action> {
     val persistence = dependency(ComposerPersistence)
     val serverID = state.server.persistenceID
@@ -494,8 +496,8 @@ internal fun HomeFeature.flushPersistedComposer(state: State): Effect<Action> {
 }
 
 /**
- * The board the call's delegator reads while a call is up; null otherwise, so Home pays nothing
- * for it between calls (iOS `HomeFeature.State.voiceSessionBoard`, `VoiceSessionBoard.swift`).
+ * The board the call's delegator reads while a call is up; null otherwise, so Home pays nothing for
+ * it between calls.
  */
 internal val State.voiceSessionBoard: VoiceSessionBoard?
     get() {
@@ -515,7 +517,7 @@ internal val State.voiceSessionBoard: VoiceSessionBoard?
         )
     }
 
-/** The drawer and the top session's composer, for a call's screenshots (iOS `voiceAppStateHome`). */
+/** The drawer and the top session's composer, for a call's screenshots. */
 internal val State.voiceAppStateHome: VoiceAppState.Home
     get() = VoiceAppState.Home(
         drawerOpen = isDrawerOpen,

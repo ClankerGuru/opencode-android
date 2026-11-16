@@ -5,6 +5,7 @@ import ai.opencode.core.log.AppLog
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
+import ai.opencode.core.strings.localized
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.CancelID
 import ai.opencode.feature.session.SessionFeature.State
@@ -28,11 +29,11 @@ import ai.opencode.server.model.keepingFirstPrompts
 import java.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
-// Port of iOS `SessionFeature+Browser.swift`: the browser, links, background work, and family updates.
+// The browser, links, background work, and family updates.
 
 /**
- * iOS `openLink(_:in:)`: opens a public web link in the app that claims it as a universal link,
- * falling back to the in-app browser or the system browser when none does.
+ * Opens a public web link in the app that claims it as a universal link, falling back to the in-app
+ * browser or the system browser when none does.
  */
 private fun SessionFeature.openLink(url: String, state: State): Reduced<State, Action> {
     // Pairing links are redeemed by AppFeature directly; never hand a single-use
@@ -56,8 +57,8 @@ private fun SessionFeature.openLink(url: String, state: State): Reduced<State, A
 }
 
 /**
- * iOS `openWithoutApps(_:)`: a reply's web link as it opens without Open Links in Apps: the in-app
- * browser when it's on and takes the link, else the system browser.
+ * A reply's web link as it opens without Open Links in Apps: the in-app browser when it's on and
+ * takes the link, else the system browser.
  */
 private fun SessionFeature.openWithoutApps(url: String): Effect<Action> {
     val route = BrowserLinkPolicy.route(url, inAppBrowser = experimentalFeatures(ExperimentalFeature.inAppBrowser))
@@ -69,8 +70,8 @@ private fun SessionFeature.openWithoutApps(url: String): Effect<Action> {
 }
 
 /**
- * iOS `sessionLinksIn(_:)`: session IDs this transcript links, in its replies' Markdown, for
- * resolving before their rows draw (a fresh REST window).
+ * Session IDs this transcript links, in its replies' Markdown, for resolving before their rows draw
+ * (a fresh REST window).
  */
 internal fun SessionFeature.sessionLinksIn(items: List<OpenCodeTranscriptItem>): Effect<Action> {
     val seen = HashSet<String>()
@@ -80,20 +81,26 @@ internal fun SessionFeature.sessionLinksIn(items: List<OpenCodeTranscriptItem>):
     return if (ids.isEmpty()) Effect.none() else Effect.send(Action.SessionLinksAppeared(ids))
 }
 
-/** iOS `openSessionLink(_:_:)`: a linked session ID. Home opens it (a subagent pushed over this screen); the session on screen opens nothing. */
+/**
+ * A linked session ID. Home opens it (a subagent pushed over this screen); the session on screen
+ * opens nothing.
+ */
 private fun SessionFeature.openSessionLink(id: String, state: State): Reduced<State, Action> {
     val drop = dropLinkProbe(state)
     if (id == drop.state.session?.id) return drop
     return Reduced(drop.state, Effect.merge(drop.effect, Effect.send(Action.Delegate(SessionFeature.Delegate.OpenSessionLink(id)))))
 }
 
-/** iOS `dropLinkProbe(_:)`: forgets a link tap still waiting on the system, so its answer opens nothing. */
+/** Forgets a link tap still waiting on the system, so its answer opens nothing. */
 private fun dropLinkProbe(state: State): Reduced<State, Action> {
     if (state.linkProbe == null) return Reduced(state)
     return Reduced(state.copy(linkProbe = null), Effect.cancel(CancelID.UniversalLink))
 }
 
-/** What [BrowserPage][ai.opencode.feature.media.BrowserPage]'s reply capsule shows, without the page reading the session (iOS `browserReplyStatus`). */
+/**
+ * What [BrowserPage][ai.opencode.feature.media.BrowserPage]'s reply capsule shows, without the page
+ * reading the session.
+ */
 val State.browserReplyStatus: BrowserReplyStatus?
     get() {
         val peek = browserPeek ?: return null
@@ -101,7 +108,7 @@ val State.browserReplyStatus: BrowserReplyStatus?
         return if (hasPendingRequests) BrowserReplyStatus.NeedsInput else BrowserReplyStatus.Working
     }
 
-/** iOS `closeBrowser(_:)`: closes the in-app browser at once and forgets its page. */
+/** Closes the in-app browser at once and forgets its page. */
 internal fun SessionFeature.closeBrowser(state: State): Reduced<State, Action> {
     val id = state.browser.pageID ?: return Reduced(state)
     val pageReader = pageReader
@@ -109,15 +116,15 @@ internal fun SessionFeature.closeBrowser(state: State): Reduced<State, Action> {
 }
 
 /**
- * iOS `appendInfo(_:_:)`. Local items need IDs that survive server refreshes replacing `items`;
- * count-based IDs would collide after a refresh resets the count.
+ * Local items need IDs that survive server refreshes replacing `items`; count-based IDs would
+ * collide after a refresh resets the count.
  */
 internal fun SessionFeature.appendInfo(state: State, text: String): State =
     state.copy(items = state.items + OpenCodeTranscriptItem.Info(id = "info-${uuid.next()}", text = text))
 
 /**
- * How long a shell must block the run before the UI offers to move it to the background
- * (iOS `SessionFeature.backgroundHintDelay`, the TUI's `BACKGROUND_TOOL_HINT_DELAY`), in seconds.
+ * How long a shell must block the run before the UI offers to move it to the background, in
+ * seconds.
  */
 internal const val backgroundHintDelay: Double = 3.0
 
@@ -208,7 +215,7 @@ internal fun SessionFeature.reduceBrowserAndBackgroundWork(state: State, action:
                     Reduced(next)
                 } else {
                     haptics.play(Haptic.error)
-                    Reduced(appendInfo(next, "Couldn’t move to background: ${error.message}"))
+                    Reduced(appendInfo(next, localized(R.string.session_move_to_background_failed, error.message)))
                 }
             } else {
                 // Moved even if its send let the claim go meanwhile.
@@ -285,7 +292,10 @@ internal fun SessionFeature.reduceBrowserAndBackgroundWork(state: State, action:
     else -> null
 }
 
-/** iOS `.browser(.askSent)`: Ask about this page. The question goes with the page attached, and its reply shows in the page's capsule. */
+/**
+ * Ask about this page. The question goes with the page attached, and its reply shows in the page's
+ * capsule.
+ */
 private fun SessionFeature.askSent(state: State): Reduced<State, Action> {
     if (state.session == null && state.draftProject == null) return Reduced(state)
     val serverID = serverID
@@ -303,7 +313,7 @@ private fun SessionFeature.askSent(state: State): Reduced<State, Action> {
     )
 }
 
-/** iOS `.linkMenu(action, url)` / `.browser(.linkMenu(action, url))`: a choice from a link's menu. */
+/** A choice from a link's menu. */
 private fun SessionFeature.linkMenu(action: LinkMenuAction, url: String, state: State): Reduced<State, Action> = when (action) {
     LinkMenuAction.OpenInAppBrowser -> {
         // Navigation: quiet, like a tap on the link.
@@ -426,8 +436,8 @@ private fun SessionFeature.familyResponse(family: ai.opencode.server.model.OpenC
 }
 
 /**
- * iOS `scheduleBackgroundHint(_:)`. Initial cached work does not trigger onChange; activation arms
- * its hint too, using the server's start time rather than restarting three seconds.
+ * Initial cached work does not trigger onChange; activation arms its hint too, using the server's
+ * start time rather than restarting three seconds.
  */
 internal fun SessionFeature.scheduleBackgroundHint(state: State): Reduced<State, Action> {
     val work = state.foregroundWork
@@ -448,10 +458,10 @@ internal fun SessionFeature.scheduleBackgroundHint(state: State): Reduced<State,
 }
 
 /**
- * iOS `refreshBackgroundWork(_:for:)`: re-reads the open session's subagent family and running shells
- * on resume and (when visible with active or background work) watchdog reconciliation, bounded to
- * the open session, so subagents, shells, or external active runs that finished while away or
- * without a live event clear promptly without polling idle locations.
+ * Re-reads the open session's subagent family and running shells on resume and (when visible with
+ * active or background work) watchdog reconciliation, bounded to the open session, so subagents,
+ * shells, or external active runs that finished while away or without a live event clear promptly
+ * without polling idle locations.
  */
 internal fun SessionFeature.refreshBackgroundWork(state: State, reason: RefreshReason): Reduced<State, Action> {
     val refreshes = when (reason) {
@@ -466,7 +476,6 @@ internal fun SessionFeature.refreshBackgroundWork(state: State, reason: RefreshR
     return Reduced(shells.state, Effect.merge(family.effect, shells.effect))
 }
 
-/** iOS `refreshFamily(_:)`. */
 internal fun SessionFeature.refreshFamily(state: State): Reduced<State, Action> {
     val rootID = state.familyRootID ?: return Reduced(state)
     val root = state.familySessions.firstOrNull { it.id == rootID } ?: return Reduced(state)
@@ -485,7 +494,6 @@ internal fun SessionFeature.refreshFamily(state: State): Reduced<State, Action> 
     )
 }
 
-/** iOS `refreshShells(_:)`. */
 internal fun SessionFeature.refreshShells(state: State): Reduced<State, Action> {
     val session = state.session ?: return Reduced(state)
     var next = state

@@ -12,8 +12,8 @@ import org.xmlpull.v1.XmlPullParser
 import java.io.ByteArrayInputStream
 
 /**
- * Paint emitted by the V2 server's Icon Composer wrapper (PR #57671). Parsing and
- * rasterization are entirely local; SVG references never fetch resources.
+ * Paint emitted by the V2 server's Icon Composer wrapper. Parsing and rasterization are entirely
+ * local; SVG references never fetch resources.
  */
 object ProjectSVGPaint {
     /** `url(#id)` → `id`. */
@@ -139,8 +139,8 @@ object ProjectSVGPaint {
 }
 
 /**
- * A minimal XML walk (iOS `XMLParser` with external entities off): no namespaces, no DTD
- * processing, so entities and references never resolve anything outside the document.
+ * A minimal XML walk: no namespaces, no DTD processing, so entities and references never resolve
+ * anything outside the document.
  */
 internal object ProjectXml {
     /**

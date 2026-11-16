@@ -10,11 +10,9 @@ import kotlin.math.min
 import kotlin.math.roundToLong
 
 /**
- * Port of iOS `DrawerDragAudit.swift`: one display frame of a drawer row drag, in window points
- * (dp here): where the finger is, where the lifted row belongs (the finger plus where it was
- * grabbed), and where the lifted row was drawn. iOS records these with `-lab-pin-drag-trace`
- * (`DrawerPinDrag+FollowTrace`), which isn't ported ([DrawerPinDrag.IS_TRACED]); the checks are,
- * so a trace on Android reports the same [MotionFinding] kinds.
+ * One display frame of a drawer row drag, in window points (dp here): where the finger is, where
+ * the lifted row belongs (the finger plus where it was grabbed), and where the lifted row was
+ * drawn. The checks are, so a trace on Android reports the same [MotionFinding] kinds.
  */
 data class DrawerDragFrame(
     val index: Int,

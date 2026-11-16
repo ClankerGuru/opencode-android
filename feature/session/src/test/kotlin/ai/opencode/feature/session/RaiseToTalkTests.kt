@@ -51,23 +51,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 
-/**
- * Port of the `SessionFeature` half of iOS `RaiseToTalkTests.swift` and `RaiseToTalkTests+Routing.swift`.
- *
- * Not ported here (:feature:voice, the raise detector `RaiseToTalkDetector` and the call's audio routing
- * `VoiceAudioEngine` / `VoiceCallHost` alone): `onlyAHeldUpPhoneCountsAsRaised`, `pocketingPhoneDoesNotTriggerRaise`,
- * `midCallHeadTiltDoesNotDropEarRouting`, `coveredAndHeldUpReportsAtEarThenRaises`, `coveredAndFlatReportsNothing`,
- * `uncoveringBeforeTheDwellReportsNothing`, `quickUncoverAndRecoverAtTheEarKeepsTheEar`,
- * `sustainedUncoverWhileHeldUpStaysAtTheEarUntilLowered`, `sustainedUncoverAndNotHeldUpLowersAfterLowerDwell`,
- * `noMotionDataLowersAfterLowerDwell`, `aRefusedRaiseDoesNotLeaveThePhoneAtTheEar`, `heldUpForeverLowersByTheCap`,
- * `releasingDetectorWithoutStopDoesNotLeak`, `stoppingAtTheEarLeavesTheEarpiece`, `stoppingBeforeTheDwellReportsNothing`,
- * `raiseStartedCallConfiguresReceiverBeforeAnyPlayback`; (+Routing) `loweringRampsAndOverridesToSpeakerWithoutResettingCategory`,
- * `externalRouteIgnoresTheEarAndLowering`, `oldDeviceUnavailableFallsBackToReceiverAtEarOrSpeakerWithRamp`,
- * `deadPreviousCoordinatorDoesNotReceiveSetAtEar`, `staleSetAtEarResumingAfterNewStartDoesNotWipeCurrentOrWritePending`,
- * `olderSetAtEarResumingAfterNewerSetAtEarDoesNotOverwritePending`, `cancellingRampOrStartingANewRampIgnoresStaleQueuedSteps`,
- * `manualStartSpeakerOverrideIsReappliedAcrossRecoveryPaths`, and the `VoiceAudioEngine` first half of
- * `setAtEarBeforeRunningIsNotLost` (only its `SessionFeature` half is here).
- */
 class RaiseToTalkTests {
     private val server = OpenCodeServer(url = "http://localhost:4096", username = "", password = "")
     private val session = OpenCodeSession(id = "ses_ear", serverTitle = "Ear", projectID = "p", directory = "/Users/kit/project", updatedAt = SessionTestSupport.distantPast)
@@ -78,7 +61,6 @@ class RaiseToTalkTests {
         return state { SessionFeature.State.session(server = server, session = session, cachedItems = emptyList()) }
     }
 
-    /** iOS `$0.voiceCall.x = …` over the inert test client. */
     private fun callClient(
         start: suspend (String, RealtimeSessionConfig) -> Flow<VoiceCallEvent> = { _, _ -> emptyFlow() },
         setAtEar: suspend (Boolean) -> Unit = {},
@@ -316,7 +298,7 @@ class RaiseToTalkTests {
         val store = h.store(h.earState()) {
             this[DateClient] = DateClient.constant(Instant.ofEpochSecond(0))
             this[Clock] = ImmediateClock()
-            // Android: every call start mints its notification identity (iOS's Live Activity is Home's).
+            // Android: every call start mints its notification identity.
             this[ai.opencode.core.dependencies.UuidClient] = ai.opencode.core.dependencies.UuidClient.incrementing()
             this[RealtimePreflightClient] = RealtimePreflightClient(verify = { _, _ -> })
             this[VoiceCallClient] = callClient(start = { _, config ->
@@ -404,7 +386,7 @@ class RaiseToTalkTests {
         val store = h.store(h.earState()) {
             this[DateClient] = DateClient.constant(Instant.ofEpochSecond(0))
             this[Clock] = ImmediateClock()
-            // Android: every call start mints its notification identity (iOS's Live Activity is Home's).
+            // Android: every call start mints its notification identity.
             this[ai.opencode.core.dependencies.UuidClient] = ai.opencode.core.dependencies.UuidClient.incrementing()
             this[RealtimePreflightClient] = RealtimePreflightClient(verify = { _, _ -> preflight.await() })
             this[VoiceCallClient] = callClient(

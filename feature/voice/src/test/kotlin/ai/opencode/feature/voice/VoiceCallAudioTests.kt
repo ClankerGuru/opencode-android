@@ -34,7 +34,6 @@ import java.net.URI
 import java.util.UUID
 import kotlin.math.abs
 
-/** Port of iOS `VoiceCallAudioTests.swift`. */
 class VoiceCallAudioTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -285,8 +284,7 @@ class VoiceCallAudioTests {
         }
         val call = play(1)
 
-        // Torn down with no reply of its own, as when its feature goes away (iOS cancels the
-        // send's task; here the store's effects go with their scope).
+        // Torn down with no reply of its own, as when its feature goes away.
         store.send(Action.PlayRequested(call)) { it.copy(loading = call) }
         scope.cancel()
         gate.open()

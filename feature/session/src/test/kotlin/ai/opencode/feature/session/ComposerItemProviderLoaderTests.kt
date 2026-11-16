@@ -5,12 +5,6 @@ import ai.opencode.feature.session.ComposerControls.MicPlacement
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * The `ComposerControls` half of iOS `ComposerItemProviderLoaderTests.swift` (`ComposerControls`
- * lives in session's `ComposerViews.kt`), keeping iOS names. The importer tests are in
- * `:feature:composer`'s `ComposerItemProviderLoaderTests`. iOS's parameterised `@Test(arguments:)`
- * cases run as a loop.
- */
 class ComposerItemProviderLoaderTests {
     private data class Case(
         val isDictating: Boolean,

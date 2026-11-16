@@ -38,11 +38,9 @@ import androidx.compose.ui.unit.sp
 import java.util.Locale
 
 /**
- * Port of iOS `ServerBrand` (`Settings/ServerBrand.swift`): how an MCP server or provider account
- * looks in Server Details: its brand mark on its brand colour, or a monogram tile when the app
- * doesn't know it. The server sends no logos; iOS maps known names to marks bundled in
- * `ProviderIcons.xcassets` (`mcp-*` from simple-icons, `provider-*`); Android bundles the same
- * SVGs in `:core` assets ([BrandAssets]), and [asset] is their iOS asset name.
+ * How an MCP server or provider account looks in Server Details: its brand mark on its brand
+ * colour, or a monogram tile when the app doesn't know it. The marks are bundled SVGs in `:core`
+ * assets ([BrandAssets]).
  */
 data class ServerBrand(
     val name: String,
@@ -92,7 +90,7 @@ data class ServerBrand(
         /** Muted tile colours for monograms, picked by a stable hash of the name. */
         private val monogramFills: List<Long> = listOf(0x46526A, 0x4F5D4A, 0x6A4A5E, 0x4A5F6A, 0x6A5A46, 0x584A6A)
 
-        /** iOS `UIImage(named:) != nil`: the mark is bundled. */
+        /** The mark is bundled. */
         private val bundledAssets: (String) -> Boolean = BrandAssets::exists
 
         fun mcp(name: String, assetExists: (String) -> Boolean = bundledAssets): ServerBrand {
@@ -112,7 +110,7 @@ data class ServerBrand(
         }
 
         fun monogramBrand(name: String): ServerBrand {
-            // djb2 over UTF-8 bytes with UInt32 wrapping, as iOS.
+            // Djb2 over UTF-8 bytes with UInt32 wrapping.
             var hash = 5381u
             for (byte in name.toByteArray(Charsets.UTF_8)) hash = hash * 33u + byte.toUByte().toUInt()
             val fill = monogramFills[(hash % monogramFills.size.toUInt()).toInt()]
@@ -129,7 +127,6 @@ data class ServerBrand(
     }
 }
 
-/** iOS `Color(serverBrandHex:)`. */
 fun serverBrandColor(hex: Long): Color = Color(0xFF000000 or (hex and 0xFFFFFF))
 
 /** A brand mark on its tile. Decorative: rows name the server themselves. */
@@ -149,13 +146,13 @@ fun BrandTile(
     val b = (brand.fill and 0xFF).toDouble()
     val isPale = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.9
     val shape = if (round) CircleShape else RoundedCornerShape(size * 0.28f)
-    // iOS `.saturation(muted ? 0 : 1)` over the whole tile: every colour drawn goes grey.
+    // Every colour drawn goes grey.
     fun Color.muted(): Color = if (muted) desaturated() else this
     val fill = serverBrandColor(brand.fill)
     val background = if (isPale && !isDark) {
         Brush.verticalGradient(listOf(SystemGray5Light, SystemGray5Light))
     } else {
-        // SwiftUI `.gradient`: a soft top-lit vertical gradient of the colour.
+        // A soft top-lit vertical gradient of the colour.
         Brush.verticalGradient(listOf(fill.lighten(0.08f).muted(), fill.darken(0.08f).muted()))
     }
     val glyph = serverBrandColor(brand.glyph).muted()
@@ -192,7 +189,7 @@ private fun Color.lighten(amount: Float) = Color(
     red + (1 - red) * amount, green + (1 - green) * amount, blue + (1 - blue) * amount, alpha,
 )
 
-/** SwiftUI `.saturation(0)`: the colour's Rec. 709 luminance as grey. */
+/** The colour's Rec. 709 luminance as grey. */
 private fun Color.desaturated(): Color {
     val luma = 0.2126f * red + 0.7152f * green + 0.0722f * blue
     return Color(luma, luma, luma, alpha)
@@ -200,7 +197,6 @@ private fun Color.desaturated(): Color {
 
 private fun Color.darken(amount: Float) = Color(red * (1 - amount), green * (1 - amount), blue * (1 - amount), alpha)
 
-/** iOS `OpenCodeMCPServer.Status.title`. */
 val OpenCodeMCPServer.Status.title: String
     get() = when (this) {
         OpenCodeMCPServer.Status.Connected -> "Connected"
@@ -211,7 +207,7 @@ val OpenCodeMCPServer.Status.title: String
         is OpenCodeMCPServer.Status.Unknown -> raw.capitalizedWords()
     }
 
-/** Swift `String.capitalized`: each word's first letter upper case, the rest lower case. */
+/** Each word's first letter upper case, the rest lower case. */
 private fun String.capitalizedWords(): String {
     val out = StringBuilder(length)
     var startOfWord = true
@@ -227,7 +223,7 @@ private fun String.capitalizedWords(): String {
     return out.toString()
 }
 
-/** iOS `OpenCodeMCPServer.Status.tint`; null is the secondary text colour. */
+/** Null is the secondary text colour. */
 val OpenCodeMCPServer.Status.tint: SettingsTint?
     get() = when (this) {
         OpenCodeMCPServer.Status.Connected -> SettingsTint.Green
@@ -272,7 +268,6 @@ fun StatusRingTile(
         is OpenCodeMCPServer.Status.NeedsAuth -> SettingsTint.Orange.color()
         is OpenCodeMCPServer.Status.Failed -> SettingsTint.Red.color()
         OpenCodeMCPServer.Status.Pending -> SettingsTint.Blue.color()
-        // iOS `.quaternary`.
         else -> OpenCodeTheme.colors.secondaryText.copy(alpha = 0.18f)
     }
     val ringColor by animateColorAsState(target, MotionRole.Swap.animation(reduceMotion = reduceMotion), label = "ring")
@@ -312,10 +307,7 @@ fun StatusRingTile(
 
 private const val ArcSamples = 48
 
-/**
- * iOS's angular gradient (clear until 60%, then into blue) turned by [turn] (0–1): sampled stops,
- * since a sweep brush can't be rotated without turning the ring with it.
- */
+/** Sampled stops, since a sweep brush can't be rotated without turning the ring with it. */
 private fun travellingArc(color: Color, turn: Float): Array<Pair<Float, Color>> = Array(ArcSamples + 1) { i ->
     val position = i / ArcSamples.toFloat()
     val base = ((position - turn) % 1f + 1f) % 1f

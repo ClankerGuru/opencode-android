@@ -9,27 +9,12 @@ import org.junit.Test
 import kotlin.math.abs
 
 /**
- * Port of iOS `ThemePaletteTests` (`OpenCodeTests/ThemePaletteTests.swift`).
- *
- * iOS resolves its dynamic `UIColor`s from a `UITraitCollection` (style, contrast, app theme);
- * Android resolves the same rules in [OpenCodeColors.resolve] (theme, dark, high contrast), so
- * the trait-collection tests assert through that.
- *
- * Not here:
- * - `appearanceSettingsActionsPersistViaSharedAndPlaySelectionHaptic` drives `HomeFeature`'s
- *   settings actions (`:feature:drawer` / `:feature:settings`).
- * - `appearanceTunablesRegisterSoftEdgeControls`: `AppearanceTunables` belongs to
- *   `:feature:settings` (not ported to Android yet).
- * - `legacyTranscriptRhythmStorageIsCleanedUp`: deleted. Android never wrote the retired
- *   `appearance-transcript-rhythm` key, so it has no legacy storage to clean up
- *   ([ThemePalette.LEGACY_TRANSCRIPT_RHYTHM_STORAGE_KEY] is kept for the key list only).
- * - From `dynamicUIColorsResolveFromTraitCollectionAndRespectIncreaseContrast`: the `UIWindow`
- *   `traitOverrides.appTheme` and `applyToWindows` half (UIKit-only).
+ * Android resolves the same rules in [OpenCodeColors.resolve] (theme, dark, high contrast), so the
+ * trait-collection tests assert through that.
  */
 class ThemePaletteTests {
     @get:Rule val isolation = TestIsolationRule()
 
-    /** `TranscriptTunables.bodyTone`'s default (`:feature:transcript`), the tone [OpenCodeColors.defaultBodyText] uses. */
     private val defaultBodyTone = 0.92
 
     @Test
@@ -85,9 +70,8 @@ class ThemePaletteTests {
             val def = ThemePalette.definition(theme)
 
             if (theme == AppTheme.OpenCode) {
-                // Android diverges from iOS on purpose here: the OpenCode theme is the desktop's
-                // palette (BrandPalette), whose accent is the monochrome contrast fill, so its
-                // swatch dot is near-black in light and near-white in dark.
+                // The OpenCode theme's accent is the desktop's monochrome contrast fill: near-black
+                // in light, near-white in dark.
                 assertTrue("${theme.title} dark swatchAccent L=${def.dark.swatchAccent.oklch.first}", def.dark.swatchAccent.oklch.first > 0.85)
                 assertTrue("${theme.title} light swatchAccent L=${def.light.swatchAccent.oklch.first}", def.light.swatchAccent.oklch.first < 0.35)
             } else {
@@ -121,7 +105,6 @@ class ThemePaletteTests {
 
     @Test
     fun dynamicUIColorsResolveFromTraitCollectionAndRespectIncreaseContrast() {
-        // System theme: UIKit's systemBackground / secondarySystemBackground (dark).
         val systemDark = OpenCodeColors.resolve(AppTheme.System, isDark = true)
         assertEquals(ThemePalette.system.dark.canvas.color, systemDark.canvas)
         assertEquals(ThemePalette.system.dark.userBubble.color, systemDark.userBubble)
@@ -137,7 +120,6 @@ class ThemePaletteTests {
         assertEquals(variant.textStrong.color, tokyoDarkHighContrast.text)
     }
 
-    /** iOS `SettingsThemeSurface` → the grouped surfaces of [OpenCodeColors.resolve]. */
     @Test
     fun settingsThemeSurfaceUpdatesAcrossThemesModesAndContrast() {
         fun surface(theme: AppTheme, isDark: Boolean, highContrast: Boolean = false) =

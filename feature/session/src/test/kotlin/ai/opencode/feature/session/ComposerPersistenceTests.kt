@@ -61,15 +61,8 @@ import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of the `SessionFeature` tests of iOS `ComposerPersistenceTests.swift`.
- *
- * iOS also checks `isExcludedFromBackup` on the files it writes; Android has no per-file backup
- * flag (backup rules are declared in the manifest), so those three assertions have no counterpart.
- *
- * Not ported here (:feature:drawer, `HomeFeature` / `AppFeature`, alone or after a `SessionFeature` phase):
- * `sessionDeletionServerDeletionAndStalenessCleanUpPersistedState`, `incomingShareAndKeepDraftMergeIntoPersistedDraftAndDisarmSendLater`,
- * `parkDraftFamilyDraftsAndCatchUpPreserveAttachmentsAndNeverDuplicateOrResurrectDrafts`,
- * `familySwitchDeduplicationSessionCreatedOutboxPromotionAndSubagentCatchUpParking`.
+ * Android has no per-file backup flag (backup rules are declared in the manifest), so those three
+ * assertions have no counterpart.
  */
 class ComposerPersistenceTests {
     private val server = OpenCodeServer(url = "http://localhost:9", username = "opencode", password = "pw")
@@ -93,7 +86,7 @@ class ComposerPersistenceTests {
         fun open() { opened.complete(Unit) }
     }
 
-    /** iOS's outbox works on the main actor; here each test's outboxes run their lanes on the test thread for the same order. */
+    /** Each test's outboxes run their lanes on the test thread for the same order. */
     private lateinit var lanes: CoroutineScope
     private fun newOutbox() = PromptOutbox(scope = lanes)
 
@@ -114,7 +107,7 @@ class ComposerPersistenceTests {
 
     private fun live(): ComposerPersistence = ComposerPersistence.make(ComposerPersistenceStorage.live(tempDir), debounce = 60.seconds)
 
-    /** A finished upload's cleanup reads the app context's cache folder (iOS's temporary directory). */
+    /** A finished upload's cleanup reads the app context's cache folder. */
     private val appContext = object : ContextWrapper(null) {
         override fun getCacheDir(): File = File(System.getProperty("java.io.tmpdir") ?: "/tmp")
     }
@@ -167,6 +160,8 @@ class ComposerPersistenceTests {
             data = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47),
             mime = "image/png",
             name = "diagram.png",
+            videoDuration = 50.0,
+            localVideoURI = "content://picker/local-fixture-movie",
         )
         val pastedAttachment = PastedText.attachment((1..14).joinToString("\n") { "line $it" }, id = "00000000-0000-0000-0000-000000000021")
         val sharedLocation = SharedLocation(

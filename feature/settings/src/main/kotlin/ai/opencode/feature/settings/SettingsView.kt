@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.experiments.ExperimentalFeature
 import ai.opencode.core.experiments.key
 import ai.opencode.core.motion.MotionPhase
@@ -63,6 +64,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -85,10 +87,10 @@ private sealed interface SettingsRoute {
 }
 
 /**
- * Port of iOS `SessionSettingsView` (`Settings/SettingsView.swift`): Settings' own stack, the root
- * page (connection card; Appearance, Sessions, Models, Voice, Notifications; What’s New; Server
- * Details; Experimental, Developer and the version line) and the pages it pushes. Back on a pushed page goes back
- * one level; at the root it closes Settings ([SettingsFeature.SettingsDelegate.Close]).
+ * Settings' own stack, the root page (connection card; Appearance, Sessions, Models, Voice,
+ * Notifications; What’s New; Server Details; Experimental, Developer and the version line) and the
+ * pages it pushes. Back on a pushed page goes back one level; at the root it closes Settings
+ * ([SettingsFeature.SettingsDelegate.Close]).
  */
 @Composable
 fun SettingsView(store: SettingsStore, modifier: Modifier = Modifier) {
@@ -99,8 +101,8 @@ fun SettingsView(store: SettingsStore, modifier: Modifier = Modifier) {
         listOf<SettingsRoute>(SettingsRoute.Root) + path.mapIndexed { index, page -> SettingsRoute.Page(index, page) }
     }
     Box(modifier.fillMaxSize()) {
-        // Android divergence: pages move on Material's shared axis (and the back gesture previews
-        // the pop) instead of Navigation 3's default 0.7 s cross-fade or iOS's push.
+        // Pages move on Material's shared axis (and the back gesture previews the pop) instead of
+        // Navigation 3's default 0.7 s cross-fade.
         val reduceMotion = rememberReduceMotion()
         val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
         val slidePx = with(LocalDensity.current) { PageTransitions.SlideDistance.roundToPx() }
@@ -114,7 +116,7 @@ fun SettingsView(store: SettingsStore, modifier: Modifier = Modifier) {
                 when (route) {
                     SettingsRoute.Root -> NavEntry(route) {
                         // Settings asked for while What’s New is the page up switches Settings'
-                        // root (iOS cross-fades, `SettingsPresentation.fade`; Android fades through).
+                        // root.
                         AnimatedContent(root, transitionSpec = { PageTransitions.fadeThrough(reduceMotion) }, label = "settings-root") { shown ->
                             when (shown) {
                                 SettingsFeature.State.Root.settings -> SettingsRootPage(store)
@@ -136,6 +138,7 @@ private fun SettingsPageContent(store: SettingsStore, page: SettingsPage) {
         SettingsPage.Server -> ServerPage(store)
         SettingsPage.Appearance -> AppearanceSettingsView(store)
         SettingsPage.Themes -> ThemesSettingsView(store)
+        SettingsPage.Language -> LanguageSettingsView(store)
         SettingsPage.Sessions -> SessionsSettingsView(store)
         SettingsPage.Models -> ModelVisibilitySettingsView(store)
         is SettingsPage.ModelProvider -> ModelVisibilityProviderView(store, page.providerID)
@@ -158,7 +161,7 @@ private fun SettingsPageContent(store: SettingsStore, page: SettingsPage) {
     }
 }
 
-/** The Onboarding playground, full screen over Settings (iOS `.fullScreenCover`). */
+/** The Onboarding playground, full screen over Settings. */
 @Composable
 private fun OnboardingPlaygroundPresentation(store: SettingsStore) {
     val shown by store.observe { it.onboardingPlayground != null }
@@ -181,14 +184,14 @@ private fun OnboardingPlaygroundPresentation(store: SettingsStore) {
 }
 
 /**
- * One Settings page's chrome (iOS `List` + inline `navigationTitle` + Back): a Back control
- * (“Back” closes Settings at the root, pops otherwise) and a list of grouped rows.
+ * One Settings page's chrome: a Back control (“Back” closes Settings at the root, pops otherwise)
+ * and a list of grouped rows.
  *
- * Android divergence: the bar is the desktop title bar ([OpenCodeLargeTopBar]): a start-aligned
- * large title that scrolls up into the bar as the list scrolls, and the page sets text in
- * Material's own type scale ([SettingsText.typography]) rather than iOS's 17 pt body. A page
- * that draws its own title ([titleVisible] false, as What's New's entry page does) keeps the
- * small bar, its title fading in over 0.15 s once the page's title scrolls under it.
+ * The bar is the desktop title bar ([OpenCodeLargeTopBar]): a start-aligned large title that
+ * scrolls up into the bar as the list scrolls, and the page sets text in Material's own type scale
+ * ([SettingsText.typography]). A page that draws its own title ([titleVisible] false, as What's
+ * New's entry page does) keeps the small bar, its title fading in over 0.15 s once the page's title
+ * scrolls under it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -267,7 +270,7 @@ fun SettingsPageScaffold(
     }
 }
 
-/** Settings' root page (iOS `SessionSettingsView.page`). */
+/** Settings' root page. */
 @Composable
 private fun SettingsRootPage(store: SettingsStore) {
     val voiceModeEnabled by remember { shared(SharedKeys.voiceModeEnabled).flow }.collectAsState()
@@ -281,7 +284,7 @@ private fun SettingsRootPage(store: SettingsStore) {
     }
 
     CompositionLocalProvider(LocalSettingsRowIcons provides true) {
-        SettingsPageScaffold(title = "Settings", store = store) {
+        SettingsPageScaffold(title = stringResource(CoreR.string.common_settings), store = store) {
             item(key = "connection", contentType = "connection") {
                 ConnectionCard(
                     store,
@@ -290,37 +293,41 @@ private fun SettingsRootPage(store: SettingsStore) {
                     focusRequest = returnFocus.request(SettingsPage.Server),
                 )
             }
-            // Preferences: Appearance, Sessions, Models, Voice and Notifications.
+            // Preferences: Appearance, Language, Sessions, Models, Voice and Notifications.
             settingsSection(key = "preferences") {
-                SettingsRow("Appearance", "paintpalette.fill", SettingsTint.Purple, modifier = returnFocus.on(SettingsPage.Appearance)) {
+                SettingsRow(stringResource(R.string.settings_appearance_title), "paintpalette.fill", SettingsTint.Purple, modifier = returnFocus.on(SettingsPage.Appearance)) {
                     push(SettingsPage.Appearance)
                 }
                 SettingsDivider(inset = true)
-                SettingsRow("Sessions", "bubble.left.fill", SettingsTint.Blue, modifier = returnFocus.on(SettingsPage.Sessions)) { push(SettingsPage.Sessions) }
-                if (ExperimentalFeature.hideModels.isActive(hideModels)) {
-                    SettingsDivider(inset = true)
-                    SettingsRow("Models", "cpu", SettingsTint.Teal, modifier = returnFocus.on(SettingsPage.Models)) { push(SettingsPage.Models) }
+                SettingsRow(stringResource(R.string.settings_language_title), "globe", SettingsTint.Blue, modifier = returnFocus.on(SettingsPage.Language)) {
+                    push(SettingsPage.Language)
                 }
                 SettingsDivider(inset = true)
-                SettingsRow("Voice", "waveform", SettingsTint.Indigo, modifier = returnFocus.on(SettingsPage.Voice), badge = if (voiceModeEnabled) "On" else null) {
+                SettingsRow(stringResource(R.string.settings_sessions_title), "bubble.left.fill", SettingsTint.Blue, modifier = returnFocus.on(SettingsPage.Sessions)) { push(SettingsPage.Sessions) }
+                if (ExperimentalFeature.hideModels.isActive(hideModels)) {
+                    SettingsDivider(inset = true)
+                    SettingsRow(stringResource(R.string.settings_models_title), "cpu", SettingsTint.Teal, modifier = returnFocus.on(SettingsPage.Models)) { push(SettingsPage.Models) }
+                }
+                SettingsDivider(inset = true)
+                SettingsRow(stringResource(R.string.settings_voice_title), "waveform", SettingsTint.Indigo, modifier = returnFocus.on(SettingsPage.Voice), badge = if (voiceModeEnabled) stringResource(R.string.settings_value_on) else null) {
                     push(SettingsPage.Voice)
                 }
                 if (notificationPermission != null) {
                     SettingsDivider(inset = true)
-                    SettingsRow("Notifications", "bell.badge.fill", SettingsTint.Red, modifier = returnFocus.on(SettingsPage.Notifications)) {
+                    SettingsRow(stringResource(R.string.settings_notifications_title), "bell.badge.fill", SettingsTint.Red, modifier = returnFocus.on(SettingsPage.Notifications)) {
                         push(SettingsPage.Notifications)
                     }
                 }
             }
             settingsSection(key = "whats-new") {
-                SettingsRow("What’s New", "sparkles", SettingsTint.Orange, modifier = returnFocus.on(SettingsPage.WhatsNew)) { push(SettingsPage.WhatsNew) }
+                SettingsRow(stringResource(R.string.settings_whats_new_title), "sparkles", SettingsTint.Orange, modifier = returnFocus.on(SettingsPage.WhatsNew)) { push(SettingsPage.WhatsNew) }
             }
             settingsSection(
                 key = "experimental",
                 footer = {
                     SelectionContainer(Modifier.fillMaxWidth()) {
                         Text(
-                            AppVersion.current.label,
+                            AppVersion.current.displayLabel,
                             style = OpenCodeTextStyles.footnote.copy(fontFeatureSettings = "tnum"),
                             color = OpenCodeTheme.colors.secondaryText,
                             textAlign = TextAlign.Center,
@@ -331,7 +338,7 @@ private fun SettingsRootPage(store: SettingsStore) {
             ) {
                 ExperimentalSettingsRow(returnFocus.on(SettingsPage.Experimental())) { push(SettingsPage.Experimental()) }
                 SettingsDivider(inset = true)
-                SettingsRow("Developer", "hammer.fill", SettingsTint.Teal, modifier = returnFocus.on(SettingsPage.Developer), badge = if (developerMode) "On" else null) {
+                SettingsRow(stringResource(R.string.settings_developer_title), "hammer.fill", SettingsTint.Teal, modifier = returnFocus.on(SettingsPage.Developer), badge = if (developerMode) stringResource(R.string.settings_value_on) else null) {
                     push(SettingsPage.Developer)
                 }
             }

@@ -31,13 +31,6 @@ import org.junit.Test
 import java.time.Instant
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `RequestReviewTests.swift`.
- *
- * Not ported here (:server, `OpenCodeFormValue.typedNumber`): `typedNumbersReadMidEntryTextAndLocaleSeparators`.
- * Not ported here (:feature:composer, `RequestDockAnswer` alone): `dockAnswersReadOtherAndReadiness`.
- * Not ported here (:feature:transcript, `QuestionRowSummary` / `TranscriptEntry`, ported there): `settledQuestionsReadAsOneQuietRow`.
- */
 class RequestReviewTests {
     private val session = OpenCodeSession(id = "ses_review", serverTitle = "Review", projectID = "proj", directory = "/tmp/review", updatedAt = Instant.EPOCH)
     private val json = Json { ignoreUnknownKeys = true }
@@ -423,7 +416,7 @@ class RequestReviewTests {
         assertEquals(setOf(shell.id), store.state.completedRequestIDs)
     }
 
-    /** iOS `@Test(arguments:)`: one case per reply. */
+    /** One case per reply. */
     @Test fun onlyADenialCarriesAReason() = sessionTest { h ->
         val cases = listOf(
             Triple(OpenCodePermissionReply.Reject, "   ", "reject:nil"),

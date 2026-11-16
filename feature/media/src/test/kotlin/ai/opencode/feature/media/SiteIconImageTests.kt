@@ -21,7 +21,10 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.ByteArrayOutputStream
 
-/** Test images (iOS `IconFixture`): a side × side square, transparent outside an inset mark. Needs Robolectric's native graphics. */
+/**
+ * Test images: a side × side square, transparent outside an inset mark. Needs Robolectric's native
+ * graphics.
+ */
 internal object IconFixture {
     data class Mark(val r: Float, val g: Float, val b: Float, val a: Float)
 
@@ -34,7 +37,6 @@ internal object IconFixture {
             canvas.drawRect(0f, 0f, s, s, paint)
         } else {
             canvas.drawOval(RectF(s * 0.2f, s * 0.2f, s * 0.8f, s * 0.8f), paint)
-            // iOS's CGContext draws this strip along the bottom edge.
             if (!inset) canvas.drawRect(0f, s * 0.9f, s, s, paint)
         }
         return bitmap
@@ -65,7 +67,7 @@ internal object IconFixture {
     fun png(side: Int): ByteArray = png(image(side))
 }
 
-/** Port of iOS `SiteIconImageTests` (`SiteIconTests.swift`): real decoding and encoding under Robolectric's native graphics. */
+/** Real decoding and encoding under Robolectric's native graphics. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -120,8 +122,8 @@ class SiteIconImageTests {
 }
 
 /**
- * The `SiteIconStoreTests` (`SiteIconTests.swift`) case that decodes a real icon from supplied
- * metadata; the rest of that suite runs on the JVM with stub icons ([SiteIconStoreTests]).
+ * The `SiteIconStoreTests` case that decodes a real icon from supplied metadata; the rest of that
+ * suite runs on the JVM with stub icons ([SiteIconStoreTests]).
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -163,7 +165,6 @@ class SiteIconStoreFrameworkTests {
     }
 }
 
-/** iOS `try #require(…)`. */
 internal fun <T : Any> required(value: T?): T {
     org.junit.Assert.assertNotNull(value)
     return value!!

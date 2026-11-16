@@ -36,8 +36,8 @@ import kotlinx.coroutines.flow.first
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * The phone's network path, from one shared default-network callback (iOS `NWPathMonitor`).
- * A hint for *when* to retry, never a verdict that a request will fail.
+ * The phone's network path, from one shared default-network callback. A hint for *when* to retry,
+ * never a verdict that a request will fail.
  */
 class NetworkPathMonitor private constructor(context: Context) {
     data class Snapshot(
@@ -55,8 +55,8 @@ class NetworkPathMonitor private constructor(context: Context) {
         enum class Status(val rawValue: String) {
             Satisfied("satisfied"),
             /**
-             * No link yet, but sending would bring one up (iOS VPN On Demand, a dormant radio).
-             * Android's callback reports no such state; kept so the two codebases match.
+             * No link yet, but sending would bring one up. Android's callback reports no such
+             * state; kept so the two codebases match.
              */
             RequiresConnection("requiresConnection"),
             Unsatisfied("unsatisfied"),
@@ -172,8 +172,8 @@ class NetworkPathMonitor private constructor(context: Context) {
             else -> "other"
         }
         val name = properties?.interfaceName ?: ""
-        // A VPN is the default network itself, carrying its underlying transport: the physical
-        // link first (its name isn't reported), then the tunnel, as iOS lists a tunnel beside Wi-Fi.
+        // A VPN is the default network itself, carrying its underlying transport: the physical link
+        // first (its name isn't reported), then the tunnel.
         val interfaces = when {
             !satisfied -> emptyList()
             caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) ->
@@ -278,10 +278,9 @@ class NetworkPathMonitor private constructor(context: Context) {
 enum class AppPhase { Active, Background }
 
 /**
- * The app entering the background or becoming active again (iOS
- * `didEnterBackground`/`didBecomeActive`), from activity start/stop counts.
- * Call [install] from `Application.onCreate` so the first foregrounding is counted;
- * otherwise it installs itself on first use.
+ * The app entering the background or becoming active again, from activity start/stop counts. Call
+ * [install] from `Application.onCreate` so the first foregrounding is counted; otherwise it
+ * installs itself on first use.
  */
 object AppPhases {
     private val observers = CopyOnWriteArrayList<(AppPhase) -> Unit>()
@@ -317,7 +316,7 @@ object AppPhases {
 
     /**
      * Calls [observer] synchronously with every phase from now on, for as long as the process
-     * lives (iOS `NotificationCenter.addObserver(queue: nil)`).
+     * lives.
      */
     fun observe(observer: (AppPhase) -> Unit) {
         installIfNeeded()

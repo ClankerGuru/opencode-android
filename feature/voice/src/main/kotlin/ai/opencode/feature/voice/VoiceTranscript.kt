@@ -21,7 +21,7 @@ import java.time.temporal.ChronoUnit
  * the next capture notes what it dropped. Delivered context is bounded by
  * `maxLines` and `maxCharacters`, as is `lines`, the continuity tail.
  *
- * Immutable (a Swift value type): the iOS `mutating` methods return the updated tail.
+ * Immutable: the mutating methods return the updated tail.
  */
 data class VoiceTranscriptTail private constructor(
     private val entries: List<Entry>,
@@ -246,7 +246,7 @@ data class VoiceTranscriptTail private constructor(
         const val maxUndeliveredCharacters = 20_000
         const val omittedNote = "[earlier conversation omitted]"
 
-        /** iOS `init(lines:)`: a tail seeded with already-delivered lines. */
+        /** A tail seeded with already-delivered lines. */
         operator fun invoke(lines: List<String> = emptyList()): VoiceTranscriptTail {
             val entries = lines.mapIndexed { key, line ->
                 if (line.startsWith("assistant: ")) {
@@ -308,7 +308,6 @@ object VoiceHandoff {
     ): String {
         val trimmedContext = context?.trim()
         val trimmedFraming = framing?.trim()
-        // Swift `JSONEncoder` with `[.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]`.
         val fields = sortedMapOf<String, Any>()
         if (appLogAttached) fields["app_log_attached"] = true
         appState?.let { fields["app_state"] = it.jsonObject }
@@ -473,7 +472,7 @@ object VoiceHandoff {
     }
 }
 
-/** Splits on characters matching [isSeparator], dropping empty pieces (Swift `split(whereSeparator:)`). */
+/** Splits on characters matching [isSeparator], dropping empty pieces. */
 internal inline fun String.splitWhere(isSeparator: (Char) -> Boolean): List<String> {
     val result = mutableListOf<String>()
     val current = StringBuilder()
@@ -490,9 +489,8 @@ internal inline fun String.splitWhere(isSeparator: (Char) -> Boolean): List<Stri
 }
 
 /**
- * Writes JSON as Swift's `JSONEncoder` does with `.prettyPrinted` and
- * `.withoutEscapingSlashes`: two-space indent, `"key" : value`, and an empty
- * array as `[\n\n<indent>]`. Values: String, Boolean, List<String>, maps.
+ * Writes JSON: two-space indent, `"key": value`, and an empty array as `[\n\n<indent>]`. Values:
+ * String, Boolean, List<String>, maps.
  */
 internal object PrettyJSON {
     fun obj(fields: Map<String, Any>): String = StringBuilder().also { write(it, fields, 0) }.toString()
@@ -566,7 +564,7 @@ data class VoiceTranscriptRecord(
     /** Everything said on this phone about this session, newest last, bounded. */
     val log: List<String>,
 ) {
-    /** iOS `mutating append(tail:log:endedAt:)`: the updated record. */
+    /** The updated record. */
     fun appending(tail: List<String>, log: List<String>, endedAt: Instant): VoiceTranscriptRecord {
         val combined = this.log + log
         return VoiceTranscriptRecord(endedAt, continuityLines(tail), combined.takeLast(maxLogLines))
@@ -574,6 +572,17 @@ data class VoiceTranscriptRecord(
 
     companion object {
         const val maxLogLines = 400
+        const val maxSessions = 64
+
+        fun pruned(records: Map<String, VoiceTranscriptRecord>): Map<String, VoiceTranscriptRecord> {
+            if (records.size <= maxSessions) return records
+            val oldest = records.entries.sortedBy { it.value.endedAt }.take(records.size - maxSessions)
+            val kept = records.toMutableMap()
+            for (entry in oldest) {
+                kept.remove(entry.key)
+            }
+            return kept
+        }
 
         /** The tail lines a later call may carry: the user's own turns, never the voice agent's. */
         fun continuityLines(lines: List<String>): List<String> = lines.filter { line ->
@@ -585,7 +594,6 @@ data class VoiceTranscriptRecord(
     }
 }
 
-/** iOS `url.host(percentEncoded: false)` for the shared `ai.opencode.server.model.VoiceViewingPage`. */
 val VoiceViewingPage.host: String?
     get() = try {
         java.net.URI(url).host?.let { java.net.URLDecoder.decode(it, "UTF-8") }
@@ -728,8 +736,7 @@ object VoiceInstructions {
             if (context.recentMessages.isNotEmpty()) {
                 sections += "Recent messages from this session:\n" + context.recentMessages.takeLast(6).joinToString("\n")
             }
-            // iOS keeps the "Previous voice call tail:" marker for voice-lab's spec;
-            // switching sessions mid-call never replays raw lines from a previous call.
+            // Switching sessions mid-call never replays raw lines from a previous call.
             sections.joinToString("\n\n")
         }
     }
@@ -781,7 +788,7 @@ Delegate before giving an answer that depends on session work.
 Nothing happens unless you delegate. If you say you're doing something, delegate it in that same turn; if you won't delegate, ask or answer instead.
 
 What you say around a delegation:
-- When you delegate, react the way a friend on the phone would: quickly and naturally, to what the user just said. Name the specific thing you understood them to want, in your own words, so they hear how you read it; this matters most when they rambled or circled. Say it as asking, not as done: "On it, asking for the check-in", never "I'm checking you in now" or "Done". Only a result decides what happened. Never use the same stock word or phrase twice in a row. After a long turn, even one that ends by asking whether you're there, name what they asked for; a stock line that names nothing doesn't cover it. When the user is mid-thought or it's a quick follow-up, a simple yeah or nothing at all is fine.
+- When you delegate, react the way a friend on the phone would: quickly and naturally, to what the user just said. Name the specific thing you understood them to want, in your own words, so they hear how you read it; this matters most when they rambled or circled. Say it in the first person as work you're starting, not as done and not as asking, sending, or handing it to anyone, unless the user asked for exactly that; never "Done". Only a result decides what happened. Never use the same stock word or phrase twice in a row. After a long turn, even one that ends by asking whether you're there, name what they asked for; a stock line that names nothing doesn't cover it. When the user is mid-thought or it's a quick follow-up, a simple yeah or nothing at all is fine.
 - A result's own words set the claim. "Asked", "started" or "will" stays that; never upgrade it to "done", and never add a date, deadline or urgency the result didn't say.
 - A result describing what would or will happen (or work still running) is not done: say it's conditional or in progress, never that you did it.
 - Say it once, without saying how the request will be framed or passed on, and without predicting the session's steps or what will be found: the result decides.
@@ -840,7 +847,7 @@ Your voice layer is ${context.voiceLayer}, inside OpenCode, whose sessions do th
 
 # Conversation Flow
 
-- Before the tool call, in the same turn, react once the way a friend on the phone would: quickly and naturally, to what the user just said, without saying how the request will be framed or passed on. Name the specific thing you understood them to want, in your own words, so they hear how you read it; this matters most when they rambled or circled. Say it as asking, not as done: "On it, asking for the check-in", never "I'm checking you in now" or "Done". Only a result decides what happened. Never use the same stock word or phrase twice in a row; for a quick follow-up a simple yeah is enough. Never start work in silence. Results state the concrete action and where ("Saved a private note in your notes", "Sent that to the OPENCODE IOS session").
+- Before the tool call, in the same turn, react once the way a friend on the phone would: quickly and naturally, to what the user just said, without saying how the request will be framed or passed on. Name the specific thing you understood them to want, in your own words, so they hear how you read it; this matters most when they rambled or circled. Say it in the first person as work you're starting, not as done and not as asking, sending, or handing it to anyone, unless the user asked for exactly that; never "Done". Only a result decides what happened. Never use the same stock word or phrase twice in a row; for a quick follow-up a simple yeah is enough. Never start work in silence. Results state the concrete action and where ("Saved a private note in your notes", "Sent that to the OPENCODE IOS session").
 - A result's own words set the claim. "Asked", "started" or "will" stays that; never upgrade it to "done", and never add a date, deadline or urgency the result didn't say.
 - A result describing what would or will happen (or work still running) is not done: say it's conditional or in progress, never that you did it.
 - Keep any status to one short line—no repeated "it's still running" warnings, no "just wait", and no "open the session" unless the session is blocked on an approval or question only the user can answer there.
@@ -860,12 +867,8 @@ $personalMessagesSection
     }
 
     /**
-     * Kit's call (Oct 19): words said over a result became "an unrelated note
-     * here about picking a gym", a child's "Bye, Keanu" got commentary and an
-     * offer to say bye, and the recap after his correction repeated it all.
-     * Kit's call (Oct 25): "Hi, baby" got "Hey! Still going?" and "Hi, you,
-     * boy" a laugh and "Hey.": "a word at most" and the greeting rules let it
-     * answer, so speech that isn't for it now gets nothing.
+     * Speech that isn't for the voice agent (a greeting to a child, an aside, background talk) gets
+     * no reply at all.
      */
     const val whatYouHearSection = """# What You Hear
 
@@ -898,7 +901,7 @@ $personalMessagesSection
         }
 
         if (context.previousTail.isNotEmpty()) {
-            // Swift `Date.ISO8601Format()`: whole seconds, UTC.
+            // Whole seconds, UTC.
             val ended = context.previousEndedAt?.truncatedTo(ChronoUnit.SECONDS)?.toString() ?: "earlier"
             sections += "# Previous Voice Call\n\n" +
                 "Voice memory resets between calls. User turns from the previous call about this session (ended $ended) follow as silent memory so earlier references resolve; never new requests, never completed outcomes or facts, and never repeat or recap them unless asked.\n\n" +

@@ -3,12 +3,6 @@ package ai.opencode.core.files
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * Port of iOS `FileAttachmentTests.swift`'s `AttachmentFileTypeTests`: typing and presentation
- * shared with desktop (packages/app/src/composer/attachments/attachments.ts,
- * packages/session-ui/src/components/message-file.ts). [AttachmentFileType] moved here from
- * the composer; the rest of that iOS file is ported in `:feature:composer`.
- */
 class AttachmentFileTypeTests {
     @Test fun mimeMirrorsDesktopNormalization() {
         assertEquals("application/pdf", AttachmentFileType.mime(fileName = "a.pdf", declared = "application/pdf", head = byteArrayOf(0x25, 0x50)))

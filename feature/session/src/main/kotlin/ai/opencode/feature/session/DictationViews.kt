@@ -2,6 +2,7 @@ package ai.opencode.feature.session
 
 import ai.opencode.feature.composer.DictationDrag
 import ai.opencode.feature.composer.DictationHoldTracker
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionSpring
@@ -68,6 +69,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -83,17 +85,16 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-// Port of iOS `Session/DictationViews.swift`: hold-to-dictate and the recording bar.
+// Hold-to-dictate and the recording bar.
 
 typealias DictationHoldArm = DictationFeature.Hold.Arm
 
-// `HoldToDictateButton`'s press is :feature:composer's `Modifier.micPressGesture` (with
-// `DictationHoldTracker`, `DictationDrag`, `MicPressCallbacks`, moved down from iOS
-// `DictationViews.swift`); the session's mic (`SessionViewComposerControls.kt`) wears it.
+// `HoldToDictateButton`'s press is:feature:composer's `Modifier.micPressGesture`; the session's mic
+// (`SessionViewComposerControls.kt`) wears it.
 
 /**
- * iOS `DictationHoldVisuals`: one recording's view-only progress through its hold. Starts over
- * with every press and when the recording ends.
+ * One recording's view-only progress through its hold. Starts over with every press and when the
+ * recording ends.
  */
 data class DictationHoldVisuals(
     /** A sustained hold, not a tap: the circle has grown and the targets show. */
@@ -107,8 +108,8 @@ data class DictationHoldVisuals(
 }
 
 /**
- * iOS `DictationHoldRetention`: identity-scoped retention for the bar's leaving hold and settled
- * fold state, so switching sessions or drafts never leaves the last one's bar on screen.
+ * Identity-scoped retention for the bar's leaving hold and settled fold state, so switching
+ * sessions or drafts never leaves the last one's bar on screen.
  */
 data class DictationHoldRetention(
     val identity: SessionFeature.State.TaskIdentity? = null,
@@ -152,8 +153,8 @@ data class DictationHoldRetention(
 }
 
 /**
- * iOS `DictationBarPose`: where the recording is, as both halves of the bar draw it (the bar's
- * buttons and scope inside the composer, and the hold layer's circle and lock target above it).
+ * Where the recording is, as both halves of the bar draw it (the bar's buttons and scope inside the
+ * composer, and the hold layer's circle and lock target above it).
  */
 data class DictationBarPose(
     val hold: DictationFeature.Hold,
@@ -210,20 +211,18 @@ data class DictationBarPose(
         const val holdDiameter = 68f
         const val targetDiameter = 38f
         const val spacing = 4f
-        /** iOS's 44 pt slot; Android targets are 48 dp. */
+        /** 48 dp, Android's minimum target. */
         const val slot = 48f
     }
 }
 
-/** iOS `@Environment(\.dictationBarIsLeaving)`. */
 val LocalDictationBarIsLeaving = compositionLocalOf { false }
 
 /**
- * iOS `DictationBarPresence` + `DictationBarTransition`: the bar and its hold layer fade (and scale
- * from `swapScale`) in where they sit, with the composer's fold (`layout` closing); leaving is
- * state, not a removal, so it fades out in place on `microOut` and stops taking touches, and
- * [onLeft] runs once that fade has finished, to take it out of the tree. Locked again mid-fade,
- * it comes back from where it is (on `microIn`) and stays.
+ * The bar and its hold layer fade (and scale from `swapScale`) in where they sit, with the
+ * composer's fold (`layout` closing); leaving is state, not a removal, so it fades out in place on
+ * `microOut` and stops taking touches, and [onLeft] runs once that fade has finished, to take it
+ * out of the tree. Locked again mid-fade, it comes back from where it is (on `microIn`) and stays.
  */
 @Composable
 fun DictationBarPresence(
@@ -259,7 +258,7 @@ fun DictationBarPresence(
 }
 
 /**
- * iOS `DictationScopeBar`: recording takes the composer's control row: Cancel (the composer's own
+ * Recording takes the composer's control row: Cancel (the composer's own
  * + turned ×, beneath) · the scope · Stop (■, into the draft) · Send (↑). While the mic is held
  * only × and the scope show (the bar takes no touches); locked, the circle and lock target fade
  * out while Stop and Send fade and scale in in their own places.
@@ -318,7 +317,7 @@ fun DictationScopeBar(
     ) {
         DotScopeView(
             mode = DotScopeMode.Dictation(leadingInset, trailingInset, DictationLevelSource),
-            // 6 dp past the bar on every side, as its insets count (iOS `.padding(-6)`).
+            // 6 dp past the bar on every side, as its insets count.
             modifier = Modifier.matchParentSize().outset(6.dp).alpha(scopeAlpha),
         )
         Row(Modifier.matchParentSize(), verticalAlignment = Alignment.CenterVertically) {
@@ -343,16 +342,16 @@ fun DictationScopeBar(
                     showsProgress = finishing,
                     enabled = p.isLocked && !p.isFinishing,
                     // Not “Stop”: during a run that's the composer's Stop for the run.
-                    label = if (finishing) "Finishing dictation" else "Stop recording",
+                    label = if (finishing) stringResource(R.string.session_dictation_finishing_description) else stringResource(R.string.session_dictation_stop_recording_description),
                     hidden = !p.isLocked || p.isLeaving,
                     order = 0f,
-                    hint = "Put the words in your message",
+                    hint = stringResource(R.string.session_dictation_stop_recording_hint),
                     onClick = { guarded(onStop) },
                 )
             }
             Spacer(Modifier.width(DictationBarPose.spacing.dp))
             DictationLockedReveal(isLocked = p.isLocked, reducedMotion = p.reducedMotion) {
-                val sendLabel = if (p.isSending) "Sending message" else "Send"
+                val sendLabel = if (p.isSending) stringResource(R.string.session_sending_message_description) else stringResource(CoreR.string.common_send)
                 val button: @Composable (Modifier, Boolean) -> Unit = { extra, tappable ->
                     RoundBarButton(
                         symbol = SFSymbol.ArrowUp,
@@ -375,8 +374,8 @@ fun DictationScopeBar(
                     DeliveryMenu(
                         onSend = { delivery -> guarded { onSend(delivery) } },
                         enabled = p.isLocked && !p.isSending,
-                        clickLabel = if (isRunning) "Steer at the next step" else null,
-                        longClickLabel = if (isRunning) "Queue after this response" else null,
+                        clickLabel = if (isRunning) stringResource(R.string.session_delivery_steer_label) else null,
+                        longClickLabel = if (isRunning) stringResource(R.string.session_delivery_queue_label) else null,
                     ) { menuModifier ->
                         button(menuModifier, false)
                     }
@@ -417,7 +416,7 @@ private fun RoundBarButton(
     order: Float,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    /** iOS `accessibilityHint`: TalkBack's click label. */
+    /** TalkBack's click label. */
     hint: String? = null,
     /** False inside a [DeliveryMenu], whose own gesture takes the tap and the hold. */
     tappable: Boolean = true,
@@ -460,8 +459,8 @@ private fun RoundBarButton(
 }
 
 /**
- * iOS `DeliveryMenu`: Send during a run, in the composer and the dictation bar: a tap steers; touch
- * and hold offers Steer and Queue. The choice is one-shot.
+ * Send during a run, in the composer and the dictation bar: a tap steers; touch and hold offers
+ * Steer and Queue. The choice is one-shot.
  *
  * @param content the control, given the modifier that takes its taps.
  */
@@ -470,7 +469,7 @@ fun DeliveryMenu(
     onSend: (OpenCodeDelivery) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    /** iOS `accessibilityHint` halves: TalkBack's tap (Steer) and hold (the menu) labels. */
+    /** TalkBack's tap (Steer) and hold (the menu) labels. */
     clickLabel: String? = null,
     longClickLabel: String? = null,
     content: @Composable (Modifier) -> Unit,
@@ -494,12 +493,12 @@ fun DeliveryMenu(
         )
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
-                text = { Text("Steer") },
+                text = { Text(stringResource(R.string.session_delivery_steer)) },
                 leadingIcon = { OpenCodeIcon(SFSymbol.ArrowTurnUpRight, contentDescription = null, size = 20.dp) },
                 onClick = { expanded = false; sendNow(OpenCodeDelivery.Steer) },
             )
             DropdownMenuItem(
-                text = { Text("Queue") },
+                text = { Text(stringResource(R.string.session_delivery_queue)) },
                 leadingIcon = { OpenCodeIcon(SFSymbol.TextBadgePlus, contentDescription = null, size = 20.dp) },
                 onClick = { expanded = false; sendNow(OpenCodeDelivery.Queue) },
             )
@@ -508,9 +507,8 @@ fun DeliveryMenu(
 }
 
 /**
- * iOS `DictationLockedReveal`: Stop and Send appear in their own places once a recording locks:
- * opacity and scale (0.6 → 1), so however it's interrupted they settle fully drawn. Fade only
- * under Reduce Motion.
+ * Stop and Send appear in their own places once a recording locks: opacity and scale (0.6 → 1), so
+ * however it's interrupted they settle fully drawn. Fade only under Reduce Motion.
  */
 @Composable
 private fun DictationLockedReveal(isLocked: Boolean, reducedMotion: Boolean, content: @Composable () -> Unit) {
@@ -523,12 +521,12 @@ private fun DictationLockedReveal(isLocked: Boolean, reducedMotion: Boolean, con
 }
 
 /**
- * iOS `DictationHoldLayer`: the parts of a held recording that leave the bar's row, drawn above
- * the composer's surface: the circle that grows out of the mic under the finger and the lock
- * target above it. Locking fades both out where they are. Purely visual.
+ * The parts of a held recording that leave the bar's row, drawn above the composer's surface: the
+ * circle that grows out of the mic under the finger and the lock target above it. Locking fades
+ * both out where they are. Purely visual.
  *
  * Coordinates are root px; [origin] is this layer's own root position, so it can draw at the mic
- * whatever the composer's layout (iOS's shared `dictationRowSpace`).
+ * whatever the composer's layout.
  */
 @Composable
 fun DictationHoldLayer(
@@ -645,8 +643,8 @@ fun DictationHoldLayer(
 }
 
 /**
- * iOS `DictationLevelFollower`: the live input level, eased for the hold circle's swell: quick to
- * rise, slower to fall, never the raw per-buffer value.
+ * The live input level, eased for the hold circle's swell: quick to rise, slower to fall, never the
+ * raw per-buffer value.
  */
 class DictationLevelFollower {
     private var value = 0f
@@ -661,7 +659,7 @@ class DictationLevelFollower {
     }
 }
 
-/** iOS `DictationLevels.shared.level`, read by the dictation bar's scope once per frame. */
+/** Read by the dictation bar's scope once per frame. */
 private val DictationLevelSource = DotScopeLevelSource { DictationLevels.level }
 
 /** Lays the element out [by] past its incoming bounds on every side, without changing its own size. */

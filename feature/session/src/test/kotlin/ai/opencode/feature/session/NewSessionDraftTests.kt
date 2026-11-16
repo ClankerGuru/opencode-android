@@ -35,16 +35,8 @@ import org.junit.Test
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `NewSessionDraftTests.swift`.
- *
- * A new session's project (D-34): the recent projects above the composer,
- * the Project sheet, and folders browsed on the server.
- *
- * Not ported here (:feature:drawer, `HomeFeature` / `AppFeature`): `aNewDraftVisitRestoresCurrentProjectRecency`,
- * `aDraftTheVoiceAgentOpensInAFolderStartsThere`, `everyDraftFromADraftGetsAFreshTaskIdentityAndLoadsModels`,
- * `switchingServersFromADraftAdvancesTaskIdentityAndLoadsTheNewServersModels`, `keepsIdentityMovesAdvanceVisitAndRunTask`.
- * Not ported here (:server, `OpenCodeProject.folder` / `OpenCodeClient.directoryListing` alone):
- * `aFolderThatIsAKnownProjectChoosesThatProject`, `listedEntriesResolveAgainstTheServersLocation`.
+ * A new session's project: the recent projects above the composer, the Project sheet, and folders
+ * browsed on the server.
  */
 class NewSessionDraftTests {
     private val server = OpenCodeServer(url = "http://localhost:9", username = "", password = "")
@@ -53,9 +45,9 @@ class NewSessionDraftTests {
 
     private fun Harness.draft(project: OpenCodeProject? = null, text: String = ""): SessionFeature.State = state {
         SessionFeature.State.draft(server = server, draftProject = project ?: projects[0], projects = projects).withDraft(text)
-    }
+    }.also { it.agentSelection.isEnabled.set(false) }
 
-    /** iOS `Issue.record` from [noSends]: failed at the end of the test. */
+    /** Failed at the end of the test. */
     private val issues = LockIsolated(listOf<String>())
 
     private fun draftTest(block: suspend kotlinx.coroutines.CoroutineScope.(Harness) -> Unit) = sessionTest { h ->
@@ -119,7 +111,7 @@ class NewSessionDraftTests {
 
     /**
      * The Project sheet lists a folder once even when the server has it
-     * under two projects (TestFlight build 640 showed `/` twice).
+     * under two projects.
      */
     @Test fun projectSheetListsEachFolderOnce() = draftTest { h ->
         val root = OpenCodeProject(id = "global", name = "/", directory = "/")

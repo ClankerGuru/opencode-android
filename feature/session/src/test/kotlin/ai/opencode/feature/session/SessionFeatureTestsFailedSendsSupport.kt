@@ -7,16 +7,14 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Helpers iOS keeps on `SessionFeatureTests` for its send tests: `sentID`
- * (`SessionFeatureTests+FailedSends.swift`) and `expectOptimisticSend`
- * (`SessionFeatureTests+Rendering.swift`), shared by the AgentSelection, Composer, Dictation,
+ * `sentID` and `expectOptimisticSend`, shared by the AgentSelection, Composer, Dictation,
  * FailedSends and Inbox ports.
  */
 internal object FailedSendsSupport {
-    /** iOS `SessionFeatureTests.sentID`: the first message ID `ServerIDClient.incrementing()` mints. */
+    /** The first message ID `ServerIDClient.incrementing()` mints. */
     const val sentID = "msg_00000000000100000000000000"
 
-    /** iOS `expectOptimisticSend(&state, text:)`: what a send does to the screen at once. */
+    /** What a send does to the screen at once. */
     fun State.expectOptimisticSend(text: String = "hello"): State {
         val messageID = sentID
         val signal = workingRunSignal
@@ -36,10 +34,10 @@ internal object FailedSendsSupport {
     }
 
     /**
-     * TCA's `finish()` on a non-exhaustive store: effects still in flight after the timeout are
-     * not a failure (TCA reports them only with `exhaustivity = .on`). Android's `TestStore.finish`
-     * fails either way, so non-exhaustive ports whose iOS test ends with a long-lived poll still
-     * running finish through this.
+     * TCA's `finish()` on a non-exhaustive store: effects still in flight after the timeout are not
+     * a failure (TCA reports them only with `exhaustivity =.on`). `TestStore.finish` fails either
+     * way, so non-exhaustive tests that end with a long-lived poll still running finish through
+     * this.
      */
     suspend fun <S, A> TestStore<S, A>.finishLikeTCA(timeout: Duration = 1.seconds) {
         if (exhaustive) return finish(timeout)

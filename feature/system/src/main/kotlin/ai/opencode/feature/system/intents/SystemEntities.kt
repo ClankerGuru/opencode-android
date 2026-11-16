@@ -1,6 +1,8 @@
 package ai.opencode.feature.system.intents
 
 import ai.opencode.core.log.SystemActionOrigin
+import ai.opencode.core.strings.localized
+import ai.opencode.feature.system.R
 import ai.opencode.feature.system.SystemAction
 import ai.opencode.feature.system.SessionDirectory
 import ai.opencode.feature.system.ScopedID
@@ -8,10 +10,9 @@ import ai.opencode.core.ui.SFSymbol
 import java.text.Normalizer
 
 /**
- * Port of iOS `SessionEntity`: a session, or one of two choices that aren't one yet:
- * **Last Viewed Session** and **New Session**. Real sessions are server-scoped
- * (`<serverKey>:<sessionID>`). Widgets' Choose Session and Ask OpenCode's session picker
- * list these from the [SessionDirectory], never the network.
+ * A session, or one of two choices that aren't one yet: **Last Viewed Session** and **New
+ * Session**. Real sessions are server-scoped (`<serverKey>:<sessionID>`). Widgets' Choose Session
+ * and Ask OpenCode's session picker list these from the [SessionDirectory], never the network.
  */
 data class SessionEntity(
     val id: String,
@@ -32,7 +33,7 @@ data class SessionEntity(
     }
 
     companion object {
-        const val TYPE_DISPLAY_NAME = "Session"
+        val TYPE_DISPLAY_NAME: String get() = localized(R.string.system_session_type_name)
         const val LAST_VIEWED_ID = "last-viewed"
         const val NEW_SESSION_ID = "new-session"
 
@@ -41,27 +42,27 @@ data class SessionEntity(
 
         /** Last Viewed Session, naming the session it means today. */
         fun lastViewed(server: SessionDirectory.Server?) =
-            SessionEntity(LAST_VIEWED_ID, "Last Viewed Session", server?.lastViewed?.title)
+            SessionEntity(LAST_VIEWED_ID, localized(R.string.system_last_viewed_session), server?.lastViewed?.title)
 
         /** New Session, naming the project it starts in. */
         fun newSession(server: SessionDirectory.Server?) =
-            SessionEntity(NEW_SESSION_ID, "New Session", server?.projects?.firstOrNull()?.name)
+            SessionEntity(NEW_SESSION_ID, localized(R.string.system_new_session), server?.projects?.firstOrNull()?.name)
     }
 }
 
-/** Port of iOS `ProjectEntity`: `<serverKey>:<projectID>`. */
+/** `<serverKey>:<projectID>`. */
 data class ProjectEntity(val id: String, val name: String) {
     val symbol: SFSymbol get() = SFSymbol.Folder
 
     companion object {
-        const val TYPE_DISPLAY_NAME = "Project"
+        val TYPE_DISPLAY_NAME: String get() = localized(R.string.system_project_type_name)
 
         fun of(project: SessionDirectory.Project, serverKey: String) =
             ProjectEntity(ScopedID(serverKey, project.id).rawValue, project.name)
     }
 }
 
-/** Port of iOS `SessionQuery`: reads the published directory. */
+/** Reads the published directory. */
 object SessionQuery {
     fun entities(directory: SessionDirectory, identifiers: List<String>) = directory.sessionEntities(identifiers)
     fun entities(directory: SessionDirectory, matching: String) = directory.sessionEntities(matching)
@@ -69,7 +70,6 @@ object SessionQuery {
     fun defaultResult(directory: SessionDirectory) = SessionEntity.lastViewed(directory.current)
 }
 
-/** Port of iOS `ProjectQuery`. */
 object ProjectQuery {
     fun entities(directory: SessionDirectory, identifiers: List<String>) = directory.projectEntities(identifiers)
     fun entities(directory: SessionDirectory, matching: String) = directory.projectEntities(matching)

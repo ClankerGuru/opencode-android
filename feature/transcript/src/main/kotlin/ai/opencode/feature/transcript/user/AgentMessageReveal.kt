@@ -27,10 +27,10 @@ import kotlin.math.pow
 
 /**
  * A message an agent sent (Voice, the delegator, another session, a parent spawning a subagent)
- * arriving bright and settling (K4 Inner glow): the bubble fades in while a luminous edge inside
- * it and a slight lift of its fill rise in 70 ms, then decay like phosphor, fast and then a
- * slower tail, to exactly the plain bubble. Under Reduce Motion it only fades in. Messages typed
- * or dictated on this phone never reveal (iOS `AgentMessageReveal`).
+ * arriving bright and settling: the bubble fades in while a luminous edge inside it and a slight
+ * lift of its fill rise in 70 ms, then decay like phosphor, fast and then a slower tail, to exactly
+ * the plain bubble. Under Reduce Motion it only fades in. Messages typed or dictated on this phone
+ * never reveal.
  */
 object AgentMessageReveal {
     @Immutable
@@ -74,7 +74,7 @@ object AgentMessageReveal {
         return (1 - slowShare) * 2.0.pow(-x / halfLife) + slowShare * 2.0.pow(-x / slowHalfLife)
     }
 
-    /** iOS DEBUG `-lab-reveal-slowmo`; Android has no lab argument, so real time. */
+    /** Android has no lab argument, so real time. */
     const val timeScale = 1.0
 
     /** Under Reduce Motion the light stays off: the bubble only fades in. */
@@ -151,8 +151,8 @@ half4 main(float2 position) {
 """
 
 /**
- * The light inside the bubble: its fill lifted, and an edge glowing inward (iOS
- * `AgentMessageRevealLight`). Fills its parent; clipped to the run's corners.
+ * The light inside the bubble: its fill lifted, and an edge glowing inward. Fills its parent;
+ * clipped to the run's corners.
  */
 @Composable
 fun AgentMessageRevealLight(light: Double, corners: UserSurfaceCorners = UserSurfaceCorners.round, modifier: Modifier = Modifier) {
@@ -187,11 +187,10 @@ internal class AgentRevealGlow {
 }
 
 /**
- * When each agent's message arrived, so its reveal plays once, on arrival (iOS
- * `TranscriptAgentMessageReveal`). The list owns it and hands each row its arrival as a value:
- * a recycled or recomposed row reads the same clock, and a message it never saw arrive (opening
- * a session, a page of history) has no reveal. Times are [AgentMessageReveal.now] seconds.
- * Main thread only.
+ * When each agent's message arrived, so its reveal plays once, on arrival. The list owns it and
+ * hands each row its arrival as a value: a recycled or recomposed row reads the same clock, and a
+ * message it never saw arrive (opening a session, a page of history) has no reveal. Times are
+ * [AgentMessageReveal.now] seconds. Main thread only.
  */
 class TranscriptAgentMessageReveal {
     private val arrivals = mutableMapOf<String, Double>()
@@ -205,7 +204,7 @@ class TranscriptAgentMessageReveal {
 
     fun arrival(of: String): Double? = arrivals[of]
 
-    /** The lab's Replay Reveal (iOS DEBUG only). */
+    /** The lab's Replay Reveal. */
     fun replay(messageID: String, time: Double = AgentMessageReveal.now()) {
         arrivals[messageID] = time
     }
@@ -213,7 +212,7 @@ class TranscriptAgentMessageReveal {
 
 /**
  * Samples the reveal each frame while it runs, then rests: a finished or absent reveal draws
- * [AgentMessageReveal.Frame.rest], which is the plain bubble (iOS `AgentMessageRevealClock`).
+ * [AgentMessageReveal.Frame.rest], which is the plain bubble.
  */
 @Composable
 fun AgentMessageRevealClock(arrival: Double?, content: @Composable (AgentMessageReveal.Frame) -> Unit) {

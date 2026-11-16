@@ -10,9 +10,8 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * Draws the orb (iOS `AgentActivityOrb`, in `AgentActivityGlyph.swift`): its soft radial glow,
- * then each dot with its white-hot core and a faint halo, in one GPU pass via
- * [AgentActivityShaders.orbShader].
+ * Draws the orb: its soft radial glow, then each dot with its white-hot core and a faint halo, in
+ * one GPU pass via [AgentActivityShaders.orbShader].
  */
 object AgentActivityOrb {
     /** The glow's spill past the layout box, in the box's own unit. */
@@ -54,15 +53,12 @@ object AgentActivityOrb {
         }
     }
 
-    /**
-     * Dark-mode cool pearl base and core shared by the dot scopes and the orb (iOS
-     * `DotScopeMetalShared.coolPearlDark`, in Voice's `DotScopeView.swift`).
-     */
+    /** Dark-mode cool pearl base and core shared by the dot scopes and the orb. */
     val coolPearlDarkBase = RGB(0.70, 0.75, 0.84)
     val coolPearlDarkCore = RGB(0.92, 0.95, 1.0)
 
     // `prototypes/ios-kit/dot-orb/index.js`'s palette: the scope's cool pearl and four phosphor accents.
-    // Done's green and Failed's red are round 4's settled solids (Deep green, Warm red), and `hot` is the
+    // Done's green and Failed's red are settled solids (Deep green, Warm red), and `hot` is the
     // flash they cool from (`prototypes/activity-glyph/round4.html`).
     val dark = Palette(
         base = coolPearlDarkBase,
@@ -116,7 +112,7 @@ object AgentActivityOrb {
         return c.clamped()
     }
 
-    /** Uniform values for one frame (iOS packs them into 268 floats). */
+    /** Uniform values for one frame. */
     class Packed {
         val header0 = FloatArray(4)
         val header1 = FloatArray(4)
@@ -196,8 +192,8 @@ object AgentActivityOrb {
     private val scratch = Packed()
 
     /**
-     * Draws [field] centred on this scope's square layout box, its glow spilling [margin] past it
-     * (iOS `AgentActivityOrb.view`). Nothing when [field] is null. Main thread only (shared shader).
+     * Draws [field] centred on this scope's square layout box, its glow spilling [margin] past it.
+     * Nothing when [field] is null. Main thread only (shared shader).
      */
     fun DrawScope.drawOrb(field: GyroField?, cells: List<GyroCell> = GyroCell.seven, dark: Boolean) {
         field ?: return

@@ -81,9 +81,8 @@ import androidx.compose.ui.text.buildAnnotatedString
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * What a row does with a link: a file link opens the viewer, a session link opens its session,
- * a web link opens (iOS `onOpenFile` / the transcript's link handling), and the hold menu's
- * actions go to the session (iOS `LinkMenuHandler.perform`).
+ * What a row does with a link: a file link opens the viewer, a session link opens its session, a
+ * web link opens, and the hold menu's actions go to the session.
  */
 internal object MarkdownLinkActions {
     fun tap(url: String, send: (TranscriptAction) -> Unit) {
@@ -106,14 +105,13 @@ internal fun rememberLinkListener(): LinkInteractionListener {
 }
 
 /**
- * Text whose newest characters fade in (iOS `ArrivingText`). The text is laid out once as it
- * is; while chunks arrive, each chunk's own characters are erased by `1 - opacity` over the
- * drawn text (opacity only, read in the draw phase from a frame clock), so no glyph moves and
- * none takes another chunk's clock. Once every fade has run it is plain text again.
+ * Text whose newest characters fade in. The text is laid out once as it is; while chunks arrive,
+ * each chunk's own characters are erased by `1 - opacity` over the drawn text (opacity only, read
+ * in the draw phase from a frame clock), so no glyph moves and none takes another chunk's clock.
+ * Once every fade has run it is plain text again.
  *
- * Also draws the text's session chips under their glyphs (iOS `SessionChipRenderer`), opens
- * links on tap and their hold menu on long press (iOS `linkMenu(for:)`), and gives TalkBack the
- * menu's actions.
+ * Also draws the text's session chips under their glyphs, opens links on tap and their hold menu on
+ * long press, and gives TalkBack the menu's actions.
  */
 @Composable
 internal fun ArrivingText(
@@ -126,7 +124,7 @@ internal fun ArrivingText(
     selectionKey: TranscriptSelectionLeafKey? = null,
 ) {
     val context = LocalTranscriptRowContext.current
-    // In a reply the list owns one selection across all its text (iOS `selectableTranscriptText`).
+    // In a reply the list owns one selection across all its text.
     val replySelection = if (selectionKey != null) LocalTranscriptReplySelection.current else null
     val send by rememberUpdatedState(context.send)
     val reveal = LocalTranscriptTextReveal.current ?: remember { TranscriptTextReveal() }
@@ -137,7 +135,7 @@ internal fun ArrivingText(
     val active = if (presented.hasMath) emptyList() else arrivals.filter { now - it.time < it.duration }
     val ends = active.maxOfOrNull { it.time + it.duration }
     val frame = rememberRevealFrame(ends, reveal.now)
-    // iOS reads the style each body pass: a change shows on the next chunk.
+    // A change shows on the next chunk.
     val revealStyle = StreamTextRevealStyle.current
     val reduceMotion = rememberReduceMotion()
     val sweep = if (revealStyle == StreamTextRevealStyle.Chunk) {
@@ -146,13 +144,13 @@ internal fun ArrivingText(
         SweepParameters(
             focus = revealStyle == StreamTextRevealStyle.Focus,
             feather = TextRevealTunables.feather.value,
-            // Points → px; Reduce Motion drops the blur (iOS `StreamSweepOverlay`).
+            // Points → px; Reduce Motion drops the blur.
             blurRadius = if (reduceMotion || !TransitionBlur.enabled) 0f else with(density) { TextRevealTunables.blurRadius.value.toFloat().dp.toPx() },
             blurPoints = if (reduceMotion || !TransitionBlur.enabled) 0.0 else TextRevealTunables.blurRadius.value,
             lift = TextRevealTunables.phosphorLift.value,
         )
     }
-    // Focus's blur steps share a few layers, one per step (iOS: `ctx.drawLayer` per step).
+    // Focus's blur steps share a few layers, one per step.
     val blurLayers = if (sweep?.focus == true && sweep.blurPoints > 0) List(SweepParameters.STEPS) { rememberGraphicsLayer() } else null
     // Offscreen layer for DstOut/Plus chunk fades (drawn inside `drawWithContent` instead of
     // `Modifier.graphicsLayer`, whose `BlockGraphicsLayerModifier` invalidated Text semantics on
@@ -161,13 +159,12 @@ internal fun ArrivingText(
     val quoteAction = LocalQuoteAccessibilityAction.current
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     var pressed by remember { mutableStateOf<String?>(null) }
-    // Web, pairing and session links hold to media's link menu (iOS `linkMenu(for:)`: the
-    // shared `LinkMenuView`, with the link's preview card, its actions, and dragging the link out
-    // from the hold); file links stay this text's own (tap opens the viewer).
+    // Web, pairing and session links hold to media's link menu; file links stay this text's own
+    // (tap opens the viewer).
     val linkMenu = remember { LinkMenuHandler { action, url -> MarkdownLinkActions.perform(action, url, send) } }
     val menuText = remember(presented.text) { linkMenuText(presented.text) }
     // A paragraph with menu links has one TalkBack node for the links' actions and Quote, the link
-    // menu's (AL-01: an action on the Text too made TalkBack stop there, short of the links').
+    // menu's (an action on the Text too makes TalkBack stop there, short of the links').
     val hasMenuLinks = remember(menuText) { LinkMenuText.webLinks(menuText).isNotEmpty() }
     val quoteOnLinkMenu = quoteAction != null && hasMenuLinks
     val textQuoteAction = quoteAction.takeUnless { quoteOnLinkMenu }
@@ -194,11 +191,9 @@ internal fun ArrivingText(
         modifier = modifier,
         trailingActions = if (quoteOnLinkMenu) listOfNotNull(quoteAction) else emptyList(),
     ) {
-        // Compose widens each link's own clickable node to a 48 dp touch target, past the
-        // link's glyphs and even past this text's box (M-02: a tap in the gap above a line
-        // opened its link). Links take touches only on their glyphs, as on iOS, so the link
-        // nodes get no minimum target: they stay inside the text, where the gesture below
-        // keeps every touch that misses the glyphs from them.
+        // Compose widens each link's clickable node to a 48 dp touch target, past the link's glyphs
+        // and this text's box. Links take touches only on their glyphs, so the link nodes get no
+        // minimum target; the gesture below keeps touches that miss the glyphs from them.
         CompositionLocalProvider(LocalViewConfiguration provides touchTargets) {
             Text(
                 text = presented.text,
@@ -298,7 +293,7 @@ internal fun ArrivingText(
                         },
                     )
                     .semantics {
-                        // iOS `.accessibilityHint("Links to …")`: read after the text.
+                        // Read after the text.
                         presented.linkHint?.let { stateDescription = it }
                         // With menu links, Quote joins the links' actions on the link menu's box.
                         if (textQuoteAction != null) customActions = listOf(textQuoteAction)
@@ -364,7 +359,7 @@ private fun DrawScope.eraseArriving(layout: TextLayoutResult, active: List<Trans
     }
 }
 
-/** The Frontier and Focus sweeps' knobs, read once per composition (iOS `StreamSweepOverlay`). */
+/** The Frontier and Focus sweeps' knobs, read once per composition. */
 private class SweepParameters(
     val focus: Boolean,
     val feather: Double,
@@ -380,13 +375,12 @@ private class SweepParameters(
 }
 
 /**
- * Frontier and Focus (iOS `StreamSweepRenderer`): each arriving chunk's glyphs reveal in reading
- * order, a feathered frontier crossing the chunk ([StreamTextRevealStyle.sweepAlpha]). A glyph
- * still sharp is erased by `1 - alpha` in place; under Focus one still arriving is erased whole
- * and drawn again into the layer of its blur step (blurred by how far it still has to go and
- * brightened by the phosphor lift), so glyphs share a few layers instead of one each. Untouched
- * text never moves; by the end every glyph is at full opacity, so handing the chunk back to the
- * plain text never changes a pixel.
+ * Frontier and Focus: each arriving chunk's glyphs reveal in reading order, a feathered frontier
+ * crossing the chunk ([StreamTextRevealStyle.sweepAlpha]). A glyph still sharp is erased by `1 -
+ * alpha` in place; under Focus one still arriving is erased whole and drawn again into the layer of
+ * its blur step (blurred by how far it still has to go and brightened by the phosphor lift), so
+ * glyphs share a few layers instead of one each. Untouched text never moves; by the end every glyph
+ * is at full opacity, so handing the chunk back to the plain text never changes a pixel.
  */
 private fun DrawScope.sweepArriving(
     layout: TextLayoutResult,
@@ -448,7 +442,7 @@ private class ChipGlyphs(val session: Painter, val subagent: Painter, val muted:
 
 private class ChipStyle(val ink: Color, val glyph: Color, val fillScale: Float)
 
-/** The chip's box (iOS `SessionChipMetrics`), on the live [SessionLinkTunables]. */
+/** The chip's box, on the live [SessionLinkTunables]. */
 private object SessionChipMetrics {
     /** The chip's height and how far its centre sits above the baseline, in ems. */
     val height: Float get() = SessionLinkTunables.height.value
@@ -458,7 +452,7 @@ private object SessionChipMetrics {
     val radius: Float get() = SessionLinkTunables.radius.value
 }
 
-/** Each line's run of the chip, as boxes around the text (iOS `SessionChipMetrics.box`). */
+/** Each line's run of the chip, as boxes around the text. */
 private fun chipBoxes(layout: TextLayoutResult, chip: SessionChip, em: Float): List<Rect> {
     val length = layout.layoutInput.text.length
     val start = chip.start.coerceIn(0, length)

@@ -2,6 +2,8 @@
 
 package ai.opencode.feature.session
 
+import ai.opencode.core.strings.localized
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.inContainer
 import ai.opencode.feature.composer.composerWindowTouches
 import ai.opencode.core.dependencies.dependency
@@ -37,15 +39,13 @@ import ai.opencode.feature.composer.LocationPermissionPrompt
 import ai.opencode.feature.composer.PastedTextViewer
 import ai.opencode.feature.composer.RequestDockContext
 import ai.opencode.feature.composer.RequestReviewSheet
-import ai.opencode.feature.composer.SentImageFlight
-import ai.opencode.feature.composer.SentImageFlightOverlay
 import ai.opencode.feature.composer.composerKeyboardStepHold
 import ai.opencode.feature.composer.plusmenu.PhotoFlightCanvas
 import ai.opencode.feature.composer.plusmenu.PlusMenuGlassSurface
 import ai.opencode.feature.composer.plusmenu.RecentPhotoPeekOverlay
 import ai.opencode.feature.media.LocalMediaPresenter
 import ai.opencode.feature.media.MediaPresenter
-import ai.opencode.feature.media.TranscriptImageViewer
+import ai.opencode.feature.media.FullscreenViewer
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
@@ -118,6 +118,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.isTraversalGroup
@@ -207,7 +208,7 @@ fun SessionView(
     val callStore = store.rememberCallStore(hostedCall)
     val ownsCall by store.observe { it.voice != null }
     if (!isInertPreview) {
-        SessionCallTasks(store, callStore, hasCall = ownsCall || hostedCall != null)
+        SessionCallTasks(store, callStore, hasCall = ownsCall || hostedCall != null, isCatchUpCard = onCatchUpOpen != null)
     }
     val isCovered by store.observe { it.isCovered }
     // iOS `floatingCallCoverage(sessionLifecycle)`: what the Living Orb's card covers gives way.
@@ -256,7 +257,7 @@ fun SessionView(
         composerHost.isImportingImages = isImportingImages
         composerHost.importer = importer
         composerHost.headerHeight = headerHeight
-        if (composerHost.pendingAttachmentsRow == null) composerHost.pendingAttachmentsRow = { expanded -> SessionPendingAttachments(store, composerHost.sendTransition.images, expanded) }
+        if (composerHost.pendingAttachmentsRow == null) composerHost.pendingAttachmentsRow = { expanded -> SessionPendingAttachments(store, expanded) }
     }
     if (!isInertPreview) {
         SessionPermissionPrompts(isCovered)
@@ -274,7 +275,7 @@ fun SessionView(
         // The + menu draws above the background-work capsule (iOS: the menu's glass covers it).
         // iOS `ComposerWindowTouchObserver` on the window: the screen's latest touch-down, for the
         // model chip's double-tap check.
-        Box(modifier.rootOffsetOnScreen { if (it != rootOffset) rootOffset = it }.composerWindowTouches(composerHost.sendTransition.windowTouches)) {
+        Box(modifier.rootOffsetOnScreen { if (it != rootOffset) rootOffset = it }.composerWindowTouches(composerHost.fieldLink.windowTouches)) {
         BackgroundWorkPresentation(
             anchor = backgroundWorkAnchor,
             sessionID = work.sessionID,
@@ -404,12 +405,9 @@ fun SessionView(
                     SessionComposer(store, Modifier.modelPanelsComposer(composerHost), callStore = callStore)
                 }
                 if (!isInertPreview) {
-                    // A send's words fly from the field into its bubble, over both.
-                    SessionSendFlightOverlay(composerHost, scrollEdgeBridge, Modifier.matchParentSize())
-                    // Its photos fly into their slots above the words (iOS installs the copies in the window).
-                    SentImageFlightOverlay(composerHost.sendTransition.images, Modifier.matchParentSize())
                     RequestPanelRoomProbe(composerHost, Modifier.matchParentSize())
                     SessionModelPickerOverlays(store, headerHeight)
+                    QuoteCommentOverlay(store, Modifier.matchParentSize())
                 }
             }
         }
@@ -811,12 +809,13 @@ private fun SessionMediaHost(content: @Composable () -> Unit) = content()
 
 /** What the composer holds, above its field (iOS `pendingAttachmentsRow`). */
 @Composable
-private fun SessionPendingAttachments(store: StoreOf<State, Action>, sendImages: SentImageFlight, composerExpanded: Boolean) {
+private fun SessionPendingAttachments(store: StoreOf<State, Action>, composerExpanded: Boolean) {
     val attachments by store.observe { it.pendingAttachments }
     val files by store.observe { it.pendingFiles }
     val canRetry by store.observe { it.supportsFileUploads }
     val location by store.observe { it.pendingLocation }
     val isLocating by store.observe { it.isLocating }
+    val quotes by store.observe { it.pendingQuotes }
     val presenter = LocalMediaPresenter.current
     val reducedMotion = rememberReduceMotion()
     val context = LocalContext.current
@@ -832,11 +831,15 @@ private fun SessionPendingAttachments(store: StoreOf<State, Action>, sendImages:
         onRemoveFile = { store.send(Action.fileRemoved(it)) },
         onRetryFile = { store.send(Action.fileRetryTapped(it)) },
         onRemoveLocation = { store.send(Action.locationRemoved) },
+        quotes = quotes,
+        onRemoveQuote = { store.send(Action.quoteRemoved(it)) },
+        commentingQuoteID = host?.commentingQuoteID,
+        onOpenQuote = { host?.commentingQuoteID = it },
         onOpenPastedText = { attachment ->
             val text = attachment.pastedText
             val summary = attachment.pasted
             if (text != null && summary != null) {
-                presenter?.present(sourceID = null, isMedia = false, reducesMotion = reducedMotion, screenName = "Pasted Text") { viewer ->
+                presenter?.present(sourceID = null, isMedia = false, reducesMotion = reducedMotion, screenName = localized(R.string.session_pasted_text_screen_title)) { viewer ->
                     PastedTextViewer(
                         text = text,
                         summary = summary,
@@ -849,7 +852,6 @@ private fun SessionPendingAttachments(store: StoreOf<State, Action>, sendImages:
         },
         onOpenLocation = { store.send(Action.LinkTapped(it)) },
         flights = LocalSessionPhotoSheet.current?.flights,
-        sendImages = sendImages,
         onOpenPhoto = { id -> presentComposerPhoto(store, id, presenter, host, reducedMotion, context) },
         composerExpanded = composerExpanded,
         server = store.state.server,
@@ -870,12 +872,16 @@ private fun presentComposerPhoto(
     context: android.content.Context,
 ) {
     presenter ?: return
-    val preview = ComposerPhotoViewer.preview(store.state.pendingAttachments, selected = id) ?: return
+    val preview = ComposerPhotoViewer.preview(
+        attachments = store.state.pendingAttachments, files = store.state.pendingFiles,
+        selected = id, server = store.state.server, directory = store.state.session?.directory,
+    ) ?: return
     val restoresFocus = host?.messageFieldFocused == true
     if (restoresFocus) host?.dismissComposerKeyboard()
-    val viewerStore = ComposerPhotoViewer.store(preview) { removed ->
+    val viewerStore = ComposerPhotoViewer.store(preview, addDrawing = drawingHandler(store)) { removed ->
         val index = store.state.pendingAttachments.indexOfFirst { it.id == removed }
         if (index >= 0) store.send(Action.attachmentRemoved(index))
+        else store.state.pendingFiles.firstOrNull { it.id.toString() == removed }?.let { store.send(Action.fileRemoved(it.id)) }
     }
     val identity = store.state.taskIdentity
     val presented = presenter.present(
@@ -885,12 +891,16 @@ private fun presentComposerPhoto(
         flightAccessories = { mediaID -> ComposerPhotoViewer.flightAccessories(mediaID, store.state.pendingAttachments, context) },
         onDismiss = {
             viewerStore.close()
+            ComposerPhotoViewer.release(preview)
             if (restoresFocus && store.state.taskIdentity == identity && !store.state.hasPendingRequests) host?.focusComposer()
         },
     ) { viewer ->
-        TranscriptImageViewer(viewerStore, viewer)
+        FullscreenViewer(viewerStore, viewer)
     }
-    if (!presented) viewerStore.close()
+    if (!presented) {
+        viewerStore.close()
+        ComposerPhotoViewer.release(preview)
+    }
 }
 
 /** The system share sheet with [text] (iOS `ShareLink`). */
@@ -928,9 +938,9 @@ private fun LoadFailure(message: String, onRetry: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         OpenCodeIcon(SFSymbol.ExclamationmarkTriangle, contentDescription = null, size = OpenCodeIconSize.hero, tint = OpenCodeTheme.colors.secondaryText)
-        Text("Couldn’t Load Session", style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+        Text(stringResource(R.string.session_load_failed_title), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
         Text(message, style = MaterialTheme.typography.bodyMedium, color = OpenCodeTheme.colors.secondaryText, textAlign = TextAlign.Center)
-        OpenCodeSecondaryButton("Try Again", onClick = onRetry)
+        OpenCodeSecondaryButton(stringResource(CoreR.string.common_try_again), onClick = onRetry)
     }
 }
 
@@ -1000,12 +1010,14 @@ private fun SessionSheets(store: StoreOf<State, Action>, listContext: SessionLis
                         phase = if (status == SessionSheetStatus.Idle) SubagentActivity.Phase.idle else SubagentActivity.Phase.running,
                         needsInput = status == SessionSheetStatus.Waiting,
                     )
+                    val statusDescription = stringResource(R.string.session_sheet_status_description)
+                    val statusText = stringResource(status.textRes)
                     CompositionLocalProvider(
                         LocalAgentActivityScope provides "${sheet.state.server.persistenceID}|${details.session?.id ?: "draft"}|sheet",
                     ) {
                         AgentActivityGlyph(
                             AgentActivitySource.Subagent(activity),
-                            Modifier.clearAndSetSemantics { contentDescription = "Status"; stateDescription = status.text },
+                            Modifier.clearAndSetSemantics { contentDescription = statusDescription; stateDescription = statusText },
                             size = size,
                         )
                     }
@@ -1088,13 +1100,13 @@ private fun LocationErrorAlert(store: StoreOf<State, Action>) {
     val message = error ?: return
     OpenCodeAlertDialog(
         onDismissRequest = { store.send(Action.locationErrorDismissed) },
-        title = { Text("Couldn’t Share Location") },
+        title = { Text(stringResource(R.string.session_location_share_failed_title)) },
         text = { Text(message) },
         confirmButton = {
-            TextButton(onClick = { store.send(Action.locationErrorDismissed) }) { Text("OK") }
+            TextButton(onClick = { store.send(Action.locationErrorDismissed) }) { Text(stringResource(CoreR.string.common_ok)) }
         },
         dismissButton = if (message == LocationClientError.Denied.message) {
-            { TextButton(onClick = { store.send(Action.locationSettingsTapped) }) { Text("Open Settings") } }
+            { TextButton(onClick = { store.send(Action.locationSettingsTapped) }) { Text(stringResource(CoreR.string.common_open_settings)) } }
         } else {
             null
         },

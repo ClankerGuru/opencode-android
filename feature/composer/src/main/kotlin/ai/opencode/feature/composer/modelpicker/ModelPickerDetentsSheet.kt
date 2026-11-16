@@ -6,6 +6,7 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.composer.OpenCodeBottomSheet
+import ai.opencode.feature.composer.R
 import android.view.accessibility.AccessibilityManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -49,26 +50,25 @@ import androidx.compose.ui.input.pointer.util.addPointerInputChange
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
 /**
- * iOS `ModelPickerDetents` (`Session/SessionView+ModelPicker.swift`): the stock sheet One Picker
- * opens in when its morph can't present ([OnePickerSheetHost]), plus the favourite swipe its rows
- * share. The plain (Today) picker these used to sit with graduated away with One Picker (iOS
- * d0b24aaa).
+ * The stock sheet One Picker opens in when its morph can't present ([OnePickerSheetHost]), plus the
+ * favourite swipe its rows share. The plain (Today) picker these used to sit with graduated away
+ * with One Picker.
  */
 
 /**
- * iOS `ModelPickerDetents` around a stock sheet: One Picker's sheet (while the composer is
- * covered) opens at the partially expanded rest and drag up to full. Dragged
- * down from full, a flick at [ModelPickerTunables.flickCloses] (800 dp/s) or faster closes them
- * and a slower drag rests partially expanded (a probe beside the sheet's own drag reads the
- * release velocity, which the settled value doesn't carry). Under TalkBack the grabber still
- * steps between the two rests: collapsing there isn't a request to close.
+ * One Picker's sheet (while the composer is covered) opens at the partially expanded rest and drag
+ * up to full. Dragged down from full, a flick at [ModelPickerTunables.flickCloses] (800 dp/s) or
+ * faster closes them and a slower drag rests partially expanded (a probe beside the sheet's own
+ * drag reads the release velocity, which the settled value doesn't carry). Under TalkBack the
+ * grabber still steps between the two rests: collapsing there isn't a request to close.
  *
  * [onClose] asks the owner to close it (`activePicker = nil`); [onClosed] runs once it leaves
- * however it closed (iOS `onDisappear`: `.modelListClosed`).
+ * however it closed.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -110,8 +110,8 @@ fun ModelPickerDetentsSheet(
             while (true) {
                 val event = awaitPointerEvent(PointerEventPass.Initial)
                 val change = event.changes.firstOrNull() ?: continue
-                // Local positions move with the sheet and under-report a flick. Track the
-                // original pointer samples, as UIKit's pan.velocity(in: nil) does.
+                // Local positions move with the sheet and under-report a flick. Track the original
+                // pointer samples.
                 tracker.addPointerInputChange(change)
                 val vy = tracker.calculateVelocity().y
                 downwardVelocity = with(density) { maxOf(vy, 0f).toDp().value }
@@ -119,9 +119,8 @@ fun ModelPickerDetentsSheet(
         }
     }
 
-    // A pick, Cancel or Done closes the sheet by removing it (`activePicker = nil`), which on
-    // its own would drop it from the screen in one frame: it slides down first, then the event
-    // goes (iOS dismisses the sheet with its own animation).
+    // A pick, Cancel or Done closes the sheet by removing it (`activePicker = nil`), which on its
+    // own would drop it from the screen in one frame: it slides down first, then the event goes.
     var hiding by remember { mutableStateOf(false) }
     val hideThen: (() -> Unit) -> Unit = { action ->
         if (!hiding) {
@@ -134,8 +133,8 @@ fun ModelPickerDetentsSheet(
         sheetState = sheetState,
         dragHandle = { Box(probe) { BottomSheetDefaults.DragHandle() } },
     ) {
-        // UIKit lifts a medium sheet when Search brings up the keyboard. Keep that expanded
-        // rest after the keyboard goes, but don't fight a subsequent drag back down.
+        // Search's keyboard lifts a medium sheet. Keep that expanded rest after the keyboard goes,
+        // but don't fight a subsequent drag back down.
         val imeVisible = WindowInsets.isImeVisible
         val focusManager = LocalFocusManager.current
         var liftedForIme by remember { mutableStateOf(false) }
@@ -145,7 +144,7 @@ fun ModelPickerDetentsSheet(
             } else if (sheetState.currentValue == SheetValue.PartiallyExpanded && sheetState.targetValue != SheetValue.Hidden) {
                 if (liftedForIme) {
                     // A slow drag back down is the reader's choice, not another keyboard rise.
-                    // UIKit dismisses input when panning the sheet; don't bounce back to full.
+                    // Don't bounce back to full.
                     focusManager.clearFocus()
                 } else {
                     liftedForIme = true
@@ -162,12 +161,12 @@ fun ModelPickerDetentsSheet(
 /** The enclosing [ModelPickerDetentsSheet]'s slide-down, run before an event that closes it. */
 internal val LocalModelSheetHideThen = staticCompositionLocalOf<((() -> Unit) -> Unit)?> { null }
 
-/** iOS's `.yellow` swipe tint (One Picker's swipe actions). */
+/** Yellow swipe tint (One Picker's swipe actions). */
 internal val FavoriteYellow = Color(0xFFFFCC00)
 
 /**
- * A trailing swipe that favorites or unfavorites the row (iOS `swipeActions(edge: .trailing,
- * allowsFullSwipe: true)`): swiped past the threshold it toggles and springs back.
+ * A trailing swipe that favorites or unfavorites the row: swiped past the threshold it toggles and
+ * springs back.
  */
 @Composable
 internal fun FavoriteSwipeBox(
@@ -178,7 +177,7 @@ internal fun FavoriteSwipeBox(
     favoriteSymbol: SFSymbol = SFSymbol.StarFill,
     /** The row's own fill, drawn over the action while it rests. */
     containerColor: Color = BottomSheetDefaults.ContainerColor,
-    /** One Picker's rows also swipe from the leading edge (iOS's leading and trailing actions). */
+    /** One Picker's rows also swipe from the leading edge. */
     swipesFromStart: Boolean = false,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
@@ -197,7 +196,7 @@ internal fun FavoriteSwipeBox(
             ) {
                 OpenCodeIcon(if (isFavorite) SFSymbol.StarSlash else favoriteSymbol, null, size = 20.dp, tint = Color.White)
                 Spacer(Modifier.width(6.dp))
-                Text(if (isFavorite) "Unfavorite" else "Favorite", color = Color.White, style = OpenCodeTextStyles.subheadline)
+                Text(if (isFavorite) stringResource(R.string.composer_model_unfavorite) else stringResource(R.string.composer_model_favorite), color = Color.White, style = OpenCodeTextStyles.subheadline)
             }
         },
         onDismiss = { value ->

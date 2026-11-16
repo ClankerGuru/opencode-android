@@ -9,15 +9,19 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.channels.awaitClose
 import java.net.URI
 import java.net.URLDecoder
+import java.util.Base64
 import java.util.UUID
 
 /**
- * Port of iOS `SystemAction`: where app shortcuts, Quick Settings tiles, widgets, launcher
- * quick actions, the share sheet's notifications and `opencode://` links take you. Every
- * surface makes one of these, and `AppFeature` routes it like a tapped notification.
+ * Where app shortcuts, Quick Settings tiles, widgets, launcher quick actions, the share sheet's
+ * notifications and `opencode://` links take you. Every surface makes one of these, and
+ * `AppFeature` routes it like a tapped notification.
  */
 data class SystemAction(
-    /** `SessionDirectory.serverKey(...)`; null means the server on screen. */
+    /**
+     * `SessionDirectory.serverKey(...)`, or from a link one of the server's addresses; null means
+     * the server on screen.
+     */
     val serverKey: String? = null,
     val destination: Destination,
     /** Starts a voice call there through the call button's own path. */
@@ -27,7 +31,7 @@ data class SystemAction(
      * background Start Voice Call, which has already shown the call's Live Update).
      */
     val startsInBackground: Boolean = false,
-    /** Which surface made it, for the call trigger log line (iOS `SystemAction.Origin`). */
+    /** Which surface made it, for the call trigger log line. */
     val origin: SystemActionOrigin = SystemActionOrigin.other,
 ) {
     sealed interface Destination {
@@ -43,8 +47,9 @@ data class SystemAction(
 
         /**
          * `opencode://session/<id>?server=<key>`, `opencode://last-session?server=<key>` and
-         * `opencode://new-session?server=<key>&project=<id>`. Links only open: a web page must
-         * never be able to start a call.
+         * `opencode://new-session?server=<key>&project=<id>`, where `<key>` may also be an address.
+         * `opencode://server/<base64url address>[/session/<id>]` is the web app's session route.
+         * Links only open: a web page must never be able to start a call.
          */
         fun fromUrl(url: String): SystemAction? {
             val uri = runCatching { URI(url) }.getOrNull() ?: return null
@@ -65,11 +70,18 @@ data class SystemAction(
                 }
                 "last-session" -> SystemAction(query["server"], Destination.LastViewed)
                 "new-session" -> SystemAction(query["server"], Destination.Draft(query["project"]))
+                "server" -> {
+                    if (path.isEmpty()) return null
+                    val address = runCatching { String(Base64.getUrlDecoder().decode(path[0]), Charsets.UTF_8) }.getOrNull() ?: return null
+                    if (path.size == 1) return SystemAction(address, Destination.LastViewed)
+                    if (path.size != 3 || path[1] != "session" || path[2].isEmpty()) return null
+                    SystemAction(address, Destination.Session(path[2]))
+                }
                 else -> null
             }
         }
 
-        /** Spotlight's identifiers on iOS; here a session shortcut's ID: its session's scoped ID. */
+        /** Spotlight's identifiers; here a session shortcut's ID: its session's scoped ID. */
         fun fromScopedIdentifier(identifier: String): SystemAction? {
             val scoped = ScopedID.parse(identifier) ?: return null
             return SystemAction(scoped.serverKey, Destination.Session(scoped.id))
@@ -82,12 +94,12 @@ data class SystemAction(
 }
 
 /**
- * Port of iOS `SystemActionInbox`: carries actions from shortcuts, tiles, widgets and links
- * (which run in the app's process) to `AppFeature`. Actions posted before anything listens
- * (a shortcut that launched the app) wait for the first listener.
+ * Carries actions from shortcuts, tiles, widgets and links (which run in the app's process) to
+ * `AppFeature`. Actions posted before anything listens (a shortcut that launched the app) wait for
+ * the first listener.
  *
  * Process-wide delivery plumbing, reached only through [SystemIntegrationClient.actions] by
- * reducers; the system entry points post to it directly, as iOS intents do.
+ * reducers; the system entry points post to it directly.
  */
 class SystemActionInbox {
     private class Listener(val id: UUID, val channel: SendChannel<SystemAction>)
@@ -116,7 +128,7 @@ class SystemActionInbox {
             waiting.clear()
             replaced
         }
-        // Finished outside the lock, as iOS does: its termination handler takes the lock.
+        // Finished outside the lock: its termination handler takes the lock.
         replaced?.channel?.close()
         awaitClose {
             synchronized(lock) { if (listener?.id == id) listener = null }

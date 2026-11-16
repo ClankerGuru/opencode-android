@@ -28,12 +28,7 @@ import java.nio.file.Files
 import java.util.Collections
 import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * The media half of iOS `MediaReferenceTests` (the loader's tiers, the retry state and the
- * viewer's page loads). The wire and decoding tests are `:server`'s `MediaReferenceTests`; the
- * mosaic's are the transcript's. Robolectric's native graphics decode the sample PNG as iOS's
- * `UIImage(data:)` does.
- */
+/** Robolectric's native graphics decode the sample PNG. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -191,42 +186,105 @@ class MediaReferenceTests {
         }
         assertNotNull(preview)
 
-        val store = TestStore(TranscriptImageViewerFeature.State(preview!!), TranscriptImageViewerFeature(), this) {
+        val store = TestStore(FullscreenViewerFeature.State(preview!!), FullscreenViewerFeature(), this) {
             this[DecodedImageCache] = decodedCache
             this[MediaReferenceClient] = mediaReferences
         }
 
-        store.send(TranscriptImageViewerFeature.Action.Task)
-        store.receive({ it is TranscriptImageViewerFeature.Action.MediaLoaded }) {
+        store.send(FullscreenViewerFeature.Action.Task)
+        store.receive({ it is FullscreenViewerFeature.Action.MediaLoaded }) {
             it.withPage(0) { page -> page.copy(loadFailed = true) }
         }
 
         val expectedImage = store.withDependencies { CachedImage.decoded("img-1", pngData, hashA) }
         assertNotNull(expectedImage)
 
-        store.send(TranscriptImageViewerFeature.Action.RetryPageTapped("img-1")) {
+        store.send(FullscreenViewerFeature.Action.RetryPageTapped("img-1")) {
             it.withPage(0) { page -> page.copy(loadFailed = false) }
         }
-        store.receive({ it is TranscriptImageViewerFeature.Action.MediaLoaded }) {
+        store.receive({ it is FullscreenViewerFeature.Action.MediaLoaded }) {
             it.withPage(0) { page -> page.copy(image = expectedImage, loadFailed = false) }
         }
         assertTrue(store.state.preview.pages[0].image === expectedImage)
 
-        store.send(TranscriptImageViewerFeature.Action.PageSelected("img-2")) {
+        store.send(FullscreenViewerFeature.Action.PageSelected("img-2")) {
             it.copy(selectedID = "img-2")
         }
-        store.receive({ it is TranscriptImageViewerFeature.Action.MediaLoaded }) {
+        store.receive({ it is FullscreenViewerFeature.Action.MediaLoaded }) {
             it.withPage(1) { page -> page.copy(isUnavailable = true) }
         }
 
         // Saving an unavailable page is a no-op.
-        store.send(TranscriptImageViewerFeature.Action.SaveTapped)
+        store.send(FullscreenViewerFeature.Action.SaveTapped)
         store.finish()
     }
 
-    private fun TranscriptImageViewerFeature.State.withPage(
+    @Test
+    fun coldPagesLoadOnlyOnSelectionAndRemovalStartsTheReplacement() = runTest {
+        val calls = Collections.synchronizedList(mutableListOf<String>())
+        val pixels = Bitmap.createBitmap(3, 2, Bitmap.Config.ARGB_8888)
+        val pages = (1..4).map { n ->
+            val id = "link$n"
+            TranscriptImagePreview.Page(id, image = if (n == 4) pixels else null, label = id,
+                imageSource = SessionVisualImageSource.Link(id))
+        }
+        val state = FullscreenViewerFeature.State(TranscriptImagePreview("link1", pages), allowsRemove = true)
+        val store = TestStore(state, FullscreenViewerFeature(), this) {
+            this[ImageLinkPreviewClient] = ImageLinkPreviewClient(load = { id, _ -> calls.add(id); pixels })
+        }
+        store.send(FullscreenViewerFeature.Action.Task) { it.withPage(3) { p -> p.copy(image = null) } }
+        store.receive(FullscreenViewerFeature.Action.SourceLoaded("link1", pixels)) { it.withPage(0) { p -> p.copy(image = pixels) } }
+        store.send(FullscreenViewerFeature.Action.RemoveTapped) {
+            it.copy(preview = it.preview.copy(pages = it.preview.pages.drop(1)), selectedID = "link2")
+        }
+        store.receive(FullscreenViewerFeature.Action.Delegate(FullscreenViewerFeature.Action.DelegateAction.Removed("link1")))
+        store.receive(FullscreenViewerFeature.Action.SourceLoaded("link2", pixels)) { it.withPage(0) { p -> p.copy(image = pixels) } }
+        store.send(FullscreenViewerFeature.Action.SourceLoaded("link3", pixels)) // stale completion
+        store.finish()
+        assertEquals(listOf("link1", "link2"), calls)
+    }
+
+    @Test
+    fun selectionAndCloseCancelPendingLoadsAndIgnoreLateResults() = runTest {
+        val started = mutableListOf<String>()
+        val cancelled = mutableListOf<String>()
+        val pages = listOf("a", "b").map { TranscriptImagePreview.Page(it, null, it, imageSource = SessionVisualImageSource.Link(it)) }
+        val store = TestStore(FullscreenViewerFeature.State(TranscriptImagePreview("a", pages)), FullscreenViewerFeature(), this) {
+            this[ImageLinkPreviewClient] = ImageLinkPreviewClient(load = { id, _ ->
+                started += id
+                try { kotlinx.coroutines.awaitCancellation() } finally { cancelled += id }
+            })
+        }
+        store.send(FullscreenViewerFeature.Action.Task)
+        testScheduler.runCurrent()
+        store.send(FullscreenViewerFeature.Action.PageSelected("b")) { it.copy(selectedID = "b") }
+        testScheduler.runCurrent()
+        store.send(FullscreenViewerFeature.Action.SourceLoaded("a", null))
+        store.send(FullscreenViewerFeature.Action.CloseTapped) { it.copy(isDismissed = true) }
+        store.send(FullscreenViewerFeature.Action.SourceLoaded("b", null))
+        store.finish()
+        assertEquals(listOf("a", "b"), started)
+        assertEquals(started, cancelled)
+    }
+
+    @Test
+    fun failedOriginalKeepsThumbnailAndDoesNotAutomaticallyRetry() = runTest {
+        val thumbnail = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+        val page = TranscriptImagePreview.Page("photo", thumbnail, "Photo", original = byteArrayOf(0))
+        val state = FullscreenViewerFeature.State(TranscriptImagePreview(page.id, listOf(page)))
+        val store = TestStore(state, FullscreenViewerFeature(), this)
+        store.send(FullscreenViewerFeature.Action.Task)
+        store.receive(FullscreenViewerFeature.Action.SourceLoaded(page.id, null)) {
+            it.withPage(0) { p -> p.copy(loadFailed = true, originalFailed = true) }
+        }
+        assertTrue(store.state.selectedPage?.image === thumbnail)
+        store.send(FullscreenViewerFeature.Action.Task)
+        store.finish()
+    }
+
+    private fun FullscreenViewerFeature.State.withPage(
         index: Int,
         update: (TranscriptImagePreview.Page) -> TranscriptImagePreview.Page,
-    ): TranscriptImageViewerFeature.State =
+    ): FullscreenViewerFeature.State =
         copy(preview = preview.copy(pages = preview.pages.toMutableList().also { it[index] = update(it[index]) }))
 }

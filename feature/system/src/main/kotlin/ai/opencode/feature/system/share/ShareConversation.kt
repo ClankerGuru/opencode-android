@@ -5,11 +5,10 @@ import ai.opencode.feature.system.SessionDirectory
 import java.security.MessageDigest
 
 /**
- * Port of iOS `ShareConversation`: how the system names a session, shared by the app and
- * the share target: the share sheet's direct-share suggestions (sharing shortcuts' IDs),
- * the share sheet's local notifications, and the links that open the app. A session is
- * `<serverKey>:<sessionID>`, where the key is a short hash of the server's persistence ID,
- * so no address ever reaches the system.
+ * How the system names a session, shared by the app and the share target: the share sheet's
+ * direct-share suggestions (sharing shortcuts' IDs), the share sheet's local notifications, and the
+ * links that open the app. A session is `<serverKey>:<sessionID>`, where the key is a short hash of
+ * the server's persistence ID, so no address ever reaches the system.
  */
 object ShareConversation {
     /** `SessionDirectory.serverKey(for:)`: the first 6 bytes of SHA-256, as 12 lowercase hex digits. */

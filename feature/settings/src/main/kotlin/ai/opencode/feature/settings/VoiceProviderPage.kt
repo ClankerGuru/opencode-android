@@ -37,6 +37,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -46,10 +48,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 /*
- * Port of iOS `Settings/VoiceProviderPage.swift` (ce694097): Settings ›
- * Voice's Voice Provider row, its page, and Your OpenAI Account. Tiles and statuses are voice's
- * `VoiceProviderTile`/`VoiceProviderStatus` (iOS `Voice/VoiceProviderViews.swift`), sized by
- * `VoiceProviderTunables`.
+ * Settings › Voice's Voice Provider row, its page, and Your OpenAI Account. Tiles and statuses are
+ * voice's `VoiceProviderTile`/`VoiceProviderStatus`, sized by `VoiceProviderTunables`.
  */
 
 /**
@@ -58,9 +58,10 @@ import androidx.compose.ui.unit.dp
 @Composable
 internal fun VoiceProviderSettingsRow(state: VoiceSettingsFeature.State, onClick: () -> Unit) {
     val active = state.providerCatalog.active
+    val providerTitle = stringResource(R.string.settings_voice_provider_title)
     SettingsRowFrame(
         Modifier.semantics(mergeDescendants = true) {
-            contentDescription = "Voice Provider"
+            contentDescription = providerTitle
             stateDescription = listOfNotNull(active.name, active.state.label).joinToString(", ")
         },
         onClick = onClick,
@@ -72,7 +73,7 @@ internal fun VoiceProviderSettingsRow(state: VoiceSettingsFeature.State, onClick
         ) {
             VoiceProviderTile(active, size = VoiceProviderTunables.rowTile.value)
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text("Voice Provider", style = SettingsText.summary, color = OpenCodeTheme.colors.secondaryText)
+                Text(providerTitle, style = SettingsText.summary, color = OpenCodeTheme.colors.secondaryText)
                 Text(active.name, style = OpenCodeTextStyles.headline, color = OpenCodeTheme.colors.text)
                 VoiceProviderStatus(active.state)
             }
@@ -118,50 +119,54 @@ internal fun VoiceProviderDetailPage(store: SettingsStore, opensAccount: Boolean
         settings(HomeSettingsFeature.Action.VoiceServerChanged(option.choice))
     }
 
-    SettingsPageScaffold(title = "Voice Provider", store = store) {
+    val automaticFooter = stringResource(R.string.settings_voice_provider_automatic_footer, active.placeName)
+    val othersHeader = stringResource(R.string.settings_voice_provider_others_header)
+
+    SettingsPageScaffold(title = stringResource(R.string.settings_voice_provider_title), store = store) {
         item(key = "header") {
             VoiceProviderHeader(
                 option = active,
                 title = active.title,
-                subtitle = if (active.brand == null) null else "On ${active.placeName}",
+                subtitle = if (active.brand == null) null else stringResource(R.string.settings_voice_provider_place, active.placeName),
                 state = active.state,
             )
         }
         if (active.place == VoiceProviderOption.Place.Phone) {
             settingsSection(key = "account") {
-                SettingsRow("API Key", symbol = null, value = state.keyBadgeTitle, onClick = openAccount)
+                SettingsRow(stringResource(R.string.settings_voice_api_key_title), symbol = null, value = state.keyBadgeTitle, onClick = openAccount)
             }
         }
         settingsSection(
             key = "automatic",
-            footer = footerText("When ${active.placeName} isn’t ready, calls use one that is."),
+            footer = footerText(automaticFooter),
         ) {
             SettingsToggleRow(
-                "Choose Automatically",
+                stringResource(R.string.settings_voice_provider_choose_automatically),
                 checked = catalog.isAutomatic,
                 onCheckedChange = { use(if (it) null else active) },
             )
         }
-        settingsSection(key = "others", header = "Other Providers") {
+        settingsSection(key = "others", header = othersHeader) {
             var rows = 0
             catalog.others.forEach { other ->
                 if (rows++ > 0) SettingsDivider()
+                val useDescription = stringResource(R.string.settings_voice_provider_use_description, other.name)
                 VoiceProviderListRow(other, showsStatus = false) {
                     FilledTonalButton(
                         onClick = { use(other) },
                         modifier = Modifier
                             .heightIn(min = 48.dp)
-                            .semantics { contentDescription = "Use ${other.name}" },
+                            .semantics { contentDescription = useDescription },
                         contentPadding = PaddingValues(horizontal = 14.dp),
                         shape = OpenCodeShape.control,
-                    ) { Text("Use", style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold)) }
+                    ) { Text(stringResource(R.string.settings_voice_provider_use), style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold)) }
                 }
             }
             if (active.place != VoiceProviderOption.Place.Phone) {
                 if (rows++ > 0) SettingsDivider()
                 VoiceProviderListRow(catalog.account, showsStatus = catalog.account.isReady, onClick = openAccount) {
                     if (!catalog.account.isReady) {
-                        Text("Set Up", style = SettingsText.title, color = OpenCodeTheme.colors.secondaryText)
+                        Text(stringResource(R.string.settings_voice_provider_set_up), style = SettingsText.title, color = OpenCodeTheme.colors.secondaryText)
                     }
                 }
             }
@@ -169,7 +174,7 @@ internal fun VoiceProviderDetailPage(store: SettingsStore, opensAccount: Boolean
                 if (rows++ > 0) SettingsDivider()
                 SettingsRowFrame(onClick = { showsUnavailable = !showsUnavailable }) {
                     Text(
-                        "${catalog.unavailable.size} Not Available",
+                        pluralStringResource(R.plurals.settings_voice_provider_not_available_count, catalog.unavailable.size, catalog.unavailable.size),
                         modifier = Modifier.weight(1f).padding(start = VoiceProviderTunables.listTile.value.dp + 12.dp),
                         style = SettingsText.title,
                         color = OpenCodeTheme.colors.secondaryText,
@@ -204,24 +209,26 @@ internal fun VoiceProviderAccountPage(store: SettingsStore) {
     // The key, revealed or about to be, out of every screenshot.
     HidesFromScreenshots()
 
-    SettingsPageScaffold(title = "API Key", store = store) {
+    val keyFooter = stringResource(R.string.settings_voice_account_key_footer)
+
+    SettingsPageScaffold(title = stringResource(R.string.settings_voice_api_key_title), store = store) {
         item(key = "header") {
             VoiceProviderHeader(
                 option = null,
-                title = "Your OpenAI Account",
-                subtitle = "On This Phone",
+                title = stringResource(R.string.settings_voice_account_title),
+                subtitle = stringResource(R.string.settings_voice_account_place),
                 state = null,
             )
         }
         settingsSection(
             key = "key",
-            footer = footerText("Calls use your OpenAI account instead of a server."),
+            footer = footerText(keyFooter),
         ) {
             VoiceKeyEditor(state, voice, settings)
         }
         if (state.hasOpenAIKey && !isPicked) {
             settingsSection(key = "use") {
-                SettingsButtonRow("Use for Calls", onClick = {
+                SettingsButtonRow(stringResource(R.string.settings_voice_account_use_for_calls), onClick = {
                     settings(HomeSettingsFeature.Action.VoiceServerChanged(VoiceServerChoice.Phone))
                 })
             }

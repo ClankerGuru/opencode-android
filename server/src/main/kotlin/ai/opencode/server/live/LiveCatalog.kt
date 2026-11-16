@@ -1,7 +1,9 @@
 package ai.opencode.server.live
 
+import ai.opencode.core.strings.localized
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.R
 import ai.opencode.server.internal.list
 import ai.opencode.server.internal.obj
 import ai.opencode.server.internal.req
@@ -32,7 +34,7 @@ import java.text.Collator
 import java.util.Locale
 import kotlin.time.Duration.Companion.seconds
 
-// Composer autocomplete (iOS `OpenCodeClient+Catalog.swift`).
+// Composer autocomplete.
 
 internal suspend fun requestSkills(server: OpenCodeServer, directory: String?): List<OpenCodeAutocompleteSkill> =
     request<DataPayload<List<OpenCodeAutocompleteSkill>>>("/api/skill", query = locationQuery(directory), timeout = 20.seconds, server = server).data
@@ -113,13 +115,17 @@ internal suspend fun requestModelCatalog(server: OpenCodeServer, directory: Stri
     OpenCodeReadCache.shared.modelCatalog(key)?.let { return it }
     // V2 ignores a bare `directory`; one catalog per opened session keeps the location set bounded.
     val query = locationQuery(directory)
-    val payload = request<DataPayload<List<ModelInfoPayload>>>("/api/model", query = query, timeout = LOCATION_BOOT_TIMEOUT, server = server)
-    val models = payload.data.filter { it.enabled && it.status == "active" }.map { it.model }
-    // Older V2 servers do not expose the default-model route; keep the catalog usable there.
-    val defaultPayload = try {
-        request<DataPayload<ModelInfoPayload?>>("/api/model/default", query = query, timeout = LOCATION_BOOT_TIMEOUT, server = server)
-    } catch (_: OpenCodeClientError) { null }
-    val catalog = OpenCodeModelCatalog(models, defaultPayload?.data?.model)
+    val catalog = coroutineScope {
+        // Older V2 servers do not expose the default-model route; keep the catalog usable there.
+        val defaultPayload = async {
+            try {
+                request<DataPayload<ModelInfoPayload?>>("/api/model/default", query = query, timeout = LOCATION_BOOT_TIMEOUT, server = server)
+            } catch (_: OpenCodeClientError) { null }
+        }
+        val payload = request<DataPayload<List<ModelInfoPayload>>>("/api/model", query = query, timeout = LOCATION_BOOT_TIMEOUT, server = server)
+        val models = payload.data.filter { it.enabled && it.status == "active" }.map { it.model }
+        OpenCodeModelCatalog(models, defaultPayload.await()?.data?.model)
+    }
     OpenCodeReadCache.shared.storeModelCatalog(catalog, key)
     return catalog
 }
@@ -131,7 +137,7 @@ internal suspend fun requestSwitchModel(server: OpenCodeServer, sessionID: Strin
     )
 }
 
-// Capabilities (iOS `OpenCodeClient+Capabilities.swift`).
+// Capabilities.
 
 internal fun pathComponent(value: String): String = percentEncodePath(value, keepSlash = false)
 
@@ -143,7 +149,7 @@ internal suspend fun requestStartIntegrationOAuth(server: OpenCodeServer, integr
     val id = pathComponent(integrationID)
     val info = request<DataPayload<IntegrationMethodsPayload>>("/api/integration/$id", timeout = 20.seconds, server = server)
     val methodID = info.data.methods.firstOrNull { it.type == "oauth" }?.id
-        ?: throw OpenCodeClientError("This integration has no sign-in method.")
+        ?: throw OpenCodeClientError(localized(R.string.server_error_integration_no_sign_in))
     val payload = request<DataPayload<OAuthAttemptPayload>>(
         "/api/integration/$id/connect/oauth",
         method = "POST",
@@ -153,7 +159,7 @@ internal suspend fun requestStartIntegrationOAuth(server: OpenCodeServer, integr
         server = server,
     )
     val url = runCatching { URI(payload.data.url) }.getOrNull()
-    if (url == null || (url.scheme != "https" && url.scheme != "http")) throw OpenCodeClientError("The sign-in page address isn’t valid.")
+    if (url == null || (url.scheme != "https" && url.scheme != "http")) throw OpenCodeClientError(localized(R.string.server_error_sign_in_url_invalid))
     return OpenCodeOAuthAttempt(
         attemptID = payload.data.attemptID,
         url = url,
@@ -227,7 +233,7 @@ internal fun standardCollator(): Collator = Collator.getInstance(Locale.getDefau
 internal suspend fun requestServerCapabilities(server: OpenCodeServer): OpenCodeServerCapabilities {
     try {
         return coroutineScope {
-            // Failures are values until awaited in order, as Swift's `async let` tuple awaits them.
+            // Failures are values until awaited in order.
             val mcp = async { capturedRequest<LocatedPayload<List<MCPServerPayload>>>("/api/mcp", timeout = 20.seconds, server = server) }
             val skills = async { capturedRequest<LocatedPayload<List<OpenCodeAutocompleteSkill>>>("/api/skill", timeout = 20.seconds, server = server) }
             val integrations = async { capturedRequest<LocatedPayload<List<IntegrationPayload>>>("/api/integration", timeout = 20.seconds, server = server) }
@@ -248,7 +254,7 @@ internal suspend fun requestServerCapabilities(server: OpenCodeServer): OpenCode
     } catch (error: OpenCodeClientError) {
         throw error
     } catch (error: Exception) {
-        throw OpenCodeClientError(error.message ?: "Couldn’t load server details")
+        throw OpenCodeClientError(error.message ?: localized(R.string.server_error_load_server_details))
     }
 }
 

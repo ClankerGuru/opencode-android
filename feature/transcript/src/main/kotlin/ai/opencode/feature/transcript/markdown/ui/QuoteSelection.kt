@@ -1,5 +1,6 @@
 package ai.opencode.feature.transcript.markdown.ui
 
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.markdown.MarkdownQuote
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import androidx.compose.foundation.layout.Box
@@ -16,15 +17,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.unit.dp
 
-/** TalkBack's whole-block Quote action for the enclosing reply block (iOS `quoteSelectionSource`). */
+/** TalkBack's whole-block Quote action for the enclosing reply block. */
 internal val LocalQuoteAccessibilityAction = compositionLocalOf<CustomAccessibilityAction?> { null }
 
 /**
- * A block whose text can be quoted whole (iOS `QuoteSelectionBlockSource`): TalkBack's Quote
- * action, as iOS keeps VoiceOver's. A selection's Quote is the reply selection's menu.
+ * A block whose text can be quoted whole: TalkBack's Quote action. A selection's Quote is the reply
+ * selection's menu.
  */
 class QuoteSelectionBlockSource private constructor(private val kind: OpenCodeMarkdownBlock.Kind) {
     /** The whole block, for TalkBack's Quote action. */
@@ -64,12 +66,11 @@ class QuoteSelectionBlockSource private constructor(private val kind: OpenCodeMa
 }
 
 /**
- * A block's selectable text (iOS `selectableTranscriptText`). In a reply ([inReply]) the list's
- * reply selection selects across all of the reply's text, Copy and Quote included, so the text
- * here only anchors to it (through `ArrivingText`'s `selectionKey`) and TalkBack gets a Quote
- * action for the whole block, sent as `TranscriptAction.QuoteTextTapped` by the row's
- * [LocalQuoteTextHandler]. Elsewhere (a compaction summary, a file in the viewer) the block is
- * selectable on its own, as iOS's `.textSelection(.enabled)`.
+ * A block's selectable text. In a reply ([inReply]) the list's reply selection selects across all
+ * of the reply's text, Copy and Quote included, so the text here only anchors to it (through
+ * `ArrivingText`'s `selectionKey`) and TalkBack gets a Quote action for the whole block, sent as
+ * `TranscriptAction.QuoteTextTapped` by the row's [LocalQuoteTextHandler]. Elsewhere (a compaction
+ * summary, a file in the viewer) the block is selectable on its own.
  */
 @Composable
 fun QuoteSelectionContainer(
@@ -91,10 +92,10 @@ fun QuoteSelectionContainer(
     val currentHandler by rememberUpdatedState(handler)
     val currentSource by rememberUpdatedState(source)
     // Attached directly to the block's Text semantics (via LocalQuoteAccessibilityAction) rather
-    // than an unmerged wrapper Box, matching iOS `.accessibilityAction(named: Text("Quote"))` and
-    // avoiding a per-paragraph ancestor semantics node during streaming scroll/growth.
+    // than an unmerged wrapper Box.
+    val quoteLabel = stringResource(R.string.transcript_quote)
     val quoteAction = remember {
-        CustomAccessibilityAction("Quote") {
+        CustomAccessibilityAction(quoteLabel) {
             currentSource.fullBlockQuoteText()?.let { currentHandler.quote(it) }
             true
         }
@@ -105,8 +106,7 @@ fun QuoteSelectionContainer(
 }
 
 /**
- * One selection toolbar and one dropdown for every [SelectionContainer] in [content]
- * (Android-only: iOS's text views share the system's edit menu).
+ * One selection toolbar and one dropdown for every [SelectionContainer] in [content].
  *
  * A SelectionContainer with no menu providers above it sets up its own: a toolbar that watches
  * snapshot state, a dropdown host, and a position callback that runs on every frame it moves.

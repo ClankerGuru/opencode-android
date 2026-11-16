@@ -6,6 +6,7 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.appFormattingLocale
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.RowProps
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.TranscriptDisclosureState
@@ -13,7 +14,7 @@ import ai.opencode.feature.transcript.TranscriptEntry
 import ai.opencode.feature.transcript.links.LinkPreviewReplyEnd
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import ai.opencode.feature.transcript.markdown.rememberMarkdownBlocks
-import ai.opencode.feature.transcript.markdown.ui.DisclosedTransition
+import ai.opencode.feature.transcript.markdown.ui.DisclosedContent
 import ai.opencode.feature.transcript.markdown.ui.LocalQuoteTextHandler
 import ai.opencode.feature.transcript.markdown.ui.LocalSessionLinks
 import ai.opencode.feature.transcript.markdown.ui.LocalMarkdownSecondary
@@ -22,7 +23,6 @@ import ai.opencode.feature.transcript.markdown.ui.QuoteTextHandler
 import ai.opencode.feature.transcript.markdown.ui.SessionLinkContext
 import ai.opencode.server.model.OpenCodeCompaction
 import ai.opencode.server.model.OpenCodeTranscriptItem
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +40,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -157,19 +158,22 @@ private fun CompactionView(entry: TranscriptEntry, id: String, info: OpenCodeCom
     val isExpanded = expandable && disclosure.isOpen(TranscriptDisclosureState.Kind.Compactions, id)
     val failed = info.status == OpenCodeCompaction.Status.Failed
     val title = when (info.status) {
-        OpenCodeCompaction.Status.Running -> "Compacting context"
-        OpenCodeCompaction.Status.Completed -> if (info.isProvider) "Provider compaction" else "Context compacted"
-        OpenCodeCompaction.Status.Cancelled -> "Compaction cancelled"
-        OpenCodeCompaction.Status.Failed -> "Compaction failed"
+        OpenCodeCompaction.Status.Running -> stringResource(R.string.transcript_compaction_running)
+        OpenCodeCompaction.Status.Completed -> if (info.isProvider) stringResource(R.string.transcript_compaction_provider) else stringResource(R.string.transcript_compaction_completed)
+        OpenCodeCompaction.Status.Cancelled -> stringResource(R.string.transcript_compaction_cancelled)
+        OpenCodeCompaction.Status.Failed -> stringResource(R.string.transcript_compaction_failed)
     }
     val usage = info.inputTokens?.let { input ->
         info.outputTokens?.let { output ->
             val format = NumberFormat.getIntegerInstance(appFormattingLocale())
-            "${format.format(input)} in · ${format.format(output)} out"
+            stringResource(R.string.transcript_compaction_usage, format.format(input), format.format(output))
         }
     }
     val label = listOfNotNull(title, usage).joinToString(", ")
     val toggle = { disclosure.toggle(TranscriptDisclosureState.Kind.Compactions, id, entry.id) }
+    val expandedLabel = stringResource(R.string.transcript_expanded)
+    val collapsedLabel = stringResource(R.string.transcript_collapsed)
+    val showSummaryLabel = stringResource(R.string.transcript_compaction_show_summary_click_label)
     val rule: @Composable (Modifier) -> Unit = { ruleModifier ->
         TranscriptRule(
             ruleModifier,
@@ -185,36 +189,38 @@ private fun CompactionView(entry: TranscriptEntry, id: String, info: OpenCodeCom
             if (usage != null) Text("· $usage", style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum"))
         }
     }
-    Column(verticalArrangement = Arrangement.spacedBy(TranscriptMetrics.standard)) {
-        if (expandable) {
-            rule(
-                Modifier.rowHitTarget(
-                    top = TranscriptMetrics.sectionHalf,
-                    bottom = TranscriptMetrics.sectionHalf,
-                    target = Modifier
-                        .clickable(role = Role.Button, onClick = toggle)
-                        .clearAndSetSemantics {
-                            contentDescription = label
-                            stateDescription = if (isExpanded) "Expanded" else "Collapsed"
-                            role = Role.Button
-                            onClick("Show the compaction summary") { toggle(); true }
-                        },
-                ),
-            )
-        } else {
-            rule(Modifier.clearAndSetSemantics { contentDescription = label })
-        }
-        if (failed) {
-            info.errorMessage?.let { message ->
-                SelectionContainer {
-                    Text(message, Modifier.fillMaxWidth(), style = OpenCodeTextStyles.footnote, color = colors.danger)
+    Column {
+        Column(verticalArrangement = Arrangement.spacedBy(TranscriptMetrics.standard)) {
+            if (expandable) {
+                rule(
+                    Modifier.rowHitTarget(
+                        top = TranscriptMetrics.sectionHalf,
+                        bottom = TranscriptMetrics.sectionHalf,
+                        target = Modifier
+                            .rowClickable(onClick = toggle)
+                            .clearAndSetSemantics {
+                                contentDescription = label
+                                stateDescription = if (isExpanded) expandedLabel else collapsedLabel
+                                role = Role.Button
+                                onClick(showSummaryLabel) { toggle(); true }
+                            },
+                    ),
+                )
+            } else {
+                rule(Modifier.clearAndSetSemantics { contentDescription = label })
+            }
+            if (failed) {
+                info.errorMessage?.let { message ->
+                    SelectionContainer {
+                        Text(message, Modifier.fillMaxWidth(), style = OpenCodeTextStyles.footnote, color = colors.danger)
+                    }
                 }
             }
         }
-        AnimatedVisibility(isExpanded, enter = DisclosedTransition.enter, exit = DisclosedTransition.exit) {
+        DisclosedContent(isExpanded) {
             val blocks = rememberMarkdownBlocks("$id-summary", info.summary)
             CompositionLocalProvider(LocalContentColor provides colors.secondaryText, LocalMarkdownSecondary provides true) {
-                MarkdownBlocksView(blocks, Modifier.fillMaxWidth().padding(start = 16.dp))
+                MarkdownBlocksView(blocks, Modifier.fillMaxWidth().padding(start = 16.dp, top = TranscriptMetrics.standard))
             }
         }
     }

@@ -5,11 +5,9 @@ import ai.opencode.core.diagnostics.ProblemReportContext
 import ai.opencode.devtools.traces.ProblemReportDestination
 import ai.opencode.feature.drawer.HomeFeature.State
 import ai.opencode.feature.session.isDraft
+import ai.opencode.feature.voice.VoiceFeature
 
-/*
- * Port of iOS `HomeFeature+Traces.swift` (`Diagnostics/Traces/`): where the app is, for a Report a
- * Problem report, and which session the report also goes into.
- */
+/* Where the app is, for a Report a Problem report, and which session the report also goes into. */
 
 /** Where the app is, for a report. Tagged with the session ID and server persistence ID: never server addresses or message text. */
 internal val State.problemReportContext: ProblemReportContext
@@ -28,7 +26,7 @@ internal val State.problemReportContext: ProblemReportContext
         }
         val call = sessionDetail?.voice?.let { voice ->
             val parts = mutableListOf(voice.statusText)
-            if (voice.isReconnecting && voice.statusText != "Reconnecting…") parts += "reconnecting"
+            if (voice.isReconnecting && voice.phase != VoiceFeature.State.Phase.Live) parts += "reconnecting"
             if (voice.pendingWork.isNotEmpty()) parts += if (voice.pendingWork.size == 1) "1 request working" else "${voice.pendingWork.size} requests working"
             if (voice.isMuted) parts += "muted"
             parts.joinToString(" · ")

@@ -10,7 +10,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-/** Port of iOS `VoiceRoutingBaselineTests.swift`. */
 class VoiceRoutingBaselineTests {
     @get:Rule val isolation = TestIsolationRule()
 

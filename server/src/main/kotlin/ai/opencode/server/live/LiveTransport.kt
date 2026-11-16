@@ -4,10 +4,12 @@ import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.log.logSummary
+import ai.opencode.core.strings.localized
 import ai.opencode.server.ConnectionFailureDetail
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.OpenCodeTransport
+import ai.opencode.server.R
 import ai.opencode.server.ServerLinkClient
 import ai.opencode.server.ServerLinkEpoch
 import ai.opencode.server.UrlErrorCode
@@ -60,8 +62,8 @@ internal fun locationQuery(directory: String?): List<Pair<String, String>> =
 /** A route as the log shows it: IDs stay, a pairing code doesn't. */
 /**
  * Advertises `X-OpenCode-Capabilities: experimental-media-uri` (merged into an existing
- * comma-separated list); the server decides whether to answer with media references or inline
- * data. Sent with every request that carries correlation headers, as iOS `applyCapabilities`.
+ * comma-separated list); the server decides whether to answer with media references or inline data.
+ * Sent with every request that carries correlation headers.
  */
 internal fun applyCapabilities(request: Request.Builder): Request.Builder {
     val capability = OpenCodeMediaReference.CAPABILITY
@@ -76,10 +78,7 @@ internal const val CAPABILITIES_HEADER = "X-OpenCode-Capabilities"
 
 internal fun loggablePath(path: String): String = if (path.startsWith("/auth/")) "/auth/…" else path
 
-/**
- * An exception's `URLError` equivalent and type (iOS logs domain and code, then the
- * underlying error's): never its message, which can carry the URL.
- */
+/** An exception's `URLError` equivalent and type: never its message, which can carry the URL. */
 internal fun logDescription(error: Throwable): String {
     if (error is kotlin.coroutines.cancellation.CancellationException) return "cancelled"
     val type = error::class.java.simpleName
@@ -145,9 +144,9 @@ internal fun requestBody(method: String, body: ByteArray?): RequestBody? = when 
 /** The status error copy shared by every route. */
 internal fun statusError(status: Int, retryAfterHeader: String?, locationMissing: Boolean = false): OpenCodeClientError = OpenCodeClientError(
     message = when {
-        status == 401 -> "The server rejected these credentials."
+        status == 401 -> localized(R.string.server_error_credentials_rejected)
         locationMissing -> OpenCodeClientError.FOLDER_GONE_MESSAGE
-        else -> "The server returned HTTP $status."
+        else -> localized(R.string.server_error_http_status, status)
     },
     statusCode = status,
     retryAfter = OpenCodeClientError.retryAfter(retryAfterHeader),
@@ -179,7 +178,7 @@ internal suspend inline fun <reified T> request(
     return decodedAs(response.data)
 }
 
-/** [request] with the failure captured as a value (iOS `capturedRequest`). */
+/** [request] with the failure captured as a value. */
 internal suspend inline fun <reified T> capturedRequest(
     path: String,
     query: List<Pair<String, String>> = emptyList(),
@@ -207,7 +206,7 @@ internal suspend fun perform(
     isConnectionProbe: Boolean = false,
     server: OpenCodeServer,
 ): MeasuredResponse {
-    val url = server.endpoint(path, query) ?: throw OpenCodeClientError("Enter a valid HTTP or HTTPS server URL.")
+    val url = server.endpoint(path, query) ?: throw OpenCodeClientError(localized(R.string.server_error_invalid_url))
     val contact = server.persistenceID
     val idempotency = idempotency ?: RequestIdempotency.forMethod(method)
     // Only a read that can be sent again is cut off when the link changes: not a send or a reply

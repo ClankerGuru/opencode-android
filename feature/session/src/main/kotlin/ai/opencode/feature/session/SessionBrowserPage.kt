@@ -13,15 +13,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import java.util.UUID
 
-// The session's glue for :feature:media's in-app browser (Experimental; iOS `BrowserPage(store:)`
-// over `SessionFeature`, pushed by `HomeView.stackPages` over whichever screen opened it, D-40).
-// The drawer area's stack pushes [sessionBrowserStackPage] and draws [SessionBrowserPage] for it.
+// The session's glue for:feature:media's in-app browser. The drawer area's stack pushes
+// [sessionBrowserStackPage] and draws [SessionBrowserPage] for it.
 
 /**
- * The page pushed over the session: media's [BrowserPage] on the session's scoped `browser` store
- * (iOS `owner.scope(\.browser, action: \.browser)`), its [browserReplyStatus], and the session's
- * [WorkingIndicator] in the reply capsule. System Back steps back through the page's history,
- * dismisses Ask, and from the first page closes it ([browserBackAction]).
+ * The page pushed over the session: media's [BrowserPage] on the session's scoped `browser` store,
+ * its [browserReplyStatus], and the session's [WorkingIndicator] in the reply capsule. System Back
+ * steps back through the page's history, dismisses Ask, and from the first page closes it
+ * ([browserBackAction]).
  */
 @Composable
 fun SessionBrowserPage(store: StoreOf<SessionFeature.State, SessionFeature.Action>, modifier: Modifier = Modifier) {
@@ -40,9 +39,8 @@ fun SessionBrowserPage(store: StoreOf<SessionFeature.State, SessionFeature.Actio
 }
 
 /**
- * The browser's place in the session's stack while a page is open (iOS `stackPages`' `web(over:)`):
- * stable for one visit, never a subagent's identity, and its back swipe yields to the page's own
- * history while it can go back.
+ * The browser's place in the session's stack while a page is open: stable for one visit, never a
+ * subagent's identity, and its back swipe yields to the page's own history while it can go back.
  */
 fun sessionBrowserStackPage(state: SessionFeature.State): SessionStackPage? {
     val pageID = state.browser.pageID ?: return null

@@ -5,6 +5,8 @@ import ai.opencode.core.dependencies.Clock
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.log.AppLog
+import ai.opencode.core.strings.localized
+import ai.opencode.feature.system.R
 import ai.opencode.feature.system.liveactivity.SessionActivityAttributes.ContentState.Phase
 import ai.opencode.server.OpenCodeLiveContentEvent
 import ai.opencode.server.model.OpenCodeToolCall
@@ -22,8 +24,7 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `SessionLiveActivity`: how a run started from this phone reads in its ongoing
- * notification (iOS: the Lock Screen and the Dynamic Island; Session Live Activity, Experimental).
+ * How a run started from this phone reads in its ongoing notification.
  *
  * Home (`:feature:drawer`) owns the tracking; the types above this module reach the mapping as
  * parameters, as the dictation mapping's do: [Run.outcome] is `WorkingRun.Outcome` mapped onto
@@ -32,7 +33,7 @@ import kotlin.time.Duration.Companion.seconds
 object SessionLiveActivity {
     typealias Content = SessionActivityAttributes.ContentState
 
-    /** iOS `WorkingRun.Outcome` (`:feature:session`): how the run's turn ended. */
+    /** How the run's turn ended. */
     enum class Outcome { done, failed, interrupted }
 
     /** What Home tracks for the one run the activity follows: from an accepted send until it settles or another send takes over. */
@@ -95,8 +96,8 @@ object SessionLiveActivity {
         for (event in events.asReversed()) {
             when (event) {
                 is OpenCodeLiveContentEvent.ToolInputStarted -> return OpenCodeToolCall.displayName(event.name)
-                is OpenCodeLiveContentEvent.ReasoningStarted -> return "Thinking"
-                is OpenCodeLiveContentEvent.TextStarted -> return "Replying"
+                is OpenCodeLiveContentEvent.ReasoningStarted -> return localized(R.string.system_session_step_thinking)
+                is OpenCodeLiveContentEvent.TextStarted -> return localized(R.string.system_session_step_replying)
                 else -> continue
             }
         }
@@ -107,8 +108,7 @@ object SessionLiveActivity {
      * The opening prose line of the last turn's last reply text, on one line and short, like a
      * notification preview. Null before that text arrives, or when it has none (only tools or
      * code). Never logged. [proseLines] gives a reply's paragraph, list item, numbered item,
-     * blockquote and heading texts in order (iOS reads them off the parsed blocks; Android's
-     * Markdown model lives in `:feature:transcript`).
+     * blockquote and heading texts in order.
      */
     fun preview(
         items: List<OpenCodeTranscriptItem>,
@@ -132,7 +132,6 @@ object SessionLiveActivity {
     }
 }
 
-/** Port of iOS `SessionLiveActivityClient`. */
 class SessionLiveActivityClient(
     /**
      * Shows `content` in the run's one ongoing notification, starting it if needed; other
@@ -156,13 +155,12 @@ class SessionLiveActivityClient(
 }
 
 /**
- * Port of iOS `LiveSessionActivity`: owns the one run notification. Requests run in order, so an
- * end never overtakes the update before it. While working, a heartbeat moves the stale date
- * (the notification's timeout) so a run the app still follows never reads as stale.
+ * Owns the one run notification. Requests run in order, so an end never overtakes the update before
+ * it. While working, a heartbeat moves the stale date (the notification's timeout) so a run the app
+ * still follows never reads as stale.
  *
  * Android has no background task to hold: the settle window runs on this object's scope, and a
- * settled run's notification is re-posted not ongoing with [SETTLED_LINGER] as its timeout
- * (iOS `end(_:dismissalPolicy: .after)`).
+ * settled run's notification is re-posted not ongoing with [SETTLED_LINGER] as its timeout.
  */
 class LiveSessionActivity internal constructor(private val system: LiveUpdateTracker, private val context: android.content.Context) {
     typealias Content = SessionActivityAttributes.ContentState

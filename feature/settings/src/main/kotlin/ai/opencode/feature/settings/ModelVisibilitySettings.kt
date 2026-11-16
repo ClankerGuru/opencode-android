@@ -1,6 +1,8 @@
 package ai.opencode.feature.settings
 
 import ai.opencode.core.ui.OpenCodeSearchField
+import ai.opencode.core.R as CoreR
+import ai.opencode.core.strings.localized
 import ai.opencode.core.dependencies.Dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
@@ -46,14 +48,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 /**
- * Port of iOS `Settings/ModelVisibilitySettings.swift`: Settings › Models (Hide Unused Models,
- * OC-510), which of this server's models the Today and Sheet pickers list, kept on this phone
- * per server (`ModelVisibility.modelVisibilityByServer`).
+ * Settings › Models (Hide Unused Models), which of this server's models the Today and Sheet
+ * pickers list, kept on this phone per server (`ModelVisibility.modelVisibilityByServer`).
  */
 class ModelVisibilityFeature : Reducer<ModelVisibilityFeature.State, ModelVisibilityFeature.Action> {
     data class State(
@@ -86,9 +88,9 @@ class ModelVisibilityFeature : Reducer<ModelVisibilityFeature.State, ModelVisibi
 
         /** “4 of 12”, or “Hidden” for a hidden provider. */
         fun summary(provider: Provider, visibility: ModelVisibility = this.visibility): String {
-            if (provider.id in visibility.hiddenProviderIDs) return "Hidden"
+            if (provider.id in visibility.hiddenProviderIDs) return localized(R.string.settings_models_summary_hidden)
             val shown = visibility.visible(models, null).count { it.providerID == provider.id }
-            return if (shown == provider.models.size) "All" else "$shown of ${provider.models.size}"
+            return if (shown == provider.models.size) localized(R.string.settings_models_summary_all) else localized(R.string.settings_models_summary_count, shown, provider.models.size)
         }
     }
 
@@ -185,7 +187,7 @@ private fun rememberModelsStore(store: SettingsStore, server: OpenCodeServer?): 
 
 private val placeholderServer = OpenCodeServer(url = "", username = "", password = "")
 
-/** Settings › Models (iOS `ModelVisibilitySettingsView`). */
+/** Settings › Models. */
 @Composable
 fun ModelVisibilitySettingsView(store: SettingsStore) {
     val models = rememberModelsStore(store, null)
@@ -193,23 +195,27 @@ fun ModelVisibilitySettingsView(store: SettingsStore) {
     val byServer by remember { shared(ModelVisibility.modelVisibilityByServer).flow }.collectAsState()
     val visibility = state.visibility(byServer)
     LaunchedEffect(models) { models.send(ModelVisibilityFeature.Action.Task) }
+    val hideTitle = stringResource(R.string.settings_models_mode_hide)
+    val onlyShowTitle = stringResource(R.string.settings_models_mode_only_show)
+    val providersHeader = stringResource(R.string.settings_models_providers_header)
+    val staleHeader = stringResource(R.string.settings_models_stale_header)
 
     Box(Modifier.fillMaxSize()) {
-        SettingsPageScaffold(title = "Models", store = store) {
+        SettingsPageScaffold(title = stringResource(R.string.settings_models_title), store = store) {
             item(key = "mode") {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                     SettingsSegmentedControl(
                         options = listOf(ModelVisibility.Mode.hide, ModelVisibility.Mode.onlyShow),
                         selected = visibility.mode,
-                        title = { if (it == ModelVisibility.Mode.hide) "Hide" else "Only Show" },
+                        title = { if (it == ModelVisibility.Mode.hide) hideTitle else onlyShowTitle },
                         onSelect = { models.send(ModelVisibilityFeature.Action.ModeChanged(it)) },
                         modifier = Modifier.testTag("model-visibility-mode"),
                     )
                     SettingsFooterText(
                         if (visibility.mode == ModelVisibility.Mode.hide) {
-                            "Turn off the models you don’t use."
+                            stringResource(R.string.settings_models_mode_hide_footer)
                         } else {
-                            "Turn on just the models you use."
+                            stringResource(R.string.settings_models_mode_only_show_footer)
                         },
                         Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
                     )
@@ -217,7 +223,7 @@ fun ModelVisibilitySettingsView(store: SettingsStore) {
             }
             val providers = state.providers
             if (providers.isNotEmpty()) {
-                settingsSection(key = "providers", header = "Providers") {
+                settingsSection(key = "providers", header = providersHeader) {
                     providers.forEachIndexed { index, provider ->
                         if (index > 0) SettingsDivider(inset = true)
                         SettingsRowFrame(Modifier.testTag("model-visibility-provider-${provider.id}"), onClick = {
@@ -234,7 +240,7 @@ fun ModelVisibilitySettingsView(store: SettingsStore) {
             if (!stale.isEmpty) {
                 settingsSection(
                     key = "stale",
-                    header = "No Longer Offered",
+                    header = staleHeader,
                 ) {
                     stale.all.forEach { id ->
                         SettingsRowFrame {
@@ -243,7 +249,7 @@ fun ModelVisibilitySettingsView(store: SettingsStore) {
                         SettingsDivider()
                     }
                     SettingsButtonRow(
-                        "Forget Unavailable Models",
+                        stringResource(R.string.settings_models_forget_unavailable),
                         onClick = { models.send(ModelVisibilityFeature.Action.ForgetUnavailableTapped) },
                         modifier = Modifier.testTag("model-visibility-forget-unavailable"),
                     )
@@ -252,7 +258,7 @@ fun ModelVisibilitySettingsView(store: SettingsStore) {
             if (state.server.persistenceID in byServer) {
                 settingsSection(key = "reset") {
                     SettingsButtonRow(
-                        "Show Every Model",
+                        stringResource(R.string.settings_models_show_every_model),
                         onClick = { models.send(ModelVisibilityFeature.Action.ResetTapped) },
                         modifier = Modifier.testTag("model-visibility-reset"),
                     )
@@ -268,17 +274,17 @@ fun ModelVisibilitySettingsView(store: SettingsStore) {
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 OpenCodeIcon(SFSymbol.ExclamationmarkTriangle, contentDescription = null, size = OpenCodeIconSize.hero, tint = OpenCodeTheme.colors.secondaryText)
-                Text("Couldn’t Load Models", style = OpenCodeTextStyles.title3, color = OpenCodeTheme.colors.text)
+                Text(stringResource(R.string.settings_models_load_failed_title), style = OpenCodeTextStyles.title3, color = OpenCodeTheme.colors.text)
                 Text(state.loadError.orEmpty(), style = OpenCodeTextStyles.subheadline, color = OpenCodeTheme.colors.secondaryText, textAlign = TextAlign.Center)
-                OpenCodePrimaryButton(onClick = { models.send(ModelVisibilityFeature.Action.Task) }) { Text("Try Again") }
+                OpenCodePrimaryButton(onClick = { models.send(ModelVisibilityFeature.Action.Task) }) { Text(stringResource(CoreR.string.common_try_again)) }
             }
         }
     }
 }
 
 /**
- * One provider's page (iOS `ModelVisibilityProviderView`): hide the whole provider, or switch its
- * models. Search ranks with `ModelSearch`, as both model pickers do.
+ * One provider's page: hide the whole provider, or switch its models. Search ranks with
+ * `ModelSearch`, as both model pickers do.
  */
 @Composable
 fun ModelVisibilityProviderView(store: SettingsStore, providerID: String) {
@@ -297,14 +303,14 @@ fun ModelVisibilityProviderView(store: SettingsStore, providerID: String) {
             OpenCodeSearchField(
                 value = filter,
                 onValueChange = { filter = it },
-                placeholder = "Search Models",
+                placeholder = stringResource(R.string.settings_models_search_placeholder),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
             )
         }
         if (filter.isEmpty()) {
             settingsSection(key = "provider") {
                 SettingsToggleRow(
-                    "Show $providerTitle",
+                    stringResource(R.string.settings_models_show_provider, providerTitle),
                     checked = providerShown,
                     onCheckedChange = { models.send(ModelVisibilityFeature.Action.ProviderToggled(providerID, it)) },
                     modifier = Modifier.testTag("model-visibility-provider-toggle"),

@@ -21,10 +21,9 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * How far the drawer's list has scrolled beneath its title, clamped to the header edge fade
- * range (iOS `DrawerHeaderScrollState`). Only [DrawerHeaderBackdrop] reads it, in its draw
- * phase, so scrolling the list never recomposes the drawer or its rows. A plain state holder:
- * the list's scroll observer calls [update].
+ * How far the drawer's list has scrolled beneath its title, clamped to the header edge fade range.
+ * Only [DrawerHeaderBackdrop] reads it, in its draw phase, so scrolling the list never recomposes
+ * the drawer or its rows. A plain state holder: the list's scroll observer calls [update].
  */
 @Stable
 class DrawerHeaderScrollState {
@@ -45,22 +44,15 @@ class DrawerHeaderScrollState {
 }
 
 /**
- * Android has no backdrop blur behind the drawer's edges, and iOS's 70% wash only reads because
- * its blur already hides what scrolls beneath. Without the blur the wash runs solid over the
- * header and the controls, then fades out over the same distance as on iOS, so a row passing
- * under the title or between New Session and Settings never shows through.
+ * Without a backdrop blur, the wash runs solid over the header and the controls, then fades out
+ * over the same distance, so a row passing beneath never shows through.
  */
 private const val NoBlurWashOpacity: Float = 1f
 
 /**
- * Behind the drawer's title and search, which rows scroll on beneath (iOS
- * `DrawerHeaderBackdrop`): a wash of the drawer's colour, solid through the status bar,
- * that eases out a little below the header ([DrawerTunables.fade]) and keeps the title
- * readable. iOS adds a progressive blur under the wash; Android draws no blur (Material
- * surfaces, no glass imitation), so the wash alone carries the edge. [opaque] (high
- * contrast, iOS Reduce Transparency) draws the header band in the drawer's colour. Size it
- * to the header; it draws [DrawerTunables.fade] past its bottom. Never takes touches or
- * reaches TalkBack.
+ * Behind the drawer's title and search: a wash of the drawer's colour, solid through the status
+ * bar, that eases out [DrawerTunables.fade] below the header. [opaque] (high contrast) draws the
+ * header band solid. Never takes touches or reaches TalkBack.
  *
  * @param safeTop the status bar's height: the wash is solid there.
  * @param revealed 0…1, how far rows have scrolled beneath the title; [scrollState] wins when set.
@@ -134,13 +126,12 @@ object DrawerHeaderBackdrop {
 }
 
 /**
- * Behind New Session and Settings at the drawer's bottom (iOS `DrawerFooterBackdrop`): rows
- * run on behind the upper [reach] of the buttons, then fade into the drawer's colour all the
- * way through the bottom inset to the screen's bottom edge, so no row below the buttons or
- * behind their lower edge stays legible under them. As with the header, Android draws the
- * wash without iOS's blur. [opaque] (high contrast, the Hard edge) draws the band opaque.
- * Size it from the buttons' top edge to the screen's bottom; it draws
- * [DrawerTunables.bottomFade] above its bar. Never takes touches or reaches TalkBack.
+ * Behind New Session and Settings at the drawer's bottom: rows run on behind the upper [reach] of
+ * the buttons, then fade into the drawer's colour all the way through the bottom inset to the
+ * screen's bottom edge, so no row below the buttons or behind their lower edge stays legible under
+ * them. As with the header. [opaque] (high contrast, the Hard edge) draws the band opaque. Size it
+ * from the buttons' top edge to the screen's bottom; it draws [DrawerTunables.bottomFade] above its
+ * bar. Never takes touches or reaches TalkBack.
  *
  * @param reach how far down from the buttons' top edge the bar starts (`drawerControlsReach`).
  * @param insetBottom the navigation bar inset at the very bottom of the screen.
@@ -224,9 +215,9 @@ object DrawerFooterBackdrop {
 }
 
 /**
- * iOS `DrawerEdgeBlur`'s strength profile: full strength over the outer [fadeStart] fraction
- * of the edge, easing to nothing at its inner end. Android draws no variable blur (see
- * [DrawerHeaderBackdrop]); the profile stays for parity and for any future edge effect.
+ * Full strength over the outer [fadeStart] fraction of the edge, easing to nothing at its inner
+ * end. Android draws no variable blur (see [DrawerHeaderBackdrop]); the profile stays for parity
+ * and for any future edge effect.
  */
 object DrawerEdgeBlur {
     enum class Edge { Top, Bottom }
@@ -243,7 +234,7 @@ object DrawerEdgeBlur {
     }
 }
 
-/** An edge's falloff (iOS `DrawerEdgeCurve`). */
+/** An edge's falloff. */
 enum class DrawerEdgeCurve {
     Smoothstep, Linear;
 

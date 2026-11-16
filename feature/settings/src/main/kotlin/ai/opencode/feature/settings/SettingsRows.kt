@@ -33,6 +33,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -52,6 +54,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -63,14 +66,13 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 
 /**
- * Port of iOS `Settings/SettingsRows.swift` plus the inset-grouped `List`/`Section` chrome every
- * Settings page uses, as Material surfaces: a page is a `LazyColumn` of [settingsSection]s, each a
- * rounded card on the grouped canvas with an optional header and footer.
+ * A page is a `LazyColumn` of [settingsSection]s, each a rounded card on the grouped canvas with an
+ * optional header and footer.
  *
- * Android divergence: the rows look like a Material 3 Expressive segmented list, as Android's own
- * Settings does. Rows are parted by small gaps instead of hairlines, icons are plain Material
- * icons instead of tinted tiles, a row's value sits under its title, navigation rows have no
- * chevron, section headers are in the accent colour, and text uses Material's list sizes.
+ * The rows look like a Material 3 Expressive segmented list, as Android's own Settings does. Rows
+ * are parted by small gaps instead of hairlines, icons are plain Material icons instead of tinted
+ * tiles, a row's value sits under its title, navigation rows have no chevron, section headers are
+ * in the accent colour, and text uses Material's list sizes.
  */
 
 /** Settings' type: the app's desktop-derived scale (this branch), not Material's default Roboto list sizes. */
@@ -87,7 +89,7 @@ object SettingsText {
     )
 }
 
-/** iOS system tints for [SettingsIcon] tiles (`Color.purple`, `.blue`, …), light and dark. */
+/** System tints for [SettingsIcon] tiles, light and dark. */
 enum class SettingsTint(private val light: Long, private val dark: Long) {
     Red(0xFFFF3B30, 0xFFFF453A),
     Orange(0xFFFF9500, 0xFFFF9F0A),
@@ -111,9 +113,8 @@ enum class SettingsTint(private val light: Long, private val dark: Long) {
 }
 
 /**
- * The icon in front of a settings row. iOS draws a white symbol on a tinted rounded tile; Android
- * draws a plain 24 dp Material icon in the secondary colour, as Material lists do. [tint] is
- * kept so the call sites stay as on iOS, but it isn't drawn.
+ * The icon in front of a settings row. Android draws a plain 24 dp Material icon in the secondary
+ * colour, as Material lists do. [tint] is kept so the call sites stay, but it isn't drawn.
  */
 @Composable
 fun SettingsIcon(symbol: String, tint: SettingsTint, modifier: Modifier = Modifier) {
@@ -135,14 +136,11 @@ val SettingsIconSize = 24.dp
 fun SettingsIcon(symbol: SFSymbol, tint: SettingsTint, modifier: Modifier = Modifier) =
     SettingsIcon(symbol.sfName, tint, modifier)
 
-/**
- * iOS `dynamicTypeSize.isAccessibilitySize`: the accessibility text sizes start at AX1, whose body
- * is 28 pt against the default 17 pt.
- */
+/** The accessibility text sizes start at AX1, whose body is 28 pt against the default 17 pt. */
 @Composable
 internal fun isAccessibilitySize(): Boolean = LocalDensity.current.fontScale >= 28f / 17f
 
-/** Minimum row height (iOS 44 pt list rows; Material's one-line list item is 56 dp). */
+/** Minimum row height. */
 val SettingsRowMinHeight = 56.dp
 
 /**
@@ -274,10 +272,9 @@ fun SettingsRowText(title: String, summary: String?, modifier: Modifier = Modifi
 }
 
 /**
- * iOS `SettingsRow`: a symbol, the title, and a quiet value; with [onClick] it is a navigation
- * row (iOS `NavigationLink`). Android divergence: the value is the summary under the title, and
- * there's no chevron (Material lists don't mark navigation rows); [showsChevron] is kept so the
- * call sites stay as on iOS.
+ * A symbol, the title, and a quiet value; with [onClick] it is a navigation row. The value is the
+ * summary under the title, and there's no chevron (Material lists don't mark navigation rows);
+ * [showsChevron] is kept so the call sites stay.
  */
 @Composable
 fun SettingsRow(
@@ -323,7 +320,7 @@ fun SettingsChoiceRow(title: String, value: String, modifier: Modifier = Modifie
     }
 }
 
-/** iOS `LabeledContent(title, value:)`: a non-interactive title/value row; on Android the value is the summary. */
+/** A non-interactive title/value row; on Android the value is the summary. */
 @Composable
 fun SettingsValueRow(title: String, value: String, modifier: Modifier = Modifier) {
     SettingsRowFrame(modifier.semantics(mergeDescendants = true) {}) {
@@ -332,9 +329,8 @@ fun SettingsValueRow(title: String, value: String, modifier: Modifier = Modifier
 }
 
 /**
- * iOS `Toggle` in a Settings list, optionally with a [SettingsIcon] (the Experimental rows). The
- * whole row toggles. The switch shows a check while on, as Android's
- * Settings switches do.
+ * A `Toggle` row in a Settings list, optionally with a [SettingsIcon] (the Experimental rows). The
+ * whole row toggles. The switch shows a check while on, as Android's Settings switches do.
  */
 @Composable
 fun SettingsToggleRow(
@@ -346,11 +342,12 @@ fun SettingsToggleRow(
     tint: SettingsTint = SettingsTint.Gray,
     enabled: Boolean = true,
 ) {
+    val stateText = if (checked) stringResource(R.string.settings_value_on) else stringResource(R.string.settings_value_off)
     SettingsRowFrame(
         modifier
             .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange)
             // Spelled out so the change is sent as a state description, which TalkBack speaks on the focused row.
-            .semantics { stateDescription = if (checked) "On" else "Off" },
+            .semantics { stateDescription = stateText },
         onClick = null,
     ) {
         if (symbol != null) SettingsIcon(symbol, tint)
@@ -359,7 +356,7 @@ fun SettingsToggleRow(
     }
 }
 
-/** A plain button row (iOS `Button` in a List): accent text, or red for destructive. */
+/** A plain button row: accent text, or red for destructive. */
 @Composable
 fun SettingsButtonRow(
     title: String,
@@ -384,12 +381,10 @@ fun SettingsButtonRow(
 data class SettingsMenuOption<T>(val value: T, val title: String, val caption: String? = null)
 
 /**
- * iOS `SettingsMenuRow`: a choice in a Settings list: the title, then the value at the row's end
- * in the secondary colour. iOS ends it with an
- * up-and-down chevron; Android uses the desktop select's thin chevron-down. The whole row opens
- * the menu (a Material dropdown with checkmarks).
- * [sections] groups options under headers (Voice › Model's provider groups); a single unnamed
- * section is a flat list.
+ * A choice in a Settings list: the title, then the value at the row's end in the secondary colour.
+ * Android uses the desktop select's thin chevron-down. The whole row opens the menu (a Material
+ * dropdown with checkmarks). [sections] groups options under headers (Voice › Model's provider
+ * groups); a single unnamed section is a flat list.
  */
 @Composable
 fun <T> SettingsMenuRow(
@@ -451,7 +446,10 @@ fun <T> SettingsMenuRow(
     }
 }
 
-/** A choice row's title, then its value at the end; at accessibility sizes the value goes under the title, as iOS. */
+/**
+ * A choice row's title, then its value at the end; at accessibility sizes the value goes under the
+ * title.
+ */
 @Composable
 private fun RowScope.SettingsTitleAndValue(title: String, value: String) {
     if (isAccessibilitySize()) {
@@ -492,10 +490,9 @@ fun SettingsDropdownChevron() {
 }
 
 /**
- * The menu a [SettingsMenuRow] opens, hanging from the row's trailing edge where its value sits,
- * as iOS shows a Settings picker's menu. Material's dropdown prefers its anchor's leading edge, so
- * it's placed under the opposite layout direction (which prefers the trailing one) while its
- * options keep the row's own.
+ * The menu a [SettingsMenuRow] opens, hanging from the row's trailing edge where its value sits.
+ * Material's dropdown prefers its anchor's leading edge, so it's placed under the opposite layout
+ * direction (which prefers the trailing one) while its options keep the row's own.
  */
 @Composable
 private fun TrailingDropdownMenu(expanded: Boolean, onDismissRequest: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
@@ -590,13 +587,15 @@ fun <T> SettingsSegmentedControl(
                             .background(fill, shape)
                             .border(SegmentEdge, edge, shape),
                     )
-                    Text(
+                    val labelStyle = MaterialTheme.typography.labelLarge
+                    BasicText(
                         title(option),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = text,
+                        style = labelStyle.copy(color = text),
                         maxLines = 1,
+                        softWrap = false,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(horizontal = 12.dp),
+                        autoSize = TextAutoSize.StepBased(minFontSize = labelStyle.fontSize * 0.8f, maxFontSize = labelStyle.fontSize),
+                        modifier = Modifier.padding(horizontal = 8.dp),
                     )
                 }
             }

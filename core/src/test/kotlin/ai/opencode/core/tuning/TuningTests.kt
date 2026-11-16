@@ -22,44 +22,13 @@ import kotlin.math.roundToLong
 import kotlin.random.Random
 
 /*
- * Port of iOS `OpenCodeTests/TuningTests.swift`: the TuningStore, Tunable, TuningContext and
- * AnimationTimeScale tests. iOS `TuningStore(defaults:)` → `TuningStore(TuningPersistence?)`
- * ([MemoryPersistence] stands in for a `UserDefaults` suite); `withObservationTracking` →
- * Compose snapshot read/apply observers ([changes]); `store.events()` → the `events` SharedFlow;
- * Copy as Swift → [TuningStore.kotlinSnippet]; iOS `CGFloat` points → [Dp].
+ * The TuningStore, Tunable, TuningContext and AnimationTimeScale tests. `withObservationTracking` →
+ * Compose snapshot read/apply observers ([changes]); `store.events()` → the `events` SharedFlow.
  *
- * Belong elsewhere (not ported here):
- * - `TuningStoreTests.composerRowRevealTunablesRegisterInComposerGroup`,
- *   `plusMenuAndModelPickerReconcileSharedComposerMorphTunables` → `:feature:composer`
- *   (`ComposerTunables`, `ComposerMorphTunables`, `ModelPickerTunables`).
- * - `TuningStoreTests.drawerMotionTunablesDefaultToNativeLiterals`, all of `DrawerSpacingTests`
- *   → `:feature:drawer` (`DrawerTunables`, `DrawerDepth`, `DrawerDim`, drawer presets).
- * - `TuningPanelGroupTests.drawerAndComposerNamespacesRegisterAllExpectedKeys`,
- *   `composerAndTranscriptPresetsRoundTripAndKeepShippedDefaults` → `:feature:drawer`,
- *   `:feature:composer`, `:feature:transcript` (their tunables).
- * - `:devtools` (Android's developer tools are native, not a port of iOS `Tuning/`):
- *   - `TuningWireTests` (7) and `TuningFeatureTests` (12): the Mac tuning link (`TuningLink`,
- *     `TuningServerMessage`/`TuningPhoneMessage`, remote client, outbox). `:devtools` has no
- *     equivalent (no Mac remote on Android).
- *   - `TuningSummonTests.theGestureShowsThePanelThenHidesIt`: `TuningFeature.summoned`;
- *     `:devtools` has a `TuningFeature` equivalent.
- *   - `TuningSummonTests.theRecognizersNeverGetInTheWay`: UIKit gesture recognizers; `:devtools`
- *     has Android-native `TuningGestures` instead.
- *   - `TuningPanelGroupTests.aScreenListsOnlyItsOwnGroups`, `allListsEveryGroupThisScreensFirst`,
- *     `settledGroupsLeaveThePanel`, the `TuningPanelGroups.shown` half of
- *     `contextsAreDeclaredAnywhere` and the `TuningPanel.sections` half of
- *     `titlesAndSectionsReadAsWords`: `:devtools` has `TuningPanelGroups` and `sections`.
- *   - `TuningPlacementTests` (7): `:devtools` has a `TuningPlacement` equivalent.
- *   - `AnimationTimeScaleTests.remotePlaygroundCommandsAndJumpsWireRoundTrip`: Mac remote and
- *     `PlaygroundCommandCenter`; no `:devtools` equivalent.
- *   - `opencodeLabSetTimeScale` in `labTimeScaleParsesArgumentsAndScalesVirtualWallDurations`:
- *     Android applies the lab scale from the launch intent in `:devtools` `DevTools`.
- * - `MotionXRayTests` (2): Motion X-Ray is not ported to Android (no `:devtools` equivalent).
- *
- * Deleted (iOS-only): the `CALayer.speed`/`convertTime` assertions and `referenceNow`
- * (`Date` clock) of the AnimationTimeScale tests (Android has one monotonic clock and no layer
- * speed; per-frame `sample` is [AnimationTimeScale.scaledDelta]), and `InternalBuild.isDebug`
- * being true (a JVM unit test has no debuggable app context, so it's not a debug build).
+ * Deleted: the `CALayer.speed`/`convertTime` assertions and `referenceNow` (`Date` clock) of the
+ * AnimationTimeScale tests (Android has one monotonic clock and no layer speed; per-frame `sample`
+ * is [AnimationTimeScale.scaledDelta]), and `InternalBuild.isDebug` being true (a JVM unit test has
+ * no debuggable app context, so it's not a debug build).
  */
 
 private enum class EdgeStyle(override val rawValue: String) : TunableChoice {
@@ -89,8 +58,8 @@ private class MemoryPersistence : TuningPersistence {
 }
 
 /**
- * iOS `withObservationTracking { read() } onChange: { … }`: how many times [mutate] changed state
- * that [read] observed (Compose snapshot reads, as a composable would).
+ * How many times [mutate] changed state that [read] observed (Compose snapshot reads, as a
+ * composable would).
  */
 private fun changes(read: () -> Unit, mutate: () -> Unit): Int {
     val observed = HashSet<Any>()
@@ -255,7 +224,7 @@ class TuningStoreTests {
         )
     }
 
-    /** iOS `copyAsSwiftWritesTheTunedDeclarations`: Android copies Kotlin declarations. */
+    /** Android copies Kotlin declarations. */
     @Test
     fun copyAsSwiftWritesTheTunedDeclarations() {
         val store = TuningStore(null)
@@ -448,7 +417,7 @@ class TuningSummonTests {
 
     /**
      * Under the release gate (here: a JVM test, which isn't a debug build) Developer Mode alone
-     * opens tuning. iOS's `InternalBuild.isDebug` assertion is deleted (see the file comment).
+     * opens tuning.
      */
     @Test
     fun onlyDebugBuildsOrDeveloperModeGetTuning() {

@@ -6,11 +6,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * `:server`'s part of iOS `ModelVisibilityTests` (the "Rules" section: `ModelVisibility` itself).
- * The "Pickers" and Settings › Models tests drive `SessionFeature` and
- * `ModelVisibilitySettingsFeature`, so they belong to `:feature:session` / `:feature:settings`.
- */
 class ModelVisibilityTests {
     @get:Rule val isolation = TestIsolationRule()
 

@@ -13,16 +13,12 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * The `:feature:transcript` tests of iOS `OpenCodeTests/VoiceHandoffParseTests.swift`
- * ([TranscriptUserMessage], [VoiceMessageIndicator]); the parsing and formatting tests are
- * `:feature:voice`'s. Two of those also check a [TranscriptUserMessage]; those halves are here
+ * Two of those also check a [TranscriptUserMessage]; those halves are here
  * (`aContinuedDelegationIsShortAndStillAVoiceMessage`,
- * `parseToleratesTrailingAttachedFileReferencesAndDetectsCallLogAttachment`). This module can't
- * see `:feature:voice`'s `VoiceHandoff.format`, so [format] writes the same header line and JSON
- * body (which `:feature:voice`'s port checks).
+ * `parseToleratesTrailingAttachedFileReferencesAndDetectsCallLogAttachment`).
  */
 class VoiceHandoffParseTests {
-    /** iOS `VoiceHandoff.format`: the header line, then the sorted JSON fields. */
+    /** The header line, then the sorted JSON fields. */
     private fun format(
         instruction: String,
         transcriptDelta: List<String>,

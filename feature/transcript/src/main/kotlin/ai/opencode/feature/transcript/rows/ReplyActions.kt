@@ -1,11 +1,13 @@
 package ai.opencode.feature.transcript.rows
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.feature.media.TranscriptMetrics
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import ai.opencode.feature.transcript.user.TranscriptDragPayload
 import ai.opencode.feature.transcript.user.transcriptDragSource
@@ -25,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -92,7 +95,7 @@ fun ReplyActions(texts: List<String>, modifier: Modifier = Modifier, onCopy: (St
     }
     // Dragging the glyph carries the reply as Markdown (iOS `.markdownBlocks(blocks)`).
     val dragPayload = remember(texts) { TranscriptDragPayload.MarkdownBlocks(texts.flatMap { OpenCodeMarkdownBlock.blocks(it) }) }
-    val label = if (copied) "Copied" else "Copy reply"
+    val label = if (copied) stringResource(CoreR.string.common_copied) else stringResource(R.string.transcript_reply_copy_description)
     // Its slot already starts 15 dp out from the text, 1 dp from the screen's edge; the target goes no further.
     ReplyCopyGlyph.Glyph(
         copied = copied,
@@ -104,7 +107,7 @@ fun ReplyActions(texts: List<String>, modifier: Modifier = Modifier, onCopy: (St
                 leading = 0.dp,
                 target = Modifier
                     .transcriptDragSource(dragPayload, cornerRadius = 8.dp)
-                    .clickable(role = Role.Button, onClick = copy)
+                    .rowClickable(onClick = copy)
                     .clearAndSetSemantics {
                         contentDescription = label
                         role = Role.Button

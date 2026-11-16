@@ -64,8 +64,7 @@ private suspend inline fun <reified E : Throwable> assertThrowsSuspending(body: 
 
 /**
  * Runs an engine test on real threads with test dependencies installed. The engine's own clock
- * settles its short teardown waits at once and never wakes its 3 s backstop or 5 s quality
- * window (iOS's engine sleeps on the continuous clock).
+ * settles its short teardown waits at once and never wakes its 3 s backstop or 5 s quality window.
  */
 private fun engineTest(body: suspend CoroutineScope.() -> Unit): Unit = runBlocking {
     val values = DependencyValues.testing().update {
@@ -82,7 +81,7 @@ private object SettleClock : Clock {
     }
 }
 
-/** iOS `VoiceAudioEngine(atEar:demo:session:owner:note:)`, with an external hardware owner. */
+/** With an external hardware owner. */
 private fun engine(
     session: FakeVoiceAudioSession,
     owner: AudioSessionOwner,
@@ -94,10 +93,8 @@ private fun engine(
     externalControl = FakeExternalAudioControl(session), lab = null,
 )
 
-/** iOS `AVAudioSession.Port.bluetoothHFP`. */
 private val bluetoothHFP = listOf(android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO)
 
-/** Port of iOS `VoiceAudioAndTranscriptTests.swift`. */
 class VoiceAudioEngineGuardTests {
     @Test fun raisedExceptionBecomesAnError() {
         DependencyValues.withValues(DependencyValues.testing()) {
@@ -154,7 +151,6 @@ class VoiceAudioPrestartTests {
 
         fun prestart(gate: Channel<Unit>? = null) = VoiceAudioPrestart(executor.asCoroutineDispatcher()) { atEar ->
             synchronized(begins) { begins += atEar }
-            // iOS `for await _ in gate { break }` ends on cancellation and carries on.
             if (gate != null) try { gate.receive() } catch (_: CancellationException) {}
             session()
         }
@@ -201,8 +197,7 @@ class VoiceAudioPrestartTests {
         prestart.discard(failed)
         assertTrue("A start no call adopted is stopped", pollUntil { fake.stops.get() == 2 })
 
-        // Discarded before it began: no engine starts at all. (iOS discards before its task is
-        // scheduled; here the start is held queued behind other work until the discard.)
+        // Discarded before it began: no engine starts at all.
         val begins = fake.begins.size
         val hold = CountDownLatch(1)
         fake.executor.execute { hold.await() }
@@ -236,9 +231,8 @@ class VoiceAudioStuckStopTests {
     private class Payload
 
     /**
-     * The discarded task used to retain its entire successful result forever
-     * while awaiting stop. Assert the session payload and activation both go,
-     * not merely that the prestart container can be deallocated.
+     * A discarded task doesn't keep its successful result while awaiting stop: the session payload
+     * and activation both go, not merely the prestart container.
      */
     @Test fun discardedSessionReleasesItsPayloadAndHolderWhileStopIsStuck() = engineTest {
         val owner = AudioSessionOwner(schedule = { _, _ -> })
@@ -526,13 +520,10 @@ class AudioSessionOwnerTests {
         }
     }
 
-    /** iOS `NSOSStatusErrorDomain` 560030580 ("session is busy"): the platform refused. */
+    /** The platform refused. */
     private class Refused : Exception("Session activation failed")
 
-    /**
-     * iOS refuses a deactivation while a player or the haptic engine still
-     * runs. Swallowing it left the phone in play-and-record until a reboot.
-     */
+    /** Swallowing it left the phone in play-and-record until a reboot. */
     @Test fun aRefusedDeactivationRetriesUntilItLands() {
         val scheduled = Scheduled()
         val owner = owner(scheduled::schedule)
@@ -589,10 +580,7 @@ class AudioSessionOwnerTests {
     }
 }
 
-/**
- * A hang-up releases the shared session only after its end tail and the
- * haptic engine are done: iOS refuses to deactivate under either.
- */
+/** A hang-up releases the shared session only after its end tail and the haptic engine are done. */
 class CallAudioTeardownTests {
     private fun teardown(log: MutableList<String>) = CallAudioTeardown(
         sleep = { delay -> log += "sleep $delay" },
@@ -631,12 +619,10 @@ class VoiceAudioGenerationTests {
 }
 
 /**
- * Interruption recovery. iOS's `handleRouteChange(.newDeviceAvailable)` is Android's route
- * observer, which calls `handleConfigurationChange`. `LiveRTCSetupTests` is dropped: its
- * `LiveRTCLocked` store-unless-finished helper has no Kotlin counterpart type.
+ * Interruption recovery. `LiveRTCSetupTests` is dropped: its `LiveRTCLocked` store-unless-finished
+ * helper has no Kotlin counterpart type.
  */
 class VoiceAudioRecoveryTests {
-    /** iOS `@Test(arguments: [false, true])`. */
     @Test fun failedReactivationCanResumeAndDeactivate() {
         for (retryOnRouteChange in listOf(false, true)) engineTest {
             val owner = AudioSessionOwner(schedule = { _, _ -> })
@@ -661,7 +647,6 @@ class VoiceAudioRecoveryTests {
         }
     }
 
-    /** iOS `@Test(arguments: [false, true])`. */
     @Test fun configurationChangeAfterFailedReactivationRequiresSuccessfulActivation() {
         for (retrySucceeds in listOf(false, true)) engineTest {
             val owner = AudioSessionOwner(schedule = { _, _ -> })
@@ -776,7 +761,7 @@ class VoiceAudioRecoveryTests {
  * reaches the call only once it connects.
  */
 class VoiceCaptureGateTests {
-    /** A capture buffer of PCM16 samples at [value] (iOS fills a float buffer). */
+    /** A capture buffer of PCM16 samples at [value]. */
     private fun buffer(value: Float, frames: Int = PCM.chunkFrames) = ShortArray(frames) { (value * Short.MAX_VALUE).toInt().toShort() }
 
     private fun samples(chunk: ByteArray) = (0 until chunk.size / 2).map { PCM.sample(chunk, it) }
@@ -849,9 +834,8 @@ class VoiceAudioFailedStartTests {
     }
 
     /**
-     * Kit's phone: ending a call while it connected deactivated the session
-     * from the main thread as the engine enabled voice processing, which
-     * deadlocked audiomxd and took the app down with it.
+     * Ending a call while it connected deactivated the session from the main thread as the engine
+     * enabled voice processing, which deadlocked audiomxd and took the app down with it.
      */
     @Test fun aHangUpMidSetupLeavesDeactivationToTheStart() = engineTest {
         val fake = FakeVoiceAudioSession(bluetoothHFP)
@@ -932,7 +916,7 @@ class VoiceAudioFailedStartTests {
 }
 
 class VoiceTranscriptTests {
-    /** iOS mutates a `var tail`; the Kotlin tail returns copies. */
+    /** The Kotlin tail returns copies. */
     private class Tail(var value: VoiceTranscriptTail = VoiceTranscriptTail()) {
         fun record(role: Role, text: String, id: String? = null): RecordOutcome =
             value.record(role, text, id).also { value = it.tail }.outcome
@@ -1163,8 +1147,6 @@ class VoiceTranscriptTests {
         assertEquals("[COMPLETE] The session returned a code block in the transcript.", VoiceHandoff.completion(codeBlock))
     }
 
-    /** A watched session's long reply, a walkthrough the user asked for, reaches
-     * the voice agent whole (it was cut at 1,600 characters until Nov 7). */
     @Test fun aWatchedSessionsLongReplyIsNotCut() {
         val reply = (1..150).joinToString(" ") { "Part $it of the explanation." }
         assertTrue(reply.length > 4_000)

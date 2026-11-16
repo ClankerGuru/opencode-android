@@ -15,6 +15,7 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.excludedFromDrawerPan
 import ai.opencode.core.ui.openCodeTapTarget
+import ai.opencode.feature.composer.R
 import ai.opencode.server.model.ModelProviderGroup
 import ai.opencode.server.model.ModelSearch
 import ai.opencode.server.model.OpenCodeModel
@@ -86,6 +87,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -109,13 +111,10 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
-// Port of iOS `Composer/ModelPicker/OnePickerSurface.swift`: One Picker's morphing surface. iOS
-// draws one Liquid Glass shape under the composer (`OnePickerGlassBackdrop`) and the panel's
-// rows over it (`OnePickerSurface`), both at `OnePickerController`'s per-frame pose. On Android
-// the shape is a Material 3 tonal surface (`surfaceContainerHigh`, as the composer's own
-// surface), never a blur or glass imitation, and the backdrop dim and blur stay off, as iOS's
-// tunables default. Coordinates are dp in the overlay's own space (the session's root box).
-// The DEBUG-only probes (window space, glass, chip, composer, integrity readout) are n/a.
+// One Picker's morphing surface. On Android the shape is a Material 3 tonal surface
+// (`surfaceContainerHigh`, as the composer's own surface), never a blur or glass imitation, and the
+// backdrop dim and blur stay off. Coordinates are dp in the overlay's own space (the session's root
+// box). The DEBUG-only probes (window space, glass, chip, composer, integrity readout) are n/a.
 
 /**
  * One Picker's surface colour: the composer's (so the morph reads as one surface), on this branch
@@ -125,7 +124,6 @@ object OnePickerSurfaceDefaults {
     val color: Color @Composable get() = OpenCodeSurfaces.color
 }
 
-/** iOS's swipe-to-favorite fill, `UIColor(red: 0.92, green: 0.68, blue: 0.10)`. */
 internal val OnePickerFavoriteTint = Color(0.92f, 0.68f, 0.10f)
 
 private fun FramePoseShape(pose: OnePickerSimulation.FramePose) = RoundedCornerShape(
@@ -136,8 +134,8 @@ private fun FramePoseShape(pose: OnePickerSimulation.FramePose) = RoundedCornerS
 )
 
 /**
- * iOS `OnePickerGlassBackdrop`: the one surface the composer folds into, mounted under the
- * composer and the panel's rows. Not hit-testable and hidden from TalkBack.
+ * The one surface the composer folds into, mounted under the composer and the panel's rows. Not
+ * hit-testable and hidden from TalkBack.
  */
 @Composable
 fun OnePickerGlassBackdrop(controller: OnePickerController, modifier: Modifier = Modifier) {
@@ -160,9 +158,8 @@ fun OnePickerGlassBackdrop(controller: OnePickerController, modifier: Modifier =
 }
 
 /**
- * iOS `OnePickerSurface`: the panel's rows, grabber and search over the backdrop, plus the
- * clear tap-catcher that closes it. [liveComposer] is the composer's frame in this space
- * (`Rect.Zero` when it isn't on screen).
+ * The panel's rows, grabber and search over the backdrop, plus the clear tap-catcher that closes
+ * it. [liveComposer] is the composer's frame in this space (`Rect.Zero` when it isn't on screen).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -180,9 +177,8 @@ fun OnePickerSurface(
     val density = LocalDensity.current
     val windowInfo = LocalWindowInfo.current
     OnePickerFrameDriver(controller)
-    // iOS's presentation-layer probes and `keyboardWillChangeFrame`: the composer's live frame, the
-    // docked keyboard now (the IME inset) and where it is heading (its animation target), in the
-    // window's dp, as the controller reads them.
+    // The composer's live frame, the docked keyboard now (the IME inset) and where it is heading
+    // (its animation target), in the window's dp, as the controller reads them.
     val windowSize = windowInfo.containerSize
     val liveComposerNow by rememberUpdatedState(liveComposer)
     val keyboardNow by rememberUpdatedState(WindowInsets.ime.getBottom(density))
@@ -237,9 +233,9 @@ fun OnePickerSurface(
                         .pointerInput(Unit) { detectTapGestures { if (controller.isOpen) currentDismiss() } },
                 )
             }
-            // Built here, not in the placement's per-frame scope, and handed the morph as a
-            // lambda it reads in its own leaf, so a morph frame skips the panel (catalog, list
-            // actions, footer) and only resizes it (iOS 25174297).
+            // Built here, not in the placement's per-frame scope, and handed the morph as a lambda
+            // it reads in its own leaf, so a morph frame skips the panel (catalog, list actions,
+            // footer) and only resizes it.
             val morph = remember(controller) { { OnePickerPanelMorph(controller.motion.pose, controller) } }
             OnePickerPanelPlacement(controller) {
                 OnePickerPanelContent(
@@ -257,7 +253,7 @@ fun OnePickerSurface(
     }
 }
 
-/** iOS `OnePickerPanelPlacement`: the panel's rows laid out at the pose, revealed with room. */
+/** The panel's rows laid out at the pose, revealed with room. */
 @Composable
 private fun OnePickerPanelPlacement(
     controller: OnePickerController,
@@ -300,7 +296,7 @@ private fun OnePickerPanelPlacement(
                     .align(Alignment.TopCenter)
                     .requiredSize(layoutWidth.dp, rect.height.dp)
                     .graphicsLayer { this.scaleX = scaleX }
-                    // iOS `.allowsHitTesting(isOpen && contentReveal > 0.4)`: eat touches until then.
+                    // Eat touches until then.
                     .let { if (interactive) it else it.pointerInput(Unit) { awaitEachGesture { awaitFirstDown(requireUnconsumed = false).consume() } } },
             ) {
                 content()
@@ -309,7 +305,7 @@ private fun OnePickerPanelPlacement(
     }
 }
 
-/** iOS `OnePickerPanelMorph`: what the panel's interior reads off the morph each frame. */
+/** What the panel's interior reads off the morph each frame. */
 data class OnePickerPanelMorph(
     val fixedListLayoutHeight: Double?,
     val composerControlsClearance: Double,
@@ -337,10 +333,9 @@ private fun OnePickerPanelMorph(pose: OnePickerSimulation.FramePose, controller:
 }
 
 /**
- * iOS `OnePickerSheetHost`: One Picker's interior in a plain sheet, for when the composer can't
- * morph (a call or a docked request covers it). Hosted in the model pickers' sheet; [onDismiss]
- * clears `activePicker` (after the sheet's slide-down), and leaving clears the search
- * (`modelListClosed`).
+ * One Picker's interior in a plain sheet, for when the composer can't morph (a call or a docked
+ * request covers it). Hosted in the model pickers' sheet; [onDismiss] clears `activePicker` (after
+ * the sheet's slide-down), and leaving clears the search (`modelListClosed`).
  */
 @Composable
 fun OnePickerSheetHost(
@@ -376,8 +371,8 @@ fun OnePickerSheetHost(
                 onEvent = onEvent,
                 onHideKeyboard = {},
                 onDismiss = { hideThen?.invoke(onDismiss) ?: onDismiss() },
-                // iOS sends the pick alone: `modelPickedWithLevel` keeps `activePicker`, so the
-                // sheet stays up with the new pick checked.
+                // `modelPickedWithLevel` keeps `activePicker`, so the sheet stays up with the new
+                // pick checked.
                 onPickModelAndClose = onPickModel,
             )
         }
@@ -385,19 +380,16 @@ fun OnePickerSheetHost(
 }
 
 /**
- * iOS `OnePickerCatalogCache`: the last catalog the panel built and the inputs it came from. Kept
- * by [OnePickerController], so it outlives the panel: the next open reuses it, or the copy
- * [OnePickerCatalogPrewarm] built while the list was shut, instead of building it on the
- * opening's first frame. A plain class, so filling it never recomposes anything. Read and filled
- * on the main thread only.
+ * The last catalog the panel built and the inputs it came from. Kept by [OnePickerController], so
+ * it outlives the panel: the next open reuses it, or the copy [OnePickerCatalogPrewarm] built while
+ * the list was shut, instead of building it on the opening's first frame. A plain class, so filling
+ * it never recomposes anything. Read and filled on the main thread only.
  */
 class OnePickerCatalogCache {
     /**
-     * iOS `OnePickerCatalogCache.Key`: what the catalog and its row snapshots are built from. iOS
-     * keys the catalogue by `SessionFeature.State.modelsRevision` (a counter `models`' `didSet`
-     * bumps) so it never compares the whole catalogue; Kotlin's immutable lists compare by
+     * What the catalog and its row snapshots are built from. Kotlin's immutable lists compare by
      * identity first, so the key holds the list itself and only a new catalogue is compared in
-     * full. iOS's row height, level alpha and arc tunables are constants here, so they're left out.
+     * full.
      */
     data class Key(
         val models: List<OpenCodeModel>,
@@ -481,11 +473,10 @@ class OnePickerCatalogCache {
 }
 
 /**
- * iOS `OnePickerCatalogPrewarm`: builds the next opening's catalog while the list is shut, half a
- * second after the models, favorites, visibility or current model settle (off the frames of
- * whatever changed them, a pick's close or the keyboard), so opening finds it in
- * [OnePickerController.catalogCache] instead of building it on its first frame. iOS's run loop
- * timer (bb4e47f7) is a coroutine delay here: a newer key cancels the pending build.
+ * Builds the next opening's catalog while the list is shut, half a second after the models,
+ * favorites, visibility or current model settle (off the frames of whatever changed them, a pick's
+ * close or the keyboard), so opening finds it in [OnePickerController.catalogCache] instead of
+ * building it on its first frame. A newer key cancels the pending build.
  */
 @Composable
 private fun OnePickerCatalogPrewarm(state: ModelPickerState, controller: OnePickerController) {
@@ -498,7 +489,7 @@ private fun OnePickerCatalogPrewarm(state: ModelPickerState, controller: OnePick
     }
 }
 
-/** iOS `snapshotSections(from:)`: each section's immutable row snapshots. */
+/** Each section's immutable row snapshots. */
 internal fun ModelPickerState.onePickerSnapshotSections(sections: List<ModelPickerSection>): List<OnePickerSectionSnapshot> {
     val currentID = currentModelInfo?.id
     val favorites = favoriteModelIDs
@@ -544,8 +535,8 @@ internal fun ModelPickerState.onePickerSnapshotSections(sections: List<ModelPick
 }
 
 /**
- * iOS `OnePickerPanelContent`: the grabber, the list (or its spinner or empty state) under edge
- * fades, and the bottom search bar. Shared by the morph and the sheet fallback.
+ * The grabber, the list (or its spinner or empty state) under edge fades, and the bottom search
+ * bar. Shared by the morph and the sheet fallback.
  */
 @Composable
 private fun OnePickerPanelContent(
@@ -679,7 +670,7 @@ private fun OnePickerPanelContent(
     }
 }
 
-/** iOS's list mask: fades rows into the top/bottom edges when they overflow there. */
+/** Fades rows into the top/bottom edges when they overflow there. */
 private fun Modifier.onePickerEdgeFade(top: Boolean, bottom: Boolean, fade: Double): Modifier {
     if ((!top && !bottom) || fade <= 0) return this
     return graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
@@ -705,9 +696,8 @@ private fun Modifier.onePickerEdgeFade(top: Boolean, bottom: Boolean, fade: Doub
 }
 
 /**
- * iOS's drag gesture with `minimumDistance`: [onBegin] once the finger moves [minimum] dp, then
- * the translation (dp) from where it went down; [onEnd] with translation and velocity (dp/s), or
- * [onCancel] when the gesture is lost.
+ * [onBegin] once the finger moves [minimum] dp, then the translation (dp) from where it went down;
+ * [onEnd] with translation and velocity (dp/s), or [onCancel] when the gesture is lost.
  */
 private fun Modifier.onePickerDrag(
     density: Density,
@@ -747,7 +737,7 @@ private fun Modifier.onePickerDrag(
     }
 }
 
-/** iOS `grabberHeader`: a 36×5 handle; tap toggles the detent, drag moves the sheet. */
+/** A 36×5 handle; tap toggles the detent, drag moves the sheet. */
 @Composable
 private fun OnePickerGrabber(
     controller: OnePickerController,
@@ -756,6 +746,9 @@ private fun OnePickerGrabber(
 ) {
     val density = LocalDensity.current
     val detent = controller.detent
+    val grabberDescription = stringResource(R.string.composer_sheet_grabber_description)
+    val compactText = stringResource(R.string.composer_model_grabber_compact_action)
+    val expandText = stringResource(R.string.composer_model_grabber_expand_action)
     Box(
         Modifier
             .fillMaxWidth()
@@ -774,10 +767,10 @@ private fun OnePickerGrabber(
                 )
             }
             .clearAndSetSemantics {
-                contentDescription = "Sheet Grabber"
+                contentDescription = grabberDescription
                 stateDescription = detent.accessibilityValue
                 role = Role.Button
-                onClick(if (detent == ModelListDetent.Large) "Make the picker compact" else "Expand the picker") {
+                onClick(if (detent == ModelListDetent.Large) compactText else expandText) {
                     if (!isSheetFallback) controller.toggleDetent()
                     true
                 }
@@ -799,7 +792,7 @@ private fun OnePickerGrabber(
     }
 }
 
-/** iOS `bottomSearchBar`: search under the thumb, riding the keyboard. */
+/** Search under the thumb, riding the keyboard. */
 @Composable
 private fun OnePickerSearchBar(
     state: ModelPickerState,
@@ -820,6 +813,7 @@ private fun OnePickerSearchBar(
     val text = state.modelFilter
     var sheetDragging by remember { mutableStateOf(false) }
     val hasTrailing = text.isNotEmpty() || focused
+    val searchModelsText = stringResource(R.string.composer_model_search_placeholder)
     Box(
         Modifier
             .fillMaxWidth()
@@ -862,7 +856,7 @@ private fun OnePickerSearchBar(
         ) {
             OpenCodeIcon(SFSymbol.Magnifyingglass, null, size = OpenCodeTextFieldDefaults.iconSize, tint = fieldColors.icon)
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                if (text.isEmpty()) Text("Search Models", style = OpenCodeTextFieldDefaults.textStyle, color = fieldColors.placeholder, maxLines = 1)
+                if (text.isEmpty()) Text(searchModelsText, style = OpenCodeTextFieldDefaults.textStyle, color = fieldColors.placeholder, maxLines = 1)
                 BasicTextField(
                     value = text,
                     onValueChange = { onEvent(ModelPickerEvent.FilterChanged(it)) },
@@ -875,16 +869,16 @@ private fun OnePickerSearchBar(
                         .fillMaxWidth()
                         .focusRequester(focusRequester)
                         .onFocusChanged { onFocusChanged(it.isFocused) }
-                        .semantics { contentDescription = "Search Models" }
+                        .semantics { contentDescription = searchModelsText }
                         .testTag("model-search"),
                 )
             }
             if (text.isNotEmpty()) {
-                OnePickerSearchButton(SFSymbol.XmarkCircleFill, "Clear search", "model-search-clear") {
+                OnePickerSearchButton(SFSymbol.XmarkCircleFill, stringResource(R.string.composer_model_clear_search_description), "model-search-clear") {
                     onEvent(ModelPickerEvent.FilterChanged(""))
                 }
             } else if (focused) {
-                OnePickerSearchButton(SFSymbol.KeyboardChevronCompactDown, "Hide keyboard", "model-search-hide-keyboard", onHideKeyboard)
+                OnePickerSearchButton(SFSymbol.KeyboardChevronCompactDown, stringResource(R.string.composer_model_hide_keyboard_description), "model-search-hide-keyboard", onHideKeyboard)
             }
         }
     }

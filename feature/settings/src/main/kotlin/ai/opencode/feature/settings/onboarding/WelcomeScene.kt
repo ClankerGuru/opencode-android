@@ -2,6 +2,7 @@ package ai.opencode.feature.settings.onboarding
 
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.tuning.AnimationTimeScale
+import ai.opencode.feature.settings.R
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -38,6 +39,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -52,10 +54,9 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Where the laptop and phone sit (iOS `WelcomeSceneLayout`): the phone stands in front of the
- * lid's right edge, a little taller than the laptop and centred on it, so neither leaves a dead
- * band beside the other. Everything scales with the width it's given, capped by `maxHeight`.
- * Values are in dp.
+ * Where the laptop and phone sit: the phone stands in front of the lid's right edge, a little
+ * taller than the laptop and centred on it, so neither leaves a dead band beside the other.
+ * Everything scales with the width it's given, capped by `maxHeight`. Values are in dp.
  */
 data class WelcomeSceneLayout(
     val size: Size,
@@ -114,12 +115,12 @@ data class WelcomeSceneLayout(
 private fun hex(value: Long, alpha: Float = 1f): Color = Color(0xFF000000 or value).copy(alpha = alpha)
 
 /**
- * The welcome's illustration (iOS `WelcomeScene`): the laptop running OpenCode and the phone
- * steering it, telling [WelcomeStory] on a loop: someone dictates a task on the phone, the laptop
- * explores, opens its browser, edits and takes a screenshot that flies back to the phone, then
- * ships it. The pairing step cross-fades both screens to Settings › Pairing and the camera
- * finding its code. The clock pauses under Reduce Motion (the story's still frame), while pairing,
- * and while the app isn't in front.
+ * The welcome's illustration: the laptop running OpenCode and the phone steering it, telling
+ * [WelcomeStory] on a loop: someone dictates a task on the phone, the laptop explores, opens its
+ * browser, edits and takes a screenshot that flies back to the phone, then ships it. The pairing
+ * step cross-fades both screens to Settings › Pairing and the camera finding its code. The clock
+ * pauses under Reduce Motion (the story's still frame), while pairing, and while the app isn't in
+ * front.
  */
 @Composable
 fun WelcomeScene(layout: WelcomeSceneLayout, pairing: Boolean, modifier: Modifier = Modifier) {
@@ -160,9 +161,9 @@ fun WelcomeScene(layout: WelcomeSceneLayout, pairing: Boolean, modifier: Modifie
     SideEffect { voice.play(frame.voice) }
 
     val label = if (pairing) {
-        "OpenCode’s pairing code on a laptop, and a phone’s camera scanning it"
+        stringResource(R.string.settings_onboarding_scene_pairing_description)
     } else {
-        "Someone dictates a task on a phone, OpenCode does it on a laptop and takes a screenshot, and the screenshot comes back to the phone"
+        stringResource(R.string.settings_onboarding_scene_story_description)
     }
     Box(
         modifier
@@ -180,15 +181,15 @@ fun WelcomeScene(layout: WelcomeSceneLayout, pairing: Boolean, modifier: Modifie
     }
 }
 
-/** Story time for [elapsed] seconds since time 0: negative before the first loop, then wrapping (iOS `WelcomeScene.storyTime`). */
+/** Story time for [elapsed] seconds since time 0: negative before the first loop, then wrapping. */
 internal fun storyTime(elapsed: Double, loop: Double): Double {
     if (elapsed <= 0 || loop <= 0) return elapsed
     return elapsed % loop
 }
 
 /**
- * The story's voice, with its own level meter (iOS `WelcomeVoice`): the phone's dictation scope
- * listens to it, never to the live dictation meter, which lives in the composer.
+ * The story's voice, with its own level meter: the phone's dictation scope listens to it, never to
+ * the live dictation meter, which lives in the composer.
  */
 @Stable
 internal class WelcomeVoice {
@@ -199,7 +200,7 @@ internal class WelcomeVoice {
     }
 }
 
-/** A dictation level meter: the latest level and a short history the scope draws (iOS `DictationLevels`). */
+/** A dictation level meter: the latest level and a short history the scope draws. */
 @Stable
 internal class WelcomeLevels {
     var level by mutableFloatStateOf(0f)
@@ -218,7 +219,7 @@ internal class WelcomeLevels {
     }
 }
 
-/** A device settling in: it rises on a spring and fades in early (iOS `welcomeSettle`). */
+/** A device settling in: it rises on a spring and fades in early. */
 private fun Modifier.welcomeSettle(p: Float, dy: Dp, reduced: Boolean): Modifier = graphicsLayer {
     alpha = (p * 1.8f).coerceIn(0f, 1f)
     val scale = if (reduced) 1f else 0.965f + 0.035f * p
@@ -238,7 +239,7 @@ private fun Placed(rect: Rect, modifier: Modifier = Modifier, content: @Composab
     ) { content() }
 }
 
-/** [content] laid out at `logical` size (dp) and scaled by [scale] from the top-left (iOS `.scaleEffect(_, anchor: .topLeading)`). */
+/** [content] laid out at `logical` size (dp) and scaled by [scale] from the top-left. */
 @Composable
 internal fun WelcomeScaled(logical: Size, scale: Float, content: @Composable () -> Unit) {
     Layout(

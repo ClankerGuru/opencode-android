@@ -9,11 +9,6 @@ import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Port of iOS `ProjectIconTests.swift`, the `:server` part: `ProjectMark` names and initials,
- * `OpenCodeProjectIcon` decoding and desktop precedence, and the `project.updated` stream frame.
- * Rendering, loading and the drawer's tiles are `:feature:drawer`'s; the Experimental flag `:core`'s.
- */
 class ProjectIconTests {
     @get:Rule val isolation = TestIsolationRule()
 

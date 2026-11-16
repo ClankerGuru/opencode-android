@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticEffect
 import ai.opencode.core.log.AppLog
@@ -8,6 +9,7 @@ import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionReduce
 import ai.opencode.core.motion.MotionTransition
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.strings.localized
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.ui.OpenCodeShape
@@ -97,6 +99,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.ViewConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -136,8 +139,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * A still camera presented full screen; the preview fills the display while the controls
- * stay inside the safe area. iOS `AttachmentCameraView` (AVFoundation → CameraX).
+ * A still camera presented full screen; the preview fills the display while the controls stay
+ * inside the safe area.
  *
  * @param onCapture the JPEG (with its EXIF orientation; front photos unmirrored).
  * @param onBack Close: the full-screen camera closes itself first.
@@ -213,9 +216,9 @@ fun AttachmentCameraView(
                 ) {
                     Text(message, style = OpenCodeTextStyles.subheadline, textAlign = TextAlign.Center, color = Color.White)
                     if (camera.needsSettings) {
-                        CameraMessageButton("Open Settings", onClick = camera::openSettings)
+                        CameraMessageButton(stringResource(CoreR.string.common_open_settings), onClick = camera::openSettings)
                     } else if (camera.canRetry) {
-                        CameraMessageButton("Try Again", onClick = camera::activate)
+                        CameraMessageButton(stringResource(CoreR.string.common_try_again), onClick = camera::activate)
                     }
                 }
             }
@@ -242,7 +245,6 @@ fun AttachmentCameraView(
             }
             if (!showsControls && !camera.canCapture) {
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
-                    // iOS `.font(.title2)`.
                     OpenCodeIcon(SFSymbol.Camera, contentDescription = null, size = 22.dp, tint = MaterialTheme.colorScheme.onSurface)
                 }
             }
@@ -250,7 +252,7 @@ fun AttachmentCameraView(
     }
 }
 
-/** The tile never prompts for permission and no hidden or background camera runs. iOS `AttachmentCameraActivity`. */
+/** The tile never prompts for permission and no hidden or background camera runs. */
 data class AttachmentCameraActivity(
     val visible: Boolean,
     val sceneActive: Boolean,
@@ -260,13 +262,14 @@ data class AttachmentCameraActivity(
     val shouldActivate: Boolean get() = visible && sceneActive && (authorized || requestsAccess)
 }
 
-/** iOS `AttachmentCameraPreview`: the viewfinder with pinch, tap to focus and long-press AE/AF Lock. */
+/** The viewfinder with pinch, tap to focus and long-press AE/AF Lock. */
 @Composable
 private fun AttachmentCameraPreview(camera: AttachmentCameraState, isInteractive: Boolean) {
     val transformer = remember { MutableCoordinateTransformer() }
     val request = camera.capture.surfaceRequest
     val zoom = camera.zoom
     val canAdjust = camera.canCapture && zoom?.canZoom == true
+    val viewfinderDescription = stringResource(R.string.composer_camera_viewfinder_description)
     val base = LocalViewConfiguration.current
     val viewConfiguration = remember(base) {
         object : ViewConfiguration by base {
@@ -281,7 +284,7 @@ private fun AttachmentCameraPreview(camera: AttachmentCameraState, isInteractive
                 if (canAdjust && zoom != null) {
                     val shown = zoom.displayed(camera.zoomState.shownFactor)
                     Modifier.semantics {
-                        contentDescription = "Viewfinder"
+                        contentDescription = viewfinderDescription
                         stateDescription = CameraZoomModel.label(shown, active = true)
                         progressBarRangeInfo = ProgressBarRangeInfo(
                             current = camera.zoomState.shownFactor.toFloat(),
@@ -355,7 +358,6 @@ private fun AttachmentCameraPreview(camera: AttachmentCameraState, isInteractive
     }
 }
 
-/** iOS `AttachmentCameraPreview.Pinch`. */
 sealed interface Pinch {
     data object Began : Pinch
     data class Changed(val scale: Double) : Pinch
@@ -363,8 +365,7 @@ sealed interface Pinch {
 }
 
 /**
- * The camera's controls, independent of the capture session so they can render over a
- * placeholder. iOS `AttachmentCameraControls`.
+ * The camera's controls, independent of the capture session so they can render over a placeholder.
  *
  * @param flash null hides the flash button (front camera, or no flash).
  */
@@ -386,6 +387,7 @@ fun AttachmentCameraControls(
 ) {
     val inert = if (canCapture) 1f else 0.35f
     val reduceMotion = rememberReduceMotion()
+    val takePhotoDescription = stringResource(R.string.composer_camera_take_photo_description)
     CompositionLocalProvider(LocalContentColor provides Color.White) {
         Column(modifier.fillMaxSize()) {
             Row(
@@ -397,7 +399,7 @@ fun AttachmentCameraControls(
                 if (flash != null) {
                     CameraCircleButton(
                         symbol = flash.systemImage,
-                        label = "Flash",
+                        label = stringResource(R.string.composer_camera_flash_description),
                         value = flash.accessibilityValue,
                         tint = if (flash == AttachmentCameraFlash.Off) Color.White else CameraYellow,
                         enabled = canCapture,
@@ -414,7 +416,7 @@ fun AttachmentCameraControls(
                     exit = MotionTransition.micro(reduceMotion).exit,
                 ) {
                     Text(
-                        "AE/AF Lock",
+                        stringResource(R.string.composer_camera_focus_lock),
                         color = Color.Black,
                         style = OpenCodeTextStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
                         modifier = Modifier
@@ -448,11 +450,11 @@ fun AttachmentCameraControls(
                     .padding(start = 20.dp, end = 20.dp, bottom = 18.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                CameraCircleButton(symbol = SFSymbol.Xmark, label = "Close camera", onClick = onClose)
+                CameraCircleButton(symbol = SFSymbol.Xmark, label = stringResource(R.string.composer_camera_close_description), onClick = onClose)
                 Spacer(Modifier.weight(1f))
-                // Android camera apps' shutter size (iOS: 58 pt). The face is sized after the tap
-                // target, which measures what follows it with no minimum: an empty Box sized before
-                // it drew only its 5 dp padding.
+                // Android camera apps' shutter size. The face is sized after the tap target, which
+                // measures what follows it with no minimum: an empty Box sized before it drew only
+                // its 5 dp padding.
                 Box(
                     Modifier
                         .alpha(inert)
@@ -460,7 +462,7 @@ fun AttachmentCameraControls(
                         .clickable(enabled = canCapture, role = Role.Button, onClick = onShutter)
                         .openCodeTapTarget()
                         .clearAndSetSemantics {
-                            contentDescription = "Take photo"
+                            contentDescription = takePhotoDescription
                             role = Role.Button
                             if (!canCapture) disabled()
                             onClick { onShutter(); true }
@@ -472,7 +474,7 @@ fun AttachmentCameraControls(
                 )
                 Spacer(Modifier.weight(1f))
                 if (canFlip) {
-                    CameraCircleButton(symbol = SFSymbol.ArrowTriangle2Circlepath, label = "Switch Camera", enabled = canCapture, onClick = onFlip)
+                    CameraCircleButton(symbol = SFSymbol.ArrowTriangle2Circlepath, label = stringResource(R.string.composer_camera_switch_description), enabled = canCapture, onClick = onFlip)
                 } else {
                     Spacer(Modifier.size(48.dp))
                 }
@@ -503,8 +505,8 @@ private fun CameraMessageButton(label: String, onClick: () -> Unit) {
 }
 
 /**
- * iOS `openCodeGlassCircle(tint: .black.opacity(0.3))` over the preview: a translucent circle with a
- * hairline. Camera controls stay round, as on every phone camera, rather than the desktop's squares.
+ * A translucent circle with a hairline. Camera controls stay round, as on every phone camera,
+ * rather than the desktop's squares.
  */
 @Composable
 private fun CameraCircleButton(
@@ -533,7 +535,6 @@ private fun CameraCircleButton(
             },
         contentAlignment = Alignment.Center,
     ) {
-        // iOS `.font(.system(size: 20))`.
         OpenCodeIcon(symbol, contentDescription = null, size = 20.dp, tint = tint)
     }
 }
@@ -601,10 +602,10 @@ private fun AttachmentLensPicker(
     }
 }
 
-/** iOS `AttachmentFocusMark`: [point] in the preview's pixels. */
+/** [point] in the preview's pixels. */
 data class AttachmentFocusMark(val id: UUID = UUID.randomUUID(), val point: Offset, val locked: Boolean)
 
-/** Camera's brief yellow square where a tap focused; it pulses once on a lock. iOS `AttachmentFocusIndicator`. */
+/** Camera's brief yellow square where a tap focused; it pulses once on a lock. */
 @Composable
 fun AttachmentFocusIndicator(mark: AttachmentFocusMark?) {
     val reduceMotion = rememberReduceMotion()
@@ -644,11 +645,11 @@ fun AttachmentFocusIndicator(mark: AttachmentFocusMark?) {
 }
 
 /**
- * Camera-local presentation state (iOS `AttachmentCameraState`, an `@Observable` view
- * object): only the camera's own state lives here; the parent owns attachments.
+ * Camera-local presentation state: only the camera's own state lives here; the parent owns
+ * attachments.
  */
 private class AttachmentCameraState(private val context: Context, private val scope: CoroutineScope) {
-    var message: String? by mutableStateOf("Opening camera…")
+    var message: String? by mutableStateOf(localized(R.string.composer_camera_opening))
     var needsSettings by mutableStateOf(false)
     var canRetry by mutableStateOf(false)
     var canCapture by mutableStateOf(false)
@@ -725,7 +726,7 @@ private class AttachmentCameraState(private val context: Context, private val sc
         canCapture = false
         canRetry = false
         needsSettings = false
-        message = "Opening camera…"
+        message = localized(R.string.composer_camera_opening)
         scope.launch {
             val prefs = context.getSharedPreferences("opencode.camera", Context.MODE_PRIVATE)
             if (!isAuthorized() && !isRestricted() && !prefs.getBoolean(ASKED, false)) {
@@ -740,7 +741,7 @@ private class AttachmentCameraState(private val context: Context, private val sc
             if (!isAuthorized()) {
                 isActivating = false
                 needsSettings = true
-                message = if (isRestricted()) "Camera access is restricted." else "Allow camera access in Settings to take a photo."
+                message = if (isRestricted()) localized(R.string.composer_camera_access_restricted) else localized(R.string.composer_camera_access_needed)
                 return@launch
             }
             val owner = lifecycle ?: return@launch
@@ -849,9 +850,9 @@ private class AttachmentCameraState(private val context: Context, private val sc
 }
 
 /**
- * The CameraX session (iOS `AttachmentCaptureSession`): binding, zoom (with lens ramps),
- * focus and exposure, capture, and camera-state reports, all on the main thread as CameraX
- * requires. Events carry the generation they belong to; stale ones are dropped by the state.
+ * The CameraX session: binding, zoom (with lens ramps), focus and exposure, capture, and
+ * camera-state reports, all on the main thread as CameraX requires. Events carry the generation
+ * they belong to; stale ones are dropped by the state.
  */
 private class AttachmentCaptureSession(
     private val context: Context,
@@ -904,7 +905,7 @@ private class AttachmentCaptureSession(
             val cameras = provider ?: runCatching { ProcessCameraProvider.awaitInstance(context) }.getOrNull()
             if (this@AttachmentCaptureSession.generation != generation) return@launch
             if (cameras == null) {
-                emit(Event.Failure("Couldn’t open the camera.", retry = true))
+                emit(Event.Failure(localized(R.string.composer_camera_open_failed), retry = true))
                 return@launch
             }
             provider = cameras
@@ -913,13 +914,13 @@ private class AttachmentCaptureSession(
                     has(cameras, CameraDeviceDescription.Position.Back) -> CameraDeviceDescription.Position.Back
                     has(cameras, CameraDeviceDescription.Position.Front) -> CameraDeviceDescription.Position.Front
                     else -> {
-                        emit(Event.Failure("No camera available on this device.", retry = false))
+                        emit(Event.Failure(localized(R.string.composer_camera_none_available), retry = false))
                         return@launch
                     }
                 }
             }
             if (!bind(cameras, owner, position)) {
-                emit(Event.Failure("Camera is unavailable.", retry = true))
+                emit(Event.Failure(localized(R.string.composer_camera_unavailable), retry = true))
                 return@launch
             }
             reportReadiness()
@@ -963,7 +964,7 @@ private class AttachmentCaptureSession(
     fun takePhoto(generation: UUID, flash: AttachmentCameraFlash, rotation: Int) {
         if (this.generation != generation) return
         if (pending || camera == null || interrupted) {
-            emit(Event.Failure("Camera is temporarily unavailable.", retry = true))
+            emit(Event.Failure(localized(R.string.composer_camera_temporarily_unavailable), retry = true))
             return
         }
         output.targetRotation = rotation
@@ -989,7 +990,7 @@ private class AttachmentCaptureSession(
                     if (data.isNotEmpty()) {
                         emit(Event.Photo(data))
                     } else {
-                        emit(Event.CaptureFailed("Couldn’t capture the photo. Try again."))
+                        emit(Event.CaptureFailed(localized(R.string.composer_camera_capture_failed)))
                     }
                 }
 
@@ -998,9 +999,9 @@ private class AttachmentCaptureSession(
                     pending = false
                     AppLog.app.error { "Photo capture failed: code ${exception.imageCaptureError}" }
                     if (camera != null && !interrupted) {
-                        emit(Event.CaptureFailed("Couldn’t capture the photo. Try again."))
+                        emit(Event.CaptureFailed(localized(R.string.composer_camera_capture_failed)))
                     } else {
-                        emit(Event.Failure("Camera is temporarily unavailable.", retry = true))
+                        emit(Event.Failure(localized(R.string.composer_camera_temporarily_unavailable), retry = true))
                     }
                 }
             },
@@ -1012,16 +1013,16 @@ private class AttachmentCaptureSession(
         if (this.generation != generation || pending || camera == null) return
         val target = if (position == CameraDeviceDescription.Position.Front) CameraDeviceDescription.Position.Back else CameraDeviceDescription.Position.Front
         if (!has(cameras, target)) {
-            emit(Event.CaptureFailed("Couldn’t switch cameras."))
+            emit(Event.CaptureFailed(localized(R.string.composer_camera_switch_failed)))
             return
         }
         val previous = position
         if (!bind(cameras, owner, target)) {
             if (!bind(cameras, owner, previous)) {
-                emit(Event.Failure("Camera is unavailable.", retry = true))
+                emit(Event.Failure(localized(R.string.composer_camera_unavailable), retry = true))
                 return
             }
-            emit(Event.CaptureFailed("Couldn’t switch cameras."))
+            emit(Event.CaptureFailed(localized(R.string.composer_camera_switch_failed)))
         }
         reportReadiness()
     }
@@ -1094,9 +1095,9 @@ private class AttachmentCaptureSession(
     }
 
     /**
-     * Maps CameraX's zoom space (1.0 = the main wide lens; a logical camera reaches its
-     * ultra wide below 1) into iOS's (1.0 = the widest lens), with each physical lens's
-     * intrinsic zoom as its switch-over point.
+     * Maps CameraX's zoom space (1.0 = the main wide lens; a logical camera reaches its ultra wide
+     * below 1) into one where 1.0 is the widest lens, with each physical lens's intrinsic zoom as
+     * its switch-over point.
      */
     @OptIn(ExperimentalCamera2Interop::class)
     private fun describe(bound: Camera): CameraDeviceDescription {
@@ -1181,7 +1182,7 @@ private class AttachmentCaptureSession(
     private fun reportReadiness() {
         val bound = camera
         if (bound == null || interrupted) {
-            emit(Event.Failure("Camera is temporarily unavailable.", retry = true))
+            emit(Event.Failure(localized(R.string.composer_camera_temporarily_unavailable), retry = true))
             return
         }
         if (pending) return
@@ -1209,8 +1210,8 @@ private class AttachmentCaptureSession(
                 CameraState.ERROR_MAX_CAMERAS_IN_USE,
                 CameraState.ERROR_DO_NOT_DISTURB_MODE_ENABLED,
                 CameraState.ERROR_CAMERA_DISABLED,
-                -> emit(Event.Failure("Camera interrupted. It will resume when available.", retry = false))
-                else -> emit(Event.Failure("Camera stopped. Try again.", retry = true))
+                -> emit(Event.Failure(localized(R.string.composer_camera_interrupted), retry = false))
+                else -> emit(Event.Failure(localized(R.string.composer_camera_stopped), retry = true))
             }
             AppLog.app.notice { "Camera state error ${error.code}" }
             return

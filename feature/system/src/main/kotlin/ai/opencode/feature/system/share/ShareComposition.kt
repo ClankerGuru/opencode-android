@@ -1,15 +1,17 @@
 package ai.opencode.feature.system.share
 
 import ai.opencode.core.files.ComposerStagedFile
+import ai.opencode.core.strings.localized
+import ai.opencode.core.strings.localizedPlural
+import ai.opencode.feature.system.R
 import java.time.Instant
 import java.util.UUID
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Port of iOS `ShareComposition`: the share sheet's decisions, kept apart from its views: which
- * session it opens on, what a send asks the server for, what a failure offers, and what it
- * leaves for the app.
+ * The share sheet's decisions, kept apart from its views: which session it opens on, what a send
+ * asks the server for, what a failure offers, and what it leaves for the app.
  */
 object ShareComposition {
     /** Send → Sent → close, so it reads as one motion and never flashes. */
@@ -32,7 +34,7 @@ object ShareComposition {
         val title: String
             get() = when (this) {
                 is Session -> session.title
-                is NewSession -> "New Session"
+                is NewSession -> localized(R.string.system_new_session)
             }
 
         val projectName: String
@@ -94,14 +96,14 @@ object ShareComposition {
     )
 
     fun problem(failure: ShareSendFailure?, serverName: String): Problem = when (failure) {
-        ShareSendFailure.Unreachable -> Problem("Couldn’t reach $serverName", canRetry = true)
-        ShareSendFailure.TooLarge -> Problem("Couldn’t send files this large from here", canRetry = false)
-        ShareSendFailure.UploadsUnsupported -> Problem("Couldn’t upload files to $serverName", canRetry = false)
+        ShareSendFailure.Unreachable -> Problem(localized(R.string.system_share_problem_unreachable, serverName), canRetry = true)
+        ShareSendFailure.TooLarge -> Problem(localized(R.string.system_share_problem_too_large), canRetry = false)
+        ShareSendFailure.UploadsUnsupported -> Problem(localized(R.string.system_share_problem_uploads_unsupported, serverName), canRetry = false)
         is ShareSendFailure.Rejected ->
-            if (failure.status == 401) Problem("Couldn’t sign in to $serverName", canRetry = false)
-            else Problem("Couldn’t send to $serverName", canRetry = true)
+            if (failure.status == 401) Problem(localized(R.string.system_share_problem_sign_in, serverName), canRetry = false)
+            else Problem(localized(R.string.system_share_problem_send, serverName), canRetry = true)
         // No credentials yet: the app shares them the next time it's opened.
-        null -> Problem("Open OpenCode once to send from here", canRetry = false)
+        null -> Problem(localized(R.string.system_share_problem_no_credentials), canRetry = false)
     }
 
     /**
@@ -146,14 +148,14 @@ object ShareComposition {
     /** The "sent" notification's body: the message (or what went), then a count of what came with it. */
     fun notificationBody(text: String, images: Int, files: Int): String {
         val parts = mutableListOf<String>()
-        if (images > 0) parts.add(if (images == 1) "1 image" else "$images images")
-        if (files > 0) parts.add(if (files == 1) "1 file" else "$files files")
+        if (images > 0) parts.add(localizedPlural(R.plurals.system_share_image_count, images, images))
+        if (files > 0) parts.add(localizedPlural(R.plurals.system_share_file_count, files, files))
         val first = text.split(NEWLINES).firstOrNull { it.isNotEmpty() }?.trim() ?: ""
         val line = clippedCharacters(first, 120)
         return (listOf(line).filter { it.isNotEmpty() } + parts).joinToString(" · ")
     }
 
-    /** iOS `count > limit ? prefix(limit - 1) + "…"`, counting grapheme clusters (Swift `Character`s). */
+    /** Counting grapheme clusters. */
     private fun clippedCharacters(text: String, limit: Int): String {
         val breaks = java.text.BreakIterator.getCharacterInstance().apply { setText(text) }
         val boundaries = ArrayList<Int>()
@@ -165,6 +167,5 @@ object ShareComposition {
         return text.substring(0, boundaries[limit - 2]) + "…"
     }
 
-    /** Swift's `Character.isNewline`. */
     private val NEWLINES = Regex("\r\n|[\n\r\u000B\u000C\u0085\u2028\u2029]")
 }

@@ -21,11 +21,10 @@ import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.voice.VoiceFeature
 import kotlin.time.Duration.Companion.milliseconds
 
-// Port of iOS `SessionFeature+Composition.swift` (split out of `SessionFeature.swift` in 9251ae06):
-// how the session's reducers compose: the core steps, the child features, and the `onChange` hooks
-// around them. `CancelID` and the companion's `coreSteps` stay nested in `SessionFeature.kt`.
+// How the session's reducers compose: the core steps, the child features, and the `onChange` hooks
+// around them. `CancelID` and `coreSteps` stay in `SessionFeature.kt`.
 
-/** iOS `reduceCore`: the ordered core steps; the first that takes the action wins. */
+/** The ordered core steps; the first that takes the action wins. */
 internal fun SessionFeature.reduceCore(state: State, action: Action): Reduced<State, Action> {
     for (step in SessionFeature.coreSteps) {
         step(this, state, action)?.let { return it }
@@ -37,12 +36,12 @@ private object ShellOutputSlot
 private object FolderBrowserSlot
 private object VoiceSlot
 
-/** Double optional for the call's viewing page (iOS `VoiceViewingPage??`). */
+/** Double optional for the call's viewing page. */
 private data class ViewingBox(val page: VoiceViewingPage?)
 
 /**
- * iOS `body`: the session's reducers composed once per feature; the class keeps the result as its
- * lazy `builtBody`. Each local is the iOS lazy property of the same name.
+ * The session's reducers composed once per feature; the class keeps the result as its lazy
+ * `builtBody`.
  */
 internal fun SessionFeature.composedBody(): Reducer<State, Action> {
     val coreReducers: Reducer<State, Action> = run {
@@ -87,6 +86,11 @@ internal fun SessionFeature.composedBody(): Reducer<State, Action> {
             // A queued send's message started with its pick still waiting.
             .onChange({ it.queuedPickDue }) { _, _, state -> applyDueModelPick(state) }
             .onChange({ it.queuedAgentPickDue }) { _, _, state -> applyDueAgentPick(state) }
+            .onChange({ it.timedReadCadence }) { old, new, state ->
+                val polls = if (old.pendingWork != new.pendingWork) retunePendingWork(state) else Reduced(state)
+                val watched = if (old.watchdog != new.watchdog && polls.state.watchdogSchedule != null) watchdog(polls.state) else Reduced(polls.state)
+                Reduced(watched.state, Effect.merge(polls.effect, watched.effect))
+            }
     }
 
     val coreChain: Reducer<State, Action> = run {
@@ -176,8 +180,8 @@ internal fun SessionFeature.composedBody(): Reducer<State, Action> {
 
     val fullBody: Reducer<State, Action> = run {
         sessionReducers
-            // A pending request takes the composer as its answer and gives it back as it was
-            // (D-31 B); paging or switching requests moves the bar's words.
+            // A pending request takes the composer as its answer and gives it back as it was;
+            // paging or switching requests moves the bar's words.
             .onChange({ it.answerContext }) { old, _, state -> reconcileAnswering(old, state) }
             .onChange({ it.composingRetiresStarterPrompts }) { _, _, state ->
                 Reduced(if (state.composingRetiresStarterPrompts) state.copy(starterPrompts = emptyList()) else state)
@@ -243,7 +247,7 @@ internal fun SessionFeature.composedBody(): Reducer<State, Action> {
             }
     }
 
-    /** iOS `builtBody`: content batches and family run changes skip the full body's hooks (the stream fast path). */
+    /** Content batches and family run changes skip the full body's hooks (the stream fast path). */
     val builtBody: Reducer<State, Action> = run {
         val full = fullBody
         val stream = streamChain
@@ -258,9 +262,9 @@ internal fun SessionFeature.composedBody(): Reducer<State, Action> {
 }
 
 /**
- * iOS `SessionFeature.State.DraftShape`: what the composer's chrome needs from the draft
- * ([draftShape]). It changes as the first character comes or the last one goes, not on every
- * keystroke, so a view reading it doesn't recompose as the person types.
+ * What the composer's chrome needs from the draft ([draftShape]). It changes as the first character
+ * comes or the last one goes, not on every keystroke, so a view reading it doesn't recompose as the
+ * person types.
  */
 data class DraftShape(
     val isEmpty: Boolean = true,
@@ -270,5 +274,5 @@ data class DraftShape(
     constructor(draft: String) : this(isEmpty = draft.isEmpty(), hasText = draft.isNotBlank())
 }
 
-/** iOS `State.draftShape`: whether [SessionFeature.State.draft] is empty or blank. */
+/** Whether [SessionFeature.State.draft] is empty or blank. */
 val SessionFeature.State.draftShape: DraftShape get() = DraftShape(draft)

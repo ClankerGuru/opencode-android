@@ -34,10 +34,9 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Port of iOS `NewMessagesReceiptTests`, the `HomeFeature` half: this phone's own read receipts
- * (`POST /view`) and the `session.viewed` echo the event stream drops. A receipt that can't echo
- * any more never swallows a desktop read at the same idle. The receipts' own tests live in
- * `:server`'s `NewMessagesReceiptTests`.
+ * The `HomeFeature` half: this phone's own read receipts (`POST /view`) and the `session.viewed`
+ * echo the event stream drops. A receipt that can't echo any more never swallows a desktop read at
+ * the same idle.
  */
 class NewMessagesReceiptTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -70,7 +69,7 @@ class NewMessagesReceiptTests {
             events
         }
 
-    /** [body] in the test's dependencies, as iOS's `TestStore` runs its expected-state updates. */
+    /** [body] in the test's dependencies. */
     private fun <R> on(body: () -> R): R = DependencyValues.withValues(DependencyValues.testing(), body)
 
     private fun store(server: OpenCodeServer, receipts: SelfViewReceipts, scope: CoroutineScope): TestStore<HomeFeature.State, HomeFeature.Action> {
@@ -104,7 +103,7 @@ class NewMessagesReceiptTests {
         }
     }
 
-    /** iOS's expected-state update: run with the store's dependencies, so the detail's shared values are the store's own. */
+    /** Run with the store's dependencies, so the detail's shared values are the store's own. */
     private fun TestStore<HomeFeature.State, HomeFeature.Action>.select(id: String, state: HomeFeature.State): HomeFeature.State = withDependencies {
         val session = state.sessions.first { it.id == id }
         val s = state.updatingLastViewedSessionIDs { it + (state.server.persistenceID to session.id) }.markingReadLocally(session)

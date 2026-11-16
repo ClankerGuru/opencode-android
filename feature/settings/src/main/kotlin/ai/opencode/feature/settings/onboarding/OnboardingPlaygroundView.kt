@@ -117,13 +117,9 @@ import kotlin.math.roundToInt
 private typealias PlaygroundStore = StoreOf<OnboardingPlaygroundFeature.State, Action>
 
 /**
- * Port of iOS `Settings/Onboarding/OnboardingPlaygroundView.swift`.
- *
- * The Onboarding Playground: the onboarding's pages over the dot field, with a hideable control
- * bar for the variant, every phase, the simulated server's latency and failures, and Replay.
- * Shown full screen from Settings › Developer › Playgrounds › Onboarding. It is a
- * sandbox only; iOS has no first-run entry to it (the real first run is `:app`'s connection
- * screen), so there is none here either.
+ * The Onboarding Playground: the onboarding's pages over the dot field, with a hideable control bar
+ * for the variant, every phase, the simulated server's latency and failures, and Replay. A sandbox
+ * only, shown from Settings › Developer › Playgrounds › Onboarding.
  */
 @Composable
 fun OnboardingPlaygroundView(
@@ -211,10 +207,7 @@ fun OnboardingPlaygroundView(
     }
 }
 
-/**
- * iOS `.onChange(of: store.phase) { if new == .session, old != .session { wipedPage = old } }`,
- * resolved during composition so the wipe never draws a frame with the wrong page.
- */
+/** Resolved during composition so the wipe never draws a frame with the wrong page. */
 private class WipedPageTracker {
     private var last: Phase? = null
     private var wiped: Phase = Phase.connected
@@ -345,10 +338,10 @@ private fun interface CentreReporter {
 
 private val LocalCentreReporter = staticCompositionLocalOf<CentreReporter?> { null }
 
-/** Page titles: iOS `.font(.largeTitle.bold())`, centred like every line above and below the centre. */
+/** Page titles: large and bold, centred like every line above and below the centre. */
 private val largeTitleBold: TextStyle get() = OpenCodeTextStyles.largeTitle.copy(fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
 
-/** Body copy in a page's top or below block, centred as iOS's `.multilineTextAlignment(.center)`. */
+/** Body copy in a page's top or below block, centred. */
 private val centredBody: TextStyle get() = OpenCodeTextStyles.body.centred()
 
 /** An explicit `style` replaces [CenteredText]'s provided one, so top/below text centres itself. */
@@ -551,8 +544,8 @@ private fun Failed(on: Boolean, failedWith: Failure, send: (Action) -> Unit) {
  * trace), a block below it, and a fixed footer. The centre lands at the same height on every
  * page, so the trace and the aperture stay put while the words around them change.
  *
- * Only the active page takes touches and is read by TalkBack (iOS `allowsHitTesting` and
- * `accessibilityHidden`): it is raised above the others and their controls are switched off.
+ * Only the active page takes touches and is read by TalkBack: it is raised above the others and
+ * their controls are switched off.
  */
 @Composable
 private fun OnboardingPageLayout(
@@ -598,10 +591,9 @@ private fun CenteredText(content: @Composable () -> Unit) {
 /**
  * The layout every page shares: a 52 pt header, the block above the centre bottom-aligned, the
  * centre, the block below top-aligned, and a footer at least 128 pt tall at the bottom. The two
- * blocks split the free height evenly, so the centre lands at the same height on every page (iOS
- * `OnboardingSkeleton`'s two `maxHeight: .infinity` frames). When a block needs more than its
- * half (large text, a short window) it takes what it needs and the centre moves to fit; when the
- * page can't fit at all it scrolls, so no text is cut off.
+ * blocks split the free height evenly, so the centre lands at the same height on every page. When a
+ * block needs more than its half (large text, a short window) it takes what it needs and the centre
+ * moves to fit; when the page can't fit at all it scrolls, so no text is cut off.
  *
  * [onCentre] reports the centre slot's coordinates, for the shared aperture to follow.
  */
@@ -674,10 +666,9 @@ private val FooterHeight = 128.dp
 private val ApertureSide = 240.dp
 
 /**
- * The camera aperture: one view for the camera and waiting pages, so it stays put when the code
- * is found. A plain opening, centred on the active page's centre slot ([centreMid], px in the
- * pages' box; iOS lays it out in the same skeleton). Reports its bounds (in root dp) for the
- * field's scan rings and trace.
+ * The camera aperture: one view for the camera and waiting pages, so it stays put when the code is
+ * found. A plain opening, centred on the active page's centre slot. Reports its bounds (in root dp)
+ * for the field's scan rings and trace.
  */
 @Composable
 private fun ApertureLayer(
@@ -831,7 +822,7 @@ private fun StoryLine(symbol: SFSymbol, text: String) {
     }
 }
 
-/** The label-coloured primary (iOS `.openCodePrimaryButton().tint(Color(.label))`). Off while its page is inactive. */
+/** The label-coloured primary. Off while its page is inactive. */
 @Composable
 private fun PrimaryButton(title: String, active: Boolean, onClick: () -> Unit) {
     val container = OpenCodeTheme.colors.text
@@ -864,11 +855,7 @@ private fun SecondaryButton(title: String, active: Boolean, onClick: () -> Unit)
     ) { Text(title, style = OpenCodeTextStyles.headline) }
 }
 
-/**
- * iOS's large circular glass icon button, drawn as the desktop's icon button (a rounded square
- * with a hairline, like `OpenCodeIconButton(style = Circle)`); off (without dimming) while its
- * page is inactive.
- */
+/** Off (without dimming) while its page is inactive. */
 @Composable
 private fun CircleIconButton(symbol: SFSymbol, label: String, active: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val container = OpenCodeSurfaces.neutralFill

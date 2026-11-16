@@ -8,8 +8,6 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 
 /**
- * Shared helpers for the `:feature:media` ports of iOS tests.
- *
  * Plain JVM unit tests run against the `android.jar` stubs, where `Bitmap` can't be made or
  * decoded. Reducers and stores that only carry an image (by identity) get a [stubBitmap]: a
  * distinct instance whose methods all return stub defaults. Tests that need the framework (real
@@ -25,7 +23,7 @@ private val unsafe: sun.misc.Unsafe by lazy {
     field.get(null) as sun.misc.Unsafe
 }
 
-/** iOS `LockIsolated`: a value effects and closures update from any thread. */
+/** A value effects and closures update from any thread. */
 internal class Locked<T>(initial: T) {
     @Volatile private var value: T = initial
     val current: T get() = synchronized(this) { value }
@@ -48,14 +46,11 @@ internal fun stubSiteIcon(png: String, tone: SiteIcon.Tone? = null): SiteIcon {
     return constructor.newInstance(stubBitmap(), png.toByteArray(), tone) as SiteIcon
 }
 
-/** A fresh directory under the JVM's temp folder (iOS `FileManager.default.temporaryDirectory`). */
+/** A fresh directory under the JVM's temp folder. */
 internal fun temporaryDirectory(prefix: String): java.io.File =
     java.io.File(System.getProperty("java.io.tmpdir"), "$prefix-${java.util.UUID.randomUUID()}")
 
-/**
- * Runs [block] with `Dispatchers.Main` on the test's scheduler, eagerly (the stores under test
- * are main-confined, as iOS's `@MainActor`).
- */
+/** Runs [block] with `Dispatchers.Main` on the test's scheduler, eagerly. */
 internal suspend fun TestScope.onMain(block: suspend () -> Unit) {
     Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
     try {

@@ -29,10 +29,6 @@ import org.junit.Test
 import java.time.Instant
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `SessionFeatureTests+QuietPolling.swift`'s Home tests (they build Home's state, so
- * they live here). The rest are `:feature:session`'s.
- */
 class SessionFeatureTestsQuietPolling {
     @get:Rule val isolation = TestIsolationRule()
 

@@ -5,15 +5,18 @@ import ai.opencode.core.ui.OpenCodeIconSize
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.RollingNumber
+import ai.opencode.feature.media.AgentFileCards
 import ai.opencode.feature.media.TranscriptImagePreview
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.InlineRowMetrics
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.TranscriptDisclosureState
 import ai.opencode.feature.transcript.TranscriptEntry
 import ai.opencode.feature.transcript.TranscriptSubagent
 import ai.opencode.feature.transcript.markdown.ui.BandClock
+import ai.opencode.feature.transcript.markdown.ui.DisclosedContent
 import ai.opencode.feature.transcript.markdown.ui.DisclosedTransition
 import ai.opencode.feature.transcript.markdown.ui.TranscriptBand
 import ai.opencode.feature.transcript.user.TranscriptDragPayload
@@ -34,6 +37,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -43,10 +47,17 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -55,8 +66,8 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
@@ -102,17 +113,20 @@ internal fun SubagentToolView(call: OpenCodeToolCall, subagents: Map<String, Tra
         else -> AgentGlyphState.Phase.Done
     }
     val shape = RoundedCornerShape(TranscriptMetrics.cardCornerRadius)
+    val failedLabel = stringResource(R.string.transcript_tool_failed)
+    val runningLabel = stringResource(R.string.transcript_tool_running)
+    val completedLabel = stringResource(R.string.transcript_tool_completed)
     Row(
         modifier
             .fillMaxWidth()
             .heightIn(min = TranscriptMetrics.minimumHitSide)
             .clip(shape)
             .background(colors.userBubble)
-            .clickable(enabled = isKnown, role = Role.Button, onClickLabel = if (isKnown) "Open the subagent’s session" else null) {
+            .clickable(enabled = isKnown, role = Role.Button, onClickLabel = if (isKnown) stringResource(R.string.transcript_subagent_open_click_label) else null) {
                 if (childID != null) context.send(TranscriptAction.SubagentTapped(childID))
             }
             .semantics(mergeDescendants = true) {
-                stateDescription = if (failed) "Failed" else if (running) "Running" else "Completed"
+                stateDescription = if (failed) failedLabel else if (running) runningLabel else completedLabel
             }
             .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -127,7 +141,7 @@ internal fun SubagentToolView(call: OpenCodeToolCall, subagents: Map<String, Tra
                 Text(it, style = OpenCodeTextStyles.subheadline, color = colors.secondaryText)
             }
             if (failed) {
-                Text("Failed", style = OpenCodeTextStyles.caption1.copy(fontWeight = FontWeight.Medium), color = colors.danger)
+                Text(failedLabel, style = OpenCodeTextStyles.caption1.copy(fontWeight = FontWeight.Medium), color = colors.danger)
             }
         }
         if (isKnown) {
@@ -143,10 +157,11 @@ internal fun SubagentToolView(call: OpenCodeToolCall, subagents: Map<String, Tra
 private fun InlineToolGroupHeaderLabel(header: InlineToolGroupHeader, expanded: Boolean, modifier: Modifier = Modifier) {
     val colors = OpenCodeTheme.colors
     val style = TranscriptFonts.metaFont().copy(fontFeatureSettings = "tnum")
+    val failedCount = stringResource(R.string.transcript_tool_group_failed_count, header.failed)
     if (isAccessibilityTextSize()) {
         val text = buildAnnotatedString {
             withStyle(SpanStyle(color = colors.secondaryText)) { append(header.title) }
-            if (header.failed > 0) withStyle(SpanStyle(color = colors.danger)) { append(" · ${header.failed} failed") }
+            if (header.failed > 0) withStyle(SpanStyle(color = colors.danger)) { append(" · $failedCount") }
             header.cue?.let { withStyle(SpanStyle(color = colors.secondaryText)) { append(" · $it") } }
         }
         Text(text, modifier, style = style)
@@ -161,7 +176,7 @@ private fun InlineToolGroupHeaderLabel(header: InlineToolGroupHeader, expanded: 
             // RollingNumber falls back to plain text when it doesn't fit (iOS `ViewThatFits`).
             RollingNumber(header.title, style = style, color = colors.secondaryText)
             if (header.failed > 0) {
-                RollingNumber(" · ${header.failed} failed", style = style, color = colors.danger)
+                RollingNumber(" · $failedCount", style = style, color = colors.danger)
             }
             header.cue?.let {
                 Text(" · $it", style = style, color = colors.secondaryText, maxLines = 1, softWrap = false)
@@ -191,7 +206,10 @@ internal fun InlineToolGroupView(entry: TranscriptEntry, key: String, tools: Lis
     val images = entry.toolImageAttachments
     val header = InlineToolGroupHeader(tools)
     val rows = InlineToolRow.rows(tools)
-    Column(verticalArrangement = Arrangement.spacedBy(TranscriptMetrics.clustered)) {
+    val expandedLabel = stringResource(R.string.transcript_expanded)
+    val collapsedLabel = stringResource(R.string.transcript_collapsed)
+    val toolImageLabel = stringResource(R.string.transcript_tool_image)
+    Column {
         InlineToolGroupHeaderLabel(
             header,
             isExpanded,
@@ -199,22 +217,24 @@ internal fun InlineToolGroupView(entry: TranscriptEntry, key: String, tools: Lis
                 .fillMaxWidth()
                 .rowHitTarget(
                     target = Modifier
-                        .clickable(role = Role.Button) {
+                        .rowClickable {
                             disclosure.toggle(TranscriptDisclosureState.Kind.ToolGroups, key, entry.id, crossFades = true)
                         }
                         .clearAndSetSemantics {
                             contentDescription = header.spoken
-                            stateDescription = if (isExpanded) "Expanded" else "Collapsed"
+                            stateDescription = if (isExpanded) expandedLabel else collapsedLabel
                             role = Role.Button
                             onClick { disclosure.toggle(TranscriptDisclosureState.Kind.ToolGroups, key, entry.id, crossFades = true); true }
                         },
                 ),
         )
         if (images.isNotEmpty()) {
-            ToolImageMosaic(images) { id ->
-                TranscriptImagePreview.fromAttachments(images, id, "Tool image", context.server)?.let { context.send(TranscriptAction.PreviewImage(it)) }
+            ToolImageMosaic(images, Modifier.padding(top = TranscriptMetrics.clustered)) { id ->
+                TranscriptImagePreview.fromAttachments(images, id, toolImageLabel, context.server)?.let { context.send(TranscriptAction.PreviewImage(it)) }
             }
         }
+        val videos = entry.toolVideoReferences
+        if (videos.isNotEmpty()) AgentFileCards(videos, onOpen = { context.send(TranscriptAction.OpenFile(it)) })
         DisclosedBand(isExpanded) {
             Column {
                 for (row in rows) InlineToolRowView(entry, row, subagents)
@@ -229,7 +249,7 @@ private fun InlineToolRowView(entry: TranscriptEntry, row: InlineToolRow, subage
         // The subagent card stays a card, in the band.
         is InlineToolRow.Kind.Tool if kind.call.isSubagent() ->
             SubagentToolView(kind.call, subagents, Modifier.padding(vertical = InlineRowMetrics.rowPadding))
-        is InlineToolRow.Kind.Notice -> InlineRowLabel(row, expanded = false, Modifier.semantics(mergeDescendants = true) {})
+        is InlineToolRow.Kind.Notice -> InlineRowLabel(row, Modifier.semantics(mergeDescendants = true) {})
         is InlineToolRow.Kind.Tool -> InlineRowDisclosure(entry, row, listOf(row.id to kind.call))
         is InlineToolRow.Kind.Reads -> InlineRowDisclosure(entry, row, row.memberIDs.zip(kind.calls))
     }
@@ -240,22 +260,36 @@ private fun InlineRowDisclosure(entry: TranscriptEntry, row: InlineToolRow, bodi
     val disclosure = LocalTranscriptRowContext.current.disclosure
     val expanded = disclosure.isOpen(Kind, row.id)
     val toggle = { disclosure.toggle(Kind, row.id, entry.id, crossFades = true) }
+    val failedLabel = stringResource(R.string.transcript_tool_failed)
+    val runningLabel = stringResource(R.string.transcript_tool_running)
+    val expandedLabel = stringResource(R.string.transcript_expanded)
+    val collapsedLabel = stringResource(R.string.transcript_collapsed)
+    var detailFits by remember(row.id) { mutableStateOf(true) }
     Column {
         InlineRowLabel(
             row,
-            expanded,
             Modifier
-                .clickable(role = Role.Button, onClickLabel = if (expanded) "Hide tool input and output" else "Show tool input and output", onClick = toggle)
+                .rowHitTarget(
+                    top = 0.dp,
+                    bottom = 0.dp,
+                    target = Modifier.rowClickable(
+                        role = Role.Button,
+                        onClickLabel = if (expanded) stringResource(R.string.transcript_tool_hide_click_label) else stringResource(R.string.transcript_tool_show_click_label),
+                        onClick = toggle,
+                    ),
+                )
                 .semantics(mergeDescendants = true) {
                     stateDescription = listOfNotNull(
-                        if (row.isFailed) "Failed" else if (row.isRunning) "Running" else null,
-                        if (expanded) "Expanded" else "Collapsed",
+                        if (row.isFailed) failedLabel else if (row.isRunning) runningLabel else null,
+                        if (expanded) expandedLabel else collapsedLabel,
                     ).joinToString(", ")
                 },
+            onDetailFits = { detailFits = it },
         )
-        AnimatedVisibility(expanded, enter = DisclosedTransition.enter, exit = DisclosedTransition.exit) {
+        DisclosedContent(expanded) {
             Column(Modifier.padding(top = TranscriptMetrics.compact), verticalArrangement = Arrangement.spacedBy(TranscriptMetrics.clustered)) {
-                for ((id, call) in bodies) ToolBody(entry, id, call)
+                val headerDetail = if (bodies.size == 1 && detailFits) row.detail else null
+                for ((id, call) in bodies) ToolBody(entry, id, call, headerDetail)
             }
         }
     }
@@ -266,22 +300,23 @@ private fun InlineRowDisclosure(entry: TranscriptEntry, row: InlineToolRow, bodi
  * detail; only commands are mono, and only failures are marked, in red.
  */
 @Composable
-private fun InlineRowLabel(row: InlineToolRow, expanded: Boolean, modifier: Modifier = Modifier) {
+private fun InlineRowLabel(row: InlineToolRow, modifier: Modifier = Modifier, onDetailFits: (Boolean) -> Unit = {}) {
     val colors = OpenCodeTheme.colors
     val style = OpenCodeTextStyles.subheadline
     Row(
         modifier.fillMaxWidth().padding(vertical = InlineRowMetrics.rowPadding),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
     ) {
-        OpenCodeIcon(
-            toolGlyph(row),
-            contentDescription = null,
-            size = 16.dp,
-            tint = if (row.isFailed) colors.danger else colors.tertiaryText,
-        )
+        Box(Modifier.height(with(LocalDensity.current) { style.lineHeight.toDp() }), contentAlignment = Alignment.Center) {
+            OpenCodeIcon(
+                toolGlyph(row),
+                contentDescription = null,
+                size = 16.dp,
+                tint = if (row.isFailed) colors.danger else colors.tertiaryText,
+            )
+        }
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            InlineRowText(row, expanded, style)
+            InlineRowText(row, style, onDetailFits)
         }
     }
 }
@@ -289,20 +324,22 @@ private fun InlineRowLabel(row: InlineToolRow, expanded: Boolean, modifier: Modi
 /** The tool's glyph, by name (the desktop shows one per tool kind). */
 private fun toolGlyph(row: InlineToolRow): String {
     if (row.detailIsCommand) return "terminal"
+    if (row.kind is InlineToolRow.Kind.Reads) return "doc.text"
     val name = row.name.lowercase()
     return when {
+        // Before "write": todowrite.
+        "todo" in name -> "checklist"
         "read" in name -> "doc.text"
         "write" in name -> "doc"
         "edit" in name || "patch" in name -> "pencil"
         "grep" in name || "glob" in name || "search" in name || "find" in name || "list" in name -> "magnifyingglass"
         "fetch" in name || "web" in name -> "globe"
-        "todo" in name -> "checklist"
         else -> "hammer.fill"
     }
 }
 
 @Composable
-private fun RowScope.InlineRowText(row: InlineToolRow, expanded: Boolean, style: TextStyle) {
+private fun RowScope.InlineRowText(row: InlineToolRow, style: TextStyle, onDetailFits: (Boolean) -> Unit) {
     val colors = OpenCodeTheme.colors
     run {
         Text(
@@ -313,7 +350,7 @@ private fun RowScope.InlineRowText(row: InlineToolRow, expanded: Boolean, style:
         )
         val detail = row.detail
         if (detail != null) {
-            val unlimited = expanded || isAccessibilityTextSize()
+            val unlimited = isAccessibilityTextSize()
             Text(
                 detail,
                 Modifier.alignByBaseline().weight(1f, fill = false),
@@ -321,10 +358,11 @@ private fun RowScope.InlineRowText(row: InlineToolRow, expanded: Boolean, style:
                 color = if (row.isFailed) colors.danger else colors.secondaryText,
                 maxLines = if (unlimited) Int.MAX_VALUE else 1,
                 overflow = TextOverflow.Ellipsis,
+                onTextLayout = { onDetailFits(!it.hasVisualOverflow) },
             )
         }
         // Denying is an answer, not a failure.
-        if (row.isDenied) Text("Denied", Modifier.alignByBaseline(), style = style, color = colors.secondaryText)
+        if (row.isDenied) Text(stringResource(R.string.transcript_tool_denied), Modifier.alignByBaseline(), style = style, color = colors.secondaryText)
     }
 }
 
@@ -337,11 +375,12 @@ private const val foldedOutputLines = 16
  * scalars read as text, structures as compact JSON per argument.
  */
 @Composable
-private fun ToolBody(entry: TranscriptEntry, id: String, call: OpenCodeToolCall) {
+private fun ToolBody(entry: TranscriptEntry, id: String, call: OpenCodeToolCall, headerDetail: String? = null) {
     val context = LocalTranscriptRowContext.current
     val colors = OpenCodeTheme.colors
-    val command = if (call.isShell) call.input.obj?.get("command")?.string?.nonEmpty else null
-    val arguments = call.arguments
+    val shellCommand = if (call.isShell) call.input.obj?.get("command")?.string?.nonEmpty else null
+    val command = if (shellCommand == headerDetail) null else shellCommand
+    val arguments = call.arguments.filter { (_, value) -> value != headerDetail }
     val output = call.output.joinToString("\n").trim('\n', '\r')
     val shape = RoundedCornerShape(TranscriptMetrics.controlCornerRadius)
     val hasInput = command != null || arguments.isNotEmpty()
@@ -392,11 +431,11 @@ private fun ToolBody(entry: TranscriptEntry, id: String, call: OpenCodeToolCall)
                         Box(
                             Modifier
                                 .heightIn(min = TranscriptMetrics.minimumHitSide)
-                                .clickable(role = Role.Button) { context.disclosure.toggle(Kind, outputKey, entry.id) },
+                                .rowHitTarget(top = 0.dp, bottom = 0.dp, target = Modifier.rowClickable { context.disclosure.toggle(Kind, outputKey, entry.id) }),
                             contentAlignment = Alignment.CenterStart,
                         ) {
                             Text(
-                                if (showsAllOutput) "Show Less" else "Show All $outputLines Lines",
+                                if (showsAllOutput) stringResource(R.string.transcript_show_less) else pluralStringResource(R.plurals.transcript_tool_output_show_all, outputLines, outputLines),
                                 style = OpenCodeTextStyles.footnote.copy(fontWeight = FontWeight.Medium),
                                 color = colors.secondaryText,
                             )
@@ -436,7 +475,7 @@ private fun ToolBody(entry: TranscriptEntry, id: String, call: OpenCodeToolCall)
                 val name = file.name
                 val style = OpenCodeTextStyles.footnote.copy(fontWeight = FontWeight.Medium)
                 OpenCodeIcon(file.symbolName, contentDescription = null, size = OpenCodeIconSize.small, tint = colors.secondaryText)
-                Text("Open $name", Modifier.weight(1f), style = style, color = colors.text, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
+                Text(stringResource(R.string.transcript_open_named, name), Modifier.weight(1f), style = style, color = colors.text, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
                 OpenCodeIcon("chevron.right", contentDescription = null, size = 14.dp, tint = colors.tertiaryText)
             }
         }
@@ -465,14 +504,18 @@ private fun InlineQuestionView(entry: TranscriptEntry, id: String, call: OpenCod
     val lines = InlineQuestion.lines(questions, InlineQuestion.options(call), call.questionAnswers, summary.decline != null, summary.reason)
     val toggle = { disclosure.toggle(Kind, id, entry.id, crossFades = true) }
     val style = TranscriptFonts.metaFont()
-    Column(verticalArrangement = Arrangement.spacedBy(TranscriptMetrics.clustered)) {
+    val expandedLabel = stringResource(R.string.transcript_expanded)
+    val collapsedLabel = stringResource(R.string.transcript_collapsed)
+    val hideQuestionLabel = stringResource(R.string.transcript_question_hide_click_label)
+    val showQuestionLabel = stringResource(R.string.transcript_question_show_click_label)
+    Column {
         val target = Modifier
-            .clickable(role = Role.Button, onClick = toggle)
+            .rowClickable(onClick = toggle)
             .clearAndSetSemantics {
                 contentDescription = summary.spoken
-                stateDescription = if (expanded) "Expanded" else "Collapsed"
+                stateDescription = if (expanded) expandedLabel else collapsedLabel
                 role = Role.Button
-                onClick(if (expanded) "Hide the question" else "Show the question and your answer") { toggle(); true }
+                onClick(if (expanded) hideQuestionLabel else showQuestionLabel) { toggle(); true }
             }
         val headerModifier = Modifier.fillMaxWidth().rowHitTarget(target = target)
         if (isAccessibilityTextSize()) {
@@ -529,7 +572,7 @@ private fun InlineQuestionLine(line: InlineQuestion.Line) {
             )
         }
         if (line.kind == InlineQuestion.Line.Kind.Chosen) {
-            OpenCodeIcon("checkmark", contentDescription = "Chosen", Modifier.align(Alignment.CenterVertically).size(12.dp), size = 12.dp, tint = colors.secondaryText)
+            OpenCodeIcon("checkmark", contentDescription = stringResource(R.string.transcript_question_chosen_description), Modifier.align(Alignment.CenterVertically).size(12.dp), size = 12.dp, tint = colors.secondaryText)
         }
     }
 }

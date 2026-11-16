@@ -17,17 +17,6 @@ import org.junit.Rule
 import org.junit.Test
 import kotlin.time.Duration.Companion.milliseconds
 
-/**
- * Port of iOS `LaunchBloomTests.swift` against `LaunchBloomController`'s policy on the AndroidX
- * splash. Dropped (no Android counterpart): `onlyForegroundColdLaunchCanMount` and
- * `backgroundingAndSceneDetachmentReleaseCover` (UIScene activation states and window cover
- * views: the system splash shows only on an activity's cold start and goes with it),
- * `touchRevealsContentAtOnce` (the splash takes no touches), `handoffIsAHardCutOrAtMostAShortCrossfade`
- * (no `launch.fade` tunable: always a hard cut), `systemLaunchUsesTheSameBlankBackground`
- * (Info.plist `UILaunchScreen`), `rootStopsObservingSessionRowsOnceLaunchIsDecided` (SwiftUI
- * observation tracking). The cover's colour half of `coverIsTheBlankLaunchBackground…` is the
- * splash theme's.
- */
 class LaunchBloomTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -36,7 +25,7 @@ class LaunchBloomTests {
 
     private fun <R> withClock(block: () -> R): R = DependencyValues.withValues(values, block)
 
-    /** iOS `makeController()` + `attachIfNeeded`: a fresh cover over a cold launch. */
+    /** A fresh cover over a cold launch. */
     private fun arm() = withClock {
         LaunchBloomController.hasCompletedColdLaunch = false
         LaunchBloomController.startedAt = null

@@ -19,7 +19,6 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
-/** Port of iOS `VoiceCallLogLiveTests` (its AppFeature test, `leavingHomeMidCallSavesTheCallLog`, is `:app`'s). */
 class VoiceCallLogLiveTests {
     @get:Rule val isolation = TestIsolationRule()
     @get:Rule val temporary = TemporaryFolder()

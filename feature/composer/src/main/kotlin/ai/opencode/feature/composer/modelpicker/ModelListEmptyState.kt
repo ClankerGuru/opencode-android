@@ -2,12 +2,14 @@
 
 package ai.opencode.feature.composer.modelpicker
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodePrimaryButton
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.ProviderIcon as CoreProviderIcon
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.composer.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -20,13 +22,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 /**
- * iOS `ModelListEmptyState`: the search's empty state, else **Couldn’t Load Models** with the
- * error and **Try Again** (when [includesLoadError]), else **No Models**.
+ * The search's empty state, else **Couldn’t Load Models** with the error and **Try Again** (when
+ * [includesLoadError]), else **No Models**.
  */
 @Composable
 fun ModelListEmptyState(
@@ -38,24 +41,24 @@ fun ModelListEmptyState(
     when {
         state.isFilteringModels -> ContentUnavailable(
             symbol = SFSymbol.Magnifyingglass,
-            title = "No Results for “${state.modelFilter}”",
-            description = "Check the spelling or try a new search.",
+            title = stringResource(R.string.composer_model_no_results_title, state.modelFilter),
+            description = stringResource(R.string.composer_model_no_results_message),
         )
         includesLoadError && error != null -> ContentUnavailable(
             symbol = SFSymbol.ExclamationmarkTriangle,
-            title = "Couldn’t Load Models",
+            title = stringResource(R.string.composer_model_load_failed_title),
             description = error,
-            action = { OpenCodePrimaryButton(text = "Try Again", onClick = onTryAgain) },
+            action = { OpenCodePrimaryButton(text = stringResource(CoreR.string.common_try_again), onClick = onTryAgain) },
         )
         else -> ContentUnavailable(
             symbol = SFSymbol.Cpu,
-            title = "No Models",
-            description = "Connect a provider in OpenCode on your computer, then try again.",
+            title = stringResource(R.string.composer_model_empty_title),
+            description = stringResource(R.string.composer_model_empty_message),
         )
     }
 }
 
-/** iOS `ContentUnavailableView`: a large glyph, a title and a description, centred. */
+/** A large glyph, a title and a description, centred. */
 @Composable
 internal fun ContentUnavailable(
     symbol: SFSymbol,

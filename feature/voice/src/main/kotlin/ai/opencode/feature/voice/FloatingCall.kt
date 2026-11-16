@@ -8,6 +8,8 @@ import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionTransition
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.observe
+import ai.opencode.core.strings.localized
+import ai.opencode.core.strings.localizedPlural
 import ai.opencode.core.tuning.Tunable
 import ai.opencode.core.tuning.TunableChoice
 import ai.opencode.core.tuning.TuningPreset
@@ -114,6 +116,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -150,24 +153,22 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-// Port of iOS `OpenCode/Voice/FloatingCall.swift` (f657969b, "One Shape"): the call floats over
-// the app as one shape that is the orb at rest, the card, and the sheet. The composer's phone
-// button breaks out into the orb (Lift and Spin Up, `FloatingCallConnectMotion`); the orb floats
-// free (Floaty, `FloatingCallFloatMotion`), a tap grows it into the card and a drag steps it
-// between the orb, the card and the sheet (`FloatingCallStageMotion`); hanging up flies it back
-// into the call button. iOS's Liquid Glass shape is an M3 surface here (tonal fill, Material
-// shadow); the stage store is `FloatingCallStageFeature`, the geometry and motion live in
-// `FloatingCallStages.kt` and `FloatingCallFloat.kt`, and the card's content in
-// `FloatingCallStageContent.kt`. Coordinates are window dp, as iOS's screen points.
+// The call floats over the app as one shape that is the orb at rest, the card, and the sheet. The
+// composer's phone button breaks out into the orb (Lift and Spin Up, `FloatingCallConnectMotion`);
+// the orb floats free (Floaty, `FloatingCallFloatMotion`), a tap grows it into the card and a drag
+// steps it between the orb, the card and the sheet (`FloatingCallStageMotion`); hanging up flies it
+// back into the call button. The stage store is `FloatingCallStageFeature`, the geometry and motion
+// live in `FloatingCallStages.kt` and `FloatingCallFloat.kt`, and the card's content in
+// `FloatingCallStageContent.kt`. Coordinates are window dp.
 
-/** The resting shape (iOS `FloatingCallStyle`): the orb, or a capsule with End beside it. */
+/** The resting shape: the orb, or a capsule with End beside it. */
 @Suppress("EnumEntryName")
 enum class FloatingCallStyle(override val rawValue: String) : TunableChoice {
     orb("orb"),
     capsule("capsule"),
 }
 
-/** iOS `FloatingCallTunables`: placement, the break-out's shadows, and Floaty's drag and throw. */
+/** Placement, the break-out's shadows, and Floaty's drag and throw. */
 object FloatingCallTunables {
     // Placement and break-out
     val style = Tunable("call.float.kind", "Shape", default = FloatingCallStyle.orb)
@@ -205,8 +206,6 @@ object FloatingCallTunables {
 }
 
 /**
- * iOS `FloatingCallTunables.labStyle/labScenes`
- * (`-lab-floating-call-style capsule`, `-lab-floating-scenes YES`):
  * UI tests and captures pick a look. Debug builds only, through [VoiceLabEnvironment]: `adb shell
  * setprop debug.opencode.lab_floating_call_style capsule`, `…lab_floating_scenes 1`.
  */
@@ -225,7 +224,7 @@ data class FloatingCallLab(
     }
 }
 
-/** Where the floating call takes touches (iOS `FloatingCallTouchArea`); everything else reaches the app beneath. */
+/** Where the floating call takes touches; everything else reaches the app beneath. */
 sealed interface FloatingCallTouchArea {
     data object None : FloatingCallTouchArea
 
@@ -237,10 +236,9 @@ sealed interface FloatingCallTouchArea {
 }
 
 /**
- * Where the floating call starts and rests (iOS
- * `FloatingCallCenter`). The session screen reports its call button and composer, in window
- * coordinates in dp ([floatingCallButton], [floatingCallComposer]); the overlay reads them.
- * One per process, behind its dependency key; main thread only.
+ * Where the floating call starts and rests. The session screen reports its call button and
+ * composer, in window coordinates in dp ([floatingCallButton], [floatingCallComposer]); the overlay
+ * reads them. One per process, behind its dependency key; main thread only.
  */
 class FloatingCallCenter {
     /** A panel request: open or shut, and a counter bumped on each request. */
@@ -370,7 +368,7 @@ fun Modifier.floatingCallDrawerButton(): Modifier = this then FloatingCallFrameE
 /**
  * Reports this element (the composer's readable column, not the pane) to
  * [FloatingCallCenter.noteComposerColumn]: whether the call's card covers it. Apply it only while
- * the call floats and the screen shows (iOS `onGeometryChange` gated on `!isCovered`).
+ * the call floats and the screen shows.
  */
 fun Modifier.floatingCallComposerColumn(): Modifier = this then FloatingCallFrameElement(FloatingCallFrameKind.composerColumn)
 
@@ -383,7 +381,7 @@ private data class FloatingCallFrameElement(val kind: FloatingCallFrameKind) : M
     override fun InspectorInfo.inspectableProperties() { name = "floatingCallFrame" }
 }
 
-/** Reports its element's window bounds in dp, as iOS's screen-space frames. */
+/** Reports its element's window bounds in dp. */
 private class FloatingCallFrameNode(var kind: FloatingCallFrameKind) : Modifier.Node(), GlobalPositionAwareModifierNode, CompositionLocalConsumerModifierNode {
     override fun onGloballyPositioned(coordinates: LayoutCoordinates) {
         val density = currentValueOf(LocalDensity).density
@@ -404,9 +402,9 @@ private class FloatingCallFrameNode(var kind: FloatingCallFrameKind) : Modifier.
 }
 
 /**
- * What a host floats (iOS `FloatingCallWindowContent`): the call, the last one (kept while its
- * shape lands), and where the overlay takes touches, for a host that hosts it in a window of its
- * own and must pass every other touch through.
+ * What a host floats: the call, the last one (kept while its shape lands), and where the overlay
+ * takes touches, for a host that hosts it in a window of its own and must pass every other touch
+ * through.
  */
 @Stable
 class FloatingCallWindowContent {
@@ -420,18 +418,17 @@ class FloatingCallWindowContent {
 
     var last by mutableStateOf<VoiceStoreOf?>(null)
 
-    /** Written by the overlay as its shape moves (iOS `@ObservationIgnored`). */
+    /** Written by the overlay as its shape moves. */
     var touchArea: FloatingCallTouchArea = FloatingCallTouchArea.None
 }
 
-/** The host the overlay reports its touch area to, if any (iOS `\.floatingCallWindow`). */
+/** The host the overlay reports its touch area to, if any. */
 val LocalFloatingCallWindow = staticCompositionLocalOf<FloatingCallWindowContent?> { null }
 
 /**
- * The floating call's host (iOS `FloatingCallWindow` + `FloatingCallWindowRoot`), mounted once at
- * the app's root over everything else, full window (its coordinates are the window's, in dp, as
- * [floatingCallButton] and [floatingCallComposer] report them), drawn edge to edge: it reads the
- * system bars and cutout itself.
+ * The floating call's host, mounted once at the app's root over everything else, full window (its
+ * coordinates are the window's, in dp, as [floatingCallButton] and [floatingCallComposer] report
+ * them), drawn edge to edge: it reads the system bars and cutout itself.
  *
  * The host passes the call to float (null when there's none or the experiment is off,
  * [FloatingCallCenter.isOn]). An ended call stays while its shape lands in the call button
@@ -462,7 +459,7 @@ fun FloatingCallWindow(
         }
     }
     val reduceMotion = rememberReduceMotion()
-    // iOS waits for the landing up to 40 × 0.1 s before taking the window down.
+    // Waits for the landing up to 40 × 0.1 s before taking the window down.
     var expired by remember { mutableStateOf(false) }
     LaunchedEffect(call) {
         expired = false
@@ -494,10 +491,10 @@ fun FloatingCallWindow(
 }
 
 /**
- * The card and the sheet, grown from the orb where it rests, on its side of the screen (iOS
- * `stageGeometry`). Covering (`call.stage.covers`), the card stands at the screen's foot with the
- * same margin as its sides, over the composer and its pills, so the keyboard never squeezes it;
- * otherwise it stands above the composer.
+ * The card and the sheet, grown from the orb where it rests, on its side of the screen. Covering
+ * (`call.stage.covers`), the card stands at the screen's foot with the same margin as its sides,
+ * over the composer and its pills, so the keyboard never squeezes it; otherwise it stands above the
+ * composer.
  */
 internal fun floatingCallStageGeometry(area: FloatingCallRestArea, rest: Rect): FloatingCallStageGeometry {
     val covers = FloatingCallStageTunables.covers.value
@@ -518,10 +515,10 @@ internal fun floatingCallStageGeometry(area: FloatingCallRestArea, rest: Rect): 
 }
 
 /**
- * The floating call over the whole window (iOS `FloatingCallOverlay`): drawn edge to edge, it
- * reads the system bars and cutout as its safe area. Mount it through [FloatingCallWindow],
- * which keeps an ended call while it lands; mounted on its own, keep it composed (with its
- * store) until [FloatingCallCenter.isLanding] goes false, or the hang-up flight is cut short.
+ * The floating call over the whole window: drawn edge to edge, it reads the system bars and cutout
+ * as its safe area. Mount it through [FloatingCallWindow], which keeps an ended call while it
+ * lands; mounted on its own, keep it composed (with its store) until [FloatingCallCenter.isLanding]
+ * goes false, or the hang-up flight is cut short.
  */
 @Composable
 fun FloatingCallOverlay(store: VoiceStoreOf, modifier: Modifier = Modifier) {
@@ -540,11 +537,14 @@ fun FloatingCallOverlay(store: VoiceStoreOf, modifier: Modifier = Modifier) {
     }
 }
 
-/** What a drag on the card or sheet does (iOS `DragMode`): step the stage, or nothing (a sideways drag). */
+/** What a drag on the card or sheet does: step the stage, or nothing (a sideways drag). */
 @Suppress("EnumEntryName")
 private enum class FloatingCallDragMode { stage, ignored }
 
-/** A finger on the resting orb, from touch-down (iOS `OrbTouch`): where it held the orb, and whether it caught it mid-drift. */
+/**
+ * A finger on the resting orb, from touch-down: where it held the orb, and whether it caught it
+ * mid-drift.
+ */
 private class FloatingCallOrbTouch(
     val offset: Offset,
     val origin: Offset,
@@ -557,9 +557,8 @@ private class FloatingCallOrbTouch(
 }
 
 /**
- * The surface's state and logic (iOS `FloatingCallSurface`'s `@State` and its functions): the
- * three motions, the touch, the tag and the tasks. The body reads its snapshot state; gestures,
- * effects and the motions' callbacks call into it.
+ * The surface's state and logic: the three motions, the touch, the tag and the tasks. The body
+ * reads its snapshot state; gestures, effects and the motions' callbacks call into it.
  */
 @Stable
 private class FloatingCallSurfaceModel(
@@ -602,7 +601,7 @@ private class FloatingCallSurfaceModel(
             return Size(width, height)
         }
 
-    /** Where the orb may be on the screen as it is when called (iOS `liveRestArea`), for motion that outlives a body. */
+    /** Where the orb may be on the screen as it is when called, for motion that outlives a body. */
     fun liveRestArea(): FloatingCallRestArea = FloatingCallRestArea(layout.screen, layout.safeArea, center.composer?.top, restSize, layout.keyboardTop)
 
     val restFrame: Rect get() = liveRestArea().frame(place)
@@ -704,7 +703,7 @@ private class FloatingCallSurfaceModel(
     /**
      * A keyboard rising in this window (a field the card doesn't cover, a sheet's search) would
      * bury Mute and End at the screen's foot: the card or sheet shrinks to the orb, which rides
-     * above it (iOS `keyboardRose`).
+     * above it.
      */
     fun keyboardRose() {
         if (store.state.floatingStage.stage == FloatingCallStage.orb || motion.isDragging || store.state.phase.isTerminal) return
@@ -714,7 +713,7 @@ private class FloatingCallSurfaceModel(
     /**
      * A keyboard the composer doesn't ride (the drawer's search, a sheet's field) would hide the
      * orb resting above the composer: it rests above the keyboard instead, and back down as it
-     * goes (iOS `keyboardMoved`). [top] is in this overlay's space, null with no keyboard.
+     * goes. [top] is in this overlay's space, null with no keyboard.
      */
     fun keyboardMoved(top: Float?) {
         if (layout.keyboardTop == top) return
@@ -757,7 +756,7 @@ private class FloatingCallSurfaceModel(
     /** The voice agent moved the call: say where it talks now. The user's own switches stay quiet. */
     fun sessionMoved(title: String) {
         if (store.state.phase.isTerminal) return
-        showTag("Now talking in $title")
+        showTag(localized(R.string.voice_floating_now_talking_in, VoiceFeature.State.displayTitle(title)))
     }
 
     private fun showTag(text: String) {
@@ -1020,7 +1019,7 @@ private class FloatingCallSurfaceModel(
         motion.drag(BACK_PULL * progress, stageGeometry())
     }
 
-    /** Back steps one stage down (iOS has no back; TalkBack's dismiss does the same). */
+    /** Back steps one stage down. */
     fun backCommitted() {
         val next = store.state.floatingStage.stage.previous
         if (backPulling) {
@@ -1040,12 +1039,11 @@ private class FloatingCallSurfaceModel(
         /** How far a predictive back gesture pulls the shape down before it lets go, in dp. */
         const val BACK_PULL = 56.0
 
-        /** Android's minimum touch target (iOS 44 pt). */
+        /** Android's minimum touch target. */
         const val MIN_TOUCH = 48f
     }
 }
 
-/** iOS `FloatingCallSurface.mood`. */
 private fun floatingCallMood(state: VoiceFeature.State): FloatingCallMood = when (state.phase) {
     VoiceFeature.State.Phase.Connecting -> FloatingCallMood.connecting
     VoiceFeature.State.Phase.Ended, VoiceFeature.State.Phase.Dropped, is VoiceFeature.State.Phase.Failed -> FloatingCallMood.ended
@@ -1057,7 +1055,7 @@ private fun floatingCallMood(state: VoiceFeature.State): FloatingCallMood = when
     }
 }
 
-/** iOS `FloatingCallSurface.statusText`: playground scenes name themselves. */
+/** Playground scenes name themselves. */
 private fun floatingCallStatus(scene: FloatingCallScene?, status: String): String = when (scene) {
     FloatingCallScene.needsInput -> "Needs your input"
     FloatingCallScene.thinking -> "Working"
@@ -1070,7 +1068,7 @@ private fun floatingCallStatus(scene: FloatingCallScene?, status: String): Strin
 
 private class FloatingCallPrevious<T>(var value: T)
 
-/** iOS `.onChange(of:)`: runs [action] after a composition in which [value] changed (not initially). */
+/** Runs [action] after a composition in which [value] changed (not initially). */
 @Composable
 private fun <T> OnChange(value: T, action: (T) -> Unit) {
     val previous = remember { FloatingCallPrevious(value) }
@@ -1082,7 +1080,7 @@ private fun <T> OnChange(value: T, action: (T) -> Unit) {
     }
 }
 
-/** Lays its children out unconstrained at its origin; each places itself with `offset` (SwiftUI's `.position`/`.offset` in a top-leading ZStack). */
+/** Lays its children out unconstrained at its origin; each places itself with `offset`. */
 @Composable
 private fun FloatingCallStack(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Layout(content, modifier) { measurables, constraints ->
@@ -1128,6 +1126,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
     val terminal = phase.isTerminal
     val scene = center.scene
     val statusText = floatingCallStatus(scene, storeStatus)
+    val expandLabel = stringResource(R.string.voice_floating_expand)
 
     // The keyboard raises the composer in one layout pass: glide after it.
     val rawComposerTop = center.composer?.top
@@ -1146,8 +1145,8 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
     val float = model.float
     val style = model.style
     val restSize = model.restSize
-    // The window's keyboard top while one is up, in this overlay's space (it fills the window
-    // edge to edge): iOS reads the scene's keyboard notifications, Android its IME insets.
+    // The window's keyboard top while one is up, in this overlay's space (it fills the window edge
+    // to edge).
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current) / density
     val keyboardTop = if (imeBottom > 0f && imeBottom < screen.height) screen.height - imeBottom else null
     val restArea = FloatingCallRestArea(screen, safeArea, composerTop, restSize, keyboardTop)
@@ -1178,7 +1177,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
         if (center.orbLayout != orbLayout) center.orbLayout = orbLayout
     }
 
-    // iOS onAppear: laidOut(), appeared(); a new screen or safe area lays out again.
+    // A new screen or safe area lays out again.
     LaunchedEffect(model) {
         model.laidOut(screen, safeArea)
         model.appeared()
@@ -1232,7 +1231,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
         Modifier
             .fillMaxSize()
             .onPlaced { model.root = it }
-            // iOS `.accessibilityAction(.escape)` (VoiceOver's scrub): TalkBack's dismiss steps one stage down.
+            // TalkBack's dismiss steps one stage down.
             .semantics {
                 dismiss {
                     model.send(FloatingCallStageFeature.Action.StepBack)
@@ -1316,7 +1315,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
                 if (rides) Rect(Offset.Zero, frame.size) else look.restFrame.translate(-frame.left, -frame.top)
             }
             // The shape's own layers, clipped to it; the orb's controls and the call button ride
-            // above, so the mute badge can sit over the orb's rim (iOS's controls layer).
+            // above, so the mute badge can sit over the orb's rim.
             FloatingCallStack(
                 Modifier
                     .fillMaxSize()
@@ -1405,7 +1404,7 @@ private fun FloatingCallSurface(store: VoiceStoreOf, screen: Size, safeArea: Flo
                                 // Already the sheet: nothing to expand to.
                                 if (stage != FloatingCallStage.full) {
                                     customActions = listOf(
-                                        CustomAccessibilityAction("Expand") {
+                                        CustomAccessibilityAction(expandLabel) {
                                             model.send(FloatingCallStageFeature.Action.Requested(FloatingCallStage.full))
                                             true
                                         },
@@ -1607,9 +1606,8 @@ private fun Modifier.placed(rect: () -> Rect): Modifier = layout { measurable, _
 
 /** Above the bloom's centre and the room below it in its field: enough for the card and the sheet's field at any stage between. */
 /**
- * How long the composer's own button takes to come back under a landed shape (iOS
- * `FloatingCallWindowRoot.buttonReturn`): the incoming button has to be there before the shape
- * leaves.
+ * How long the composer's own button takes to come back under a landed shape: the incoming button
+ * has to be there before the shape leaves.
  */
 private const val FLOATING_CALL_BUTTON_RETURN = 0.15
 
@@ -1627,7 +1625,7 @@ private fun FloatingCallOrbFace(config: LivingOrbConfig, placed: Boolean, isHidd
     }
 }
 
-/** The resting orb's face (iOS `restContent(.face)`), laid out as [FloatingCallRestControls]. */
+/** The resting orb's face, laid out as [FloatingCallRestControls]. */
 @Composable
 private fun FloatingCallRestFace(
     style: FloatingCallStyle,
@@ -1657,7 +1655,7 @@ private fun capsuleEndDiameter(orbSize: Float): Float = min(40f, orbSize - 12)
 
 private fun capsuleEndPadding(orbSize: Float): Float = max(0f, (orbSize - capsuleEndDiameter(orbSize)) / 2 - 2)
 
-/** What you touch on the resting orb (iOS `restContent(.controls)`): mounted only while it rests as the orb. */
+/** What you touch on the resting orb: mounted only while it rests as the orb. */
 @Composable
 private fun FloatingCallRestControls(
     style: FloatingCallStyle,
@@ -1690,13 +1688,15 @@ private fun FloatingCallRestControls(
 /** The orb as one control: a tap is told from a drag by the shape's own gesture; TalkBack expands it. */
 @Composable
 private fun FloatingCallOrbControls(isMuted: Boolean, statusText: String, reduceMotion: Boolean, onExpand: () -> Unit, modifier: Modifier) {
+    val orbDescription = stringResource(R.string.voice_floating_orb_description)
+    val showControlsLabel = stringResource(R.string.voice_floating_orb_show_controls)
     Box(
         modifier.clearAndSetSemantics {
             role = Role.Button
-            contentDescription = "Voice call"
+            contentDescription = orbDescription
             stateDescription = statusText
             testTag = "floating-call-orb"
-            onClick(label = "Show the call’s controls") {
+            onClick(label = showControlsLabel) {
                 onExpand()
                 true
             }
@@ -1724,16 +1724,17 @@ private fun FloatingCallOrbControls(isMuted: Boolean, statusText: String, reduce
     }
 }
 
-/** The capsule's End (iOS `endButton(diameter:)`): a red circle in a full touch target. */
+/** The capsule's End: a red circle in a full touch target. */
 @Composable
 private fun FloatingCallEndButton(diameter: Float, isEnabled: Boolean, onEnd: () -> Unit, modifier: Modifier = Modifier) {
+    val endDescription = stringResource(R.string.voice_floating_end_description)
     Box(
         modifier
             .size(FloatingCallSurfaceModel.MIN_TOUCH.dp)
             // The press shows on the round button, not the square touch target around it.
             .clip(CircleShape)
             .clickable(enabled = isEnabled, role = Role.Button, onClick = onEnd)
-            .semantics { contentDescription = "End voice call" },
+            .semantics { contentDescription = endDescription },
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -1784,6 +1785,7 @@ internal fun RowScope.FloatingCallControl(
     action: () -> Unit,
 ) {
     val active = !isPlaceholder && isEnabled
+    val placeholderState = stringResource(R.string.voice_floating_control_placeholder_state)
     // Mute turning on, or every control dimming as the call ends, eases rather than flipping.
     val reduceMotion = rememberReduceMotion()
     val dim by animateFloatAsState(if (isPlaceholder || !isEnabled) 0.35f else 1f, Motion.swap.animation(reduceMotion = reduceMotion), label = "floatingCallControlDim")
@@ -1810,13 +1812,13 @@ internal fun RowScope.FloatingCallControl(
             .clickable(interactionSource = interaction, indication = null, enabled = active, role = Role.Button, onClick = action)
             .semantics {
                 contentDescription = name
-                if (isPlaceholder) stateDescription = "Not available in this prototype"
+                if (isPlaceholder) stateDescription = placeholderState
                 if (!active) disabled()
             },
         contentAlignment = Alignment.Center,
     ) {
-        // iOS dims the whole control; here the glyph takes iOS's dim and the plate only part of
-        // it, so a control that isn't available still reads as a button on the light card.
+        // The glyph takes the full dim and the plate only part of it, so a control that isn't
+        // available still reads as a button on the light card.
         val plateDim = 1f - (1f - dim) * 0.4f
         Box(
             Modifier
@@ -1840,7 +1842,7 @@ internal fun RowScope.FloatingCallControl(
     }
 }
 
-/** How long the call has run, or what it's doing before it connects (iOS `FloatingCallDuration`). */
+/** How long the call has run, or what it's doing before it connects. */
 @Composable
 internal fun FloatingCallDuration(connectedAt: Instant?, status: String, modifier: Modifier = Modifier) {
     val date = remember { dependency(DateClient) }
@@ -1854,13 +1856,14 @@ internal fun FloatingCallDuration(connectedAt: Instant?, status: String, modifie
         }
     }
     val text = if (connectedAt == null) status else "%d:%02d".format(Locale.ROOT, seconds / 60, seconds % 60)
+    val durationDescription = stringResource(R.string.voice_floating_duration_description)
     Text(
         text,
         style = OpenCodeTextStyles.footnote.copy(fontFeatureSettings = "tnum"),
         color = OpenCodeTheme.colors.secondaryText,
         maxLines = 1,
         modifier = modifier.clearAndSetSemantics {
-            contentDescription = "Call duration"
+            contentDescription = durationDescription
             // TalkBack reads "1:05" as a time of day; say how long it's been.
             stateDescription = if (connectedAt == null) text else floatingCallSpokenDuration(seconds)
         },
@@ -1871,10 +1874,12 @@ internal fun FloatingCallDuration(connectedAt: Instant?, status: String, modifie
 internal fun floatingCallSpokenDuration(seconds: Long): String {
     val minutes = seconds / 60
     val rest = seconds % 60
-    val secondsText = if (rest == 1L) "1 second" else "$rest seconds"
-    if (minutes == 0L) return secondsText
-    val minutesText = if (minutes == 1L) "1 minute" else "$minutes minutes"
-    return "$minutesText, $secondsText"
+    if (minutes == 0L) return localizedPlural(R.plurals.voice_floating_spoken_seconds, rest.toInt(), rest.toInt())
+    return localized(
+        R.string.voice_floating_spoken_duration,
+        localizedPlural(R.plurals.voice_floating_spoken_minutes, minutes.toInt(), minutes.toInt()),
+        localizedPlural(R.plurals.voice_floating_spoken_seconds, rest.toInt(), rest.toInt()),
+    )
 }
 
 private fun lerp(a: Double, b: Double, t: Double): Double = a + (b - a) * t

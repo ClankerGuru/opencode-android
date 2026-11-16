@@ -4,6 +4,8 @@ import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.motion.rememberReduceMotion
+import ai.opencode.core.strings.localized
+import ai.opencode.core.strings.localizedPlural
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
@@ -11,7 +13,6 @@ import ai.opencode.feature.media.GitHubLink
 import ai.opencode.feature.media.GitHubPreview
 import ai.opencode.feature.media.LinkPreview
 import ai.opencode.feature.media.LinkPreviewBitmap
-import ai.opencode.feature.media.LocalAgentImageRowGrowth
 import ai.opencode.feature.media.LocalLinkPreviewRevision
 import ai.opencode.feature.media.LocalLinkPreviewStore
 import ai.opencode.feature.media.RichLinkSource
@@ -19,10 +20,11 @@ import ai.opencode.feature.media.SiteIcon
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.media.withinNodeLimit
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.TranscriptDisclosureState
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
-import ai.opencode.feature.transcript.markdown.ui.DisclosedTransition
+import ai.opencode.feature.transcript.markdown.ui.DisclosedContent
 import ai.opencode.feature.transcript.markdown.ui.HairlineRule
 import ai.opencode.feature.transcript.markdown.ui.MarkdownLinks
 import ai.opencode.feature.transcript.markdown.ui.MarkdownStyle
@@ -80,6 +82,8 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -106,7 +110,7 @@ import kotlin.math.roundToInt
 /**
  * Every link under a finished reply, in reading order, as one compact line each (one line for a
  * lone link) (iOS `LinkPreviewReplyEnd`). Past [LinkPreviewEntries.shown] the rest wait behind
- * “N more ⌄” at the right end of the Copy row (D-47 option 6, Compact List). No nested scroller:
+ * “N more ⌄” at the right end of the Copy row. No nested scroller:
  * the transcript is the only scrolling surface.
  *
  * [texts] are the reply's texts (`TranscriptEntry.ReplyEnd.texts`), parsed once here; [key] is
@@ -136,8 +140,6 @@ fun LinkPreviewReplyEnd(
     }
     val previews = targets.map(store::preview)
     val disclosure = LocalTranscriptRowContext.current.disclosure
-    val growth = LocalAgentImageRowGrowth.current
-    val reduceMotion = rememberReduceMotion()
     LaunchedEffect(store, key, targets) {
         for (target in targets) store.appeared(target, key)
     }
@@ -150,10 +152,7 @@ fun LinkPreviewReplyEnd(
     ) {
         LinkPreviewEntries(previews, isOpen = disclosure.isOpen(TranscriptDisclosureState.Kind.LinkLists, key), presentation = store.presentation(key) { LinkPreviewRowPresentation() })
         Row(
-            Modifier
-                .fillMaxWidth()
-                // Holds still while the links above it grow, as the rows below do.
-                .graphicsLayer { translationY = if (reduceMotion || growth == null) 0f else -growth.lift(previews.size) * density },
+            Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             actions()
@@ -178,21 +177,15 @@ object LinkPreviewEntries {
 fun LinkPreviewEntries(previews: List<LinkPreview>, isOpen: Boolean, presentation: LinkPreviewRowPresentation? = null) {
     val scaledIcon = LinkPreviewEntry.iconSide * LocalDensity.current.fontScale
     val inset = min(scaledIcon, LinkPreviewEntry.maximumIconSide.value).dp + LinkPreviewEntry.iconSpacing
-    val growth = LocalAgentImageRowGrowth.current
-    val reduceMotion = rememberReduceMotion()
 
-    /** A hairline from the text column to the trailing edge, drawn up by what the links above it still have to grow. */
+    /** A hairline from the text column to the trailing edge. */
     @Composable
-    fun separator(before: Int) = HairlineRule(
-        Modifier
-            .padding(start = inset)
-            .graphicsLayer { translationY = if (reduceMotion || growth == null) 0f else -growth.lift(before) * density },
-    )
+    fun separator() = HairlineRule(Modifier.padding(start = inset))
 
     @Composable
-    fun entry(preview: LinkPreview, index: Int) {
+    fun entry(preview: LinkPreview) {
         if (presentation != null) {
-            ArrivingLinkPreview(preview, block = index, presentation = presentation)
+            ArrivingLinkPreview(preview, presentation = presentation)
         } else {
             LinkPreviewButton(preview) { LinkPreviewEntry(preview) }
         }
@@ -201,16 +194,16 @@ fun LinkPreviewEntries(previews: List<LinkPreview>, isOpen: Boolean, presentatio
     Column(Modifier.fillMaxWidth()) {
         previews.take(LinkPreviewEntries.shown).forEachIndexed { index, preview ->
             key(preview.id) {
-                if (index > 0) separator(index)
-                entry(preview, index)
+                if (index > 0) separator()
+                entry(preview)
             }
         }
-        AnimatedVisibility(isOpen && previews.size > LinkPreviewEntries.shown, enter = DisclosedTransition.enter, exit = DisclosedTransition.exit) {
+        DisclosedContent(isOpen && previews.size > LinkPreviewEntries.shown) {
             Column(Modifier.fillMaxWidth()) {
-                previews.drop(LinkPreviewEntries.shown).forEachIndexed { offset, preview ->
+                previews.drop(LinkPreviewEntries.shown).forEach { preview ->
                     key(preview.id) {
-                        separator(LinkPreviewEntries.shown + offset)
-                        entry(preview, LinkPreviewEntries.shown + offset)
+                        separator()
+                        entry(preview)
                     }
                 }
             }
@@ -234,8 +227,8 @@ fun LinkPreviewMoreButton(count: Int, key: String, entryID: String) {
         if (reducedMotion) snap() else DisclosureMotion.animation(open),
         label = "LinkPreviewMoreChevron",
     )
-    val label = if (open) "Show Fewer Links" else "Show All Links"
-    val value = if (open) "$count of $count links shown" else "${LinkPreviewEntries.shown} of $count links shown"
+    val label = if (open) stringResource(R.string.transcript_link_preview_show_fewer) else stringResource(R.string.transcript_link_preview_show_all)
+    val value = if (open) pluralStringResource(R.plurals.transcript_link_preview_shown, count, count, count) else pluralStringResource(R.plurals.transcript_link_preview_shown, count, LinkPreviewEntries.shown, count)
     val color = OpenCodeTheme.colors.secondaryText
     Row(
         Modifier
@@ -261,7 +254,7 @@ fun LinkPreviewMoreButton(count: Int, key: String, entryID: String) {
         Spacer(Modifier.width(0.dp).height((17f * min(fontScale, 1.35f)).dp))
         AnimatedVisibility(!open, enter = fadeIn(), exit = fadeOut()) {
             Text(
-                "${count - LinkPreviewEntries.shown} more",
+                stringResource(R.string.transcript_link_preview_more, count - LinkPreviewEntries.shown),
                 style = OpenCodeTextStyles.footnote.copy(fontFeatureSettings = "tnum"),
                 color = color,
             )
@@ -401,12 +394,12 @@ class LinkPreviewSummary(preview: LinkPreview, palette: LinkPreviewPalette) {
                     }
                     is RichLinkSource.Youtube -> {
                         site = "YouTube"
-                        title = "Video"
+                        title = localized(R.string.transcript_link_preview_video)
                         isVideo = true
                     }
                     null -> {
                         site = preview.handle?.let { "@$it" } ?: preview.domain
-                        title = "Post"
+                        title = localized(R.string.transcript_link_preview_post)
                     }
                 }
             }
@@ -448,7 +441,7 @@ class LinkPreviewSummary(preview: LinkPreview, palette: LinkPreviewPalette) {
                 isPlain = true
                 if (preview.isXPost) {
                     site = preview.handle?.let { "@$it" } ?: preview.domain
-                    title = "Post unavailable"
+                    title = localized(R.string.transcript_link_preview_post_unavailable)
                 } else {
                     val readable = LinkPreview.readableTitle(preview.url)
                     if (readable != null) {
@@ -470,7 +463,7 @@ class LinkPreviewSummary(preview: LinkPreview, palette: LinkPreviewPalette) {
             val parts = ArrayList<AnnotatedString>()
             details.state?.let { state ->
                 parts += buildAnnotatedString {
-                    withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = stateColor(state, palette))) { append(state.rawValue) }
+                    withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = stateColor(state, palette))) { append(state.title) }
                 }
             }
             when (details.kind) {
@@ -487,7 +480,7 @@ class LinkPreviewSummary(preview: LinkPreview, palette: LinkPreviewPalette) {
                 GitHubLink.Kind.Issue -> {
                     val comments = details.comments
                     if (comments != null && comments > 0) {
-                        parts += AnnotatedString(if (comments == 1) "1 comment" else "${LinkPreview.formatted(comments)} comments")
+                        parts += AnnotatedString(localizedPlural(R.plurals.transcript_link_preview_comments, comments, LinkPreview.formatted(comments)))
                     }
                     val labels = details.labels
                     if (!labels.isNullOrEmpty()) parts += AnnotatedString(labels.take(2).joinToString(", "))
@@ -579,7 +572,7 @@ object LinkPreviewEntry {
                 val details = display.details
                 val state = details.state
                 if (state != null) {
-                    AnnotatedString(state.rawValue, SpanStyle(fontWeight = FontWeight.SemiBold, color = LinkPreviewSummary.stateColor(state, palette)))
+                    AnnotatedString(state.title, SpanStyle(fontWeight = FontWeight.SemiBold, color = LinkPreviewSummary.stateColor(state, palette)))
                 } else {
                     when (details.kind) {
                         GitHubLink.Kind.Commit -> {

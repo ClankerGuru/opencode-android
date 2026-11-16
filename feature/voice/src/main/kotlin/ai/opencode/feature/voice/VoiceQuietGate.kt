@@ -3,9 +3,8 @@ package ai.opencode.feature.voice
 import ai.opencode.core.tuning.Tunable
 import kotlin.time.Duration
 
-// Port of iOS `VoiceQuietGate.swift` (`extension ReplyWatch { struct QuietGate }`).
-// The type and its `note…` updates are declared in `ReplyWatch.kt` so it keeps
-// the name `ReplyWatch.QuietGate`; its policy lives here.
+// The type and its `note…` updates are declared in `ReplyWatch.kt` so it keeps the name
+// `ReplyWatch.QuietGate`; its policy lives here.
 
 /** GPT-Live turn-taking, read when a call starts. */
 object VoiceTurnTunables {
@@ -14,7 +13,7 @@ object VoiceTurnTunables {
     val bargeIn = Tunable("call.turns.bargeIn", "Talk-Over Stop (s)", default = 0.6, range = 0.0..2.0, step = 0.1)
 }
 
-/** iOS `VoiceCallTiming.quietGate` (VoiceCallClient.swift): the gate for this call's timing. */
+/** The gate for this call's timing. */
 val VoiceCallTiming.quietGate: ReplyWatch.QuietGate
     get() = ReplyWatch.QuietGate(
         quietWindow = liveAppendQuiet,
@@ -52,13 +51,10 @@ fun ReplyWatch.QuietGate.delay(now: Duration): Duration? {
 }
 
 /**
- * A delegation's own answer is the reply the user is owed, so it never
- * waits for a reply to start: only for speech in progress and the brief
- * pauses after it. Held, the voice agent fills the gap from older
- * results (a call answered "it was cut off" while the full answer sat
- * here for 23 s). Once the user has asked again ([pressed]), the voice
- * agent talking without the answer holds it at most [pressedHold] (zero:
- * no limit) of that talk; the user's own words always hold it.
+ * A delegation's own answer is the reply the user is owed, so it never waits for a reply to start:
+ * only for speech in progress and the brief pauses after it. Once the user has asked again
+ * ([pressed]), the voice agent talking without the answer holds it at most [pressedHold] (zero: no
+ * limit) of that talk; the user's own words always hold it.
  */
 fun ReplyWatch.QuietGate.answerDelay(
     now: Duration,

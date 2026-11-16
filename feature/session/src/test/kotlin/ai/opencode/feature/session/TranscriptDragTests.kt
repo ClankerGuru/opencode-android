@@ -34,14 +34,11 @@ import java.io.File
 import java.nio.file.Files
 
 /**
- * The composer-drop test of iOS `OpenCodeTests/TranscriptDragTests.swift`; the drag payload tests
- * are `:feature:transcript`'s. Android's drop is a `ClipData` the composer sorts in
- * [SessionAttachmentImporter.handleComposerDrop] (iOS `TranscriptComposerDrop.hasImage/hasFile/
- * hasText`, `loadText` and `ComposerFileImporter`), so this drops onto a real store under
- * Robolectric and checks where each part landed. iOS's `acceptedTypes` (`UTType`s for
- * `.onDrop`) has no counterpart: Android's composer target takes every drag. The transcript's
- * `.agentFile` drags are `content://` URIs served from the agent's server; local files stand in
- * as `file://` URIs with the payload's MIME types.
+ * Android's drop is a `ClipData` the composer sorts in
+ * [SessionAttachmentImporter.handleComposerDrop], so this drops onto a real store under Robolectric
+ * and checks where each part landed. The transcript's `.agentFile` drags are `content://` URIs
+ * served from the agent's server; local files stand in as `file://` URIs with the payload's MIME
+ * types.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -74,7 +71,6 @@ class TranscriptDragTests {
             assertEquals("let x = 1", store.state.draft)
             assertTrue("Text stages no file", store.state.pendingFiles.isEmpty() && !importer.isLoadingFiles && !importer.isLoadingImages)
 
-            // Both a PDF and a Swift file are file drops and stage through `ComposerFileImporter`.
             val pdf = File(folder, "report.pdf").apply { writeBytes("%PDF-1.7 sample".toByteArray()) }
             val swift = File(folder, "Agent.swift").apply { writeBytes("struct Agent {}\n".toByteArray()) }
             val files = ClipData(ClipDescription("files", arrayOf("application/pdf", "text/x-swift")), ClipData.Item(Uri.fromFile(pdf)))

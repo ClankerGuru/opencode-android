@@ -13,10 +13,7 @@ import java.util.UUID
 import kotlin.math.abs
 import kotlin.time.Duration
 
-/**
- * The call's sounds are Wisp's (wisp b55d486), bundled per pack. iOS's parameterised tests
- * loop over the packs here.
- */
+/** The call's sounds are Wisp's, bundled per pack. */
 class VoiceCallCueTests {
     @get:Rule val isolation = TestIsolationRule()
 

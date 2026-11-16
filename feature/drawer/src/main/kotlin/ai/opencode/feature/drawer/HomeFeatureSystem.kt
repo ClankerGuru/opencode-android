@@ -38,9 +38,9 @@ import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeSession
 
 /*
- * Port of iOS `HomeFeature+System.swift`: the share sheet's credentials, the call's and the
- * recording's ongoing-notification commands, shares arriving, and what Shortcuts, launcher actions
- * and links open (and calls they start), and the list published to the system.
+ * The share sheet's credentials, the call's and the recording's ongoing-notification commands,
+ * shares arriving, and what Shortcuts, launcher actions and links open (and calls they start), and
+ * the list published to the system.
  */
 
 /**
@@ -139,9 +139,8 @@ private fun HomeFeature.sharesReceived(state: State, shares: List<ReceivedShare>
 }
 
 /**
- * iOS `SharedComposerDraft.init(_ share: ReceivedShare, projectID:)` (`ShareInbox.swift`): the
- * composer half of a share. Built here because `:feature:composer` can't see `:feature:system`'s
- * [ReceivedShare].
+ * The composer half of a share. Built here because `:feature:composer` can't see
+ * `:feature:system`'s [ReceivedShare].
  */
 private fun sharedComposerDraft(share: ReceivedShare, projectID: String?): SharedComposerDraft {
     val base = SharedComposerDraft(
@@ -167,7 +166,7 @@ internal fun HomeFeature.publishToSystem(state: State) {
     dependency(SystemIntegrationClient).publish(state.systemPublication.systemDirectoryEntry, state.systemVoiceAvailable)
 }
 
-/** What Shortcuts, launcher actions and search are handed (iOS `HomeFeature.State.systemPublication`). */
+/** What Shortcuts, launcher actions and search are handed. */
 internal val State.systemPublication: SystemPublication
     get() = SystemPublication(
         server = server,
@@ -181,8 +180,8 @@ internal val State.systemPublication: SystemPublication
     )
 
 /**
- * What the share sheet's targets are built from (iOS `shareTargetsPublication`, `ShareInbox.swift`):
- * Catch Up's card isn't the session you'd share to, the one it was opened from is.
+ * What the share sheet's targets are built from: Catch Up's card isn't the session you'd share to,
+ * the one it was opened from is.
  */
 internal val State.shareTargetsPublication: ShareTargetsPublication
     get() = ShareTargetsPublication(
@@ -195,7 +194,7 @@ internal val State.shareTargetsPublication: ShareTargetsPublication
         draftProject = if (catchUp == null && sessionDetail?.isDraft == true) sessionDetail.draftProject else null,
     )
 
-/** Pinned and recent sessions in drawer order, without the drawer's search (iOS `shareTargets`). */
+/** Pinned and recent sessions in drawer order, without the drawer's search. */
 internal val State.shareTargets: ShareTargets get() = shareTargetsPublication.targets()
 
 /**

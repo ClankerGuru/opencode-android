@@ -47,7 +47,7 @@ import androidx.compose.ui.unit.dp
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicInteger
 
-/** One half-second window of frame and recomposition stats (iOS `PerfFrameSampler`'s 500 ms windows). */
+/** One half-second window of frame and recomposition stats. */
 data class PerfWindow(
     val fps: Double = 0.0,
     val frames: Int = 0,
@@ -58,10 +58,8 @@ data class PerfWindow(
 )
 
 /**
- * Collects per-frame durations from the window's `FrameMetrics` (a frame is janky when its total
- * duration passes its deadline) and counts recomposed scopes across every composition of the
- * window's `Recomposer`. Plain object, no reducer: per-frame data. Frame stalls ≥ 250 ms are logged
- * (`frame_stall`) and every window is a Perfetto counter track.
+ * Collects per-frame durations from the window's `FrameMetrics` and counts recomposed scopes. Frame
+ * stalls ≥ 250 ms are logged (`frame_stall`).
  */
 @OptIn(ExperimentalComposeRuntimeApi::class)
 private class PerfSampler(private val window: Window, private val recomposer: Recomposer?, private val publish: (PerfWindow) -> Unit) {
@@ -150,8 +148,8 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 }
 
 /**
- * The perf HUD (Android equivalent of iOS's frame sampler + Motion X-Ray's on-device readout): FPS,
- * janky frames per window, the worst frame, recomposed scopes per second, and the slow-motion scale.
+ * The perf HUD: FPS, janky frames, the worst frame, recomposed scopes per second, and the
+ * slow-motion scale.
  */
 @Composable
 fun PerfHud(modifier: Modifier = Modifier) {

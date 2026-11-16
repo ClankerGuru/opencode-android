@@ -1,5 +1,6 @@
 package ai.opencode.server
 
+import ai.opencode.core.strings.localized
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -26,8 +27,8 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * iOS `URLError.Code` values, so failure evidence and copy read the same on both
- * platforms. [fromThrowable] maps the JVM/OkHttp exception to its closest code.
+ * IOS `URLError.Code` values, so failure evidence and copy read the same on both platforms.
+ * [fromThrowable] maps the JVM/OkHttp exception to its closest code.
  */
 object UrlErrorCode {
     const val UNKNOWN = -1
@@ -73,7 +74,7 @@ object UrlErrorCode {
         is SSLPeerUnverifiedException -> SERVER_CERTIFICATE_UNTRUSTED
         is SSLHandshakeException -> if (error.hasCertificateCause()) SERVER_CERTIFICATE_UNTRUSTED else SECURE_CONNECTION_FAILED
         is SSLException -> SECURE_CONNECTION_FAILED
-        // Android's network security config refusing cleartext (iOS ATS).
+        // Android's network security config refusing cleartext.
         is UnknownServiceException -> APP_TRANSPORT_SECURITY_REQUIRES_SECURE_CONNECTION
         is InterruptedIOException -> if (error.message == "timeout") TIMED_OUT else if (error.message == "Canceled") CANCELLED else TIMED_OUT
         is EOFException -> NETWORK_CONNECTION_LOST
@@ -115,7 +116,7 @@ data class ConnectionFailureDetail(
     val errorLabel: String
         get() {
             statusCode?.let { return "HTTP $it" }
-            val code = urlErrorCode ?: return "Connection failed"
+            val code = urlErrorCode ?: return localized(R.string.server_connection_failed)
             val name = when (code) {
                 UrlErrorCode.TIMED_OUT -> "timedOut"
                 UrlErrorCode.CANNOT_FIND_HOST -> "cannotFindHost"
@@ -153,11 +154,11 @@ data class ConnectionFailureDetail(
         get() {
             val lines = mutableListOf(
                 "$errorLabel · $endpoint",
-                if (addresses.isEmpty()) "Resolved address: Unknown"
-                else "Resolved address (lookup after failure): ${addresses.joinToString(", ")}",
+                if (addresses.isEmpty()) localized(R.string.server_connection_resolved_address_unknown)
+                else localized(R.string.server_connection_resolved_address, addresses.joinToString(", ")),
             )
             if (hasTailnetDNSMismatch) {
-                lines += "This tailnet name resolved to an address outside Tailscale’s range, so Tailscale DNS may not be in use. In the Tailscale app, turn on Use Tailscale DNS settings, and turn off Private DNS or any DNS-changing VPN profile."
+                lines += localized(R.string.server_connection_tailnet_dns_mismatch)
             }
             return lines.joinToString("\n")
         }
@@ -184,8 +185,7 @@ data class ConnectionFailureDetail(
         suspend fun resolve(host: String): List<String> {
             if (host.isEmpty()) return emptyList()
             // The lookup blocks and can't be interrupted, so it runs detached: a late answer is
-            // dropped instead of holding the connection flow past the second (iOS finishes the
-            // continuation on a 1 s timer and lets getaddrinfo complete on its own).
+            // dropped instead of holding the connection flow past the second.
             val lookup = LOOKUP_SCOPE.async {
                 runCatching {
                     InetAddress.getAllByName(host).mapNotNull { it.hostAddress?.let(::numericHost) }.toSortedSet().toList()

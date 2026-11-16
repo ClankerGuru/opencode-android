@@ -28,10 +28,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Every image a tool read, whole and in order, so it can be read without opening it (iOS
- * `ToolImageMosaic`): justified rows ([JustifiedImageRows]) where each row's images share a
- * height and together fill the width, nothing cropped or hidden. Tapping one opens them all in
- * the gallery, at [onPreview]'s ID.
+ * Every image a tool read, whole and in order, so it can be read without opening it: justified rows
+ * ([JustifiedImageRows]) where each row's images share a height and together fill the width,
+ * nothing cropped or hidden. Tapping one opens them all in the gallery, at [onPreview]'s ID.
  */
 @Composable
 fun ToolImageMosaic(images: List<OpenCodeImageAttachment>, modifier: Modifier = Modifier, onPreview: (String) -> Unit) {
@@ -64,7 +63,6 @@ fun ToolImageMosaic(images: List<OpenCodeImageAttachment>, modifier: Modifier = 
     }
 }
 
-/** iOS `ToolImageMosaic`'s statics. */
 object ToolImageMosaic {
     /** What a tile's loaded image changes: the shape to remember (null when known), and whether the row's height may change. */
     data class Change(val record: Float?, val revisesRow: Boolean)
@@ -91,7 +89,7 @@ object ToolImageMosaic {
     }
 }
 
-/** Lays out images by [JustifiedImageRows], each at its exact frame (iOS `JustifiedImagesLayout`). */
+/** Lays out images by [JustifiedImageRows], each at its exact frame. */
 @Composable
 fun JustifiedImagesLayout(
     aspects: List<Float>,
@@ -117,11 +115,11 @@ fun JustifiedImagesLayout(
 }
 
 /**
- * Justified rows (iOS `JustifiedImageRows`): images keep their shapes, a row's images share one
- * height and fill the width, and the breaks between rows are chosen (in order) to keep every row
- * near a comfortable height. A wide panorama gets a row to itself; a tall screenshot pairs with
- * something square. A row that can't fill the width without growing past the cap (a lone tall
- * screenshot) stays at the cap, leading-aligned. Units are dp.
+ * Justified rows: images keep their shapes, a row's images share one height and fill the width, and
+ * the breaks between rows are chosen (in order) to keep every row near a comfortable height. A wide
+ * panorama gets a row to itself; a tall screenshot pairs with something square. A row that can't
+ * fill the width without growing past the cap (a lone tall screenshot) stays at the cap,
+ * leading-aligned. Units are dp.
  */
 @Immutable
 class JustifiedImageRows(rawAspects: List<Float>, width: Float, loneMaxHeight: Float = singleMaxHeight) {

@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -37,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.MotionTunables
 import ai.opencode.core.ui.OpenCodeTextStyles
+import ai.opencode.feature.drawer.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -45,9 +47,8 @@ import kotlin.math.min
 import kotlin.math.pow
 
 /**
- * Per-frame state of one swipe overlay (iOS `CatchUpSwipeOverlay` + `CatchUpProgressCircleView`):
- * the controller writes it, the overlay reads it in draw and layer blocks only, so a swipe never
- * recomposes. Units: dp.
+ * Per-frame state of one swipe overlay: the controller writes it, the overlay reads it in draw and
+ * layer blocks only, so a swipe never recomposes. Units: dp.
  */
 @Stable
 class CatchUpBadgeState(val disposition: CatchUpDisposition) {
@@ -68,7 +69,6 @@ class CatchUpBadgeState(val disposition: CatchUpDisposition) {
     internal val washAlpha: Float
         get() = min(max(washDistance, 0f) / max(threshold * 0.62f, 1f), 1f).pow(0.85f)
 
-    /** iOS `CatchUpSwipeOverlay.update(distance:threshold:reducedMotion:animatedPop:)`. */
     fun update(distance: Float, threshold: Float, reducedMotion: Boolean, animatedPop: Boolean, scope: CoroutineScope?) {
         val clamped = max(distance, 0f)
         if (clamped == 0f && lastDistance == 0f) return
@@ -88,7 +88,7 @@ class CatchUpBadgeState(val disposition: CatchUpDisposition) {
         ringDistance = max(distance, 0f)
         if (fullChanged && full && animatedPop && !reducedMotion) {
             // The filled disc arrives on `MotionRole.MicroIn`, from as far above full size as a
-            // micro arrival starts below it (iOS 03adf07a).
+            // micro arrival starts below it.
             scope?.launch {
                 pop.snapTo(2f - MotionTunables.microInScale.value)
                 pop.animateTo(1f, MotionRole.MicroIn.animation())
@@ -112,7 +112,7 @@ class CatchUpBadgeState(val disposition: CatchUpDisposition) {
  * label in the top-leading (Mark as Read) or top-trailing (Keep Unread) corner that fills solid
  * at the commit threshold. Not an accessibility element.
  *
- * @param opaque iOS's Reduce Transparency / Increase Contrast: an opaque wash.
+ * @param opaque An opaque wash.
  */
 @Composable
 internal fun CatchUpSwipeOverlay(state: CatchUpBadgeState, opaque: Boolean, modifier: Modifier = Modifier) {
@@ -137,7 +137,7 @@ internal fun CatchUpSwipeOverlay(state: CatchUpBadgeState, opaque: Boolean, modi
         ) {
             CatchUpProgressCircle(state, tint, isRead)
             Text(
-                text = if (isRead) "Mark as\nRead" else "Keep\nUnread",
+                text = if (isRead) stringResource(R.string.drawer_catch_up_swipe_mark_read) else stringResource(R.string.drawer_catch_up_swipe_keep_unread),
                 style = OpenCodeTextStyles.title1.copy(fontWeight = FontWeight.Bold, fontSize = 28.sp),
                 color = Color.White,
                 textAlign = if (isRead) TextAlign.Start else TextAlign.End,
@@ -146,7 +146,7 @@ internal fun CatchUpSwipeOverlay(state: CatchUpBadgeState, opaque: Boolean, modi
     }
 }
 
-/** A Slack-style progress circle (iOS `CatchUpProgressCircleView`, 56 pt, drawn in a 100-unit box). */
+/** A Slack-style progress circle. */
 @Composable
 private fun CatchUpProgressCircle(state: CatchUpBadgeState, tone: Color, isRead: Boolean) {
     Canvas(Modifier.size(56.dp)) {

@@ -1,5 +1,6 @@
 package ai.opencode.feature.media
 
+import ai.opencode.core.strings.localized
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
@@ -15,8 +16,8 @@ import java.util.concurrent.TimeUnit
 import kotlin.math.max
 
 /**
- * Only service-owned identifiers leave the phone (iOS `RichLinkSource`). No arbitrary OG
- * fetches, response-provided image URLs, credentials, query strings or redirects.
+ * Only service-owned identifiers leave the phone. No arbitrary OG fetches, response-provided image
+ * URLs, credentials, query strings or redirects.
  */
 sealed interface RichLinkSource {
     data class Github(val link: GitHubLink) : RichLinkSource
@@ -64,7 +65,7 @@ sealed interface RichLinkSource {
             GitHubLink.of(url)?.let { return Github(it) }
             val parsed = url.toHttpUrlOrNull() ?: return null
             val host = parsed.host.lowercase()
-            // iOS `url.path`: decoded.
+            // Decoded.
             val parts = parsed.pathSegments.filter { it.isNotEmpty() }
             val id: String? = when (host) {
                 "youtu.be" -> if (parts.size == 1) parts[0] else null
@@ -87,8 +88,7 @@ sealed interface RichLinkSource {
 
         /**
          * A first-party JSON request: 6 s, no cookies, refused on a constrained path (the
-         * transport). Android identifies itself as `OpenCode-Android-LinkPreview` (iOS sends
-         * `OpenCode-iOS-LinkPreview`; GitHub requires a User-Agent).
+         * transport). Android identifies itself as `OpenCode-Android-LinkPreview`.
          */
         fun request(url: String): Request = Request.Builder()
             .url(url)
@@ -99,7 +99,7 @@ sealed interface RichLinkSource {
     }
 }
 
-/** A public GitHub repository, issue, pull request or commit URL (iOS `GitHubLink`). */
+/** A public GitHub repository, issue, pull request or commit URL. */
 data class GitHubLink(val repository: String, val kind: Kind, val reference: String? = null) {
     @Serializable
     enum class Kind {
@@ -231,7 +231,7 @@ data class GitHubLink(val repository: String, val kind: Kind, val reference: Str
     }
 }
 
-/** What GitHub's REST answer says about a link (iOS `GitHubPreview`). */
+/** What GitHub's REST answer says about a link. */
 @Serializable
 data class GitHubPreview(
     val repository: String,
@@ -253,7 +253,18 @@ data class GitHubPreview(
         @SerialName("Merged") Merged("Merged"),
         @SerialName("Draft") Draft("Draft"),
         @SerialName("Completed") Completed("Completed"),
-        @SerialName("Not planned") NotPlanned("Not planned"),
+        @SerialName("Not planned") NotPlanned("Not planned");
+
+        /** What the preview shows for the state; [rawValue] stays the wire value. */
+        val title: String
+            get() = when (this) {
+                Open -> localized(R.string.media_github_state_open)
+                Closed -> localized(R.string.media_github_state_closed)
+                Merged -> localized(R.string.media_github_state_merged)
+                Draft -> localized(R.string.media_github_state_draft)
+                Completed -> localized(R.string.media_github_state_completed)
+                NotPlanned -> localized(R.string.media_github_state_not_planned)
+            }
     }
 
     val caption: String
@@ -263,7 +274,7 @@ data class GitHubPreview(
         }
 }
 
-/** A decoded immutable thumbnail, prepared once when metadata arrives (iOS `LinkPreviewBitmap`). */
+/** A decoded immutable thumbnail, prepared once when metadata arrives. */
 class LinkPreviewBitmap private constructor(val image: Bitmap, private val data: ByteArray) {
     override fun equals(other: Any?): Boolean = other is LinkPreviewBitmap && other.data.contentEquals(data)
     override fun hashCode(): Int = data.contentHashCode()
@@ -275,8 +286,8 @@ class LinkPreviewBitmap private constructor(val image: Bitmap, private val data:
 }
 
 /**
- * Downsamples before decoding full pixels (iOS `LinkPreviewArtwork`, ImageIO thumbnails): even a
- * huge source image never becomes a full-resolution bitmap. Caches keep the small JPEG.
+ * Downsamples before decoding full pixels: even a huge source image never becomes a full-resolution
+ * bitmap. Caches keep the small JPEG.
  */
 object LinkPreviewArtwork {
     fun thumbnail(data: ByteArray, pixels: Int = 960): ByteArray? {

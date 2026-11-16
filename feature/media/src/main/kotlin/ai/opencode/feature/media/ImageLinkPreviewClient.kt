@@ -16,8 +16,8 @@ import java.util.concurrent.TimeUnit
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
- * Direct image links are an opt-in exception to page-metadata fetching (iOS `ImageLinkPolicy`).
- * The exact URL is used (query intact); it never goes to an icon service.
+ * Direct image links are an opt-in exception to page-metadata fetching. The exact URL is used
+ * (query intact); it never goes to an icon service.
  */
 object ImageLinkPolicy {
     /** One plan for the entire message, before rendering its individual blocks: block ID → its image links. */
@@ -34,7 +34,7 @@ object ImageLinkPolicy {
     }
 
     fun allows(url: String): Boolean {
-        // iOS `url.pathExtension`: of the last path component, a trailing slash ignored.
+        // Of the last path component, a trailing slash ignored.
         val last = url.toHttpUrlOrNull()?.pathSegments?.lastOrNull { it.isNotEmpty() } ?: return false
         val pathExtension = if (last.contains('.')) last.substringAfterLast('.').lowercase() else ""
         return pathExtension in setOf("png", "jpg", "jpeg", "gif", "webp") &&
@@ -72,7 +72,7 @@ object ImageLinkPolicy {
     }
 }
 
-/** Bounded direct-image reads for the Image Link Previews experiment (iOS `ImageLinkPreviewClient`). */
+/** Bounded direct-image reads for the Image Link Previews experiment. */
 class ImageLinkPreviewClient(
     val cached: (String) -> Bitmap? = { null },
     val load: suspend (url: String, onSize: (AgentImageSize) -> Unit) -> Bitmap? = { _, _ -> null },
@@ -104,8 +104,8 @@ class ImageLinkPreviewClient(
 }
 
 /**
- * Reuses the metadata pipeline's request coalescing and the Markdown pixel cache (iOS
- * `ImageLinkLoader`). One download at a time across hosts, at most three links per message.
+ * Reuses the metadata pipeline's request coalescing and the Markdown pixel cache. One download at a
+ * time across hosts, at most three links per message.
  */
 class ImageLinkLoader(
     private val cache: DecodedImageCache,

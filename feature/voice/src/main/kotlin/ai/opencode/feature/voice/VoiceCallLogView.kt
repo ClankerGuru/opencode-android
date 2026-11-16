@@ -1,5 +1,6 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeTopBar
 import ai.opencode.core.ui.OpenCodeTopBarBackButton
 import ai.opencode.core.ui.rememberOverscrollIfContentScrolls
@@ -12,6 +13,7 @@ import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
+import ai.opencode.core.strings.localized
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconSize
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -80,6 +82,7 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -106,17 +109,16 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * Settings → Voice → Call History: saved calls and uploaded diagnostics (iOS `VoiceCallLogList`).
- * Settings hosts it as a page; navigation and the Developer Mode links are the host's.
+ * Settings → Voice → Call History: saved calls and uploaded diagnostics. Settings hosts it as a
+ * page; navigation and the Developer Mode links are the host's.
  *
  * Reads and deletes the logs through [VoiceCallLogClient] off the main thread.
  *
  * @param onBack the top bar's Back.
  * @param onOpenCall pushes [VoiceCallReplayView] for a saved call.
- * @param onOpenWeb Developer Mode's Open on the Web (iOS `Link(destination: DeveloperMode.webURL)`);
- *   Diagnostics sit above Voice, so the host opens the page. `null` hides it.
- * @param onShareLink Developer Mode's Share Link (iOS `ShareLink(item: DeveloperMode.webURL)`);
- *   the host shares it. `null` hides it.
+ * @param onOpenWeb Developer Mode's Open on the Web; Diagnostics sit above Voice, so the host opens
+ *     the page. `null` hides it.
+ * @param onShareLink Developer Mode's Share Link; the host shares it. `null` hides it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -139,14 +141,14 @@ fun VoiceCallLogList(
         modifier = modifier,
         topBar = {
             OpenCodeTopBar(
-                title = { Text("Call History", modifier = Modifier.semantics { heading() }) },
+                title = { Text(stringResource(R.string.voice_call_history_title), modifier = Modifier.semantics { heading() }) },
                 navigation = { OpenCodeTopBarBackButton(onClick = onBack) },
                 centerTitle = true,
                 actions = {
                     if (developerMode || logs.isNotEmpty()) {
                         Box {
                             IconButton(onClick = { showsOptions = true }, modifier = Modifier.testTag("diagnostics-history-options")) {
-                                OpenCodeIcon(SFSymbol.Ellipsis, contentDescription = "History options")
+                                OpenCodeIcon(SFSymbol.Ellipsis, contentDescription = stringResource(R.string.voice_call_history_options_description))
                             }
                             DropdownMenu(expanded = showsOptions, onDismissRequest = { showsOptions = false }) {
                                 if (developerMode) {
@@ -167,7 +169,7 @@ fun VoiceCallLogList(
                                 }
                                 if (logs.isNotEmpty()) {
                                     DropdownMenuItem(
-                                        text = { Text("Delete All", color = OpenCodeTheme.colors.destructive) },
+                                        text = { Text(stringResource(R.string.voice_call_history_delete_all), color = OpenCodeTheme.colors.destructive) },
                                         leadingIcon = { OpenCodeIcon(SFSymbol.Trash, null, tint = OpenCodeTheme.colors.destructive) },
                                         onClick = { showsOptions = false; confirmingDeleteAll = true },
                                     )
@@ -187,10 +189,10 @@ fun VoiceCallLogList(
             ) {
                 OpenCodeIcon(SFSymbol.Waveform, null, size = OpenCodeIconSize.hero, tint = OpenCodeTheme.colors.secondaryText)
                 Spacer(Modifier.height(12.dp))
-                Text("No Voice Calls Yet", style = OpenCodeTextStyles.title2.copy(fontWeight = FontWeight.Bold), color = OpenCodeTheme.colors.text, textAlign = TextAlign.Center)
+                Text(stringResource(R.string.voice_call_history_empty_title), style = OpenCodeTextStyles.title2.copy(fontWeight = FontWeight.Bold), color = OpenCodeTheme.colors.text, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "Calls are saved on this phone so you can replay them.",
+                    stringResource(R.string.voice_call_history_empty_message),
                     style = OpenCodeTextStyles.callout,
                     color = OpenCodeTheme.colors.secondaryText,
                     textAlign = TextAlign.Center,
@@ -223,20 +225,20 @@ fun VoiceCallLogList(
     if (confirmingDeleteAll) {
         OpenCodeAlertDialog(
             onDismissRequest = { confirmingDeleteAll = false },
-            title = { Text("Delete all voice calls?") },
+            title = { Text(stringResource(R.string.voice_call_history_delete_all_confirm_title)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmingDeleteAll = false
                     logs = emptyList()
                     scope.launch { withContext(Dispatchers.IO) { voiceCallLog.deleteAll() } }
-                }) { Text("Delete All", color = OpenCodeTheme.colors.destructive) }
+                }) { Text(stringResource(R.string.voice_call_history_delete_all), color = OpenCodeTheme.colors.destructive) }
             },
-            dismissButton = { TextButton(onClick = { confirmingDeleteAll = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { confirmingDeleteAll = false }) { Text(stringResource(CoreR.string.common_cancel)) } },
         )
     }
 }
 
-/** One saved call: its title and when it was, swiped away to delete (iOS `onDelete`). */
+/** One saved call: its title and when it was, swiped away to delete. */
 @Composable
 private fun VoiceCallLogRow(log: VoiceCallLog, onOpen: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier) {
     val swipe = rememberSwipeToDismissBoxState()
@@ -250,7 +252,7 @@ private fun VoiceCallLogRow(log: VoiceCallLog, onOpen: () -> Unit, onDelete: () 
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Delete", color = Color.White, style = OpenCodeTextStyles.body)
+                Text(stringResource(CoreR.string.common_delete), color = Color.White, style = OpenCodeTextStyles.body)
             }
         },
         onDismiss = { value -> if (value == SwipeToDismissBoxValue.EndToStart) onDelete() },
@@ -265,7 +267,7 @@ private fun VoiceCallLogRow(log: VoiceCallLog, onOpen: () -> Unit, onDelete: () 
                 .testTag("voice-call-log-${log.id.toString().uppercase()}"),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Text(log.title, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(if (log.title == VoiceFeature.State.newSessionTitle) stringResource(R.string.voice_session_new_title) else log.title, style = OpenCodeTextStyles.body, color = OpenCodeTheme.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
                 "${VoiceCallLogFormat.startedAt(log)} · ${VoiceCallLogFormat.duration(log.duration)}",
                 style = OpenCodeTextStyles.footnote,
@@ -275,7 +277,7 @@ private fun VoiceCallLogRow(log: VoiceCallLog, onOpen: () -> Unit, onDelete: () 
     }
 }
 
-/** The list's and replay's text formats (iOS `VoiceCallLogList.duration`, `formatted(date: .abbreviated, time: .shortened)`). */
+/** The list's and replay's text formats. */
 object VoiceCallLogFormat {
     private val started = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
 
@@ -285,16 +287,15 @@ object VoiceCallLogFormat {
     /** “42s”, or “3m 5s” from a minute. */
     fun duration(seconds: Double): String {
         val total = seconds.roundToInt()
-        return if (total < 60) "${total}s" else "${total / 60}m ${total % 60}s"
+        return if (total < 60) localized(R.string.voice_call_log_duration_seconds, total) else localized(R.string.voice_call_log_duration_minutes, total / 60, total % 60)
     }
 
-    /** Swift's `Double.formatted()` for the playback speeds: “0.5”, “1”, “2”. */
     fun speed(value: Double, locale: Locale = appFormattingLocale()): String = NumberFormat.getInstance(locale).format(value)
 }
 
 /**
  * Replays one call: the four tracks fill in as the playhead passes, with what happened so far
- * listed beneath (iOS `VoiceCallReplayView`). Settings hosts it as a page.
+ * listed beneath. Settings hosts it as a page.
  *
  * @param onBack the top bar's Back; playback stops when the view leaves.
  */
@@ -304,8 +305,7 @@ fun VoiceCallReplayView(log: VoiceCallLog, onBack: () -> Unit, modifier: Modifie
     val reduceMotion = rememberReduceMotion()
     val playback = remember(log) { VoiceCallReplayPlayback(log.duration) }
 
-    // The playhead runs at 60 Hz while playing (iOS `TimelineView(.animation(minimumInterval:
-    // AmbientRate.foreground.minimumInterval, paused: !playing))`).
+    // The playhead runs at 60 Hz while playing.
     LaunchedEffect(playback, playback.playing) {
         if (!playback.playing) return@LaunchedEffect
         var last = 0L
@@ -323,7 +323,7 @@ fun VoiceCallReplayView(log: VoiceCallLog, onBack: () -> Unit, modifier: Modifie
         modifier = modifier,
         topBar = {
             OpenCodeTopBar(
-                title = { Text(log.title, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() }) },
+                title = { Text(if (log.title == VoiceFeature.State.newSessionTitle) stringResource(R.string.voice_session_new_title) else log.title, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() }) },
                 navigation = { OpenCodeTopBarBackButton(onClick = onBack) },
                 centerTitle = true,
             )
@@ -339,8 +339,8 @@ fun VoiceCallReplayView(log: VoiceCallLog, onBack: () -> Unit, modifier: Modifie
 }
 
 /**
- * The replay's clock: where playback is, whether it plays, and how fast (iOS `time`, `playing`,
- * `speed`, `anchor`). A plain object with snapshot state; main thread only.
+ * The replay's clock: where playback is, whether it plays, and how fast. A plain object with
+ * snapshot state; main thread only.
  */
 private class VoiceCallReplayPlayback(val duration: Double) {
     var time by mutableDoubleStateOf(0.0)
@@ -415,6 +415,8 @@ private fun ReplayTimeline(log: VoiceCallLog, playback: VoiceCallReplayPlayback)
     val labels = remember(log, labelStyle) { log.spans.associate { it.id to measurer.measure(it.label, labelStyle, maxLines = 1, softWrap = false) } }
     val now = playback.now
     val quarter = (now * 4).toInt()
+    val timelineDescription = stringResource(R.string.voice_replay_timeline_description)
+    val timelineState = stringResource(R.string.voice_replay_timeline_state, VoiceCallLogFormat.duration(now), VoiceCallLogFormat.duration(log.duration))
     // Keep the playhead in view while playing.
     LaunchedEffect(quarter) {
         if (!playback.playing) return@LaunchedEffect
@@ -424,8 +426,8 @@ private fun ReplayTimeline(log: VoiceCallLog, playback: VoiceCallReplayPlayback)
         Modifier
             .padding(vertical = 8.dp)
             .clearAndSetSemantics {
-                contentDescription = "Call timeline"
-                stateDescription = "${VoiceCallLogFormat.duration(now)} of ${VoiceCallLogFormat.duration(log.duration)}"
+                contentDescription = timelineDescription
+                stateDescription = timelineState
             },
     ) {
         Column(Modifier.padding(start = 12.dp).width(labelWidth.dp)) {
@@ -489,6 +491,8 @@ private fun ReplayTimeline(log: VoiceCallLog, playback: VoiceCallReplayPlayback)
 private fun ReplayControls(log: VoiceCallLog, playback: VoiceCallReplayPlayback) {
     var showsSpeeds by remember { mutableStateOf(false) }
     val now = playback.now
+    val positionDescription = stringResource(R.string.voice_replay_position_description)
+    val speedDescription = stringResource(R.string.voice_replay_speed_description)
     Row(
         Modifier.padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -496,14 +500,14 @@ private fun ReplayControls(log: VoiceCallLog, playback: VoiceCallReplayPlayback)
     ) {
         IconButton(onClick = { playback.toggle() }, modifier = Modifier.size(48.dp)) {
             Crossfade(playback.playing, animationSpec = Motion.easeOut(0.18), label = "replayPlayGlyph") { playing ->
-                OpenCodeIcon(if (playing) SFSymbol.PauseFill else SFSymbol.PlayFill, contentDescription = if (playing) "Pause" else "Play", size = OpenCodeIconSize.large)
+                OpenCodeIcon(if (playing) SFSymbol.PauseFill else SFSymbol.PlayFill, contentDescription = if (playing) stringResource(R.string.voice_replay_pause) else stringResource(R.string.voice_replay_play), size = OpenCodeIconSize.large)
             }
         }
         Slider(
             value = now.toFloat(),
             onValueChange = { playback.seek(it.toDouble()) },
             valueRange = 0f..max(log.duration, 0.1).toFloat(),
-            modifier = Modifier.weight(1f).semantics { contentDescription = "Position" },
+            modifier = Modifier.weight(1f).semantics { contentDescription = positionDescription },
         )
         Text(
             VoiceCallLogFormat.duration(now),
@@ -515,7 +519,7 @@ private fun ReplayControls(log: VoiceCallLog, playback: VoiceCallReplayPlayback)
         Box {
             TextButton(
                 onClick = { showsSpeeds = true },
-                modifier = Modifier.widthIn(min = 48.dp).heightIn(min = 48.dp).semantics { contentDescription = "Playback speed" },
+                modifier = Modifier.widthIn(min = 48.dp).heightIn(min = 48.dp).semantics { contentDescription = speedDescription },
             ) {
                 Text("${VoiceCallLogFormat.speed(playback.speed)}×", style = OpenCodeTextStyles.footnote.copy(fontWeight = FontWeight.SemiBold))
             }
@@ -551,9 +555,9 @@ private fun replayEvents(log: VoiceCallLog, dark: Boolean, secondary: Color): Li
     }
     val notes = log.notes.map { note ->
         val (who, color) = when (note.kind) {
-            VoiceCallLog.Note.Kind.received -> "→ Delegator" to VoiceCallLogColors.color(VoiceCallLog.Track.delegator, dark)
-            VoiceCallLog.Note.Kind.injected -> "→ Voice" to VoiceCallLogColors.color(VoiceCallLog.Track.voice, dark)
-            VoiceCallLog.Note.Kind.audio -> "Audio" to if (note.text.startsWith("⚠︎")) VoiceCallLogColors.red(dark) else VoiceCallLogColors.teal(dark)
+            VoiceCallLog.Note.Kind.received -> localized(R.string.voice_replay_to_delegator) to VoiceCallLogColors.color(VoiceCallLog.Track.delegator, dark)
+            VoiceCallLog.Note.Kind.injected -> localized(R.string.voice_replay_to_voice) to VoiceCallLogColors.color(VoiceCallLog.Track.voice, dark)
+            VoiceCallLog.Note.Kind.audio -> localized(R.string.voice_replay_audio) to if (note.text.startsWith("⚠︎")) VoiceCallLogColors.red(dark) else VoiceCallLogColors.teal(dark)
             VoiceCallLog.Note.Kind.marker -> "•" to secondary
         }
         ReplayEvent(
@@ -573,7 +577,7 @@ private fun ReplayEvents(log: VoiceCallLog, playback: VoiceCallReplayPlayback, r
     val dark = OpenCodeTheme.colors.isDark
     val secondary = OpenCodeTheme.colors.secondaryText
     val all = remember(log, dark, secondary) { replayEvents(log, dark, secondary) }
-    // Updated at most every quarter second, as iOS's `TimelineView(minimumInterval: 0.25)`.
+    // Updated at most every quarter second.
     val shown by remember(all) {
         derivedStateOf {
             val now = if (playback.playing) floor(playback.now * 4) / 4 else playback.now
@@ -632,7 +636,7 @@ private fun ReplayEvents(log: VoiceCallLog, playback: VoiceCallReplayPlayback, r
         }
         if (shown.isEmpty()) {
             Text(
-                "Press play to replay the call.",
+                stringResource(R.string.voice_replay_empty),
                 style = OpenCodeTextStyles.footnote,
                 color = OpenCodeTheme.colors.secondaryText,
                 modifier = Modifier.align(Alignment.Center),
@@ -641,7 +645,7 @@ private fun ReplayEvents(log: VoiceCallLog, playback: VoiceCallReplayPlayback, r
     }
 }
 
-/** The replay's track colours and names (iOS `VoiceCallReplayView.color(_:)`, `.name(_:)`), as iOS's system colours. */
+/** The replay's track colours and names. */
 object VoiceCallLogColors {
     fun color(track: VoiceCallLog.Track, dark: Boolean): Color = when (track) {
         VoiceCallLog.Track.user -> if (dark) Color(1f, 0.624f, 0.039f) else Color(1f, 0.584f, 0f)
@@ -651,10 +655,10 @@ object VoiceCallLogColors {
     }
 
     fun name(track: VoiceCallLog.Track): String = when (track) {
-        VoiceCallLog.Track.user -> "You"
-        VoiceCallLog.Track.voice -> "Voice"
-        VoiceCallLog.Track.delegator -> "Delegator"
-        VoiceCallLog.Track.tool -> "Tools"
+        VoiceCallLog.Track.user -> localized(R.string.voice_replay_track_user)
+        VoiceCallLog.Track.voice -> localized(R.string.voice_replay_track_voice)
+        VoiceCallLog.Track.delegator -> localized(R.string.voice_replay_track_delegator)
+        VoiceCallLog.Track.tool -> localized(R.string.voice_replay_track_tools)
     }
 
     /** `UIColor.systemRed`. */

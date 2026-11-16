@@ -26,14 +26,11 @@ import java.time.Instant
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.seconds
 
-/** iOS `HomeFeature.CatchUpDisposition` (a typealias of [CatchUpFeature.Disposition]). */
 typealias CatchUpDisposition = CatchUpFeature.Disposition
 
 /**
- * Port of iOS `CatchUpFeature` (`OpenCode/Drawer/CatchUpStack.swift` lines 1–234, plus
- * `reduceFinish` from `CatchUpFinish.swift`): the Catch Up stack's queue, Undo history, Mark All
- * receipts and the All Caught Up finish. `HomeFeature` composes it (`HomeFeature+CatchUp.swift`)
- * and coordinates through the transient `last…`/`exiting…` records, exactly as iOS does.
+ * The Catch Up stack's queue, Undo history, Mark All receipts and the All Caught Up finish.
+ * `HomeFeature` composes it and coordinates through the transient `last…`/`exiting…` records.
  */
 class CatchUpFeature : Reducer<CatchUpFeature.State, CatchUpFeature.Action> {
     enum class Disposition { markRead, keepUnread }
@@ -56,7 +53,10 @@ class CatchUpFeature : Reducer<CatchUpFeature.State, CatchUpFeature.Action> {
         /** Where the reader was, restored on leaving. */
         val returnSessionID: String? = null,
         val returnComposerSessionID: String? = null,
-        /** iOS `SessionFeature.State.DraftState` (the drawer-local stand-in until `:feature:session` ports it). */
+        /**
+         * The drawer-local stand-in for the session's draft state, until `:feature:session` ports
+         * it.
+         */
         val returnComposer: DraftState? = null,
     ) {
         val composerTargetSessionID: String? get() = returnComposerSessionID ?: returnSessionID
@@ -139,13 +139,11 @@ class CatchUpFeature : Reducer<CatchUpFeature.State, CatchUpFeature.Action> {
     ) {
         data class ResolvedReceipt(val sessionID: String, val backup: ReadBackup, val succeeded: Boolean)
 
-        /** iOS `consumeLastUndone()`: the record and the state without it. */
+        /** The record and the state without it. */
         fun consumeLastUndone(): Pair<Stack.Handled?, State> = lastUndone to copy(lastUndone = null)
 
-        /** iOS `consumeExitingStack()`. */
         fun consumeExitingStack(): Pair<Stack?, State> = exitingStack to copy(exitingStack = null)
 
-        /** iOS `consumeLastResolvedReceipt()`. */
         fun consumeLastResolvedReceipt(): Pair<ResolvedReceipt?, State> = lastResolvedReceipt to copy(lastResolvedReceipt = null)
     }
 
@@ -211,8 +209,8 @@ class CatchUpFeature : Reducer<CatchUpFeature.State, CatchUpFeature.Action> {
     }
 
     /**
-     * The finish's own actions (iOS `reduceFinish`, `CatchUpFinish.swift`): [Action.Finished] starts
-     * the timeline, which plays `.success` at the check and rests; a tap or arriving work ends it early.
+     * The finish's own actions: [Action.Finished] starts the timeline, which plays `.success` at
+     * the check and rests; a tap or arriving work ends it early.
      */
     private fun reduceFinish(state: State, action: Action): Reduced<State, Action> = when (action) {
         is Action.Finished -> {
@@ -261,7 +259,7 @@ class CatchUpFeature : Reducer<CatchUpFeature.State, CatchUpFeature.Action> {
 
         /**
          * Acknowledges Mark All's receipts, [receiptConcurrency] at a time, answering each with
-         * [Action.MarkAllReceiptResponse] (iOS `acknowledgeViews(_:server:openCodeClient:)`).
+         * [Action.MarkAllReceiptResponse].
          */
         fun acknowledgeViews(
             receipts: List<Pair<String, Long>>,

@@ -4,6 +4,7 @@ import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.map
+import ai.opencode.core.strings.localized
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.core.files.AttachmentFileType
@@ -11,9 +12,8 @@ import ai.opencode.feature.composer.ComposerAttachmentsFeature
 import ai.opencode.feature.composer.ComposerFileAttachment
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
 
-// Port of iOS `SessionFeature+Attachments.swift`: attachments, uploads, and Location as the session
-// sees them. `:feature:composer`'s `ComposerAttachmentsFeature` reduces the rest of each action
-// first.
+// Attachments, uploads, and Location as the session sees them. `:feature:composer`'s
+// `ComposerAttachmentsFeature` reduces the rest of each action first.
 
 private fun SessionFeature.appendAttachment(state: State, attachment: OpenCodeOutgoingAttachment, haptic: Boolean = true): Reduced<State, Action> {
     val parked = state.parkedComposer
@@ -30,6 +30,10 @@ private fun SessionFeature.appendAttachment(state: State, attachment: OpenCodeOu
 
 /** Attachments, uploads, and Location. Null: the action passes on. */
 internal fun SessionFeature.reduceAttachments(state: State, action: Action): Reduced<State, Action>? {
+    if (action is Action.DrawingAdded) {
+        if (state.taskIdentity != action.from || !state.takesPasteAttachments) return Reduced(state)
+        return appendAttachment(state, action.attachment)
+    }
     val attachments = (action as? Action.ComposerAttachments)?.action ?: return null
     return when (attachments) {
         is ComposerAttachmentsFeature.Action.AttachmentAdded -> appendAttachment(state, attachments.attachment)
@@ -40,6 +44,8 @@ internal fun SessionFeature.reduceAttachments(state: State, action: Action): Red
         is ComposerAttachmentsFeature.Action.AttachmentRemoved,
         ComposerAttachmentsFeature.Action.LocationTapped,
         ComposerAttachmentsFeature.Action.LocationRemoved,
+        is ComposerAttachmentsFeature.Action.QuoteRemoved,
+        is ComposerAttachmentsFeature.Action.QuoteCommented,
         ComposerAttachmentsFeature.Action.LocationErrorDismissed,
         ComposerAttachmentsFeature.Action.LocationSettingsTapped,
         -> Reduced(state)
@@ -102,7 +108,7 @@ internal fun SessionFeature.reduceAttachments(state: State, action: Action): Red
                     state.uploadUnsupportedServerIDs.update { it + serverID }
                 }
                 var next = updateFile(id, state) {
-                    it.copy(status = ComposerFileAttachment.Status.Failed(if (isUnsupported) "Server doesn’t support files" else "Couldn’t upload"))
+                    it.copy(status = ComposerFileAttachment.Status.Failed(if (isUnsupported) localized(R.string.session_attachment_files_unsupported) else localized(R.string.session_attachment_upload_failed)))
                 }
                 if (next.pendingFiles.any { it.id == id } || next.parkedComposer?.files?.any { it.id == id } == true) {
                     next = forgetSharedSend(next.withSendAfterUploads(null))

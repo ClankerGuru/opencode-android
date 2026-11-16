@@ -23,9 +23,9 @@ import androidx.compose.ui.unit.IntOffset
 import kotlin.math.roundToInt
 
 /**
- * A steering message accepted: the list moves its row past Working while the row lets its label
- * go, both on this one critically damped spring, so the bubble's two motions (the row moving, the
- * label's space closing) add up to one and nothing passes its place (iOS `PromotionMotion`).
+ * A steering message accepted: the list moves its row past Working while the row lets its label go,
+ * both on this one critically damped spring, so the bubble's two motions (the row moving, the
+ * label's space closing) add up to one and nothing passes its place.
  */
 object PromotionMotion {
     val duration: Double get() = Motion.layout.curve().duration
@@ -59,16 +59,16 @@ object PromotionMotion {
 }
 
 /**
- * Set while the list morphs this row through a promotion (iOS `promotionMorph`): its change lands
- * at once, and the list moves and fades it on the promotion's spring itself.
+ * Set while the list morphs this row through a promotion: its change lands at once, and the list
+ * moves and fades it on the promotion's spring itself.
  */
 val LocalPromotionMorph = staticCompositionLocalOf { false }
 
 /**
- * Lays a row out at its own height and pins it to the top of its slot (iOS `TopAnchoredRow`).
- * While the list animates a row to a new height, the content is already laid out for the new
- * one; centred in the old frame it would jump up and slide back. Pinned, it stays put while the
- * slot's edge moves. A fixed height from the list is kept; otherwise the content's own.
+ * Lays a row out at its own height and pins it to the top of its slot. While the list animates a
+ * row to a new height, the content is already laid out for the new one; centred in the old frame it
+ * would jump up and slide back. Pinned, it stays put while the slot's edge moves. A fixed height
+ * from the list is kept; otherwise the content's own.
  */
 @Composable
 fun TopAnchoredRow(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
@@ -83,7 +83,7 @@ fun TopAnchoredRow(modifier: Modifier = Modifier, content: @Composable () -> Uni
     }
 }
 
-/** Places the bubble at the trailing edge within [fraction] of the width (iOS `TrailingFractionLayout`). */
+/** Places the bubble at the trailing edge within [fraction] of the width. */
 @Composable
 internal fun TrailingFractionLayout(fraction: Float, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Layout(content, modifier) { measurables, constraints ->

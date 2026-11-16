@@ -42,10 +42,9 @@ import androidx.compose.ui.unit.dp
 import ai.opencode.core.motion.Motion
 
 /**
- * What every transcript band shares: code, tables, and opened inline rows. On this branch a band
- * is the desktop's inset block (`markdown.css` `.highlights`, `message-part.css` tool output): a
- * faint fill inside a hairline border with small rounded corners, at the prose's width rather
- * than iOS's full-bleed band between hairlines.
+ * What every transcript band shares: code, tables, and opened inline rows. On this branch a band is
+ * the desktop's inset block (`markdown.css` `.highlights`, `message-part.css` tool output): a faint
+ * fill inside a hairline border with small rounded corners.
  */
 object TranscriptBandStyle {
     /** From the border to the content's first line box. */
@@ -61,9 +60,8 @@ object TranscriptBandStyle {
 }
 
 /**
- * Runs the content out past the row's gutters to the screen's edges (iOS
- * `.padding(.horizontal, -TranscriptMetrics.contentGutter)`): measured [gutter] wider on each
- * side and placed [gutter] to the left.
+ * Runs the content out past the row's gutters to the screen's edges: measured [gutter] wider on
+ * each side and placed [gutter] to the left.
  */
 fun Modifier.bleedHorizontal(gutter: Dp): Modifier = layout { measurable, constraints ->
     val extra = gutter.roundToPx()
@@ -74,8 +72,8 @@ fun Modifier.bleedHorizontal(gutter: Dp): Modifier = layout { measurable, constr
 }
 
 /**
- * One device pixel (iOS `HairlineRule`). Compose places layouts on whole pixels, so the rule
- * never renders two pixels wide or vanishes at a fractional position.
+ * One device pixel. Compose places layouts on whole pixels, so the rule never renders two pixels
+ * wide or vanishes at a fractional position.
  */
 @Composable
 fun HairlineRule(modifier: Modifier = Modifier, alpha: Float = 1f) {
@@ -84,9 +82,8 @@ fun HairlineRule(modifier: Modifier = Modifier, alpha: Float = 1f) {
 }
 
 /**
- * Fades a horizontal scroll's edges where more content lies past them: the trailing edge
- * until the end, the leading edge once scrolled (iOS `horizontalOverflowFade(width:)`).
- * The fades ease over 0.15 s; only drawing changes.
+ * Fades a horizontal scroll's edges where more content lies past them: the trailing edge until the
+ * end, the leading edge once scrolled. The fades ease over 0.15 s; only drawing changes.
  */
 @Composable
 fun Modifier.horizontalOverflowFade(state: ScrollState, width: Dp = 40.dp): Modifier {
@@ -120,9 +117,9 @@ class TableRules {
 }
 
 /**
- * Code and tables sit in the desktop's inset block (iOS draws a full-width `MarkdownBand`).
- * Content scrolls horizontally inside the block, fading where more lies past it. A table's rules keep the viewport's width while its
- * columns scroll underneath.
+ * Code and tables sit in the desktop's inset block. Content scrolls horizontally inside the block,
+ * fading where more lies past it. A table's rules keep the viewport's width while its columns
+ * scroll underneath.
  *
  * [action] sits in the block's top-trailing corner, over the content (a code block's copy
  * button). The whole block takes the sideways drag, so a swipe that starts on the action

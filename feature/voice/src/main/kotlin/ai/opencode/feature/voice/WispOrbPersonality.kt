@@ -9,10 +9,10 @@ import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-// Wisp's in-call personality (iOS `WispOrbPersonality.swift`): the ponder gaze (gaze.rs, ponder
-// path only), Attentive Presence (attentive.rs), Thinking Fidgets (fidget.rs) and the Breathing
-// Ember idle (idle.rs). A one-for-one port; Wisp's window-look, cursor and other idle variants
-// have no phone equivalent and are left out.
+// Wisp's in-call personality: the ponder gaze (gaze.rs, ponder path only), Attentive Presence
+// (attentive.rs), Thinking Fidgets (fidget.rs) and the Breathing Ember idle (idle.rs). A
+// one-for-one port; Wisp's window-look, cursor and other idle variants have no phone equivalent and
+// are left out.
 
 internal fun wispHash01(seq: Int): Float {
     var x = (seq * 0x9E3779B9.toInt()) xor 0xC2B2AE35.toInt()
@@ -22,7 +22,7 @@ internal fun wispHash01(seq: Int): Float {
     return (x ushr 8).toFloat() / (1 shl 24).toFloat()
 }
 
-/** A point or direction in the lens, iOS `SIMD2<Float>`. */
+/** A point or direction in the lens. */
 data class WispVec2(val x: Float, val y: Float) {
     operator fun plus(o: WispVec2) = WispVec2(x + o.x, y + o.y)
     operator fun times(s: Float) = WispVec2(x * s, y * s)
@@ -33,7 +33,7 @@ data class WispVec2(val x: Float, val y: Float) {
     }
 }
 
-/** Kit's side of the lens (his ribbon enters from the left). */
+/** The user's side of the lens (their ribbon enters from the left). */
 internal val wispKitLook = WispVec2(-0.12f, -0.04f)
 
 // Gaze
@@ -150,8 +150,8 @@ data class WispGazeFrame(
 // Attentive Presence
 
 /**
- * Quiet open-call pauses (Listening, quiet over 4 s): blinking eyes that glance toward Kit and
- * perk up when he speaks.
+ * Quiet open-call pauses (Listening, quiet over 4 s): blinking eyes that glance toward the user and
+ * perk up when they speak.
  */
 class WispAttentiveSim {
     var quietSecs = 0f

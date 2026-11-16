@@ -1,11 +1,12 @@
 package ai.opencode.feature.session
 
+import ai.opencode.core.strings.localized
+import ai.opencode.core.strings.localizedPlural
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-// Port of the notice model of iOS `OpenCode/Drawer/InAppNotices.swift`. It lives here, below
-// `:feature:drawer`, because `SessionListContext` carries it to the session's header; the rules,
-// the mode and Home's wiring stay in the drawer (`notices/InAppNotices.kt`,
+// It lives here, below `:feature:drawer`, because `SessionListContext` carries it to the session's
+// header; the rules, the mode and Home's wiring stay in the drawer (`notices/InAppNotices.kt`,
 // `HomeFeatureNotifications.kt`).
 
 /**
@@ -36,14 +37,14 @@ data class InAppNotice(
 
     val target: Target get() = if (events.size == 1) Target.Session(events[0].sessionID) else Target.Drawer
 
-    val title: String get() = if (events.size == 1) events[0].title else "${events.size} sessions"
+    val title: String get() = if (events.size == 1) events[0].title else localizedPlural(R.plurals.session_notice_session_count, events.size, events.size)
 
     val status: String
         get() {
             val waiting = needsInputCount
-            if (events.size <= 1) return if (waiting > 0) "Needs your input" else "Done"
-            if (waiting <= 0) return "Done"
-            return "$waiting ${if (waiting == 1) "needs" else "need"} your input"
+            if (events.size <= 1) return if (waiting > 0) localized(R.string.session_status_needs_input) else localized(R.string.session_status_done)
+            if (waiting <= 0) return localized(R.string.session_status_done)
+            return localizedPlural(R.plurals.session_notice_needs_input_count, waiting, waiting)
         }
 
     /** The notice after [merge], and the events that were new to it. */
@@ -74,6 +75,6 @@ data class InAppNotice(
     }
 
     /** What TalkBack hears: the label, without moving focus. */
-    val announcement: String get() = "$title, $status"
+    val announcement: String get() = localized(R.string.session_notice_announcement, title, status)
 }
 

@@ -10,11 +10,9 @@ import ai.opencode.server.model.AgentFileReference
 import ai.opencode.server.model.SessionLink
 
 /**
- * The private and web links rendered Markdown carries, as the renderer reads them: iOS
- * `SessionLink.id(from:)`/`title(from:)`/`url(id:title:)`/`shortID`,
- * `AgentFileReference(linkURL:)`, `LinkMenuAction.offers`/`actions(for:)` and `LinkMenuText`.
- * The link formats live in `:server` (`SessionLink`, `AgentFileReference`); the menu's rules in
- * `:feature:media` (`LinkMenuAction`, `LinkMenuText`, `BrowserLinkPolicy`, `SiteIconDomain`).
+ * The private and web links rendered Markdown carries, as the renderer reads them. The link formats
+ * live in `:server` (`SessionLink`, `AgentFileReference`); the menu's rules in `:feature:media`
+ * (`LinkMenuAction`, `LinkMenuText`, `BrowserLinkPolicy`, `SiteIconDomain`).
  */
 object MarkdownLinks {
     fun sessionID(url: String): String? = SessionLink.id(url)
@@ -37,8 +35,8 @@ object MarkdownLinks {
     fun offersMenu(url: String): Boolean = LinkMenuAction.offers(url)
 
     /**
-     * What holding [url] offers, in order (iOS `LinkMenuAction.actions(for:experimental:)`):
-     * read as the menu is built, so it follows the Experimental switches.
+     * What holding [url] offers, in order: read as the menu is built, so it follows the
+     * Experimental switches.
      */
     fun menuActions(url: String): List<LinkMenuAction> = LinkMenuAction.actions(url, dependency(ExperimentalFeatures))
 
@@ -48,16 +46,15 @@ object MarkdownLinks {
 
     fun displayHost(url: String): String = LinkMenuText.displayHost(url)
 
-    /** One link: the menu's own titles. Several: each names its host (iOS `LinkMenuText.accessibilityName`). */
+    /** One link: the menu's own titles. Several: each names its host. */
     fun accessibilityName(action: LinkMenuAction, url: String, among: List<String>): String =
         LinkMenuText.accessibilityName(action, url, among)
 
     /**
-     * The registrable domain the icon service may be asked about; null for a private, tailnet
-     * or credentialed link, which keeps a neutral glyph (iOS `SiteIconDomain.registrable`).
+     * The registrable domain the icon service may be asked about; null for a private, tailnet or
+     * credentialed link, which keeps a neutral glyph.
      */
     fun iconDomain(url: String): String? = SiteIconDomain.registrable(url)
 
-    /** iOS `BrowserLinkPolicy.isPublicWebPage`. */
     fun isPublicWebPage(url: String): Boolean = BrowserLinkPolicy.isPublicWebPage(url)
 }

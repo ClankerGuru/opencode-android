@@ -63,18 +63,7 @@ import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `ComposerPersistenceTests.swift`'s Home tests (composer persistence as Home parks,
- * restores, cleans up and promotes drafts). The rest are `:feature:composer`'s.
- *
- * Adapted:
- * - `sessionDeletionServerDeletionAndStalenessCleanUpPersistedState`: the `AppFeature.serverDeleted`
- *   step is `:app`'s; the Home deletion and the relaunch's staleness pruning are here.
- * - `parkDraftFamilyDraftsAndCatchUpPreserveAttachmentsAndNeverDuplicateOrResurrectDrafts`: step 2's
- *   `SessionFeature` family switches assert the composer and persistence rather than iOS's exhaustive
- *   field list (the run, history and request bookkeeping are `:feature:session`'s tests); step 3's
- *   Catch Up actions assert the screen and composers non-exhaustively, and the
- *   `restorePersistedComposer` probe is dropped (internal to `:feature:session`; the card's empty
- *   composer after its `task` is asserted instead).
+ * Family switches and Catch Up steps assert the composer and persistence rather than every field.
  */
 class ComposerPersistenceTests {
     @get:Rule val isolation = TestIsolationRule()
@@ -118,7 +107,7 @@ class ComposerPersistenceTests {
 
     private fun setDraft(text: String): SessionFeature.Action = SessionFeature.Action.Binding(BindingAction.Draft(text))
 
-    /** Reads that never answer (iOS's `for await _ in stream {}`): the screens' opening effects stay out of the way. */
+    /** Reads that never answer: the screens' opening effects stay out of the way. */
     @Suppress("UNUSED_PARAMETER")
     private fun hangingClient(getSession: (String) -> OpenCodeSession): OpenCodeClient = OpenCodeClient.testValue.copy(
         getSession = { _, _ -> awaitCancellation() },
@@ -183,8 +172,6 @@ class ComposerPersistenceTests {
             assertNull(persistence.loadDraft(server.persistenceID, session.id))
             assertFalse("Deleted session's attachment blob is cleaned up", blobA.exists())
             assertEquals("Draft on other server", persistence.loadDraft(otherServer.persistenceID, "ses_other")?.draft?.text)
-
-            // (iOS: `AppFeature.serverDeleted(otherServer)` cleans up its drafts — `:app`'s.)
 
             // Advance past 30 days and reload from disk: stale entry is pruned and its attachment blob discarded.
             currentTime.setValue(Instant.ofEpochSecond(1_000_000 + PersistedComposerState.STALENESS_INTERVAL_SECONDS + 60))
@@ -364,7 +351,7 @@ class ComposerPersistenceTests {
         assertEquals(false, catchUpStore.state.sessionDetail?.readsOnView)
         assertEquals("Catch Up card starts with an empty composer", "", catchUpStore.state.sessionDetail?.draft)
 
-        // The card's `task` doesn't load the persisted draft either (iOS probes `restorePersistedComposer`).
+        // The card's `task` doesn't load the persisted draft either.
         catchUpStore.send(detail(SessionFeature.Action.Task))
         assertEquals("restorePersistedComposer does not load persisted draft when readsOnView is false", "", catchUpStore.state.sessionDetail?.draft)
 

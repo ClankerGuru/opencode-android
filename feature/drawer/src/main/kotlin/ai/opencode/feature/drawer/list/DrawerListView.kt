@@ -81,27 +81,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 
-/*
- * Port of iOS `DrawerListController.swift` (+ its SwiftUI host `DrawerListView`): the drawer's
- * session list as a `LazyColumn` keyed by [DrawerListItem.key]. The title, search, New Session
- * and Settings lie around it in `HomeDrawer`.
- *
- * Home's state reaches the rows through one model build ([DrawerListModel.build]) in a derived
- * state; unchanged rows keep their instances, so only rows whose values changed recompose (iOS
- * reconfigures only those cells). iOS flushes observation on the layout pass so a pin drop's store
- * change is laid out before `DrawerPinDrag` reads the rows' new places; here the list reads Home's
- * state through its own snapshot value, which [DrawerPinDragHost.flushNow] sets at once, so the
- * drop recomposes and lays out in the frame that commits it.
- *
- * The time reveal: rows read the drawer's live [DrawerTimeReveal] while a drag moves them; it
- * lands on zero at release, so the list springs the rows back from where they were on iOS's
- * spring (0.4 s, bounce 0.2; Reduce Motion: the times fade over 0.2 s).
- */
+// The drawer's session list as a `LazyColumn` keyed by [DrawerListItem.key]. Home's state reaches
+// the rows through one model build ([DrawerListModel.build]); unchanged rows keep their instances,
+// so only changed rows recompose. [DrawerPinDragHost.flushNow] sets the list's snapshot at once, so
+// a pin drop lays out in the frame that commits it. The time reveal springs the rows back from
+// where they were at release (0.4 s, bounce 0.2; Reduce Motion fades over 0.2 s).
 
-/** What the list does that only `HomeDrawer` can (iOS `DrawerListActions`). */
+/** What the list does that only `HomeDrawer` can. */
 class DrawerListActions(
     val select: (sessionID: String) -> Unit,
-    /** A row's hold: it joins or leaves the selection (Android; iOS opens `rowMenu(_:isPinned:)`). */
+    /** A row's hold: it joins or leaves the selection. */
     val held: (sessionID: String) -> Unit,
     val openCatchUp: () -> Unit,
     val openWhatsNew: () -> Unit,
@@ -122,22 +111,22 @@ internal class DrawerListReveal(private val timeReveal: DrawerTimeReveal) : Draw
 
 /**
  * The last model built, so unchanged rows keep their instances; and the gate that keeps a hidden
- * drawer from building (iOS `DrawerListController`'s deferred builds, f5636460 and 34a02fc4).
+ * drawer from building.
  */
 internal class DrawerListModelHolder {
     var model = DrawerListModel()
 
-    /** Models built, for the perf gate tests (iOS `builds`). */
+    /** Models built, for the perf gate tests. */
     var builds = 0
         private set
 
-    /** The first build done hidden, before the drawer shows (iOS's prewarm). */
+    /** The first build done hidden, before the drawer shows. */
     private var hasBuilt = false
     private var wasHidden = false
 
     /**
-     * This build is the first since the drawer was hidden: what changed while hidden lands in
-     * place instead of animating (iOS `isRevealing`). Cleared once the shortcuts have synced.
+     * This build is the first since the drawer was hidden: what changed while hidden lands in place
+     * instead of animating. Cleared once the shortcuts have synced.
      */
     var isRevealing = false
 
@@ -163,7 +152,7 @@ internal class DrawerListModelHolder {
  * The drawer's session list.
  *
  * @param inputs the list's view-local values (selection, environment).
- * @param isDrawerVisible the drawer shows (iOS `isDrawerVisible`): the shortcut rows animate only then.
+ * @param isDrawerVisible The drawer shows: the shortcut rows animate only then.
  * @param catchUpFocusRequests bumped when leaving Catch Up hands TalkBack back to its row.
  * @param contentPadding room under the title and above New Session and Settings.
  * @param panRegions the drawer pan's regions: a rightward drag on the list reveals the rows' times.
@@ -198,7 +187,7 @@ fun DrawerListView(
     LaunchedEffect(store) { store.states.collect { homeState.value = it } }
     val liftedID = remember { mutableStateOf<String?>(null) }
     val holder = remember { DrawerListModelHolder() }
-    // The rows' times follow the device's 24-hour setting (iOS `.shortened` follows the user's).
+    // The rows' times follow the device's 24-hour setting.
     val timeContext = LocalContext.current
     val hour24 = remember(timeContext) { android.text.format.DateFormat.is24HourFormat(timeContext) }
 
@@ -213,7 +202,7 @@ fun DrawerListView(
         derivedStateOf {
             holder.model(isHidden = drawerHidden.value) {
                 val state = homeState.value
-                // Today and the projects worked out once for every row (iOS f5636460).
+                // Today and the projects worked out once for every row.
                 val day = DrawerTimestamp.Day(Instant.now(), hour24 = hour24)
                 val projects = OpenCodeProjectLookup(state.projects)
                 DrawerListModel.build(
@@ -231,8 +220,7 @@ fun DrawerListView(
     }
     val isSettingsShown by remember { derivedStateOf { homeState.value.isSettingsShown } }
 
-    // iOS `DrawerTuningRegistration.registerIfNeeded`: the drawer's knobs join the tuning panel
-    // once while it's on.
+    // The drawer's knobs join the tuning panel once while it's on.
     SideEffect { DrawerTunables.registerIfNeeded() }
 
     // Server Flow: before the rows it moves, as the title may not have drawn it yet.
@@ -252,7 +240,7 @@ fun DrawerListView(
         searchIsEmpty = model.search.isEmpty(),
         serverID = model.serverID,
         isSettingsShown = isSettingsShown,
-        // What changed while the drawer was hidden lands in place on reveal (iOS 34a02fc4).
+        // What changed while the drawer was hidden lands in place on reveal.
         isDrawerVisible = isDrawerVisible && !holder.isRevealing,
         reducedMotion = model.reducedMotion,
     )
@@ -381,11 +369,9 @@ fun DrawerListView(
         )
     }
 
-    // Leaving Catch Up: TalkBack lands on the Catch Up row, or on the highlighted session (iOS
-    // `focusCatchUpRow`, `DrawerListController.swift:652-664`), as VoiceOver goes back to the
-    // control that presented it. Accessibility focus only (QA AD-02): input focus on the row used
-    // to land on the drawer's scrim instead, and stayed in the window for Catch Up's next open to
-    // drop (AD-01). Once, as the leave happens: a row not laid out by then never takes it later.
+    // Leaving Catch Up: TalkBack lands on the Catch Up row, or on the highlighted session.
+    // Accessibility focus only, not input focus. Once, as the leave happens: a row not laid out by
+    // then never takes it later.
     val answeredFocusRequests = remember { intArrayOf(catchUpFocusRequests) }
     var catchUpReturn by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(catchUpFocusRequests) {
@@ -398,9 +384,9 @@ fun DrawerListView(
     val returnFocus = rememberAccessibilityFocusRequest(catchUpReturn)
     val returnsToCatchUp = DrawerListItem.CatchUp in model.items
 
-    // iOS `apply`'s server branches: Server Flow's switch leaves the old server's rows hanging off
-    // its name as it goes (`swapRows`); otherwise another server's Home arriving in place, or
-    // Server Flow's ghost rows giving way to what loaded, fades the list in.
+    // Server Flow's switch leaves the old server's rows hanging off its name as it goes
+    // (`swapRows`); otherwise another server's Home arriving in place, or Server Flow's ghost rows
+    // giving way to what loaded, fades the list in.
     val listAlpha = remember { Animatable(1f) }
     val graphics = LocalGraphicsContext.current
     val swapPictures = remember(graphics) { ServerSwapPictures(graphics) }
@@ -425,7 +411,6 @@ fun DrawerListView(
     LaunchedEffect(listFades[0]) {
         if (listFades[0] == 0) return@LaunchedEffect
         listAlpha.snapTo(0f)
-        // iOS `Motion.swap.crossDissolve` (Reduce Motion: `Motion.reduced`).
         listAlpha.animateTo(1f, MotionRole.Swap.animation(reduceMotion = model.reducedMotion))
     }
 
@@ -436,16 +421,16 @@ fun DrawerListView(
         }
     }
 
-    // A list resting at its top stays there when a row arrives above the first one (Catch Up
-    // or Pinned coming back), as iOS's collection view keeps its zero offset; LazyColumn would
-    // otherwise keep the old first row in place and leave the new one scrolled under the title.
+    // A list resting at its top stays there when a row arrives above the first one (Catch Up or
+    // Pinned coming back); LazyColumn would otherwise keep the old first row in place and leave the
+    // new one scrolled under the title.
     val restsAtTop = remember { booleanArrayOf(true) }
     LaunchedEffect(listState) {
         snapshotFlow { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 }
             .collect { restsAtTop[0] = it }
     }
-    // iOS `loadMoreIfFooterVisible`: the footer in view while it spins reads the next page, and
-    // each page's answer checks again, so a page too short to push it out reads the one after.
+    // The footer in view while it spins reads the next page, and each page's answer checks again,
+    // so a page too short to push it out reads the one after.
     val currentModel = rememberUpdatedState(model)
     LaunchedEffect(store, listState) {
         snapshotFlow {
@@ -464,9 +449,9 @@ fun DrawerListView(
         shownFirstKey[0] = firstKey
     }
 
-    // iOS ff935bef (`movesPins`): Pin, Unpin and Move Up/Down outside a drag (the menu, TalkBack)
-    // move the row to its new place as the rows between make room, in one move; not on another
-    // server's Home or a changed search, and a drag lands its own.
+    // Pin, Unpin and Move Up/Down outside a drag (the menu, TalkBack) move the row to its new place
+    // as the rows between make room, in one move; not on another server's Home or a changed search,
+    // and a drag lands its own.
     val shownPins = remember { arrayOfNulls<DrawerShownPins>(1) }
     val pins = DrawerShownPins(
         serverID = model.serverID,
@@ -479,8 +464,8 @@ fun DrawerListView(
     shownPins[0] = pins
 
     Box(modifier) {
-        // Beneath the rows: they move out of its way, and the lifted row (drawn in the list)
-        // stays above it, as iOS's system platter floats above the zone.
+        // Beneath the rows: they move out of its way, and the lifted row (drawn in the list) stays
+        // above it.
         DrawerPinDropZoneOverlay(pinDrag)
         LazyColumn(
             state = listState,
@@ -502,9 +487,9 @@ fun DrawerListView(
         ) {
             val current = model
             itemsIndexed(current.items, key = { _, item -> item.key }, contentType = { _, item -> contentType(item) }) { index, item ->
-                // The dragged row draws above every other item, headers included, through its
-                // drag, landing and settle (iOS lifts it into a layer over the whole list). The
-                // z-order has to sit on the item's root: the list orders its items, not their content.
+                // The dragged row draws above every other item, headers included, through its drag,
+                // landing and settle. The z-order has to sit on the item's root: the list orders
+                // its items, not their content.
                 val isDragged = item is DrawerListItem.Session && pinDrag.draggingID == item.id
                 Box(
                     Modifier
@@ -554,7 +539,7 @@ fun DrawerListView(
                 }
             }
         }
-        // iOS adds the leaving pictures over the cells; here they draw over the list.
+        // The leaving pictures draw over the list.
         if (serverSwap != null && swapsRows) {
             Spacer(
                 Modifier
@@ -571,7 +556,7 @@ fun DrawerListView(
     }
 }
 
-/** The empty-pins drop zone at the list's top while a drag opens it (iOS's hosted `DrawerEmptyPinDropZone`). */
+/** The empty-pins drop zone at the list's top while a drag opens it. */
 @Composable
 private fun DrawerPinDropZoneOverlay(pinDrag: DrawerPinDrag) {
     val zone = pinDrag.dropZone ?: return
@@ -612,8 +597,7 @@ private fun rowActions(
             } else {
                 pinDrag.endDrag(x, y)
             }
-            // A drag that never began (no list to move) leaves no lift behind (iOS
-            // `dragInteraction(_:session:didEndWith:)` clears it whatever happened).
+            // A drag that never began (no list to move) leaves no lift behind.
             if (pinDrag.draggingID == null) liftedID.value = null
         },
         dismantled = { if (pinDrag.activeSessionID == id) pinDrag.cancelDrag() },
@@ -628,8 +612,8 @@ private fun rowActions(
 }
 
 /**
- * iOS `DrawerTimeReveal`'s release: back on `MotionRole.Release`, critically damped from where the
- * rows are, no bounce on the way home. Under Reduce Motion the time fades out (`Reduced`).
+ * Back on `MotionRole.Release`, critically damped from where the rows are, no bounce on the way
+ * home. Under Reduce Motion the time fades out (`Reduced`).
  */
 private suspend fun springBack(reveal: DrawerListReveal, reducedMotion: Boolean, frameDuration: Double) {
     val startOffset = reveal.heldOffset
@@ -678,7 +662,7 @@ private fun contentType(item: DrawerListItem): Int = when (item) {
     DrawerListItem.Footer -> 7
 }
 
-/** What the list showed of its pins, to tell a Pin, Unpin or Move outside a drag (iOS `movesPins`). */
+/** What the list showed of its pins, to tell a Pin, Unpin or Move outside a drag. */
 internal data class DrawerShownPins(val serverID: String, val search: String, val pinned: List<DrawerListItem>) {
     fun movesPins(next: DrawerShownPins): Boolean = serverID == next.serverID && search == next.search && pinned != next.pinned
 }

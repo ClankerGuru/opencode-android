@@ -3,12 +3,11 @@ package ai.opencode.feature.media
 import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.files.AttachmentFileType
 import ai.opencode.core.log.AppLog
-import ai.opencode.core.sharing.SharedKeys
-import ai.opencode.core.sharing.shared
+import ai.opencode.core.strings.localized
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.AgentFileReference
-import ai.opencode.core.files.AttachmentFileType
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Context
@@ -29,6 +28,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,21 +41,18 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.Request
-import java.io.File
 
 /**
- * One open file's loading, playback and Share (iOS `AgentFileViewerModel`, an `@Observable`
- * model the page owns). A plain object, like iOS: its state is Compose snapshot state the page
- * reads; the page calls [open] when it appears and [stop] when it goes, and the viewer calls
- * [release] when the page is gone for good.
+ * Loads one file's content and export bytes. The page owns its native player/PDF resources;
+ * the fullscreen feature decides what to present, share or draw.
  */
 class AgentFileViewerModel(
     val reference: AgentFileReference,
     val server: OpenCodeServer,
     val directory: String?,
     private val playbackAudio: MediaPlaybackAudio = dependency(MediaPlaybackAudio),
-    private val shareClient: AgentFileShareClient = dependency(AgentFileShareClient),
     private val context: Context = dependency(AppContext),
+    private val fileChecks: AgentFileChecks = dependency(AgentFileChecks),
 ) {
     sealed interface Content {
         class Player(val player: ExoPlayer, val isAudio: Boolean, val isStreaming: Boolean) : Content
@@ -64,8 +61,8 @@ class AgentFileViewerModel(
         class Image(val image: Bitmap) : Content
 
         /**
-         * iOS Quick Look. Android has none: a PDF renders its pages ([pdf]); any other document
-         * offers another app (`ACTION_VIEW` through the FileProvider).
+         * Android has none: a PDF renders its pages ([pdf]); any other document offers another app
+         * (`ACTION_VIEW` through the FileProvider).
          */
         class QuickLook(val file: File, val pdf: AgentPdfDocument?) : Content
 
@@ -97,33 +94,16 @@ class AgentFileViewerModel(
     var shareProgress: ShareProgress? by mutableStateOf(null)
         private set
 
-    var shareError: AgentFileError? by mutableStateOf(null)
-
-    /**
-     * No app on this device opened the document (Android only: iOS previews every document in
-     * Quick Look). Cleared by the next try.
-     */
-    var noAppOpens: Boolean by mutableStateOf(false)
-        private set
-
-    private val wrapsLinesShared = shared(SharedKeys.fileViewerWrapsLines)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var streamLoader: StreamingFileLoader? = null
     private var probe: AgentFileProbe? = null
     private var work: Job? = null
-    private var shareWork: Job? = null
     private var audioHolder: AudioHolder? = null
 
     /** One activation; `holder` is set once activation succeeded off the main thread. */
     private class AudioHolder {
         @Volatile var holder: MediaPlaybackAudio.Holder? = null
         @Volatile var released = false
-    }
-
-    fun toggleWrapLines() {
-        val next = !wrapsLinesShared.value
-        if (wrapsLinesShared.value == next) return
-        wrapsLinesShared.set(next)
     }
 
     val target: AgentFileReference.Target? get() = reference.target(directory)
@@ -160,7 +140,6 @@ class AgentFileViewerModel(
 
     fun stop() {
         work?.cancel()
-        shareWork?.cancel()
         ((phase as? Phase.Ready)?.content as? Content.Player)?.player?.pause()
         releaseAudio()
         streamLoader?.invalidate()
@@ -178,38 +157,42 @@ class AgentFileViewerModel(
         scope.cancel()
     }
 
+    private val original: AgentFileLoader.Original?
+        get() = AgentFileLoader.original(server, reference, directory)
+
     private suspend fun run(confirmed: Boolean) {
-        val target = target
-        val request = target?.let { server.fileReadRequest(it) }
-        if (target == null || request == null) {
+        val original = original
+        if (original == null) {
             phase = Phase.Failed(AgentFileError.Unreadable)
             return
         }
         try {
             if (!confirmed || probe == null) {
                 phase = Phase.Opening
-                probe = AgentFileLoader.probe(request, server)
+                probe = AgentFileLoader.probe(original.request, server)
             }
             val probe = probe ?: return
             if (!scope.isActive) return
             if (reference.kind.isTimeBased && probe.supportsRanges) {
-                startStreaming(request, probe.mime)
+                startStreaming(original.request, reference.media?.mime ?: probe.mime)
                 return
             }
-            val size = probe.size
+            val size = downloadSize(probe)
             if (!confirmed && size != null && size > AgentFileLoader.confirmationBytes) {
                 phase = Phase.ConfirmLarge(size)
                 return
             }
-            phase = Phase.Downloading(0, probe.size)
-            val destination = AgentFileLoader.cacheURL(server, target.absolutePath, reference.name, context.cacheDir)
-            val file = AgentFileLoader.download(request, destination, server) { received, expected ->
+            phase = Phase.Downloading(0, size)
+            val destination = AgentFileLoader.cacheURL(server, original.cacheKey, reference.name, context.cacheDir)
+            val limit = if (confirmed) maxOf(size ?: 0, AgentFileLoader.confirmationBytes) else AgentFileLoader.confirmationBytes
+            val file = AgentFileLoader.download(original.request, destination, server, maxBytes = limit) { received, expected ->
                 scope.launch { downloaded(received, expected) }
             }
             present(file)
         } catch (error: CancellationException) {
             throw error
         } catch (error: AgentFileError) {
+            if (error == AgentFileError.NotFound) target?.let { fileChecks.markMissing(server, it.absolutePath) }
             phase = Phase.Failed(error)
         } catch (error: Exception) {
             AppLog.network.notice { "Agent file: ${error::class.java.simpleName}" }
@@ -217,55 +200,30 @@ class AgentFileViewerModel(
         }
     }
 
-    /**
-     * Every file that opens can be shared, and so saved. A downloaded one shares at once; a
-     * streamed one downloads first, keeps playing meanwhile, and opens the share sheet when it
-     * lands.
-     */
-    fun share() {
-        val ready = phase as? Phase.Ready ?: return
-        val file = ready.localFile
-        if (file != null) {
-            shareClient.share(file, reference.mime)
-            return
-        }
-        shareStreamed()
-    }
-
-    fun shareStreamed() {
-        val ready = phase as? Phase.Ready ?: return
-        if (ready.localFile != null || shareWork != null) return
-        val target = target ?: return
-        val request = server.fileReadRequest(target) ?: return
-        val content = ready.content
+    /** The original for export. A ranged stream keeps playing while its bytes download. */
+    suspend fun exportFile(): File? {
+        val ready = phase as? Phase.Ready ?: return null
+        ready.localFile?.let { return it }
+        if (shareProgress != null) return null
+        val original = original ?: return null
+        if ((downloadSize(probe) ?: 0L) > AgentFileLoader.confirmationBytes) throw AgentFileLoader.overLimit
         shareProgress = ShareProgress(0, probe?.size)
-        val destination = AgentFileLoader.cacheURL(server, target.absolutePath, reference.name, context.cacheDir)
-        shareWork = scope.launch {
-            try {
-                val file = AgentFileLoader.download(request, destination, server) { received, expected ->
-                    scope.launch { shareDownloaded(received, expected) }
-                }
-                val current = phase as? Phase.Ready
-                if (current == null || current.content !== content || current.localFile != null) return@launch
-                phase = Phase.Ready(content, file)
-                shareClient.share(file, reference.mime)
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: AgentFileError) {
-                shareError = error
-            } catch (error: Exception) {
-                shareError = AgentFileError.network(error)
-            } finally {
-                shareWork = null
-                shareProgress = null
+        try {
+            val destination = AgentFileLoader.cacheURL(server, original.cacheKey, reference.name, context.cacheDir)
+            val file = AgentFileLoader.download(original.request, destination, server, maxBytes = AgentFileLoader.confirmationBytes) { received, expected ->
+                scope.launch { shareDownloaded(received, expected) }
             }
+            if (phase !== ready || !scope.isActive) return null
+            phase = ready.copy(localFile = file)
+            return file
+        } finally {
+            shareProgress = null
         }
     }
 
-    /** Opens a document that can't show here (not a PDF) in another app. */
-    fun openExternally() {
-        val file = ((phase as? Phase.Ready)?.content as? Content.QuickLook)?.file ?: return
-        noAppOpens = !shareClient.view(file, reference.mime)
+    private fun downloadSize(probe: AgentFileProbe?): Long? {
+        val media = reference.media ?: return probe?.size
+        return media.downloadSize(probe?.size) ?: throw AgentFileError.Network(localized(R.string.media_file_error_size_unknown))
     }
 
     private fun shareDownloaded(received: Long, expected: Long?) {
@@ -474,9 +432,8 @@ class AgentPdfDocument private constructor(
 }
 
 /**
- * Hands a downloaded file to the system: the share sheet (iOS `ShareLink` /
- * `ActivitySharePresenter`), or another app for a document Android can't preview (iOS shows
- * those in Quick Look). Files go out through the FileProvider declared in this module's manifest.
+ * Hands a downloaded file to the share sheet, or to another app for a document Android can't
+ * preview, through this module's FileProvider.
  */
 class AgentFileShareClient(
     val share: (file: File, mime: String) -> Boolean,

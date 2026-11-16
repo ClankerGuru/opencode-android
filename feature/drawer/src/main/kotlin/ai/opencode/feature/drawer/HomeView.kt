@@ -113,17 +113,10 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 
 /**
- * Port of `OpenCode/Drawer/HomeView.swift`: one server's Home. The open session (or a draft) on
- * the session drawer's card ([SessionDrawerContainer]), its pushed subagents and in-app browser
- * pages (`:feature:session`'s [SessionPageStack], with predictive back), the call's floating
- * orb, Catch Up, Settings pushed over everything, the delete confirmation, and the
- * lifecycle that tells [HomeFeature] about the screen.
- *
- * A window at least [SidebarMetrics.minimumWindowWidth] wide lists the sessions in a sidebar
- * beside the session, shown or hidden with the header's button
- * ([HomeFeature.State.isSidebarShown]); anything narrower slides the phone's drawer under it.
- * Per-frame drawer motion never recomposes this view or the session: the container's plain
- * objects own it, and only settled open/shut reaches the reducer.
+ * One server's Home. A window at least [SidebarMetrics.minimumWindowWidth] wide lists the sessions
+ * in a sidebar beside the session; anything narrower slides the phone's drawer under it. Per-frame
+ * drawer motion never recomposes this view: the container's plain objects own it, and only settled
+ * open/shut reaches the reducer.
  */
 @Composable
 fun HomeView(
@@ -153,8 +146,8 @@ fun HomeView(
                 // An iPad-wide window lists the sessions in a sidebar beside the session; anything
                 // narrower slides the phone's drawer under it.
                 val usesSidebar = maxWidth >= SidebarMetrics.minimumWindowWidth
-                // Android: Material's modal drawer width (at most 360 dp, leaving 56 dp of the session
-                // beside it to tap shut), where iOS takes three quarters of the phone.
+                // Android: Material's modal drawer width (at most 360 dp, leaving 56 dp of the
+                // session beside it to tap shut).
                 val drawerWidth = if (usesSidebar) SidebarMetrics.width else min(maxWidth - 56.dp, 360.dp)
                 val containerWidth = maxWidth
                 SideEffect { view.usesSidebar = usesSidebar }
@@ -167,13 +160,13 @@ fun HomeView(
     HomeWelcome(store, welcomeMark)
     HomeFloatingCallWindow(store)
     HomeLifecycle(store, view)
-    // iOS hosts it on Home, so deletes from the session's own menu confirm too.
+    // Hosted on Home, so deletes from the session's own menu confirm too.
     HomeDeleteConfirmation(store)
-    // iOS `.traceUploads(store.scope(\.traces, action: \.traces))`: Report a Problem and its toast.
+    // Report a Problem and its toast.
     TraceUploadsHost(store.rememberScope({ it.traces }, HomeFeature.Action::Traces))
 }
 
-/** iOS `homeLayout`: the container with the session, the drawer, and Catch Up. */
+/** The container with the session, the drawer, and Catch Up. */
 @Composable
 private fun HomeLayout(
     store: StoreOf<HomeFeature.State, HomeFeature.Action>,
@@ -201,10 +194,10 @@ private fun HomeLayout(
     catchUp?.let { lastCatchUp[0] = it }
 
     /**
-     * iOS `leaveCatchUp(finished:)`: Back, TalkBack's escape, or the last card gone (`finished`,
-     * which the drawer's Catch Up row celebrates). The stack hands back to the drawer it was opened
-     * from, as it was; set before the stack ends, so the card sees both in one update and returns
-     * to the open drawer rather than landing shut and opening again. Navigation: no haptic.
+     * Back, TalkBack's escape, or the last card gone (`finished`, which the drawer's Catch Up row
+     * celebrates). The stack hands back to the drawer it was opened from, as it was; set before the
+     * stack ends, so the card sees both in one update and returns to the open drawer rather than
+     * landing shut and opening again. Navigation: no haptic.
      */
     fun leaveCatchUp(finished: Boolean) {
         if (finished && store.state.catchUp?.queue?.isEmpty() != true) return
@@ -258,7 +251,6 @@ private fun HomeLayout(
         onCommitted = { haptics.play(Haptic.snap) },
         onTouchDown = { haptics.prepare(Haptic.snap) },
         onReveal = { phase ->
-            // iOS `@ScaledMetric(relativeTo: .footnote) timeRevealReach = 76`.
             view.timeReveal.update(phase, reach = TIME_REVEAL_REACH * density.fontScale, reducedMotion = currentReducedMotion)
         },
         contentSessionID = DrawerKeyboard.closingSession(chosen = view.chosenSessionID, shown = selectedSessionID),
@@ -267,8 +259,8 @@ private fun HomeLayout(
         content = {
             HomeSessionStack(store, view, usesSidebar, containerWidth)
         },
-        // The drawer's panel (iOS `sessionDrawer(width:insets:)`); Home hosts the delete confirmation.
-        // The drawer's selection reaches the rows' checks, which wave out from the held row.
+        // The drawer's panel; Home hosts the delete confirmation. The drawer's selection reaches
+        // the rows' checks, which wave out from the held row.
         drawer = {
             CompositionLocalProvider(LocalDrawerSelection provides view.selection) {
                 HomeDrawer(store, view, Modifier.fillMaxSize(), hostsDeleteConfirmation = false)
@@ -291,11 +283,11 @@ private fun HomeLayout(
 }
 
 /**
- * The floating call's window (iOS `homeLayout`'s `FloatingCallWindowAnchor`): a floating call stays
- * put above everything while the card slides, sessions change and Settings, Welcome or a sheet
- * opens: the call belongs to the root session, and its orb has a window of its own. Only while the
- * call doesn't show its card (`call.flatMap { $0.phase.showsCard ? nil : $0 }`); a failed or
- * dropped call hands over to its card, and the window fades the orb.
+ * The floating call's window: a floating call stays put above everything while the card slides,
+ * sessions change and Settings, Welcome or a sheet opens: the call belongs to the root session, and
+ * its orb has a window of its own. Only while the call doesn't show its card (`call.flatMap {
+ * $0.phase.showsCard ? nil: $0 }`); a failed or dropped call hands over to its card, and the window
+ * fades the orb.
  */
 @Composable
 private fun HomeFloatingCallWindow(store: StoreOf<HomeFeature.State, HomeFeature.Action>) {
@@ -305,9 +297,8 @@ private fun HomeFloatingCallWindow(store: StoreOf<HomeFeature.State, HomeFeature
 }
 
 /**
- * The open session's call, scoped from its screen (iOS `sessionStore.scope(\.voice, action:
- * \.voice.presented)`): null while there's none. It keeps its last state while it leaves, so a
- * view still drawing it never reads a missing call.
+ * The open session's call, scoped from its screen: null while there's none. It keeps its last state
+ * while it leaves, so a view still drawing it never reads a missing call.
  */
 @Composable
 internal fun rememberHomeCall(store: StoreOf<HomeFeature.State, HomeFeature.Action>): VoiceStoreOf? {
@@ -322,7 +313,7 @@ internal fun rememberHomeCall(store: StoreOf<HomeFeature.State, HomeFeature.Acti
     }
 }
 
-/** The open session's screen (iOS `store.scope(\.sessionDetail, action: \.sessionDetail.presented)`), keeping its last state while it leaves. */
+/** The open session's screen, keeping its last state while it leaves. */
 @Composable
 private fun rememberRootStore(store: StoreOf<HomeFeature.State, HomeFeature.Action>): StoreOf<SessionFeature.State, SessionFeature.Action> =
     remember(store) {
@@ -333,7 +324,7 @@ private fun rememberRootStore(store: StoreOf<HomeFeature.State, HomeFeature.Acti
         )
     }
 
-/** A pushed subagent's screen by its `navigationID` (iOS `subagentStack` element scope), drawable while it animates out. */
+/** A pushed subagent's screen by its `navigationID`, drawable while it animates out. */
 private fun subagentStore(
     store: StoreOf<HomeFeature.State, HomeFeature.Action>,
     navigationID: Int,
@@ -348,7 +339,10 @@ private fun subagentStore(
     )
 }
 
-/** One page of the session's stack (iOS `StackEntry`): a subagent at [index], or a web page over the screen [owner] names. */
+/**
+ * One page of the session's stack: a subagent at [index], or a web page over the screen [owner]
+ * names.
+ */
 private sealed interface StackEntry {
     val page: SessionStackPage
 
@@ -360,8 +354,7 @@ private sealed interface StackEntry {
 
 /**
  * What the session's stack shows, bottom first: each subagent pushed over the session, and a web
- * page over whichever screen opened it (iOS `stackPages`, D-40). Back (the back button, the back
- * gesture, TalkBack's escape) goes to the screen beneath.
+ * page over whichever screen opened it. Back goes to the screen beneath.
  */
 private fun stackEntries(state: HomeFeature.State): List<StackEntry> {
     val entries = ArrayList<StackEntry>()
@@ -456,9 +449,9 @@ private fun HomeSessionStack(
 }
 
 /**
- * What a session screen shows of the drawer's knowledge of it (iOS `sessionListContext(for:)`):
- * its project, pin, read and mute state, the drawer button's dot for other sessions, and the
- * In-App Notice and the connection pill, outside Catch Up.
+ * What a session screen shows of the drawer's knowledge of it: its project, pin, read and mute
+ * state, the drawer button's dot for other sessions, and the In-App Notice and the connection pill,
+ * outside Catch Up.
  */
 internal fun HomeFeature.State.sessionListContext(session: OpenCodeSession?): SessionListContext {
     val listed = session?.let { s -> sessions.firstOrNull { it.id == s.id } }
@@ -475,8 +468,8 @@ internal fun HomeFeature.State.sessionListContext(session: OpenCodeSession?): Se
 }
 
 /**
- * iOS `HomeView.serverConnectionNotice`: what the pill says of the connection, from the displayed
- * status, so a reconnect still in its grace says nothing.
+ * What the pill says of the connection, from the displayed status, so a reconnect still in its
+ * grace says nothing.
  */
 internal fun HomeFeature.State.serverConnectionNotice(): ServerConnectionNotice? =
     ServerConnectionNotice(
@@ -487,7 +480,7 @@ internal fun HomeFeature.State.serverConnectionNotice(): ServerConnectionNotice?
         isSwitching = switchingTo != null,
     )
 
-/** iOS `HomeView.serverConnectionAction(_:)`: the pill's action, as Home's. */
+/** The pill's action, as Home's. */
 internal fun serverConnectionAction(action: ServerConnectionNotice.Action, server: OpenCodeServer): HomeFeature.Action =
     when (action) {
         ServerConnectionNotice.Action.retry -> HomeFeature.Action.RetryConnectionTapped
@@ -496,9 +489,9 @@ internal fun serverConnectionAction(action: ServerConnectionNotice.Action, serve
     }
 
 /**
- * The session header's drawer button (iOS `SessionView(onOpenSessions:onNoticeTapped:)`): opens
- * the drawer, or toggles the sidebar beside a wide window. Its In-App Notice label opens what it
- * names; several sessions open the drawer, which lists them all.
+ * The session header's drawer button: opens the drawer, or toggles the sidebar beside a wide
+ * window. Its In-App Notice label opens what it names; several sessions open the drawer, which
+ * lists them all.
  */
 @Composable
 private fun HomeDrawerButton(
@@ -530,10 +523,10 @@ private fun HomeDrawerButton(
 }
 
 /**
- * The real session screen for the card behind the open one, rendered from its cached transcript
- * by an inert store (iOS `CatchUpPreviewCard` over `CatchUpPreviewStores`). One store for the
- * preview host: its state is replaced in place, so its screen's scaffold is reused across swipes.
- * Inert: it reads nothing and sends nothing, and the stack hides it from TalkBack.
+ * The real session screen for the card behind the open one, rendered from its cached transcript by
+ * an inert store. One store for the preview host: its state is replaced in place, so its screen's
+ * scaffold is reused across swipes. Inert: it reads nothing and sends nothing, and the stack hides
+ * it from TalkBack.
  */
 @Composable
 private fun CatchUpPreviewCard(store: StoreOf<HomeFeature.State, HomeFeature.Action>, sessionID: String, revision: Int) {
@@ -547,7 +540,7 @@ private fun CatchUpPreviewCard(store: StoreOf<HomeFeature.State, HomeFeature.Act
     DisposableEffect(previews) { onDispose { previews.close() } }
     val preview = previews.store(session, home)
     SideEffect { previews.commit() }
-    // A picture of the next session: nothing in it moves TalkBack's focus (QA W-05).
+    // A picture of the next session: nothing in it moves TalkBack's focus.
     CompositionLocalProvider(LocalAccessibilityFocusMoves provides false) {
         SessionView(
             preview,
@@ -560,10 +553,10 @@ private fun CatchUpPreviewCard(store: StoreOf<HomeFeature.State, HomeFeature.Act
 }
 
 /**
- * iOS `CatchUpPreviewStores`: the inert store behind the Catch Up preview card, rebuilt from what
- * Home knows (cached transcript, run state, remembered snapshot) only when that changes. Its
- * reducer honours the renderer's first-frame event, as the live screen does, and nothing else: a
- * preview performs no loading, request handling or read receipts.
+ * The inert store behind the Catch Up preview card, rebuilt from what Home knows (cached
+ * transcript, run state, remembered snapshot) only when that changes. Its reducer honours the
+ * renderer's first-frame event, as the live screen does, and nothing else: a preview performs no
+ * loading, request handling or read receipts.
  */
 internal class CatchUpPreviewStores {
     private data class Inputs(
@@ -627,7 +620,6 @@ internal class CatchUpPreviewStores {
     }
 }
 
-/** iOS `homeLayout`'s `onChange(of: usesSidebar)` and `onChange(of: store.opensDrawerForPairing)`, both `initial: true`. */
 @Composable
 private fun HomeSidebarEffects(store: StoreOf<HomeFeature.State, HomeFeature.Action>, view: HomeViewState, usesSidebar: Boolean) {
     val opensDrawerForPairing by store.observe { it.opensDrawerForPairing }
@@ -649,7 +641,6 @@ private fun HomeSidebarEffects(store: StoreOf<HomeFeature.State, HomeFeature.Act
     }
 }
 
-/** iOS `homeLifecycle` and the body's `scenePhase` handling. */
 @Composable
 internal fun HomeLifecycle(store: StoreOf<HomeFeature.State, HomeFeature.Action>, view: HomeViewState) {
     val serverID by store.observe { it.server.persistenceID }
@@ -663,8 +654,7 @@ internal fun HomeLifecycle(store: StoreOf<HomeFeature.State, HomeFeature.Action>
 
     // Keyed by the server: a switch from the drawer swaps Home's state in place, and the new
     // server's Home starts here like a fresh one. Retained across activity recreation (dark mode,
-    // font size, locale) so the running event stream stays on its socket instead of reconnecting
-    // and clearing in-flight `liveText` accumulators (K-01), where iOS never rebuilds `HomeView`.
+    // font size, locale) so the running event stream stays on its socket.
     val startedServerID = retain { arrayOfNulls<String>(1) }
     LaunchedEffect(serverID) {
         if (startedServerID[0] == serverID) return@LaunchedEffect
@@ -708,16 +698,13 @@ internal fun HomeLifecycle(store: StoreOf<HomeFeature.State, HomeFeature.Action>
     LaunchedEffect(serverID, isVoiceAvailable) {
         store.send(HomeFeature.Action.SystemPublishRequested(isVoiceAvailable))
     }
-    // Notifications arriving in the foreground read In-App Notices' mode through Home's reader
-    // (iOS reads the shared key directly; `:feature:system` can't see the drawer's settings).
+    // Notifications arriving in the foreground read In-App Notices' mode through Home's reader.
     LaunchedEffect(Unit) {
         val settings = dependency(InAppNoticeSettings)
         dependency(SessionNotificationsClient).setInAppNoticesProvider { settings.mode() != InAppNoticeMode.off }
     }
-    // iOS `scenePhase`: RESUMED is active, STARTED inactive, below that the background.
-    // A configuration change recreates the activity while the reader stays in the scene, as an iOS
-    // appearance or Dynamic Type change never moves `scenePhase`: neither the leaving activity's
-    // stop nor the recreated activity's first resume is a leave/return cycle (K-01).
+    // RESUMED is active, STARTED inactive, below that the background. A configuration change's stop
+    // and the recreated activity's first resume aren't a leave/return cycle.
     val activity = LocalActivity.current
     val changingConfigurations = { activity?.isChangingConfigurations == true }
     val currentStore by rememberUpdatedState(store)
@@ -772,9 +759,9 @@ private fun HomeSettings(store: StoreOf<HomeFeature.State, HomeFeature.Action>) 
 }
 
 /**
- * Show Welcome (iOS `SettingsPresentation`'s welcome overlay): the first-run welcome, faded in over
- * Settings and Home, never a cover, so pairing's scanner and the server form still present over
- * it from the root. Close (and Back) dismiss it. [mark] is the app mark, from `:app`'s resources.
+ * Show Welcome: the first-run welcome, faded in over Settings and Home, never a cover, so pairing's
+ * scanner and the server form still present over it from the root. Close (and Back) dismiss it.
+ * [mark] is the app mark, from `:app`'s resources.
  */
 @Composable
 private fun HomeWelcome(store: StoreOf<HomeFeature.State, HomeFeature.Action>, mark: Painter?) {
@@ -793,7 +780,6 @@ private fun HomeWelcome(store: StoreOf<HomeFeature.State, HomeFeature.Action>, m
     }
 }
 
-/** iOS `SettingsPresentation.fade`. */
 private const val WELCOME_FADE_MS = 300
 
 /**
@@ -815,15 +801,13 @@ private fun HomeSettingsBack(store: StoreOf<HomeFeature.State, HomeFeature.Actio
     }
 }
 
-/** iOS `timeRevealReach` (76 pt, scaled with the footnote style). */
 private const val TIME_REVEAL_REACH = 76f
 /** How much of the window the drawer button's notice label may span. */
 private const val HEADER_LABEL_FRACTION = 0.6f
 
 /**
- * iOS `HomeView.isVoiceAvailable` (`store.voicePreferences.isAvailable(server:)`): Voice set up for
- * [server], recomputed whenever a setting it reads changes (Settings changes them outside any
- * Home action).
+ * Voice set up for [server], recomputed whenever a setting it reads changes (Settings changes them
+ * outside any Home action).
  */
 @Composable
 private fun rememberVoiceAvailable(server: OpenCodeServer): Boolean {

@@ -32,6 +32,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
@@ -44,8 +45,8 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 
 /**
- * A permission in a line or two (iOS `PermissionSummary`): its command flattened onto one
- * line, the file it edits (with `+N −M`), or what it reaches.
+ * A permission in a line or two: its command flattened onto one line, the file it edits (with `+N
+ * −M`), or what it reaches.
  */
 data class PermissionSummary(val text: String, val isCode: Boolean) {
     companion object {
@@ -62,7 +63,7 @@ data class PermissionSummary(val text: String, val isCode: Boolean) {
             return PermissionSummary(flattened(permission.resources.joinToString(" ")), isCode = permission.resources.isNotEmpty())
         }
 
-        /** Swift `split(whereSeparator: \.isWhitespace)`: every Unicode whitespace, newlines included. */
+        /** Every Unicode whitespace, newlines included. */
         fun flattened(text: String): String = buildString {
             var pending = false
             for (char in text) {
@@ -85,10 +86,7 @@ internal fun lastPathComponent(path: String): String {
     return trimmed.substringAfterLast('/')
 }
 
-/**
- * The permission actions' sizes (iOS `RequestTunables`; the Tuning Panel backing isn't
- * ported, these are its defaults).
- */
+/** The permission actions' sizes. */
 object RequestTunables {
     /** `requests.permission.scopeMaxHeight`: the scope list's maximum height (120…400). */
     val scopeMaxHeight = 220.dp
@@ -98,7 +96,10 @@ object RequestTunables {
     val buttonRadius = 8.dp
 }
 
-/** iOS `TranscriptMetrics` fonts and corner the request panel borrows (the transcript module sits beside this one). */
+/**
+ * Transcript fonts and corner the request panel borrows (the transcript module sits beside this
+ * one).
+ */
 internal object RequestTranscriptMetrics {
     /** `TranscriptMetrics.toolFont`: footnote, monospaced. */
     val toolFont: TextStyle get() = OpenCodeTextStyles.footnote.copy(fontFamily = OpenCodeFonts.monospace)
@@ -111,8 +112,7 @@ internal object RequestTranscriptMetrics {
 }
 
 /**
- * A permission action (iOS `requestPermissionButtonShape()` inside the shared button
- * styles): normal height, its corners [RequestTunables.buttonRadius]. Primary is the
+ * A permission action: normal height, its corners [RequestTunables.buttonRadius]. Primary is the
  * accent fill (Always Allow), secondary the desktop's neutral hairline one (Allow Once).
  */
 @Composable
@@ -140,7 +140,7 @@ internal fun RequestPermissionButton(
 }
 
 /**
- * Always Allow's scope, shown in full before it's given (R-177, D-130): every pattern
+ * Always Allow's scope, shown in full before it's given: every pattern
  * wraps, selectable, and a long list scrolls above the confirm, which stays in view.
  */
 @Composable
@@ -148,7 +148,7 @@ fun PermissionScopeConfirm(save: List<String>, confirm: () -> Unit, modifier: Mo
     val colors = OpenCodeTheme.colors
     Column(modifier.width(280.dp).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            "Won’t ask again for",
+            stringResource(R.string.composer_request_scope_title),
             style = OpenCodeTextStyles.footnote.copy(fontWeight = FontWeight.Medium),
             color = colors.secondaryText,
         )
@@ -166,7 +166,7 @@ fun PermissionScopeConfirm(save: List<String>, confirm: () -> Unit, modifier: Mo
         }
         RequestPermissionButton(primary = true, onClick = confirm, modifier = Modifier.fillMaxWidth().testTag("request-always-confirm")) {
             Text(
-                "Always Allow",
+                stringResource(R.string.composer_request_always_allow),
                 style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
                 maxLines = 1,
             )
@@ -216,7 +216,7 @@ private fun PermissionBand(text: String) {
             modifier = Modifier
                 .fillMaxWidth()
                 .background(colors.text.copy(alpha = if (colors.isDark) 0.035f else 0.025f))
-                // iOS overlays the hairlines on the band's top and bottom edges (they add no height).
+                // The hairlines overlay the band's top and bottom edges (they add no height).
                 .drawWithContent {
                     drawContent()
                     val px = 1f
@@ -242,7 +242,12 @@ private fun DiffPreview(patch: String, modifier: Modifier = Modifier) {
                 DiffPreviewLines.Kind.Context -> colors.text to Color.Transparent
                 DiffPreviewLines.Kind.Hunk -> colors.secondaryText to Color.Transparent
             }
-            val spoken = line.kind.spoken + line.text.drop(1)
+            val body = line.text.drop(1)
+            val spoken = when (line.kind) {
+                DiffPreviewLines.Kind.Added -> stringResource(R.string.composer_diff_added_description, body)
+                DiffPreviewLines.Kind.Removed -> stringResource(R.string.composer_diff_removed_description, body)
+                DiffPreviewLines.Kind.Context, DiffPreviewLines.Kind.Hunk -> body
+            }
             Text(
                 line.text.ifEmpty { " " },
                 style = RequestTranscriptMetrics.toolFont,
@@ -259,9 +264,8 @@ private fun DiffPreview(patch: String, modifier: Modifier = Modifier) {
     }
 }
 
-/** The pure part of iOS `DiffPreview`. */
 internal object DiffPreviewLines {
-    enum class Kind(val spoken: String) { Added("Added: "), Removed("Removed: "), Context(""), Hunk("") }
+    enum class Kind { Added, Removed, Context, Hunk }
 
     data class Line(val kind: Kind, val text: String)
 

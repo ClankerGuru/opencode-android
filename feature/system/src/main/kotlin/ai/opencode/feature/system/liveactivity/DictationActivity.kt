@@ -1,11 +1,12 @@
 package ai.opencode.feature.system.liveactivity
 
+import ai.opencode.core.strings.localized
+import ai.opencode.feature.system.R
 import java.time.Instant
 
 /**
- * Port of iOS `DictationActivityAttributes`: a hands-free recording reads on the lock screen
- * and in the status bar while the app is away, so it isn't forgotten. Tapping it opens the
- * app, where the recording's bar is on screen.
+ * A hands-free recording reads on the lock screen and in the status bar while the app is away, so
+ * it isn't forgotten. Tapping it opens the app, where the recording's bar is on screen.
  */
 data class DictationActivityAttributes(val serverID: String) {
     data class ContentState(
@@ -18,7 +19,6 @@ data class DictationActivityAttributes(val serverID: String) {
 
 enum class DictationCommand { Stop }
 
-/** Port of iOS `StopDictationIntent`. */
 object DictationIntents {
-    const val STOP_TITLE = "Stop Recording"
+    val STOP_TITLE: String get() = localized(R.string.system_recording_stop_title)
 }

@@ -16,11 +16,10 @@ import kotlin.time.Duration.Companion.seconds
  * What [EventBatcher] calls as events pass through, installed by the features that own them
  * (`DependencyValues.installRoot { this[EventBatcherHooks] = … }`):
  *
- * - [prepareMarkdown] projects a text part's Markdown off the reducer's path (iOS
- *   `MarkdownStreamClient.prepare`). For a streaming part, [text] is the accumulated text so
- *   far and the transcript applies `holdingPendingMarker` itself; for an ended part it's the
- *   final text.
- * - [record] sees every event once per upstream connection (iOS `AgentActivityLedger.record`).
+ * - [prepareMarkdown] projects a text part's Markdown off the reducer's path. For a streaming part,
+ *   [text] is the accumulated text so far and the transcript applies `holdingPendingMarker` itself;
+ *   for an ended part it's the final text.
+ * - [record] sees every event once per upstream connection.
  */
 class EventBatcherHooks(
     val prepareMarkdown: (partID: String, text: String, isStreaming: Boolean) -> Unit = { _, _, _ -> },
@@ -32,7 +31,7 @@ class EventBatcherHooks(
     }
 }
 
-/** What happened to one event [EventBatcher] handed downstream (iOS `AsyncStream.YieldResult`). */
+/** What happened to one event [EventBatcher] handed downstream. */
 sealed interface EventEmission {
     /** Queued, with [remaining] free slots left in the buffer. */
     data class Enqueued(val remaining: Int) : EventEmission
@@ -45,18 +44,10 @@ sealed interface EventEmission {
 }
 
 /**
- * Mirrors the official clients' small event flush window while keeping high-frequency
- * event handling out of reducers: adjacent deltas for one part coalesce, a flush happens
- * [flushInterval] (75 ms) after the first pending delta, and a slow subscriber receives at
- * most 256 semantic mutations in one batch. Any non-content event first flushes the deltas
- * it must follow (its session's, or all), so ordering is preserved.
- *
- * Under pressure (half of the [capacity]-slot buffer waiting on a slow main thread) a session off
- * screen ([isFocused] false) loses its streaming deltas rather than overflowing the stream for
- * everyone (390f157d).
- *
- * A plain object, not a reducer. [emit] delivers downstream and reports what happened; anything
- * but [EventEmission.Enqueued] terminates the batcher.
+ * Keeps high-frequency events out of reducers: adjacent deltas for one part coalesce and flush
+ * [flushInterval] after the first, at most 256 mutations per batch. A non-content event first
+ * flushes the deltas it must follow. Under pressure, sessions off screen lose their streaming
+ * deltas. Anything [emit] reports but [EventEmission.Enqueued] ends the batcher.
  */
 class EventBatcher(
     private val scope: CoroutineScope,
@@ -96,13 +87,9 @@ class EventBatcher(
         get() = remaining <= capacity / 2 && clock.now() - remainingMeasuredAt < 1.seconds
 
     /**
-     * Attach a complete prefix whenever this connection has one: a screen can open between this
-     * flush and delivery. Only focused sessions prepare Markdown.
-     *
-     * Under pressure, a session off screen loses its streaming deltas: its rows aren't drawn, and
-     * their ends (`TextEnded`, `ToolInputEnded`) and every other event still arrive, so nothing
-     * durable goes. Emitting them would fill the buffer and drop the connection for everyone (a
-     * reconnect gap, and a backoff of up to 15 s).
+     * Attach a complete prefix whenever this connection has one: a screen can open between flush
+     * and delivery. Under pressure, sessions off screen drop streaming deltas but keep their ends
+     * and every other event.
      */
     private fun prepare(events: List<OpenCodeLiveContentEvent>, sessionID: String): List<OpenCodeLiveContentEvent> {
         val focused = isFocused(sessionID)
@@ -257,7 +244,7 @@ class EventBatcher(
     }
 
     companion object {
-        /** The event stream's buffer size (iOS `EventBatcher.bufferCapacity`). */
+        /** The event stream's buffer size. */
         const val BUFFER_CAPACITY = 128
         private const val BATCH_LIMIT = 256
         private const val OFFSCREEN_PART_BYTE_LIMIT = 512 * 1024

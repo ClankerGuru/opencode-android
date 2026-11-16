@@ -1,15 +1,21 @@
 package ai.opencode.feature.transcript.markdown.ui
 
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.media.AgentImagePlan
 import ai.opencode.feature.media.AgentImageRowAnchor
+import ai.opencode.feature.media.AgentImageStatusCard
 import ai.opencode.feature.media.DecodedImageCache
+import ai.opencode.feature.media.MediaThumbnail
+import ai.opencode.feature.media.R as MediaR
 import ai.opencode.feature.media.TranscriptImagePreview
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.TranscriptAction
 import ai.opencode.feature.transcript.user.TranscriptDragPayload
 import ai.opencode.feature.transcript.user.transcriptDragSource
@@ -19,7 +25,6 @@ import ai.opencode.server.model.AgentFileReference
 import ai.opencode.server.model.FileReadTarget
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -49,9 +54,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTag
@@ -65,10 +74,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * A Markdown image (iOS `MarkdownImage`). A web image loads through Coil; a `data:` image or a
- * file outside the session's folder loads through the server client's Markdown image reader
- * (`OpenCodeClient.markdownImage`, desktop's `readLocalImage`) once it's on screen. Tapping it
- * opens the zoom viewer; one that didn't load says so, and a tap tries again.
+ * A Markdown image. A web image loads through Coil; a `data:` image loads through the server
+ * client's Markdown image reader (`OpenCodeClient.markdownImage`, desktop's `readLocalImage`) once
+ * it's on screen, and a file outside the session's folder waits for a tap first. Tapping it opens
+ * the zoom viewer; one that didn't load says so, and a tap tries again.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -94,11 +103,15 @@ fun MarkdownImage(
     var attempt by remember { mutableIntStateOf(0) }
     var image by remember(cacheKey) { mutableStateOf<ImageBitmap?>(null) }
     var failed by remember(cacheKey) { mutableStateOf(false) }
+    var allowsOutside by remember(cacheKey) { mutableStateOf(false) }
+    val outside = remember(cacheKey, allowsOutside, fallbackFile) {
+        if (allowsOutside || server == null) null else MarkdownImage.outsideFile(source, fallbackFile, server, directory)
+    }
     // Marks the hosting row revised before an async load, failure, or retry resizes it.
     val row = remember { AgentImageRowAnchor() }
     AgentImageRowAnchor.Placement(row)
-    // iOS shows a cached image on the first frame; Android keeps its decoded copy for that, so
-    // a row coming back on screen doesn't decode on the main thread.
+    // Android keeps the decoded copy, so a row coming back on screen doesn't decode on the main
+    // thread.
     val cachedImage = remember(cacheKey) { decodedImages.image(cacheKey)?.asImageBitmap() }
     val shown = image ?: cachedImage
     fun applyState(nextImage: ImageBitmap?, nextFailed: Boolean, hadImage: Boolean) {
@@ -106,7 +119,7 @@ fun MarkdownImage(
         image = nextImage
         failed = nextFailed
     }
-    LaunchedEffect(cacheKey, attempt) {
+    LaunchedEffect(cacheKey, attempt, outside == null) {
         val hadImage = shown != null
         if (shown != null) {
             applyState(shown, nextFailed = false, hadImage = hadImage)
@@ -120,7 +133,7 @@ fun MarkdownImage(
                     (result as? SuccessResult)?.image?.toBitmap()
                 } else {
                     val bytes = client.cachedMarkdownImage(cacheKey)
-                        ?: server?.let { server ->
+                        ?: if (outside != null) null else server?.let { server ->
                             val fallback = fallbackFile?.target(directory)?.let { FileReadTarget(it.location, it.relativePath) }
                             client.markdownImage(server, directory, source, fallback)
                         }
@@ -129,17 +142,21 @@ fun MarkdownImage(
                 bitmap?.also { decodedImages.insert(it, cacheKey) }?.asImageBitmap()
             }.getOrNull()
         }
+        if (loaded == null && outside != null) return@LaunchedEffect
         applyState(loaded, nextFailed = loaded == null, hadImage = hadImage)
     }
     val state = when {
         shown != null -> ImageLoad.Loaded(shown)
+        outside != null -> ImageLoad.Outside(outside)
         failed -> ImageLoad.Failed
         else -> ImageLoad.Loading
     }
     val shape = RoundedCornerShape(TranscriptMetrics.cardCornerRadius)
+    val imageLabel = stringResource(R.string.transcript_image)
+    val openDescription = if (alt.isEmpty()) stringResource(R.string.transcript_image_open_description) else stringResource(R.string.transcript_open_named, alt)
     when (val load = state) {
         is ImageLoad.Loaded -> {
-            val label = alt.ifEmpty { "Image" }
+            val label = alt.ifEmpty { imageLabel }
             Box(
                 modifier
                     .fillMaxWidth()
@@ -156,15 +173,16 @@ fun MarkdownImage(
                     )
                     .clip(shape)
                     .background(colors.userBubble, shape)
-                    .clickable { send(TranscriptAction.PreviewImage(TranscriptImagePreview(cacheKey, load.image.asAndroidBitmap(), label))) }
-                    .semantics { contentDescription = "Open ${alt.ifEmpty { "image" }}" },
+                    .clickable { send(TranscriptAction.PreviewImage(TranscriptImagePreview(cacheKey, load.image.asAndroidBitmap(), label, labelIsPlaceholder = alt.isEmpty()))) }
+                    .semantics { contentDescription = openDescription },
                 contentAlignment = Alignment.Center,
             ) {
-                Image(load.image, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.heightIn(max = 360.dp))
+                MediaThumbnail(load.image.asAndroidBitmap(), listOf(cacheKey), Modifier.heightIn(max = 360.dp),
+                    fits = true, maxHeight = 360.dp, cornerRadius = TranscriptMetrics.cardCornerRadius)
             }
         }
         ImageLoad.Failed -> FailedImageCard(
-            name = fallbackFile?.path?.substringAfterLast('/') ?: alt.ifEmpty { "Image" },
+            name = fallbackFile?.path?.substringAfterLast('/') ?: alt.ifEmpty { imageLabel },
             fallbackFile = fallbackFile,
             onRetry = {
                 if (failed) row.revised()
@@ -173,6 +191,31 @@ fun MarkdownImage(
             },
             modifier = modifier,
         )
+        is ImageLoad.Outside -> {
+            val loadLabel = stringResource(MediaR.string.media_image_load_label)
+            val value = AgentImagePlan.outsideAccessibilityValue(load.file, directory)
+            val allow = {
+                row.revised()
+                allowsOutside = true
+            }
+            AgentImageStatusCard(
+                load.file,
+                AgentImageStatusCard.Status.Outside,
+                modifier
+                    .clip(shape)
+                    .clickable(onClickLabel = loadLabel, role = Role.Button) { allow() }
+                    .clearAndSetSemantics {
+                        role = Role.Button
+                        contentDescription = load.file.name
+                        stateDescription = value
+                        testTag = "markdown-image-outside"
+                        onClick(label = loadLabel) {
+                            allow()
+                            true
+                        }
+                    },
+            )
+        }
         ImageLoad.Loading -> Box(
             modifier.fillMaxWidth().heightIn(min = 120.dp).background(colors.userBubble, shape),
             contentAlignment = Alignment.Center,
@@ -180,8 +223,16 @@ fun MarkdownImage(
     }
 }
 
-/** iOS `MarkdownImage`'s statics. */
 object MarkdownImage {
+    /** A local image outside the session's folder: it waits for a tap, since reading it starts a server instance for that folder. */
+    fun outsideFile(source: String, file: AgentFileReference?, server: OpenCodeServer, directory: String?): AgentFileReference? {
+        file ?: return null
+        val target = file.target(directory) ?: return null
+        if (AgentImagePlan.isInside(target, directory)) return null
+        if (server.imageRequest(source, directory) != null) return null
+        return file
+    }
+
     /** Whether changing between placeholder, loaded image, and failed card alters the row's height. */
     fun revisesRow(hadImage: Boolean, wasFailed: Boolean, nextImage: Boolean, nextFailed: Boolean): Boolean =
         hadImage != nextImage || (!nextImage && wasFailed != nextFailed)
@@ -190,6 +241,7 @@ object MarkdownImage {
 private sealed interface ImageLoad {
     data object Loading : ImageLoad
     data object Failed : ImageLoad
+    class Outside(val file: AgentFileReference) : ImageLoad
     class Loaded(val image: ImageBitmap) : ImageLoad
 }
 
@@ -205,6 +257,7 @@ private fun FailedImageCard(name: String, fallbackFile: AgentFileReference?, onR
     val send = LocalTranscriptRowContext.current.send
     var menu by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(TranscriptMetrics.cardCornerRadius)
+    val loadFailed = stringResource(R.string.transcript_image_load_failed)
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
         Row(
             Modifier
@@ -212,11 +265,11 @@ private fun FailedImageCard(name: String, fallbackFile: AgentFileReference?, onR
                 .heightIn(min = 48.dp)
                 .clip(shape)
                 .background(colors.userBubble, shape)
-                // iOS `accessibilityHint("Tries again")`: TalkBack reads “Double-tap to try again”.
-                .combinedClickable(onClickLabel = "Try again", onClick = onRetry, onLongClick = { menu = true })
+                // TalkBack reads “Double-tap to try again”.
+                .combinedClickable(onClickLabel = stringResource(R.string.transcript_image_retry_click_label), onClick = onRetry, onLongClick = { menu = true })
                 .semantics {
                     contentDescription = name
-                    stateDescription = "Couldn’t load image"
+                    stateDescription = loadFailed
                     testTag = "markdown-image-failed"
                 }
                 .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -226,19 +279,19 @@ private fun FailedImageCard(name: String, fallbackFile: AgentFileReference?, onR
             OpenCodeIcon(SFSymbol.PhotoBadgeExclamationmark, contentDescription = null, tint = colors.secondaryText)
             Column(Modifier.weight(1f)) {
                 Text(name, style = OpenCodeTextStyles.subheadline, color = colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("Couldn’t load image", style = OpenCodeTextStyles.footnote, color = colors.secondaryText)
+                Text(loadFailed, style = OpenCodeTextStyles.footnote, color = colors.secondaryText)
             }
             OpenCodeIcon(SFSymbol.ArrowClockwise, contentDescription = null, tint = colors.tertiaryText)
         }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
             DropdownMenuItem(
-                text = { Text("Try Again") },
+                text = { Text(stringResource(CoreR.string.common_try_again)) },
                 leadingIcon = { OpenCodeIcon(SFSymbol.ArrowClockwise, contentDescription = null) },
                 onClick = { menu = false; onRetry() },
             )
             if (fallbackFile != null) {
                 DropdownMenuItem(
-                    text = { Text("Open") },
+                    text = { Text(stringResource(R.string.transcript_image_open)) },
                     leadingIcon = { OpenCodeIcon(SFSymbol.DocTextMagnifyingglass, contentDescription = null) },
                     onClick = { menu = false; send(TranscriptAction.OpenFile(fallbackFile)) },
                 )

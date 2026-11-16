@@ -2,12 +2,18 @@ package ai.opencode.server
 
 import ai.opencode.core.testing.TestIsolationRule
 import ai.opencode.server.OpenCodeLiveContentEvent.ReasoningDelta
+import ai.opencode.server.OpenCodeLiveContentEvent.ReasoningEnded
 import ai.opencode.server.OpenCodeLiveContentEvent.TextDelta
 import ai.opencode.server.OpenCodeLiveContentEvent.TextEnded
 import ai.opencode.server.OpenCodeLiveContentEvent.ToolInputDelta
 import ai.opencode.server.live.decodeStreamFrame
+import ai.opencode.server.live.decodeTranscriptPage
 import ai.opencode.server.model.OpenCodeDelivery
+import ai.opencode.server.model.OpenCodeJSONValue
 import ai.opencode.server.model.OpenCodeShell
+import ai.opencode.server.model.OpenCodeToolBounds
+import ai.opencode.server.model.OpenCodeTranscriptItem
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -152,6 +158,48 @@ class OpenCodeEventDecodingTests {
     }
 
     @Test
+    fun liveToolPayloadsAreBoundedLikeTheSettledRead() {
+        val big = "0123456789\n".repeat(20_000)
+        val bigJSON = JsonPrimitive(big).toString()
+        val content = """[{"type":"text","text":$bigJSON}]"""
+        val metadata = """{"diff":$bigJSON,"title":"ok"}"""
+        val input = """{"command":$bigJSON}"""
+        fun live(type: String, data: String): OpenCodeLiveContentEvent? {
+            val frame = """{"type":"$type","data":{"sessionID":"s","assistantMessageID":"m","id":"t",$data}}"""
+            return (decodeStreamFrame(frame) as? OpenCodeServerEvent.ContentBatch)?.events?.firstOrNull()
+        }
+        val state = """{"status":"completed","input":$input,"content":$content,"metadata":$metadata}"""
+        val page = decodeTranscriptPage(
+            """{"data":[{"id":"m","type":"assistant","content":[{"type":"tool","id":"t","name":"shell","state":$state}]}]}""".toByteArray(),
+            null,
+        )
+        val settled = (page.items.first() as OpenCodeTranscriptItem.Tool).call
+        val succeeded = live("session.tool.success", """"content":$content,"metadata":$metadata""") as OpenCodeLiveContentEvent.ToolSucceeded
+        val called = live("session.tool.called", """"input":$input""") as OpenCodeLiveContentEvent.ToolCalled
+        val inputEnded = live("session.tool.input.ended", """"text":$bigJSON""") as OpenCodeLiveContentEvent.ToolInputEnded
+        assertEquals(settled.output, succeeded.output)
+        assertEquals(settled.metadata, succeeded.metadata)
+        assertEquals(settled.input, called.input)
+        assertEquals(OpenCodeJSONValue.Str("ok"), succeeded.metadata["title"])
+        val truncated = OpenCodeToolBounds.TEXT_LIMIT + "\n… output truncated".toByteArray().size
+        assertEquals(listOf(truncated), succeeded.output.map { it.toByteArray().size })
+        assertEquals(truncated, inputEnded.text.toByteArray().size)
+    }
+
+    @Test
+    fun reasoningFramesDecodeWithoutTheirText() {
+        val thinking = "hmm ".repeat(10_000)
+        val cases = listOf(
+            Triple("session.reasoning.delta", "delta", ReasoningDelta("m", 2)),
+            Triple("session.reasoning.ended", "text", ReasoningEnded("m", 2)),
+        )
+        for ((type, key, event) in cases) {
+            val frame = "{\"type\":\"$type\",\"data\":{\"sessionID\":\"s\",\"assistantMessageID\":\"m\",\"ordinal\":2,\"$key\":\"$thinking\"}}"
+            assertEquals(OpenCodeServerEvent.ContentBatch("s", listOf(event)), decodeStreamFrame(frame))
+        }
+    }
+
+    @Test
     fun adjacentDeltasForOnePartCoalesceWithoutReordering() {
         val pending = mutableListOf<OpenCodeLiveContentEvent>()
         pending.appendCoalescingDeltas(
@@ -159,8 +207,8 @@ class OpenCodeEventDecodingTests {
                 TextDelta("m", 0, "Hel"),
                 TextDelta("m", 0, "lo"),
                 TextDelta("m", 1, "Other part"),
-                ReasoningDelta("m", 0, "Why"),
-                ReasoningDelta("m", 0, " not"),
+                ReasoningDelta("m", 0),
+                ReasoningDelta("m", 0),
                 ToolInputDelta("m", "t", "{\"a\""),
             ),
         )
@@ -178,7 +226,7 @@ class OpenCodeEventDecodingTests {
             listOf(
                 TextDelta("m", 0, "Hello"),
                 TextDelta("m", 1, "Other part"),
-                ReasoningDelta("m", 0, "Why not"),
+                ReasoningDelta("m", 0),
                 ToolInputDelta("m", "t", "{\"a\":1}"),
                 ToolInputDelta("m", "u", "{}"),
                 TextDelta("m", 0, "!"),
@@ -237,14 +285,17 @@ class OpenCodeEventDecodingTests {
                 decodeStreamFrame("""{"type":"$type","data":{"sessionID":"ses_compact"}}"""),
             )
         }
-        for (ignored in listOf(
-            """{"type":"session.compaction.delta","data":{"sessionID":"ses_compact","text":"Summary"}}""",
-            """{"type":"provider.updated","data":{"providers":[1,2,3]}}""",
-            """{"type":"model.updated","data":{"models":[1,2,3]}}""",
-        )) {
-            assertNull(decodeStreamFrame(ignored))
-        }
-        assertFalse(OpenCodeLiveContentEvent.ReasoningEnded("m", 0, "thinking").isDurableBoundary)
+        assertNull(decodeStreamFrame("""{"type":"session.compaction.delta","data":{"sessionID":"ses_compact","text":"Summary"}}"""))
+        assertFalse(OpenCodeLiveContentEvent.ReasoningEnded("m", 0).isDurableBoundary)
         assertTrue(TextEnded("m", 0, "hello").isDurableBoundary)
+    }
+
+    @Test
+    fun catalogUpdatesDecodeAsCatalogChanges() {
+        val location = ""","location":{"directory":"/tmp/demo"}"""
+        assertEquals(OpenCodeServerEvent.ModelsChanged, decodeStreamFrame("""{"type":"model.updated"$location,"data":{}}"""))
+        assertEquals(OpenCodeServerEvent.ModelsChanged, decodeStreamFrame("""{"type":"provider.updated","data":{"providers":[1,2,3]}}"""))
+        assertEquals(OpenCodeServerEvent.AgentsChanged, decodeStreamFrame("""{"type":"agent.updated"$location,"data":{}}"""))
+        assertEquals(OpenCodeServerEvent.ModelsChanged, decodeStreamFrame("""{"type":"model.updated"}"""))
     }
 }

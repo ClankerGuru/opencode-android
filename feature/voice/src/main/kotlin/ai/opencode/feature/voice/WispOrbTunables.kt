@@ -6,7 +6,7 @@ import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 
-/** The voice orb's look, at Wisp's `OrbTuning` defaults (iOS `WispOrbTunables`). */
+/** The voice orb's look, at Wisp's `OrbTuning` defaults. */
 object WispOrbTunables {
     val size = Tunable("call.wispOrb.size", "Orb Size", default = 87.0, range = 44.0..120.0, step = 1.0)
     val diameter = Tunable("call.wispOrb.diameter", "Lattice Size (pt)", default = 88.0, range = 60.0..128.0, step = 1.0)

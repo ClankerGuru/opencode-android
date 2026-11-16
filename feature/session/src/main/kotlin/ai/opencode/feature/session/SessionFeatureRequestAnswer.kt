@@ -6,12 +6,10 @@ import ai.opencode.feature.composer.RequestBar
 import ai.opencode.feature.composer.RequestDockFeature
 import ai.opencode.feature.session.SessionFeature.State
 
-// Port of the `extension SessionFeature.State` half of iOS `Composer/RequestAnswer.swift`: the
-// members that make the composer a pending request's answer. The dock's state, reducer and bar
+// The members that make the composer a pending request's answer. The dock's state, reducer and bar
 // modes are `:feature:composer`'s `RequestDockFeature<DraftState>` / `RequestBar`; these members
 // extend `SessionFeature.State`, so they live here, over the composer's pure helpers.
 
-/** iOS `SessionFeature.State.AnswerContext`. */
 typealias AnswerContext = RequestDockFeature.AnswerContext
 
 /** The composer is a pending request's answer. */

@@ -29,12 +29,7 @@ import ai.opencode.server.ServerSharedKeys
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.merge
 
-/**
- * Settings › Developer, Android-native (iOS `DiagnosticsView` + `DeveloperMode`): the
- * Developer Mode switch with iOS's gating and copy, Record Diagnostics, and the tools — Tuning
- * Panel, slow motion, perf HUD, layout bounds, Troubleshooting (timeline), Logs, Network,
- * Session Lab and a diagnostics bundle export. Keep the public names stable: `:app` wires them.
- */
+/** Settings › Developer. Keep the public names stable: `:app` wires them. */
 class DevToolsFeature : Reducer<DevToolsFeature.State, DevToolsFeature.Action> {
     enum class Route { Main, Troubleshooting, Logs, Network, Lab }
 
@@ -57,15 +52,15 @@ class DevToolsFeature : Reducer<DevToolsFeature.State, DevToolsFeature.Action> {
         val recordDiagnostics: Boolean = false,
         val includesTranscripts: Boolean = false,
         val demoCallAudio: Boolean = false,
-        /** iOS `@Shared(.motionWatch)`: the saved Motion Watch switch. */
+        /** The saved Motion Watch switch. */
         val motionWatch: Boolean = false,
-        /** iOS `diagnostics.isMotionWatchActive()`: on and available. */
+        /** On and available. */
         val motionWatchActive: Boolean = false,
         val motionJumps: List<MotionWatchEvent> = emptyList(),
         val tuningEnabled: Boolean = false,
         /** Debug build, or Developer Mode on ([TuningAccess]). */
         val toolsAvailable: Boolean = false,
-        /** iOS `InternalBuild.isEnabled`: debug or not installed by Play. */
+        /** Debug or not installed by Play. */
         val isInternalBuild: Boolean = false,
         val timeScale: Double = 1.0,
         val perfHud: Boolean = false,
@@ -274,7 +269,7 @@ class DevToolsFeature : Reducer<DevToolsFeature.State, DevToolsFeature.Action> {
         Action.PointAppAtLabTapped -> {
             val address = state.lab.address.trim().trimEnd('/')
             val url = if (address.startsWith("http://") || address.startsWith("https://")) address else "http://$address"
-            // session-lab takes an empty password (iOS SESSION_LAB.md); the user name is the app's default.
+            // Session-lab takes an empty password; the user name is the app's default.
             val server = OpenCodeServer(url = url, username = "opencode", password = "", name = "Session Lab")
             shared(ServerSharedKeys.savedServers).update { servers -> listOf(server) + servers.filterNot { server.supersedes(it) } }
             shared(ServerSharedKeys.savedServer).set(server)

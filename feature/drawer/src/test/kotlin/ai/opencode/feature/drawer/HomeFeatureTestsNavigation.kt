@@ -56,8 +56,8 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Port of iOS `HomeFeatureTests` (`OpenCodeTests/HomeFeatureTests.swift`), opening sessions and
- * drafts, the recording that follows the screen, server events and the connection.
+ * Opening sessions and drafts, the recording that follows the screen, server events and the
+ * connection.
  */
 class HomeFeatureTestsNavigation {
     @get:Rule val isolation = TestIsolationRule()
@@ -242,7 +242,7 @@ class HomeFeatureTestsNavigation {
         // fixed number of yields ran out on a slow CI runner before the prompt went out.
         val deadline = System.nanoTime() + 5_000_000_000L
         while (sent.value.isEmpty() && System.nanoTime() < deadline) {
-            // iOS's store reduces what effects send as they send it; this one when asked.
+            // This TestStore reduces what effects send when asked.
             store.skipReceivedActions()
             settle(1)
             withContext(Dispatchers.IO) { Thread.sleep(5) }

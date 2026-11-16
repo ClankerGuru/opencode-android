@@ -1,5 +1,6 @@
 package ai.opencode.feature.voice
 
+import ai.opencode.core.strings.localized
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeSession
 import kotlinx.serialization.KSerializer
@@ -12,9 +13,8 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
 
 /**
- * Settings › Voice › Delegator (the `voiceSessionDelegator` experiment): whether GPT-Live
- * uses its built-in Responses API delegator or steers a real OpenCode session on the
- * connected server (iOS `VoiceDelegatorChoice.swift`).
+ * Settings › Voice › Delegator (the `voiceSessionDelegator` experiment): whether GPT-Live uses its
+ * built-in Responses API delegator or steers a real OpenCode session on the connected server.
  */
 @Serializable(with = VoiceDelegatorChoice.Serializer::class)
 sealed interface VoiceDelegatorChoice {
@@ -38,7 +38,11 @@ sealed interface VoiceDelegatorChoice {
         val title: String,
         val projectName: String? = null,
     ) {
-        val displayTitle: String get() = VoiceFeature.State.usableTitle(title) ?: "Session"
+        /** The title the delegator and the voice agent read; it stays English. */
+        val modelTitle: String get() = VoiceFeature.State.usableTitle(title) ?: "Session"
+
+        val displayTitle: String
+            get() = VoiceFeature.State.usableTitle(title)?.let { VoiceFeature.State.displayTitle(it) } ?: localized(R.string.voice_delegator_session_fallback)
 
         companion object {
             operator fun invoke(session: OpenCodeSession, server: OpenCodeServer): Picked {
@@ -46,7 +50,7 @@ sealed interface VoiceDelegatorChoice {
                 return Picked(
                     serverID = voiceServerID(server),
                     sessionID = session.id,
-                    title = VoiceFeature.State.usableTitle(session.title) ?: "New session",
+                    title = VoiceFeature.State.usableTitle(session.title) ?: VoiceFeature.State.newSessionTitle,
                     projectName = if (folder.isEmpty() || folder == "/") null else folder,
                 )
             }
@@ -58,7 +62,7 @@ sealed interface VoiceDelegatorChoice {
             BuiltIn -> ""
             AutomaticSession -> "automatic"
             ViewedSession -> "viewed"
-            // Sorted keys, as iOS's encoder writes them; null fields left out.
+            // Null fields left out.
             is PickedSession -> pickedJSON.encodeToString(Picked.serializer(), picked)
         }
 
@@ -76,7 +80,6 @@ sealed interface VoiceDelegatorChoice {
     companion object {
         private val pickedJSON = Json { ignoreUnknownKeys = true; explicitNulls = false }
 
-        /** iOS `init(rawValue:)`. */
         fun of(rawValue: String): VoiceDelegatorChoice = when (rawValue) {
             "", "built-in" -> BuiltIn
             "automatic" -> AutomaticSession
@@ -88,7 +91,7 @@ sealed interface VoiceDelegatorChoice {
         }
     }
 
-    /** Stored as its raw value, as iOS `AppStorage` stores a `RawRepresentable`. */
+    /** Stored as its raw value. */
     object Serializer : KSerializer<VoiceDelegatorChoice> {
         override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("VoiceDelegatorChoice", PrimitiveKind.STRING)
         override fun serialize(encoder: Encoder, value: VoiceDelegatorChoice) = encoder.encodeString(value.rawValue)
@@ -111,8 +114,8 @@ sealed interface VoiceDelegatorRouteAvailability {
     val explanation: String?
         get() = when (this) {
             Available -> null
-            GeminiLive -> "Gemini Live delegates straight to the session on screen. Choose an OpenAI Voice Provider to use an OpenCode session."
-            is UnsupportedEngine -> "${engine.title} delegates straight to the session on screen. Switch Voice Model to GPT-Live to use an OpenCode session."
+            GeminiLive -> localized(R.string.voice_delegator_unavailable_gemini)
+            is UnsupportedEngine -> localized(R.string.voice_delegator_unavailable_engine, engine.title)
         }
 
     companion object {

@@ -4,6 +4,7 @@ import ai.opencode.core.dependencies.AppContext
 import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.log.AppLog
+import ai.opencode.core.strings.localized
 import ai.opencode.feature.voice.AudioSessionGeneration
 import android.Manifest
 import android.content.Context
@@ -50,17 +51,15 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * On-device dictation through Android's `SpeechRecognizer` (the on-device
- * recognizer when the device has one, else the default service preferring
- * offline), fed the app's own microphone audio so the mic goes live at the
- * touch and streams live partial results. iOS uses `SpeechAnalyzer`.
+ * On-device dictation through Android's `SpeechRecognizer` (the on-device recognizer when the
+ * device has one, else the default service preferring offline), fed the app's own microphone audio
+ * so the mic goes live at the touch and streams live partial results.
  */
 class DictationClient(
     /**
-     * Readies the speech model so the first mic press doesn't stall behind it.
-     * Safe to call repeatedly. Never installs anything: on Android installing
-     * the on-device language raises a system download dialog, so that waits
-     * for the first press that needs it (iOS installs silently here).
+     * Readies the speech model so the first mic press doesn't stall behind it. Safe to call
+     * repeatedly. Never installs anything: on Android installing the on-device language raises a
+     * system download dialog, so that waits for the first press that needs it.
      */
     val prepare: suspend () -> Unit = {},
     /**
@@ -135,9 +134,8 @@ class DictationPermissionClient {
 }
 
 /**
- * The microphone's live level while dictating, for the recording button's
- * halo. Kept outside the store, like `VoiceAudioLevels`, so per-buffer updates
- * never become actions. A plain meter (iOS `DictationLevels.shared`).
+ * The microphone's live level while dictating, for the recording button's halo. Kept outside the
+ * store, like `VoiceAudioLevels`, so per-buffer updates never become actions. A plain meter.
  */
 object DictationLevels {
     @Volatile
@@ -164,10 +162,8 @@ object DictationLevels {
 }
 
 /**
- * How long a press takes to become a hot mic and then words: milliseconds from
- * the touch landing on the mic to each step, recorded once per press. The
- * session and mic steps also go to [AppLog]. (iOS also writes signposts and lab
- * marks: n/a.)
+ * How long a press takes to become a hot mic and then words: milliseconds from the touch landing on
+ * the mic to each step, recorded once per press. The session and mic steps also go to [AppLog].
  */
 object DictationLatency {
     private class Press(val touchDownNanos: Long) {
@@ -213,12 +209,12 @@ object DictationLatency {
 }
 
 sealed class DictationError(val errorDescription: String) : Exception(errorDescription) {
-    class MicrophoneDenied : DictationError("Microphone access is off for OpenCode. Enable it in Settings.")
-    class LocaleUnsupported : DictationError("Dictation isn’t available for your language yet.")
-    class AudioFormatUnavailable : DictationError("Dictation couldn’t start an audio session.")
+    class MicrophoneDenied : DictationError(localized(R.string.composer_dictation_microphone_denied))
+    class LocaleUnsupported : DictationError(localized(R.string.composer_dictation_locale_unsupported))
+    class AudioFormatUnavailable : DictationError(localized(R.string.composer_dictation_audio_unavailable))
 
-    /** The recognizer failed (iOS shows the Speech framework's own description). */
-    class Recognizer(val code: Int) : DictationError("Couldn’t transcribe dictation (error $code)")
+    /** The recognizer failed. */
+    class Recognizer(val code: Int) : DictationError(localized(R.string.composer_dictation_recognizer_failed, code))
 }
 
 /** A warm-up load found the on-device language not installed: the first press installs it. */
@@ -308,7 +304,7 @@ class DictationModel(
     val isInstallFallback: Boolean = false,
 )
 
-/** Where [DictationInput] hands converted audio (iOS: the analyzer's input stream). */
+/** Where [DictationInput] hands converted audio. */
 interface DictationInputSink {
     fun yield(samples: ShortArray)
     fun finish()
@@ -517,10 +513,10 @@ private class SpeechSetup(private val context: Context) {
     }
 
     /**
-     * A scheduled download of [language]'s model (the system asked the user, then downloads
-     * it): waits while dictation shows Preparing for it to be installed, as iOS's
-     * `downloadAndInstall()` does. The caller bounds both the request and this polling by
-     * [INSTALL_WAIT]. False if no longer pending (declined or failed) after [INSTALL_GRACE].
+     * A scheduled download of [language]'s model (the system asked the user, then downloads it):
+     * waits while dictation shows Preparing for it to be installed. The caller bounds both the
+     * request and this polling by [INSTALL_WAIT]. False if no longer pending (declined or failed)
+     * after [INSTALL_GRACE].
      */
     private suspend fun awaitInstalled(language: String): Boolean {
         val started = SystemClock.uptimeMillis()

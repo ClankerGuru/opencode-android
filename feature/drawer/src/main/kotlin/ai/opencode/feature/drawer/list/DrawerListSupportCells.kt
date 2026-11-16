@@ -1,6 +1,7 @@
 package ai.opencode.feature.drawer.list
 
 import ai.opencode.feature.drawer.style.drawerCanvas
+import ai.opencode.core.R as CoreR
 import ai.opencode.core.motion.transitionBlurEffect
 
 import ai.opencode.core.ui.AccessibilityFocusRequest
@@ -12,6 +13,7 @@ import ai.opencode.core.ui.RollingNumberAlignment
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.accessibilityFocusRequest
 import ai.opencode.feature.drawer.DrawerListFooter
+import ai.opencode.feature.drawer.R
 import ai.opencode.feature.drawer.catchup.DrawerCatchUpFinishedLabel
 import ai.opencode.feature.drawer.motion.DrawerMotionTunables
 import ai.opencode.feature.drawer.motion.DrawerShortcutMotion
@@ -49,6 +51,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -65,17 +69,15 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /*
- * Port of iOS `DrawerListSupportCells.swift`: the list's rows that aren't sessions: the Pinned and
- * Recents headers (or a gap or hairline between sections), Catch Up and What’s New above them
- * collapsing on the drawer's shortcut spring, no sessions / no results, and a failed deletion.
- * iOS hosts the SwiftUI ones in collection view cells (`DrawerListHostedCell`, whose safe-area
- * override has no Compose counterpart); here they are plain items of the same `LazyColumn`.
+ * The list's rows that aren't sessions: the Pinned and Recents headers (or a gap or hairline
+ * between sections), Catch Up and What’s New above them collapsing on the drawer's shortcut spring,
+ * no sessions / no results, and a failed deletion. They are plain items of the same `LazyColumn`.
  */
 
-/** Pinned or Recents, as a header row or a gap or hairline between sections (iOS `DrawerListHeaderCell`). */
+/** Pinned or Recents, as a header row or a gap or hairline between sections. */
 @Composable
 fun DrawerListHeaderCell(kind: DrawerSectionHeaderKind, pinDrag: DrawerPinDrag, modifier: Modifier = Modifier) {
-    val title = if (kind == DrawerSectionHeaderKind.Pinned) "Pinned" else "Recents"
+    val title = if (kind == DrawerSectionHeaderKind.Pinned) stringResource(R.string.drawer_section_pinned) else stringResource(R.string.drawer_section_recents)
     val key = if (kind == DrawerSectionHeaderKind.Pinned) DrawerPinDrag.ItemKey.PinnedHeader else DrawerPinDrag.ItemKey.RecentsHeader
     val density = LocalDensity.current
     val tag = if (kind == DrawerSectionHeaderKind.Pinned) "drawer-section-pinned" else "drawer-section-recents"
@@ -131,9 +133,8 @@ enum class DrawerListShortcutKind { CatchUp, WhatsNew }
 
 /**
  * Catch Up or What’s New above the sections, collapsing on the drawer's shortcut spring
- * ([DrawerShortcutMotion]): height, insets, scale and blur. The row reads the motion in its
- * layout and layer blocks, so the spring never recomposes the list (iOS: never reaches the
- * collection view as anything but a size change).
+ * ([DrawerShortcutMotion]): height, insets, scale and blur. The row reads the motion in its layout
+ * and layer blocks, so the spring never recomposes the list.
  */
 @Composable
 fun DrawerListShortcutRow(
@@ -204,6 +205,10 @@ private fun CatchUpButton(
 ) {
     val shape = RoundedCornerShape(DrawerMetrics.rowCornerRadius)
     val canvas = OpenCodeTheme.colors.drawerCanvas
+    val catchUpTitle = stringResource(R.string.drawer_catch_up_title)
+    val sessionCount = pluralStringResource(R.plurals.drawer_catch_up_session_count, count, count)
+    val openLabel = stringResource(R.string.drawer_catch_up_open_action)
+    val markAllReadLabel = stringResource(R.string.drawer_mark_all_read)
     RecentRowMenu(
         enabled = canMarkAllRead,
         onClick = openCatchUp,
@@ -212,15 +217,15 @@ private fun CatchUpButton(
             // Ahead of the clearing below, which would drop its marker.
             .accessibilityFocusRequest(returnFocus)
             .clearAndSetSemantics {
-                contentDescription = "Catch Up"
-                stateDescription = if (count == 1) "1 session" else "$count sessions"
+                contentDescription = catchUpTitle
+                stateDescription = sessionCount
                 role = Role.Button
-                onClick(label = "Swipe through unread and waiting sessions") { openCatchUp(); true }
-                if (canMarkAllRead) customActions = listOf(CustomAccessibilityAction("Mark All as Read") { markAllRead(); true })
+                onClick(label = openLabel) { openCatchUp(); true }
+                if (canMarkAllRead) customActions = listOf(CustomAccessibilityAction(markAllReadLabel) { markAllRead(); true })
             },
         items = { dismiss ->
             DropdownMenuItem(
-                text = { Text("Mark All as Read") },
+                text = { Text(markAllReadLabel) },
                 leadingIcon = { OpenCodeIcon(SFSymbol.EnvelopeOpen, contentDescription = null) },
                 onClick = {
                     dismiss()
@@ -230,7 +235,7 @@ private fun CatchUpButton(
         },
     ) {
         DrawerShortcutLabel(
-            title = "Catch Up",
+            title = catchUpTitle,
             systemImage = "rectangle.stack",
             modifier = Modifier.background(canvas, shape),
         ) {
@@ -245,27 +250,29 @@ private fun CatchUpButton(
 }
 
 /**
- * The What’s New row (iOS `WhatsNewButton` in `Settings/WhatsNew/WhatsNewView.swift`): a gift, the
- * title and an accent dot; holding it offers Hide. Drawn here because the drawer owns the row.
+ * The What’s New row: a gift, the title and an accent dot; holding it offers Hide. Drawn here
+ * because the drawer owns the row.
  */
 @Composable
 fun DrawerWhatsNewButton(action: () -> Unit, onHide: () -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(DrawerMetrics.rowCornerRadius)
     val canvas = OpenCodeTheme.colors.drawerCanvas
+    val whatsNewTitle = stringResource(R.string.drawer_whats_new)
+    val hideLabel = stringResource(R.string.drawer_whats_new_hide)
     RecentRowMenu(
         enabled = true,
         onClick = action,
         modifier = modifier
             .testTag("drawer-whats-new")
             .clearAndSetSemantics {
-                contentDescription = "What’s New"
+                contentDescription = whatsNewTitle
                 role = Role.Button
                 onClick { action(); true }
-                customActions = listOf(CustomAccessibilityAction("Hide") { onHide(); true })
+                customActions = listOf(CustomAccessibilityAction(hideLabel) { onHide(); true })
             },
         items = { dismiss ->
             DropdownMenuItem(
-                text = { Text("Hide") },
+                text = { Text(hideLabel) },
                 leadingIcon = { OpenCodeIcon(SFSymbol.EyeSlash, contentDescription = null) },
                 onClick = {
                     dismiss()
@@ -274,7 +281,7 @@ fun DrawerWhatsNewButton(action: () -> Unit, onHide: () -> Unit, modifier: Modif
             )
         },
     ) {
-        DrawerShortcutLabel(title = "What’s New", systemImage = "gift", modifier = Modifier.background(canvas, shape)) {
+        DrawerShortcutLabel(title = whatsNewTitle, systemImage = "gift", modifier = Modifier.background(canvas, shape)) {
             OpenCodeIcon(
                 SFSymbol.CircleFill,
                 contentDescription = null,
@@ -287,10 +294,10 @@ fun DrawerWhatsNewButton(action: () -> Unit, onHide: () -> Unit, modifier: Modif
 }
 
 /**
- * The shortcut's collapse (iOS `DrawerListShortcutRow.collapse`): scale toward the top
- * ([DrawerMotionTunables.SHORTCUT_SCALE]), `MotionBlurReveal` (fade, blur up to
- * [DrawerMotionTunables.shortcutBlur]), height `rowHeight × progress` until open, insets, and no
- * touches unless it wants to be open. Everything per frame is read in layout and layer blocks.
+ * The shortcut's collapse: scale toward the top ([DrawerMotionTunables.SHORTCUT_SCALE]),
+ * `MotionBlurReveal` (fade, blur up to [DrawerMotionTunables.shortcutBlur]), height `rowHeight ×
+ * progress` until open, insets, and no touches unless it wants to be open. Everything per frame is
+ * read in layout and layer blocks.
  */
 @Composable
 private fun Collapse(
@@ -333,14 +340,14 @@ private fun Collapse(
     }
 }
 
-/** iOS `.allowsHitTesting(false)`: takes the touches so nothing in the row reacts. */
+/** Takes the touches so nothing in the row reacts. */
 private fun Modifier.blockingTouches(): Modifier = pointerInput(Unit) {
     awaitPointerEventScope {
         while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
     }
 }
 
-/** No sessions, or no results for a search, on the text edge (iOS `DrawerListEmptyRow`). */
+/** No sessions, or no results for a search, on the text edge. */
 @Composable
 fun DrawerListEmptyRow(search: String, modifier: Modifier = Modifier) {
     Column(
@@ -354,28 +361,29 @@ fun DrawerListEmptyRow(search: String, modifier: Modifier = Modifier) {
     ) {
         val colors = OpenCodeTheme.colors
         if (search.isEmpty()) {
-            Text("No Sessions", style = OpenCodeTextStyles.headline, color = colors.text)
-            Text("Start one with New Session.", style = OpenCodeTextStyles.body, color = colors.secondaryText)
+            Text(stringResource(R.string.drawer_empty_title), style = OpenCodeTextStyles.headline, color = colors.text)
+            Text(stringResource(R.string.drawer_empty_message), style = OpenCodeTextStyles.body, color = colors.secondaryText)
         } else {
-            Text("No Results for “$search”", style = OpenCodeTextStyles.headline, color = colors.text)
-            Text("Check the spelling or try a new search.", style = OpenCodeTextStyles.body, color = colors.secondaryText)
+            Text(stringResource(R.string.drawer_search_no_results_title, search), style = OpenCodeTextStyles.headline, color = colors.text)
+            Text(stringResource(R.string.drawer_search_no_results_message), style = OpenCodeTextStyles.body, color = colors.secondaryText)
         }
     }
 }
 
 /**
  * Under the last row: a spinner while the next page is read, or the read that failed with Try
- * Again (iOS `DrawerListFooterRow`; Material's progress indicator and text button).
+ * Again.
  */
 @Composable
 fun DrawerListFooterRow(footer: DrawerListFooter, retry: () -> Unit, modifier: Modifier = Modifier) {
+    val loadingDescription = stringResource(R.string.drawer_load_more_description)
     when (footer) {
         DrawerListFooter.loading -> Box(
             modifier
                 .fillMaxWidth()
                 .heightIn(min = DrawerMetrics.rowHeight)
                 .testTag("drawer-load-more")
-                .semantics { contentDescription = "Loading more sessions" },
+                .semantics { contentDescription = loadingDescription },
             contentAlignment = Alignment.Center,
         ) {
             CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = OpenCodeTheme.colors.secondaryText)
@@ -389,19 +397,19 @@ fun DrawerListFooterRow(footer: DrawerListFooter, retry: () -> Unit, modifier: M
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                "Couldn’t load more sessions",
+                stringResource(R.string.drawer_load_more_failed),
                 style = OpenCodeTextStyles.footnote,
                 color = OpenCodeTheme.colors.secondaryText,
                 modifier = Modifier.weight(1f),
             )
             TextButton(onClick = retry, modifier = Modifier.testTag("drawer-load-more-retry")) {
-                Text("Try Again", style = OpenCodeTextStyles.footnote, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(CoreR.string.common_try_again), style = OpenCodeTextStyles.footnote, fontWeight = FontWeight.SemiBold)
             }
         }
     }
 }
 
-/** A deletion that failed, above the sections (iOS `DrawerListDeletionErrorRow`). */
+/** A deletion that failed, above the sections. */
 @Composable
 fun DrawerListDeletionErrorRow(message: String, modifier: Modifier = Modifier) {
     val red = OpenCodeTheme.colors.destructive

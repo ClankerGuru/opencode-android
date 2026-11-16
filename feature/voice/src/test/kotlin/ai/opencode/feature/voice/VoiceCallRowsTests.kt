@@ -11,12 +11,8 @@ import org.junit.Test
 import java.util.UUID
 
 /**
- * Port of iOS `VoiceCallRowsTests.swift`, its value tests. The panel tests
- * (`roomIsTheShownRowsHeight`, `anUnmeasuredRowThatLeavesClearsRightAway`,
- * `aLiveRequestSlidesWithTheTrackSlotUnderIt`, and the room checks in
- * `theTrackStaysWhileARequestComesAndGoes`) test iOS's `VoiceCallRowsPanel`, which grows the
- * composer's glass by measured heights. Android shows the rows on a Material card that
- * animates its own size, so there's no panel to test.
+ * Its value tests. Android shows the rows on a Material card that animates its own size, so there's
+ * no panel to test.
  */
 class VoiceCallRowsTests {
     @get:Rule val isolation = TestIsolationRule()

@@ -30,26 +30,24 @@ import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 
-// One Shape (D-138 option 2, OC-577; iOS `FloatingCallStages.swift`): the orb's own surface and
-// dot field grow into a card above the composer, then into a sheet the height of the screen, on
-// one vertical drag. One progress value runs 0 (orb), 1 (card) and 2 (full); the finger holds the
-// shape's top edge, so every stage is scrubbable, and a release carries the finger's speed into
-// the spring. Hanging up from any stage flies the shape into the composer's call button. Lengths
-// in dp (iOS points), times in seconds. The lab's `-lab-stage-trace` (`FloatingCallStageTrace`)
-// is a debug-only iOS recorder and isn't ported.
+// One Shape: the orb's own surface and dot field grow into a card above the composer, then into a
+// sheet the height of the screen, on one vertical drag. One progress value runs 0 (orb), 1 (card)
+// and 2 (full); the finger holds the shape's top edge, so every stage is scrubbable, and a release
+// carries the finger's speed into the spring. Hanging up from any stage flies the shape into the
+// composer's call button. Lengths in dp, times in seconds.
 
-/** One Shape's tunables (iOS `FloatingCallStageTunables`). */
+/** One Shape's tunables. */
 object FloatingCallStageTunables {
     val cardWidth = Tunable("call.stage.cardWidth", "Card width", default = 416.0, range = 300.0..440.0, step = 2.0)
     val cardHeight = Tunable("call.stage.cardHeight", "Card height", default = 440.0, range = 300.0..620.0, step = 2.0)
     val fullTop = Tunable("call.stage.fullTop", "Full sheet top", default = 70.0, range = 44.0..160.0, step = 1.0)
     val margin = Tunable("call.stage.margin", "Card side margin", default = 12.0, range = 0.0..32.0, step = 1.0)
 
-    /** The card takes over the screen's foot, the composer and its pills hidden under it, instead of standing above them (Kit, Nov 1). */
+    /** The card takes over the screen's foot, the composer and its pills hidden under it, instead of standing above them. */
     val covers = Tunable("call.stage.covers", "Card covers the composer", default = true)
     val coverHeight = Tunable("call.stage.coverHeight", "Covering card height", default = 560.0, range = 300.0..720.0, step = 2.0)
     val coverInset = Tunable("call.stage.coverInset", "Covering card bottom margin", default = 12.0, range = 0.0..40.0, step = 1.0)
-    // The design system's sheet radius (iOS follows the device's corners: 36 and 38).
+    // The design system's sheet radius.
     val cardRadius = Tunable("call.stage.cardRadius", "Card corner radius", default = OpenCodeRadius.sheet.value.toDouble(), range = 12.0..56.0, step = 1.0)
     val fullRadius = Tunable("call.stage.fullRadius", "Sheet corner radius", default = OpenCodeRadius.sheet.value.toDouble(), range = 12.0..56.0, step = 1.0)
     val cardBloomY = Tunable("call.stage.cardBloomY", "Card bloom centre", default = 166.0, range = 100.0..260.0, step = 1.0)
@@ -73,10 +71,9 @@ object FloatingCallStageTunables {
 }
 
 /**
- * Lift and Spin Up (D-144; iOS `FloatingCallConnectTunables`): the composer's call button is where
- * the orb starts. Pressed, it dips and its phone glyph starts to spin; it lifts on a spring that
- * starts moving up, turning into the dark Rim Spinner as it grows, the spin speeding up until the
- * call connects.
+ * Lift and Spin Up: the composer's call button is where the orb starts. Pressed, it dips and its
+ * phone glyph starts to spin; it lifts on a spring that starts moving up, turning into the dark Rim
+ * Spinner as it grows, the spin speeding up until the call connects.
  */
 object FloatingCallConnectTunables {
     val pressScale = Tunable("call.connect.pressScale", "Press scale", default = 0.88, range = 0.6..1.0, step = 0.01)
@@ -109,10 +106,10 @@ object FloatingCallConnectTunables {
 }
 
 /**
- * A plain motion object's frame callback (iOS `MotionDisplayLink`): [start] asks for frames and
- * [Drive], composed by the surface that owns the object, steps it on Compose's frame clock until
- * the callback returns [MotionFrameAction.Stop]. Off screen (and in JVM tests) nothing drives it;
- * tests step the object by hand.
+ * A plain motion object's frame callback: [start] asks for frames and [Drive], composed by the
+ * surface that owns the object, steps it on Compose's frame clock until the callback returns
+ * [MotionFrameAction.Stop]. Off screen (and in JVM tests) nothing drives it; tests step the object
+ * by hand.
  */
 class FloatingCallDisplayLink(val surface: String, private val onFrame: (MotionTick) -> MotionFrameAction) {
     /** Wants frames: [Drive] runs its loop while this is true. */
@@ -134,7 +131,7 @@ class FloatingCallDisplayLink(val surface: String, private val onFrame: (MotionT
     }
 }
 
-/** Steps the link's object every frame while it runs; leaving composition stops it (iOS's weak target). */
+/** Steps the link's object every frame while it runs; leaving composition stops it. */
 @Composable
 fun FloatingCallDisplayLink.Drive() {
     val running = isRunning
@@ -145,11 +142,11 @@ fun FloatingCallDisplayLink.Drive() {
 }
 
 /**
- * Lift and Spin Up's motion (iOS `FloatingCallConnectMotion`), stepped on the display link: the
- * shape from the call button up into the orb's rest, the white button giving way to the dark
- * spinner, the swell on connect, and the call's one spin, which the phone glyph shows while the
- * button does. Events fire at their own time within a frame, so it moves alike at any frame rate.
- * A plain object: Compose observes its published values, nothing else.
+ * Lift and Spin Up's motion, stepped on the display link: the shape from the call button up into
+ * the orb's rest, the white button giving way to the dark spinner, the swell on connect, and the
+ * call's one spin, which the phone glyph shows while the button does. Events fire at their own time
+ * within a frame, so it moves alike at any frame rate. A plain object: Compose observes its
+ * published values, nothing else.
  */
 class FloatingCallConnectMotion {
     /** The shape while it lifts out of the call button or swells on connect; null while it rests. */
@@ -372,11 +369,11 @@ class FloatingCallConnectMotion {
     }
 }
 
-/** A rect from its origin and size, in doubles (iOS `CGRect(x:y:width:height:)`). */
+/** A rect from its origin and size, in doubles. */
 internal fun rect(x: Double, y: Double, width: Double, height: Double): Rect =
     Rect(x.toFloat(), y.toFloat(), (x + width).toFloat(), (y + height).toFloat())
 
-/** Where the shape is at each stage, for one screen and one resting orb (iOS `FloatingCallStageGeometry`). */
+/** Where the shape is at each stage, for one screen and one resting orb. */
 data class FloatingCallStageGeometry(
     val screen: Size,
     /** The orb at rest. */
@@ -587,10 +584,10 @@ data class FloatingCallStageGeometry(
 }
 
 /**
- * The shape's motion between stages (iOS `FloatingCallStageMotion`), stepped on the display link.
- * The shape is the stage geometry at [progress], plus an offset that decays to zero: a hang-up
- * re-bases onto the call button and keeps its position and speed. A plain object: Compose
- * observes its published values; the frame loop steps it, never a reducer.
+ * The shape's motion between stages, stepped on the display link. The shape is the stage geometry
+ * at [progress], plus an offset that decays to zero: a hang-up re-bases onto the call button and
+ * keeps its position and speed. A plain object: Compose observes its published values; the frame
+ * loop steps it, never a reducer.
  */
 class FloatingCallStageMotion {
     var progress by mutableDoubleStateOf(0.0)

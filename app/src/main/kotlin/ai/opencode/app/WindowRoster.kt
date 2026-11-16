@@ -2,7 +2,7 @@ package ai.opencode.app
 
 import java.lang.ref.WeakReference
 
-/** A window's part in the app, decided by [WindowRoster] (iOS `WindowRosterMember`). */
+/** A window's part in the app, decided by [WindowRoster]. */
 interface WindowRosterMember {
     /** The window's role changed after it joined. */
     fun rosterAssigned(role: WindowRoster.Role)
@@ -12,16 +12,9 @@ interface WindowRosterMember {
 }
 
 /**
- * Port of iOS `WindowRoster`: which window shows the first window's store and which does the
- * app's own work (the system action inbox, shares, quick action publishing). Driven by windows
- * (Android tasks) connecting and disconnecting, never by a window's state going away.
- *
- * - The **primary** restores as the app always has. The first connected window takes it; a
- *   window joining after the primary's task went takes it over.
- * - On a tablet every other window is **secondary**, with a store of its own. A phone has one
- *   window, so a new window's state is always that window's and takes over as the primary.
- * - The **app-wide owner** is the connected primary, else the first connected secondary, so
- *   that work always has a window.
+ * Driven by windows connecting and disconnecting. The first connected window is primary; on a
+ * tablet others are secondary with their own store. The app-wide owner is the connected primary,
+ * else the first connected secondary.
  */
 class WindowRoster(
     /** The device has several windows (a tablet). */
@@ -43,7 +36,6 @@ class WindowRoster(
 
     val members: List<WindowRosterMember> get() = entries.mapNotNull { it.member.get() }
 
-    /** Members whose window is connected. */
     val connectedMembers: List<WindowRosterMember> get() = entries.filter { it.connected }.mapNotNull { it.member.get() }
     val primary: WindowRosterMember? get() = entries.firstOrNull { it.isConnectedPrimary }?.member?.get()
     val appWideOwner: WindowRosterMember? get() = entries.firstOrNull { it.ownsAppWide }?.member?.get()

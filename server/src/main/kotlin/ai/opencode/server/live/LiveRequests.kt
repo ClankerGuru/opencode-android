@@ -1,8 +1,10 @@
 package ai.opencode.server.live
 
 import ai.opencode.core.log.AppLog
+import ai.opencode.core.strings.localized
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
+import ai.opencode.server.R
 import ai.opencode.server.model.OpenCodeFormRequest
 import ai.opencode.server.model.OpenCodeFormValue
 import ai.opencode.server.model.OpenCodePendingRequests
@@ -13,8 +15,12 @@ import ai.opencode.server.model.OpenCodeShell
 import ai.opencode.server.model.OpenCodeShellOutputPage
 import ai.opencode.server.model.PromptContext
 import ai.opencode.server.model.nonEmpty
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration.Companion.seconds
@@ -44,10 +50,22 @@ private suspend fun requestLocationPendingRequests(server: OpenCodeServer, direc
     return OpenCodePendingRequests(permissions.getOrThrow().data, forms.getOrThrow().data)
 }
 
+internal const val CONCURRENT_ATTENTION_DIRECTORIES = 4
+
+private suspend fun requestLocationPendingRequests(server: OpenCodeServer, directories: List<String>): List<OpenCodePendingRequests> {
+    val slots = Semaphore(CONCURRENT_ATTENTION_DIRECTORIES)
+    return coroutineScope {
+        val reads = mutableListOf<Deferred<OpenCodePendingRequests>>()
+        for (directory in directories) {
+            reads += async { slots.withPermit { requestLocationPendingRequests(server, directory) } }
+        }
+        reads.awaitAll()
+    }
+}
+
 internal suspend fun requestHomeAttention(server: OpenCodeServer, roots: List<OpenCodeSession>, directories: List<String>): Set<String> {
     val pendingSessionIDs = LinkedHashSet<String>()
-    for (directory in directories) {
-        val requests = requestLocationPendingRequests(server, directory)
+    for (requests in requestLocationPendingRequests(server, directories)) {
         pendingSessionIDs += requests.permissions.map { it.sessionID }
         pendingSessionIDs += requests.forms.map { it.sessionID }.filter { it != "global" }
     }
@@ -120,7 +138,7 @@ enum class FormStatus {
     @SerialName("cancelled") Cancelled,
 }
 
-/** A form's state on the server: what settled it, if anything did (iOS `FormState`). */
+/** A form's state on the server: what settled it, if anything did. */
 @Serializable
 data class FormState(
     val status: FormStatus,
@@ -128,7 +146,7 @@ data class FormState(
     val message: String? = null,
 )
 
-/** How a reply or dismissal asks a form to settle (iOS `FormSettlement`). */
+/** How a reply or dismissal asks a form to settle. */
 sealed interface FormSettlement {
     data class Answered(val answer: Map<String, OpenCodeFormValue>) : FormSettlement
     data class Cancelled(val message: String?) : FormSettlement
@@ -141,8 +159,8 @@ sealed interface FormSettlement {
 
     /** Why a form settled otherwise can't take this one. */
     fun conflict(state: FormState): String = when (this) {
-        is Answered -> if (state.status == FormStatus.Answered) "Already answered elsewhere" else "Already dismissed"
-        is Cancelled -> if (state.status == FormStatus.Answered) "Already answered" else "Already dismissed elsewhere"
+        is Answered -> if (state.status == FormStatus.Answered) localized(R.string.server_request_already_answered_elsewhere) else localized(R.string.server_request_already_dismissed)
+        is Cancelled -> if (state.status == FormStatus.Answered) localized(R.string.server_request_already_answered) else localized(R.string.server_request_already_dismissed_elsewhere)
     }
 
     val logName: String
@@ -154,7 +172,7 @@ sealed interface FormSettlement {
 
 @Serializable private data class FormDetail(val state: FormState)
 
-/** Where a form stands on the server now (iOS `requestFormState`). */
+/** Where a form stands on the server now. */
 internal suspend fun requestFormState(server: OpenCodeServer, sessionID: String, formID: String): FormState =
     request<DataPayload<FormDetail>>(
         "/api/session/$sessionID/form/$formID",
@@ -185,12 +203,12 @@ private suspend fun settleForm(
         } catch (failure: OpenCodeClientError) {
             failure
         }
-        if (isGone(error)) throw settled(error, "No longer waiting")
+        if (isGone(error)) throw settled(error, localized(R.string.server_request_no_longer_waiting))
         if (!error.mayHaveReachedServer && error.statusCode != 409) throw error
         val state = try {
             requestFormState(server, sessionID, formID)
         } catch (read: OpenCodeClientError) {
-            throw if (isGone(read)) settled(error, "No longer waiting") else error
+            throw if (isGone(read)) settled(error, localized(R.string.server_request_no_longer_waiting)) else error
         }
         if (wanted.matches(state)) return
         if (state.status != FormStatus.Pending) throw settled(error, wanted.conflict(state))
@@ -206,7 +224,7 @@ private fun isGone(error: OpenCodeClientError): Boolean = error.statusCode == 40
 private fun settled(error: OpenCodeClientError, message: String): OpenCodeClientError =
     error.copy(message = message, requestSettled = true)
 
-// Shells (iOS `OpenCodeClient+Shells.swift`).
+// Shells.
 
 internal suspend fun requestRunningShells(server: OpenCodeServer, directory: String): List<OpenCodeShell> =
     request<DataPayload<List<ShellInfo>>>("/api/shell", query = locationQuery(directory), server = server)

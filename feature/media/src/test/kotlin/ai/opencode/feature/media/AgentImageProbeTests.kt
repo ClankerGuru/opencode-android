@@ -17,7 +17,7 @@ import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
-/** Port of iOS `AgentImageProbeTests`: shapes first, from a header probe. */
+/** Shapes first, from a header probe. */
 class AgentImageProbeTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -44,7 +44,7 @@ class AgentImageProbeTests {
     private val key = AgentImageKey(server = "s", path = "/game/render.png")
     private val request = request("render.png")
 
-    /** iOS's probe harness: reads never answer (they sleep a minute and are cancelled). */
+    /** Reads never answer (they sleep a minute and are cancelled). */
     private fun TestScope.previews(prober: Prober, gate: Gate, sizes: AgentImageSizeCache = AgentImageSizeCache.inMemory) = AgentImagePreviews(
         sizes = sizes,
         loader = { _, _, _ ->
@@ -266,7 +266,6 @@ class AgentImageProbeTests {
         }
     }
 
-    /** iOS also checks the probe's session keeps no `URLCache` and isn't the reads' session. */
     @Test
     fun aProbeAsksForTheFirstBytesOnly() {
         val ranged = request.request.newBuilder().header("Range", "bytes=0-${AgentImageProbe.BYTES - 1}").build()

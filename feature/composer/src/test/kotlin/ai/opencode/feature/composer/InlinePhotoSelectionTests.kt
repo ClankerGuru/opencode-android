@@ -4,11 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Port of iOS `InlinePhotoSelectionTests.swift`. Items are strings standing in for the
- * picker's `Uri`s (iOS `PhotosPickerItem(itemIdentifier:)`), which the bookkeeping only
- * compares.
- */
+/** Items are strings standing in for the picker's `Uri`s, which the bookkeeping only compares. */
 class InlinePhotoSelectionTests {
     private val first = "first"
     private val second = "second"

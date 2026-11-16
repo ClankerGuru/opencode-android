@@ -5,9 +5,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Port of iOS `VoiceTurnTakingTests.swift`. */
 class VoiceTurnTakingTests {
-    /** iOS mutates a `var turns`; the Kotlin value returns copies, so the test holds the var. */
+    /** The Kotlin value returns copies, so the test holds the var. */
     private class Turns {
         var value = VoiceTurnTaking()
         private fun <R> take(step: (VoiceTurnTaking) -> Pair<VoiceTurnTaking, R>): R =

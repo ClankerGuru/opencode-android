@@ -21,9 +21,7 @@ import org.junit.Rule
 import org.junit.Test
 import java.util.UUID
 
-/**
- * Port of iOS `BrowserTests.swift` (`BrowserLinkPolicyTests`). URLs are strings on Android.
- */
+/** URLs are strings on Android. */
 class BrowserLinkPolicyTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -118,7 +116,6 @@ class BrowserLinkPolicyTests {
     }
 }
 
-/** Port of iOS `BrowserFeatureTests` (`BrowserTests.swift`). */
 class BrowserFeatureTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -383,11 +380,7 @@ class BrowserFeatureTests {
     }
 }
 
-/**
- * Port of iOS `LinkMenuTests` (`BrowserTests.swift`): what the menu offers. The menu actions'
- * effects run in `SessionFeature` (`:feature:session`); WebKit's context-menu configuration has
- * no Android counterpart (the WebView's hold menu is ours, see `BrowserWebViews.linkMenuActions`).
- */
+/** What the menu offers. */
 class LinkMenuTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -440,7 +433,7 @@ class LinkMenuTests {
         assertEquals("Share Link to example.com", LinkMenuText.accessibilityName(LinkMenuAction.Share, url = docs, among = listOf(docs, post)))
     }
 
-    /** Android-only (AA-01): Android throws once a node has more than 32 custom actions; VoiceOver has no cap. */
+    /** Android-only: Android throws once a node has more than 32 custom actions; VoiceOver has no cap. */
     @Test
     fun manyLinksKeepEveryLinkReachableWithinTheNodeLimit() {
         val browserOn = ExperimentalFeatures.enabling(setOf(ExperimentalFeature.inAppBrowser))
@@ -456,7 +449,7 @@ class LinkMenuTests {
         assertEquals(kept.flatMap { url -> actionsFor(url).map { it to url } }, plan.actions)
         assertEquals(6, kept.size)
 
-        // A few links keep the flat list iOS has, with no More Links.
+        // A few links keep the flat list, with no More Links.
         val few = links.take(6)
         val fits = LinkMenuText.accessibilityActions(few, actionsFor)
         assertEquals(few.flatMap { url -> actionsFor(url).map { it to url } }, fits.actions)
@@ -467,7 +460,7 @@ class LinkMenuTests {
         assertEquals("Action 0", guarded.first().label)
     }
 
-    /** Android-only (F-73): TalkBack shows one of several actions with the same label, so links sharing a host need their own names. */
+    /** Android-only: TalkBack shows one of several actions with the same label, so links sharing a host need their own names. */
     @Test
     fun linksOnOneHostGetDistinctActionNames() {
         val links = List(7) { "https://example.net/n-${it + 1}" }
@@ -495,7 +488,7 @@ class LinkMenuTests {
         assertEquals("example.com link 2", LinkMenuText.accessibilityTarget(rootSlash, listOf(root, rootSlash)))
     }
 
-    /** Android-only (AL-01): the block's Quote shares the links' node, after their actions and inside the 32-action cap. */
+    /** Android-only: the block's Quote shares the links' node, after their actions and inside the 32-action cap. */
     @Test
     fun quoteJoinsTheLinksActionsWithinTheNodeLimit() {
         val quote = CustomAccessibilityAction("Quote") { true }
@@ -521,10 +514,6 @@ class LinkMenuTests {
     }
 }
 
-/**
- * The menu half of iOS `OpenLinksInAppsTests.theMenuOffersTheAppBrowserOnlyWhenATapMightSkipIt`;
- * its universal-link probe runs in `SessionFeature` (`:feature:session`).
- */
 class OpenLinksInAppsTests {
     @get:Rule val isolation = TestIsolationRule()
 
@@ -552,7 +541,6 @@ class OpenLinksInAppsTests {
     }
 }
 
-/** Port of iOS `BrowserObscuredInsetsTests` (`BrowserWebViewHost.obscuredInsets` → [BrowserInsets.obscured]). */
 class BrowserObscuredInsetsTests {
     @Test
     fun negativeInsetsNeverReachTheWebView() {

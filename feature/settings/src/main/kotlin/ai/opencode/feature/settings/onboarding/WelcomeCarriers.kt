@@ -41,11 +41,11 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * What carries each message between the devices, over both of them (iOS `WelcomeCarriers`): a
- * pearl of light with a continuous comet tail for what the person says, leaving the phone's ↑ and
- * absorbing into the laptop's bubble, and the dark OpenCode webpage screenshot itself for the
- * proof, lifting off the browser and landing seamlessly on its tile in the phone's transcript.
- * [targets] are in px, in the scene's own coordinates.
+ * What carries each message between the devices, over both of them: a pearl of light with a
+ * continuous comet tail for what the person says, leaving the phone's ↑ and absorbing into the
+ * laptop's bubble, and the dark OpenCode webpage screenshot itself for the proof, lifting off the
+ * browser and landing seamlessly on its tile in the phone's transcript. [targets] are in px, in the
+ * scene's own coordinates.
  */
 @Composable
 internal fun WelcomeCarriers(frame: WelcomeFrame, targets: Map<WelcomeTarget, Rect>, layout: WelcomeSceneLayout, modifier: Modifier = Modifier) {
@@ -80,7 +80,7 @@ internal object WelcomeCarriers {
     /**
      * Smooth thrown-arc progress [tau] seconds into a trip of [travel] seconds: crisp launch
      * impulse off the button, visible arc across the gap, and a zero-overshoot glide into the
-     * destination (iOS `along`).
+     * destination.
      */
     fun along(tau: Double, travel: Double): Double {
         if (tau <= 0) return 0.0
@@ -121,7 +121,7 @@ internal object WelcomeCarriers {
     /**
      * The spoken message's light: a press bloom + ring where ↑ fires, a continuous tapered comet
      * ribbon along the arc, a velocity-aligned pearl head, and a bubble-shaped arrival ripple that
-     * cools smoothly (iOS `drawPearl`). Lengths are px.
+     * cools smoothly. Lengths are px.
      */
     fun drawPearl(scope: DrawScope, flight: WelcomeFrame.Flight, from: Rect, to: Rect, lift: Float, r: Float) = scope.drawIntoCanvas { canvas ->
         val c = canvas.nativeCanvas
@@ -229,8 +229,8 @@ internal object WelcomeCarriers {
 /**
  * The dark OpenCode website screenshot crossing from the laptop browser to the phone: it lifts off
  * the page along an arc with subtle bank and depth, carries a crisp rim catchlight so dark-on-dark
- * stays unmistakable in flight, and cools seamlessly over the resting tile with zero opacity dip
- * (iOS `WelcomeScreenshotCarrier`). Rects and radii are px.
+ * stays unmistakable in flight, and cools seamlessly over the resting tile with zero opacity dip.
+ * Rects and radii are px.
  */
 @Composable
 private fun WelcomeScreenshotCarrier(

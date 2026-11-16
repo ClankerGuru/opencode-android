@@ -10,6 +10,7 @@ import ai.opencode.core.ui.RollingNumber
 import ai.opencode.core.ui.RollingNumberAlignment
 import ai.opencode.core.ui.RollingNumberStyle
 import ai.opencode.core.ui.SFSymbol
+import ai.opencode.feature.drawer.R
 import ai.opencode.feature.drawer.style.DrawerMetrics
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
@@ -49,6 +50,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.Dp
@@ -61,20 +63,20 @@ import kotlin.math.pow
 import kotlin.math.sin
 
 /**
- * Catch Up's finish (D-133, Count to Check; iOS `CatchUpFinish.swift`): the last card gone, Catch
- * Up closes itself and the drawer's Catch Up row rolls its count to 0, draws the 0 into a
- * checkmark, turns its title to All Caught Up and sweeps a shimmer across once (a soft band, then
- * a narrow glint that overtakes it), rests, then folds away like any shortcut. It plays while Catch
- * Up is still closing (the return takes 0.45 s), so the close, the check and the glow read as one
- * motion rather than waiting for the exit. [CatchUpFeature] owns the moment (`justFinished`, the `.success` haptic,
- * the rest); the drawer list's shortcut motion clocks it and [DrawerCatchUpFinishedLabel] draws it.
+ * Catch Up's finish: the last card gone, Catch Up closes itself and the drawer's Catch Up row rolls
+ * its count to 0, draws the 0 into a checkmark, turns its title to All Caught Up and sweeps a
+ * shimmer across once (a soft band, then a narrow glint that overtakes it), rests, then folds away
+ * like any shortcut. It plays while Catch Up is still closing (the return takes 0.45 s), so the
+ * close, the check and the glow read as one motion rather than waiting for the exit.
+ * [CatchUpFeature] owns the moment (`justFinished`, the `.success` haptic, the rest); the drawer
+ * list's shortcut motion clocks it and [DrawerCatchUpFinishedLabel] draws it.
  *
- * iOS `CatchUpFinishTunables`, as baked defaults (seconds unless noted).
+ * As baked defaults (seconds unless noted).
  */
 object CatchUpFinishTunables {
     /**
-     * The session coming back from faint, slightly small and low, as Catch Up closes itself (iOS
-     * `catchUp.finish.sessionReturn`): Catch Up's signature finish keeps its own spring.
+     * The session coming back from faint, slightly small and low, as Catch Up closes itself: Catch
+     * Up's signature finish keeps its own spring.
      */
     val sessionReturn: MotionCurve = MotionCurve.Spring(duration = 0.48, bounce = 0.08)
     /** Close once emptied elsewhere (s). */
@@ -114,8 +116,8 @@ object CatchUpFinishTunables {
 }
 
 /**
- * When each part of the finish happens and how the row looks at a moment, in seconds from the
- * row's landing (`landDelay` after Catch Up starts closing). iOS `CatchUpFinishTimeline`.
+ * When each part of the finish happens and how the row looks at a moment, in seconds from the row's
+ * landing (`landDelay` after Catch Up starts closing).
  */
 data class CatchUpFinishTimeline(
     val landDelay: Double,
@@ -235,9 +237,9 @@ data class CatchUpFinishTimeline(
         }
 
         /**
-         * The finish's reference clock in seconds (iOS `AnimationTimeScale.referenceNow`): the
-         * monotonic `System.nanoTime` base Compose's frame clock also uses. The drawer list records
-         * `start` from this when it first shows the finished row.
+         * The finish's reference clock in seconds: the monotonic `System.nanoTime` base Compose's
+         * frame clock also uses. The drawer list records `start` from this when it first shows the
+         * finished row.
          */
         fun referenceNow(): Double = System.nanoTime() / 1e9
 
@@ -262,13 +264,12 @@ data class CatchUpFinishTimeline(
 }
 
 /**
- * The Catch Up row once Catch Up is finished (iOS `DrawerCatchUpFinishedLabel`). [start] is the
- * reference time ([CatchUpFinishTimeline.referenceNow]) the drawer first showed it; `null` holds
- * it at Catch Up with its count. Per-frame values are read in draw/layer blocks, so the row
- * recomposes only when the count first shows 0.
+ * The Catch Up row once Catch Up is finished. [start] is the reference time
+ * ([CatchUpFinishTimeline.referenceNow]) the drawer first showed it; `null` holds it at Catch Up
+ * with its count. Per-frame values are read in draw/layer blocks, so the row recomposes only when
+ * the count first shows 0.
  *
- * Laid out like iOS `DrawerShortcutLabel` (symbol 22 wide, 8 apart, row 44 high, 10/12 insets);
- * the drawer list's Catch Up row (`DrawerListSupportCells`) hosts it in its shortcut label.
+ * The drawer list's Catch Up row (`DrawerListSupportCells`) hosts it in its shortcut label.
  */
 @Composable
 fun DrawerCatchUpFinishedLabel(
@@ -285,7 +286,7 @@ fun DrawerCatchUpFinishedLabel(
             elapsed.doubleValue = 0.0
             return@LaunchedEffect
         }
-        // Runs until settled (iOS pauses its `TimelineView` once `settlesAt` passes).
+        // Runs until settled.
         while (true) {
             val now = withFrameNanos { it / 1e9 }
             val e = CatchUpFinishTimeline.elapsed(start, now)
@@ -298,6 +299,8 @@ fun DrawerCatchUpFinishedLabel(
 
     val tone = CatchUpMetrics.readColor
     val background = OpenCodeTheme.colors.canvas
+    val catchUpTitle = stringResource(R.string.drawer_catch_up_title)
+    val allCaughtUp = stringResource(R.string.drawer_catch_up_all_caught_up)
     val shape = RoundedCornerShape(cornerRadius)
     val rollStyle = remember(timeline) { RollingNumberStyle.Native.copy(duration = timeline.roll, bounce = 0.0) }
 
@@ -343,7 +346,7 @@ fun DrawerCatchUpFinishedLabel(
                 }
             }
             .padding(start = 10.dp, end = 12.dp)
-            .clearAndSetSemantics { contentDescription = "All Caught Up" },
+            .clearAndSetSemantics { contentDescription = allCaughtUp },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         OpenCodeIcon(
@@ -358,7 +361,7 @@ fun DrawerCatchUpFinishedLabel(
             val oldTitleLayer = rememberGraphicsLayer()
             val newTitleLayer = rememberGraphicsLayer()
             Text(
-                "Catch Up",
+                catchUpTitle,
                 style = textStyle,
                 maxLines = 1,
                 modifier = Modifier.drawWithContent {
@@ -373,7 +376,7 @@ fun DrawerCatchUpFinishedLabel(
                 },
             )
             Text(
-                "All Caught Up",
+                allCaughtUp,
                 style = textStyle,
                 maxLines = 1,
                 modifier = Modifier.drawWithContent {
@@ -421,7 +424,7 @@ fun DrawerCatchUpFinishedLabel(
     }
 }
 
-/** The trailing checkmark the 0 becomes, drawn by trimming (iOS `CatchUpFinishCheckShape`). */
+/** The trailing checkmark the 0 becomes, drawn by trimming. */
 @Composable
 private fun CatchUpFinishCheck(tone: Color, trim: () -> Float, opacity: () -> Float, modifier: Modifier = Modifier) {
     Canvas(modifier) {

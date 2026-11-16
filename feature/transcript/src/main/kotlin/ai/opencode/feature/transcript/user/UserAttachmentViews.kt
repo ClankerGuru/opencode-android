@@ -7,9 +7,11 @@ import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.drawerPanHorizontalScroller
 import ai.opencode.feature.media.mediaZoomSource
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
+import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.TranscriptAction
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.role
@@ -59,14 +61,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
-/** The fill iOS gives cards (`secondarySystemBackground`): the user bubble's colour. */
+/** The user bubble's colour. */
 @Composable
 internal fun cardFill(): Color = OpenCodeTheme.colors.userBubble
 
 /**
- * Sent files on a user message, trailing like the message's images. An uploaded file opens in
- * the viewer from the server's copy (iOS `Composer/FileAttachmentViews.swift`
- * `TranscriptFileChips`, with media's `FileAttachmentCard`).
+ * Sent files on a user message, trailing like the message's images. An uploaded file opens in the
+ * viewer from the server's copy.
  */
 @Composable
 internal fun TranscriptFileChips(
@@ -75,8 +76,7 @@ internal fun TranscriptFileChips(
     trailingCorners: UserSurfaceCorners = UserSurfaceCorners.round,
     modifier: Modifier = Modifier,
 ) {
-    // iOS anchors the row trailing only `for: .alignment`: a row that fits sits at the end, one
-    // that doesn't starts at its first card.
+    // A row that fits sits at the end, one that doesn't starts at its first card.
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
         val scroll = rememberScrollState()
         Row(
@@ -89,7 +89,7 @@ internal fun TranscriptFileChips(
                 val summary = file.pasted
                 if (text != null && summary != null) {
                     PastedTextCard(file.id, text, summary, corners)
-                } else if (file.isUnavailable || file.mediaHash != null) {
+                } else if (file.isUnavailable || (file.mediaHash != null && file.mediaViewerReference == null && file.path == null)) {
                     TranscriptMediaFileChip(file, corners)
                 } else {
                     FileChip(file, onOpen, corners)
@@ -102,35 +102,38 @@ internal fun TranscriptFileChips(
 @Composable
 private fun FileChip(file: OpenCodeTranscriptFile, onOpen: ((AgentFileReference) -> Unit)?, corners: UserSurfaceCorners) {
     val typeLabel = AttachmentFileType.label(file.name, file.mime)
-    val path = file.path
+    val ref = file.path?.let { AgentFileReference(it) } ?: file.mediaViewerReference
     val shape = corners.shape(TranscriptMetrics.cardCornerRadius)
-    val open = if (onOpen != null && path != null) ({ onOpen(AgentFileReference(path)) }) else null
+    val open = if (onOpen != null && ref != null) ({ onOpen(ref) }) else null
+    val attachedFileDescription = stringResource(R.string.transcript_attached_file_description, file.name)
+    val openFileLabel = stringResource(R.string.transcript_file_open_click_label)
     FileAttachmentCard(
         name = file.name,
         symbolName = AttachmentFileType.symbolName(file.name, file.mime),
         modifier = Modifier
             .then(
-                if (path != null && open != null) {
+                if (ref != null && open != null) {
                     Modifier.transcriptDragSource(
-                        TranscriptDragPayload.AgentFile(AgentFileReference(path), mime = file.mime, displayName = file.name),
+                        TranscriptDragPayload.AgentFile(ref, mime = file.mime, displayName = file.name),
                         cornerRadius = TranscriptMetrics.cardCornerRadius,
                     )
                 } else Modifier,
             )
             .clip(shape)
             .background(cardFill(), shape)
-            .then(if (open != null) Modifier.clickable(onClickLabel = "Open the file", onClick = open) else Modifier)
+            .then(if (open != null && ref != null) Modifier.mediaZoomSource(ref.zoomSourceID, TranscriptMetrics.cardCornerRadius)
+                .clickable(onClickLabel = openFileLabel, onClick = open) else Modifier)
             .semantics(mergeDescendants = true) {
-                contentDescription = "Attached file ${file.name}"
+                contentDescription = attachedFileDescription
                 stateDescription = typeLabel
             },
     ) { FileAttachmentDetail(typeLabel) }
 }
 
 /**
- * A long paste's card: its name, length and first lines fading out (iOS `PastedTextCard`). A tap
- * opens the whole text in the Pasted Text viewer, zooming out of the card (its zoom source is
- * `pasted-<file id>`); the session presents it for [TranscriptAction.OpenPastedText].
+ * A long paste's card: its name, length and first lines fading out. A tap opens the whole text in
+ * the Pasted Text viewer, zooming out of the card (its zoom source is `pasted-<file id>`); the
+ * session presents it for [TranscriptAction.OpenPastedText].
  */
 @Composable
 internal fun PastedTextCard(id: String, text: String, summary: PastedTextSummary, corners: UserSurfaceCorners) {
@@ -145,10 +148,10 @@ internal fun PastedTextCard(id: String, text: String, summary: PastedTextSummary
             .clip(shape)
             .background(cardFill(), shape)
             .mediaZoomSource(sourceID, TranscriptMetrics.cardCornerRadius)
-            .clickable(onClickLabel = "Open the text", onClick = open)
+            .clickable(onClickLabel = stringResource(R.string.transcript_pasted_text_open_click_label), onClick = open)
             .padding(horizontal = TranscriptMetrics.standard, vertical = 10.dp)
             .semantics(mergeDescendants = true) {
-                contentDescription = PastedText.NAME
+                contentDescription = PastedText.title
                 stateDescription = summary.summary
                 role = Role.Button
             },
@@ -157,12 +160,12 @@ internal fun PastedTextCard(id: String, text: String, summary: PastedTextSummary
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             OpenCodeIcon("doc.plaintext", contentDescription = null, size = smallGlyph(OpenCodeTextStyles.subheadline) + 2.dp, tint = OpenCodeTheme.colors.secondaryText)
             Text(
-                PastedText.NAME,
+                PastedText.title,
                 style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium),
                 color = OpenCodeTheme.colors.text,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                // iOS `Spacer(minLength: 6)` gives way before the title does.
+                // The spacer gives way before the title does.
                 modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(6.dp))
@@ -200,8 +203,8 @@ internal fun PastedTextCard(id: String, text: String, summary: PastedTextSummary
 }
 
 /**
- * A shared location's card: a map, its place and address, and its coordinates (iOS
- * `SharedLocationCard`, the sent card only). Tapping opens the maps link.
+ * A shared location's card: a map, its place and address, and its coordinates. Tapping opens the
+ * maps link.
  */
 @Composable
 internal fun SharedLocationCard(
@@ -211,8 +214,14 @@ internal fun SharedLocationCard(
     onOpen: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val title = location.place ?: location.address ?: "Shared Location"
+    val title = location.place ?: location.address ?: stringResource(R.string.transcript_location_shared)
     val subtitle = if (location.place != null) location.address else null
+    val openInMapsLabel = stringResource(R.string.transcript_location_open_in_maps)
+    val locationDescription = if (subtitle != null) {
+        stringResource(R.string.transcript_location_description_with_address, title, subtitle)
+    } else {
+        stringResource(R.string.transcript_location_description, title)
+    }
     val shape = corners.shape(TranscriptMetrics.cardCornerRadius)
     val blue = Color(0xFF0A84FF)
     Column(
@@ -221,15 +230,15 @@ internal fun SharedLocationCard(
             .graphicsLayer { alpha = if (isPending) 0.6f else 1f }
             .clip(shape)
             .background(cardFill())
-            .clickable(onClickLabel = "Open in Maps") { onOpen(location.mapsURL) }
+            .clickable(onClickLabel = openInMapsLabel) { onOpen(location.mapsURL) }
             .clearAndSetSemantics {
-                contentDescription = "Location: $title${subtitle?.let { ", $it" } ?: ""}"
+                contentDescription = locationDescription
                 role = Role.Button
-                onClick("Open in Maps") { onOpen(location.mapsURL); true }
+                onClick(openInMapsLabel) { onOpen(location.mapsURL); true }
             },
     ) {
-        // iOS `SharedLocationMap`: a still map under the pin. Android has no MapKit snapshot (the
-        // composer's `LocationClient.snapshot` seam is empty too), so the tile and pin alone.
+        // A still map under the pin. Android has no MapKit snapshot (the composer's
+        // `LocationClient.snapshot` seam is empty too), so the tile and pin alone.
         Box(
             Modifier
                 .fillMaxWidth()
@@ -271,8 +280,8 @@ internal fun SharedLocationCard(
 }
 
 /**
- * A message's images, trailing: 200 alone, 130 each when several; up to three fit the column,
- * more scroll, starting at the first image (iOS `TranscriptUserMessageView.images`).
+ * A message's images, trailing: 200 alone, 130 each when several; up to three fit the column, more
+ * scroll, starting at the first image.
  */
 @Composable
 internal fun UserMessageImages(
@@ -301,8 +310,7 @@ internal fun UserMessageImages(
             .graphicsLayer { alpha = if (isPending) 0.6f else 1f },
         contentAlignment = Alignment.CenterEnd,
     ) {
-        // iOS anchors the strip trailing only `for: .alignment`: a strip that fits sits at the end,
-        // one that doesn't starts at its first image.
+        // A strip that fits sits at the end, one that doesn't starts at its first image.
         if (images.size <= 3) {
             strip(Modifier)
         } else {

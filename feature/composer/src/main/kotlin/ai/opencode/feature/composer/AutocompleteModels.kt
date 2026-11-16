@@ -1,6 +1,7 @@
 package ai.opencode.feature.composer
 
 import ai.opencode.core.sharing.InstantSerializer
+import ai.opencode.core.strings.localized
 import ai.opencode.server.model.OpenCodeAgentMention
 import ai.opencode.server.model.OpenCodeAutocompleteAgent
 import ai.opencode.server.model.OpenCodeAutocompleteCommand
@@ -24,19 +25,17 @@ import java.io.File
 import java.time.Instant
 import java.util.UUID
 
-// Port of `Composer/AutocompleteModels.swift`. The wire types (skill, agent, command, file,
-// mentions, `PromptAutocompleteMentions` → `PromptContext.mentions`) live in `:server`
-// (`model/Composer.kt`). Kotlin `String` indices are UTF-16 code units, as `NSString`'s are,
-// so the offsets below match iOS exactly.
+// The wire types (skill, agent, command, file, mentions, `PromptAutocompleteMentions` →
+// `PromptContext.mentions`) live in `:server` (`model/Composer.kt`). Kotlin `String` indices are
+// UTF-16 code units.
 
-/** `UUID` as its string, as Swift's `Codable` writes it. */
+/** `UUID` as its string. */
 object UUIDSerializer : KSerializer<UUID> {
     override val descriptor = PrimitiveSerialDescriptor("UUID", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: UUID) = encoder.encodeString(value.toString())
     override fun deserialize(decoder: Decoder): UUID = UUID.fromString(decoder.decodeString())
 }
 
-/** Swift's `trimmingCharacters(in: .whitespacesAndNewlines)`. */
 internal fun String.trimmedWhitespaceAndNewlines(): String = trim { it.isWhitespace() || Character.isSpaceChar(it) }
 
 private fun isWhitespaceUTF16(unit: Char): Boolean = unit.isWhitespace() || Character.isSpaceChar(unit)
@@ -58,10 +57,10 @@ data class OpenCodeAutocompleteSession(
     val sentToken: String get() = "@session:$id"
 
     companion object {
-        /** iOS's designated init: an empty title reads “New Session”. */
+        /** An empty title reads “New Session”. */
         fun of(id: String, title: String, project: String, updatedAt: Instant): OpenCodeAutocompleteSession {
             val trimmed = title.trimmedWhitespaceAndNewlines()
-            return OpenCodeAutocompleteSession(id, trimmed.ifEmpty { "New Session" }, project, updatedAt)
+            return OpenCodeAutocompleteSession(id, trimmed.ifEmpty { localized(R.string.composer_autocomplete_new_session) }, project, updatedAt)
         }
 
         fun of(session: OpenCodeSession, projects: List<OpenCodeProject>): OpenCodeAutocompleteSession {
@@ -153,24 +152,32 @@ data class AutocompleteItem(
 
     val accessibilityLabel: String
         get() = when (kind) {
-            Kind.Skill -> "Skill, $title"
-            Kind.Agent -> "Subagent, $title"
-            Kind.File -> "File, $title, $label"
-            Kind.Session -> "Session, $title, $label"
-            Kind.Command -> if (label.isEmpty() || label == "Command") "Command, $title" else "Command, $title, $label"
+            Kind.Skill -> localized(R.string.composer_autocomplete_skill_description, title)
+            Kind.Agent -> localized(R.string.composer_autocomplete_subagent_description, title)
+            Kind.File -> localized(R.string.composer_autocomplete_file_description, title, label)
+            Kind.Session -> localized(R.string.composer_autocomplete_session_description, title, label)
+            Kind.Command -> {
+                // A command without a description shows the word “Command” as its label; it isn't read twice.
+                val description = (payload as? Payload.Command)?.command?.description?.trimmedWhitespaceAndNewlines()
+                if (label.isEmpty() || description.isNullOrEmpty()) {
+                    localized(R.string.composer_autocomplete_command_description, title)
+                } else {
+                    localized(R.string.composer_autocomplete_command_with_label_description, title, label)
+                }
+            }
             Kind.Empty -> title
         }
 
     companion object {
         fun skill(skill: OpenCodeAutocompleteSkill) = AutocompleteItem(
-            id = "skill:${skill.id}", kind = Kind.Skill, title = skill.name, label = "Skill",
+            id = "skill:${skill.id}", kind = Kind.Skill, title = skill.name, label = localized(R.string.composer_autocomplete_skill),
             searchText = "", payload = Payload.Skill(skill),
         )
 
         fun agent(agent: OpenCodeAutocompleteAgent): AutocompleteItem {
             val display = agent.id.ifEmpty { agent.name }
             return AutocompleteItem(
-                id = "agent:$display", kind = Kind.Agent, title = display, label = "Subagent",
+                id = "agent:$display", kind = Kind.Agent, title = display, label = localized(R.string.composer_autocomplete_subagent),
                 searchText = agent.name, payload = Payload.Agent(agent),
             )
         }
@@ -189,13 +196,13 @@ data class AutocompleteItem(
             val title = if (command.name.startsWith("/")) command.name else "/${command.name}"
             return AutocompleteItem(
                 id = "command:${command.name}", kind = Kind.Command, title = title,
-                label = command.description?.trimmedWhitespaceAndNewlines()?.ifEmpty { null } ?: "Command",
+                label = command.description?.trimmedWhitespaceAndNewlines()?.ifEmpty { null } ?: localized(R.string.composer_autocomplete_command),
                 searchText = "", payload = Payload.Command(command),
             )
         }
 
         fun empty(query: String) = AutocompleteItem(
-            id = "empty", kind = Kind.Empty, title = "No matches for “$query”", label = "",
+            id = "empty", kind = Kind.Empty, title = localized(R.string.composer_autocomplete_no_matches, query), label = "",
             searchText = "", payload = Payload.Empty(query),
         )
     }

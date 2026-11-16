@@ -1,5 +1,7 @@
 package ai.opencode.feature.system.liveactivity
 
+import ai.opencode.core.strings.localized
+import ai.opencode.feature.system.R
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
@@ -9,8 +11,7 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * Port of iOS `VoiceCallActivityAttributes`: what a voice call's Live Update (iOS Live
- * Activity) shows. Android renders it as a promoted ongoing notification
+ * What a voice call's Live Update shows. Android renders it as a promoted ongoing notification
  * ([LiveUpdateNotifications.voiceCall]).
  */
 data class VoiceCallActivityAttributes(val serverID: String, val sessionID: String) {
@@ -27,8 +28,8 @@ data class VoiceCallActivityAttributes(val serverID: String, val sessionID: Stri
 enum class VoiceCallCommand { End, ToggleMute }
 
 /**
- * Port of iOS `LiveActivityCommands`: carries Live Update button taps from the notification's
- * broadcast (in the app's process) to whichever part of the app is listening.
+ * Carries Live Update button taps from the notification's broadcast (in the app's process) to
+ * whichever part of the app is listening.
  */
 class LiveActivityCommands<Command : Any>(private val endActivities: suspend () -> Unit = {}) {
     private val lock = Any()
@@ -58,15 +59,13 @@ class LiveActivityCommands<Command : Any>(private val endActivities: suspend () 
     }.buffer(8, BufferOverflow.DROP_OLDEST)
 
     companion object {
-        /** iOS `VoiceCallCommands.shared`. */
         val voiceCall = LiveActivityCommands<VoiceCallCommand>(endActivities = { LiveVoiceActivity.endAllFromCommand() })
-        /** iOS `DictationCommands.shared`. */
         val dictation = LiveActivityCommands<DictationCommand>(endActivities = { LiveDictationActivity.endAllFromCommand() })
     }
 }
 
-/** Port of iOS `EndVoiceCallIntent` / `ToggleVoiceMuteIntent`: the call's Live Update buttons. */
+/** The call's Live Update buttons. */
 object VoiceCallIntents {
-    const val END_TITLE = "End Call"
-    const val TOGGLE_MUTE_TITLE = "Mute or Unmute Call"
+    val END_TITLE: String get() = localized(R.string.system_call_end_title)
+    val TOGGLE_MUTE_TITLE: String get() = localized(R.string.system_call_toggle_mute_title)
 }

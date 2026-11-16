@@ -1,5 +1,7 @@
 package ai.opencode.core.dependencies
 
+import ai.opencode.core.R
+import ai.opencode.core.strings.localized
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -9,9 +11,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Port of iOS `PasteboardClient` (`OpenCode/Browser/LinkMenu.swift`), moved down to `:core`
- * because the app, the browser, the transcript and the composer all copy and paste.
- * The system clipboard, for reducers (through effects) and views; never touch
+ * Moved down to `:core` because the app, the browser, the transcript and the composer all copy and
+ * paste. The system clipboard, for reducers (through effects) and views; never touch
  * `ClipboardManager` elsewhere.
  */
 class PasteboardClient(
@@ -20,7 +21,7 @@ class PasteboardClient(
     /** The clipboard's text if it isn't blank, else its URL. Main thread. */
     val string: () -> String? = { null },
     val hasImages: () -> Boolean = { false },
-    /** The clipboard's images (content URIs), for the composer's + menu Paste (iOS `PasteButton`'s item providers). Main thread. */
+    /** The clipboard's images (content URIs), for the composer's + menu Paste. Main thread. */
     val imageURIs: () -> List<Uri> = { emptyList() },
 ) {
     companion object Key : DependencyKey<PasteboardClient> {
@@ -28,8 +29,8 @@ class PasteboardClient(
             val context = dependency(AppContext)
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             PasteboardClient(
-                setURL = { url -> withContext(Dispatchers.Main) { clipboard.setPrimaryClip(ClipData.newRawUri("URL", url.toUri())) } },
-                setString = { text -> withContext(Dispatchers.Main) { clipboard.setPrimaryClip(ClipData.newPlainText("Text", text)) } },
+                setURL = { url -> withContext(Dispatchers.Main) { clipboard.setPrimaryClip(ClipData.newRawUri(localized(R.string.core_clipboard_url_label), url.toUri())) } },
+                setString = { text -> withContext(Dispatchers.Main) { clipboard.setPrimaryClip(ClipData.newPlainText(localized(R.string.core_clipboard_text_label), text)) } },
                 string = {
                     val item = clipboard.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)
                     item?.text?.toString()?.takeIf { it.isNotBlank() } ?: item?.uri?.toString()

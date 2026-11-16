@@ -28,11 +28,6 @@ import org.junit.Test
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `CallVoiceTests.swift`, the `:feature:settings` part: `CallVoicePicker.rowValue`
- * (from `anUnsupportedChoiceFallsBackToTheDefault`, whose `CallVoice` checks are
- * `:feature:voice`'s port) and the two `VoiceSettingsFeature` tests.
- */
 class CallVoiceTests {
     @get:Rule val isolation = TestIsolationRule()
 

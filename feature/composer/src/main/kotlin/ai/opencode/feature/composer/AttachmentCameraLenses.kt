@@ -1,7 +1,8 @@
 package ai.opencode.feature.composer
 
+import ai.opencode.core.strings.localized
 import ai.opencode.core.ui.SFSymbol
-import java.util.Locale
+import ai.opencode.core.ui.appFormattingLocale
 import java.util.UUID
 import kotlin.math.abs
 import kotlin.math.max
@@ -9,8 +10,8 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * What the camera seam reports about the active capture device, in the device's own zoom
- * space (a logical multi-camera's 1.0 is its widest lens). iOS `CameraDeviceDescription`.
+ * What the camera seam reports about the active capture device, in the device's own zoom space (a
+ * logical multi-camera's 1.0 is its widest lens).
  *
  * On Android it comes from CameraX's `CameraInfo`: `ZoomState.minZoomRatio`/`maxZoomRatio`
  * and the physical cameras behind a logical camera (see [AttachmentCameraView]).
@@ -19,23 +20,22 @@ data class CameraDeviceDescription(
     val position: Position,
     /** Physical lenses behind the device, any order. */
     val lenses: List<Lens>,
-    /** Where each narrower lens takes over (iOS `virtualDeviceSwitchOverVideoZoomFactors`). */
+    /** Where each narrower lens takes over. */
     val switchOverFactors: List<Double> = emptyList(),
     val minZoom: Double = 1.0,
     val maxZoom: Double = 1.0,
-    /** Full-quality sensor crops, like Camera's 2× (iOS `secondaryNativeResolutionZoomFactors`). */
+    /** Full-quality sensor crops, like Camera's 2×. */
     val nativeCropFactors: List<Double> = emptyList(),
 ) {
     enum class Position { Back, Front }
 
-    /** Ordered widest first (iOS `Lens: Comparable` by raw value). */
+    /** Ordered widest first. */
     enum class Lens { UltraWide, Wide, Telephoto }
 }
 
 /**
- * Lens buttons and zoom limits for one device. Displayed factors are relative to the wide
- * lens, so 1× is the wide lens even when the device's 1.0 is the ultra wide.
- * iOS `CameraZoomModel` (pure; `AttachmentCameraLensTests`).
+ * Lens buttons and zoom limits for one device. Displayed factors are relative to the wide lens, so
+ * 1× is the wide lens even when the device's 1.0 is the ultra wide.
  */
 class CameraZoomModel(device: CameraDeviceDescription) {
     data class Preset(
@@ -47,10 +47,14 @@ class CameraZoomModel(device: CameraDeviceDescription) {
 
         val accessibilityLabel: String
             get() = when (lens) {
-                CameraDeviceDescription.Lens.UltraWide -> "Ultra Wide"
+                CameraDeviceDescription.Lens.UltraWide -> localized(R.string.composer_camera_lens_ultra_wide_description)
                 CameraDeviceDescription.Lens.Wide ->
-                    if (displayFactor > 1.01) "Wide ${number(displayFactor)}×" else "Wide"
-                CameraDeviceDescription.Lens.Telephoto -> "Telephoto ${number(displayFactor)}×"
+                    if (displayFactor > 1.01) {
+                        localized(R.string.composer_camera_lens_wide_zoom_description, number(displayFactor))
+                    } else {
+                        localized(R.string.composer_camera_lens_wide_description)
+                    }
+                CameraDeviceDescription.Lens.Telephoto -> localized(R.string.composer_camera_lens_telephoto_description, number(displayFactor))
             }
     }
 
@@ -142,7 +146,7 @@ class CameraZoomModel(device: CameraDeviceDescription) {
         fun label(display: Double, active: Boolean): String {
             val text = number(display)
             if (active) return "$text×"
-            return if (text.startsWith("0.")) text.drop(1) else text
+            return if (text.length > 1 && text.startsWith("0")) text.drop(1) else text
         }
 
         fun number(display: Double): String {
@@ -150,16 +154,16 @@ class CameraZoomModel(device: CameraDeviceDescription) {
             if (display >= 10 || abs(tenths - Math.round(tenths).toDouble()) < 0.001) {
                 return display.roundToInt().toString()
             }
-            return String.format(Locale.US, "%.1f", tenths)
+            return String.format(appFormattingLocale(), "%.1f", tenths)
         }
     }
 }
 
 /**
- * The zoom the controls show, reconciling direct manipulation with the device's reports.
- * Pinch and TalkBack set the zoom directly; only a lens button's ramp takes the device's
- * progress, matched by the ramp's ID so late reports from an earlier ramp never pull the
- * zoom back. iOS `CameraZoomState` (a mutable value type; [copy] gives an independent one).
+ * The zoom the controls show, reconciling direct manipulation with the device's reports. Pinch and
+ * TalkBack set the zoom directly; only a lens button's ramp takes the device's progress, matched by
+ * the ramp's ID so late reports from an earlier ramp never pull the zoom back. A mutable value
+ * type; [copy] gives an independent one.
  */
 class CameraZoomState {
     data class Ramp(val id: UUID, val target: Double)
@@ -242,7 +246,6 @@ class CameraZoomState {
     override fun hashCode(): Int = listOf(factor, isPinching, ramp, pinchStart).hashCode()
 }
 
-/** iOS `AttachmentCameraFlash`. */
 enum class AttachmentCameraFlash {
     Off,
     Auto,
@@ -265,8 +268,8 @@ enum class AttachmentCameraFlash {
 
     val accessibilityValue: String
         get() = when (this) {
-            Off -> "Off"
-            Auto -> "Auto"
-            On -> "On"
+            Off -> localized(R.string.composer_camera_flash_off)
+            Auto -> localized(R.string.composer_camera_flash_auto)
+            On -> localized(R.string.composer_camera_flash_on)
         }
 }

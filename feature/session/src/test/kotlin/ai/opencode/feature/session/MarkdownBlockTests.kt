@@ -5,12 +5,7 @@ import ai.opencode.core.ui.OpenCodeColors
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * The `:feature:session` test of iOS `OpenCodeTests/MarkdownBlockTests.swift` (the session
- * header's project line); the Markdown tests are `:feature:transcript`'s. iOS's
- * `ColorSchemeContrast.increased` is [OpenCodeColors.highContrast]; `.primary`/`.secondary` are
- * the palette's text and secondary text.
- */
+/** `.primary`/`.secondary` are the palette's text and secondary text. */
 class MarkdownBlockTests {
     @Test
     fun increaseContrastUsesSecondaryOnHeaderProjectLine() {

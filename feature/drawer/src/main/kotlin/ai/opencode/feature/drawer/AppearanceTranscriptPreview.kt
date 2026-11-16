@@ -1,5 +1,6 @@
 package ai.opencode.feature.drawer
 
+import ai.opencode.core.strings.localized
 import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptLayoutTuning
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
@@ -23,11 +24,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 
 /**
- * The real transcript rows behind Settings › Appearance › Themes (iOS `AppearanceTranscriptPreview`
- * in `Settings/AppearanceSettingsView.swift`): a user bubble and an assistant Markdown reply with
- * inline code and a code band, drawn by `TranscriptMessageRow` at real transcript spacing.
- * `:feature:settings` sits beside `:feature:transcript`, so Home provides this through
- * `LocalAppearanceTranscriptPreview`; Settings themes it, caps its type and labels it.
+ * The real transcript rows behind Settings › Appearance › Themes: a user bubble and an assistant
+ * Markdown reply with inline code and a code band, drawn by `TranscriptMessageRow` at real
+ * transcript spacing. `:feature:settings` sits beside `:feature:transcript`, so Home provides this
+ * through `LocalAppearanceTranscriptPreview`; Settings themes it, caps its type and labels it.
  */
 internal val AppearanceTranscriptPreviewRows: @Composable () -> Unit = {
     val disclosure = remember { TranscriptDisclosureState() }
@@ -49,7 +49,7 @@ internal val AppearanceTranscriptPreviewRows: @Composable () -> Unit = {
                     props = RowProps(),
                     run = UserMessageRun.alone,
                     revealArrival = null,
-                    // At the readable width on a wider window (iOS `readableColumn`).
+                    // At the readable width on a wider window.
                     modifier = Modifier
                         .fillMaxWidth()
                         .wrapContentWidth()
@@ -66,13 +66,14 @@ private val previewServer = OpenCodeServer(url = "http://127.0.0.1:4096", userna
 
 private val previewTuning = TranscriptLayoutTuning()
 
-private val previewEntries: List<TranscriptEntry> = listOf(
+private val previewEntries: List<TranscriptEntry>
+    get() = listOf(
     TranscriptEntry.UserGroup(
         groupID = "msg_preview_user",
         items = listOf(
             OpenCodeTranscriptItem.UserText(
                 id = "msg_preview_user",
-                text = "Help me improve the session screen. Show me what you find and explain the changes.",
+                text = localized(R.string.drawer_appearance_preview_user_text),
             ),
         ),
         startsTurn = false,
@@ -80,9 +81,7 @@ private val previewEntries: List<TranscriptEntry> = listOf(
     TranscriptEntry.Single(
         OpenCodeTranscriptItem.AssistantMarkdown(
             id = "msg_preview_assistant",
-            text = """
-                |I found the layout issue in `SessionView.swift`. The transcript and composer share the available height, so the keyboard is a useful stress test.
-                |
+            text = localized(R.string.drawer_appearance_preview_assistant_text) + "\n\n" + """
                 |```swift
                 |struct SessionSummary: Equatable {
                 |  var title: String

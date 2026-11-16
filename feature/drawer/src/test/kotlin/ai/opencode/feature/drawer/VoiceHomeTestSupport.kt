@@ -32,16 +32,10 @@ import kotlin.reflect.KClass
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Voice helpers for the Home tests ported from iOS's voice test files (`VoiceFeatureTests`,
- * `VoiceLiveTests`, `VoiceLiveActivityTests`, …): small copies of `:feature:voice`'s test
- * support (its source set isn't visible here).
- */
 internal object VoiceHomeTestSupport {
     /**
      * `runBlocking`, not `runTest`: the delegator's tools run on real dispatchers, so receive
-     * timeouts must be real time. Effects left running are cancelled at the end
-     * (iOS `store.skipInFlightEffects()`).
+     * timeouts must be real time. Effects left running are cancelled at the end.
      */
     fun voiceHomeTest(block: suspend CoroutineScope.(HomeFeatureTestSupport.Harness) -> Unit) = runBlocking {
         val harness = HomeFeatureTestSupport.Harness(this)
@@ -52,7 +46,7 @@ internal object VoiceHomeTestSupport {
         }
     }
 
-    /** iOS `while condition { await Task.yield() }`, bounded. */
+    /** Bounded. */
     suspend fun eventually(limit: Int = 2_000, condition: () -> Boolean) {
         var tries = 0
         while (!condition() && tries < limit) {
@@ -62,18 +56,14 @@ internal object VoiceHomeTestSupport {
         }
     }
 
-    /** iOS `voice.phase = .live`. */
     fun VoiceFeature.State.live(): VoiceFeature.State = withPhase(VoiceFeature.State.Phase.Live)
 
-    /** iOS `_ = voice.tail.record(role, text, id:)`. */
     fun VoiceFeature.State.recording(role: VoiceTranscriptTail.Role, text: String, id: String? = null): VoiceFeature.State =
         copy(tail = tail.record(role, text, id).tail)
 
-    /** iOS `home.sessionDetail?.voice = voice`. */
     fun HomeFeature.State.withCall(voice: VoiceFeature.State?): HomeFeature.State =
         copy(sessionDetail = sessionDetail!!.copy(voice = voice))
 
-    /** iOS `.object(["text": .string(text)])`. */
     fun arguments(text: String? = null): RealtimeJSON =
         JsonObject(if (text == null) emptyMap() else mapOf("text" to JsonPrimitive(text)))
 
@@ -84,7 +74,6 @@ internal object VoiceHomeTestSupport {
     /** `.sessionDetail(.presented(.voice(.presented(.callEvent(event)))))`. */
     fun voiceEvent(event: VoiceCallEvent): HomeFeature.Action = voice(VoiceFeature.Action.CallEvent(event))
 
-    /** iOS `store.receive(\.sessionDetail.presented.voice.presented.case)`. */
     suspend fun <T : VoiceFeature.Action> TestStore<HomeFeature.State, HomeFeature.Action>.receiveVoice(
         case: KClass<T>,
         timeout: Duration = 5.seconds,
@@ -92,7 +81,6 @@ internal object VoiceHomeTestSupport {
         receiveBounded({ action -> action.voiceAction?.let(case::isInstance) == true }, "voice.${case.simpleName}", timeout)
     }
 
-    /** iOS `VoiceDelegatorClient(isEnabled: true) { key, input, previous in … }`. */
     fun delegator(respond: suspend (String, List<VoiceDelegator.InputItem>, String?) -> VoiceDelegator.Response) =
         VoiceDelegatorClient(isEnabled = true, respond = respond)
 
@@ -101,7 +89,7 @@ internal object VoiceHomeTestSupport {
 
     fun call(callID: String, name: String, arguments: String) = VoiceDelegator.ToolCall(callID = callID, name = name, arguments = arguments)
 
-    /** A copy of the call client with some closures replaced (iOS `$0.voiceCall.x = …`). */
+    /** A copy of the call client with some closures replaced. */
     fun VoiceCallClient.copy(
         start: suspend (String, RealtimeSessionConfig) -> Flow<VoiceCallEvent> = this.start,
         completeFunction: suspend (String, String) -> Unit = this.completeFunction,
@@ -123,7 +111,7 @@ internal object VoiceHomeTestSupport {
         retarget, setMuted, setAtEar, updateInstructions, end, delegatorRound, submitDelegatorInput, updateDelegatorInstructions,
     )
 
-    /** A copy of the work client with some closures replaced (iOS `$0.voiceWork.x = …`). */
+    /** A copy of the work client with some closures replaced. */
     fun VoiceWorkClient.copy(
         submit: suspend (VoiceWorkTarget, String) -> VoiceWorkAdmission = this.submit,
         awaitReply: suspend (OpenCodeServer, String, String) -> String? = this.awaitReply,
@@ -161,9 +149,7 @@ internal object VoiceHomeTestSupport {
     }
 
     /**
-     * The reads a session screen makes when it opens (iOS's repeated `getSession`, `transcript`,
-     * `sessionFamily`, `runningShells`, `modelCatalog`, `familyPendingRequests`, `pendingInputs`
-     * overrides), answering [getSession] for the session ID.
+     * The reads a session screen makes when it opens, answering [getSession] for the session ID.
      */
     fun OpenCodeClient.openingScreens(getSession: (String) -> OpenCodeSession): OpenCodeClient = copy(
         getSession = { _, id -> getSession(id) },

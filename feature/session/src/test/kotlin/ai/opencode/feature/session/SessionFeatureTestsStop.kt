@@ -35,19 +35,14 @@ import org.junit.Test
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-/** Port of iOS `SessionFeatureTests+Stop.swift`. */
 class SessionFeatureTestsStop {
     private val couldntStop = OpenCodeTranscriptItem.Info(id = "info-00000000-0000-0000-0000-000000000000", text = "Couldn’t stop session")
     private val missing = OpenCodeClientError(message = "Missing", statusCode = 404)
     private val unavailable = OpenCodeClientError(message = "The server returned HTTP 503.", statusCode = 503)
 
-    /** iOS `OpenCodeClient.stoppedRunText` (internal to `:server` here). */
     private val stoppedRunText = "Interrupted"
 
-    /**
-     * iOS `settleEffects()` (20 yields, then 30 ms). iOS's store has reduced what effects sent by
-     * then; this one reduces it here too ([flush]).
-     */
+    /** Settle effects (20 yields, then 30 ms) and reduce what they sent ([flush]). */
     private suspend fun TestStore<State, Action>.settleEffects() {
         flush()
         delay(30.milliseconds)

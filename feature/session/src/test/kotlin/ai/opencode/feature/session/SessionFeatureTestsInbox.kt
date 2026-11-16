@@ -48,11 +48,7 @@ import org.junit.Assert.fail
 import org.junit.Test
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Port of iOS `SessionFeatureTests+Inbox.swift`. Parameterized tests loop over their arguments.
- * iOS's `TranscriptEntryView.toolGroupLabel(_:).text` / `toolGroupFailedNotices` are
- * `ToolGroupLabel.of(_:).first` / `ToolGroupLabel.failedNotices` here.
- */
+/** Parameterized tests loop over their arguments. */
 class SessionFeatureTestsInbox {
     private fun markdown(id: String, text: String) = OpenCodeTranscriptItem.AssistantMarkdown(id = id, text = text)
     private fun user(id: String, text: String) = OpenCodeTranscriptItem.UserText(id = id, text = text)
@@ -115,7 +111,6 @@ class SessionFeatureTestsInbox {
         store.exhaustive = false
         store.send(Action.VisibilityChanged(true)) { it.copy(isVisible = true) }
         store.send(Action.FirstContentFrameRendered)
-        // iOS's non-exhaustive finish leaves the pending-work poll running (TCA reports nothing).
         store.finishLikeTCA()
         assertTrue(store.state.viewedIdle.isEmpty())
     }
@@ -154,10 +149,8 @@ class SessionFeatureTestsInbox {
     }
 
     /**
-     * TestFlight 203: a subagent's completion waited in the parent's inbox
-     * (about 30 s on a live server) and showed as a bare “Agent finished” row
-     * under the reply. Like the desktop's compact timeline, it rides at the
-     * end of the turn it arrived in: in a quiet group of its own after a reply,
+     * A subagent's completion that waited in the parent's inbox rides at the end of the turn it
+     * arrived in, like the desktop's compact timeline: in a quiet group of its own after a reply,
      * inside the Used N group after tools, never as its own row.
      */
     @Test fun pendingCompletionNoticeFoldsIntoTheTurn() {

@@ -15,24 +15,8 @@ import org.junit.Test
 import kotlin.math.abs
 
 /**
- * Port of iOS `SessionHeaderStyleTests.swift`.
- *
- * iOS's `Environment()` defaults to the system edge (`forceAppBlur = false`); Android's defaults to
- * the app-drawn band (no system scroll edge, see `SessionHeaderStyle.Environment`), so these ports
- * pass `forceAppBlur = false` wherever iOS relies on its default ([env]).
- *
- * Partly ported: `onlyTheLabOverridesTheShippedStyle` and `headerBlurTunablesRegisterAndResolveLive`
- * keep only their baked-default checks (Android has no `TuningStore`, lab overrides or presets).
- * Not ported here: `composerGlassIsInteractiveAndSwipeDownDismissesKeyboard` (`ComposerSwipeDown`,
- * `:feature:composer`, ported there; `ComposerSurface.usesInteractiveGlass` has no Android counterpart).
- * Dropped (no Android counterpart): `removedSettingsPickCannotLeaveAnInvisibleHeaderOverride`
- * (`TuningStore`/`UserDefaults`), `decodesTheLabsJSON` (the lab's JSON bridge isn't ported, the style
- * isn't `Codable` here), `variableBlurAttachesANewFilterOnEveryLiveChange` and
- * `privateAPIKillSwitchDisablesVariableBlurAndRemoteKeyboardLookup` (Core Animation private
- * filters; Android draws a scrim), `composerTextViewDisablesScrollBounceAndIndicatorsUntilDraftOverflowsCap`
- * (`UITextView` probe), `sessionAndHomeViewTypeMetadataFitDeviceOneMegabyteStack` (Swift opaque
- * type metadata on a 1 MB pthread), `topEdgePocketStaysPinnedAndOpaqueAcrossKeyboardMoves`
- * (`UIScrollEdgeElementContainerInteraction` frame trace).
+ * Android's defaults to the app-drawn band (no system scroll edge, see
+ * `SessionHeaderStyle.Environment`).
  */
 class SessionHeaderStyleTests {
     private fun env(
@@ -51,7 +35,7 @@ class SessionHeaderStyleTests {
         headerHeight = headerHeight,
     )
 
-    /** The header styles from `prototypes/header-blur`, kept as fixtures (iOS `SessionHeaderStyle.Preset`). */
+    /** The header styles from `prototypes/header-blur`, kept as fixtures. */
     private enum class Preset {
         A, C, D, F, G;
 
@@ -238,7 +222,6 @@ class SessionHeaderStyleTests {
         assertEquals(12f, bridge.scrolledUnderHeader)
     }
 
-    /** Partly ported: without a tuning store, only the shipped style resolves. */
     @Test fun onlyTheLabOverridesTheShippedStyle() {
         val environment = env(osVersion = "27.0")
         assertEquals(SessionHeaderStyle.shipped.resolved(environment), HeaderBlurTunables.resolved(environment))
@@ -274,19 +257,12 @@ class SessionHeaderStyleTests {
         assertTrue(abs(stops[1].first - 92.0 / 152.0) < 1e-6)
     }
 
-    /**
-     * Partly ported: Android bakes the tunables (no `TuningStore`, presets or registration), so only
-     * the shipped defaults' resolution is checked: the system edge on iOS 27, and the baked radius
-     * and fade on the app-blur path.
-     */
     @Test fun headerBlurTunablesRegisterAndResolveLive() {
         assertEquals(18f, HeaderBlurTunables.titleInset.value)
         assertEquals(44f, HeaderBlurTunables.buttonSize.value)
         assertEquals(ai.opencode.feature.session.header.HeaderTextStyle.Subheadline, HeaderBlurTunables.titleFont)
         assertEquals(ai.opencode.feature.session.header.HeaderTextStyle.Footnote, HeaderBlurTunables.projectFont)
 
-        // Default values match the shipped style on both iOS 27 (system edge)
-        // and iOS 26 / Force App Blur (the app's progressive blur over the pocket).
         val defaulted = HeaderBlurTunables.resolved(env(osVersion = "27.0"))
         assertEquals(SessionHeaderStyle.shipped.resolved(env(osVersion = "27.0")), defaulted)
         assertEquals(Resolved.SystemEdge(pocket = 52f, isHard = false), defaulted.systemEdge)

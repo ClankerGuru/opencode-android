@@ -20,20 +20,22 @@ import android.icu.text.BreakIterator
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.unit.Density
 
-/** One selectable text in an assistant reply: a paragraph, heading, quote, list item, code block, display formula, or one table cell ([part]). Port of iOS `TranscriptSelectionLeafKey`. */
+/**
+ * One selectable text in an assistant reply: a paragraph, heading, quote, list item, code block,
+ * display formula, or one table cell ([part]).
+ */
 data class TranscriptSelectionLeafKey(val itemID: String, val blockID: Int, val part: Int = 0) {
     companion object {
-        /** A table cell's part (iOS `MarkdownTable.part(row:column:)`): row 0 is the header. */
+        /** A table cell's part: row 0 is the header. */
         fun tablePart(row: Int, column: Int): Int = row * 1000 + column
     }
 }
 
 /**
  * A leaf's text as selection reads it, and how it maps onto the string Compose laid out
- * (`TextLayoutResult` offsets). Port of iOS `TranscriptSelectionLeaf`. The two differ only where
- * the drawn text holds inline content: a Link Icon's slot (one drawn character, nothing read) or
- * a typeset formula (its source drawn as one placeholder, read as its `$…$` source). Selection
- * never splits either.
+ * (`TextLayoutResult` offsets). The two differ only where the drawn text holds inline content: a
+ * Link Icon's slot (one drawn character, nothing read) or a typeset formula (its source drawn as
+ * one placeholder, read as its `$…$` source). Selection never splits either.
  */
 data class TranscriptSelectionLeaf(
     val key: TranscriptSelectionLeafKey,
@@ -98,12 +100,12 @@ data class TranscriptSelectionLeaf(
     }
 }
 
-/** A half-open range of the document's UTF-16 offsets (iOS `NSRange`). */
+/** A half-open range of the document's UTF-16 offsets. */
 data class TextRange(val start: Int, val length: Int) {
     val end: Int get() = start + length
 }
 
-/** Presentation inputs a reply's leaves depend on: what the rows were given. Port of iOS `TranscriptSelectionContext`. */
+/** Presentation inputs a reply's leaves depend on: what the rows were given. */
 class TranscriptSelectionContext(
     val style: MarkdownStyle,
     val density: Density,
@@ -118,9 +120,9 @@ class TranscriptSelectionContext(
 /** One reply row: its item and parsed blocks. */
 data class TranscriptSelectionRow(val itemID: String, val blocks: List<OpenCodeMarkdownBlock>)
 
-/** Builds leaves from the same presentation the views draw. Port of iOS `TranscriptSelectionText`. */
+/** Builds leaves from the same presentation the views draw. */
 object TranscriptSelectionText {
-    /** The leaf for text drawn as [presented] (iOS `leaf(key:role:blockIndex:presented:hasIcons:)`). */
+    /** The leaf for text drawn as [presented]. */
     fun leaf(key: TranscriptSelectionLeafKey, role: TranscriptSelectionLeaf.Role, blockIndex: Int, presented: PresentedText): TranscriptSelectionLeaf {
         val drawn = presented.text.text
         val isLinkDrawn = BooleanArray(drawn.length)
@@ -214,8 +216,7 @@ object TranscriptSelectionText {
 
 /**
  * One assistant reply as a single selectable document: every leaf of every reply row in the turn
- * (prose split by tool groups included), in reading order, one `\n` between leaves. Port of iOS
- * `TranscriptSelectionDocument`.
+ * (prose split by tool groups included), in reading order, one `\n` between leaves.
  */
 class TranscriptSelectionDocument(val leaves: List<TranscriptSelectionLeaf>) {
     /** Each leaf's first offset in [string]. */

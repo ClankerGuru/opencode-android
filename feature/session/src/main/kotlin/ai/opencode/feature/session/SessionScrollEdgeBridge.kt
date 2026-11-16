@@ -29,9 +29,9 @@ class SessionScrollEdgeBridge {
 
     /**
      * What the transcript last said about Jump to latest (the composer host shows it). Saved with
-     * the composer's height, so a recreated screen's pill is there from its first frame (F-38).
+     * the composer's height, so a recreated screen's pill is there from its first frame.
      * Only within the same process: after process death the list starts hidden while its row
-     * loads (V-01) and says itself when to show the pill (AI-01).
+     * loads and says itself when to show the pill.
      */
     var reportedShowsJumpButton = false
 
@@ -44,12 +44,6 @@ class SessionScrollEdgeBridge {
 
     /** iOS `onBorrowedDrag`: drags on the controls over the list (Jump to latest, queued, capsule) scroll it. */
     val borrowedDrag = TranscriptBorrowedDrag()
-
-    /**
-     * iOS `sendTransition`'s list half: the transcript's landing markers and its send hand-off,
-     * which `SessionSendFlightOverlay` flies into (the composer's capture is the composer host's).
-     */
-    val sendLanding = ai.opencode.feature.transcript.user.SendLanding()
 
     private val workingRunStamps = HashMap<String, Double>()
     private val workingRunOrder = ArrayDeque<String>()
@@ -80,8 +74,8 @@ class SessionScrollEdgeBridge {
         /**
          * For the screen's `rememberSaveable`: the composer's last height outlives the activity
          * being recreated, so a restored transcript's first frame already has its bottom inset and
-         * lays the reader's row out where it was (I-02), instead of a frame at a shorter scroll range.
-         * Jump to latest's last state goes with it within the same process (F-38, AI-01).
+         * lays the reader's row out where it was, instead of a frame at a shorter scroll range.
+         * Jump to latest's last state goes with it within the same process.
          */
         val Saver: Saver<SessionScrollEdgeBridge, Any> = listSaver(
             save = { listOf(it.composerHeight, it.reportedShowsJumpButton, process) },

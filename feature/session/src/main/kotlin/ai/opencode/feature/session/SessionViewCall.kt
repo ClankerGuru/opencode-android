@@ -35,34 +35,32 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import kotlin.time.Duration.Companion.seconds
 
-// The call's part of iOS `SessionView`: which store is the screen's call (`callStore`), its
-// presentation (`callPresentation`/`voiceStore`), the failed and ended cards above the composer,
-// and the screen's `.task`s that start it once, listen for Raise to Talk and keep a GPT-Live socket
-// warm. The call floats over the screen (Living Orb, :feature:voice's `FloatingCallOverlay`) and
-// the composer stays a composer.
+// The session screen's call: which store is the screen's call (`callStore`), its presentation
+// (`callPresentation`/`voiceStore`), the failed and ended cards above the composer, and the tasks
+// that start it once, listen for Raise to Talk and keep a GPT-Live socket warm. The call floats
+// over the screen (Living Orb,:feature:voice's `FloatingCallOverlay`) and the composer stays a
+// composer.
 
 /**
- * iOS `callStore`: the call on this screen, its own (`store.scope(\.voice, action: \.voice.presented)`)
- * or the one its root owns ([hostedCall], a pushed subagent's).
+ * The call on this screen, its own (`store.scope(\.voice, action: \.voice.presented)`) or the one
+ * its root owns ([hostedCall], a pushed subagent's).
  */
 @Composable
 internal fun StoreOf<State, Action>.rememberCallStore(hostedCall: VoiceStoreOf?): VoiceStoreOf? =
     rememberOptionalScope<VoiceFeature.State, VoiceFeature.Action>({ it.voice }, { Action.voicePresented(it) }) ?: hostedCall
 
 /**
- * The screen's call tasks (iOS `sessionScaffold`'s `.task`s and the composer area's `.task(id: hasCall)`):
+ * The screen's call tasks.
  * - once per call, the call starts (`.startIfNeeded`): it keeps running while the drawer swaps sessions;
- * - Raise to Talk listens while the setting is on, Voice is available and the app is active; the
- *   reducer decides what a raise does;
- * - a GPT-Live socket kept open (no session started, so free) while a call could start here, so a
- *   tap skips the connection setup.
+ * - Raise to Talk listens on the front screen (or the call's own screen) while the setting is on,
+ *   Voice is available and the app is active; the reducer decides what a raise does;
+ * - a GPT-Live socket kept open (no session started, so free) for a minute after a call could start
+ *   here, so a tap skips the connection setup.
  */
 @Composable
-internal fun SessionCallTasks(store: StoreOf<State, Action>, callStore: VoiceStoreOf?, hasCall: Boolean) {
+internal fun SessionCallTasks(store: StoreOf<State, Action>, callStore: VoiceStoreOf?, hasCall: Boolean, isCatchUpCard: Boolean) {
     val currentCall by rememberUpdatedState(callStore)
     LaunchedEffect(hasCall) { currentCall?.send(VoiceFeature.Action.StartIfNeeded) }
 
@@ -70,8 +68,11 @@ internal fun SessionCallTasks(store: StoreOf<State, Action>, callStore: VoiceSto
     val active = lifecycle.isAtLeast(Lifecycle.State.RESUMED)
     val raiseToTalk by remember { shared(SharedKeys.raiseToTalk).flow }.collectAsState(shared(SharedKeys.raiseToTalk).value)
     val isVoiceAvailable by store.observe { it.isVoiceAvailable }
-    LaunchedEffect(raiseToTalk && isVoiceAvailable && active) {
-        if (!(raiseToTalk && isVoiceAvailable && active)) return@LaunchedEffect
+    val ownsCall by store.observe { it.voice != null }
+    val isCovered by store.observe { it.isCovered }
+    val listensForRaise = raiseToTalk && isVoiceAvailable && active && !isCatchUpCard && (ownsCall || (!hasCall && !isCovered))
+    LaunchedEffect(listensForRaise) {
+        if (!listensForRaise) return@LaunchedEffect
         dependency(RaiseToEarClient).monitor(
             {
                 // The reducer decides; its sends run before this returns.
@@ -84,31 +85,28 @@ internal fun SessionCallTasks(store: StoreOf<State, Action>, callStore: VoiceSto
         )
     }
 
-    val warmsPhoneConnection by store.observe { it.voiceRoute.warmsPhoneConnection }
+    val routeWarms by store.observe { it.voiceRoute.warmsPhoneConnection }
     val currentHasCall by rememberUpdatedState(hasCall)
-    LaunchedEffect(warmsPhoneConnection && isVoiceAvailable && !hasCall && active) {
-        if (!(warmsPhoneConnection && isVoiceAvailable && !hasCall && active)) return@LaunchedEffect
-        // iOS reads the lab's key in DEBUG builds; VoiceLabEnvironment answers null in release ones.
+    val warmsPhoneConnection = routeWarms && isVoiceAvailable && !hasCall && active && !isCovered && !isCatchUpCard
+    LaunchedEffect(warmsPhoneConnection) {
+        if (!warmsPhoneConnection) return@LaunchedEffect
+        // VoiceLabEnvironment answers null in release ones.
         val stored = store.state.openAIAPIKey.value ?: withContext(Dispatchers.IO) { VoiceLabDemo.labAPIKey }
         val key = stored?.trim()?.takeIf { it.isNotEmpty() } ?: return@LaunchedEffect
         val warmer = dependency(LiveSocketWarmerClient)
         try {
-            while (true) {
-                warmer.warm(key)
-                delay((LiveSocketWarmer.maxAge / 2).seconds)
-            }
+            LiveSocketWarmer.warmWindow { warmer.warm(key) }
         } finally {
-            // Still here means the screen left or a call began (and took it).
             if (!currentHasCall) warmer.cool()
         }
     }
 }
 
 /**
- * iOS `safeAreaInset`'s cards above the composer: a call that couldn't connect
- * ([VoiceCallFailure]: the provider's failure card, or Check API Key/Open Settings and Try Again),
- * whose connection was lost ([VoiceCallEnded]: Close and Rejoin), or that is connecting through a
- * server ([VoiceConnectingCaption]: “Connecting via My Mac…”, fading in and out).
+ * A call that couldn't connect ([VoiceCallFailure]: the provider's failure card, or Check API
+ * Key/Open Settings and Try Again), whose connection was lost ([VoiceCallEnded]: Close and Rejoin),
+ * or that is connecting through a server ([VoiceConnectingCaption]: “Connecting via My Mac…”,
+ * fading in and out).
  */
 @Composable
 internal fun SessionCallCards(callStore: VoiceStoreOf?) {
@@ -126,7 +124,7 @@ internal fun SessionCallCards(callStore: VoiceStoreOf?) {
         else -> Unit
     }
     val connecting = place?.takeIf { phase == VoiceFeature.State.Phase.Connecting }?.let { it to statusText }
-    // The caption fades out as it last read (iOS's removal transition), not as the next phase.
+    // The caption fades out as it last read, not as the next phase.
     var shown by remember { mutableStateOf(connecting) }
     if (connecting != null && connecting != shown) shown = connecting
     AnimatedVisibility(visible = connecting != null, enter = fadeIn(), exit = fadeOut()) {

@@ -16,6 +16,7 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.appFormattingLocale
 import ai.opencode.core.ui.sfSymbol
+import ai.opencode.feature.settings.R
 import ai.opencode.feature.settings.SettingsDivider
 import ai.opencode.feature.settings.SettingsFeature
 import ai.opencode.feature.settings.SettingsPage
@@ -77,6 +78,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.onClick
@@ -99,14 +101,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Port of iOS `Settings/WhatsNew/WhatsNewView.swift`.
- *
- * iOS `WhatsNewStack` (the drawer's row pushing its own stack with Back) is Settings' stack with
- * `root = whatsNew` on Android: [WhatsNewListPage] is then the root page and Back closes it.
- * `WhatsNewServerPage` is Settings' own server page ([SettingsPage.Server]), which Settings'
- * stack pushes for `open(.servers)`. `WhatsNewButton` (the drawer's row) belongs to the drawer:
- * it shows while [WhatsNewFeature.State.showsButton], sends [WhatsNewFeature.Action.ButtonTapped]
- * (then opens `SettingsFeature.State.whatsNew(server)`), and its Hide sends
+ * [WhatsNewListPage] is then the root page and Back closes it. `WhatsNewServerPage` is Settings'
+ * own server page ([SettingsPage.Server]), which Settings' stack pushes for `open(.servers)`.
+ * `WhatsNewButton` (the drawer's row) belongs to the drawer: it shows while
+ * [WhatsNewFeature.State.showsButton], sends [WhatsNewFeature.Action.ButtonTapped] (then opens
+ * `SettingsFeature.State.whatsNew(server)`), and its Hide sends
  * [WhatsNewFeature.Action.HideTapped]; [WhatsNewFeature.State.unseenFeatures] is what it counts.
  * `.screenName` (Scrawl diagnostics tags) has no Android counterpart.
  */
@@ -124,11 +123,13 @@ fun WhatsNewListPage(store: SettingsStore) {
     val developerMode by remember { shared(SharedKeys.developerMode).flow }.collectAsState()
     val days = remember(whatsNew.entries) { WhatsNewDay.group(whatsNew.features) }
     val push = { page: SettingsPage -> store.send(SettingsFeature.Action.PagePushed(page)) }
+    val developerUpdatesHeader = stringResource(R.string.settings_whatsnew_developer_updates)
+    val smallerChangesTitle = stringResource(R.string.settings_whatsnew_smaller_changes)
 
     LaunchedEffect(Unit) { store.send(SettingsFeature.Action.WhatsNew(WhatsNewFeature.Action.Viewed)) }
 
     SettingsPageScaffold(
-        title = "What’s New",
+        title = stringResource(R.string.settings_whatsnew_title),
         store = store,
         actions = {
             // In Settings only; from the drawer's row the page is the root and has no menu.
@@ -150,7 +151,7 @@ fun WhatsNewListPage(store: SettingsStore) {
             }
         }
         if (developerMode && whatsNew.developerFeatures.isNotEmpty()) {
-            settingsSection(key = "developer", header = "Developer Updates") {
+            settingsSection(key = "developer", header = developerUpdatesHeader) {
                 whatsNew.developerFeatures.forEachIndexed { index, entry ->
                     if (index > 0) SettingsDivider(inset = true)
                     WhatsNewFeatureRow(entry, isNew = whatsNew.isNew(entry, seenIDs)) {
@@ -162,7 +163,7 @@ fun WhatsNewListPage(store: SettingsStore) {
         if (whatsNew.smallerChanges.isNotEmpty()) {
             settingsSection(key = "smaller") {
                 SettingsRow(
-                    "Smaller Changes",
+                    smallerChangesTitle,
                     symbol = null,
                     value = NumberFormat.getIntegerInstance(appFormattingLocale()).format(whatsNew.smallerChanges.size),
                 ) { push(SettingsPage.WhatsNewSmallerChanges) }
@@ -175,16 +176,17 @@ fun WhatsNewListPage(store: SettingsStore) {
 @Composable
 private fun WhatsNewOptionsMenu(isButtonEnabled: Boolean, onEnabledChange: (Boolean) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
+    val optionsDescription = stringResource(R.string.settings_whatsnew_options_description)
     Box {
         IconButton(
             onClick = { expanded = true },
-            modifier = Modifier.semantics { contentDescription = "What’s New options" },
+            modifier = Modifier.semantics { contentDescription = optionsDescription },
         ) {
             OpenCodeIcon(SFSymbol.Ellipsis, contentDescription = null)
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
-                text = { Text("Show in Drawer") },
+                text = { Text(stringResource(R.string.settings_whatsnew_show_in_drawer)) },
                 trailingIcon = { OpenCodeSwitch(checked = isButtonEnabled, onCheckedChange = null) },
                 onClick = { onEnabledChange(!isButtonEnabled) },
                 modifier = Modifier.semantics { toggleableState = ToggleableState(isButtonEnabled) },
@@ -193,7 +195,7 @@ private fun WhatsNewOptionsMenu(isButtonEnabled: Boolean, onEnabledChange: (Bool
     }
 }
 
-/** A section's day header (iOS `.dateTime.month(.wide).day()`, e.g. “October 21”). */
+/** A section's day header. */
 private fun whatsNewDayTitle(day: LocalDate): String {
     val locale = appFormattingLocale()
     val pattern = DateFormat.getBestDateTimePattern(locale, "MMMMd")
@@ -224,9 +226,10 @@ private val WhatsNewEntry.Tint.settingsTint: SettingsTint
 @Composable
 private fun WhatsNewFeatureRow(entry: WhatsNewEntry, isNew: Boolean, onClick: () -> Unit) {
     val accessibilitySize = isAccessibilitySize()
+    val newState = stringResource(R.string.settings_whatsnew_new_state)
     SettingsRowFrame(
         Modifier
-            .semantics { if (isNew) stateDescription = "New" }
+            .semantics { if (isNew) stateDescription = newState }
             .padding(vertical = 4.dp),
         onClick = onClick,
     ) {
@@ -376,7 +379,7 @@ fun WhatsNewDetailPage(store: SettingsStore, entryID: String) {
                 }
             }
         }
-        // iOS pads the page's foot by 32: the list's own 24 plus this.
+        // The list's own 24 plus this.
         item(key = "foot") { Spacer(Modifier.height(8.dp)) }
     }
 }
@@ -403,7 +406,7 @@ private fun WhatsNewTryBar(store: SettingsStore, entry: WhatsNewEntry) {
                 text = destination.title(voiceAvailable),
                 onClick = tryIt,
                 enabled = canTry,
-                // iOS `accessibilityHint`: TalkBack's click label (“Double tap to …”).
+                // TalkBack's click label (“Double tap to …”).
                 modifier = Modifier
                     .fillMaxWidth()
                     .semantics {
@@ -438,7 +441,7 @@ private fun rememberWhatsNewVoiceAvailable(server: OpenCodeServer?): Boolean {
 fun WhatsNewSmallerListPage(store: SettingsStore) {
     val whatsNew by store.observe { it.whatsNew }
     val days = remember(whatsNew.entries) { WhatsNewDay.group(whatsNew.smallerChanges) }
-    SettingsPageScaffold(title = "Smaller Changes", store = store) {
+    SettingsPageScaffold(title = stringResource(R.string.settings_whatsnew_smaller_changes), store = store) {
         for (day in days) {
             settingsSection(key = "day-${day.id}", header = whatsNewDayTitle(day.day)) {
                 day.entries.forEachIndexed { index, entry ->
@@ -474,9 +477,8 @@ private fun WhatsNewSmallerRow(entry: WhatsNewEntry, onClick: (() -> Unit)?) {
 
 /**
  * A feature's symbol lit on the app's LED dot grid (3.5 dp pitch), in the feature's colour with a
- * soft glow, under a slow sweep of light on the shared ambient clock (iOS `AmbientTimelineView`,
- * background rate). Still under reduce motion, while the app isn't in the foreground, and off
- * screen (it leaves composition with its list item).
+ * soft glow, under a slow sweep of light on the shared ambient clock. Still under reduce motion,
+ * while the app isn't in the foreground, and off screen (it leaves composition with its list item).
  */
 @Composable
 private fun WhatsNewDotSymbol(symbol: String, tint: Color, modifier: Modifier = Modifier) {
