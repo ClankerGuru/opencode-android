@@ -1,10 +1,13 @@
 package ai.opencode.feature.transcript.markdown.ui
 
+import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.media.AgentFileCards
+import ai.opencode.feature.media.AgentFileChecks
 import ai.opencode.feature.media.AgentImageGallery
+import ai.opencode.feature.media.CheckedAgentFiles
 import ai.opencode.feature.media.LocalLinkPreviewRevision
 import ai.opencode.feature.media.LocalLinkPreviewStore
 import ai.opencode.feature.media.MermaidDiagramCard
@@ -12,6 +15,7 @@ import ai.opencode.feature.media.TranscriptMetrics
 import ai.opencode.feature.transcript.LocalTranscriptRowContext
 import ai.opencode.feature.transcript.R
 import ai.opencode.feature.transcript.TranscriptAction
+import ai.opencode.feature.transcript.markdown.InlineRun
 import ai.opencode.feature.transcript.markdown.InlineText
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock.Kind
@@ -55,6 +59,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -74,6 +79,7 @@ import androidx.compose.ui.unit.sp
 fun MarkdownBlockView(
     block: OpenCodeMarkdownBlock,
     modifier: Modifier = Modifier,
+    gap: Dp = 0.dp,
     arrivals: List<TranscriptTextReveal.Arrival> = emptyList(),
     isGrowingTail: Boolean = false,
     selectionItemID: String? = null,
@@ -83,13 +89,15 @@ fun MarkdownBlockView(
     val grown = arrivals.filter { it.offset > 0 }
     val inList = LocalTranscriptReplySelection.current != null
     val selection = if (selectionItemID != null && inList) TranscriptSelectionLeafKey(selectionItemID, block.id) else null
-    Column(modifier.fillMaxWidth().arrivalFade(whole, reveal)) {
-        BlockContent(block.kind, grown, isGrowingTail, selection)
+    // File cards carry their own gap: none shows for a file that isn't there.
+    val spaced = if (block.kind is Kind.Files) modifier else modifier.padding(top = gap)
+    Column(spaced.fillMaxWidth().arrivalFade(whole, reveal)) {
+        BlockContent(block.kind, grown, isGrowingTail, selection, gap)
     }
 }
 
 @Composable
-private fun BlockContent(kind: Kind, grown: List<TranscriptTextReveal.Arrival>, isGrowingTail: Boolean, selection: TranscriptSelectionLeafKey?) {
+private fun BlockContent(kind: Kind, grown: List<TranscriptTextReveal.Arrival>, isGrowingTail: Boolean, selection: TranscriptSelectionLeafKey?, gap: Dp) {
     val style = currentMarkdownStyle()
     val colors = style.colors
     val context = LocalTranscriptRowContext.current
@@ -115,7 +123,7 @@ private fun BlockContent(kind: Kind, grown: List<TranscriptTextReveal.Arrival>, 
             // At the prose's width, like the desktop's `hr`, with the block gap on each side.
             HairlineRule(Modifier.clearAndSetSemantics {})
         is Kind.PullRequest -> PullRequestCard(kind.title, kind.url) { send(TranscriptAction.LinkTapped(kind.url)) }
-        is Kind.Files -> FileCards(kind.files)
+        is Kind.Files -> FileCards(kind.files, gap)
         is Kind.Image -> MarkdownImage(kind.source, kind.alt, fallbackFile = AgentFileReference.fromLink(kind.source))
         is Kind.Heading -> BlockText(
             kind, kind.text, style.headingStyle(kind.level), colors.strongText, grown, isGrowingTail, selection,
@@ -193,8 +201,9 @@ private fun BlockText(
         linkStyle = linkStyle,
         isGrowing = isGrowingTail,
     )
-    val presented = remember(inline, options, sessionLinks.targets, style.colors, density, siteIcon, linkRevision) {
-        MarkdownPresentation.present(inline, options, style, sessionLinks.targets, density, listener, siteIcon)
+    val shownInline = withoutMissingFiles(inline)
+    val presented = remember(shownInline, options, sessionLinks.targets, style.colors, density, siteIcon, linkRevision) {
+        MarkdownPresentation.present(shownInline, options, style, sessionLinks.targets, density, listener, siteIcon)
     }
     QuoteSelectionContainer(kind, inReply = selection != null, modifier) {
         ArrivingText(presented, presented.mapArrivals(grown), textStyle, tint, selectionKey = selection)
@@ -204,6 +213,23 @@ private fun BlockText(
     if (fetchable.isNotEmpty() && linkStore != null && linkRow != null) {
         LaunchedEffect(linkStore, fetchable, linkRow) { linkStore.inlineLinksAppeared(fetchable, linkRow) }
     }
+}
+
+/** A file that isn't there keeps its name in code, without a link. */
+@Composable
+private fun withoutMissingFiles(inline: InlineText): InlineText {
+    val context = LocalTranscriptRowContext.current
+    val server = context.server ?: return inline
+    val checks = remember { dependency(AgentFileChecks) }
+    var runs: MutableList<InlineRun>? = null
+    for ((index, run) in inline.runs.withIndex()) {
+        val link = run.link ?: continue
+        val file = MarkdownLinks.fileReference(link) ?: continue
+        if (checks.status(server, context.directory, file) != AgentFileChecks.Status.Missing) continue
+        if (runs == null) runs = inline.runs.toMutableList()
+        runs[index] = run.copy(link = null)
+    }
+    return if (runs == null) inline else InlineText(runs)
 }
 
 /** The marker hangs, so wrapped lines align with the text, not under it. */
@@ -297,7 +323,7 @@ private fun PullRequestCard(title: String, url: String, onOpen: () -> Unit) {
  * without a server to read the images from).
  */
 @Composable
-private fun FileCards(files: List<AgentFileReference>) {
+private fun FileCards(files: List<AgentFileReference>, gap: Dp) {
     val context = LocalTranscriptRowContext.current
     val server = context.server
     val onOpenFile = { file: AgentFileReference -> context.send(TranscriptAction.OpenFile(file)) }
@@ -305,7 +331,11 @@ private fun FileCards(files: List<AgentFileReference>) {
     // folder from here.
     val directory = context.directory
     androidx.compose.runtime.CompositionLocalProvider(ai.opencode.feature.media.LocalMediaDragContext provides ai.opencode.feature.media.MediaDragContext(server, directory)) {
-        FileCardsContent(files, server, context.imagePreviews, directory, onOpenFile)
+        CheckedAgentFiles(files, server, directory) { shown ->
+            Column(Modifier.padding(top = gap)) {
+                FileCardsContent(shown, server, context.imagePreviews, directory, onOpenFile)
+            }
+        }
     }
 }
 

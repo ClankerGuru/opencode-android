@@ -5,7 +5,6 @@ import ai.opencode.feature.media.LocalAgentImageSiblings
 import ai.opencode.feature.transcript.markdown.OpenCodeMarkdownBlock
 import ai.opencode.server.model.AgentFileReference
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -55,7 +54,7 @@ fun MarkdownBlocksView(
                     Column {
                     MarkdownBlockView(
                         block,
-                        Modifier.padding(top = style.gap(if (index == 0) null else blocks[index - 1].kind, block.kind)),
+                        gap = style.gap(if (index == 0) null else blocks[index - 1].kind, block.kind),
                         arrivals = arrivals[block.id].orEmpty(),
                         isGrowingTail = isGrowing && index == blocks.size - 1,
                         selectionItemID = selectionItemID,
