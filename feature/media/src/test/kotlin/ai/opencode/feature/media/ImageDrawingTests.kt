@@ -78,7 +78,8 @@ class ImageDrawingFeatureTests {
     private fun copy(id: UUID): OpenCodeOutgoingAttachment =
         OpenCodeOutgoingAttachment(id = id.toString(), data = byteArrayOf(0xFF.toByte(), 0xD8.toByte()), mime = "image/jpeg")
 
-    private val added = ImageDrawingFeature.Action.Delegate(ImageDrawingFeature.Action.DelegateAction.Added)
+    private val target = "media-thumbnail"
+    private val added = ImageDrawingFeature.Action.Delegate(ImageDrawingFeature.Action.DelegateAction.Added(target))
     private val dismiss = ImageDrawingFeature.Action.Delegate(ImageDrawingFeature.Action.DelegateAction.Dismiss)
 
     private fun kotlinx.coroutines.test.TestScope.editor(
@@ -89,7 +90,7 @@ class ImageDrawingFeatureTests {
         ImageDrawingFeature.State(image),
         ImageDrawingFeature { attachment ->
             offered.update { it + attachment }
-            accepts
+            if (accepts) target else null
         },
         this,
     ) {
@@ -139,7 +140,7 @@ class ImageDrawingFeatureTests {
         val store = editor(offered = offered)
         store.send(ImageDrawingFeature.Action.StrokeFinished(stroke)) { it.copy(drawing = it.drawing.copy(strokes = listOf(stroke))) }
         store.send(ImageDrawingFeature.Action.AddTapped) { it.copy(isAdding = true) }
-        store.receive(ImageDrawingFeature.Action.AddFinished(null))
+        store.receive(ImageDrawingFeature.Action.AddFinished(null, target))
         store.receive(added)
         store.receive(dismiss)
         store.finish()
@@ -185,7 +186,7 @@ class ImageDrawingFeatureTests {
         FullscreenViewerFeature.State(TranscriptImagePreview(page.id, listOf(page)), isShowingControls = true, allowsDrawing = allowsDrawing),
         FullscreenViewerFeature { attachment ->
             offered.update { it + attachment }
-            true
+            target
         },
         this,
     ) {
@@ -252,8 +253,8 @@ class ImageDrawingFeatureTests {
             it.copy(drawing = it.drawing!!.copy(drawing = ImageDrawing(strokes = listOf(stroke))))
         }
         store.send(drawing(ImageDrawingFeature.Action.AddTapped)) { it.copy(drawing = it.drawing!!.copy(isAdding = true)) }
-        store.receive(drawing(ImageDrawingFeature.Action.AddFinished(null)))
-        store.receive(drawing(added)) { it.copy(closesAfterDrawing = true) }
+        store.receive(drawing(ImageDrawingFeature.Action.AddFinished(null, target)))
+        store.receive(drawing(added)) { it.copy(handOff = DrawingHandOff(target, image, ImageDrawing(strokes = listOf(stroke)))) }
         store.receive(drawing(dismiss)) { it.copy(drawing = null) }
         store.finish()
         // The view puts the viewer away once the editor has gone.
@@ -281,7 +282,7 @@ class ImageDrawingFeatureTests {
         val preview = TranscriptImagePreview(root, OpenCodeServer(url = "https://fixture.invalid", username = "", password = ""))
         val store = TestStore(FullscreenViewerFeature.State(preview, allowsDrawing = true), FullscreenViewerFeature { attachment ->
             offered.update { it + attachment }
-            true
+            target
         }, this) {
             this[UuidClient] = UuidClient.incrementing()
             this[ImageDrawingClient] = ImageDrawingClient(flatten = { _, _, _ -> awaitCancellation() })

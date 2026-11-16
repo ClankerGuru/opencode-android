@@ -3,6 +3,9 @@ package ai.opencode.feature.media
 import ai.opencode.core.R as CoreR
 import ai.opencode.core.dependencies.UuidClient
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionRole
+import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.Reducer
@@ -24,6 +27,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.view.MotionEvent
 import android.view.View
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -43,11 +47,18 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -57,14 +68,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
 /**
- * The opener's prompt (iOS `ImageDrawingFeature.Add`): takes the drawn copy on the main thread,
- * or answers false once it no longer takes attachments.
+ * The opener's prompt (iOS `ImageDrawingFeature.Add`): takes the drawn copy on the main thread and
+ * answers the media ID of its new thumbnail, or null once it no longer takes attachments.
  */
-typealias ImageDrawingAdd = (OpenCodeOutgoingAttachment) -> Boolean
+typealias ImageDrawingAdd = (OpenCodeOutgoingAttachment) -> String?
 
 /**
  * Draw on Image (iOS `ImageDrawingFeature`): marks up a copy of one image and hands it to the
@@ -109,13 +121,13 @@ class ImageDrawingFeature(private val add: ImageDrawingAdd) : Reducer<ImageDrawi
         data object AddTapped : Action
 
         /** Null once the copy is in the prompt. */
-        data class AddFinished(val failure: Failure?) : Action
+        data class AddFinished(val failure: Failure?, val target: String? = null) : Action
         data object FailureDismissed : Action
         data class Delegate(val action: DelegateAction) : Action
 
         sealed interface DelegateAction {
-            /** The drawn copy is in the opener's prompt. */
-            data object Added : DelegateAction
+            /** The drawn copy is in the opener's prompt, shown by the thumbnail with media ID [target]. */
+            data class Added(val target: String) : DelegateAction
 
             /** Put the editor away. */
             data object Dismiss : DelegateAction
@@ -167,7 +179,8 @@ class ImageDrawingFeature(private val add: ImageDrawingAdd) : Reducer<ImageDrawi
                         // Checked on the main thread with the add, so an editor put away
                         // meanwhile adds nothing.
                         currentCoroutineContext().ensureActive()
-                        send(Action.AddFinished(if (add(attachment)) null else Failure.Prompt))
+                        val target = add(attachment)
+                        send(if (target != null) Action.AddFinished(null, target) else Action.AddFinished(Failure.Prompt))
                     }.cancellable(CancelID.Add, cancelInFlight = true),
                 )
             }
@@ -175,10 +188,11 @@ class ImageDrawingFeature(private val add: ImageDrawingAdd) : Reducer<ImageDrawi
 
         is Action.AddFinished -> {
             val failure = action.failure
-            if (failure == null) {
-                Reduced(state, Effect.merge(Effect.send(Action.Delegate(Action.DelegateAction.Added)), dismiss))
+            val target = action.target
+            if (failure == null && target != null) {
+                Reduced(state, Effect.merge(Effect.send(Action.Delegate(Action.DelegateAction.Added(target))), dismiss))
             } else {
-                Reduced(state.copy(isAdding = false, failure = failure))
+                Reduced(state.copy(isAdding = false, failure = failure ?: Failure.Prompt))
             }
         }
 
@@ -193,15 +207,29 @@ class ImageDrawingFeature(private val add: ImageDrawingAdd) : Reducer<ImageDrawi
  * zoom, dismiss gestures and Back stay out of drawing. Back is Cancel.
  */
 @Composable
-fun ImageDrawingEditor(store: StoreOf<ImageDrawingFeature.State, ImageDrawingFeature.Action>) {
+fun ImageDrawingEditor(
+    store: StoreOf<ImageDrawingFeature.State, ImageDrawingFeature.Action>,
+    onImageFrame: (Rect) -> Unit = {},
+) {
     val state by store.collectState()
     val enabled = !state.isAdding
+    val reduceMotion = rememberReduceMotion()
+    val controlsAlpha by animateFloatAsState(
+        if (state.isAdding) 0f else 1f,
+        MotionRole.MicroOut.animation(if (state.isAdding) MotionPhase.Exit else MotionPhase.Enter, reduceMotion),
+        label = "drawingControls",
+    )
     Dialog(
         onDismissRequest = { store.send(ImageDrawingFeature.Action.CancelTapped) },
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false, decorFitsSystemWindows = false),
     ) {
+        val window = (LocalView.current.parent as? DialogWindowProvider)?.window
+        LaunchedEffect(state.isAdding, reduceMotion) {
+            // The viewer takes the added image from under the editor, so the window goes at once.
+            if (state.isAdding && !reduceMotion) window?.setWindowAnimations(0)
+        }
         Column(Modifier.fillMaxSize().background(Color.Black).safeDrawingPadding()) {
-            Row(Modifier.fillMaxWidth().padding(start = 16.dp, top = 8.dp, end = 16.dp)) {
+            Row(Modifier.fillMaxWidth().padding(start = 16.dp, top = 8.dp, end = 16.dp).graphicsLayer { alpha = controlsAlpha }) {
                 OpenCodeIconButton(
                     symbol = SFSymbol.Xmark,
                     contentDescription = stringResource(CoreR.string.common_cancel),
@@ -235,12 +263,24 @@ fun ImageDrawingEditor(store: StoreOf<ImageDrawingFeature.State, ImageDrawingFea
                     canvas.commit = { store.send(ImageDrawingFeature.Action.StrokeFinished(it)) }
                     canvas.invalidate()
                 },
-                modifier = Modifier.fillMaxWidth().weight(1f).testTag("image-drawing-canvas"),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .onGloballyPositioned { coordinates ->
+                        val box = coordinates.boundsInWindow()
+                        val image = state.image
+                        if (image.width > 0 && image.height > 0) {
+                            val scale = minOf(box.width / image.width, box.height / image.height)
+                            val size = Size(image.width * scale, image.height * scale)
+                            onImageFrame(Rect(Offset(box.center.x - size.width / 2, box.center.y - size.height / 2), size))
+                        }
+                    }
+                    .testTag("image-drawing-canvas"),
             )
             Surface(
                 shape = OpenCodeShape.control,
                 color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 16.dp),
+                modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 16.dp).graphicsLayer { alpha = controlsAlpha },
             ) {
                 Row(Modifier.padding(horizontal = 6.dp)) {
                     ImageDrawing.Ink.entries.forEach { ink ->

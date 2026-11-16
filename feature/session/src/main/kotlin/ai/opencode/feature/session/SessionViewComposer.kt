@@ -55,6 +55,7 @@ import ai.opencode.feature.composer.handsGlassOver
 import ai.opencode.feature.composer.layoutProgress
 import ai.opencode.feature.composer.plusmenu.PhotoFlightTunables
 import ai.opencode.feature.composer.requestPanelCap
+import ai.opencode.feature.media.LocalMediaPresenter
 import ai.opencode.feature.media.MediaReferenceResolver
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.transcript.TranscriptTunables
@@ -1797,7 +1798,16 @@ private fun SessionComposerEnv.Composer() {
         if (holdsRow) rowReveal.snapTo(0f)
         else if (rowReveal.value < 1f) rowReveal.animateTo(1f, PhotoFlightTunables.rowAnimation())
     }
-    val attachmentReveal = if (holdsRow) 0f else rowReveal.value
+    // A drawing added from the full-screen viewer opens the row on its flight's spring.
+    val presenter = LocalMediaPresenter.current
+    val hasAttachments = hasComposerAttachments
+    val handOffReveal = remember(hasAttachments) {
+        Animatable(if (hasAttachments && presenter?.isPresenting == true && !reducedMotion) 0f else 1f)
+    }
+    LaunchedEffect(handOffReveal) {
+        if (handOffReveal.value < 1f) handOffReveal.animateTo(1f, Motion.flight.animation(reduceMotion = reducedMotion))
+    }
+    val attachmentReveal = if (holdsRow) 0f else rowReveal.value * handOffReveal.value
     val sendReset = host.sendReset
     sendReset.Animate()
     val current by rememberUpdatedState(this)

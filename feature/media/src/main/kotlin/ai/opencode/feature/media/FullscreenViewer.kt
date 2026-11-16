@@ -88,6 +88,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -238,6 +239,8 @@ val TranscriptImagePreview.Page.displayTitle: String?
 
 // MARK: - Feature
 
+data class DrawingHandOff(val target: String, val image: Bitmap, val drawing: ImageDrawing)
+
 /** [addDrawing] is the opener's prompt, for a viewer that [State.allowsDrawing]. */
 class FullscreenViewerFeature(
     addDrawing: ImageDrawingAdd? = null,
@@ -260,8 +263,8 @@ class FullscreenViewerFeature(
         val allowsDrawing: Boolean = false,
         /** Draw on Image's editor, while it's up. */
         val drawing: ImageDrawingFeature.State? = null,
-        /** Add to Prompt landed: the viewer goes once the editor has. */
-        val closesAfterDrawing: Boolean = false,
+        /** Add to Prompt landed: the viewer goes with the marked-up image to its thumbnail. */
+        val handOff: DrawingHandOff? = null,
     ) {
         val selectedPage: TranscriptImagePreview.Page?
             get() = filePath.lastOrNull() ?: preview.pages.firstOrNull { it.id == selectedID } ?: preview.pages.firstOrNull()
@@ -312,7 +315,7 @@ class FullscreenViewerFeature(
         setState = { state, drawing -> state.copy(drawing = drawing) },
         action = { (it as? Action.Drawing)?.action },
         embed = { Action.Drawing(it) },
-        child = ImageDrawingFeature(addDrawing ?: { false }),
+        child = ImageDrawingFeature(addDrawing ?: { null }),
     )
 
     override fun reduce(state: State, action: Action): Reduced<State, Action> = body.reduce(state, action)
@@ -469,26 +472,30 @@ class FullscreenViewerFeature(
         is Action.DrawCapturedFrame -> {
             val page = state.selectedPage
             if (page?.id != action.pageID || !page.isVideo || page.isUnavailable || page.loadFailed || page.originalFailed || !state.allowsDrawing || state.drawing != null ||
-                state.closesAfterDrawing || state.isDismissed || state.isDiscarded) Reduced(state)
+                state.handOff != null || state.isDismissed || state.isDiscarded) Reduced(state)
             else Reduced(state.copy(drawing = ImageDrawingFeature.State(action.frame)))
         }
 
         Action.DrawTapped -> {
             val page = state.selectedPage
             val image = page?.image
-            if (!state.allowsDrawing || state.isDismissed || state.isDiscarded || page == null || page.isVideo || page.originalPending || page.originalFailed || page.loadFailed || image == null) {
+            if (!state.allowsDrawing || state.handOff != null || state.isDismissed || state.isDiscarded || page == null || page.isVideo || page.originalPending || page.originalFailed || page.loadFailed || image == null) {
                 Reduced(state)
             } else {
                 Reduced(state.copy(drawing = ImageDrawingFeature.State(image)))
             }
         }
 
-        is Action.Drawing -> when ((action.action as? PresentationAction.Presented)?.action) {
-            ImageDrawingFeature.Action.Delegate(ImageDrawingFeature.Action.DelegateAction.Added) ->
-                Reduced(state.copy(closesAfterDrawing = true))
-            ImageDrawingFeature.Action.Delegate(ImageDrawingFeature.Action.DelegateAction.Dismiss) ->
-                Reduced(state.copy(drawing = null))
-            else -> Reduced(state)
+        is Action.Drawing -> {
+            val presented = (action.action as? PresentationAction.Presented)?.action
+            val delegate = (presented as? ImageDrawingFeature.Action.Delegate)?.action
+            val drawing = state.drawing
+            when {
+                delegate is ImageDrawingFeature.Action.DelegateAction.Added && drawing != null ->
+                    Reduced(state.copy(handOff = DrawingHandOff(delegate.target, drawing.image, drawing.drawing)))
+                delegate == ImageDrawingFeature.Action.DelegateAction.Dismiss -> Reduced(state.copy(drawing = null))
+                else -> Reduced(state)
+            }
         }
 
         is Action.Delegate -> Reduced(state)
@@ -616,10 +623,10 @@ fun FullscreenViewer(
     LaunchedEffect(state.isDiscarded) {
         if (state.isDiscarded) viewer.discard()
     }
-    // The image flies home from the viewer, never from under the editor.
-    val closesAfterDrawing = state.closesAfterDrawing && state.drawing == null
-    LaunchedEffect(closesAfterDrawing) {
-        if (closesAfterDrawing) viewer.dismiss()
+    val editorFrame = remember { mutableStateOf<Rect?>(null) }
+    val handOff = state.handOff
+    LaunchedEffect(handOff) {
+        if (handOff != null) viewer.handOff(handOff, editorFrame.value)
     }
 
     val remote = ready?.content as? AgentFileViewerModel.Content.Player
@@ -632,10 +639,11 @@ fun FullscreenViewer(
         if (movie != null) MovieContentPage(movie, page.label, { store.send(Action.ImageTapped) }, { viewer.isZoomed = it },
             { frame -> if (tracksSource) viewer.mediaFrames[page.id] = frame; pip?.videoFrame = frame }, { capture = it },
             modifier = Modifier.testTag(if (pip?.isActive == true) "agent-file-pip" else if (remote?.isStreaming == true) "agent-file-player-streaming" else "agent-file-player"),
-            isHidden = tracksSource && viewer.mediaHidden && viewer.image != null)
+            isHidden = state.handOff != null || tracksSource && viewer.mediaHidden && viewer.image != null)
     }
     val wrapsLines by remember { shared(SharedKeys.fileViewerWrapsLines) }.flow.collectAsState()
-    val visible = pip?.isActive != true && controlsAreVisible(state.isShowingControls, talkBack, viewer.chromeHidden)
+    val visible = pip?.isActive != true && controlsAreVisible(state.isShowingControls, talkBack, viewer.chromeHidden) &&
+        state.drawing == null && state.handOff == null
     val safe = WindowInsets.systemBarsIgnoringVisibility.union(WindowInsets.displayCutout)
     val reduceMotion = rememberReduceMotion()
     val enter = fadeIn(MotionRole.Swap.animation(MotionPhase.Enter, reduceMotion))
@@ -664,7 +672,7 @@ fun FullscreenViewer(
                         else -> null
                     })
                 movie != null -> visualMovie()
-                image != null -> ViewerImage(page, image, viewer, selected = true, flight = root, onTap = { store.send(Action.ImageTapped) })
+                image != null -> ViewerImage(page, image, viewer, selected = true, flight = root, handingOff = state.handOff != null, onTap = { store.send(Action.ImageTapped) })
                 file != null -> Box(
                     Modifier.fillMaxSize().padding(top = safe.asPaddingValues().calculateTopPadding() + OpenCodeTopBarDefaults.height),
                     contentAlignment = Alignment.Center,
@@ -721,7 +729,10 @@ fun FullscreenViewer(
             confirmButton = { TextButton(onClick = dismiss) { Text(stringResource(CoreR.string.common_ok)) } })
     }
 
-    state.drawing?.let { first ->
+    // The editor stays over the viewer until the added image is ready to leave it.
+    val editor = state.drawing
+        ?: state.handOff?.takeIf { !viewer.handOffCovered }?.let { ImageDrawingFeature.State(it.image, it.drawing, isAdding = true) }
+    editor?.let { first ->
         val drawing = remember(store) {
             // The last state, so the scope never reads `null` while its dismissal lands.
             var last = first
@@ -730,7 +741,7 @@ fun FullscreenViewer(
                 action = { FullscreenViewerFeature.Action.Drawing(PresentationAction.Presented(it)) },
             )
         }
-        ImageDrawingEditor(drawing)
+        ImageDrawingEditor(drawing, onImageFrame = { editorFrame.value = it })
     }
 }
 
@@ -866,7 +877,7 @@ private fun VisualPager(state: FullscreenViewerFeature.State, viewer: MediaViewe
         )
         when {
             selected && selectedContent != null -> selectedContent()
-            image != null -> ViewerImage(page, image, viewer, selected, flight = flight, onTap = tap)
+            image != null -> ViewerImage(page, image, viewer, selected, flight = flight, handingOff = state.handOff != null, onTap = tap)
             page.isUnavailable -> Box(placeholder) {
                 MediaAttachmentUnavailableView(name = page.name ?: page.displayTitle)
             }
@@ -891,10 +902,11 @@ private fun ViewerImage(
     viewer: MediaViewerState,
     selected: Boolean,
     flight: Boolean = true,
+    handingOff: Boolean = false,
     onTap: () -> Unit,
 ) {
     ZoomableImagePage(
-        image = image, label = page.label, isSelected = selected, isHidden = flight && viewer.mediaHidden && selected,
+        image = image, label = page.label, isSelected = selected, isHidden = handingOff || flight && viewer.mediaHidden && selected,
         modifier = if (page.file != null) Modifier.fillMaxSize().testTag("agent-file-image") else Modifier.fillMaxSize(),
         onSingleTap = onTap, onZoomChange = { if (selected) viewer.isZoomed = it },
         onFrame = { if (flight) viewer.mediaFrames[page.id] = it },
