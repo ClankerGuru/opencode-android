@@ -275,7 +275,7 @@ and `ellipsis` (every overflow menu) is the vertical `more_vert`, as on other An
 | `laptopcomputer.and.iphone` | `devices` | `ms_devices` | `SFSymbol.LaptopcomputerAndIphone` | WhatsNewList |
 | `line.3.horizontal` | `menu` | `ms_menu` | `SFSymbol.Line3Horizontal` | DrawerButton, OnboardingPlaygroundView, SessionSwitcher |
 | `line.horizontal.star.fill.line.horizontal` | `new_releases` | `ms_new_releases` | `SFSymbol.LineHorizontalStarFillLineHorizontal` | WhatsNewList |
-| `link` | `link` | `ms_link` | `SFSymbol.Link` | InlineLinkIcons, ProblemReport, ShareView, TranscriptDragSource, TuningPanelView, WhatsNewList |
+| `link` | `link` | `ms_link` | `SFSymbol.Link` | ExperimentalFeatures, InlineLinkIcons, ProblemReport, ShareView, TranscriptDragSource, TuningPanelView, WhatsNewList |
 | `list.bullet` | `format_list_bulleted` | `ms_format_list_bulleted` | `SFSymbol.ListBullet` | WhatsNewList |
 | `list.bullet.rectangle` | `list_alt` | `ms_list_alt` | `SFSymbol.ListBulletRectangle` | WhatsNewList |
 | `location` | `near_me` | `ms_near_me` | `SFSymbol.Location` | AttachmentPicker |

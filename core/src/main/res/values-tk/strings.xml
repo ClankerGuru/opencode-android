@@ -18,6 +18,7 @@
     <string name="core_experiment_inbox_sidebar_title">Gelýänler gapdal paneli</string>
     <string name="core_experiment_session_live_activity_title">Sessiýanyň janly täzelenmeleri</string>
     <string name="core_experiment_sound_effects_title">Ses effektleri</string>
+    <string name="core_experiment_server_address_links_title">Serwer salgysy boýunça baglanyşyklary açyň</string>
     <string name="core_experiment_in_app_browser_title">Programmadaky brauzer</string>
     <string name="core_experiment_welcome_preview_title">Garşylama deslapky syny</string>
     <string name="core_experiment_since_you_left_title">Siz gideniňizden bäri</string>

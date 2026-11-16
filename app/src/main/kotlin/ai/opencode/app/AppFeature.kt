@@ -799,6 +799,9 @@ class AppFeature : Reducer<AppFeature.State, AppFeature.Action> {
         val key = action.serverKey
         val server = if (key != null) {
             state.knownServers.firstOrNull { SessionDirectory.serverKey(it.persistenceID) == key }
+                ?: state.knownServers.firstOrNull {
+                    dependency(ExperimentalFeatures)(ExperimentalFeature.serverAddressLinks) && it.matchesOrigin(key)
+                }
         } else {
             state.homeServer ?: state.savedServer.value
         }

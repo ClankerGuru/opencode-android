@@ -92,7 +92,10 @@ class ExperimentalFeatureTests {
             ExperimentalGroup.calls.features,
         )
         assertEquals(
-            listOf(ExperimentalFeature.inboxSidebar, ExperimentalFeature.sessionLiveActivity, ExperimentalFeature.soundEffects),
+            listOf(
+                ExperimentalFeature.inboxSidebar, ExperimentalFeature.sessionLiveActivity, ExperimentalFeature.soundEffects,
+                ExperimentalFeature.serverAddressLinks,
+            ),
             ExperimentalGroup.drawer.features,
         )
         assertEquals(listOf(ExperimentalFeature.inAppBrowser), ExperimentalGroup.transcript.features)

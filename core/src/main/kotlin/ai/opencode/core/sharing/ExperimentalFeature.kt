@@ -62,6 +62,7 @@ enum class ExperimentalFeature(
         "session-live-activity", R.string.core_experiment_session_live_activity_title, ExperimentalGroup.drawer, "platter.filled.top.iphone",
     ),
     soundEffects("sound-effects", R.string.core_experiment_sound_effects_title, ExperimentalGroup.drawer, "speaker.wave.2.fill"),
+    serverAddressLinks("server-address-links", R.string.core_experiment_server_address_links_title, ExperimentalGroup.drawer, "link"),
 
     // Transcript
     inAppBrowser("in-app-browser", R.string.core_experiment_in_app_browser_title, ExperimentalGroup.transcript, "safari"),
