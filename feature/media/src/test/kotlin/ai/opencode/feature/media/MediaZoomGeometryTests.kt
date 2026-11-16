@@ -146,16 +146,16 @@ class FullscreenViewerFeatureTests {
     @get:Rule val isolation = TestIsolationRule()
 
     @Test
-    fun controlsStartHiddenAndToggleOnTap() = runTest {
+    fun controlsStartShownAndToggleOnTap() = runTest {
         val preview = TranscriptImagePreview(id = "img-1", image = stubBitmap(), label = "Tool image 1 of 1")
         val haptics = Locked(listOf<Haptic>())
         val store = TestStore(FullscreenViewerFeature.State(preview), FullscreenViewerFeature(), this) {
             this[HapticsClient] = HapticsClient(play = { haptic -> haptics.update { it + haptic } })
         }
 
-        assertFalse(store.state.isShowingControls)
-        store.send(FullscreenViewerFeature.Action.ImageTapped) { it.copy(isShowingControls = true) }
+        assertTrue(store.state.isShowingControls)
         store.send(FullscreenViewerFeature.Action.ImageTapped) { it.copy(isShowingControls = false) }
+        store.send(FullscreenViewerFeature.Action.ImageTapped) { it.copy(isShowingControls = true) }
         store.send(FullscreenViewerFeature.Action.CloseTapped) { it.copy(isDismissed = true) }
         store.finish()
         assertTrue(haptics.current.isEmpty())

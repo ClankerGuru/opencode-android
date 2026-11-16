@@ -191,4 +191,5 @@
     <string name="media_mermaid_type_architecture">Sơ đồ kiến trúc</string>
     <string name="media_mermaid_type_radar">Biểu đồ radar</string>
     <string name="media_mermaid_type_treemap">Biểu đồ cây</string>
+    <string name="media_viewer_page_counter">%1$d / %2$d</string>
 </resources>

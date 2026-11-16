@@ -1,13 +1,9 @@
 package ai.opencode.feature.media
 
-import ai.opencode.core.ui.OpenCodeIconButton
-import ai.opencode.core.ui.SFSymbol
 import android.graphics.Bitmap
 import android.net.Uri
 import android.view.TextureView
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,23 +15,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.compose.state.rememberPlayPauseButtonState
-import androidx.media3.ui.compose.state.rememberProgressStateWithTickInterval
-import java.util.Locale
 import kotlin.math.roundToInt
 
 /** Only the selected local page owns a player. For a remote page borrow the file loader's player. */
@@ -132,27 +120,5 @@ internal fun MovieContentPage(
             )
         }
         if (failed) Text(stringResource(R.string.media_video_play_failed), color = Color.White)
-    }
-}
-
-@androidx.annotation.OptIn(UnstableApi::class)
-@Composable
-internal fun MovieTransport(player: Player, modifier: Modifier = Modifier) {
-    val play = rememberPlayPauseButtonState(player)
-    val progress = rememberProgressStateWithTickInterval(player, 250L)
-    val duration = progress.durationMs.coerceAtLeast(0)
-    var drag by remember(player) { mutableStateOf<Float?>(null) }
-    val ms = drag ?: progress.currentPositionMs.coerceIn(0, duration).toFloat()
-    val positionDescription = stringResource(R.string.media_video_position_description)
-    Row(modifier.fillMaxWidth().padding(bottom = 8.dp).background(Color.Black.copy(alpha = 0.65f)).padding(end = 12.dp),
-        verticalAlignment = Alignment.CenterVertically) {
-        OpenCodeIconButton(if (play.showPlay) SFSymbol.PlayFill else SFSymbol.PauseFill, if (play.showPlay) stringResource(R.string.media_player_play) else stringResource(R.string.media_player_pause), play::onClick,
-            Modifier.testTag("image-gallery-video-play"), enabled = play.isEnabled)
-        Slider(value = ms, onValueChange = { if (drag == null) player.pause(); drag = it },
-            onValueChangeFinished = { drag?.let { player.seekTo(it.toLong()) }; drag = null },
-            valueRange = 0f..maxOf(duration, 1L).toFloat(), enabled = duration > 0,
-            modifier = Modifier.weight(1f).testTag("image-gallery-video-position").semantics { contentDescription = positionDescription })
-        val seconds = ms.toLong() / 1000
-        Text(String.format(Locale.ROOT, "%d:%02d", seconds / 60, seconds % 60), color = Color.White)
     }
 }

@@ -192,4 +192,5 @@
     <string name="media_mermaid_type_architecture">Arxitektura diagrammasi</string>
     <string name="media_mermaid_type_radar">Radar diagrammasi</string>
     <string name="media_mermaid_type_treemap">Daraxtsimon xarita</string>
+    <string name="media_viewer_page_counter">%1$d / %2$d</string>
 </resources>

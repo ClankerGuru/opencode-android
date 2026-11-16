@@ -194,4 +194,5 @@
     <string name="media_mermaid_type_architecture">Діаграма архітектури</string>
     <string name="media_mermaid_type_radar">Пелюсткова діаграма</string>
     <string name="media_mermaid_type_treemap">Деревоподібна карта</string>
+    <string name="media_viewer_page_counter">%1$d / %2$d</string>
 </resources>

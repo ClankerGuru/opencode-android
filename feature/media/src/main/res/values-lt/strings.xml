@@ -194,4 +194,5 @@
     <string name="media_mermaid_type_architecture">Architektūros diagrama</string>
     <string name="media_mermaid_type_radar">Radaro diagrama</string>
     <string name="media_mermaid_type_treemap">Medžio žemėlapis</string>
+    <string name="media_viewer_page_counter">%1$d / %2$d</string>
 </resources>

@@ -191,4 +191,5 @@
     <string name="media_mermaid_type_architecture">ແຜນວາດສະຖາປັດຕະຍະກຳ</string>
     <string name="media_mermaid_type_radar">ແຜນພູມເຣດາ</string>
     <string name="media_mermaid_type_treemap">ແຜນພູມຕົ້ນໄມ້</string>
+    <string name="media_viewer_page_counter">%1$d / %2$d</string>
 </resources>

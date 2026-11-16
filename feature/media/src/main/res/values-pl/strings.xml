@@ -194,4 +194,5 @@
     <string name="media_mermaid_type_architecture">Diagram architektury</string>
     <string name="media_mermaid_type_radar">Wykres radarowy</string>
     <string name="media_mermaid_type_treemap">Mapa drzewa</string>
+    <string name="media_viewer_page_counter">%1$d / %2$d</string>
 </resources>

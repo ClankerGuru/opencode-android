@@ -27,7 +27,6 @@ import ai.opencode.core.ui.OpenCodeAlertDialog
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconButton
 import ai.opencode.core.ui.OpenCodeIconButtonStyle
-import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.OpenCodeTopBar
@@ -51,11 +50,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.displayCutout
@@ -65,14 +62,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsIgnoringVisibility
 import androidx.compose.foundation.layout.union
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -252,7 +246,7 @@ class FullscreenViewerFeature(
         val filePath: List<TranscriptImagePreview.Page> = emptyList(),
         val shareError: AgentFileError? = null,
         val noAppOpens: Boolean = false,
-        val isShowingControls: Boolean = preview.pages.firstOrNull { it.id == selectedID }?.file != null,
+        val isShowingControls: Boolean = true,
         val isSaving: Boolean = false,
         val isDismissed: Boolean = false,
         /** Pages can be taken out (a composer's pending photos). */
@@ -686,35 +680,36 @@ fun FullscreenViewer(
                 }
                 else -> Unit
             }
-            AnimatedVisibility(visible, enter = enter, exit = exit, modifier = Modifier.align(Alignment.TopCenter)) {
-                OpenCodeTopBar(
-                    modifier = if (gallery) Modifier.padding(horizontal = 16.dp, vertical = 8.dp) else Modifier,
-                    containerColor = background, hairline = file != null && !file.reference.kind.isMedia, centerTitle = true,
-                    contentColor = if (gallery) Color.White else OpenCodeTheme.colors.text,
-                    title = { ViewerTitle(page, file) },
-                    navigation = {
-                        when {
-                            !root -> OpenCodeTopBarBackButton(onClick = { store.send(Action.BackTapped) })
-                            !gallery && file != null -> TextButton(onClick = { store.send(Action.CloseTapped) }, modifier = Modifier.testTag("agent-file-done")) { Text(stringResource(CoreR.string.common_done)) }
-                            else -> OpenCodeIconButton(SFSymbol.Xmark, stringResource(CoreR.string.common_close), { store.send(Action.CloseTapped) }, Modifier.testTag("image-gallery-close"))
-                        }
-                    },
-                    actions = { if (!gallery) actions() },
-                )
-            }
-            if (visible && movie != null) MovieTransport(movie,
-                Modifier.align(Alignment.BottomCenter).windowInsetsPadding(safe).padding(start = 16.dp, end = 16.dp, bottom = if (gallery) 72.dp else 16.dp))
-            if (gallery) Box(Modifier.fillMaxSize().windowInsetsPadding(safe).padding(16.dp)) {
-                AnimatedVisibility(visible && root && state.allowsRemove, enter = enter, exit = exit, modifier = Modifier.align(Alignment.BottomStart)) {
-                    OpenCodeIconButton(SFSymbol.Trash, stringResource(CoreR.string.common_remove), { store.send(Action.RemoveTapped) },
-                        Modifier.testTag("image-gallery-remove"), tint = MaterialTheme.colorScheme.error, enabled = !state.isDiscarded)
-                }
-                val hasActions = file == null || ready != null || file.shareProgress != null
-                AnimatedVisibility(visible && hasActions, enter = enter, exit = exit, modifier = Modifier.align(Alignment.BottomEnd)) {
-                    Surface(shape = OpenCodeShape.control, color = MaterialTheme.colorScheme.surfaceContainerHighest, contentColor = Color.White) {
-                        Row(Modifier.height(52.dp).padding(horizontal = 6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically) { actions() }
-                    }
+            if (gallery || movie != null) {
+                ViewerChrome(visible, viewer.chromeFadeSeconds.takeIf { viewer.chromeHidden }, ViewerChromeModel(
+                    title = page.displayTitle,
+                    detail = file?.locationLabel ?: page.detail,
+                    index = state.preview.pages.indexOfFirst { it.id == page.id }.coerceAtLeast(0),
+                    count = if (gallery) state.preview.pages.size else 1,
+                    movie = movie,
+                    showsActions = file == null || ready != null || file.shareProgress != null,
+                    removes = root && state.allowsRemove,
+                    removeEnabled = !state.isDiscarded,
+                    autoHides = !talkBack,
+                    onClose = { store.send(if (root) Action.CloseTapped else Action.BackTapped) },
+                    onRemove = { store.send(Action.RemoveTapped) },
+                    onToggle = { store.send(Action.ImageTapped) },
+                    actions = actions,
+                ))
+            } else {
+                AnimatedVisibility(visible, enter = enter, exit = exit, modifier = Modifier.align(Alignment.TopCenter)) {
+                    OpenCodeTopBar(
+                        containerColor = background, hairline = file != null && !file.reference.kind.isMedia, centerTitle = true,
+                        title = { ViewerTitle(page, file) },
+                        navigation = {
+                            when {
+                                !root -> OpenCodeTopBarBackButton(onClick = { store.send(Action.BackTapped) })
+                                file != null -> TextButton(onClick = { store.send(Action.CloseTapped) }, modifier = Modifier.testTag("agent-file-done")) { Text(stringResource(CoreR.string.common_done)) }
+                                else -> OpenCodeIconButton(SFSymbol.Xmark, stringResource(CoreR.string.common_close), { store.send(Action.CloseTapped) }, Modifier.testTag("image-gallery-close"))
+                            }
+                        },
+                        actions = { actions() },
+                    )
                 }
             }
         }
@@ -870,6 +865,7 @@ private fun VisualPager(state: FullscreenViewerFeature.State, viewer: MediaViewe
     HorizontalPager(
         state = pagerState,
         modifier = Modifier.fillMaxSize().testTag("image-gallery"),
+        pageSpacing = 16.dp,
         beyondViewportPageCount = 1,
         key = { pages[it].id },
     ) { index ->

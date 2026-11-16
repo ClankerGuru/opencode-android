@@ -74,7 +74,7 @@ class MediaDismissDragTests {
 
         val preview = TranscriptImagePreview(id = "img-1", image = stubBitmap(), label = "shot.png")
         val store = TestStore(FullscreenViewerFeature.State(preview), FullscreenViewerFeature(), this)
-        store.send(FullscreenViewerFeature.Action.ImageTapped) { it.copy(isShowingControls = true) }
+        store.send(FullscreenViewerFeature.Action.ImageTapped) { it.copy(isShowingControls = false) }
         store.send(FullscreenViewerFeature.Action.CloseTapped) { it.copy(isDismissed = true) }
         store.finish()
     }
