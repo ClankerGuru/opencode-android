@@ -7,6 +7,7 @@ import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionSpring
 import ai.opencode.core.motion.MotionTunables
+import ai.opencode.core.motion.motionPress
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeShape
@@ -20,6 +21,7 @@ import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.feature.composer.DictationLatency
 import ai.opencode.feature.composer.DictationLevels
 import ai.opencode.server.model.OpenCodeDelivery
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
@@ -422,6 +424,7 @@ private fun RoundBarButton(
     tappable: Boolean = true,
 ) {
     val interactions = remember { MutableInteractionSource() }
+    val reduceMotion = rememberReduceMotion()
     Box(
         modifier
             .then(
@@ -446,13 +449,20 @@ private fun RoundBarButton(
         contentAlignment = Alignment.Center,
     ) {
         Box(
-            Modifier.size(diameter.dp).clip(OpenCodeShape.circle).background(background).indication(interactions, ripple()),
+            Modifier.motionPress(interactions).size(diameter.dp).clip(OpenCodeShape.circle).background(background).indication(interactions, ripple()),
             contentAlignment = Alignment.Center,
         ) {
-            if (showsProgress) {
-                CircularProgressIndicator(Modifier.size(16.dp), color = foreground, strokeWidth = 2.dp)
-            } else {
-                OpenCodeIcon(symbol, contentDescription = null, size = glyph.dp, tint = foreground)
+            AnimatedContent(
+                targetState = ControlGlyph(if (showsProgress) null else symbol.sfName, glyph.dp, 0f),
+                transitionSpec = { controlGlyphSwap(reduceMotion) },
+                contentAlignment = Alignment.Center,
+                label = "barButtonGlyph",
+            ) { shown ->
+                if (shown.symbol == null) {
+                    CircularProgressIndicator(Modifier.size(16.dp), color = foreground, strokeWidth = 2.dp)
+                } else {
+                    OpenCodeIcon(shown.symbol, contentDescription = null, size = shown.size, tint = foreground)
+                }
             }
         }
     }
