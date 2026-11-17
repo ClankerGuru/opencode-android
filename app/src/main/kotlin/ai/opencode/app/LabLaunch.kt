@@ -3,10 +3,14 @@ package ai.opencode.app
 import ai.opencode.core.dependencies.PasteboardClient
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.log.AppLog
+import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.SharedKeys
+import ai.opencode.core.sharing.experimental
 import ai.opencode.core.sharing.shared
+import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.ServerSharedKeys
 import ai.opencode.server.model.ModelVisibility
+import ai.opencode.server.remember
 import android.content.Intent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,7 +28,9 @@ internal object LabLaunch {
             shared(ServerSharedKeys.savedServers).set(emptyList())
             AppLog.app.info { "lab fresh install: saved servers forgotten" }
         }
-        val isLab = intent.getStringExtra("lab-server-url") != null
+        val labServerURL = intent.getStringExtra("lab-server-url")
+        val isLab = labServerURL != null
+        if (labServerURL != null) OpenCodeServer(url = labServerURL, username = "opencode", password = "").remember()
         if (isLab && intent.getBooleanExtra("lab-reset-model-preferences", false)) {
             shared(SharedKeys.favoriteModelIDs).set(emptySet())
             shared(SharedKeys.recentModelIDs).set(emptyList())
@@ -35,6 +41,17 @@ internal object LabLaunch {
             CoroutineScope(Dispatchers.Main).launch { pasteboard.setString(text) }
         }
         seedVoiceKeys(intent)
+        setExperiments(intent.getStringExtra("lab-experiments-on"), true)
+        setExperiments(intent.getStringExtra("lab-experiments-off"), false)
+    }
+
+    private fun setExperiments(names: String?, on: Boolean) {
+        if (names == null) return
+        for (name in names.split(",")) {
+            val feature = ExperimentalFeature.fromRawValue(name) ?: continue
+            val stored = shared(experimental(feature))
+            if (stored.value != on) stored.set(on)
+        }
     }
 
     private fun seedVoiceKeys(intent: Intent) {
