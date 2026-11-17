@@ -18,7 +18,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|uiMode"
             android:launchMode="singleInstancePerTask"
             android:supportsPictureInPicture="true"
             android:theme="@style/Theme.OpenCode.Starting"
