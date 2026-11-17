@@ -2,6 +2,8 @@ package ai.opencode.feature.transcript.markdown.ui
 
 import ai.opencode.core.R as CoreR
 import ai.opencode.core.dependencies.dependency
+import ai.opencode.core.motion.MotionRole
+import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
@@ -24,6 +26,7 @@ import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.AgentFileReference
 import ai.opencode.server.model.FileReadTarget
 import android.graphics.BitmapFactory
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -54,6 +57,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -114,6 +118,11 @@ fun MarkdownImage(
     // thread.
     val cachedImage = remember(cacheKey) { decodedImages.image(cacheKey)?.asImageBitmap() }
     val shown = image ?: cachedImage
+    val reduceMotion = rememberReduceMotion()
+    val pixels = remember(cacheKey) { Animatable(if (shown != null) 1f else 0f) }
+    LaunchedEffect(shown != null) {
+        if (shown != null) pixels.animateTo(1f, MotionRole.Dim.animation(reduceMotion = reduceMotion))
+    }
     fun applyState(nextImage: ImageBitmap?, nextFailed: Boolean, hadImage: Boolean) {
         if (MarkdownImage.revisesRow(hadImage, failed, nextImage != null, nextFailed)) row.revised()
         image = nextImage
@@ -177,7 +186,7 @@ fun MarkdownImage(
                     .semantics { contentDescription = openDescription },
                 contentAlignment = Alignment.Center,
             ) {
-                MediaThumbnail(load.image.asAndroidBitmap(), listOf(cacheKey), Modifier.heightIn(max = 360.dp),
+                MediaThumbnail(load.image.asAndroidBitmap(), listOf(cacheKey), Modifier.heightIn(max = 360.dp).graphicsLayer { alpha = pixels.value },
                     fits = true, maxHeight = 360.dp, cornerRadius = TranscriptMetrics.cardCornerRadius)
             }
         }
