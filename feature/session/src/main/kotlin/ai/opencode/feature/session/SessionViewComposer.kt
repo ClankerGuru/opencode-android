@@ -1897,6 +1897,7 @@ private fun SessionComposerEnv.Composer() {
                         // Everything at the trailing edge travels as one group: Send/Stop rightmost, dictation to its left.
                         Box(
                             Modifier
+                                .onGloballyPositioned { sendReset.trailingBounds = it.boundsInRoot() }
                                 .alpha(rowAlpha)
                                 // The bar replaces these, the run's Stop included.
                                 .then(if (recording) Modifier.clearAndSetSemantics { } else Modifier),

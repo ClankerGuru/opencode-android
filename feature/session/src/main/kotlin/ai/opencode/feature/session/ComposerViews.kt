@@ -17,6 +17,14 @@ import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
 import ai.opencode.feature.composer.ComposerTextInputTunables
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Brush
@@ -157,8 +165,8 @@ object ComposerTunables {
     const val queuedGlyphDrop = 1f
     const val plusScale = 17f
     const val buttonDiameter = 34f
-    /** Send's visible face, bigger than the other trailing controls; its target stays 48. */
-    const val sendDiameter = 40f
+    /** A filled control's visible face (Send, Stop, Call); its target stays 48. */
+    const val faceDiameter = 40f
     const val trailingGap = 11f
     const val micScale = 17f
     const val trailingSpacing = 4f
@@ -604,30 +612,113 @@ fun ComposerControlLabel(
             .offset(x = visualOffsetX.dp)
             .size(diameter.dp)
             // The desktop's submit button: a rounded square, not a circle.
-            .background(background, RoundedCornerShape(8.dp)),
+            .clip(RoundedCornerShape(8.dp))
+            .background(background),
         contentAlignment = Alignment.Center,
     ) {
-        if (showsProgress) {
-            CircularProgressIndicator(Modifier.size(16.dp), color = foreground, strokeWidth = 2.dp)
-        } else {
-            AnimatedContent(
-                targetState = systemImage,
-                transitionSpec = {
-                    val spec = if (reduceMotion) tween<Float>(0) else Motion.easeOut<Float>(Motion.fadeFast)
-                    fadeIn(spec) togetherWith fadeOut(spec)
-                },
-                label = "composerControlGlyph",
-            ) { symbol ->
+        AnimatedContent(
+            targetState = ControlGlyph(if (showsProgress) null else systemImage, glyphSize, glyphRise),
+            transitionSpec = { controlGlyphSwap(reduceMotion) },
+            contentAlignment = Alignment.Center,
+            label = "composerControlGlyph",
+        ) { glyph ->
+            if (glyph.symbol == null) {
+                CircularProgressIndicator(Modifier.size(16.dp), color = foreground, strokeWidth = 2.dp)
+            } else {
                 OpenCodeIcon(
-                    symbol,
+                    glyph.symbol,
                     contentDescription = null,
-                    size = (glyphSize.value * textScale).dp,
+                    size = (glyph.size.value * textScale).dp,
                     tint = foreground,
-                    modifier = Modifier.offset(y = (-glyphRise * textScale).dp),
+                    modifier = Modifier.offset(y = (-glyph.rise * textScale).dp),
                 )
             }
         }
     }
+}
+
+/** What a control's face shows; a null [symbol] is the progress spinner. */
+private data class ControlGlyph(val symbol: String?, val size: Dp, val rise: Float)
+
+/**
+ * Send's arrow rises into the face and leaves upward as the message goes (down when the draft
+ * empties); every other glyph grows in and shrinks out.
+ */
+private fun AnimatedContentTransitionScope<ControlGlyph>.controlGlyphSwap(reduceMotion: Boolean): ContentTransform {
+    if (reduceMotion) return fadeIn(tween(0)) togetherWith fadeOut(tween(0))
+    val arrow = "arrow.up"
+    val fadeIn = fadeIn(Motion.easeOut(Motion.fadeFast, delaySeconds = 0.04))
+    val fadeOut = fadeOut(Motion.easeOut(Motion.fadeFast))
+    val enter = if (targetState.symbol == arrow) {
+        slideInVertically(Motion.microIn.animation(MotionPhase.Enter, false)) { it } + fadeIn
+    } else {
+        scaleIn(Motion.microIn.animation(MotionPhase.Enter, false), initialScale = 0.4f) + fadeIn
+    }
+    val exit = when {
+        initialState.symbol != arrow -> scaleOut(Motion.microOut.animation(MotionPhase.Exit, false), targetScale = 0.4f) + fadeOut
+        targetState.symbol == "stop.fill" || targetState.symbol == null ->
+            slideOutVertically(Motion.microOut.animation(MotionPhase.Exit, false)) { -it * 3 / 2 } + fadeOut
+        else -> slideOutVertically(Motion.microOut.animation(MotionPhase.Exit, false)) { it } + fadeOut
+    }
+    return (enter togetherWith exit).using(SizeTransform(clip = false))
+}
+
+/**
+ * The trailing slot's face. Send, Stop and Call share one size, and a change of control blends
+ * the colours, swaps the glyph and gives the face a small press, so the slot reads as one button.
+ */
+@Composable
+fun ComposerTrailingLabel(
+    control: ComposerTrailingControl,
+    showsProgress: Boolean,
+    visualOffsetX: Float,
+    modifier: Modifier = Modifier,
+) {
+    val reduceMotion = rememberReduceMotion()
+    val colors = OpenCodeTheme.colors
+    val isMic = control == ComposerTrailingControl.Mic
+    val dimmedSend = control == ComposerTrailingControl.Send(enabled = false)
+    val blend = Motion.swap.animation<Color>(MotionPhase.Enter, reduceMotion)
+    val foreground by animateColorAsState(control.foreground(), blend, label = "trailingForeground")
+    val background by animateColorAsState(
+        if (dimmedSend) OpenCodeSurfaces.neutralFill else control.background(),
+        blend,
+        label = "trailingBackground",
+    )
+    val diameter by animateFloatAsState(
+        if (isMic) ComposerTunables.buttonDiameter else ComposerTunables.faceDiameter,
+        Motion.layout.animation(MotionPhase.Enter, reduceMotion),
+        label = "trailingDiameter",
+    )
+    val press = remember { Animatable(1f) }
+    val symbol = control.symbolName
+    var shown by remember { mutableStateOf(symbol) }
+    LaunchedEffect(symbol, reduceMotion) {
+        if (shown == symbol) return@LaunchedEffect
+        shown = symbol
+        if (reduceMotion) return@LaunchedEffect
+        press.animateTo(0.9f, Motion.easeOut(0.08))
+        press.animateTo(1f, Motion.microIn.animation(MotionPhase.Enter, false))
+    }
+    ComposerControlLabel(
+        systemImage = symbol,
+        showsProgress = showsProgress,
+        foreground = foreground,
+        background = background,
+        modifier = modifier.graphicsLayer {
+            scaleX = press.value
+            scaleY = press.value
+        },
+        glyphSize = when (control) {
+            ComposerTrailingControl.Stop -> 24.dp
+            ComposerTrailingControl.Mic -> 22.dp
+            else -> 20.dp
+        },
+        visualOffsetX = visualOffsetX,
+        // The mic's stand and base weigh its mass low: lifted, its optical centre sits on the end-cap's centre.
+        glyphRise = if (isMic) ComposerTunables.micInkRise else 0f,
+        faceDiameter = diameter,
+    )
 }
 
 // endregion
@@ -864,28 +955,3 @@ fun Modifier.horizontalScrollEdgeFade(state: LazyListState, width: Dp = 20.dp, i
         }
 }
 
-/**
- * New Plus Menu's one fixed Send. Empty, it's a neutral face ([OpenCodeSurfaces.neutralFill]) with
- * a secondary arrow, so it stays legible on the white composer, and fades to the send colours as
- * text arrives.
- */
-@Composable
-fun ComposerSendLabel(enabled: Boolean, showsProgress: Boolean, visualOffsetX: Float, modifier: Modifier = Modifier) {
-    val reduceMotion = rememberReduceMotion()
-    val progress by animateFloatAsState(
-        if (enabled) 1f else 0f,
-        Motion.swap.animation(if (enabled) MotionPhase.Enter else MotionPhase.Exit, reduceMotion),
-        label = "sendLabelProgress",
-    )
-    val colors = OpenCodeTheme.colors
-    ComposerControlLabel(
-        systemImage = "arrow.up",
-        showsProgress = showsProgress,
-        foreground = lerp(colors.secondaryText, colors.sendButtonForeground, progress),
-        background = lerp(OpenCodeSurfaces.neutralFill, colors.sendButtonBackground, progress),
-        visualOffsetX = visualOffsetX,
-        faceDiameter = ComposerTunables.sendDiameter,
-        glyphSize = 20.dp,
-        modifier = modifier,
-    )
-}
