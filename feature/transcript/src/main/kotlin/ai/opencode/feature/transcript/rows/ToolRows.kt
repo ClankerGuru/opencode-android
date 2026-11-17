@@ -1,5 +1,6 @@
 package ai.opencode.feature.transcript.rows
 
+import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconSize
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -28,6 +29,8 @@ import ai.opencode.server.model.OpenCodeTranscriptItem
 import ai.opencode.server.model.TranscriptNoticeKind
 import ai.opencode.server.model.nonEmpty
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -55,6 +58,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalDensity
@@ -182,10 +186,16 @@ private fun InlineToolGroupHeaderLabel(header: InlineToolGroupHeader, expanded: 
                 Text(" · $it", style = style, color = colors.secondaryText, maxLines = 1, softWrap = false)
             }
             // The desktop's disclosure chevron.
+            val reducedMotion = rememberReduceMotion()
+            val rotation by animateFloatAsState(
+                if (!reducedMotion && expanded) 90f else 0f,
+                if (reducedMotion) snap() else DisclosureMotion.animation(expanded),
+                label = "ToolGroupChevron",
+            )
             OpenCodeIcon(
-                if (expanded) "chevron.down" else "chevron.right",
+                if (reducedMotion && expanded) "chevron.down" else "chevron.right",
                 contentDescription = null,
-                modifier = Modifier.align(Alignment.CenterVertically).padding(start = 4.dp),
+                modifier = Modifier.align(Alignment.CenterVertically).padding(start = 4.dp).graphicsLayer { rotationZ = rotation },
                 size = 16.dp,
                 tint = colors.tertiaryText,
             )
