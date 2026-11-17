@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings
 
+import ai.opencode.core.motion.MotionPresence
 import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.ui.OpenCodeTopBar
 import ai.opencode.core.ui.OpenCodeTopBarBackButton
@@ -308,14 +309,17 @@ private fun ThemeOptionRow(
             maxLines = if (isAccessibilitySize()) Int.MAX_VALUE else 1,
             modifier = Modifier.weight(1f),
         )
-        if (isSelected) {
-            OpenCodeIcon(SFSymbol.CheckmarkCircleFill, contentDescription = null, size = 22.dp, tint = OpenCodeTheme.colors.selection)
-        } else {
-            Box(
-                Modifier
-                    .size(20.dp)
-                    .border(1.5.dp, OpenCodeTheme.colors.tertiaryText.copy(alpha = 0.65f), CircleShape),
-            )
+        Box(contentAlignment = Alignment.Center) {
+            MotionPresence(isOpen = !isSelected) {
+                Box(
+                    Modifier
+                        .size(20.dp)
+                        .border(1.5.dp, OpenCodeTheme.colors.tertiaryText.copy(alpha = 0.65f), CircleShape),
+                )
+            }
+            MotionPresence(isOpen = isSelected) {
+                OpenCodeIcon(SFSymbol.CheckmarkCircleFill, contentDescription = null, size = 22.dp, tint = OpenCodeTheme.colors.selection)
+            }
         }
     }
 }
