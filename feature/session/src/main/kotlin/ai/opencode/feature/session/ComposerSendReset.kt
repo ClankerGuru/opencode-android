@@ -17,7 +17,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalView
@@ -33,6 +35,8 @@ import kotlinx.coroutines.launch
 internal class ComposerSendReset {
     private var view: View? = null
     internal var cardBounds = Rect.Zero
+    /** The trailing controls, in root space: they stay live through the fade, so their own motion shows. */
+    internal var trailingBounds = Rect.Zero
     internal var outgoing: Bitmap? = null
         private set
     internal val outgoingAlpha = Animatable(1f)
@@ -82,11 +86,14 @@ internal fun Modifier.composerSendReset(reset: ComposerSendReset): Modifier = th
         drawContent()
         val bitmap = reset.outgoing
         if (!reset.isResetting || bitmap == null || reset.outgoingAlpha.value <= 0f) return@drawWithContent
-        drawImage(
-            image = bitmap.asImageBitmap(),
-            topLeft = Offset(0f, size.height - bitmap.height),
-            alpha = reset.outgoingAlpha.value,
-        )
+        val trailing = reset.trailingBounds.translate(-reset.cardBounds.topLeft)
+        clipRect(trailing.left, trailing.top, trailing.right, trailing.bottom, ClipOp.Difference) {
+            drawImage(
+                image = bitmap.asImageBitmap(),
+                topLeft = Offset(0f, size.height - bitmap.height),
+                alpha = reset.outgoingAlpha.value,
+            )
+        }
     }
 
 /** Material 3's fast spatial spring. */

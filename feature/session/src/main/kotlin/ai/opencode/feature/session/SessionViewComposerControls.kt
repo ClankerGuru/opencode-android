@@ -54,6 +54,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -366,6 +367,8 @@ internal fun SessionComposerEnv.AnswerTrailingControls(bar: RequestBar) {
                             showsProgress = responding,
                             foreground = control.foreground(),
                             background = if (ready) control.background() else OpenCodeTheme.colors.variant.surfaceStrong.color,
+                            faceDiameter = ComposerTunables.faceDiameter,
+                            glyphSize = 20.dp,
                         )
                     }
                 }
@@ -450,8 +453,6 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
         steers -> stringResource(R.string.session_steer_message_description)
         else -> control.accessibilityLabel
     }
-    // iOS `persistentSend`: New Plus Menu's Send stays put, dimmed while there's nothing to send.
-    val persistentSend = control is ComposerTrailingControl.Send
     // VoiceOver stays in the trailing slot when the Send just pressed turns into Stop, or
     // the Stop into Send: iOS swaps the control inside one slot whose accessibility element keeps
     // its frame (SessionView+ComposerControls.swift:400-447). Here each control is its own node,
@@ -477,30 +478,14 @@ internal fun SessionComposerEnv.TrailingButton(control: ComposerTrailingControl)
     val followFocus = rememberAccessibilityFocusRequest(follows.takeIf { following })
     val stoppingState = stringResource(R.string.session_stopping_description)
     val startVoiceCallLabel = stringResource(R.string.session_start_voice_call)
-    val label: @Composable () -> Unit = {
-        if (persistentSend) {
-            ComposerSendLabel(
-                enabled = control == ComposerTrailingControl.Send(enabled = true),
-                showsProgress = s.isWaitingForUploads,
-                visualOffsetX = visualOffset,
-            )
-        } else {
-        ComposerControlLabel(
-            systemImage = control.symbolName,
-            showsProgress = s.isWaitingForUploads || (control == ComposerTrailingControl.Stop && s.isInterrupting),
-            foreground = control.foreground(),
-            background = control.background(),
-            glyphSize = when (control) {
-                ComposerTrailingControl.Stop -> 12.dp
-                ComposerTrailingControl.Mic -> 22.dp
-                else -> 18.dp
-            },
-            visualOffsetX = visualOffset,
-            // The mic's stand and base weigh its mass low: lifted, its optical centre sits on the end-cap's centre.
-            glyphRise = if (control == ComposerTrailingControl.Mic) ComposerTunables.micInkRise else 0f,
-        )
+    val showsProgress = s.isWaitingForUploads || (control == ComposerTrailingControl.Stop && s.isInterrupting)
+    // One face for the slot: it moves with whichever control owns the touch, so its motion carries across.
+    val face = remember {
+        movableContentOf<ComposerTrailingControl, Boolean, Float> { shown, progress, offset ->
+            ComposerTrailingLabel(control = shown, showsProgress = progress, visualOffsetX = offset)
         }
     }
+    val label: @Composable () -> Unit = { face(control, showsProgress, visualOffset) }
     val semantics = Modifier.accessibilityFocusRequest(followFocus).semantics(mergeDescendants = true) {
         contentDescription = accessibilityLabel
         testTag = control.accessibilityLabel
@@ -585,7 +570,8 @@ internal fun SessionComposerEnv.DictationTrailingControls(controls: ComposerCont
                 showsProgress = controls.isFinishing,
                 foreground = OpenCodeTheme.colors.text,
                 background = OpenCodeTheme.colors.variant.surfaceStrong.color,
-                glyphSize = 12.dp,
+                faceDiameter = ComposerTunables.faceDiameter,
+                glyphSize = 16.dp,
             )
         }
         val sendEnabled = !controls.isFinishing && canSend && !host.isImportingImages
@@ -604,7 +590,7 @@ internal fun SessionComposerEnv.DictationTrailingControls(controls: ComposerCont
                 showsProgress = false,
                 foreground = OpenCodeTheme.colors.sendButtonForeground,
                 background = OpenCodeTheme.colors.sendButtonBackground,
-                faceDiameter = ComposerTunables.sendDiameter,
+                faceDiameter = ComposerTunables.faceDiameter,
                 glyphSize = 20.dp,
             )
         }
