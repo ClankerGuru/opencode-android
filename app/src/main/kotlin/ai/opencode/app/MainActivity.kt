@@ -9,12 +9,15 @@ import ai.opencode.server.OpenCodePairingLink
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.diagnostics.PerfFrameSampler
 import ai.opencode.core.diagnostics.PerfTimeline
+import ai.opencode.core.sharing.shared
 import ai.opencode.core.touch.TouchRecoveryClient
+import ai.opencode.core.ui.ThemeSharedKeys
 import ai.opencode.feature.composer.DictationPermissionClient
 import ai.opencode.feature.system.notifications.NotificationPermission
 import ai.opencode.feature.system.notifications.NotificationPermissionClient
 import ai.opencode.feature.voice.VoiceMicrophonePermission
 import android.Manifest
+import android.app.UiModeManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -138,6 +141,7 @@ class MainActivity : ComponentActivity() {
             override fun dispatchKeyEvent(event: KeyEvent): Boolean = dropsTypedFocus(event) || callback.dispatchKeyEvent(event)
         }
         if (root.follows) followShownSession()
+        followAppearanceNightMode()
         // A recreated activity already handled its launch intent.
         if (savedInstanceState == null) handle(intent)
     }
@@ -191,6 +195,21 @@ class MainActivity : ComponentActivity() {
             microphoneLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
         return pending.await()
+    }
+
+    /** The splash's day/night colour follows the app's night mode, so that mirrors Appearance. */
+    private fun followAppearanceNightMode() {
+        val uiModeManager = getSystemService(UiModeManager::class.java)
+        lifecycleScope.launch {
+            shared(ThemeSharedKeys.appearanceColorScheme).flow.collect { scheme ->
+                val mode = when (scheme.isDark) {
+                    true -> UiModeManager.MODE_NIGHT_YES
+                    false -> UiModeManager.MODE_NIGHT_NO
+                    null -> UiModeManager.MODE_NIGHT_AUTO
+                }
+                uiModeManager.setApplicationNightMode(mode)
+            }
+        }
     }
 
     /** On a tablet the window's restorable value follows the session it shows. */
