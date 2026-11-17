@@ -1275,7 +1275,7 @@ private fun SessionComposerEnv.QueuedActivity(hasQueued: Boolean) {
 /**
  * iOS `composerCapsule`: the composer's surface ([ComposerSurface]). A pending request's panel grows up out of it,
  * drawn above the bar in the room the capsule makes for it (layout-phase top padding),
- * which stays until the surface has folded, so nothing under the panel moves while it shows.
+ * which shrinks with the surface as it folds.
  */
 @Composable
 private fun SessionComposerEnv.ComposerCapsule() {
@@ -1289,7 +1289,7 @@ private fun SessionComposerEnv.ComposerCapsule() {
     // header changes on every frame of the keyboard's animation.
     val cap = { requestPanelCap() }
     val activeHeight = { activeRequestPanelHeight(cap()) }
-    val room = { if (showsRequestPanel) activeHeight() else 0f }
+    val room = { if (showsRequestPanel) activeHeight() * view.requestPanelReveal.value else 0f }
     DisposableEffect(Unit) {
         onDispose {
             host.surfaceTopInWindow = Float.NaN
@@ -1443,9 +1443,8 @@ private fun SessionComposerEnv.requestPanelLeft() {
 
 /**
  * iOS `requestPanelFolded(fold:)`: the leaving request's fold has landed. Unless another request
- * docked (iOS `!docksRequest`, read now) or the screen changed meanwhile, its room goes in one
- * step, so the surface and its frame never part mid-animation, and its height is forgotten, so
- * the next request grows from nothing.
+ * docked (iOS `!docksRequest`, read now) or the screen changed meanwhile, its height is
+ * forgotten, so the next request grows from nothing.
  */
 private suspend fun SessionComposerEnv.requestPanelFolded(leaving: SessionFeature.State.TaskIdentity?) {
     if (store.state.isAnsweringRequest || view.requestPanelIdentity != leaving) return
