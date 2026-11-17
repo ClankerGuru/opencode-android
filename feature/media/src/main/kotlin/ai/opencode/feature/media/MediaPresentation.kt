@@ -1047,7 +1047,7 @@ internal class MediaViewerController(
         if (!lands) MediaZoomSources.shared.hide(null)
         val role = if (!isMedia) MediaMotion.open else if (lands) MediaMotion.home else MediaMotion.away
         val phase = if (isMedia && !lands) MotionPhase.Exit else MotionPhase.Enter
-        setChromeHidden(true, flightDuration = role.curve(phase).duration)
+        setChromeHidden(true)
         updateStatusBarLight(false)
         val speed = if (lands) springVelocity(velocity, from, homeFrame(target)) else 0f
         val backdrop = backdropAlpha
