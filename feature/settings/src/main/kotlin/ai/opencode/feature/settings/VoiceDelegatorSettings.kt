@@ -2,6 +2,7 @@ package ai.opencode.feature.settings
 
 import ai.opencode.core.ui.OpenCodeSearchField
 import ai.opencode.core.experiments.ExperimentalFeature
+import ai.opencode.core.motion.MotionPresence
 import ai.opencode.core.strings.localized
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -14,11 +15,13 @@ import ai.opencode.feature.voice.VoiceDelegatorWorkspace
 import ai.opencode.feature.voice.VoiceFeature
 import ai.opencode.server.model.OpenCodeSession
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,7 +32,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
@@ -259,13 +261,11 @@ private fun ModeRow(
             }
         }
         Spacer(Modifier.width(4.dp))
-        OpenCodeIcon(
-            SFSymbol.Checkmark,
-            contentDescription = null,
-            modifier = Modifier.alpha(if (isSelected) 1f else 0f),
-            size = 18.dp,
-            tint = OpenCodeTheme.colors.selection,
-        )
+        Box(Modifier.size(18.dp)) {
+            MotionPresence(isOpen = isSelected) {
+                OpenCodeIcon(SFSymbol.Checkmark, contentDescription = null, size = 18.dp, tint = OpenCodeTheme.colors.selection)
+            }
+        }
     }
 }
 

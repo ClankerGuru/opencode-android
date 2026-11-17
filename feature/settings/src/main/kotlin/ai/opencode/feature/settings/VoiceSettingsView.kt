@@ -27,6 +27,7 @@ import ai.opencode.feature.voice.VoiceServerChoice
 import ai.opencode.feature.voice.VoiceCallSoundPack
 import ai.opencode.feature.voice.VoiceSharedKeys
 import ai.opencode.server.ServerSharedKeys
+import ai.opencode.core.motion.MotionPresence
 import ai.opencode.core.motion.MotionRole
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
@@ -415,12 +416,11 @@ private fun VoiceRow(
                 Text(voice.title, style = SettingsText.title, color = OpenCodeTheme.colors.text)
                 voice.accent?.let { Text(it, style = SettingsText.summary, color = OpenCodeTheme.colors.secondaryText) }
             }
-            OpenCodeIcon(
-                SFSymbol.Checkmark,
-                contentDescription = null,
-                size = 20.dp,
-                tint = if (isSelected) OpenCodeTheme.colors.selection else androidx.compose.ui.graphics.Color.Transparent,
-            )
+            Box(Modifier.size(20.dp)) {
+                MotionPresence(isOpen = isSelected) {
+                    OpenCodeIcon(SFSymbol.Checkmark, contentDescription = null, size = 20.dp, tint = OpenCodeTheme.colors.selection)
+                }
+            }
         }
         val accent = MaterialTheme.colorScheme.primary
         val previewDescription = if (isPlaying) stringResource(R.string.settings_voice_stop_preview_description, voice.title) else stringResource(R.string.settings_voice_preview_description, voice.title)
