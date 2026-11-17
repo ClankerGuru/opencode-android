@@ -1,5 +1,8 @@
 package ai.opencode.feature.settings
 
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionRole
+import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeSwitch
 import ai.opencode.core.ui.OpenCodeTextStyles
 import androidx.compose.ui.text.font.FontWeight
@@ -11,6 +14,8 @@ import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import androidx.compose.foundation.clickable
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -62,6 +67,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 
@@ -156,7 +162,19 @@ fun LazyListScope.settingsSection(
     rows: @Composable ColumnScope.() -> Unit,
 ) {
     item(key = key, contentType = "settings-section") {
-        SettingsSection(header = header, description = description, footer = footer, rows = rows)
+        val reduceMotion = rememberReduceMotion()
+        SettingsSection(
+            modifier = Modifier.animateItem(
+                // Waits until the sections below have mostly made room, so they don't slide over it.
+                fadeInSpec = MotionRole.MicroIn.animation(reduceMotion = reduceMotion, delaySeconds = MotionRole.Layout.curve().duration / 2),
+                placementSpec = MotionRole.Layout.animation(reduceMotion = reduceMotion, visibilityThreshold = IntOffset.VisibilityThreshold),
+                fadeOutSpec = MotionRole.MicroOut.animation(MotionPhase.Exit, reduceMotion),
+            ),
+            header = header,
+            description = description,
+            footer = footer,
+            rows = rows,
+        )
     }
 }
 
@@ -202,7 +220,7 @@ fun SettingsSection(
             border = BorderStroke(1.dp, OpenCodeTheme.colors.border),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Column(content = rows)
+            Column(Modifier.animateContentSize(MotionRole.Layout.animation(reduceMotion = rememberReduceMotion())), content = rows)
         }
         if (footer != null) {
             Column(
