@@ -200,7 +200,7 @@ private val ChipTextStyle: TextStyle get() = OpenCodeTextStyles.subheadline.copy
  * animated ([animates] false: the picker is open) the value is swapped at once.
  */
 @Composable
-private fun <T> OnePickerChipRoll(
+internal fun <T> OnePickerChipRoll(
     target: T,
     animates: Boolean,
     reduceMotion: Boolean,
