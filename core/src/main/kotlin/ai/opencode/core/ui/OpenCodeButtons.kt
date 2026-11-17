@@ -1,5 +1,7 @@
 package ai.opencode.core.ui
 
+import ai.opencode.core.motion.motionPress
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.heightIn
@@ -9,6 +11,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
@@ -43,13 +46,15 @@ fun OpenCodePrimaryButton(
     } else {
         ButtonDefaults.buttonColors()
     }
+    val interactions = remember { MutableInteractionSource() }
     Button(
         onClick = onClick,
-        modifier = modifier.heightIn(min = OpenCodeButtonDefaults.height),
+        modifier = modifier.heightIn(min = OpenCodeButtonDefaults.height).motionPress(interactions),
         enabled = enabled,
         shape = OpenCodeShape.control,
         colors = colors,
         contentPadding = OpenCodeButtonDefaults.contentPadding,
+        interactionSource = interactions,
         content = content,
     )
 }
@@ -83,14 +88,16 @@ fun OpenCodeSecondaryButton(
     } else {
         ButtonDefaults.filledTonalButtonColors(containerColor = container, contentColor = OpenCodeTheme.colors.text)
     }
+    val interactions = remember { MutableInteractionSource() }
     FilledTonalButton(
         onClick = onClick,
-        modifier = modifier.heightIn(min = OpenCodeButtonDefaults.height),
+        modifier = modifier.heightIn(min = OpenCodeButtonDefaults.height).motionPress(interactions),
         enabled = enabled,
         shape = OpenCodeShape.control,
         border = OpenCodeSurfaces.border,
         colors = colors,
         contentPadding = OpenCodeButtonDefaults.contentPadding,
+        interactionSource = interactions,
         content = content,
     )
 }
