@@ -571,7 +571,7 @@ internal fun SessionComposerEnv.DictationTrailingControls(controls: ComposerCont
                 foreground = OpenCodeTheme.colors.text,
                 background = OpenCodeTheme.colors.variant.surfaceStrong.color,
                 faceDiameter = ComposerTunables.faceDiameter,
-                glyphSize = 16.dp,
+                glyphSize = 24.dp,
             )
         }
         val sendEnabled = !controls.isFinishing && canSend && !host.isImportingImages

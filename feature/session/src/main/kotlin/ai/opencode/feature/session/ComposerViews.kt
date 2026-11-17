@@ -710,7 +710,7 @@ fun ComposerTrailingLabel(
             scaleY = press.value
         },
         glyphSize = when (control) {
-            ComposerTrailingControl.Stop -> 16.dp
+            ComposerTrailingControl.Stop -> 24.dp
             ComposerTrailingControl.Mic -> 22.dp
             else -> 20.dp
         },
