@@ -16,6 +16,7 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
+import ai.opencode.feature.composer.modelpicker.OnePickerChipRoll
 import ai.opencode.feature.composer.plusmenu.findActivity
 import ai.opencode.server.model.AgentDisplayName
 import ai.opencode.server.model.OpenCodeAutocompleteAgent
@@ -165,6 +166,7 @@ fun AgentChip(
     LaunchedEffect(Unit) { onOpen() }
     val chooseAgentDescription = stringResource(R.string.composer_agent_choose_description)
     val secondary = OpenCodeTheme.colors.secondaryText
+    val reduceMotion = rememberReduceMotion()
     AgentMenuBackHandler(enabled = open) { open = false }
     // The whole menu moves its target down and its ink back up, so the menu drops from the lowered
     // target too.
@@ -187,7 +189,9 @@ fun AgentChip(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium)
-            Text(name, style = style, color = OpenCodeTheme.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 96.dp))
+            OnePickerChipRoll(name, animates = true, reduceMotion, label = "agentName") { rolled ->
+                Text(rolled, style = style, color = OpenCodeTheme.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 96.dp))
+            }
             OpenCodeIcon(SFSymbol.ChevronDown, null, size = 11.dp, tint = secondary)
         }
         AgentMenu(
