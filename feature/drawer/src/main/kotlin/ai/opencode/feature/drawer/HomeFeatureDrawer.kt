@@ -15,6 +15,9 @@ import ai.opencode.core.store.Effect
 import ai.opencode.core.store.Reduced
 import ai.opencode.core.store.cancellable
 import ai.opencode.feature.composer.ComposerPersistence
+import ai.opencode.feature.composer.PromptOutbox
+import ai.opencode.feature.composer.UndeliveredPrompts
+import ai.opencode.feature.composer.unsentDrafts
 import ai.opencode.feature.composer.DraftState
 import ai.opencode.feature.composer.SharedComposerDraft
 import ai.opencode.feature.composer.SharedDraftTarget
@@ -166,7 +169,15 @@ internal fun HomeFeature.reduceDrawer(state: State, action: Action): HomeReduced
 
         Action.DrawerOpenRequestHandled -> return Reduced(state.copy(drawerOpenRequest = null))
 
-        is Action.SessionTapped -> return sessionTapped(state, action.sessionID)
+        is Action.SessionTapped -> {
+            val unsent = state.unsentDraft(action.sessionID) ?: return sessionTapped(state, action.sessionID)
+            return Reduced(state.leavingCatchUp().openingUnsentDraft(unsent))
+        }
+
+        Action.UnsentDraftsChanged -> {
+            val drafts = dependency(ComposerPersistence).unsentDrafts(state.server.persistenceID)
+            return Reduced(if (drafts == state.unsentDrafts) state else state.copy(unsentDrafts = drafts))
+        }
 
         is Action.TogglePin -> {
             if (state.sessions.none { it.id == action.sessionID }) return Reduced(state)
@@ -219,14 +230,29 @@ internal fun HomeFeature.reduceDrawer(state: State, action: Action): HomeReduced
 
         is Action.DrawerRowDropped -> return Reduced(dropPin(state, action.sessionID, action.pinnedIndex))
 
-        is Action.DeleteSessionTapped -> return Reduced(
-            state.copy(pendingDeletion = state.sessions.firstOrNull { it.id == action.sessionID }, deletionError = null),
-        )
+        is Action.DeleteSessionTapped -> {
+            val session = state.unsentDraft(action.sessionID)?.placeholderSession ?: state.sessions.firstOrNull { it.id == action.sessionID }
+            return Reduced(state.copy(pendingDeletion = session, deletionError = null))
+        }
 
         Action.DeleteSessionCancelled -> return Reduced(state.copy(pendingDeletion = null))
 
         Action.DeleteSessionConfirmed -> {
             val session = state.pendingDeletion ?: return Reduced(state)
+            val unsent = state.unsentDraft(session.id)
+            if (unsent != null) {
+                // Only this phone has it: its messages leave the outbox and the list.
+                haptics.play(Haptic.confirm)
+                dependency(UndeliveredPrompts).resolve(unsent.messageIDs)
+                val outbox = dependency(PromptOutbox)
+                for (id in unsent.messageIDs) outbox.withdraw(id)
+                val persistence = dependency(ComposerPersistence)
+                persistence.settlePrompts(unsent.messageIDs)
+                var s = state.copy(pendingDeletion = null, unsentDrafts = persistence.unsentDrafts(state.server.persistenceID))
+                val open = s.sessionDetail
+                if (open != null && open.session == null && open.outboxDraftID == unsent.draftID) s = s.openingDraft(reason = "you deleted it")
+                return Reduced(s)
+            }
             val hidden = hideSession(state, session) ?: return Reduced(state.copy(pendingDeletion = null))
             var (s, backup) = hidden
             s = s.copy(pendingDeletion = null, deletionError = null)

@@ -124,6 +124,8 @@
     <string name="drawer_row_needs_input_state">Müdaxiləniz lazımdır</string>
     <string name="drawer_row_working_state">İşləyir</string>
     <string name="drawer_row_unread_state">Oxunmamış</string>
+    <string name="drawer_row_unsent_failed_state">Göndərmək mümkün olmadı</string>
+    <string name="drawer_row_unsent_sending_state">Göndərilir</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">İcazə istənilə bilmədi. Yenidən cəhd edin.</string>

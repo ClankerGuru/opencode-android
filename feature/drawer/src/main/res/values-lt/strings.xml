@@ -132,6 +132,8 @@
     <string name="drawer_row_needs_input_state">Reikia jūsų atsakymo</string>
     <string name="drawer_row_working_state">Darbas</string>
     <string name="drawer_row_unread_state">Neperskaitytas</string>
+    <string name="drawer_row_unsent_failed_state">Nepavyko išsiųsti</string>
+    <string name="drawer_row_unsent_sending_state">Siunčiama</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Nepavyko paprašyti leidimo. Bandykite dar kartą.</string>

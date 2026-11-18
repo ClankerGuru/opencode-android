@@ -1,6 +1,7 @@
 package ai.opencode.feature.session
 
 import ai.opencode.feature.composer.PromptOutbox
+import ai.opencode.feature.composer.unsentDrafts
 import ai.opencode.feature.composer.PendingPrompt
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.store.Effect
@@ -326,8 +327,15 @@ internal fun SessionFeature.removeFailedSend(id: String, state: State, leavesOut
  */
 internal fun SessionFeature.restoreFailedSends(state: State): State {
     var next = state
+    // Every failed create is kept under the server: a draft shows only its own lane's.
+    val ownIDs = if (next.session == null) {
+        composerPersistence.unsentDrafts(next.server.persistenceID).firstOrNull { it.draftID == next.outboxDraftID }?.messageIDs ?: emptySet()
+    } else {
+        null
+    }
     for (entry in undeliveredPrompts.entries(next.server.persistenceID, next.session?.id)) {
         val id = entry.pending.messageID
+        if (ownIDs != null && id !in ownIDs) continue
         if (next.failedSends.withID(id) != null) continue
         if (SessionFeature.containsMessage(id, next.items) && id !in next.optimisticPromptIDs) {
             undeliveredPrompts.resolve(setOf(id))

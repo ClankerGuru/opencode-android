@@ -215,8 +215,8 @@ internal fun TranscriptPendingLabel(delivery: OpenCodeDelivery, modifier: Modifi
 }
 
 /**
- * “! Couldn’t send · Retry” under a failed message. The status opens the same menu as the
- * bubble, so a message of only images or files has it too (iOS `TranscriptFailedSendLine`).
+ * “! Couldn’t send · Retry · Edit · Delete” under a failed message. The status opens the same
+ * menu as the bubble.
  */
 @Composable
 internal fun TranscriptFailedSendLine(failedSend: TranscriptFailedSend, modifier: Modifier = Modifier) {
@@ -252,20 +252,30 @@ internal fun TranscriptFailedSendLine(failedSend: TranscriptFailedSend, modifier
             )
         } else {
             val moveTitle = failedSend.moveTitle
-            Text(
+            FailedSendAction(
                 moveTitle ?: stringResource(CoreR.string.common_retry),
-                style = style.copy(fontWeight = FontWeight.SemiBold),
-                color = OpenCodeTheme.colors.accent,
-                maxLines = 1,
-                modifier = Modifier
-                    .rowHitTarget(
-                        top = 12.dp,
-                        bottom = 12.dp,
-                        target = Modifier.rowClickable(role = null, onClick = if (moveTitle == null) failedSend.retry else failedSend.move),
-                    )
-                    .semantics { }
-                    .testTag(if (moveTitle == null) "failed-send-retry" else "failed-send-move"),
+                OpenCodeTheme.colors.accent,
+                if (moveTitle == null) "failed-send-retry" else "failed-send-move",
+                if (moveTitle == null) failedSend.retry else failedSend.move,
             )
+            Text("·", style = style, color = OpenCodeTheme.colors.tertiaryText, modifier = Modifier.clearAndSetSemantics { })
+            FailedSendAction(stringResource(CoreR.string.common_edit), OpenCodeTheme.colors.accent, "failed-send-edit", failedSend.edit)
+            Text("·", style = style, color = OpenCodeTheme.colors.tertiaryText, modifier = Modifier.clearAndSetSemantics { })
+            FailedSendAction(stringResource(CoreR.string.common_delete), OpenCodeTheme.colors.destructive, "failed-send-delete", failedSend.delete)
         }
     }
+}
+
+@Composable
+private fun FailedSendAction(title: String, color: Color, tag: String, action: () -> Unit) {
+    Text(
+        title,
+        style = OpenCodeTextStyles.footnote.copy(fontWeight = FontWeight.SemiBold),
+        color = color,
+        maxLines = 1,
+        modifier = Modifier
+            .rowHitTarget(top = 12.dp, bottom = 12.dp, target = Modifier.rowClickable(role = null, onClick = action))
+            .semantics { }
+            .testTag(tag),
+    )
 }

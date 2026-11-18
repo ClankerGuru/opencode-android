@@ -632,13 +632,13 @@ fun ComposerControlLabel(
 }
 
 /** What a control's face shows; a null [symbol] is the progress spinner. */
-private data class ControlGlyph(val symbol: String?, val size: Dp, val rise: Float)
+internal data class ControlGlyph(val symbol: String?, val size: Dp, val rise: Float)
 
 /**
  * Send's arrow rises into the face and leaves upward as the message goes (down when the draft
  * empties); every other glyph grows in and shrinks out.
  */
-private fun AnimatedContentTransitionScope<ControlGlyph>.controlGlyphSwap(reduceMotion: Boolean): ContentTransform {
+internal fun AnimatedContentTransitionScope<ControlGlyph>.controlGlyphSwap(reduceMotion: Boolean): ContentTransform {
     if (reduceMotion) return fadeIn(tween(0)) togetherWith fadeOut(tween(0))
     val arrow = "arrow.up"
     val fadeIn = fadeIn(Motion.easeOut(Motion.fadeFast, delaySeconds = 0.04))

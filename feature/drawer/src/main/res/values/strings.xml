@@ -124,6 +124,8 @@
     <string name="drawer_row_needs_input_state">Needs your input</string>
     <string name="drawer_row_working_state">Working</string>
     <string name="drawer_row_unread_state">Unread</string>
+    <string name="drawer_row_unsent_failed_state">Couldn’t send</string>
+    <string name="drawer_row_unsent_sending_state">Sending</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Couldn’t request permission. Try again.</string>

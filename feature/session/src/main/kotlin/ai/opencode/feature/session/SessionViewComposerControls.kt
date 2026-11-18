@@ -9,7 +9,11 @@ import ai.opencode.feature.composer.LocalComposerKeyboardMorph
 import ai.opencode.feature.composer.MicPressCallbacks
 import ai.opencode.feature.composer.RequestBar
 import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionSpring
+import ai.opencode.core.motion.MotionSwap
+import ai.opencode.core.motion.motionPress
+import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -30,7 +34,9 @@ import ai.opencode.feature.composer.SelectionMarkWidth
 import ai.opencode.feature.composer.micPressGesture
 import ai.opencode.feature.composer.modelpicker.OnePickerChip
 import ai.opencode.feature.composer.modelpicker.OnePickerController
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -302,11 +308,17 @@ internal fun SessionComposerEnv.AnswerTrailingControls(bar: RequestBar) {
         SecondaryMicButton()
         when (bar) {
             is RequestBar.Decline -> ComposerHidden(foldsComposerControls) {
+                val interactions = remember { MutableInteractionSource() }
                 Box(
                     Modifier
                         .padding(end = 5.dp)
                         .heightIn(min = 48.dp)
-                        .clickable(role = Role.Button, onClickLabel = if (!s.draftShape.isEmpty) stringResource(R.string.session_answer_decline_with_words_label) else null) {
+                        .clickable(
+                            interactionSource = interactions,
+                            indication = LocalIndication.current,
+                            role = Role.Button,
+                            onClickLabel = if (!s.draftShape.isEmpty) stringResource(R.string.session_answer_decline_with_words_label) else null,
+                        ) {
                             dismissKeyboard()
                             store.send(Action.SendTapped)
                         }
@@ -318,16 +330,19 @@ internal fun SessionComposerEnv.AnswerTrailingControls(bar: RequestBar) {
                 ) {
                     Box(
                         Modifier
+                            .motionPress(interactions)
                             .widthIn(min = 64.dp)
                             .heightIn(min = 34.dp)
                             .background(OpenCodeTheme.colors.variant.surfaceStrong.color, OpenCodeShape.control)
                             .padding(horizontal = 14.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (responding) {
-                            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                        } else {
-                            Text(bar.verb.title, style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), color = OpenCodeTheme.colors.text)
+                        MotionSwap(responding) { shown ->
+                            if (shown) {
+                                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                            } else {
+                                Text(bar.verb.title, style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), color = OpenCodeTheme.colors.text)
+                            }
                         }
                     }
                 }
@@ -340,12 +355,20 @@ internal fun SessionComposerEnv.AnswerTrailingControls(bar: RequestBar) {
                 // Settled on the server already: nothing more can send (× clears it).
                 val settled = s.requestSettled
                 val enabled = ready && !responding && !settled
+                val blend = Motion.swap.animation<Color>(MotionPhase.Enter, rememberReduceMotion())
+                val foreground by animateColorAsState(control.foreground(), blend, label = "answerForeground")
+                val background by animateColorAsState(
+                    if (ready) control.background() else OpenCodeTheme.colors.variant.surfaceStrong.color,
+                    blend,
+                    label = "answerBackground",
+                )
+                val interactions = remember { MutableInteractionSource() }
                 ComposerHidden(foldsComposerControls) {
                     Box(
                         Modifier
                             .clickable(
                                 enabled = enabled,
-                                interactionSource = remember { MutableInteractionSource() },
+                                interactionSource = interactions,
                                 indication = ripple(bounded = false, radius = 22.dp),
                                 role = Role.Button,
                             ) {
@@ -365,10 +388,11 @@ internal fun SessionComposerEnv.AnswerTrailingControls(bar: RequestBar) {
                         ComposerControlLabel(
                             systemImage = if (retries) "arrow.clockwise" else if (bar.isLast) "arrow.up" else "chevron.right",
                             showsProgress = responding,
-                            foreground = control.foreground(),
-                            background = if (ready) control.background() else OpenCodeTheme.colors.variant.surfaceStrong.color,
+                            foreground = foreground,
+                            background = background,
                             faceDiameter = ComposerTunables.faceDiameter,
                             glyphSize = 20.dp,
+                            modifier = Modifier.motionPress(interactions),
                         )
                     }
                 }

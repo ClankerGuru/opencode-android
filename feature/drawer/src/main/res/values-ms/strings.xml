@@ -120,6 +120,8 @@
     <string name="drawer_row_needs_input_state">Memerlukan input anda</string>
     <string name="drawer_row_working_state">Sedang bekerja</string>
     <string name="drawer_row_unread_state">Belum dibaca</string>
+    <string name="drawer_row_unsent_failed_state">Tidak dapat menghantar</string>
+    <string name="drawer_row_unsent_sending_state">Menghantar</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Tidak dapat meminta kebenaran. Cuba lagi.</string>
