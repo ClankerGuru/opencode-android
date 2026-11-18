@@ -2,6 +2,7 @@ package ai.opencode.feature.system.share
 
 import ai.opencode.core.R as CoreR
 import ai.opencode.core.strings.localizedPlural
+import ai.opencode.core.ui.OpenCodeContentUnavailable
 import ai.opencode.core.ui.OpenCodeSearchField
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeRadius
@@ -51,7 +52,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -127,7 +127,6 @@ import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -327,22 +326,12 @@ private fun TopBar(state: ShareModel.State, actions: ShareActions) {
 
 @Composable
 private fun EmptyState(modifier: Modifier) {
-    Column(
-        modifier.fillMaxWidth().padding(horizontal = 32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        OpenCodeIcon(SFSymbol.Desktopcomputer, contentDescription = null, size = OpenCodeIconSize.hero, tint = OpenCodeTheme.colors.secondaryText)
-        Spacer(Modifier.height(16.dp))
-        Text(stringResource(R.string.system_share_no_server_title), style = OpenCodeTextStyles.title2.copy(fontWeight = FontWeight.Bold), textAlign = TextAlign.Center)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            stringResource(R.string.system_share_no_server_message),
-            style = OpenCodeTextStyles.subheadline,
-            color = OpenCodeTheme.colors.secondaryText,
-            textAlign = TextAlign.Center,
-        )
-    }
+    OpenCodeContentUnavailable(
+        symbol = SFSymbol.Desktopcomputer,
+        title = stringResource(R.string.system_share_no_server_title),
+        modifier = modifier.fillMaxWidth(),
+        description = stringResource(R.string.system_share_no_server_message),
+    )
 }
 
 @Composable

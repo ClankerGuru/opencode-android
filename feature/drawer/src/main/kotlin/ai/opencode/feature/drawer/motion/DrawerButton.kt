@@ -89,7 +89,6 @@ import kotlin.math.min
 private val InAppNotice.identity: String get() = events.joinToString(",") { "${it.sessionID}|${it.kind}" }
 
 private object DrawerBadgeColors {
-    fun orange(isDark: Boolean) = if (isDark) Color(0xFFFF9F0A) else Color(0xFFFF9500)
     fun blue(isDark: Boolean) = if (isDark) Color(0xFF0A84FF) else Color(0xFF007AFF)
 }
 
@@ -344,7 +343,7 @@ private fun Modifier.layoutWidth(widthDp: () -> Float): Modifier = layout { meas
 @Composable
 fun DrawerNoticeLabel(notice: InAppNotice, modifier: Modifier = Modifier) {
     val isDark = isDarkTheme()
-    val orange = DrawerBadgeColors.orange(isDark)
+    val orange = OpenCodeTheme.colors.warning
     val colors = OpenCodeTheme.colors
     Row(
         modifier.padding(start = 2.dp, end = 16.dp),
@@ -385,6 +384,7 @@ fun DrawerBadgeDot(badge: DrawerBadge?, modifier: Modifier = Modifier) {
     val reducedMotion = rememberReduceMotion()
     val highContrast = rememberHighContrast()
     val isDark = isDarkTheme()
+    val orange = OpenCodeTheme.colors.warning
     val background = MaterialTheme.colorScheme.background
     // The last colour shown, so the dot keeps it while it leaves.
     var lastBadge by remember { mutableStateOf(badge) }
@@ -400,7 +400,7 @@ fun DrawerBadgeDot(badge: DrawerBadge?, modifier: Modifier = Modifier) {
                 scaleOut(MotionRole.MicroIn.animation(MotionPhase.Exit, reducedMotion), targetScale = scale),
         ) {
             Canvas(Modifier.size(10.dp)) {
-                val color = if (lastBadge == DrawerBadge.Attention) DrawerBadgeColors.orange(isDark) else DrawerBadgeColors.blue(isDark)
+                val color = if (lastBadge == DrawerBadge.Attention) orange else DrawerBadgeColors.blue(isDark)
                 val radius = size.minDimension / 2
                 drawCircle(color, radius = radius)
                 if (highContrast) {

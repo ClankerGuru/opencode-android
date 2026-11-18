@@ -9,6 +9,7 @@ import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.core.store.scope
 import ai.opencode.core.strings.localized
+import ai.opencode.core.ui.OpenCodeErrorText
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -312,7 +313,7 @@ private fun KeyStatusAccessory(state: VoiceSettingsFeature.State, rotation: Floa
             }
             VoiceKeyStatus.Saved -> Text(stringResource(R.string.settings_voice_key_saved), style = SettingsText.title, color = secondary)
             is VoiceKeyStatus.Invalid -> {
-                OpenCodeIcon(SFSymbol.ExclamationmarkCircleFill, contentDescription = null, size = 18.dp, tint = SettingsTint.Orange.color())
+                OpenCodeIcon(SFSymbol.ExclamationmarkCircleFill, contentDescription = null, size = 18.dp, tint = OpenCodeTheme.colors.warning)
                 Text(stringResource(R.string.settings_voice_key_saved), style = SettingsText.title, color = secondary)
             }
             VoiceKeyStatus.Missing -> Text(stringResource(R.string.settings_voice_key_missing), style = SettingsText.title, color = secondary)
@@ -371,8 +372,8 @@ fun CallVoicePickerView(store: SettingsStore) {
         state.previewError?.let { error ->
             settingsSection(key = "error") {
                 SettingsRowFrame {
-                    OpenCodeIcon(SFSymbol.ExclamationmarkCircleFill, contentDescription = null, size = 18.dp, tint = OpenCodeTheme.colors.destructive)
-                    Text(error, style = OpenCodeTextStyles.subheadline, color = OpenCodeTheme.colors.destructive)
+                    OpenCodeIcon(SFSymbol.ExclamationmarkCircleFill, contentDescription = null, size = 18.dp, tint = OpenCodeTheme.colors.danger)
+                    OpenCodeErrorText(error, style = OpenCodeTextStyles.subheadline)
                 }
             }
         }

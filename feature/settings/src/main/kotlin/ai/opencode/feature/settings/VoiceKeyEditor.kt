@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings
 
+import ai.opencode.core.ui.OpenCodeErrorText
 import ai.opencode.core.ui.OpenCodeTextField
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.diagnostics.HidesFromScreenshots
@@ -95,9 +96,9 @@ internal fun VoiceKeyEditor(state: VoiceSettingsFeature.State, voice: VoiceStore
         }
         state.keyVerificationError?.let { error ->
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                OpenCodeIcon(SFSymbol.ExclamationmarkCircleFill, contentDescription = null, size = 16.dp, tint = OpenCodeTheme.colors.destructive)
+                OpenCodeIcon(SFSymbol.ExclamationmarkCircleFill, contentDescription = null, size = 16.dp, tint = OpenCodeTheme.colors.danger)
                 SelectionContainer {
-                    Text(error, style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.destructive)
+                    OpenCodeErrorText(error)
                 }
             }
         }

@@ -3,6 +3,7 @@ package ai.opencode.feature.settings
 import ai.opencode.core.experiments.InAppNoticeMode
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.observe
+import ai.opencode.core.ui.OpenCodeErrorText
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.feature.system.notifications.NotificationPermission
 import ai.opencode.server.model.OpenCodeNotifyPluginStatus
@@ -80,7 +81,7 @@ fun NotificationSettingsView(store: SettingsStore) {
             setupError?.let { error ->
                 SettingsDivider()
                 SettingsRowFrame {
-                    Text(error, style = SettingsText.summary, color = OpenCodeTheme.colors.destructive)
+                    OpenCodeErrorText(error, style = SettingsText.summary)
                 }
             }
         }

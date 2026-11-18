@@ -37,6 +37,12 @@ the OpenCode desktop design system (`packages/ui`, theme `oc-2`), not iOS's SF /
   capsules (grabbers, dots, avatars).
 - Surfaces (`ui/OpenCodeSurfaces.kt`): floating fill + 1 dp hairline (`openCodeHairline`)
   + small shadow; `OpenCodeAlertDialog` (desktop dialog over Material's `AlertDialog`).
+- Errors use one of four shapes. In a form or next to what failed: `OpenCodeErrorText`
+  (`danger`, read out by TalkBack) or `OpenCodeTextField`'s error state. A pane that has nothing
+  to show (failed to load, empty, no results): `OpenCodeContentUnavailable`, a 48 dp glyph, a
+  bold `title3`, a `subheadline` description and a primary action. Needing a decision:
+  `OpenCodeAlertDialog`. Anything else: a notice (below). `OpenCodeColors.warning` (systemOrange)
+  colours what needs attention without having failed. Android-only; iOS draws each by hand.
 - Notices (`ui/OpenCodeNotice.kt`): `OpenCodeNotice` is how a failure outside a form or a dialog
   is shown: a floating chip with a glyph (`danger` for a failure), what failed, why, and an
   action word. `OpenCodeNoticePresence` brings it in and out. Android-only; the session's

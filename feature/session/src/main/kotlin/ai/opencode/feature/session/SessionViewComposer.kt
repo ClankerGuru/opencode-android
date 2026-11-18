@@ -10,6 +10,7 @@ import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.core.ui.LocalDrawerKeyboardSignals
+import ai.opencode.core.ui.OpenCodeErrorText
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeNotice
 import ai.opencode.core.ui.OpenCodeNoticePresence
@@ -1943,12 +1944,7 @@ private fun SessionComposerEnv.Composer() {
             } else {
                 val error = s.dictationError
                 if (error != null) {
-                    Text(
-                        error,
-                        style = OpenCodeTextStyles.footnote,
-                        color = OpenCodeTheme.colors.destructive,
-                        modifier = Modifier.composerFolds().padding(horizontal = 14.dp),
-                    )
+                    OpenCodeErrorText(error, Modifier.composerFolds().padding(horizontal = 14.dp))
                 }
             }
         }

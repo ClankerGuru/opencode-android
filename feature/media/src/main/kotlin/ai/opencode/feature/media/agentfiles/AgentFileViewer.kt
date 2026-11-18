@@ -5,12 +5,12 @@ import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.strings.localized
 import ai.opencode.core.strings.localizedPlural
 import ai.opencode.core.ui.AppearanceColorScheme
+import ai.opencode.core.ui.OpenCodeContentUnavailable
 import ai.opencode.core.ui.OpenCodeIcon
-import ai.opencode.core.ui.OpenCodeIconSize
 import ai.opencode.core.ui.OpenCodePrimaryButton
-import ai.opencode.core.ui.OpenCodeSecondaryButton
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.appFormattingLocale
 import ai.opencode.core.ui.rememberAppAppearance
 import ai.opencode.server.OpenCodeServer
@@ -73,7 +73,6 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
@@ -229,22 +228,13 @@ private fun ConfirmLargeView(reference: AgentFileReference, size: Long, onDownlo
 
 @Composable
 private fun FailedView(error: AgentFileError, onRetry: () -> Unit) {
-    Column(
-        Modifier.padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(TranscriptMetrics.standard),
-    ) {
-        OpenCodeIcon(
-            if (error == AgentFileError.NotFound) "questionmark.folder" else "exclamationmark.triangle",
-            contentDescription = null,
-            size = OpenCodeIconSize.hero,
-            tint = OpenCodeTheme.colors.secondaryText,
-        )
-        Text(error.title, style = OpenCodeTextStyles.title2, color = OpenCodeTheme.colors.text, textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
-        Text(error.detail, style = OpenCodeTextStyles.subheadline, color = OpenCodeTheme.colors.secondaryText, textAlign = TextAlign.Center)
-        Spacer(Modifier.size(TranscriptMetrics.compact))
-        OpenCodeSecondaryButton(text = stringResource(CoreR.string.common_try_again), onClick = onRetry)
-    }
+    OpenCodeContentUnavailable(
+        symbol = if (error == AgentFileError.NotFound) SFSymbol.QuestionmarkFolder else SFSymbol.ExclamationmarkTriangle,
+        title = error.title,
+        description = error.detail,
+        action = stringResource(CoreR.string.common_try_again),
+        onAction = onRetry,
+    )
 }
 
 /** A document Android can't preview here: another app opens it. */

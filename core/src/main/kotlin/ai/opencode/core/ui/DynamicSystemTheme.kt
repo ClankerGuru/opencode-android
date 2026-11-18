@@ -120,6 +120,7 @@ object DynamicSystemTheme {
             diffRemovedText = onSurface,
             destructive = scheme.error,
             danger = scheme.error,
+            warning = SystemColors.orange(isDark).color,
             bodyTextResolver = bodyResolver,
         )
     }

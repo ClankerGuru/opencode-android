@@ -307,7 +307,7 @@ internal fun InboxSidebarRowView(row: InboxSidebarRow, now: Instant, checked: Bo
             }
             when (val line = row.line) {
                 InboxSidebarRow.Line.NeedsInput -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    OpenCodeIcon(SFSymbol.ExclamationmarkCircleFill, null, size = 16.dp, tint = InboxSidebarMetrics.needsInputTint)
+                    OpenCodeIcon(SFSymbol.ExclamationmarkCircleFill, null, size = 16.dp, tint = OpenCodeTheme.colors.warning)
                     Text(needsInputText, style = OpenCodeTextStyles.subheadline, fontWeight = FontWeight.Medium, color = colors.text)
                 }
                 InboxSidebarRow.Line.Working -> Text(workingText, style = OpenCodeTextStyles.subheadline, color = colors.secondaryText)
@@ -328,5 +328,4 @@ internal fun rememberInboxSidebarOn(): Boolean {
 
 internal object InboxSidebarMetrics {
     val edge = 20.dp
-    val needsInputTint = Color(0xFFFF9F0A)
 }

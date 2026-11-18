@@ -98,12 +98,14 @@ import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.dismiss
 import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -188,11 +190,6 @@ object VoiceCallSurfaceDefaults {
     val tertiaryFill: Color
         @Composable @ReadOnlyComposable get() =
             Color(0.4627f, 0.4627f, 0.502f, if (OpenCodeTheme.colors.isDark) 0.24f else 0.12f)
-
-    /** `UIColor.systemOrange`: needs input, a weak connection, the failure's title. */
-    val orange: Color
-        @Composable @ReadOnlyComposable get() =
-            if (OpenCodeTheme.colors.isDark) Color(1f, 0.624f, 0.039f) else Color(1f, 0.584f, 0f)
 
     /** `UIColor.systemRed`: End. */
     val red: Color
@@ -786,11 +783,12 @@ private fun VoiceCallFailurePlainCard(store: VoiceStoreOf, message: String, modi
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                OpenCodeIcon(SFSymbol.ExclamationmarkTriangleFill, null, tint = VoiceCallSurfaceDefaults.orange, size = 18.dp)
+                OpenCodeIcon(SFSymbol.ExclamationmarkTriangleFill, null, tint = OpenCodeTheme.colors.warning, size = 18.dp)
                 Text(
                     stringResource(R.string.voice_failure_title),
                     style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
-                    color = VoiceCallSurfaceDefaults.orange,
+                    color = OpenCodeTheme.colors.warning,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                 )
             }
             VoiceFailureCloseButton({ store.send(VoiceFeature.Action.EndPressed) })

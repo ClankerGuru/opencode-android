@@ -1,6 +1,7 @@
 package ai.opencode.feature.composer
 
 import ai.opencode.core.R as CoreR
+import ai.opencode.core.ui.OpenCodeErrorText
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeSwitch
@@ -275,7 +276,7 @@ private fun FormField(
         }
         val value = answers[field.key]
         if (value != null) {
-            field.validationError(value)?.let { Text(it, style = OpenCodeTextStyles.footnote, color = colors.destructive) }
+            field.validationError(value)?.let { OpenCodeErrorText(it) }
         }
     }
 }

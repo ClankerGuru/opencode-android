@@ -135,7 +135,7 @@ private fun ColorsSection() = Section("Colors") {
         "userBubble" to c.userBubble, "codeBand" to c.codeBand, "inlineCodeFill" to c.inlineCodeFill,
         "text" to c.text, "secondaryText" to c.secondaryText, "tertiaryText" to c.tertiaryText,
         "border" to c.border, "accent" to c.accent, "link" to c.link, "signal" to c.signal,
-        "sendButton" to c.sendButtonBackground, "destructive" to c.destructive, "danger" to c.danger,
+        "sendButton" to c.sendButtonBackground, "destructive" to c.destructive, "danger" to c.danger, "warning" to c.warning,
         "syntaxKeyword" to c.syntaxKeyword, "syntaxString" to c.syntaxString, "syntaxNumber" to c.syntaxNumber,
         "syntaxComment" to c.syntaxComment, "syntaxType" to c.syntaxType,
         "diffAddedFill" to c.diffAddedFill, "diffRemovedFill" to c.diffRemovedFill,

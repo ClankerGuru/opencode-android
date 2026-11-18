@@ -117,8 +117,8 @@ fun DrawerServerNoteRow(note: ServerSwitchNote, onAction: () -> Unit, modifier: 
     val colors = OpenCodeTheme.colors
     val tint = when (note.reason) {
         is ServerSwitchNote.Reason.TimedOut -> colors.secondaryText
-        ServerSwitchNote.Reason.Unreachable -> colors.destructive
-        ServerSwitchNote.Reason.SignInFailed -> Color(0xFFFF9F0A)
+        ServerSwitchNote.Reason.Unreachable -> colors.danger
+        ServerSwitchNote.Reason.SignInFailed -> colors.warning
     }
     Column(
         modifier

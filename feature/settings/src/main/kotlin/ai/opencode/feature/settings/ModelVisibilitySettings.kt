@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings
 
+import ai.opencode.core.ui.OpenCodeContentUnavailable
 import ai.opencode.core.ui.OpenCodeSearchField
 import ai.opencode.core.R as CoreR
 import ai.opencode.core.strings.localized
@@ -13,9 +14,6 @@ import ai.opencode.core.store.Reducer
 import ai.opencode.core.store.cancellable
 import ai.opencode.core.store.observe
 import ai.opencode.core.store.scope
-import ai.opencode.core.ui.OpenCodeIcon
-import ai.opencode.core.ui.OpenCodeIconSize
-import ai.opencode.core.ui.OpenCodePrimaryButton
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.ProviderIcon
@@ -28,7 +26,6 @@ import ai.opencode.server.model.ModelSearch
 import ai.opencode.server.model.ModelVisibility
 import ai.opencode.server.model.OpenCodeModel
 import ai.opencode.server.model.OpenCodeModelCatalog
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -50,7 +47,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import ai.opencode.core.ui.OpenCodeFonts
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 /**
@@ -268,16 +264,14 @@ fun ModelVisibilitySettingsView(store: SettingsStore) {
         if (state.isLoading && state.models.isEmpty()) {
             CircularProgressIndicator(Modifier.align(Alignment.Center))
         } else if (state.loadError != null && state.models.isEmpty()) {
-            Column(
-                Modifier.align(Alignment.Center).padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                OpenCodeIcon(SFSymbol.ExclamationmarkTriangle, contentDescription = null, size = OpenCodeIconSize.hero, tint = OpenCodeTheme.colors.secondaryText)
-                Text(stringResource(R.string.settings_models_load_failed_title), style = OpenCodeTextStyles.title3, color = OpenCodeTheme.colors.text)
-                Text(state.loadError.orEmpty(), style = OpenCodeTextStyles.subheadline, color = OpenCodeTheme.colors.secondaryText, textAlign = TextAlign.Center)
-                OpenCodePrimaryButton(onClick = { models.send(ModelVisibilityFeature.Action.Task) }) { Text(stringResource(CoreR.string.common_try_again)) }
-            }
+            OpenCodeContentUnavailable(
+                symbol = SFSymbol.ExclamationmarkTriangle,
+                title = stringResource(R.string.settings_models_load_failed_title),
+                modifier = Modifier.align(Alignment.Center),
+                description = state.loadError,
+                action = stringResource(CoreR.string.common_try_again),
+                onAction = { models.send(ModelVisibilityFeature.Action.Task) },
+            )
         }
     }
 }

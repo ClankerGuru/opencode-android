@@ -31,7 +31,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -109,7 +108,7 @@ fun OpenCodeNotice(
             val tint = when (shown.tone) {
                 OpenCodeNoticeTone.progress -> OpenCodeTheme.colors.secondaryText
                 OpenCodeNoticeTone.failure -> OpenCodeTheme.colors.danger
-                OpenCodeNoticeTone.attention -> Color(0xFFFF9500)
+                OpenCodeNoticeTone.attention -> OpenCodeTheme.colors.warning
             }
             Row(
                 Modifier.heightIn(min = 44.dp).padding(horizontal = 16.dp, vertical = 8.dp),

@@ -256,7 +256,7 @@ private fun Footer(report: State.Report, send: (Action) -> Unit) {
                 Modifier.semantics(mergeDescendants = true) {}.testTag("problem-report-error"),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                OpenCodeIcon(SFSymbol.ExclamationmarkTriangleFill, contentDescription = null, size = OpenCodeIconSize.small, tint = systemOrange())
+                OpenCodeIcon(SFSymbol.ExclamationmarkTriangleFill, contentDescription = null, size = OpenCodeIconSize.small, tint = OpenCodeTheme.colors.warning)
                 Spacer(Modifier.size(8.dp))
                 Text("Couldn’t send report", style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium))
             }
@@ -319,7 +319,7 @@ fun ProblemReportToastView(toast: State.Toast?) {
                     if (sent) SFSymbol.CheckmarkCircleFill else SFSymbol.ExclamationmarkTriangleFill,
                     contentDescription = null,
                     size = OpenCodeIconSize.small,
-                    tint = if (sent) systemGreen() else systemOrange(),
+                    tint = if (sent) systemGreen() else OpenCodeTheme.colors.warning,
                 )
                 Spacer(Modifier.size(8.dp))
                 Text(shown.message, style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold))
@@ -333,6 +333,3 @@ private val SNAPPY = MotionSpring(0.5, 0.15)
 
 @Composable
 private fun systemGreen(): Color = if (OpenCodeTheme.colors.isDark) Color(0.1882f, 0.8196f, 0.3451f) else Color(0.2039f, 0.7804f, 0.349f)
-
-@Composable
-private fun systemOrange(): Color = if (OpenCodeTheme.colors.isDark) Color(1f, 0.6235f, 0.0392f) else Color(1f, 0.5843f, 0f)
