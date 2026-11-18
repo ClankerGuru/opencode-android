@@ -8,12 +8,14 @@ import ai.opencode.core.tuning.Tunable
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.AgentFileReference
 import ai.opencode.server.model.OpenCodeImageAttachment
-import android.content.ComponentCallbacks2
-import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import coil3.BitmapImage
+import coil3.SingletonImageLoader
+import coil3.asImage
+import coil3.memory.MemoryCache
 import java.security.MessageDigest
 
 /**
@@ -168,88 +170,26 @@ data class TranscriptImagePreview(val id: String, val pages: List<Page>, val ser
 }
 
 /**
- * A hard retained-pixel bound (iOS `Core/DecodedImageCache.swift`). Originals retain their
- * resolution for zoom/export; an image larger than the budget is returned to its visible owner
- * but never retained by this cache. At most 64 entries, LRU; a memory-pressure callback
- * (`onTrimMemory` ≥ RUNNING_LOW / `onLowMemory`, Android's memory warning) purges it.
- *
- * Coil's own memory cache keeps Coil-loaded images (link artwork, site icons); this cache holds
- * the Markdown and attachment originals the app decodes itself, as iOS does.
+ * Decoded images the app keeps for the transcript and viewers, stored in Coil's memory cache so
+ * they share one budget and memory-pressure purge with everything Coil loads.
  */
-class DecodedImageCache(byteLimit: Int = DEFAULT_BYTE_LIMIT) {
-    val byteLimit: Int = maxOf(0, byteLimit)
-
-    private class Entry(val image: Bitmap, val bytes: Int)
-
-    private val lock = Any()
-    private val entries = HashMap<String, Entry>()
-    private val order = ArrayList<String>()
-    private var bytes = 0
-
-    val retainedBytes: Int get() = synchronized(lock) { bytes }
-
-    /** Purges entries and cost accounting (memory warning). */
-    fun removeAll() = synchronized(lock) {
-        entries.clear()
-        order.clear()
-        bytes = 0
-    }
-
-    fun image(source: String): Bitmap? {
-        val key = key(source)
-        return synchronized(lock) {
-            val entry = entries[key] ?: return null
-            order.remove(key)
-            order.add(key)
-            entry.image
-        }
-    }
+class DecodedImageCache(
+    private val memory: MemoryCache = MemoryCache.Builder().maxSizeBytes(48L * 1024 * 1024).build(),
+) {
+    fun image(source: String): Bitmap? = (memory[memoryKey(source)]?.image as? BitmapImage)?.bitmap
 
     fun insert(image: Bitmap, source: String) {
-        val key = key(source)
-        val cost = pixelBytes(image)
-        synchronized(lock) {
-            entries.remove(key)?.let { bytes -= it.bytes }
-            order.remove(key)
-            if (cost <= 0 || cost > byteLimit) return
-            while (order.isNotEmpty() && (bytes > byteLimit - cost || order.size >= 64)) {
-                val oldest = order.removeAt(0)
-                entries.remove(oldest)?.let { bytes -= it.bytes }
-            }
-            entries[key] = Entry(image, cost)
-            order.add(key)
-            bytes += cost
-        }
+        memory[memoryKey(source)] = MemoryCache.Value(image.asImage())
     }
 
     companion object Key : DependencyKey<DecodedImageCache> {
-        const val DEFAULT_BYTE_LIMIT = 48 * 1024 * 1024
-
-        /** Markdown and attachment caches share one decoded-pixel budget (`\.transcriptImageCache`). */
-        override val liveValue: DecodedImageCache by lazy { DecodedImageCache().also(::observeMemoryPressure) }
+        override val liveValue: DecodedImageCache by lazy {
+            DecodedImageCache(checkNotNull(SingletonImageLoader.get(dependency(AppContext)).memoryCache))
+        }
         override val testValue: DecodedImageCache get() = DecodedImageCache()
 
-        /** `bytesPerRow × height`, saturating. */
-        fun pixelBytes(image: Bitmap): Int {
-            val cost = image.rowBytes.toLong() * image.height
-            return if (cost > Int.MAX_VALUE) Int.MAX_VALUE else cost.toInt()
-        }
-
         /** Data URLs must not become multi-megabyte map keys. */
-        private fun key(source: String): String =
-            MessageDigest.getInstance("SHA-256").digest(source.toByteArray()).joinToString("") { "%02x".format(it) }
-
-        private fun observeMemoryPressure(cache: DecodedImageCache) {
-            val context = runCatching { dependency(AppContext) }.getOrNull() ?: return
-            context.registerComponentCallbacks(object : ComponentCallbacks2 {
-                @Suppress("DEPRECATION")
-                override fun onTrimMemory(level: Int) {
-                    if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) cache.removeAll()
-                }
-                override fun onConfigurationChanged(newConfig: Configuration) = Unit
-                @Deprecated("Deprecated in Java")
-                override fun onLowMemory() = cache.removeAll()
-            })
-        }
+        fun memoryKey(source: String): MemoryCache.Key =
+            MemoryCache.Key(MessageDigest.getInstance("SHA-256").digest(source.toByteArray()).joinToString("") { "%02x".format(it) })
     }
 }
