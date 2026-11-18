@@ -403,8 +403,3 @@ fun Modifier.drawerSearchFocusFade(state: DrawerSearchState, reducedMotion: Bool
         .blockingTouches(focused)
         .then(if (focused) Modifier.clearAndSetSemantics {} else Modifier)
 }
-
-/** The raised bottom controls stop taking touches while search owns the keyboard. */
-fun Modifier.drawerSearchFocusHitTesting(state: DrawerSearchState): Modifier = composed {
-    blockingTouches(state.isFocused)
-}
