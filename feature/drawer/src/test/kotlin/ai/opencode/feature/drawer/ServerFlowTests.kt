@@ -117,7 +117,7 @@ class ServerFlowTests {
             selectedSessionID = null, reducedMotion = false, increasedContrast = false,
         )
         fun build() = DrawerListModel.build(
-            state = home, inputs = inputs, liftedID = null, catchUpMounted = false, whatsNewMounted = false,
+            state = home, inputs = inputs, liftedID = null,
             now = Instant.ofEpochSecond(100), timestamp = { _, _ -> "" }, project = { _, _ -> null },
         )
         inputs = inputs.copy(serverSwap = ServerSwapTarget(current = laptop, switchingTo = studio, servers = listOf(laptop, studio)))

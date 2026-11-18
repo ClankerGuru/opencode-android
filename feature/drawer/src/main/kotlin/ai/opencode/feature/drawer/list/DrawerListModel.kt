@@ -105,8 +105,6 @@ data class DrawerListShortcuts(
     val catchUpFinish: Int? = null,
     val canMarkAllRead: Boolean = false,
     val showsWhatsNew: Boolean = false,
-    val catchUpMounted: Boolean = false,
-    val whatsNewMounted: Boolean = false,
 ) {
     val catchUpFinished: Boolean get() = catchUpFinish != null
     val showsCatchUp: Boolean get() = catchUpCount > 0 || catchUpFinished
@@ -156,8 +154,6 @@ data class DrawerListModel(
             state: HomeFeature.State,
             inputs: DrawerListInputs,
             liftedID: String?,
-            catchUpMounted: Boolean,
-            whatsNewMounted: Boolean,
             now: Instant,
             timestamp: (date: Instant, now: Instant) -> String,
             project: (OpenCodeSession, List<OpenCodeProject>) -> OpenCodeProject?,
@@ -190,16 +186,16 @@ data class DrawerListModel(
                 catchUpFinish = if (state.catchUpState.justFinished && catchUpCount == 0) state.catchUpState.finishes else null,
                 canMarkAllRead = catchUpSessions.any { status.indicator(it) == Indicator.unread },
                 showsWhatsNew = state.showsWhatsNewButton,
-                catchUpMounted = state.search.isEmpty() && catchUpMounted,
-                whatsNewMounted = state.search.isEmpty() && whatsNewMounted,
             )
             val archivedCount = if (state.search.isEmpty()) state.inboxSidebarStatus.archived.size else 0
-            val showsShortcuts = shortcuts.catchUpMounted || shortcuts.whatsNewMounted || archivedCount > 0
+            val showsShortcuts = state.search.isEmpty() && (shortcuts.showsCatchUp || shortcuts.showsWhatsNew) || archivedCount > 0
 
             val top = buildList {
                 if (serverNote != null && state.search.isEmpty()) add(DrawerListItem.ServerNote)
-                if (shortcuts.catchUpMounted) add(DrawerListItem.CatchUp)
-                if (shortcuts.whatsNewMounted) add(DrawerListItem.WhatsNew)
+                if (state.search.isEmpty()) {
+                    add(DrawerListItem.CatchUp)
+                    add(DrawerListItem.WhatsNew)
+                }
                 if (archivedCount > 0) add(DrawerListItem.Archived)
             }
 

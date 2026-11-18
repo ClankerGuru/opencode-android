@@ -2,7 +2,8 @@ package ai.opencode.feature.drawer.list
 
 import ai.opencode.feature.drawer.style.drawerCanvas
 import ai.opencode.core.R as CoreR
-import ai.opencode.core.motion.transitionBlurEffect
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionRole
 
 import ai.opencode.core.ui.AccessibilityFocusRequest
 import ai.opencode.core.ui.OpenCodeIcon
@@ -24,6 +25,19 @@ import ai.opencode.feature.drawer.style.DrawerSectionTitle
 import ai.opencode.feature.drawer.style.DrawerShortcutLabel
 import ai.opencode.feature.drawer.style.DrawerTunables
 import ai.opencode.feature.drawer.style.RecentRowMenu
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +54,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -48,7 +63,6 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
@@ -64,13 +78,15 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlin.math.max
 import kotlin.math.roundToInt
 
 /*
  * The list's rows that aren't sessions: the Pinned and Recents headers (or a gap or hairline
- * between sections), Catch Up and What’s New above them collapsing on the drawer's shortcut spring,
+ * between sections), Catch Up and What’s New above them,
  * no sessions / no results, and a failed deletion. They are plain items of the same `LazyColumn`.
  */
 
@@ -132,15 +148,16 @@ fun DrawerListHeaderCell(kind: DrawerSectionHeaderKind, pinDrag: DrawerPinDrag, 
 enum class DrawerListShortcutKind { CatchUp, WhatsNew }
 
 /**
- * Catch Up or What’s New above the sections, collapsing on the drawer's shortcut spring
- * ([DrawerShortcutMotion]): height, insets, scale and blur. The row reads the motion in its layout
- * and layer blocks, so the spring never recomposes the list.
+ * Catch Up or What’s New above the sections. Each stays in the list while search is empty and
+ * folds in and out with [AnimatedVisibility]; [animates] off lands the change in place.
  */
 @Composable
 fun DrawerListShortcutRow(
     kind: DrawerListShortcutKind,
     motion: DrawerShortcutMotion,
     shortcuts: DrawerListShortcuts,
+    animates: Boolean,
+    exitDelay: Double,
     reducedMotion: Boolean,
     openCatchUp: () -> Unit,
     markAllRead: () -> Unit,
@@ -149,24 +166,13 @@ fun DrawerListShortcutRow(
     modifier: Modifier = Modifier,
     returnFocus: AccessibilityFocusRequest? = null,
 ) {
-    val showsCatchUp = shortcuts.showsCatchUp
-    val showsWhatsNew = shortcuts.showsWhatsNew
-    val catchUpProgress = { motion.catchUpProgress(fallback = showsCatchUp) }
-    val whatsNewProgress = { motion.whatsNewProgress(fallback = showsWhatsNew) }
     when (kind) {
         DrawerListShortcutKind.CatchUp -> {
             val count = if (shortcuts.catchUpCount > 0) shortcuts.catchUpCount else max(motion.displayedCatchUpCount, 1)
             val canMarkAllRead = if (shortcuts.catchUpCount > 0) shortcuts.canMarkAllRead else motion.displayedCanMarkAllRead
             // Finished, it stays All Caught Up while it rests and folds away.
             val finished = shortcuts.catchUpFinished || (shortcuts.catchUpCount == 0 && motion.finishStart != null)
-            Collapse(
-                progress = catchUpProgress,
-                wantsOpen = motion.catchUpWantsOpen(fallback = showsCatchUp),
-                top = { DrawerTunables.shortcutsTop.value * catchUpProgress() },
-                bottom = { DrawerTunables.shortcutsBelow.value * (1 - whatsNewProgress()) * catchUpProgress() },
-                reducedMotion = reducedMotion,
-                modifier = modifier,
-            ) {
+            Collapse(shortcuts.showsCatchUp, animates, 0.0, reducedMotion, modifier.padding(top = DrawerTunables.shortcutsTop)) {
                 if (finished) {
                     DrawerCatchUpFinishedLabel(
                         start = motion.finishStart,
@@ -179,18 +185,12 @@ fun DrawerListShortcutRow(
                 }
             }
         }
-        DrawerListShortcutKind.WhatsNew -> Collapse(
-            progress = whatsNewProgress,
-            wantsOpen = motion.whatsNewWantsOpen(fallback = showsWhatsNew),
-            top = {
-                val c = catchUpProgress()
-                (DrawerTunables.shortcutsGap.value * c + DrawerTunables.shortcutsTop.value * (1 - c)) * whatsNewProgress()
-            },
-            bottom = { DrawerTunables.shortcutsBelow.value * whatsNewProgress() },
-            reducedMotion = reducedMotion,
-            modifier = modifier,
-        ) {
-            DrawerWhatsNewButton(action = openWhatsNew, onHide = hideWhatsNew)
+        DrawerListShortcutKind.WhatsNew -> {
+            val topSpec: AnimationSpec<Dp> = if (animates) MotionRole.Layout.animation(reduceMotion = reducedMotion) else snap()
+            val top by animateDpAsState(if (shortcuts.showsCatchUp) DrawerTunables.shortcutsGap else DrawerTunables.shortcutsTop, topSpec)
+            Collapse(shortcuts.showsWhatsNew, animates, exitDelay, reducedMotion, modifier.padding(top = top, bottom = DrawerTunables.shortcutsBelow)) {
+                DrawerWhatsNewButton(action = openWhatsNew, onHide = hideWhatsNew)
+            }
         }
     }
 }
@@ -294,49 +294,44 @@ fun DrawerWhatsNewButton(action: () -> Unit, onHide: () -> Unit, modifier: Modif
 }
 
 /**
- * The shortcut's collapse: scale toward the top ([DrawerMotionTunables.SHORTCUT_SCALE]),
- * `MotionBlurReveal` (fade, blur up to [DrawerMotionTunables.shortcutBlur]), height `rowHeight ×
- * progress` until open, insets, and no touches unless it wants to be open. Everything per frame is
- * read in layout and layer blocks.
+ * The shortcut's fold: height from the top, a fade and a scale toward the top
+ * ([DrawerMotionTunables.SHORTCUT_SCALE], not under Reduce Motion), on the layout spring. While it
+ * leaves it takes no touches.
  */
 @Composable
 private fun Collapse(
-    progress: () -> Float,
-    wantsOpen: Boolean,
-    top: () -> Float,
-    bottom: () -> Float,
+    visible: Boolean,
+    animates: Boolean,
+    exitDelay: Double,
     reducedMotion: Boolean,
     modifier: Modifier,
     content: @Composable () -> Unit,
 ) {
-    val minScale = DrawerMotionTunables.SHORTCUT_SCALE
-    val maxBlur = if (reducedMotion) 0.dp else DrawerMotionTunables.shortcutBlur
-    Box(
-        modifier
-            .fillMaxWidth()
-            .layout { measurable, constraints ->
-                val p = progress().coerceIn(0f, 1f)
-                val topPx = (top() * density).roundToInt()
-                val bottomPx = (bottom() * density).roundToInt()
-                val inner = constraints.copy(minHeight = 0, maxHeight = androidx.compose.ui.unit.Constraints.Infinity)
-                val placeable = measurable.measure(inner)
-                val height = if (p >= 0.999f) placeable.height else max(0, (DrawerMetrics.rowHeight.toPx() * p).roundToInt())
-                layout(placeable.width, topPx + height + bottomPx) { placeable.place(0, topPx) }
-            }
-            .padding(horizontal = DrawerMetrics.rowEdge)
-            .graphicsLayer {
-                val p = progress().coerceIn(0f, 1f)
-                val scale = if (reducedMotion) 1f else minScale + (1 - minScale) * p
-                scaleX = scale
-                scaleY = scale
-                transformOrigin = TransformOrigin(0.5f, 0f)
-                alpha = if (p <= 0.02f) 0f else p
-                val radius = if (reducedMotion || p >= 0.98f) 0f else (1 - p) * maxBlur.toPx()
-                renderEffect = transitionBlurEffect(radius)
-            }
-            .then(if (wantsOpen) Modifier else Modifier.blockingTouches()),
-    ) {
-        content()
+    val top = TransformOrigin(0.5f, 0f)
+    val scale = if (reducedMotion) 1f else DrawerMotionTunables.SHORTCUT_SCALE
+    val enter = if (!animates) {
+        EnterTransition.None
+    } else {
+        expandVertically(MotionRole.Layout.animation(reduceMotion = reducedMotion, visibilityThreshold = IntSize.VisibilityThreshold), Alignment.Top) +
+            fadeIn(MotionRole.Layout.animation(reduceMotion = reducedMotion)) +
+            scaleIn(MotionRole.Layout.animation(reduceMotion = reducedMotion), scale, top)
+    }
+    val exit = if (!animates) {
+        ExitTransition.None
+    } else {
+        val phase = MotionPhase.Exit
+        shrinkVertically(MotionRole.Layout.animation(phase, reducedMotion, exitDelay, IntSize.VisibilityThreshold), Alignment.Top) +
+            fadeOut(MotionRole.Layout.animation(phase, reducedMotion, exitDelay)) +
+            scaleOut(MotionRole.Layout.animation(phase, reducedMotion, exitDelay), scale, top)
+    }
+    AnimatedVisibility(visible, Modifier.fillMaxWidth(), enter, exit) {
+        Box(
+            modifier
+                .padding(horizontal = DrawerMetrics.rowEdge)
+                .then(if (visible) Modifier else Modifier.blockingTouches()),
+        ) {
+            content()
+        }
     }
 }
 

@@ -205,7 +205,7 @@ class CatchUpFinishHomeTests {
             selectedSessionID = null, reducedMotion = false, increasedContrast = false,
         )
         return DrawerListModel.build(
-            state = state, inputs = inputs, liftedID = null, catchUpMounted = true, whatsNewMounted = false,
+            state = state, inputs = inputs, liftedID = null,
             now = Instant.ofEpochSecond(100), timestamp = { _, _ -> "" }, project = { _, _ -> null },
         ).shortcuts.catchUpFinish
     }
