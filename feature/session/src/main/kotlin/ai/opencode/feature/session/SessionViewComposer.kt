@@ -235,8 +235,8 @@ class SessionComposerHost {
     internal var floatingCallCovers by mutableStateOf(false)
     /** iOS `showsAutocomplete`: no request panel holds the composer's glass, so its suggestions can be drawn there. Set by the capsule. */
     internal var showsAutocomplete by mutableStateOf(true)
-    /** iOS `composerPanelCovers`: a panel grown out of the composer (One Picker, suggestions), or the Living Orb's card, stands over what sits above it. */
-    val composerPanelCovers: Boolean get() = modelPanels?.covers == true || autocompleteCovers || floatingCallCovers
+    /** iOS `composerPanelCovers`: a panel grown out of the composer (One Picker, suggestions, a quote's comment panel), or the Living Orb's card, stands over what sits above it. */
+    val composerPanelCovers: Boolean get() = modelPanels?.covers == true || autocompleteCovers || floatingCallCovers || commentingQuoteID != null
     /** One Picker is shown: the composer stays expanded under it. */
     val keepsComposerExpanded: Boolean get() = modelPanels?.keepsComposerExpanded == true
     /** A panel or overlay owns downward drags now (iOS `composerSwipeYields`' panels). */
