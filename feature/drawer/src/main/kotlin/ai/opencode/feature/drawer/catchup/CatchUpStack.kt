@@ -88,8 +88,6 @@ fun rememberCatchUpStackController(): CatchUpStackController {
  * @param revealsPreviewOnBegin Reveal the card behind as soon as the stack begins. A host that
  *     morphs into Catch Up (the session container) passes `false` and calls
  *     [CatchUpStackController.revealPreview] when its morph lands.
- * @param handlesPan the stack runs its own two-axis pan. Pass `false` when the drawer container's
- *   pan routes Catch Up swipes to [CatchUpStackController.handlePan].
  * @param panRegions The drawer's pan regions: a horizontal scroller in the card that can still move
  *     the way the finger goes keeps the drag.
  * @param card the live card's body for the open session (`null` once the stack is empty).
@@ -104,7 +102,6 @@ fun CatchUpStack(
     proxy: CatchUpStageProxy? = null,
     previewRevision: Int = 0,
     revealsPreviewOnBegin: Boolean = true,
-    handlesPan: Boolean = true,
     isExiting: Boolean = false,
     panRegions: DrawerPanRegions? = null,
     /** What [proxy]'s buttons do. */
@@ -196,7 +193,7 @@ fun CatchUpStack(
                         controller.refreshTuning()
                     }
                 }
-                .then(if (handlesPan && !isExiting) Modifier.catchUpPan(controller, panRegions) else Modifier),
+                .then(if (!isExiting) Modifier.catchUpPan(controller, panRegions) else Modifier),
         ) {
             // The card behind: the next session, dimmed, inert and hidden from TalkBack.
             Box(

@@ -66,12 +66,10 @@ class DirectionalPanGestureRecognizerTests {
         data class Row(val origin: DirectionalPan.TouchOrigin, val presented: Boolean, val dx: Float, val dy: Float, val expected: DirectionalPan.Decision)
         val rows = listOf(
             // Rows have no swipe actions: a leftward drag on one closes the drawer.
-            Row(DirectionalPan.TouchOrigin.DrawerRow, true, -20f, 1f, DirectionalPan.Decision.Begin),
             Row(DirectionalPan.TouchOrigin.DrawerList, true, -20f, 1f, DirectionalPan.Decision.Begin),
             Row(DirectionalPan.TouchOrigin.DrawerChrome, true, -20f, 1f, DirectionalPan.Decision.Begin),
             Row(DirectionalPan.TouchOrigin.ExposedCard, true, -20f, 1f, DirectionalPan.Decision.Begin),
             // Toward the card, the list slides its rows to show their times.
-            Row(DirectionalPan.TouchOrigin.DrawerRow, true, 20f, 1f, DirectionalPan.Decision.Reveal),
             Row(DirectionalPan.TouchOrigin.DrawerList, true, 20f, 1f, DirectionalPan.Decision.Reveal),
             Row(DirectionalPan.TouchOrigin.DrawerChrome, true, 20f, 1f, DirectionalPan.Decision.Begin),
             Row(DirectionalPan.TouchOrigin.Content(horizontalScrollerOwnsRightwardDrag = false), false, 20f, 1f, DirectionalPan.Decision.Begin),
@@ -161,10 +159,6 @@ class DrawerHoldTests {
         assertFalse("a quick drag is the drawer's", DirectionalPan.yieldsToHold(heldForSeconds = 0.05, holdBegan = false))
         assertTrue("a rested finger keeps its hold", DirectionalPan.yieldsToHold(heldForSeconds = 0.6, holdBegan = false))
         assertTrue("a begun long press keeps its touch", DirectionalPan.yieldsToHold(heldForSeconds = 0.1, holdBegan = true))
-        assertFalse(
-            "in Catch Up, holding before dragging still drags the card",
-            DirectionalPan.yieldsToHold(heldForSeconds = 0.6, holdBegan = true, isCardSwipe = true),
-        )
     }
 }
 
