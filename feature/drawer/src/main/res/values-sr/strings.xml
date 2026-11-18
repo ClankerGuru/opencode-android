@@ -128,6 +128,8 @@
     <string name="drawer_row_needs_input_state">Потребан је ваш унос</string>
     <string name="drawer_row_working_state">У току</string>
     <string name="drawer_row_unread_state">Непрочитано</string>
+    <string name="drawer_row_unsent_failed_state">Слање није успело</string>
+    <string name="drawer_row_unsent_sending_state">Слање</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Није могуће затражити дозволу. Покушајте поново.</string>

@@ -124,6 +124,8 @@
     <string name="drawer_row_needs_input_state">Dit input er nødvendigt</string>
     <string name="drawer_row_working_state">Arbejder</string>
     <string name="drawer_row_unread_state">Ulæst</string>
+    <string name="drawer_row_unsent_failed_state">Kunne ikke sende</string>
+    <string name="drawer_row_unsent_sending_state">Sender</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Kunne ikke anmode om tilladelse. Prøv igen.</string>

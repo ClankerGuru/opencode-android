@@ -8,6 +8,8 @@ import ai.opencode.server.model.OpenCodeDelivery
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeSession
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.Instant
@@ -50,6 +52,8 @@ class ComposerPersistence(
     val loadUndelivered: (serverID: String, sessionID: String?) -> List<UndeliveredPrompts.Entry> = { _, _ -> emptyList() },
     val markUndelivered: (pending: PendingPrompt, reason: String, serverID: String, sessionID: String?) -> Unit = { _, _, _, _ -> },
     val settlePrompts: (messageIDs: Set<String>) -> Unit = {},
+    /** Emits each time the unsent outbox changes. */
+    val outboxChanges: Flow<Unit> = emptyFlow(),
     /** A session's model pick and request answers saved before a relaunch ([SessionStatePersistence.kt]). */
     val loadSessionState: (serverID: String, sessionID: String) -> PersistedSessionState? = { _, _ -> null },
     val scheduleSessionState: (serverID: String, sessionID: String, update: PersistedSessionState.Update) -> Unit = { _, _, _ -> },
@@ -106,6 +110,7 @@ class ComposerPersistence(
                 loadUndelivered = writer::loadUndelivered,
                 markUndelivered = writer::markUndelivered,
                 settlePrompts = writer::settlePrompts,
+                outboxChanges = writer.outboxChanges,
                 loadSessionState = writer::loadSessionState,
                 scheduleSessionState = writer::scheduleSessionState,
                 removeSession = writer::removeSession,

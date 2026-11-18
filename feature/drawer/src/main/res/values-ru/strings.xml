@@ -132,6 +132,8 @@
     <string name="drawer_row_needs_input_state">Нужен ваш ответ</string>
     <string name="drawer_row_working_state">Работает</string>
     <string name="drawer_row_unread_state">Непрочитанная</string>
+    <string name="drawer_row_unsent_failed_state">Не удалось отправить</string>
+    <string name="drawer_row_unsent_sending_state">Отправка</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Не удалось запросить разрешение. Попробуйте снова.</string>

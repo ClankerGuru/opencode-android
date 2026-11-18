@@ -124,6 +124,8 @@
     <string name="drawer_row_needs_input_state">Tín luttøka krevst</string>
     <string name="drawer_row_working_state">Arbeiða</string>
     <string name="drawer_row_unread_state">Ólisið</string>
+    <string name="drawer_row_unsent_failed_state">Kundi ikki senda</string>
+    <string name="drawer_row_unsent_sending_state">Sendir</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Kundi ikki biðja um loyvi. Royn aftur.</string>

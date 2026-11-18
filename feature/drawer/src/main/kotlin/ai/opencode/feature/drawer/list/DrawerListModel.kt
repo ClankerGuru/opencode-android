@@ -9,6 +9,7 @@ import ai.opencode.feature.drawer.ServerSwapTarget
 import ai.opencode.feature.drawer.ServerSwitchNote
 import ai.opencode.feature.drawer.drawerListFooter
 import ai.opencode.feature.drawer.drawerSessions
+import ai.opencode.feature.drawer.placeholderSession
 import ai.opencode.feature.drawer.statusSnapshot
 import ai.opencode.feature.drawer.style.DrawerSectionHeaderKind
 import ai.opencode.server.OpenCodeServer
@@ -74,16 +75,22 @@ data class DrawerListRow(
     val increasedContrast: Boolean,
     /** Whether the row is chosen while the drawer selects rows ([DrawerSelection]); null when it isn't. */
     val checked: Boolean? = null,
+    /** A new session whose first message only this phone has; null for a session the server has. */
+    val unsent: Unsent? = null,
 ) {
+    enum class Unsent { Sending, Failed }
+
     /** TalkBack's state for the row. */
     val accessibilityValue: String
         get() {
             val parts = mutableListOf<String>()
             if (isPinnedSection) parts += localized(R.string.drawer_row_pinned_state)
             if (muted) parts += localized(R.string.drawer_row_muted_state)
+            if (unsent == Unsent.Failed) parts += localized(R.string.drawer_row_unsent_failed_state)
+            if (unsent == Unsent.Sending) parts += localized(R.string.drawer_row_unsent_sending_state)
             val status = when (indicator) {
                 Indicator.attention -> localized(R.string.drawer_row_needs_input_state)
-                Indicator.running -> localized(R.string.drawer_row_working_state)
+                Indicator.running -> if (unsent == null) localized(R.string.drawer_row_working_state) else ""
                 Indicator.unread -> localized(R.string.drawer_row_unread_state)
                 Indicator.none -> ""
             }
@@ -239,9 +246,36 @@ data class DrawerListModel(
                     pinnedItems += DrawerListItem.Session(session.id)
                 }
             }
+            // Unsent sessions lead Recents: they wait on you, and the server can't order them.
+            val open = if (state.catchUp == null) state.sessionDetail else null
+            val unsentRows = mutableListOf<DrawerListRow>()
+            for (draft in state.unsentDrafts) {
+                val session = draft.placeholderSession
+                if (session.id in rows || state.sessions.any { it.id == session.id }) continue
+                if (state.search.isNotEmpty() && !session.title.contains(state.search.trim(), ignoreCase = true)) continue
+                unsentRows += DrawerListRow(
+                    session = session,
+                    isPinnedSection = false,
+                    selected = open != null && open.session == null && open.outboxDraftID == draft.draftID,
+                    indicator = if (draft.isFailed) Indicator.none else Indicator.running,
+                    muted = false,
+                    unread = false,
+                    isLifted = false,
+                    time = timestamp(session.updatedAt, now),
+                    project = project(session, state.projects),
+                    server = state.server,
+                    reducedMotion = inputs.reducedMotion,
+                    increasedContrast = inputs.increasedContrast,
+                    unsent = if (draft.isFailed) DrawerListRow.Unsent.Failed else DrawerListRow.Unsent.Sending,
+                )
+            }
             val recentItems = mutableListOf<DrawerListItem>()
-            if (recents.isNotEmpty()) {
+            if (recents.isNotEmpty() || unsentRows.isNotEmpty()) {
                 recentItems += header(DrawerSectionHeaderKind.Recents, follows = pinned.isNotEmpty() || showsShortcuts)
+                for (unsent in unsentRows) {
+                    rows[unsent.session.id] = unsent
+                    recentItems += DrawerListItem.Session(unsent.session.id)
+                }
                 for (session in recents) {
                     if (session.id in rows) continue
                     rows[session.id] = row(session, pinned = false)

@@ -128,6 +128,8 @@
     <string name="drawer_row_needs_input_state">Votre intervention est requise</string>
     <string name="drawer_row_working_state">En cours</string>
     <string name="drawer_row_unread_state">Non lue</string>
+    <string name="drawer_row_unsent_failed_state">Échec de l’envoi</string>
+    <string name="drawer_row_unsent_sending_state">Envoi en cours</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Impossible de demander la permission. Réessayez.</string>

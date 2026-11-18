@@ -124,6 +124,8 @@
     <string name="drawer_row_needs_input_state">Изисква се отговор</string>
     <string name="drawer_row_working_state">Работи</string>
     <string name="drawer_row_unread_state">Непрочетена</string>
+    <string name="drawer_row_unsent_failed_state">Неуспешно изпращане</string>
+    <string name="drawer_row_unsent_sending_state">Изпращане</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Неуспешно искане на разрешение. Опитайте отново.</string>

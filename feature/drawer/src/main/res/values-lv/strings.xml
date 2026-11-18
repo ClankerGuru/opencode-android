@@ -128,6 +128,8 @@
     <string name="drawer_row_needs_input_state">Vajadzīga tava ievade</string>
     <string name="drawer_row_working_state">Darbojas</string>
     <string name="drawer_row_unread_state">Nelasīta</string>
+    <string name="drawer_row_unsent_failed_state">Neizdevās nosūtīt</string>
+    <string name="drawer_row_unsent_sending_state">Notiek sūtīšana</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Neizdevās pieprasīt atļauju. Mēģini vēlreiz.</string>

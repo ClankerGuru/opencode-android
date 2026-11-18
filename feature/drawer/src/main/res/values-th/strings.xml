@@ -120,6 +120,8 @@
     <string name="drawer_row_needs_input_state">ต้องการคำตอบจากคุณ</string>
     <string name="drawer_row_working_state">การทำงาน</string>
     <string name="drawer_row_unread_state">ยังไม่อ่าน</string>
+    <string name="drawer_row_unsent_failed_state">ส่งไม่ได้</string>
+    <string name="drawer_row_unsent_sending_state">กำลังส่ง</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">ขอสิทธิ์ไม่ได้ ลองอีกครั้ง</string>

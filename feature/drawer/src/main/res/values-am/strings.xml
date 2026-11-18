@@ -124,6 +124,8 @@
     <string name="drawer_row_needs_input_state">የእርስዎን ግቤት ይፈልጋል</string>
     <string name="drawer_row_working_state">በመስራት ላይ</string>
     <string name="drawer_row_unread_state">ያልተነበቡ</string>
+    <string name="drawer_row_unsent_failed_state">መላክ አልተቻለም</string>
+    <string name="drawer_row_unsent_sending_state">በመላክ ላይ</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">ፈቃድ መጠየቅ አልተቻለም። እንደገና ሞክር።</string>

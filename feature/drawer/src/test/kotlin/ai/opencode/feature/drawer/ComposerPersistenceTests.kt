@@ -486,14 +486,8 @@ class ComposerPersistenceTests {
         val coldRestoredHome = coldWorld.state {
             HomeFeature.State(server, OpenCodeHomeSnapshot(projects = listOf(project), sessions = listOf(session), activeSessionIDs = emptySet()))
         }
-        assertEquals(createdSession.id, coldRestoredHome.sessionDetail?.session?.id)
-        assertEquals(
-            "restorePersistedDraft migrates the nil-session follow-up draft to created.id",
-            "Follow-up typed before create settled",
-            coldRestoredHome.sessionDetail?.draft,
-        )
-        assertNull(coldPersistence.loadDraft(server.persistenceID, null))
-        assertEquals("Follow-up typed before create settled", coldPersistence.loadDraft(server.persistenceID, createdSession.id)?.draft?.text)
+        assertNull("A new draft doesn't adopt the session another draft created", coldRestoredHome.sessionDetail?.session)
+        assertEquals("Follow-up typed before create settled", coldRestoredHome.sessionDetail?.draft)
 
         // 3. Catch Up entered from a subagent parks the subagent composer under the subagent ID without overwriting the root draft,
         // and promoteCatchUpDetail migrates catchUpFamilyDrafts.

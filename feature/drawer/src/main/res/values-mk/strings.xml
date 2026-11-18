@@ -124,6 +124,8 @@
     <string name="drawer_row_needs_input_state">Се бара твој внес</string>
     <string name="drawer_row_working_state">Работи</string>
     <string name="drawer_row_unread_state">Непрочитана</string>
+    <string name="drawer_row_unsent_failed_state">Не успеа испраќањето</string>
+    <string name="drawer_row_unsent_sending_state">Се испраќа</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Не успеа барањето дозвола. Обиди се повторно.</string>

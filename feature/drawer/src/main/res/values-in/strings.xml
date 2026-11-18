@@ -120,6 +120,8 @@
     <string name="drawer_row_needs_input_state">Perlu masukan Anda</string>
     <string name="drawer_row_working_state">Bekerja</string>
     <string name="drawer_row_unread_state">Belum dibaca</string>
+    <string name="drawer_row_unsent_failed_state">Gagal mengirim</string>
+    <string name="drawer_row_unsent_sending_state">Mengirim</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Gagal meminta izin. Coba lagi.</string>

@@ -124,6 +124,8 @@
     <string name="drawer_row_needs_input_state">Vajab sinu sisendit</string>
     <string name="drawer_row_working_state">Töötab</string>
     <string name="drawer_row_unread_state">Lugemata</string>
+    <string name="drawer_row_unsent_failed_state">Saatmine ebaõnnestus</string>
+    <string name="drawer_row_unsent_sending_state">Saatmine</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Loa taotlemine ebaõnnestus. Proovi uuesti.</string>

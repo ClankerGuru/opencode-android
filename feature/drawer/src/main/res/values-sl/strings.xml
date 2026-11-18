@@ -132,6 +132,8 @@
     <string name="drawer_row_needs_input_state">Potreben je tvoj vnos</string>
     <string name="drawer_row_working_state">Deluje</string>
     <string name="drawer_row_unread_state">Neprebrano</string>
+    <string name="drawer_row_unsent_failed_state">Pošiljanje ni uspelo</string>
+    <string name="drawer_row_unsent_sending_state">Pošiljanje</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Za dovoljenje ni bilo mogoče zaprositi. Poskusite znova.</string>

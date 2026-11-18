@@ -124,6 +124,8 @@
     <string name="drawer_row_needs_input_state">तपाईंको इनपुट चाहिन्छ</string>
     <string name="drawer_row_working_state">काम हुँदै छ</string>
     <string name="drawer_row_unread_state">नपढिएका</string>
+    <string name="drawer_row_unsent_failed_state">पठाउन सकिएन</string>
+    <string name="drawer_row_unsent_sending_state">पठाउँदै</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">अनुमति माग्न सकिएन। फेरि प्रयास गर्नुहोस्।</string>

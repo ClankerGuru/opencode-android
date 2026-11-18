@@ -120,6 +120,8 @@
     <string name="drawer_row_needs_input_state">သင့်တုံ့ပြန်မှု လိုအပ်သည်</string>
     <string name="drawer_row_working_state">အလုပ်လုပ်တယ်။</string>
     <string name="drawer_row_unread_state">မဖတ်ရသေး</string>
+    <string name="drawer_row_unsent_failed_state">မပို့နိုင်ပါ</string>
+    <string name="drawer_row_unsent_sending_state">ပို့နေသည်</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">ခွင့်ပြုချက် မတောင်းနိုင်ပါ။ ပြန်ကြိုးစားပါ။</string>

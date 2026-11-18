@@ -124,6 +124,8 @@
     <string name="drawer_row_needs_input_state">Behöver ditt svar</string>
     <string name="drawer_row_working_state">Arbetar</string>
     <string name="drawer_row_unread_state">Oläst</string>
+    <string name="drawer_row_unsent_failed_state">Kunde inte skicka</string>
+    <string name="drawer_row_unsent_sending_state">Skickar</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Kunde inte begära behörighet. Försök igen.</string>

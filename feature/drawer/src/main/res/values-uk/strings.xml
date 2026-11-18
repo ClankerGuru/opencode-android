@@ -132,6 +132,8 @@
     <string name="drawer_row_needs_input_state">Потрібна ваша відповідь</string>
     <string name="drawer_row_working_state">Працює</string>
     <string name="drawer_row_unread_state">Непрочитана</string>
+    <string name="drawer_row_unsent_failed_state">Не вдалося надіслати</string>
+    <string name="drawer_row_unsent_sending_state">Надсилання</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Не вдалося запитати дозвіл. Спробуйте ще раз.</string>

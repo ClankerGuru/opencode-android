@@ -7,6 +7,10 @@ import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeSession
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
@@ -52,6 +56,10 @@ internal class ComposerPersistenceWriter(
     private val flushing = Any()
     private var state = WriterState()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val outboxRevision = MutableStateFlow(0)
+
+    /** Emits each time the unsent outbox changes. */
+    val outboxChanges: Flow<Unit> get() = outboxRevision.drop(1).map { }
 
     fun loadDraft(serverID: String, sessionID: String?): RestoredComposerDraft? =
         synchronized(lock) { loadDraftLocked(serverID, sessionID) }
@@ -381,6 +389,7 @@ internal class ComposerPersistenceWriter(
         val task = synchronized(lock) {
             val task = state.pendingTask
             state = WriterState().also { it.loaded = PersistedComposerState() }
+            outboxRevision.value += 1
             task
         }
         task?.cancel()
@@ -408,6 +417,7 @@ internal class ComposerPersistenceWriter(
     }
 
     private fun commitLocked(next: PersistedComposerState): Int {
+        if (state.loaded?.outbox != next.outbox) outboxRevision.value += 1
         state.loaded = next
         state.dirty = true
         state.generation += 1

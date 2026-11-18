@@ -128,6 +128,8 @@
     <string name="drawer_row_needs_input_state">Serve il tuo intervento</string>
     <string name="drawer_row_working_state">In elaborazione</string>
     <string name="drawer_row_unread_state">Da leggere</string>
+    <string name="drawer_row_unsent_failed_state">Invio non riuscito</string>
+    <string name="drawer_row_unsent_sending_state">Invio</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Impossibile richiedere l\'autorizzazione. Riprova.</string>

@@ -16,6 +16,7 @@ import ai.opencode.devtools.traces.TraceUploadsFeature
 import ai.opencode.feature.session.InAppNotice
 import ai.opencode.feature.composer.ComposerPersistence
 import ai.opencode.feature.composer.PromptOutbox
+import ai.opencode.feature.composer.UnsentDraft
 import ai.opencode.feature.composer.DraftState
 import ai.opencode.feature.composer.SharedComposerDraft
 import ai.opencode.feature.composer.SharedDraftTarget
@@ -158,6 +159,8 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         val traces: TraceUploadsFeature.State = TraceUploadsFeature.State(),
         /** Sends the server's session list has not reflected yet. */
         val localActivity: Map<String, LocalActivity> = emptyMap(),
+        /** New sessions whose first message only this phone has, listed above Recents. */
+        val unsentDrafts: List<UnsentDraft> = emptyList(),
         val pendingDeletion: OpenCodeSession? = null,
         val deletionError: String? = null,
         val recentlyDeletedIDs: Set<String> = emptySet(),
@@ -697,6 +700,8 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         /** The view opened the drawer `drawerOpenRequest` asked for. */
         data object DrawerOpenRequestHandled : Action
         data class SessionTapped(val sessionID: String) : Action
+        /** The unsent outbox changed: the list's unsent sessions are read again. */
+        data object UnsentDraftsChanged : Action
         data class TogglePin(val sessionID: String) : Action
         data class ToggleMute(val sessionID: String) : Action
         data class MovePinUp(val sessionID: String) : Action
@@ -789,6 +794,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         data object DeletionError : CancelID
         data object VoiceCallCommands : CancelID
         data object DictationCommands : CancelID
+        data object UnsentDrafts : CancelID
         data object SnapshotRetry : CancelID
         data object LastKnownActivity : CancelID
         data object NetworkPath : CancelID
@@ -1000,7 +1006,11 @@ fun HomeFeature.State.openingDetail(
     return s.copy(sessionDetail = detail)
 }
 
-fun HomeFeature.State.makeDraft(directory: String? = null, reason: String = "you started a new session"): Pair<HomeFeature.State, SessionFeature.State> {
+fun HomeFeature.State.makeDraft(
+    directory: String? = null,
+    reason: String = "you started a new session",
+    outboxDraftID: String? = null,
+): Pair<HomeFeature.State, SessionFeature.State> {
     val outgoingDirectory = sessionDetail?.session?.directory
     val (begun, transition) = beginningDetailTransition(defaultReason = reason, targetIsDraft = true)
     var s = begun
@@ -1016,7 +1026,7 @@ fun HomeFeature.State.makeDraft(directory: String? = null, reason: String = "you
         projects = projects,
         navigationID = transition.navID,
         visit = transition.visit,
-    )
+    ).copy(outboxDraftID = outboxDraftID)
     val voice = transition.activeVoice?.let { current ->
         val callDirectory = draft.draftProject?.directory ?: outgoingDirectory ?: current.target.directory
         current.retargetToDraft(directory = callDirectory, model = draft.currentModel, reason = transition.reason)
@@ -1025,6 +1035,20 @@ fun HomeFeature.State.makeDraft(directory: String? = null, reason: String = "you
     val (restored, withDraft) = s.restoringPersistedDraft(draft, preservesExplicitProject = directory != null)
     s = restored
     return s to withDraft
+}
+
+/** An unsent new session from the list: a draft on its own outbox lane, which shows its messages. */
+fun HomeFeature.State.openingUnsentDraft(unsent: UnsentDraft): HomeFeature.State {
+    val open = sessionDetail
+    if (catchUp == null && open != null && open.session == null && open.outboxDraftID == unsent.draftID) return this
+    val (s, draft) = makeDraft(unsent.directory.ifEmpty { null }, reason = "you opened it", outboxDraftID = unsent.draftID)
+    return s.copy(sessionDetail = draft)
+}
+
+/** The unsent session whose row is [sessionID], unless the server has the session by now. */
+fun HomeFeature.State.unsentDraft(sessionID: String): UnsentDraft? {
+    if (sessions.any { it.id == sessionID }) return null
+    return unsentDrafts.firstOrNull { it.sessionID == sessionID }
 }
 
 /** `sessionDetail = makeDraft(…)`. */
@@ -1174,8 +1198,8 @@ private fun HomeFeature.State.restoringPersistedDraft(
     var s = this
     var next = detail
     next = restoringPersistedPick(next)
-    if (next.session == null) {
-        val entry = persistence.loadOutbox(server.persistenceID, null).firstOrNull()
+    if (next.session == null && next.outboxDraftID != null) {
+        val entry = persistence.loadOutbox(server.persistenceID, null).firstOrNull { (it.draftID ?: it.pending.messageID) == next.outboxDraftID }
         if (entry != null) {
             val alreadyInOutbox = dependency(PromptOutbox).contains(entry.pending.messageID)
             // The prompt it was created with names it until the server does.

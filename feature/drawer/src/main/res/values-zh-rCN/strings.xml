@@ -120,6 +120,8 @@
     <string name="drawer_row_needs_input_state">需要你输入</string>
     <string name="drawer_row_working_state">工作中</string>
     <string name="drawer_row_unread_state">未读</string>
+    <string name="drawer_row_unsent_failed_state">发送失败</string>
+    <string name="drawer_row_unsent_sending_state">正在发送</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">无法请求权限，请重试。</string>

@@ -128,6 +128,8 @@
     <string name="drawer_row_needs_input_state">Precisa da sua resposta</string>
     <string name="drawer_row_working_state">Trabalhando</string>
     <string name="drawer_row_unread_state">Não lida</string>
+    <string name="drawer_row_unsent_failed_state">Não foi possível enviar</string>
+    <string name="drawer_row_unsent_sending_state">Enviando</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Não foi possível solicitar permissão. Tente novamente.</string>

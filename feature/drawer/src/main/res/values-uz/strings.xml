@@ -124,6 +124,8 @@
     <string name="drawer_row_needs_input_state">Javobingiz kerak</string>
     <string name="drawer_row_working_state">Bajarilmoqda</string>
     <string name="drawer_row_unread_state">O‘qilmagan</string>
+    <string name="drawer_row_unsent_failed_state">Yuborib bo‘lmadi</string>
+    <string name="drawer_row_unsent_sending_state">Yuborilmoqda</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Ruxsat so‘rab bo‘lmadi. Qayta urinib ko‘ring.</string>

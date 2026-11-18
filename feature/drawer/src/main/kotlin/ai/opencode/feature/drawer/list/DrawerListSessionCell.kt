@@ -157,7 +157,9 @@ fun DrawerListSessionCell(
         onDispose { currentActions.dismantled() }
     }
 
-    val emphasis = DrawerRowEmphasis.of(selected = row.selected, muted = row.muted, hasIndicator = row.indicator != Indicator.none)
+    val failed = row.unsent == DrawerListRow.Unsent.Failed
+    val hasStatus = row.indicator != Indicator.none || failed
+    val emphasis = DrawerRowEmphasis.of(selected = row.selected, muted = row.muted, hasIndicator = hasStatus)
     val weight = emphasis.weight(DrawerTunables.unreadWeight, DrawerTunables.readWeight)
     // While the drawer selects, the chosen rows' tint stands in for the open session's mark.
     val selection = if (row.selected && row.checked == null) DrawerTunables.selection else null
@@ -177,7 +179,7 @@ fun DrawerListSessionCell(
     val previousID = remember { arrayOf(row.session.id) }
     val animateStatus = previousID[0] == row.session.id
     previousID[0] = row.session.id
-    val statusPhase = if (row.indicator == Indicator.none) MotionPhase.Exit else MotionPhase.Enter
+    val statusPhase = if (hasStatus) MotionPhase.Enter else MotionPhase.Exit
     val statusSpec = if (animateStatus) MotionRole.MicroIn.animation<Float>(statusPhase, row.reducedMotion) else snap()
     val ringAlpha by animateFloatAsState(if (row.indicator == Indicator.running) 1f else 0f, statusSpec, label = "ring")
     val dotAlpha by animateFloatAsState(
@@ -185,9 +187,10 @@ fun DrawerListSessionCell(
         statusSpec,
         label = "dot",
     )
+    val failedAlpha by animateFloatAsState(if (failed) 1f else 0f, statusSpec, label = "failed")
     // The title makes room for the status on the indicator's own spring.
     val statusInset by animateDpAsState(
-        if (row.indicator == Indicator.none) 0.dp else DrawerListSessionCell.indicatorSize + DrawerTunables.statusGap,
+        if (!hasStatus) 0.dp else DrawerListSessionCell.indicatorSize + DrawerTunables.statusGap,
         if (animateStatus && !row.reducedMotion) MotionRole.MicroIn.animation() else snap(),
         label = "status-inset",
     )
@@ -291,7 +294,8 @@ fun DrawerListSessionCell(
                 .drawerRowInteraction(
                     interaction = DrawerRowInteraction(
                         sessionID = row.session.id,
-                        reorderable = true,
+                        reorderable = row.unsent == null,
+                        holdable = row.unsent == null,
                         isPinnedSection = row.isPinnedSection,
                         select = { currentActions.select() },
                         pressed = { currentActions.pressed() },
@@ -322,11 +326,13 @@ fun DrawerListSessionCell(
                     stateDescription = listOfNotNull(chosen, row.accessibilityValue.ifEmpty { null }).joinToString(", ")
                     role = Role.Button
                     onClick { currentActions.select(); true }
-                    if (row.checked == null) onLongClick(selectLabel) { currentActions.held(); true }
+                    if (row.checked == null && row.unsent == null) onLongClick(selectLabel) { currentActions.held(); true }
                     customActions = buildList {
-                        add(CustomAccessibilityAction(pinLabel) { currentActions.togglePin(); true })
-                        add(CustomAccessibilityAction(readLabel) { currentActions.toggleRead(); true })
-                        add(CustomAccessibilityAction(muteLabel) { currentActions.toggleMute(); true })
+                        if (row.unsent == null) {
+                            add(CustomAccessibilityAction(pinLabel) { currentActions.togglePin(); true })
+                            add(CustomAccessibilityAction(readLabel) { currentActions.toggleRead(); true })
+                            add(CustomAccessibilityAction(muteLabel) { currentActions.toggleMute(); true })
+                        }
                         add(CustomAccessibilityAction(deleteLabel) { currentActions.delete(); true })
                         if (row.isPinnedSection) {
                             add(CustomAccessibilityAction(moveUpLabel) { currentActions.movePinUp(); true })
@@ -410,6 +416,13 @@ fun DrawerListSessionCell(
                         size = (11 * density.fontScale).dp,
                         tint = if (row.indicator == Indicator.attention) DrawerListSessionCell.attentionColor(colors.isDark) else colors.signal,
                         modifier = Modifier.graphicsLayer { alpha = dotAlpha },
+                    )
+                    OpenCodeIcon(
+                        "exclamationmark.circle.fill",
+                        contentDescription = null,
+                        size = (15 * density.fontScale).dp,
+                        tint = colors.destructive,
+                        modifier = Modifier.graphicsLayer { alpha = failedAlpha },
                     )
                 }
             }

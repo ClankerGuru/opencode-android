@@ -120,6 +120,8 @@
     <string name="drawer_row_needs_input_state">입력이 필요해요</string>
     <string name="drawer_row_working_state">일하고 있는</string>
     <string name="drawer_row_unread_state">읽지 않음</string>
+    <string name="drawer_row_unsent_failed_state">보낼 수 없어요</string>
+    <string name="drawer_row_unsent_sending_state">보내는 중</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">권한을 요청할 수 없어요. 다시 시도해 주세요.</string>
