@@ -40,14 +40,13 @@ fun SessionBrowserPage(store: StoreOf<SessionFeature.State, SessionFeature.Actio
 
 /**
  * The browser's place in the session's stack while a page is open: stable for one visit, never a
- * subagent's identity, and its back swipe yields to the page's own history while it can go back.
+ * subagent's identity.
  */
 fun sessionBrowserStackPage(state: SessionFeature.State): SessionStackPage? {
     val pageID = state.browser.pageID ?: return null
     return SessionStackPage(
         id = browserStackPageID(pageID),
         paneTitle = state.browser.title.ifEmpty { null },
-        yieldsBackSwipe = { state.browser.canGoBack },
     )
 }
 

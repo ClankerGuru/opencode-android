@@ -39,6 +39,9 @@ by hand (`gh workflow run scheduled-release.yml`) to release sooner ([docs/relea
 - The full-screen media viewer's motion (open, close, drag to dismiss, predictive back) is Android-native
   on purpose: an animated frame and rounded clip in `MediaPresentation.kt`. Don't port iOS's viewer flight;
   the drawing hand-off into the composer still follows iOS.
+- The session's page stack (subagent and browser pages) is Android-native on purpose: one animated
+  shared-axis move in `SessionPageStack.kt` and system predictive back. Don't port iOS's full-width
+  back pan or its stack motion; covered pages still stay composed so they keep their state.
 
 ## Modules (fixed; never edit `settings.gradle.kts`)
 
