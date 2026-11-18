@@ -1,23 +1,13 @@
 package ai.opencode.feature.transcript.markdown.ui
 
-import ai.opencode.core.motion.TransitionBlur
-
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
-import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.feature.transcript.selection.LocalTranscriptReplySelection
 import ai.opencode.feature.transcript.selection.TranscriptSelectionLeafKey
 import ai.opencode.feature.transcript.selection.transcriptSelectionAnchor
-import androidx.compose.ui.graphics.BlurEffect
-import androidx.compose.ui.graphics.ColorMatrix
-import androidx.compose.ui.graphics.TileMode
-import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
-import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.text.drawText
-import androidx.compose.ui.unit.IntSize
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
@@ -69,8 +59,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.dp
-import kotlin.math.roundToInt
 import ai.opencode.feature.media.LinkMenu
 import ai.opencode.feature.media.LinkMenuHandler
 import ai.opencode.feature.media.LinkMenuText
@@ -135,23 +123,6 @@ internal fun ArrivingText(
     val active = if (presented.hasMath) emptyList() else arrivals.filter { now - it.time < it.duration }
     val ends = active.maxOfOrNull { it.time + it.duration }
     val frame = rememberRevealFrame(ends, reveal.now)
-    // A change shows on the next chunk.
-    val revealStyle = StreamTextRevealStyle.current
-    val reduceMotion = rememberReduceMotion()
-    val sweep = if (revealStyle == StreamTextRevealStyle.Chunk) {
-        null
-    } else {
-        SweepParameters(
-            focus = revealStyle == StreamTextRevealStyle.Focus,
-            feather = TextRevealTunables.feather.value,
-            // Points → px; Reduce Motion drops the blur.
-            blurRadius = if (reduceMotion || !TransitionBlur.enabled) 0f else with(density) { TextRevealTunables.blurRadius.value.toFloat().dp.toPx() },
-            blurPoints = if (reduceMotion || !TransitionBlur.enabled) 0.0 else TextRevealTunables.blurRadius.value,
-            lift = TextRevealTunables.phosphorLift.value,
-        )
-    }
-    // Focus's blur steps share a few layers, one per step.
-    val blurLayers = if (sweep?.focus == true && sweep.blurPoints > 0) List(SweepParameters.STEPS) { rememberGraphicsLayer() } else null
     // Offscreen layer for DstOut/Plus chunk fades (drawn inside `drawWithContent` instead of
     // `Modifier.graphicsLayer`, whose `BlockGraphicsLayerModifier` invalidated Text semantics on
     // every chunk).
@@ -230,11 +201,7 @@ internal fun ArrivingText(
                                 if (chipGlyphs != null) {
                                     for (chip in presented.chips) drawChipGlyph(result, chip, emPx, chipStyle, chipGlyphs)
                                 }
-                                if (sweep == null) {
-                                    eraseArriving(result, active, drawNow)
-                                } else {
-                                    sweepArriving(result, active, drawNow, sweep, blurLayers)
-                                }
+                                eraseArriving(result, active, drawNow)
                             }
                             drawLayer(offscreenLayer)
                         } else {
@@ -356,85 +323,6 @@ private fun DrawScope.eraseArriving(layout: TextLayoutResult, active: List<Trans
         if (hidden <= 0.004f) continue
         val path: Path = layout.getPathForRange(start, end)
         drawPath(path, Color.Black, alpha = hidden, blendMode = BlendMode.DstOut)
-    }
-}
-
-/** The Frontier and Focus sweeps' knobs, read once per composition. */
-private class SweepParameters(
-    val focus: Boolean,
-    val feather: Double,
-    /** Px. */
-    val blurRadius: Float,
-    val blurPoints: Double,
-    val lift: Double,
-) {
-    companion object {
-        /** Focus blurs glyphs in this many steps, one layer each. */
-        const val STEPS = 6
-    }
-}
-
-/**
- * Frontier and Focus: each arriving chunk's glyphs reveal in reading order, a feathered frontier
- * crossing the chunk ([StreamTextRevealStyle.sweepAlpha]). A glyph still sharp is erased by `1 -
- * alpha` in place; under Focus one still arriving is erased whole and drawn again into the layer of
- * its blur step (blurred by how far it still has to go and brightened by the phosphor lift), so
- * glyphs share a few layers instead of one each. Untouched text never moves; by the end every glyph
- * is at full opacity, so handing the chunk back to the plain text never changes a pixel.
- */
-private fun DrawScope.sweepArriving(
-    layout: TextLayoutResult,
-    active: List<TranscriptTextReveal.Arrival>,
-    now: Double,
-    sweep: SweepParameters,
-    blurLayers: List<GraphicsLayer>?,
-) {
-    val length = layout.layoutInput.text.length
-    val sorted = active.sortedBy { it.offset }
-    val steps = SweepParameters.STEPS
-    val blurred = if (sweep.focus && sweep.blurPoints > 0 && blurLayers != null) Array(steps + 1) { mutableListOf<Pair<Rect, Float>>() } else null
-    for ((index, arrival) in sorted.withIndex()) {
-        val start = arrival.offset.coerceIn(0, length)
-        val end = (if (index + 1 < sorted.size) sorted[index + 1].offset else length).coerceIn(start, length)
-        if (end <= start) continue
-        val u = ((now - arrival.time) / maxOf(0.01, arrival.duration)).coerceIn(0.0, 1.0)
-        if (u >= 1) continue
-        val count = end - start
-        for (offset in start until end) {
-            val position = (offset - start + 0.5) / count
-            val alpha = StreamTextRevealStyle.sweepAlpha(u, position, sweep.feather)
-            if (alpha >= 0.996) continue
-            val box = layout.getBoundingBox(offset)
-            if (box.width <= 0f || box.height <= 0f) continue
-            val step = if (blurred != null) ((1 - alpha) * steps).roundToInt() else 0
-            if (step == 0 || alpha <= 0.004) {
-                drawRect(Color.Black, box.topLeft, box.size, alpha = (1 - alpha).toFloat(), blendMode = BlendMode.DstOut)
-            } else {
-                drawRect(Color.Black, box.topLeft, box.size, blendMode = BlendMode.DstOut)
-                blurred!![step] += box to alpha.toFloat()
-            }
-        }
-    }
-    if (blurred == null || blurLayers == null) return
-    for (step in 1..steps) {
-        val glyphs = blurred[step]
-        if (glyphs.isEmpty()) continue
-        val layer = blurLayers[step - 1]
-        val remaining = step.toDouble() / steps
-        val radius = (remaining * sweep.blurRadius).toFloat()
-        layer.renderEffect = if (remaining * sweep.blurPoints >= 0.25) BlurEffect(radius, radius, TileMode.Decal) else null
-        val boost = (1 + sweep.lift * remaining).toFloat()
-        layer.colorFilter = if (boost > 1.001f) {
-            ColorFilter.colorMatrix(ColorMatrix().apply { setToScale(boost, boost, boost, 1f) })
-        } else {
-            null
-        }
-        layer.record(IntSize(size.width.roundToInt(), size.height.roundToInt())) {
-            for ((box, alpha) in glyphs) {
-                clipRect(box.left, box.top, box.right, box.bottom) { drawText(layout, alpha = alpha) }
-            }
-        }
-        drawLayer(layer)
     }
 }
 
