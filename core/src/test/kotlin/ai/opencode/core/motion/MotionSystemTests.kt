@@ -7,9 +7,6 @@ import ai.opencode.core.tuning.TuningStore
 import ai.opencode.core.tuning.TuningTitle
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.MonotonicFrameClock
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.test.runTest
@@ -246,30 +243,6 @@ class MotionSystemTests {
         // Continuous at the ends.
         assertTrue(abs(band.band(-1e-6, bounds) - 0) < 1e-5)
         assertTrue(abs(band.band(240 + 1e-6, bounds) - 240) < 1e-5)
-    }
-
-    /** Compose geometry is `Float`, so the exactness tolerances are float-sized. */
-    @Test
-    fun flightWidthLeadsHeightAndLandsExactly() {
-        val from = Rect(offset = Offset(20f, 30f), size = Size(56f, 56f))
-        val to = Rect(offset = Offset(200f, 10f), size = Size(144f, 88f))
-        assertEquals(from, MotionFlightGeometry.rect(from, to, progress = 0f))
-        val landed = MotionFlightGeometry.rect(from, to, progress = 1f)
-        assertTrue(abs(landed.left - to.left) < 1e-4 && abs(landed.width - to.width) < 1e-4 && abs(landed.height - to.height) < 1e-4)
-        val mid = MotionFlightGeometry.rect(from, to, progress = 0.3f, lead = 1.65f)
-        val widthProgress = (mid.width - from.width) / (to.width - from.width)
-        val heightProgress = (mid.height - from.height) / (to.height - from.height)
-        assertTrue("width leads", widthProgress > heightProgress + 0.05f)
-        assertTrue(abs(heightProgress - 0.3f) < 1e-5)
-        assertTrue("the centre travels on the spring", abs(mid.center.x - (from.center.x + (to.center.x - from.center.x) * 0.3f)) < 1e-4)
-        var previous = -1f
-        for (step in 0..100) {
-            val p = step / 100f
-            val lead = MotionFlightGeometry.leading(p, 1.65f)
-            assertTrue(lead >= previous && lead >= p - 1e-6f)
-            previous = lead
-        }
-        assertEquals("no lead is linear", 0.5f, MotionFlightGeometry.leading(0.5f, 1f))
     }
 
     @Test

@@ -3,7 +3,6 @@ package ai.opencode.devtools.playgrounds
 import ai.opencode.core.motion.AmbientClock
 import ai.opencode.core.motion.AmbientTimeline
 import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.MotionFlightGeometry
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionPresence
 import ai.opencode.core.motion.MotionRelease
@@ -54,7 +53,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -89,7 +87,6 @@ fun MotionPlaygroundView(modifier: Modifier = Modifier) {
         SwapStage(reduceMotion)
         PressStage(reduceMotion)
         ReleaseStage(reduceMotion)
-        FlightStage(reduceMotion)
         AmbientStage(reduceMotion)
     }
 }
@@ -233,30 +230,6 @@ private fun ReleaseStage(reduceMotion: Boolean) {
                             )
                         },
                     ),
-            )
-        }
-    }
-}
-
-/** A thumbnail flies between two frames, its width leading its height. */
-@Composable
-private fun FlightStage(reduceMotion: Boolean) {
-    val scope = rememberCoroutineScope()
-    val progress = remember { Animatable(0f) }
-    var isLanded by remember { mutableStateOf(false) }
-    MotionStage("Flight", if (isLanded) "Return" else "Fly", {
-        isLanded = !isLanded
-        val phase = if (isLanded) MotionPhase.Enter else MotionPhase.Exit
-        scope.launch { progress.animateTo(if (isLanded) 1f else 0f, Motion.flight.animation(phase, reduceMotion)) }
-    }) {
-        BoxWithConstraints(Modifier.fillMaxWidth().height(120.dp)) {
-            val width = maxWidth.value
-            val from = Rect(0f, 32f, 56f, 88f)
-            val to = Rect(width - 144f, 16f, width, 104f)
-            val rect = MotionFlightGeometry.rect(from, to, progress.value)
-            Box(
-                Modifier.offset(rect.left.dp, rect.top.dp).size(rect.width.dp, rect.height.dp)
-                    .clip(OpenCodeShape.card).background(OpenCodeTheme.colors.signal),
             )
         }
     }
