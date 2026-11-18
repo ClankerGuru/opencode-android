@@ -7,7 +7,6 @@ import ai.opencode.core.dependencies.DependencyKey
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.MotionBlurReveal
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.motionBlurReveal
 import ai.opencode.core.motion.rememberReduceMotion
@@ -34,8 +33,12 @@ import android.location.LocationRequest
 import android.net.Uri
 import android.provider.Settings
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -70,7 +73,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -602,40 +604,25 @@ private fun MapPin() {
 /**
  * Unified composer location attachment card that keeps a single stable
  * `220 × (72 + compactFooterHeight)` frame across “Finding Location…” and the resolved
- * [SharedLocationCard], animating in once (the session's `PresenceGate` drives [gateProgress]:
- * `Motion.layout`'s enter in, its exit out) and revealing the map and address in
- * place with [motionBlurReveal] when ready, without a second pop or height snap.
- *
- * [gateProgress] is the gate's target (0 or 1); this animates toward it and reports [onGateSettled]
- * when it lands, so the session can complete its gate generation.
+ * [SharedLocationCard], fading and scaling in once on `Motion.layout` (a fade alone under Reduce
+ * Motion) and revealing the map and address in place with [motionBlurReveal] when ready, without a
+ * second pop or height snap.
  */
 @Composable
 fun ComposerLocationAttachment(
     location: SharedLocation?,
     isLocating: Boolean,
-    gateProgress: Float,
-    onAppear: () -> Unit,
     onRemove: () -> Unit,
     onOpen: (String) -> Unit,
     modifier: Modifier = Modifier,
-    onGateSettled: (Float) -> Unit = {},
 ) {
     val reduceMotion = rememberReduceMotion()
     val footerHeight = SharedLocationCard.compactFooterHeight()
     val cardHeight = SharedLocationCard.compactMapHeight + footerHeight
     var displayedLocation by remember { mutableStateOf(location) }
     val resolved = remember { Animatable(if (location != null) 1f else 0f) }
-    // Mounted already presented (a reset gate) it shows at once; mounted by a request it waits for onAppear.
-    val gate = remember { Animatable(gateProgress) }
     val activeLocation = location ?: displayedLocation
 
-    LaunchedEffect(Unit) { onAppear() }
-    LaunchedEffect(gateProgress) {
-        val spec = Motion.layout.animation<Float>(if (gateProgress >= 1f) MotionPhase.Enter else MotionPhase.Exit, reduceMotion)
-        if (gate.value == gateProgress) return@LaunchedEffect
-        gate.animateTo(gateProgress, spec)
-        onGateSettled(gateProgress)
-    }
     LaunchedEffect(location) {
         if (location != null) {
             displayedLocation = location
@@ -649,51 +636,46 @@ fun ComposerLocationAttachment(
         }
     }
 
-    val metrics = ComposerLocationEntrance.metrics(gate.value, resolved.value, cardHeight.value, reduceMotion)
-    Box(
-        modifier
-            .graphicsLayer {
-                scaleX = metrics.scale
-                scaleY = metrics.scale
-                transformOrigin = TransformOrigin(0f, 1f)
-                alpha = metrics.opacity
+    val appearing = remember { MutableTransitionState(false).apply { targetState = true } }
+    val spec = Motion.layout.animation<Float>(MotionPhase.Enter, reduceMotion)
+    var enter = fadeIn(spec)
+    if (!reduceMotion) enter += scaleIn(spec, initialScale = 0.965f, transformOrigin = TransformOrigin(0f, 1f))
+    AnimatedVisibility(appearing, modifier, enter = enter) {
+        Box(contentAlignment = Alignment.TopEnd) {
+            val progress = resolved.value
+            Box(
+                Modifier
+                    .size(SharedLocationCard.compactWidth, cardHeight)
+                    .clip(RoundedCornerShape(SharedLocationCard.cornerRadius))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            ) {
+                if (progress < 1f) {
+                    LocatingSurface(
+                        footerHeight = footerHeight,
+                        cardHeight = cardHeight,
+                        isHidden = activeLocation != null,
+                        modifier = Modifier
+                            .alpha(maxOf(0f, 1f - progress * 2.2f))
+                            .then(if (!reduceMotion && progress > 0f) Modifier.transitionBlur(Motion.blurSubtle * progress.coerceIn(0f, 1f)) else Modifier),
+                    )
+                }
+                if (activeLocation != null) {
+                    SharedLocationCard(
+                        activeLocation,
+                        onOpen = onOpen,
+                        compact = true,
+                        modifier = Modifier.motionBlurReveal(progress, Motion.blurSubtle, reduceMotion = reduceMotion),
+                    )
+                }
             }
-            .then(if (metrics.blur > 0f) Modifier.transitionBlur(metrics.blur.dp) else Modifier),
-        contentAlignment = Alignment.TopEnd,
-    ) {
-        val progress = resolved.value
-        Box(
-            Modifier
-                .size(SharedLocationCard.compactWidth, cardHeight)
-                .clip(RoundedCornerShape(SharedLocationCard.cornerRadius))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-        ) {
-            if (progress < 1f) {
-                LocatingSurface(
-                    footerHeight = footerHeight,
-                    cardHeight = cardHeight,
-                    isHidden = activeLocation != null,
-                    modifier = Modifier
-                        .alpha(maxOf(0f, 1f - progress * 2.2f))
-                        .then(if (!reduceMotion && progress > 0f) Modifier.transitionBlur(Motion.blurSubtle * progress.coerceIn(0f, 1f)) else Modifier),
-                )
-            }
-            if (activeLocation != null) {
-                SharedLocationCard(
-                    activeLocation,
-                    onOpen = onOpen,
-                    compact = true,
-                    modifier = Modifier.motionBlurReveal(progress, Motion.blurSubtle, reduceMotion = reduceMotion),
-                )
-            }
+            val removeLabel = if (location != null) stringResource(R.string.composer_location_remove_description) else stringResource(R.string.composer_location_cancel_description)
+            ComposerRemoveBadge(
+                label = removeLabel,
+                testTag = if (location != null) "remove-pending-location" else "cancel-pending-location",
+                onClick = onRemove,
+                modifier = Modifier.offset(x = 8.dp, y = (-8).dp),
+            )
         }
-        val removeLabel = if (location != null) stringResource(R.string.composer_location_remove_description) else stringResource(R.string.composer_location_cancel_description)
-        ComposerRemoveBadge(
-            label = removeLabel,
-            testTag = if (location != null) "remove-pending-location" else "cancel-pending-location",
-            onClick = onRemove,
-            modifier = Modifier.offset(x = 8.dp, y = (-8).dp),
-        )
     }
 }
 
@@ -763,28 +745,6 @@ internal fun ComposerRemoveBadge(label: String, testTag: String, onClick: () -> 
     ) {
         Box(Modifier.size(12.dp).background(Color.White, RoundedCornerShape(50)))
         OpenCodeIcon(SFSymbol.XmarkCircleFill, contentDescription = null, size = 22.dp, tint = Color.Black.copy(alpha = 0.65f))
-    }
-}
-
-/** The card's single continuous scale + blur + opacity entrance; the per-frame lab trace is n/a. */
-object ComposerLocationEntrance {
-    /** Subtle scale origin for the entrance (0.965 → 1), keeping each frame's height step small. */
-    const val ENTRANCE_SCALE = 0.965f
-
-    data class Metrics(val scale: Float, val opacity: Float, val blur: Float, val height: Float, val resolved: Float)
-
-    fun metrics(
-        gateProgress: Float,
-        resolvedProgress: Float,
-        cardHeight: Float = (SharedLocationCard.compactMapHeight + SharedLocationCard.defaultCompactFooterHeight).value,
-        reduceMotion: Boolean,
-    ): Metrics {
-        val clamped = gateProgress.coerceIn(0f, 1f)
-        val resolved = resolvedProgress.coerceIn(0f, 1f)
-        val scale = if (reduceMotion) 1f else ENTRANCE_SCALE + (1 - ENTRANCE_SCALE) * clamped
-        val opacity = if (clamped <= 0.02f) 0f else clamped
-        val blur = MotionBlurReveal.blurRadius(clamped, Motion.blurSubtle.value, reduceMotion)
-        return Metrics(scale, opacity, blur, cardHeight * scale, resolved)
     }
 }
 

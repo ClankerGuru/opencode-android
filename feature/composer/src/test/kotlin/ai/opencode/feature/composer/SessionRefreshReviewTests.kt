@@ -98,39 +98,6 @@ class SharedLocationTests {
         store.finish()
     }
 
-    @Test fun locationEntranceTraceHasOneContinuousEntranceWithNoHeightJumpAbove1_5pt() {
-        // 20 frames of entrance (0 -> 1) with resolution starting mid-flight at frame 10 and
-        // completing across frames 10...28: one continuous entrance, zero second pop.
-        val samples = (0..28).map { frame ->
-            val gateProgress = minOf(1f, frame / 18f)
-            val resolvedProgress = if (frame < 10) 0f else minOf(1f, (frame - 10) / 18f)
-            ComposerLocationEntrance.metrics(gateProgress = gateProgress, resolvedProgress = resolvedProgress, reduceMotion = false)
-        }
-        assertTrue(abs(samples.first().scale - ComposerLocationEntrance.ENTRANCE_SCALE) < 0.01)
-        assertTrue(abs(samples.last().scale - 1) < 0.01)
-        assertEquals(0f, samples.first().opacity)
-        assertTrue(abs(samples.last().opacity - 1) < 0.01)
-        assertTrue(abs(samples.last().resolved - 1) < 0.01)
-        for (index in 1 until samples.size) {
-            assertTrue(samples[index].scale >= samples[index - 1].scale - 0.001f)
-            assertTrue(samples[index].opacity >= samples[index - 1].opacity - 0.001f)
-        }
-        val maxJump = (1 until samples.size).maxOf { abs(samples[it].height - samples[it - 1].height) }
-        assertTrue("Max frame-to-frame height jump was $maxJump pt (> 1.5 pt)", maxJump <= 1.5f)
-
-        // Reduce Motion: constant scale = 1, blur = 0, height jump = 0, opacity cross-fades 0 -> 1.
-        val reduced = (0..10).map { step ->
-            val progress = step / 10f
-            ComposerLocationEntrance.metrics(gateProgress = progress, resolvedProgress = progress, reduceMotion = true).also {
-                assertEquals(1f, it.scale)
-                assertEquals(0f, it.blur)
-            }
-        }
-        assertEquals(0f, (1 until reduced.size).maxOf { abs(reduced[it].height - reduced[it - 1].height) })
-        assertEquals(0f, reduced.first().opacity)
-        assertTrue(abs(reduced.last().opacity - 1) < 0.01)
-    }
-
     @Test fun locationTappedDeliversLocationAfterPrefetchTimeoutAndLoadsMapAsyncWithoutHeightChange() = runTest {
         assertEquals(1200.milliseconds, LocationClient.DEFAULT_PREFETCH_TIMEOUT)
 
@@ -168,14 +135,8 @@ class SharedLocationTests {
             assertEquals(1, snapshotAttempts)
             assertNotNull(hung)
 
-            // When the card mounts with no cached map and the map finishes loading async, its
-            // compact size stays constant, with zero height change.
-            val beforeAsyncMap = ComposerLocationEntrance.metrics(gateProgress = 1f, resolvedProgress = 1f, reduceMotion = false)
             assertSame(stub, client.snapshot(spot, compactMapSize, true))
             assertEquals(2, snapshotAttempts)
-            val afterAsyncMap = ComposerLocationEntrance.metrics(gateProgress = 1f, resolvedProgress = 1f, reduceMotion = false)
-            assertEquals((SharedLocationCard.compactMapHeight + SharedLocationCard.defaultCompactFooterHeight).value, beforeAsyncMap.height)
-            assertEquals(beforeAsyncMap.height, afterAsyncMap.height)
             store.finish()
         } finally {
             hung?.resumeWith(Result.success(null))
