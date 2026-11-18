@@ -124,6 +124,8 @@
     <string name="drawer_row_needs_input_state">საჭიროა თქვენი პასუხი</string>
     <string name="drawer_row_working_state">მუშაობს</string>
     <string name="drawer_row_unread_state">წაუკითხავი</string>
+    <string name="drawer_row_unsent_failed_state">გაგზავნა ვერ მოხერხდა</string>
+    <string name="drawer_row_unsent_sending_state">იგზავნება</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">ნებართვის მოთხოვნა ვერ მოხერხდა. ხელახლა სცადეთ.</string>

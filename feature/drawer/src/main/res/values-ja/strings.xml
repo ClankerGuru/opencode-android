@@ -120,6 +120,8 @@
     <string name="drawer_row_needs_input_state">入力が必要です</string>
     <string name="drawer_row_working_state">作業中</string>
     <string name="drawer_row_unread_state">未読</string>
+    <string name="drawer_row_unsent_failed_state">送信できませんでした</string>
+    <string name="drawer_row_unsent_sending_state">送信中</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">権限をリクエストできませんでした。もう一度試してください。</string>

@@ -124,6 +124,8 @@
     <string name="drawer_row_needs_input_state">Deine Eingabe ist nötig</string>
     <string name="drawer_row_working_state">In Arbeit</string>
     <string name="drawer_row_unread_state">Ungelesen</string>
+    <string name="drawer_row_unsent_failed_state">Senden fehlgeschlagen</string>
+    <string name="drawer_row_unsent_sending_state">Wird gesendet</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Berechtigung konnte nicht angefragt werden. Versuche es erneut.</string>

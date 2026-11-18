@@ -132,6 +132,8 @@
     <string name="drawer_row_needs_input_state">Je potřeba vaše reakce</string>
     <string name="drawer_row_working_state">Pracuje</string>
     <string name="drawer_row_unread_state">Nepřečtené</string>
+    <string name="drawer_row_unsent_failed_state">Nepodařilo se odeslat</string>
+    <string name="drawer_row_unsent_sending_state">Odesílání</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Nepodařilo se požádat o oprávnění. Zkuste to znovu.</string>

@@ -12,6 +12,7 @@ import ai.opencode.core.store.cancellable
 import ai.opencode.feature.drawer.HomeFeature.Action
 import ai.opencode.feature.drawer.HomeFeature.State
 import ai.opencode.feature.composer.ComposerPersistence
+import ai.opencode.feature.composer.unsentDrafts
 import ai.opencode.feature.session.SessionFeature
 import ai.opencode.feature.session.sessionComposer
 import ai.opencode.feature.system.liveactivity.DictationLiveActivityClient
@@ -47,9 +48,11 @@ import ai.opencode.core.tuning.DeveloperMode
 internal fun HomeFeature.reduceConnection(state: State, action: Action): HomeReduced = when (action) {
     Action.Task -> {
         LabMarks.mark("home_task_started")
-        val s = if (state.isConnected) state.initializingInbox() else state
+        var s = if (state.isConnected) state.initializingInbox() else state
         // A restored session was open before any change could publish it.
         dependency(EventStreamFocusClient).publish(streamFocusOwner, s.streamFocusSessionIDs)
+        val composerPersistence = dependency(ComposerPersistence)
+        s = s.copy(unsentDrafts = composerPersistence.unsentDrafts(s.server.persistenceID))
         val load = if (s.isConnected) Reduced(s, Effect.merge(refreshAttention(s), resolveActiveAncestry(s))) else refreshSnapshot(s)
         // The call's and the recording's ongoing-notification buttons.
         val voiceLiveActivity = dependency(VoiceLiveActivityClient)
@@ -62,6 +65,8 @@ internal fun HomeFeature.reduceConnection(state: State, action: Action): HomeRed
                     .cancellable(HomeFeature.CancelID.VoiceCallCommands, cancelInFlight = true),
                 Effect.run<Action> { send -> dictationLiveActivity.commands().collect { send(Action.DictationCommandReceived(it)) } }
                     .cancellable(HomeFeature.CancelID.DictationCommands, cancelInFlight = true),
+                Effect.run<Action> { send -> composerPersistence.outboxChanges.collect { send(Action.UnsentDraftsChanged) } }
+                    .cancellable(HomeFeature.CancelID.UnsentDrafts, cancelInFlight = true),
             ),
         )
     }

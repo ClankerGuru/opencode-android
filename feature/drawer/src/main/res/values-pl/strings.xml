@@ -132,6 +132,8 @@
     <string name="drawer_row_needs_input_state">Potrzebna jest twoja odpowiedź</string>
     <string name="drawer_row_working_state">Pracuje</string>
     <string name="drawer_row_unread_state">Nieprzeczytane</string>
+    <string name="drawer_row_unsent_failed_state">Nie udało się wysłać</string>
+    <string name="drawer_row_unsent_sending_state">Wysyłanie</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Nie udało się poprosić o uprawnienie. Spróbuj ponownie.</string>

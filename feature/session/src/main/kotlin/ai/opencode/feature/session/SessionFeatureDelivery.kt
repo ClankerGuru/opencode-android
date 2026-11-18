@@ -177,8 +177,8 @@ internal fun SessionFeature.Companion.deliveryJob(
                 }
             }
 
-            // Kept until Retry, Edit, or Delete: if this screen is gone, reopening the session (or the
-            // next new draft) shows it again.
+            // Kept until Retry, Edit, or Delete: if this screen is gone, reopening the session (or its
+            // unsent draft from the session list) shows it again.
             fun failed(sessionID: String?, created: OpenCodeSession?, error: OpenCodeClientError): DeliveryOutcome {
                 if (handle.intent().cancelled) return DeliveryOutcome.Withdrawn(sessionID, created)
                 undeliveredPrompts.keep(handle.current(), error.message, server.persistenceID, sessionID ?: created?.id)

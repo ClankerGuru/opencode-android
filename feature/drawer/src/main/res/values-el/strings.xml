@@ -124,6 +124,8 @@
     <string name="drawer_row_needs_input_state">Χρειάζεται η συμβολή σας</string>
     <string name="drawer_row_working_state">Εργασία</string>
     <string name="drawer_row_unread_state">Αδιάβαστη</string>
+    <string name="drawer_row_unsent_failed_state">Αδυναμία αποστολής</string>
+    <string name="drawer_row_unsent_sending_state">Αποστολή</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Αδυναμία αιτήματος άδειας. Δοκιμάστε ξανά.</string>

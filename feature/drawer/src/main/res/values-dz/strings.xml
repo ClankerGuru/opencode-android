@@ -120,6 +120,8 @@
     <string name="drawer_row_needs_input_state">ཁྱོད་ཀྱི་ལན་དགོཔ་ཨིན།</string>
     <string name="drawer_row_working_state">ལཱ་འབད་དོ།</string>
     <string name="drawer_row_unread_state">མ་ལྷགཔ།</string>
+    <string name="drawer_row_unsent_failed_state">གཏང་མ་ཚུགས།</string>
+    <string name="drawer_row_unsent_sending_state">གཏང་དོ།</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">གནང་བ་ཞུ་མ་ཚུགས། བསྐྱར་དུ་ཚོད་ལྟ་འབད།</string>

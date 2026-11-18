@@ -555,19 +555,24 @@ class ComposerPersistenceTests {
                 .updateWorkingRun(oldSignal)
         }
 
-        // While the send is still in flight in-process (`alreadyInOutbox == true`), reopening a New Session
-        // draft where `draftProject` defaulted to `projects.first` must restore `outboxDraftID` before the
-        // `alreadyInOutbox` guard and let the persisted entry's directory win over `projects.first`.
-        var probeState = h.draftState(project, listOf(project, secondProject)).copy(models = listOf(claudeModel))
+        val probeValues = h.values.update {
+            this[ComposerPersistence] = persistence
+            this[PromptOutbox] = sharedOutbox
+            this[UndeliveredPrompts] = sharedUndelivered
+        }
+        // A new draft starts blank while the send is still in flight.
+        val freshState = h.draftState(project, listOf(project, secondProject)).copy(models = listOf(claudeModel))
+        val freshRestored = DependencyValues.withValues(probeValues) { SessionFeature().restorePersistedComposer(freshState) }
+        assertNull("A new draft doesn't adopt another draft's send", freshRestored.outboxDraftID)
+        assertEquals(project, freshRestored.draftProject)
+        assertTrue(freshRestored.items.isEmpty())
+
+        // Reopening the unsent draft (`alreadyInOutbox == true`) lets the persisted entry's directory
+        // win over `projects.first`.
+        var probeState = freshState.copy(outboxDraftID = firstID)
         assertEquals(project, probeState.draftProject)
-        probeState = DependencyValues.withValues(
-            h.values.update {
-                this[ComposerPersistence] = persistence
-                this[PromptOutbox] = sharedOutbox
-                this[UndeliveredPrompts] = sharedUndelivered
-            },
-        ) { SessionFeature().restorePersistedComposer(probeState) }
-        assertEquals("outboxDraftID restores even when alreadyInOutbox is true", firstID, probeState.outboxDraftID)
+        probeState = DependencyValues.withValues(probeValues) { SessionFeature().restorePersistedComposer(probeState) }
+        assertEquals(firstID, probeState.outboxDraftID)
         assertEquals("Persisted entry's directory wins over projects.first", secondProject, probeState.draftProject)
 
         firstStore.send(Action.SceneEnteredBackground) { it.copy(isBackgrounded = true) }
@@ -616,7 +621,7 @@ class ComposerPersistenceTests {
         val wrongSessions = LockIsolated(listOf<String>())
 
         freshHarness { h2 ->
-            val relaunchedDraftState = h2.draftState(project, listOf(project, secondProject)).copy(models = listOf(claudeModel))
+            val relaunchedDraftState = h2.draftState(project, listOf(project, secondProject)).copy(models = listOf(claudeModel), outboxDraftID = firstID)
             val relaunchedStore = h2.store(relaunchedDraftState) {
                 this[UuidClient] = UuidClient.incrementing()
                 this[Clock] = ImmediateClock()
@@ -642,7 +647,7 @@ class ComposerPersistenceTests {
 
             relaunchedStore.send(Action.Task) {
                 val oldSignal = it.workingRunSignal
-                it.copy(outboxDraftID = firstID, draftProject = secondProject, isAwaitingReply = true)
+                it.copy(draftProject = secondProject, isAwaitingReply = true)
                     .sent(firstID, "Start in second project")
                     .updateWorkingRun(oldSignal)
             }
@@ -744,14 +749,14 @@ class ComposerPersistenceTests {
         firstStore.finish()
         stateFile.writeBytes(frozenMidSend)
 
-        // Relaunch with a New Session draft state: it must adopt `createdSession` and send to `createdSession.id`
+        // Relaunch into that draft: it must adopt `createdSession` and send to `createdSession.id`
         // without calling `createSession` again.
         val secondPersistence = live()
         val createSessionCalls = LockIsolated(0)
         val postedSessions = LockIsolated(listOf<String>())
 
         val relaunchedState = h.draftState(project, listOf(project, secondProject))
-            .copy(models = listOf(claudeModel), initialTranscriptRequestIsExternal = true)
+            .copy(models = listOf(claudeModel), initialTranscriptRequestIsExternal = true, outboxDraftID = firstID)
         val secondStore = h.store(relaunchedState) {
             this[UuidClient] = UuidClient.incrementing()
             this[Clock] = ImmediateClock()

@@ -120,6 +120,8 @@
     <string name="drawer_row_needs_input_state">Cần bạn phản hồi</string>
     <string name="drawer_row_working_state">Đang làm việc</string>
     <string name="drawer_row_unread_state">Chưa đọc</string>
+    <string name="drawer_row_unsent_failed_state">Không thể gửi</string>
+    <string name="drawer_row_unsent_sending_state">Đang gửi</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Không thể yêu cầu cấp quyền. Hãy thử lại.</string>

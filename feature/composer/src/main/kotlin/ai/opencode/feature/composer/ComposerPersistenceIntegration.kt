@@ -1,5 +1,6 @@
 package ai.opencode.feature.composer
 
+import java.time.Instant
 import ai.opencode.core.strings.localized
 import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.OpenCodeProject
@@ -119,6 +120,52 @@ suspend fun ComposerPersistence.syncAndFlush(composers: List<Pair<PersistedCompo
     flush()
 }
 
+/**
+ * A new session whose first message hasn't reached the server, so only this phone has it. The
+ * session list shows it until the send creates its session or the message is deleted.
+ */
+data class UnsentDraft(
+    /** Its outbox lane (`SessionFeature.State.outboxDraftID`). */
+    val draftID: String,
+    /** The ID its session gets once the server creates it. */
+    val sessionID: String,
+    /** The first message's preview; null when it has no text. */
+    val title: String?,
+    val directory: String,
+    val updatedAt: Instant,
+    /** The send gave up and waits for Retry, Edit or Delete. */
+    val isFailed: Boolean,
+    val messageIDs: Set<String>,
+)
+
+/** [serverID]'s unsent new sessions, the newest first. */
+fun ComposerPersistence.unsentDrafts(serverID: String): List<UnsentDraft> {
+    val drafts = LinkedHashMap<String, UnsentDraft>()
+    for (entry in loadOutbox(serverID, null)) {
+        if (entry.createdSession != null || entry.sessionID != null) continue
+        val draftID = entry.draftID ?: entry.pending.messageID
+        val existing = drafts[draftID]
+        if (existing == null) {
+            drafts[draftID] = UnsentDraft(
+                draftID = draftID,
+                sessionID = entry.newSessionID,
+                title = SessionTitle.preview(entry.pending.text),
+                directory = entry.directory ?: "",
+                updatedAt = entry.updatedAt,
+                isFailed = entry.isHeld,
+                messageIDs = setOf(entry.pending.messageID),
+            )
+        } else {
+            drafts[draftID] = existing.copy(
+                updatedAt = maxOf(existing.updatedAt, entry.updatedAt),
+                isFailed = existing.isFailed || entry.isHeld,
+                messageIDs = existing.messageIDs + entry.pending.messageID,
+            )
+        }
+    }
+    return drafts.values.sortedByDescending { it.updatedAt }
+}
+
 /** What [restorePersistedComposer] changed; the session reducer applies it to its state. */
 data class PersistedComposerRestore(
     /** The draft to put in the composer, if one was restored. */
@@ -135,7 +182,8 @@ data class PersistedComposerRestore(
  * sends from a previous process into [PromptOutbox] (held ones also into [UndeliveredPrompts] as
  * “Couldn’t send message”), each under its original message and new-session IDs. Sends the
  * transcript already has ([existingMessageIDs]: prompt IDs in the items, less optimistic ones) are
- * settled.
+ * settled. A draft restores only its own lane ([outboxDraftID]): a new draft starts blank, and the
+ * others wait in the session list ([unsentDrafts]).
  *
  * [makeJob] is the session area's `restoredDeliveryJob`: the delivery job for the entry's
  * existing session ID, or a new session in `newSessionDirectory`, with `reconcileFirst: true`.
@@ -183,6 +231,8 @@ fun restorePersistedComposer(
         }
         val alreadyInOutbox = outbox.contains(id)
         if (currentSession == null) {
+            // A draft shows only its own sends: a new one starts blank.
+            if (became == null && (entry.draftID ?: id) != currentOutboxDraftID) continue
             // The prompt it was created with names it until the server does.
             val firstPrompt = SessionTitle.preview(entry.pending.text)
             val created = if (alreadyInOutbox) null else entry.createdSession?.learningFirstPrompt(firstPrompt) ?: entry.sessionID?.let { sessionID ->
@@ -210,9 +260,6 @@ fun restorePersistedComposer(
                 }
             } else {
                 if (entry.createdSession != null || entry.sessionID != null) continue
-                val draftID = entry.draftID ?: id
-                if (currentOutboxDraftID == null) currentOutboxDraftID = draftID
-                if (currentOutboxDraftID != draftID) continue
                 val directory = entry.directory
                 if (!directory.isNullOrEmpty()) currentProject = OpenCodeProject.folder(directory, projects)
             }

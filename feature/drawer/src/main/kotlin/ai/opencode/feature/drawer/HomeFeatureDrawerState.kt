@@ -4,6 +4,7 @@ import ai.opencode.feature.session.*
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.sharing.SharedKey
 import ai.opencode.feature.composer.ComposerPersistence
+import ai.opencode.feature.composer.UnsentDraft
 import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
 import ai.opencode.feature.media.BrowserFeature
@@ -14,6 +15,7 @@ import ai.opencode.feature.transcript.list.NewMessagesMark
 import ai.opencode.feature.drawer.catchup.CatchUpFeature
 import ai.opencode.server.ServerSharedKeys
 import ai.opencode.server.model.OpenCodeSession
+import ai.opencode.server.model.SessionTitle
 import ai.opencode.server.model.OpenCodeTranscriptItem
 import ai.opencode.server.model.SessionActivity
 import ai.opencode.server.model.learningFirstPrompt
@@ -233,6 +235,17 @@ private fun HomeFeature.State.catchUpSessions(status: StatusSnapshot): List<Open
         if (aWaiting != bWaiting) (if (aWaiting) -1 else 1) else b.updatedAt.compareTo(a.updatedAt)
     }
 }
+
+/** The unsent session as a list row: named by its first message until the server names it. */
+val UnsentDraft.placeholderSession: OpenCodeSession
+    get() = OpenCodeSession(
+        id = sessionID,
+        serverTitle = SessionTitle.placeholder,
+        projectID = "",
+        directory = directory,
+        updatedAt = updatedAt,
+        firstPrompt = title,
+    )
 
 /** Back to the session Catch Up was opened from, with the composer it set aside (or a draft). */
 fun HomeFeature.State.returningFromCatchUp(): HomeFeature.State {
