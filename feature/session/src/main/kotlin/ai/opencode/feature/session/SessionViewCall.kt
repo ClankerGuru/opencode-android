@@ -6,6 +6,7 @@ import ai.opencode.core.sharing.shared
 import ai.opencode.core.experiments.key
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
+import ai.opencode.core.ui.OpenCodeNoticePresence
 import ai.opencode.feature.session.SessionFeature.Action
 import ai.opencode.feature.session.SessionFeature.State
 import ai.opencode.feature.voice.LiveSocketWarmer
@@ -110,20 +111,25 @@ internal fun SessionCallTasks(store: StoreOf<State, Action>, callStore: VoiceSto
  */
 @Composable
 internal fun SessionCallCards(callStore: VoiceStoreOf?) {
-    val call = callStore ?: return
+    var shownCall by remember { mutableStateOf(callStore) }
+    if (callStore != null) shownCall = callStore
+    val call = shownCall ?: return
     val phase by call.observe { it.phase }
     val place by call.observe { it.callPlace }
     val statusText by call.observe { it.statusText }
-    when (val current = phase) {
-        is VoiceFeature.State.Phase.Failed -> VoiceCallFailure(
-            store = call,
-            message = current.message,
-            modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 6.dp),
-        )
-        VoiceFeature.State.Phase.Dropped -> VoiceCallEnded(call, Modifier.padding(start = 12.dp, end = 12.dp, bottom = 6.dp))
-        else -> Unit
+    val card = phase.takeIf { callStore != null && (it is VoiceFeature.State.Phase.Failed || it == VoiceFeature.State.Phase.Dropped) }
+    OpenCodeNoticePresence(card) { current ->
+        when (current) {
+            is VoiceFeature.State.Phase.Failed -> VoiceCallFailure(
+                store = call,
+                message = current.message,
+                modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 6.dp),
+            )
+            VoiceFeature.State.Phase.Dropped -> VoiceCallEnded(call, Modifier.padding(start = 12.dp, end = 12.dp, bottom = 6.dp))
+            else -> Unit
+        }
     }
-    val connecting = place?.takeIf { phase == VoiceFeature.State.Phase.Connecting }?.let { it to statusText }
+    val connecting = place?.takeIf { callStore != null && phase == VoiceFeature.State.Phase.Connecting }?.let { it to statusText }
     // The caption fades out as it last read, not as the next phase.
     var shown by remember { mutableStateOf(connecting) }
     if (connecting != null && connecting != shown) shown = connecting
