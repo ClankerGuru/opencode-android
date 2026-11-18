@@ -134,9 +134,24 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Nije moguće zatražiti dopuštenje. Pokušaj ponovno.</string>
     <string name="drawer_notifications_open_settings_error">Nije moguće otvoriti postavke. Otvorite postavke Androida i odaberite Obavijesti → OpenCode.</string>
-    <string name="drawer_delete_session_error">Nije moguće izbrisati „%1$s”. %2$s</string>
-    <string name="drawer_archive_error">Nije moguće arhivirati „%1$s”. %2$s</string>
-    <string name="drawer_unarchive_error">Nije moguće vratiti „%1$s” iz arhive. %2$s</string>
+    <string name="drawer_delete_session_error">Nije moguće izbrisati „%1$s”</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">Nije moguće izbrisati %1$d sesiju</item>
+        <item quantity="few">Nije moguće izbrisati %1$d sesije</item>
+        <item quantity="other">Nije moguće izbrisati %1$d sesija</item>
+    </plurals>
+    <string name="drawer_archive_error">Nije moguće arhivirati „%1$s”</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">Nije moguće arhivirati %1$d sesiju</item>
+        <item quantity="few">Nije moguće arhivirati %1$d sesije</item>
+        <item quantity="other">Nije moguće arhivirati %1$d sesija</item>
+    </plurals>
+    <string name="drawer_unarchive_error">Nije moguće vratiti „%1$s” iz arhive</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">Nije moguće vratiti %1$d sesiju iz arhive</item>
+        <item quantity="few">Nije moguće vratiti %1$d sesije iz arhive</item>
+        <item quantity="other">Nije moguće vratiti %1$d sesija iz arhive</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Nova sesija</string>

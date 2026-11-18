@@ -130,9 +130,21 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Зөвшөөрөл хүсэж чадсангүй. Дахин оролдоно уу.</string>
     <string name="drawer_notifications_open_settings_error">Тохиргоог нээж чадсангүй. Android тохиргоог нээгээд Мэдэгдэл → OpenCode-г сонгоно уу.</string>
-    <string name="drawer_delete_session_error">“%1$s”-г устгаж чадсангүй. %2$s</string>
-    <string name="drawer_archive_error">“%1$s”-г архивлаж чадсангүй. %2$s</string>
-    <string name="drawer_unarchive_error">“%1$s”-г архиваас гаргаж чадсангүй. %2$s</string>
+    <string name="drawer_delete_session_error">“%1$s”-г устгаж чадсангүй</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">%1$d сессийг устгаж чадсангүй</item>
+        <item quantity="other">%1$d сессийг устгаж чадсангүй</item>
+    </plurals>
+    <string name="drawer_archive_error">“%1$s”-г архивлаж чадсангүй</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">%1$d сессийг архивлаж чадсангүй</item>
+        <item quantity="other">%1$d сессийг архивлаж чадсангүй</item>
+    </plurals>
+    <string name="drawer_unarchive_error">“%1$s”-г архиваас гаргаж чадсангүй</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">%1$d сессийг архиваас гаргаж чадсангүй</item>
+        <item quantity="other">%1$d сессийг архиваас гаргаж чадсангүй</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Шинэ сесс</string>

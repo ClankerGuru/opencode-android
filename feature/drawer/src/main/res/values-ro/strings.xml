@@ -134,9 +134,24 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Nu s-a putut solicita permisiunea. Încearcă din nou.</string>
     <string name="drawer_notifications_open_settings_error">Nu s-au putut deschide setările. Deschide setările Android și alege Notificări → OpenCode.</string>
-    <string name="drawer_delete_session_error">Nu s-a putut șterge „%1$s”. %2$s</string>
-    <string name="drawer_archive_error">Nu s-a putut arhiva „%1$s”. %2$s</string>
-    <string name="drawer_unarchive_error">Nu s-a putut dezarhiva „%1$s”. %2$s</string>
+    <string name="drawer_delete_session_error">Nu s-a putut șterge „%1$s”</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">Nu s-a putut șterge %1$d sesiune</item>
+        <item quantity="few">Nu s-au putut șterge %1$d sesiuni</item>
+        <item quantity="other">Nu s-au putut șterge %1$d de sesiuni</item>
+    </plurals>
+    <string name="drawer_archive_error">Nu s-a putut arhiva „%1$s”</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">Nu s-a putut arhiva %1$d sesiune</item>
+        <item quantity="few">Nu s-au putut arhiva %1$d sesiuni</item>
+        <item quantity="other">Nu s-au putut arhiva %1$d de sesiuni</item>
+    </plurals>
+    <string name="drawer_unarchive_error">Nu s-a putut dezarhiva „%1$s”</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">Nu s-a putut dezarhiva %1$d sesiune</item>
+        <item quantity="few">Nu s-au putut dezarhiva %1$d sesiuni</item>
+        <item quantity="other">Nu s-au putut dezarhiva %1$d de sesiuni</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Sesiune nouă</string>

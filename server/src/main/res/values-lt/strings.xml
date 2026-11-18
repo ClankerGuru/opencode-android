@@ -70,6 +70,7 @@
     <string name="server_error_unreachable">Nepavyko pasiekti OpenCode serverio</string>
     <string name="server_error_folder_gone">Aplanko nebėra</string>
     <string name="server_error_uploads_unsupported">Šis serveris nepalaiko failų priedų. Atnaujinkite OpenCode kompiuteryje.</string>
+    <string name="server_error_archiving_unsupported">Šis serveris nepalaiko archyvavimo. Atnaujinkite OpenCode savo kompiuteryje.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode neleidžiama pasiekti vietinio tinklo įrenginių. Nustatymuose suteikite OpenCode leidimą pasiekti netoliese esančius įrenginius ir bandykite dar kartą.</string>

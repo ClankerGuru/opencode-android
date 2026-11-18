@@ -130,9 +130,21 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Kunne ikke be om tillatelse. Prøv igjen.</string>
     <string name="drawer_notifications_open_settings_error">Kunne ikke åpne innstillinger. Åpne Android-innstillingene og velg Varsler → OpenCode.</string>
-    <string name="drawer_delete_session_error">Kunne ikke slette «%1$s». %2$s</string>
-    <string name="drawer_archive_error">Kunne ikke arkivere «%1$s». %2$s</string>
-    <string name="drawer_unarchive_error">Kunne ikke hente «%1$s» fra arkivet. %2$s</string>
+    <string name="drawer_delete_session_error">Kunne ikke slette «%1$s»</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">Kunne ikke slette %1$d sesjon</item>
+        <item quantity="other">Kunne ikke slette %1$d sesjoner</item>
+    </plurals>
+    <string name="drawer_archive_error">Kunne ikke arkivere «%1$s»</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">Kunne ikke arkivere %1$d sesjon</item>
+        <item quantity="other">Kunne ikke arkivere %1$d sesjoner</item>
+    </plurals>
+    <string name="drawer_unarchive_error">Kunne ikke hente «%1$s» fra arkivet</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">Kunne ikke hente %1$d sesjon fra arkivet</item>
+        <item quantity="other">Kunne ikke hente %1$d sesjoner fra arkivet</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Ny sesjon</string>

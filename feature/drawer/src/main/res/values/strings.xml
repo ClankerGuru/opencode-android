@@ -130,9 +130,21 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Couldn’t request permission. Try again.</string>
     <string name="drawer_notifications_open_settings_error">Couldn’t open Settings. Open Android Settings and choose Notifications → OpenCode.</string>
-    <string name="drawer_delete_session_error">Couldn’t delete “%1$s”. %2$s</string>
-    <string name="drawer_archive_error">Couldn’t archive “%1$s”. %2$s</string>
-    <string name="drawer_unarchive_error">Couldn’t unarchive “%1$s”. %2$s</string>
+    <string name="drawer_delete_session_error">Couldn’t delete “%1$s”</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">Couldn’t delete %1$d session</item>
+        <item quantity="other">Couldn’t delete %1$d sessions</item>
+    </plurals>
+    <string name="drawer_archive_error">Couldn’t archive “%1$s”</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">Couldn’t archive %1$d session</item>
+        <item quantity="other">Couldn’t archive %1$d sessions</item>
+    </plurals>
+    <string name="drawer_unarchive_error">Couldn’t unarchive “%1$s”</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">Couldn’t unarchive %1$d session</item>
+        <item quantity="other">Couldn’t unarchive %1$d sessions</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">New session</string>

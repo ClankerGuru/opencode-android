@@ -52,6 +52,7 @@
     <string name="server_error_unreachable">ເຊື່ອມຕໍ່ກັບເຊີບເວີ OpenCode ບໍ່ໄດ້</string>
     <string name="server_error_folder_gone">ໂຟນເດີບໍ່ຢູ່ແລ້ວ</string>
     <string name="server_error_uploads_unsupported">ເຊີບເວີນີ້ບໍ່ຮອງຮັບໄຟລ໌ແນບ. ອັບເດດ OpenCode ໃນຄອມພິວເຕີຂອງເຈົ້າ.</string>
+    <string name="server_error_archiving_unsupported">ເຊີບເວີນີ້ບໍ່ຮອງຮັບການຮວບຮວມ. ອັບເດດ OpenCode ໃນຄອມພິວເຕີຂອງເຈົ້າ.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode ບໍ່ໄດ້ຮັບອະນຸຍາດໃຫ້ເຂົ້າເຖິງອຸປະກອນໃນເຄືອຂ່າຍທ້ອງຖິ່ນຂອງເຈົ້າ. ເປີດສິດອຸປະກອນໃກ້ຄຽງໃຫ້ OpenCode ໃນການຕັ້ງຄ່າ ແລ້ວລອງໃໝ່.</string>

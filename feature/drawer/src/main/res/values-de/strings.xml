@@ -130,9 +130,21 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Berechtigung konnte nicht angefragt werden. Versuche es erneut.</string>
     <string name="drawer_notifications_open_settings_error">Einstellungen konnten nicht geöffnet werden. Öffne die Android-Einstellungen und wähle Benachrichtigungen → OpenCode.</string>
-    <string name="drawer_delete_session_error">„%1$s“ konnte nicht gelöscht werden. %2$s</string>
-    <string name="drawer_archive_error">„%1$s“ konnte nicht archiviert werden. %2$s</string>
-    <string name="drawer_unarchive_error">„%1$s“ konnte nicht aus dem Archiv geholt werden. %2$s</string>
+    <string name="drawer_delete_session_error">„%1$s“ konnte nicht gelöscht werden</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">%1$d Sitzung konnte nicht gelöscht werden</item>
+        <item quantity="other">%1$d Sitzungen konnten nicht gelöscht werden</item>
+    </plurals>
+    <string name="drawer_archive_error">„%1$s“ konnte nicht archiviert werden</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">%1$d Sitzung konnte nicht archiviert werden</item>
+        <item quantity="other">%1$d Sitzungen konnten nicht archiviert werden</item>
+    </plurals>
+    <string name="drawer_unarchive_error">„%1$s“ konnte nicht aus dem Archiv geholt werden</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">%1$d Sitzung konnte nicht aus dem Archiv geholt werden</item>
+        <item quantity="other">%1$d Sitzungen konnten nicht aus dem Archiv geholt werden</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Neue Sitzung</string>

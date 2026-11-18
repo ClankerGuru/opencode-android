@@ -52,6 +52,7 @@
     <string name="server_error_unreachable">OpenCode ဆာဗာကို မချိတ်ဆက်နိုင်ပါ</string>
     <string name="server_error_folder_gone">ဖိုင်တွဲ မရှိတော့ပါ</string>
     <string name="server_error_uploads_unsupported">ဒီဆာဗာက ဖိုင်ပူးတွဲခြင်းကို မပံ့ပိုးပါ။ ကွန်ပျူတာရှိ OpenCode ကို အပ်ဒိတ်လုပ်ပါ။</string>
+    <string name="server_error_archiving_unsupported">ဤဆာဗာက မှတ်တမ်းသိမ်းခြင်းကို မပံ့ပိုးပါ။ သင့်ကွန်ပျူတာရှိ OpenCode ကို အပ်ဒိတ်လုပ်ပါ။</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode သည် သင့်စက်တွင်းကွန်ရက်ရှိ စက်များကို ချိတ်ဆက်ခွင့် မရှိပါ။ ဆက်တင်များတွင် OpenCode အတွက် အနီးအနားရှိစက်များ ခွင့်ပြုချက်ကို ဖွင့်ပြီး ပြန်ကြိုးစားပါ။</string>

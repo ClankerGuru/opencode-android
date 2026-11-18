@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">OpenCode सर्वर से संपर्क नहीं हो सका</string>
     <string name="server_error_folder_gone">फ़ोल्डर अब मौजूद नहीं है</string>
     <string name="server_error_uploads_unsupported">यह सर्वर फ़ाइल अटैचमेंट का समर्थन नहीं करता। अपने कंप्यूटर पर OpenCode अपडेट करें।</string>
+    <string name="server_error_archiving_unsupported">यह सर्वर सेशन संग्रहित करने का समर्थन नहीं करता। अपने कंप्यूटर पर OpenCode अपडेट करें।</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode को आपके स्थानीय नेटवर्क के डिवाइस से जुड़ने की अनुमति नहीं है। सेटिंग्स में OpenCode के लिए आस-पास के डिवाइस की अनुमति चालू करें, फिर से कोशिश करें।</string>

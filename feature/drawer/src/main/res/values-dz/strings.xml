@@ -126,9 +126,18 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">གནང་བ་ཞུ་མ་ཚུགས། བསྐྱར་དུ་ཚོད་ལྟ་འབད།</string>
     <string name="drawer_notifications_open_settings_error">སྒྲིག་སྟངས་ཁ་ཕྱེ་མ་ཚུགས། Android གི་སྒྲིག་སྟངས་ཁ་ཕྱེ་སྟེ་ བརྡ་བསྐུལ་ཚུ་ → OpenCode གདམ།</string>
-    <string name="drawer_delete_session_error">“%1$s” བཏོན་གཏང་མ་ཚུགས། %2$s</string>
-    <string name="drawer_archive_error">“%1$s” གཏན་མཛོད་ནང་བཙུགས་མ་ཚུགས། %2$s</string>
-    <string name="drawer_unarchive_error">“%1$s” གཏན་མཛོད་ལས་བཏོན་མ་ཚུགས། %2$s</string>
+    <string name="drawer_delete_session_error">“%1$s” བཏོན་གཏང་མ་ཚུགས།</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="other">ལཱ་ཡུན་ %1$d བཏོན་གཏང་མ་ཚུགས།</item>
+    </plurals>
+    <string name="drawer_archive_error">“%1$s” གཏན་མཛོད་ནང་བཙུགས་མ་ཚུགས།</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="other">ལཱ་ཡུན་ %1$d གཏན་མཛོད་ནང་བཙུགས་མ་ཚུགས།</item>
+    </plurals>
+    <string name="drawer_unarchive_error">“%1$s” གཏན་མཛོད་ལས་བཏོན་མ་ཚུགས།</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="other">ལཱ་ཡུན་ %1$d གཏན་མཛོད་ལས་བཏོན་མ་ཚུགས།</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">ལཱ་ཡུན་གསརཔ།</string>

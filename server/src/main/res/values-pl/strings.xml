@@ -70,6 +70,7 @@
     <string name="server_error_unreachable">Nie udało się połączyć z serwerem OpenCode</string>
     <string name="server_error_folder_gone">Folder już nie istnieje</string>
     <string name="server_error_uploads_unsupported">Ten serwer nie obsługuje załączników. Zaktualizuj OpenCode na komputerze.</string>
+    <string name="server_error_archiving_unsupported">Ten serwer nie obsługuje archiwizacji. Zaktualizuj OpenCode na swoim komputerze.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode nie ma dostępu do urządzeń w sieci lokalnej. W ustawieniach włącz uprawnienie „Urządzenia w pobliżu” dla OpenCode i spróbuj ponownie.</string>

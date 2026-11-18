@@ -130,9 +130,21 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Неуспешно искане на разрешение. Опитайте отново.</string>
     <string name="drawer_notifications_open_settings_error">Неуспешно отваряне на настройките. Отворете настройките на Android и изберете Известия → OpenCode.</string>
-    <string name="drawer_delete_session_error">Неуспешно изтриване на „%1$s“. %2$s</string>
-    <string name="drawer_archive_error">Неуспешно архивиране на „%1$s“. %2$s</string>
-    <string name="drawer_unarchive_error">Неуспешно разархивиране на „%1$s“. %2$s</string>
+    <string name="drawer_delete_session_error">Неуспешно изтриване на „%1$s“</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">Неуспешно изтриване на %1$d сесия</item>
+        <item quantity="other">Неуспешно изтриване на %1$d сесии</item>
+    </plurals>
+    <string name="drawer_archive_error">Неуспешно архивиране на „%1$s“</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">Неуспешно архивиране на %1$d сесия</item>
+        <item quantity="other">Неуспешно архивиране на %1$d сесии</item>
+    </plurals>
+    <string name="drawer_unarchive_error">Неуспешно разархивиране на „%1$s“</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">Неуспешно разархивиране на %1$d сесия</item>
+        <item quantity="other">Неуспешно разархивиране на %1$d сесии</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Нова сесия</string>

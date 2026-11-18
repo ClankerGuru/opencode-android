@@ -130,9 +130,21 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Loa taotlemine ebaõnnestus. Proovi uuesti.</string>
     <string name="drawer_notifications_open_settings_error">Seadete avamine ebaõnnestus. Ava Androidi seaded ja vali Teavitused → OpenCode.</string>
-    <string name="drawer_delete_session_error">„%1$s” kustutamine ebaõnnestus. %2$s</string>
-    <string name="drawer_archive_error">„%1$s” arhiveerimine ebaõnnestus. %2$s</string>
-    <string name="drawer_unarchive_error">„%1$s” arhiivist taastamine ebaõnnestus. %2$s</string>
+    <string name="drawer_delete_session_error">„%1$s” kustutamine ebaõnnestus</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">%1$d seansi kustutamine ebaõnnestus</item>
+        <item quantity="other">%1$d seansi kustutamine ebaõnnestus</item>
+    </plurals>
+    <string name="drawer_archive_error">„%1$s” arhiveerimine ebaõnnestus</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">%1$d seansi arhiveerimine ebaõnnestus</item>
+        <item quantity="other">%1$d seansi arhiveerimine ebaõnnestus</item>
+    </plurals>
+    <string name="drawer_unarchive_error">„%1$s” arhiivist taastamine ebaõnnestus</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">%1$d seansi arhiivist taastamine ebaõnnestus</item>
+        <item quantity="other">%1$d seansi arhiivist taastamine ebaõnnestus</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Uus seanss</string>

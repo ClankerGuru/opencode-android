@@ -52,6 +52,7 @@
     <string name="server_error_unreachable">OpenCodeサーバーに接続できませんでした</string>
     <string name="server_error_folder_gone">フォルダが見つかりません</string>
     <string name="server_error_uploads_unsupported">このサーバーはファイルの添付に対応していません。パソコンのOpenCodeを更新してください。</string>
+    <string name="server_error_archiving_unsupported">このサーバーはアーカイブに対応していません。コンピューターのOpenCodeを更新してください。</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCodeにはローカルネットワーク上のデバイスへの接続が許可されていません。設定でOpenCodeの「付近のデバイス」を許可してから、もう一度試してください。</string>

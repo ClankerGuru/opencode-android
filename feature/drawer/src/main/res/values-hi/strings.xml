@@ -130,9 +130,21 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">अनुमति नहीं माँगी जा सकी। फिर से कोशिश करें।</string>
     <string name="drawer_notifications_open_settings_error">सेटिंग्स नहीं खुल सकीं। Android सेटिंग्स खोलें और सूचनाएँ → OpenCode चुनें।</string>
-    <string name="drawer_delete_session_error">“%1$s” हटाया नहीं जा सका। %2$s</string>
-    <string name="drawer_archive_error">“%1$s” संग्रहित नहीं किया जा सका। %2$s</string>
-    <string name="drawer_unarchive_error">“%1$s” संग्रह से नहीं निकाला जा सका। %2$s</string>
+    <string name="drawer_delete_session_error">“%1$s” हटाया नहीं जा सका</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">%1$d सेशन हटाया नहीं जा सका</item>
+        <item quantity="other">%1$d सेशन हटाए नहीं जा सके</item>
+    </plurals>
+    <string name="drawer_archive_error">“%1$s” संग्रहित नहीं किया जा सका</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">%1$d सेशन संग्रहित नहीं किया जा सका</item>
+        <item quantity="other">%1$d सेशन संग्रहित नहीं किए जा सके</item>
+    </plurals>
+    <string name="drawer_unarchive_error">“%1$s” संग्रह से नहीं निकाला जा सका</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">%1$d सेशन संग्रह से नहीं निकाला जा सका</item>
+        <item quantity="other">%1$d सेशन संग्रह से नहीं निकाले जा सके</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">नया सेशन</string>

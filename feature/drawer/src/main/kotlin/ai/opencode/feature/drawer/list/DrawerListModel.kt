@@ -32,7 +32,6 @@ sealed interface DrawerListItem {
     data object WhatsNew : DrawerListItem
     /** Under Catch Up while the server has archived sessions. */
     data object Archived : DrawerListItem
-    data object DeletionError : DrawerListItem
     data class Header(val kind: DrawerSectionHeaderKind) : DrawerListItem
     data class Session(val id: String) : DrawerListItem
     data object Empty : DrawerListItem
@@ -49,7 +48,6 @@ sealed interface DrawerListItem {
             CatchUp -> "catch-up"
             WhatsNew -> "whats-new"
             Archived -> "archived"
-            DeletionError -> "deletion-error"
             is Header -> "header-${kind.name}"
             is Session -> "session-$id"
             Empty -> "empty"
@@ -132,7 +130,6 @@ data class DrawerListModel(
     val rows: Map<String, DrawerListRow> = emptyMap(),
     val headerFollows: Map<DrawerSectionHeaderKind, Boolean> = emptyMap(),
     val shortcuts: DrawerListShortcuts = DrawerListShortcuts(),
-    val deletionError: String? = null,
     val archivedCount: Int = 0,
     val serverNote: ServerSwitchNote? = null,
     val search: String = "",
@@ -178,7 +175,6 @@ data class DrawerListModel(
                                 (0 until ghostCount).map { DrawerListItem.Ghost(it) },
                         ),
                         headerFollows = mapOf(DrawerSectionHeaderKind.Recents to false),
-                        deletionError = state.deletionError,
                         search = state.search,
                         serverID = swap.id,
                         reducedMotion = inputs.reducedMotion,
@@ -200,14 +196,11 @@ data class DrawerListModel(
             val archivedCount = if (state.search.isEmpty()) state.inboxSidebarStatus.archived.size else 0
             val showsShortcuts = shortcuts.catchUpMounted || shortcuts.whatsNewMounted || archivedCount > 0
 
-            // A failed archive shows where a failed delete does.
-            val error = state.deletionError ?: state.inboxSidebarStatus.archiveError
             val top = buildList {
                 if (serverNote != null && state.search.isEmpty()) add(DrawerListItem.ServerNote)
                 if (shortcuts.catchUpMounted) add(DrawerListItem.CatchUp)
                 if (shortcuts.whatsNewMounted) add(DrawerListItem.WhatsNew)
                 if (archivedCount > 0) add(DrawerListItem.Archived)
-                if (error != null) add(DrawerListItem.DeletionError)
             }
 
             // One pass for both lists.
@@ -295,7 +288,6 @@ data class DrawerListModel(
                 rows = rows,
                 headerFollows = headerFollows,
                 shortcuts = shortcuts,
-                deletionError = error,
                 archivedCount = archivedCount,
                 serverNote = serverNote,
                 search = state.search,

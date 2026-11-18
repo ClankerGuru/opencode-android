@@ -130,9 +130,21 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Nem sikerült engedélyt kérni. Próbálja újra.</string>
     <string name="drawer_notifications_open_settings_error">Nem sikerült megnyitni a beállításokat. Nyissa meg az Android beállításait, és válassza az Értesítések → OpenCode lehetőséget.</string>
-    <string name="drawer_delete_session_error">Nem sikerült törölni: „%1$s”. %2$s</string>
-    <string name="drawer_archive_error">Nem sikerült archiválni: „%1$s”. %2$s</string>
-    <string name="drawer_unarchive_error">Nem sikerült visszavonni az archiválást: „%1$s”. %2$s</string>
+    <string name="drawer_delete_session_error">Nem sikerült törölni: „%1$s”</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">Nem sikerült törölni %1$d munkamenetet</item>
+        <item quantity="other">Nem sikerült törölni %1$d munkamenetet</item>
+    </plurals>
+    <string name="drawer_archive_error">Nem sikerült archiválni: „%1$s”</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">Nem sikerült archiválni %1$d munkamenetet</item>
+        <item quantity="other">Nem sikerült archiválni %1$d munkamenetet</item>
+    </plurals>
+    <string name="drawer_unarchive_error">Nem sikerült visszavonni az archiválást: „%1$s”</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">Nem sikerült visszavonni %1$d munkamenet archiválását</item>
+        <item quantity="other">Nem sikerült visszavonni %1$d munkamenet archiválását</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Új munkamenet</string>

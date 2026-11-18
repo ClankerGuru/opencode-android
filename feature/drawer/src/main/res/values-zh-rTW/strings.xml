@@ -126,9 +126,18 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">無法要求權限，請再試一次。</string>
     <string name="drawer_notifications_open_settings_error">無法開啟設定。請開啟 Android 設定，選擇「通知」→「OpenCode」。</string>
-    <string name="drawer_delete_session_error">無法刪除「%1$s」。%2$s</string>
-    <string name="drawer_archive_error">無法封存「%1$s」。%2$s</string>
-    <string name="drawer_unarchive_error">無法取消封存「%1$s」。%2$s</string>
+    <string name="drawer_delete_session_error">無法刪除「%1$s」</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="other">無法刪除 %1$d 個工作階段</item>
+    </plurals>
+    <string name="drawer_archive_error">無法封存「%1$s」</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="other">無法封存 %1$d 個工作階段</item>
+    </plurals>
+    <string name="drawer_unarchive_error">無法取消封存「%1$s」</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="other">無法取消封存 %1$d 個工作階段</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">新增工作階段</string>

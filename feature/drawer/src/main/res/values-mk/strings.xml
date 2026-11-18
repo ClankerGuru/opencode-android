@@ -130,9 +130,21 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Не успеа барањето дозвола. Обиди се повторно.</string>
     <string name="drawer_notifications_open_settings_error">Не успеа отворањето на поставките. Отвори ги поставките на Android и избери Известувања → OpenCode.</string>
-    <string name="drawer_delete_session_error">Не успеа бришењето на „%1$s“. %2$s</string>
-    <string name="drawer_archive_error">Не успеа архивирањето на „%1$s“. %2$s</string>
-    <string name="drawer_unarchive_error">Не успеа враќањето на „%1$s“ од архива. %2$s</string>
+    <string name="drawer_delete_session_error">Не успеа бришењето на „%1$s“</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">Не успеа бришењето на %1$d сесија</item>
+        <item quantity="other">Не успеа бришењето на %1$d сесии</item>
+    </plurals>
+    <string name="drawer_archive_error">Не успеа архивирањето на „%1$s“</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">Не успеа архивирањето на %1$d сесија</item>
+        <item quantity="other">Не успеа архивирањето на %1$d сесии</item>
+    </plurals>
+    <string name="drawer_unarchive_error">Не успеа враќањето на „%1$s“ од архива</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">Не успеа враќањето на %1$d сесија од архива</item>
+        <item quantity="other">Не успеа враќањето на %1$d сесии од архива</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Нова сесија</string>

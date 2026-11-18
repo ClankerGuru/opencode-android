@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">OpenCode-palvelimeen ei saatu yhteyttä</string>
     <string name="server_error_folder_gone">Kansiota ei enää ole</string>
     <string name="server_error_uploads_unsupported">Tämä palvelin ei tue tiedostoliitteitä. Päivitä OpenCode tietokoneellasi.</string>
+    <string name="server_error_archiving_unsupported">Tämä palvelin ei tue arkistointia. Päivitä OpenCode tietokoneellasi.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode ei saa muodostaa yhteyttä lähiverkon laitteisiin. Salli OpenCodelle lähellä olevien laitteiden käyttö asetuksissa ja yritä uudelleen.</string>

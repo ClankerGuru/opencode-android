@@ -126,9 +126,18 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">无法请求权限，请重试。</string>
     <string name="drawer_notifications_open_settings_error">无法打开设置。请打开 Android 设置，选择通知 → OpenCode。</string>
-    <string name="drawer_delete_session_error">无法删除“%1$s”。%2$s</string>
-    <string name="drawer_archive_error">无法归档“%1$s”。%2$s</string>
-    <string name="drawer_unarchive_error">无法取消归档“%1$s”。%2$s</string>
+    <string name="drawer_delete_session_error">无法删除“%1$s”</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="other">无法删除 %1$d 个会话</item>
+    </plurals>
+    <string name="drawer_archive_error">无法归档“%1$s”</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="other">无法归档 %1$d 个会话</item>
+    </plurals>
+    <string name="drawer_unarchive_error">无法取消归档“%1$s”</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="other">无法取消归档 %1$d 个会话</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">新建会话</string>

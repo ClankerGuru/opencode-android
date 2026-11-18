@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">OpenCode serwerine birigip bolmady</string>
     <string name="server_error_folder_gone">Papka indi ýok</string>
     <string name="server_error_uploads_unsupported">Bu serwer faýl goşundylaryny goldamaýar. Kompýuteriňizdäki OpenCode programmasyny täzeläň.</string>
+    <string name="server_error_archiving_unsupported">Bu serwer arhiwlemegi goldamaýar. Kompýuteriňizdäki OpenCode-y täzeläň.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode ýerli toruňyzdaky enjamlara birigip bilmeýär. Sazlamalarda OpenCode üçin Golaýdaky enjamlar rugsadyny açyň we täzeden synanyşyň.</string>

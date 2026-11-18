@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">Kunne ikke få forbindelse til OpenCode-serveren</string>
     <string name="server_error_folder_gone">Mappen findes ikke længere</string>
     <string name="server_error_uploads_unsupported">Denne server understøtter ikke vedhæftede filer. Opdater OpenCode på din computer.</string>
+    <string name="server_error_archiving_unsupported">Denne server understøtter ikke arkivering. Opdater OpenCode på din computer.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode har ikke tilladelse til at kontakte enheder på dit lokale netværk. Slå Enheder i nærheden til for OpenCode i Indstillinger, og prøv igen.</string>

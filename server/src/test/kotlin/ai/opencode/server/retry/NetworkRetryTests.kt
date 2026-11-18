@@ -810,12 +810,43 @@ class NetworkRetryWireTests {
     @Test
     fun archivingASessionPatchesArchivedAndRidesOutADrop() = runTest {
         val attempts = AtomicInteger(0)
-        WireFixture { if (attempts.incrementAndGet() == 1) Reply.Failure(UrlErrorCode.NETWORK_CONNECTION_LOST) else Reply.status(204) }.use { fixture ->
+        WireFixture { request ->
+            when {
+                request.route.startsWith("GET") -> Reply.Json(200, sessionReply(archived = true))
+                attempts.incrementAndGet() == 1 -> Reply.Failure(UrlErrorCode.NETWORK_CONNECTION_LOST)
+                else -> Reply.status(204)
+            }
+        }.use { fixture ->
             retrying { client.archiveSession(fixture.server, "ses_1") }
-            assertEquals(List(2) { "PATCH /api/session/ses_1" }, fixture.requests.map { it.route })
+            assertEquals(List(2) { "PATCH /api/session/ses_1" } + "GET /api/session/ses_1", fixture.requests.map { it.route })
             assertEquals("true", fixture.requests[0].json()["archived"]?.jsonPrimitive?.content)
             assertEquals(1, fixture.requests[0].json().size)
         }
+    }
+
+    @Test
+    fun archivingASessionFailsWhenTheServerLeavesItUnarchived() = runTest {
+        WireFixture { request ->
+            if (request.route.startsWith("GET")) Reply.Json(200, sessionReply(archived = false)) else Reply.status(204)
+        }.use { fixture ->
+            val error = runCatching { client.archiveSession(fixture.server, "ses_1") }.exceptionOrNull()
+            assertEquals("This server doesn’t support archiving. Update OpenCode on your computer.", error?.message)
+        }
+    }
+
+    @Test
+    fun archivingASessionSucceedsWhenItCannotBeReadBack() = runTest {
+        WireFixture { request ->
+            if (request.route.startsWith("GET")) Reply.Failure(UrlErrorCode.NETWORK_CONNECTION_LOST) else Reply.status(204)
+        }.use { fixture ->
+            client.archiveSession(fixture.server, "ses_1")
+            assertEquals(listOf("PATCH /api/session/ses_1", "GET /api/session/ses_1"), fixture.requests.map { it.route })
+        }
+    }
+
+    private fun sessionReply(archived: Boolean): String {
+        val time = if (archived) "\"updated\":1000,\"archived\":2000" else "\"updated\":1000"
+        return "{\"data\":{\"id\":\"ses_1\",\"projectID\":\"p\",\"location\":{\"directory\":\"/project\"},\"time\":{$time}}}"
     }
 
     @Test

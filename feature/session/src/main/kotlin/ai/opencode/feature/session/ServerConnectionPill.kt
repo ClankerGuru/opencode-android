@@ -4,6 +4,7 @@ import ai.opencode.core.R as CoreR
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionTransition
+import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.strings.localized
 import ai.opencode.server.OpenCodeClientError
 import ai.opencode.core.ui.OpenCodeShape
@@ -13,8 +14,10 @@ import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
 import ai.opencode.core.ui.openCodeTapTarget
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -169,11 +172,7 @@ fun ServerConnectionPill(
     onAction: (ServerConnectionNotice.Action) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val tint = when (notice.kind) {
-        ServerConnectionNotice.Kind.reconnecting -> OpenCodeTheme.colors.secondaryText
-        ServerConnectionNotice.Kind.failed -> OpenCodeTheme.colors.destructive
-        ServerConnectionNotice.Kind.signInFailed -> Color(0xFFFF9500)
-    }
+    val reduceMotion = rememberReduceMotion()
     val offersEdit = notice.kind == ServerConnectionNotice.Kind.signInFailed
     var menuShown by remember { mutableStateOf(false) }
     val fontScale = LocalDensity.current.fontScale
@@ -202,31 +201,46 @@ fun ServerConnectionPill(
                 }
                 .testTag("server-connection-pill"),
         ) {
-            Row(
-                Modifier.heightIn(min = 44.dp).padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (notice.kind == ServerConnectionNotice.Kind.reconnecting) {
-                    CircularProgressIndicator(Modifier.size((16 * fontScale).dp), color = tint, strokeWidth = 2.dp)
-                } else {
-                    OpenCodeIcon(notice.systemImage, contentDescription = null, size = (18 * fontScale).dp, tint = tint, modifier = Modifier.width((18 * fontScale).dp))
+            AnimatedContent(
+                targetState = notice,
+                transitionSpec = {
+                    val size = SizeTransform(clip = false) { _, _ -> Motion.layout.animation(reduceMotion = reduceMotion, visibilityThreshold = IntSize.VisibilityThreshold) }
+                    MotionTransition.swap(reduceMotion).content.using(size)
+                },
+                contentAlignment = Alignment.CenterStart,
+                label = "serverConnectionPill",
+            ) { shown ->
+                val tint = when (shown.kind) {
+                    ServerConnectionNotice.Kind.reconnecting -> OpenCodeTheme.colors.secondaryText
+                    ServerConnectionNotice.Kind.failed -> OpenCodeTheme.colors.destructive
+                    ServerConnectionNotice.Kind.signInFailed -> Color(0xFFFF9500)
                 }
-                Column(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                    Text(
-                        notice.title,
-                        style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium),
-                        color = OpenCodeTheme.colors.text,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    notice.detail?.let {
-                        Text(it, style = OpenCodeTextStyles.caption1, color = OpenCodeTheme.colors.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(
+                    Modifier.heightIn(min = 44.dp).padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (shown.kind == ServerConnectionNotice.Kind.reconnecting) {
+                        CircularProgressIndicator(Modifier.size((16 * fontScale).dp), color = tint, strokeWidth = 2.dp)
+                    } else {
+                        OpenCodeIcon(shown.systemImage, contentDescription = null, size = (18 * fontScale).dp, tint = tint, modifier = Modifier.width((18 * fontScale).dp))
                     }
-                }
-                notice.action?.let {
-                    Spacer(Modifier.width(8.dp))
-                    Text(it, style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), color = OpenCodeTheme.colors.accent)
+                    Column(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text(
+                            shown.title,
+                            style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium),
+                            color = OpenCodeTheme.colors.text,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        shown.detail?.let {
+                            Text(it, style = OpenCodeTextStyles.caption1, color = OpenCodeTheme.colors.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                    shown.action?.let {
+                        Spacer(Modifier.width(8.dp))
+                        Text(it, style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), color = OpenCodeTheme.colors.accent)
+                    }
                 }
             }
         }

@@ -138,9 +138,27 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Nepodarilo sa požiadať o povolenie. Skúste znova.</string>
     <string name="drawer_notifications_open_settings_error">Nepodarilo sa otvoriť nastavenia. Otvorte nastavenia Androidu a vyberte Upozornenia → OpenCode.</string>
-    <string name="drawer_delete_session_error">Nepodarilo sa odstrániť „%1$s“. %2$s</string>
-    <string name="drawer_archive_error">Nepodarilo sa archivovať „%1$s“. %2$s</string>
-    <string name="drawer_unarchive_error">Nepodarilo sa obnoviť „%1$s“ z archívu. %2$s</string>
+    <string name="drawer_delete_session_error">Nepodarilo sa odstrániť „%1$s“</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">Nepodarilo sa odstrániť %1$d reláciu</item>
+        <item quantity="few">Nepodarilo sa odstrániť %1$d relácie</item>
+        <item quantity="many">Nepodarilo sa odstrániť %1$d relácie</item>
+        <item quantity="other">Nepodarilo sa odstrániť %1$d relácií</item>
+    </plurals>
+    <string name="drawer_archive_error">Nepodarilo sa archivovať „%1$s“</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">Nepodarilo sa archivovať %1$d reláciu</item>
+        <item quantity="few">Nepodarilo sa archivovať %1$d relácie</item>
+        <item quantity="many">Nepodarilo sa archivovať %1$d relácie</item>
+        <item quantity="other">Nepodarilo sa archivovať %1$d relácií</item>
+    </plurals>
+    <string name="drawer_unarchive_error">Nepodarilo sa obnoviť „%1$s“ z archívu</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">Nepodarilo sa obnoviť %1$d reláciu z archívu</item>
+        <item quantity="few">Nepodarilo sa obnoviť %1$d relácie z archívu</item>
+        <item quantity="many">Nepodarilo sa obnoviť %1$d relácie z archívu</item>
+        <item quantity="other">Nepodarilo sa obnoviť %1$d relácií z archívu</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Nová relácia</string>

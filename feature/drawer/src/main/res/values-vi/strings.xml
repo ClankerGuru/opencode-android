@@ -126,9 +126,18 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Không thể yêu cầu cấp quyền. Hãy thử lại.</string>
     <string name="drawer_notifications_open_settings_error">Không thể mở cài đặt. Hãy mở cài đặt Android và chọn Thông báo → OpenCode.</string>
-    <string name="drawer_delete_session_error">Không thể xóa “%1$s”. %2$s</string>
-    <string name="drawer_archive_error">Không thể lưu trữ “%1$s”. %2$s</string>
-    <string name="drawer_unarchive_error">Không thể bỏ lưu trữ “%1$s”. %2$s</string>
+    <string name="drawer_delete_session_error">Không thể xóa “%1$s”</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="other">Không thể xóa %1$d phiên</item>
+    </plurals>
+    <string name="drawer_archive_error">Không thể lưu trữ “%1$s”</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="other">Không thể lưu trữ %1$d phiên</item>
+    </plurals>
+    <string name="drawer_unarchive_error">Không thể bỏ lưu trữ “%1$s”</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="other">Không thể bỏ lưu trữ %1$d phiên</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Phiên mới</string>

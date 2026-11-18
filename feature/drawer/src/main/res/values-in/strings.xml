@@ -126,9 +126,18 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Gagal meminta izin. Coba lagi.</string>
     <string name="drawer_notifications_open_settings_error">Gagal membuka pengaturan. Buka pengaturan Android dan pilih Notifikasi → OpenCode.</string>
-    <string name="drawer_delete_session_error">Gagal menghapus “%1$s”. %2$s</string>
-    <string name="drawer_archive_error">Gagal mengarsipkan “%1$s”. %2$s</string>
-    <string name="drawer_unarchive_error">Gagal mengeluarkan “%1$s” dari arsip. %2$s</string>
+    <string name="drawer_delete_session_error">Gagal menghapus “%1$s”</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="other">Gagal menghapus %1$d sesi</item>
+    </plurals>
+    <string name="drawer_archive_error">Gagal mengarsipkan “%1$s”</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="other">Gagal mengarsipkan %1$d sesi</item>
+    </plurals>
+    <string name="drawer_unarchive_error">Gagal mengeluarkan “%1$s” dari arsip</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="other">Gagal mengeluarkan %1$d sesi dari arsip</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Sesi baru</string>

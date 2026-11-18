@@ -134,9 +134,24 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Impossibile richiedere l\'autorizzazione. Riprova.</string>
     <string name="drawer_notifications_open_settings_error">Impossibile aprire le impostazioni. Apri le impostazioni di Android e scegli Notifiche → OpenCode.</string>
-    <string name="drawer_delete_session_error">Impossibile eliminare “%1$s”. %2$s</string>
-    <string name="drawer_archive_error">Impossibile archiviare “%1$s”. %2$s</string>
-    <string name="drawer_unarchive_error">Impossibile ripristinare “%1$s” dall\'archivio. %2$s</string>
+    <string name="drawer_delete_session_error">Impossibile eliminare “%1$s”</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">Impossibile eliminare %1$d sessione</item>
+        <item quantity="many">Impossibile eliminare %1$d sessioni</item>
+        <item quantity="other">Impossibile eliminare %1$d sessioni</item>
+    </plurals>
+    <string name="drawer_archive_error">Impossibile archiviare “%1$s”</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">Impossibile archiviare %1$d sessione</item>
+        <item quantity="many">Impossibile archiviare %1$d sessioni</item>
+        <item quantity="other">Impossibile archiviare %1$d sessioni</item>
+    </plurals>
+    <string name="drawer_unarchive_error">Impossibile ripristinare “%1$s” dall\'archivio</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">Impossibile ripristinare %1$d sessione dall\'archivio</item>
+        <item quantity="many">Impossibile ripristinare %1$d sessioni dall\'archivio</item>
+        <item quantity="other">Impossibile ripristinare %1$d sessioni dall\'archivio</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Nuova sessione</string>

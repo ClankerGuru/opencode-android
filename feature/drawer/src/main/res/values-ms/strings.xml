@@ -126,9 +126,18 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Tidak dapat meminta kebenaran. Cuba lagi.</string>
     <string name="drawer_notifications_open_settings_error">Tidak dapat membuka tetapan. Buka tetapan Android dan pilih Notifikasi → OpenCode.</string>
-    <string name="drawer_delete_session_error">Tidak dapat memadam “%1$s”. %2$s</string>
-    <string name="drawer_archive_error">Tidak dapat mengarkibkan “%1$s”. %2$s</string>
-    <string name="drawer_unarchive_error">Tidak dapat menyaharkibkan “%1$s”. %2$s</string>
+    <string name="drawer_delete_session_error">Tidak dapat memadam “%1$s”</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="other">Tidak dapat memadam %1$d sesi</item>
+    </plurals>
+    <string name="drawer_archive_error">Tidak dapat mengarkibkan “%1$s”</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="other">Tidak dapat mengarkibkan %1$d sesi</item>
+    </plurals>
+    <string name="drawer_unarchive_error">Tidak dapat menyaharkibkan “%1$s”</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="other">Tidak dapat menyaharkibkan %1$d sesi</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Sesi baharu</string>

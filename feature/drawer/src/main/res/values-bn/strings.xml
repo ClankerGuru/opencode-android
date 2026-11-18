@@ -130,9 +130,21 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">অনুমতি চাওয়া যায়নি। আবার চেষ্টা করুন।</string>
     <string name="drawer_notifications_open_settings_error">সেটিংস খোলা যায়নি। Android সেটিংস খুলে বিজ্ঞপ্তি → OpenCode বেছে নিন।</string>
-    <string name="drawer_delete_session_error">“%1$s” মোছা যায়নি। %2$s</string>
-    <string name="drawer_archive_error">“%1$s” সংরক্ষণাগারে রাখা যায়নি। %2$s</string>
-    <string name="drawer_unarchive_error">“%1$s” সংরক্ষণাগার থেকে সরানো যায়নি। %2$s</string>
+    <string name="drawer_delete_session_error">“%1$s” মোছা যায়নি</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">%1$dটি সেশন মোছা যায়নি</item>
+        <item quantity="other">%1$dটি সেশন মোছা যায়নি</item>
+    </plurals>
+    <string name="drawer_archive_error">“%1$s” সংরক্ষণাগারে রাখা যায়নি</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">%1$dটি সেশন সংরক্ষণাগারে রাখা যায়নি</item>
+        <item quantity="other">%1$dটি সেশন সংরক্ষণাগারে রাখা যায়নি</item>
+    </plurals>
+    <string name="drawer_unarchive_error">“%1$s” সংরক্ষণাগার থেকে সরানো যায়নি</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">%1$dটি সেশন সংরক্ষণাগার থেকে সরানো যায়নি</item>
+        <item quantity="other">%1$dটি সেশন সংরক্ষণাগার থেকে সরানো যায়নি</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">নতুন সেশন</string>

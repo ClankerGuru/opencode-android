@@ -97,7 +97,6 @@ internal fun InboxSidebarList(
     val rows by store.observe { it.inboxSidebarRows() }
     val archivedCount by store.observe { it.inboxSidebarStatus.archived.size }
     val catchUpCount by store.observe { it.catchUpSessions.size }
-    val archiveError by store.observe { it.inboxSidebarStatus.archiveError }
     val snapshotLoaded by store.observe { it.snapshotLoaded }
     val catchUpSessionCount = pluralStringResource(R.plurals.drawer_catch_up_session_count, catchUpCount, catchUpCount)
     // Ages tick over on the minute.
@@ -110,7 +109,7 @@ internal fun InboxSidebarList(
     }
     val listState = rememberLazyListState()
     // As in DrawerListView: a list resting at its top stays there when a row arrives above the
-    // first one (the archive error, Catch Up, a session that just got busy); LazyColumn would keep
+    // first one (Catch Up, a session that just got busy); LazyColumn would keep
     // the old first row anchored by key and leave the new ones scrolled under the header.
     val restsAtTop = remember { booleanArrayOf(true) }
     LaunchedEffect(listState) {
@@ -118,7 +117,6 @@ internal fun InboxSidebarList(
             .collect { restsAtTop[0] = it }
     }
     val firstKey = when {
-        archiveError != null -> "inbox-error"
         catchUpCount > 0 -> "inbox-catch-up"
         else -> rows.firstOrNull()?.id
     }
@@ -139,16 +137,6 @@ internal fun InboxSidebarList(
     val colors = OpenCodeTheme.colors
     Box(modifier) {
         LazyColumn(state = listState, contentPadding = contentPadding, modifier = Modifier.fillMaxSize()) {
-            archiveError?.let { error ->
-                item(key = "inbox-error") {
-                    Text(
-                        error,
-                        style = OpenCodeTextStyles.footnote,
-                        color = colors.destructive,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = InboxSidebarMetrics.edge, vertical = 8.dp),
-                    )
-                }
-            }
             if (catchUpCount > 0) {
                 item(key = "inbox-catch-up") {
                     Row(

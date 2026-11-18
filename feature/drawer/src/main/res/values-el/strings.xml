@@ -130,9 +130,21 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Αδυναμία αιτήματος άδειας. Δοκιμάστε ξανά.</string>
     <string name="drawer_notifications_open_settings_error">Αδυναμία ανοίγματος των ρυθμίσεων. Ανοίξτε τις ρυθμίσεις Android και επιλέξτε Ειδοποιήσεις → OpenCode.</string>
-    <string name="drawer_delete_session_error">Αδυναμία διαγραφής του «%1$s». %2$s</string>
-    <string name="drawer_archive_error">Αδυναμία αρχειοθέτησης του «%1$s». %2$s</string>
-    <string name="drawer_unarchive_error">Αδυναμία κατάργησης αρχειοθέτησης του «%1$s». %2$s</string>
+    <string name="drawer_delete_session_error">Αδυναμία διαγραφής του «%1$s»</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">Αδυναμία διαγραφής %1$d συνεδρίας</item>
+        <item quantity="other">Αδυναμία διαγραφής %1$d συνεδριών</item>
+    </plurals>
+    <string name="drawer_archive_error">Αδυναμία αρχειοθέτησης του «%1$s»</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">Αδυναμία αρχειοθέτησης %1$d συνεδρίας</item>
+        <item quantity="other">Αδυναμία αρχειοθέτησης %1$d συνεδριών</item>
+    </plurals>
+    <string name="drawer_unarchive_error">Αδυναμία κατάργησης αρχειοθέτησης του «%1$s»</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">Αδυναμία κατάργησης αρχειοθέτησης %1$d συνεδρίας</item>
+        <item quantity="other">Αδυναμία κατάργησης αρχειοθέτησης %1$d συνεδριών</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Νέα συνεδρία</string>

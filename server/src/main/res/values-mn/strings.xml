@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">OpenCode сервертэй холбогдож чадсангүй</string>
     <string name="server_error_folder_gone">Хавтас байхгүй болсон</string>
     <string name="server_error_uploads_unsupported">Энэ сервер файл хавсаргахыг дэмждэггүй. Компьютер дээрх OpenCode-оо шинэчилнэ үү.</string>
+    <string name="server_error_archiving_unsupported">Энэ сервер архивлахыг дэмждэггүй. Компьютер дээрх OpenCode-ийг шинэчилнэ үү.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode-д дотоод сүлжээний төхөөрөмжүүдтэй холбогдох зөвшөөрөл алга. Тохиргооноос OpenCode-ийн «Ойролцоох төхөөрөмжүүд» зөвшөөрлийг идэвхжүүлээд дахин оролдоно уу.</string>

@@ -162,7 +162,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         /** New sessions whose first message only this phone has, listed above Recents. */
         val unsentDrafts: List<UnsentDraft> = emptyList(),
         val pendingDeletion: OpenCodeSession? = null,
-        val deletionError: String? = null,
+        val deletionError: DrawerFailure? = null,
         val recentlyDeletedIDs: Set<String> = emptySet(),
         /**
          * Settings, pushed full screen over the drawer and the session; Back returns to whichever

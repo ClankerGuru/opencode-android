@@ -52,6 +52,7 @@
     <string name="server_error_unreachable">เชื่อมต่อเซิร์ฟเวอร์ OpenCode ไม่ได้</string>
     <string name="server_error_folder_gone">ไม่มีโฟลเดอร์นี้แล้ว</string>
     <string name="server_error_uploads_unsupported">เซิร์ฟเวอร์นี้ไม่รองรับไฟล์แนบ โปรดอัปเดต OpenCode บนคอมพิวเตอร์</string>
+    <string name="server_error_archiving_unsupported">เซิร์ฟเวอร์นี้ไม่รองรับการจัดเก็บ โปรดอัปเดต OpenCode บนคอมพิวเตอร์ของคุณ</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode ไม่ได้รับอนุญาตให้เชื่อมต่ออุปกรณ์ในเครือข่ายภายในของคุณ เปิดสิทธิ์อุปกรณ์ใกล้เคียงให้ OpenCode ในการตั้งค่า แล้วลองอีกครั้ง</string>

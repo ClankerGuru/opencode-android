@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">OpenCode serveriga ulanib bo‘lmadi</string>
     <string name="server_error_folder_gone">Jild endi mavjud emas</string>
     <string name="server_error_uploads_unsupported">Bu server fayl biriktirishni qo‘llamaydi. Kompyuteringizdagi OpenCode ilovasini yangilang.</string>
+    <string name="server_error_archiving_unsupported">Bu server arxivlashni qo‘llab-quvvatlamaydi. Kompyuteringizda OpenCode’ni yangilang.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode mahalliy tarmog‘ingizdagi qurilmalarga ulanishga ruxsati yo‘q. Sozlamalarda OpenCode uchun Yaqin-atrofdagi qurilmalar ruxsatini yoqing va qayta urinib ko‘ring.</string>

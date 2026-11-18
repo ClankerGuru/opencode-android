@@ -70,6 +70,7 @@
     <string name="server_error_unreachable">Povezava s strežnikom OpenCode ni mogoča</string>
     <string name="server_error_folder_gone">Mapa ne obstaja več</string>
     <string name="server_error_uploads_unsupported">Ta strežnik ne podpira datotečnih prilog. Posodobi OpenCode v računalniku.</string>
+    <string name="server_error_archiving_unsupported">Ta strežnik ne podpira arhiviranja. Posodobite OpenCode na svojem računalniku.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode nima dovoljenja za dostop do naprav v lokalnem omrežju. V nastavitvah za OpenCode omogoči Naprave v bližini in poskusi znova.</string>

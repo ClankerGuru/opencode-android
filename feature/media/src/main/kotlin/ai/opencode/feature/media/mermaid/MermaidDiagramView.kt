@@ -5,12 +5,14 @@ import ai.opencode.core.dependencies.PasteboardClient
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticsClient
+import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.drawerPanHorizontalScroller
 import android.graphics.Bitmap
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -51,6 +53,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -188,6 +191,10 @@ fun MermaidDiagramCard(
             val height = if (naturalSize == null) MermaidDiagramMetrics.placeholderHeight else max(display.height, 44f).dp
             val key = MermaidCacheKey(source, theme, display.width)
             val shown = image?.takeIf { it.first == key }?.second ?: renderer.cachedImage(key)
+            val pixels = remember(key) { Animatable(if (shown != null) 1f else 0f) }
+            LaunchedEffect(shown != null) {
+                if (shown != null) pixels.animateTo(1f, MotionRole.Dim.animation(reduceMotion = reduceMotion))
+            }
             val shape = RoundedCornerShape(TranscriptMetrics.cardCornerRadius)
             val dragSource = LocalTranscriptImageDragSource.current
             Box(
@@ -223,7 +230,7 @@ fun MermaidDiagramCard(
                         fits = true,
                         maxHeight = display.height.dp,
                         cornerRadius = if (display.width >= width - 1) TranscriptMetrics.cardCornerRadius else 0.dp,
-                        modifier = Modifier.size(display.width.dp, display.height.dp),
+                        modifier = Modifier.size(display.width.dp, display.height.dp).graphicsLayer { alpha = pixels.value },
                     )
                 } else {
                     CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)

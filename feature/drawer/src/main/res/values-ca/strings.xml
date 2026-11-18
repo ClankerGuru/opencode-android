@@ -134,9 +134,24 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">No s\'ha pogut demanar permís. Torna-ho a provar.</string>
     <string name="drawer_notifications_open_settings_error">No s\'ha pogut obrir la configuració. Obre la configuració d\'Android i tria Notificacions → OpenCode.</string>
-    <string name="drawer_delete_session_error">No s\'ha pogut suprimir «%1$s». %2$s</string>
-    <string name="drawer_archive_error">No s\'ha pogut arxivar «%1$s». %2$s</string>
-    <string name="drawer_unarchive_error">No s\'ha pogut desarxivar «%1$s». %2$s</string>
+    <string name="drawer_delete_session_error">No s\'ha pogut suprimir «%1$s»</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">No s\'ha pogut suprimir %1$d sessió</item>
+        <item quantity="many">No s\'han pogut suprimir %1$d sessions</item>
+        <item quantity="other">No s\'han pogut suprimir %1$d sessions</item>
+    </plurals>
+    <string name="drawer_archive_error">No s\'ha pogut arxivar «%1$s»</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">No s\'ha pogut arxivar %1$d sessió</item>
+        <item quantity="many">No s\'han pogut arxivar %1$d sessions</item>
+        <item quantity="other">No s\'han pogut arxivar %1$d sessions</item>
+    </plurals>
+    <string name="drawer_unarchive_error">No s\'ha pogut desarxivar «%1$s»</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">No s\'ha pogut desarxivar %1$d sessió</item>
+        <item quantity="many">No s\'han pogut desarxivar %1$d sessions</item>
+        <item quantity="other">No s\'han pogut desarxivar %1$d sessions</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Nova sessió</string>

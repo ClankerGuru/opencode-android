@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">Az OpenCode-kiszolgáló nem érhető el</string>
     <string name="server_error_folder_gone">A mappa már nem létezik</string>
     <string name="server_error_uploads_unsupported">Ez a kiszolgáló nem támogatja a fájlmellékleteket. Frissítse az OpenCode-ot a számítógépén.</string>
+    <string name="server_error_archiving_unsupported">Ez a kiszolgáló nem támogatja az archiválást. Frissítse az OpenCode-ot a számítógépén.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">Az OpenCode nem férhet hozzá a helyi hálózat eszközeihez. Engedélyezze a Közeli eszközök hozzáférést az OpenCode számára a Beállításokban, majd próbálja újra.</string>
