@@ -29,9 +29,6 @@ object SharedKeys {
     /** Developer Mode: upload voice calls and traces to the log server. Off by default. Keeps the voice-only switch's key. */
     val developerMode = SharedKey.appStorage("voice-call-uploads", false)
 
-    /** Developer Mode's Motion Watch. Off by default. */
-    val motionWatch = SharedKey.appStorage("developer-motion-watch", false)
-
     /** Touch Probe. Off by default. */
     val touchProbe = SharedKey.appStorage("diagnostics-touch-probe", false)
 

@@ -19,8 +19,7 @@ object Troubleshooting {
         events.filter { it.kind == DiagnosticsEvent.Kind.NetworkMetrics && it.requestID != null }.associateBy { it.requestID!! }
 
     /** Last session open, tap → first frame / fresh content, SSE, last 60 seconds. */
-    /** [motionJumps]: the Motion Watch count, shown while it's on or has jumps, else null. */
-    fun summary(events: List<DiagnosticsEvent>, motionJumps: Int? = null): List<Pair<String, String>> {
+    fun summary(events: List<DiagnosticsEvent>): List<Pair<String, String>> {
         val open = events.lastOrNull { it.name == "session_tap" || it.name == "session_navigation_started" }
         val frame = after(events, open, setOf("session_first_frame"))
         val fresh = after(events, open, setOf("fresh_content_laid_out", "snapshot_apply", "transcript_response"))
@@ -33,8 +32,8 @@ object Troubleshooting {
             "Address race" to (events.lastOrNull { it.name == "link_race" }?.reason ?: "None yet"),
             "Network path" to (events.lastOrNull { it.name == "path_change" }?.reason ?: "No change recorded"),
             "Stream watchdog" to watchdogSummary(events),
-        ) + listOfNotNull(motionJumps?.let { "Motion Watch" to (if (it == 1) "1 jump" else "$it jumps") }) +
-            listOf("Last 60 seconds" to lastMinute(events))
+            "Last 60 seconds" to lastMinute(events),
+        )
     }
 
     /** Stalled streams the watchdog ended, by which deadline passed. */
