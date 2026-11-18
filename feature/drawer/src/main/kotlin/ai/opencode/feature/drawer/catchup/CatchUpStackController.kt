@@ -10,7 +10,6 @@ import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionRole
 import ai.opencode.core.motion.SpringSolver
 import ai.opencode.core.motion.motionFrameLoop
-import ai.opencode.feature.drawer.motion.DrawerPanEvent
 import androidx.compose.animation.core.Easing
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -476,27 +475,6 @@ class CatchUpStackController internal constructor() {
             settleBack(releaseVelocity)
         }
     }
-
-    /**
-     * For a host that routes the drawer container's pan here. That pan is horizontal only, so the card gets no vertical rubber
-     * band; [CatchUpStack]'s own pan (its default) carries both axes.
-     */
-    fun handlePan(event: DrawerPanEvent) {
-        when (event) {
-            is DrawerPanEvent.Began -> {
-                lastPanX = event.fingerTranslation
-                panBegan(Offset(event.fingerTranslation, 0f))
-            }
-            is DrawerPanEvent.Changed -> {
-                lastPanX = event.fingerTranslation
-                panChanged(Offset(event.fingerTranslation, 0f))
-            }
-            is DrawerPanEvent.Ended -> panEnded(Offset(lastPanX, 0f), Offset(event.velocity, 0f))
-            is DrawerPanEvent.Cancelled -> panCancelled()
-        }
-    }
-
-    private var lastPanX = 0f
 
     fun panCancelled() {
         if (!isDragging) return

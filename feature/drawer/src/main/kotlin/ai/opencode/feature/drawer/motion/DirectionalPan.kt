@@ -27,8 +27,7 @@ import kotlin.math.abs
  * The session drawer's pan. It watches every touch in the `Initial` pass, waits for 8 dp of travel
  * ([BackSwipeRules.decisionDistance]), then picks once: vertical or leftward on a shut drawer stays
  * with the content; rightward on the open drawer's list reveals the rows' times; rightward on a
- * scroller that can still scroll back, or a control that claims sideways drags, stays with it
- * except from the leading 28 dp edge; a finger that rested 0.45 s keeps its hold. Once chosen it
+ * scroller that can still scroll back stays with it except from the leading 28 dp edge; a finger that rested 0.45 s keeps its hold. Once chosen it
  * consumes the pointer. Touches are tested against the layout nodes registered in
  * [DrawerPanRegions].
  */
@@ -43,7 +42,6 @@ object DirectionalPan {
 
     /** Where a touch began. */
     sealed interface TouchOrigin {
-        data object DrawerRow : TouchOrigin
         data object DrawerList : TouchOrigin
         data object DrawerChrome : TouchOrigin
         data object ExposedCard : TouchOrigin
@@ -73,17 +71,17 @@ object DirectionalPan {
         if (dx * dx + dy * dy < decisionDistance * decisionDistance) return Decision.Wait
         if (abs(dx) <= abs(dy)) return Decision.Fail
         if (dx <= 0) return if (presented) Decision.Begin else Decision.Fail
-        if (presented && (origin == TouchOrigin.DrawerRow || origin == TouchOrigin.DrawerList)) return Decision.Reveal
+        if (presented && origin == TouchOrigin.DrawerList) return Decision.Reveal
         if (!presented && origin == TouchOrigin.Content(horizontalScrollerOwnsRightwardDrag = true)) return Decision.Fail
         return Decision.Begin
     }
 
     /**
      * A touch that rested before moving (a text selection, a pin's lift, a context menu) keeps
-     * doing what the hold began. In Catch Up, holding before dragging still drags the card.
+     * doing what the hold began.
      */
-    fun yieldsToHold(heldForSeconds: Double, holdBegan: Boolean, isCardSwipe: Boolean = false): Boolean =
-        !isCardSwipe && BackSwipeRules.yieldsToHold(heldForSeconds, holdBegan)
+    fun yieldsToHold(heldForSeconds: Double, holdBegan: Boolean): Boolean =
+        BackSwipeRules.yieldsToHold(heldForSeconds, holdBegan)
 }
 
 /** One phase of the drawer pan. Distances in dp, toward the trailing side positive (mirrored in RTL). */
@@ -102,7 +100,7 @@ sealed interface DrawerPanEvent {
 
 /**
  * The layout nodes the drawer pan tests touches against. Register them with [drawerPanDrawer],
- * [drawerPanList], [drawerPanCard], [drawerPanDragCard] and [drawerPanHorizontalScroller];
+ * [drawerPanList] and [drawerPanCard];
  * provide it as `LocalDrawerPanExclusion` so the card's controls can use
  * `Modifier.excludedFromDrawerPan()`.
  */
@@ -113,11 +111,8 @@ class DrawerPanRegions : DrawerPanExclusion {
 
     internal var drawer: LayoutCoordinates? = null
     internal var card: LayoutCoordinates? = null
-    internal var dragCard: LayoutCoordinates? = null
-    internal var dragCardHidden: () -> Boolean = { false }
     internal val lists = HashMap<Any, LayoutCoordinates>()
     internal val scrollers = HashMap<Any, Scroller>()
-    internal val claims = HashMap<Any, LayoutCoordinates>()
     internal val exclusions = HashMap<Any, LayoutCoordinates>()
     internal val selectionHandles = HashMap<Any, SelectionHandles>()
 
@@ -179,31 +174,10 @@ fun Modifier.drawerPanList(regions: DrawerPanRegions): Modifier =
 fun Modifier.drawerPanCard(regions: DrawerPanRegions): Modifier =
     region(regions) { _, c -> regions.card = c }
 
-/** Catch Up's top card, hit only while not [isHidden]. */
-fun Modifier.drawerPanDragCard(regions: DrawerPanRegions, isHidden: () -> Boolean = { false }): Modifier =
-    region(regions) { _, c ->
-        regions.dragCard = c
-        regions.dragCardHidden = isHidden
-    }
-
-/**
- * A horizontal scroller (code, table, attachments): while it can still scroll back toward its
- * start ([canScrollBackward], e.g. `scrollState.canScrollBackward`), a rightward drag is its
- * scroll; likewise leftward with [canScrollForward] in Catch Up.
- */
-fun Modifier.drawerPanHorizontalScroller(
-    regions: DrawerPanRegions,
-    canScrollBackward: () -> Boolean,
-    canScrollForward: () -> Boolean,
-): Modifier = region(regions) { id, c ->
-    if (c == null) regions.scrollers.remove(id) else regions.scrollers[id] = DrawerPanRegions.Scroller(c, canScrollBackward, canScrollForward)
-}
-
 /**
  * The drawer's pan over the whole drawer container (put it on the untransformed root that holds
  * the drawer and the card). Reads its inputs as lambdas so it never restarts mid-gesture.
  *
- * @param isCardSwipe Catch Up turns the pan into a two-way card swipe.
  * @param isContentPushed a subagent is pushed over the session: the back pan has the drag, and
  *   only the root session's drag opens the drawer.
  * @param onTouchDown a touch that may move the drawer began (not in Catch Up).
@@ -211,7 +185,6 @@ fun Modifier.drawerPanHorizontalScroller(
 fun Modifier.drawerDirectionalPan(
     regions: DrawerPanRegions,
     isDrawerPresented: () -> Boolean,
-    isCardSwipe: () -> Boolean = { false },
     isContentPushed: () -> Boolean = { false },
     enabled: () -> Boolean = { true },
     onTouchDown: () -> Unit = {},
@@ -231,7 +204,6 @@ fun Modifier.drawerDirectionalPan(
                 val pan = panCoordinates[0] ?: return@awaitEachGesture
                 if (!enabled()) return@awaitEachGesture
                 val presented = isDrawerPresented()
-                val cardSwipe = isCardSwipe()
                 val point = down.position
                 // Android's modal drawer lies over the card: a touch on the open drawer is the drawer's.
                 val onExposedCard = regions.contains(regions.card, pan, point) &&
@@ -242,30 +214,25 @@ fun Modifier.drawerDirectionalPan(
                 }
                 // A text selection's handle drags the handle, even at the edge.
                 if (!presented && regions.selectionHandleClaims(pan, point)) return@awaitEachGesture
-                if (!presented && !cardSwipe && isContentPushed()) return@awaitEachGesture
-                val startedAtEdge = !presented && !cardSwipe &&
+                if (!presented && isContentPushed()) return@awaitEachGesture
+                val startedAtEdge = !presented &&
                     (if (rtl) point.x >= size.width - edgeWidth else point.x <= edgeWidth)
-                if (!cardSwipe) onTouchDown()
+                onTouchDown()
 
                 // Every registered region under the finger.
                 val scrollersHere = regions.scrollers.values.filter { regions.contains(it.coordinates, pan, point) }
                 val ownsRightward = scrollersHere.any { if (rtl) it.canScrollForward() else it.canScrollBackward() }
-                val ownsLeftward = scrollersHere.any { if (rtl) it.canScrollBackward() else it.canScrollForward() }
                 val hitDrawer = regions.contains(regions.drawer, pan, point)
                 val isDrawerList = regions.lists.values.any { regions.contains(it, pan, point) }
-                val hitDragCard = cardSwipe && !regions.dragCardHidden() && regions.contains(regions.dragCard, pan, point)
-                val hitExposedCard = hitDragCard || onExposedCard
-                val cardSwipeOrigin = DirectionalPan.CardSwipeOrigin(hitExposedCard, ownsRightward, ownsLeftward)
                 val touchOrigin: DirectionalPan.TouchOrigin = if (presented) {
                     when {
                         isDrawerList && hitDrawer -> DirectionalPan.TouchOrigin.DrawerList
-                        hitExposedCard -> DirectionalPan.TouchOrigin.ExposedCard
+                        onExposedCard -> DirectionalPan.TouchOrigin.ExposedCard
                         else -> DirectionalPan.TouchOrigin.DrawerChrome
                     }
                 } else {
-                    // At the edge the drag is the drawer's; elsewhere a scroller or a control that tracks a drag keeps it.
-                    val claimed = ownsRightward || regions.claims.values.any { regions.contains(it, pan, point) }
-                    DirectionalPan.TouchOrigin.Content(horizontalScrollerOwnsRightwardDrag = claimed && !startedAtEdge)
+                    // At the edge the drag is the drawer's; elsewhere a scroller keeps it.
+                    DirectionalPan.TouchOrigin.Content(horizontalScrollerOwnsRightwardDrag = ownsRightward && !startedAtEdge)
                 }
 
                 val pointerId = down.id
@@ -301,11 +268,7 @@ fun Modifier.drawerDirectionalPan(
                         onPan(DrawerPanEvent.Changed(revealing, finger, finger - chosenAt))
                         continue
                     }
-                    val decision = if (cardSwipe) {
-                        DirectionalPan.cardSwipeDecision(cardSwipeOrigin, dx, delta.y, decisionDistance)
-                    } else {
-                        DirectionalPan.decision(touchOrigin, presented, dx, delta.y, decisionDistance)
-                    }
+                    val decision = DirectionalPan.decision(touchOrigin, presented, dx, delta.y, decisionDistance)
                     when (decision) {
                         DirectionalPan.Decision.Wait -> {
                             // Children see this move next; one that consumes it before the pan chose
@@ -318,7 +281,7 @@ fun Modifier.drawerDirectionalPan(
                         DirectionalPan.Decision.Fail -> return@awaitEachGesture
                         DirectionalPan.Decision.Begin, DirectionalPan.Decision.Reveal -> {
                             val heldFor = (change.uptimeMillis - downTime) / 1000.0
-                            if (!startedAtEdge && DirectionalPan.yieldsToHold(heldFor, holdBegan, cardSwipe)) {
+                            if (!startedAtEdge && DirectionalPan.yieldsToHold(heldFor, holdBegan)) {
                                 return@awaitEachGesture
                             }
                             chosen = true
