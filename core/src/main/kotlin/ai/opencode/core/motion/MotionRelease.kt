@@ -1,10 +1,8 @@
 package ai.opencode.core.motion
 
-import androidx.compose.ui.geometry.Rect
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.pow
 
 /**
  * The release rule: commits on a flick toward the target, never away, else on passing halfway.
@@ -68,26 +66,4 @@ class MotionRubberBand(dimension: Double, coefficient: Double = 0.55) {
         other is MotionRubberBand && other.dimension == dimension && other.coefficient == coefficient
 
     override fun hashCode(): Int = dimension.hashCode() * 31 + coefficient.hashCode()
-}
-
-/**
- * A morph between two frames: width leads, so a pill widens before it grows tall, while height and
- * centre move linearly and land exactly on the target.
- */
-object MotionFlightGeometry {
-    fun rect(from: Rect, to: Rect, progress: Float, lead: Float = MotionTunables.widthLead.value.toFloat()): Rect {
-        val widthProgress = leading(progress, lead)
-        val width = from.width + (to.width - from.width) * widthProgress
-        val height = from.height + (to.height - from.height) * progress
-        val midX = from.center.x + (to.center.x - from.center.x) * progress
-        val midY = from.center.y + (to.center.y - from.center.y) * progress
-        return Rect(left = midX - width / 2, top = midY - height / 2, right = midX + width / 2, bottom = midY + height / 2)
-    }
-
-    fun leading(progress: Float, lead: Float): Float {
-        val clampedLead = max(lead, 1f)
-        if (progress <= 0f) return progress * clampedLead
-        if (progress >= 1f) return 1f
-        return 1f - (1f - progress).pow(clampedLead)
-    }
 }
