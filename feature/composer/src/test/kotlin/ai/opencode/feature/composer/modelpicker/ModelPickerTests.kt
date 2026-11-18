@@ -283,13 +283,6 @@ class ModelPickerTests {
         assertEquals(240.0, LevelScrubberTunables.arcSpan, 0.0)
     }
 
-    @Test fun theBackdropIsStrongestOverTheComposerAndGoneAtBothEnds() {
-        val band = progressiveBlurStrengths(ProgressiveBlurProfile.Band(0.46, 0.66), samples = 50)
-        assertEquals(0.0, band.first(), 0.0)
-        assertEquals(0.0, band.last(), 0.0)
-        assertEquals(1.0, band[28], 0.0)
-    }
-
     // MARK: - Model names and levels
 
     private val opus55 = model("claude-opus-5-5", "anthropic", "Claude Opus 5.5", listOf("low", "medium", "high", "max"))

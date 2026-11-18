@@ -105,9 +105,6 @@ class OnePickerController {
     private var closeSyncWaitElapsed = 0.0
     private var launchGeneration = 0
 
-    /** True whenever One Picker owns the composer's surface on screen. */
-    val handsComposerGlass: Boolean get() = isShown
-
     private fun syncObservedPhase() {
         if (isShown != simulation.isShown) isShown = simulation.isShown
         if (isOpen != simulation.isOpen) isOpen = simulation.isOpen

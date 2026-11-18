@@ -98,9 +98,6 @@ class DrawerPinDrag {
     }
 
     companion object {
-        /** No launch arguments on Android. */
-        const val IS_TRACED = false
-
         /** A release over the chrome this far beside the list still lands, dp. */
         const val CANCEL_MARGIN = 24f
 

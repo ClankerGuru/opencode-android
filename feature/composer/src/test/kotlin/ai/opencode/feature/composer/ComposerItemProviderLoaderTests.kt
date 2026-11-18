@@ -122,7 +122,7 @@ class ComposerItemProviderLoaderTests {
         assertEquals(listOf<Byte>(1, 2, 3), imported)
     }
 
-    /** The importer's own default (pastes, shares, quotes) is 4; the + menu and photo sheet pass 8. */
+    /** The importer's own default (pastes, shares, quotes) is 4; the + menu passes 8. */
     @Test fun imageImportEnforcesSelectionLimitOnce() = runTest {
         for (limit in listOf(4, 8)) {
             if (limit == 8) assertEquals(8, AttachmentPickerButton.MAX_PHOTO_SELECTION)

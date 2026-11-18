@@ -42,16 +42,10 @@ import ai.opencode.feature.drawer.list.InboxSidebarList
 import ai.opencode.feature.drawer.list.SelectionHeaderSwap
 import ai.opencode.feature.drawer.list.rememberInboxSidebarOn
 import ai.opencode.feature.drawer.list.selectionActions
-import ai.opencode.feature.drawer.motion.DrawerControlsTrace
-import ai.opencode.feature.drawer.motion.DrawerControlsTraceView
-import ai.opencode.feature.drawer.motion.DrawerKeyboardMonitor
-import ai.opencode.feature.drawer.motion.DrawerRevealTrace
 import ai.opencode.feature.drawer.motion.DrawerSearchPill
 import ai.opencode.feature.drawer.motion.DrawerSearchPillDefaults
-import ai.opencode.feature.drawer.motion.DrawerTimeReveal
 import ai.opencode.feature.drawer.motion.RunServerSwapMotion
 import ai.opencode.feature.drawer.motion.ServerSwapMotion
-import ai.opencode.feature.drawer.motion.drawerControlsTraceProbe
 import ai.opencode.feature.drawer.motion.drawerPanList
 import ai.opencode.feature.drawer.motion.drawerSearchFocusFade
 import ai.opencode.feature.drawer.motion.drawerSearchTitleFade
@@ -197,7 +191,6 @@ fun HomeDrawer(
     }
     val localShortcutMotion = rememberDrawerShortcutMotion()
     val shortcutMotion = viewState.shortcutMotion ?: localShortcutMotion
-    val controlsTrace = remember { DrawerControlsTrace() }
 
     val isDrawerVisible = rememberIsDrawerVisible(store, viewState)
     val selectedSessionID by store.observe { viewState.drawerSelectedSessionID(it) }
@@ -214,7 +207,6 @@ fun HomeDrawer(
     val serverSwapTarget = ServerSwapTarget(current, switchingTo, drawerTitleServers(current, saved))
 
     // Always draws its own bottom edge.
-    val keyboardMonitor: DrawerKeyboardMonitor = viewState.keyboardMonitor
     val hardBottomEdge = highContrast || DrawerTunables.bottomEdge == DrawerEdgeStyle.Hard
 
     // Measured: the first row starts below the title, the last scrolls clear of the controls.
@@ -343,7 +335,6 @@ fun HomeDrawer(
                 .padding(top = headerHeight.dp, bottom = controlsHeight.dp + insetBottom + footerBottom)
                 .drawerPanList(viewState.panRegions),
         )
-        if (DrawerTimeReveal.IS_TRACED) DrawerRevealTrace(viewState.timeReveal)
 
         // The title band: the server's name (the switcher) and search, over the list.
         Box(
@@ -458,8 +449,7 @@ fun HomeDrawer(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .onSizeChanged { controlsHeight = it.height / density.density }
-                    .then(if (DrawerControlsTrace.IS_TRACED) Modifier.drawerControlsTraceProbe(controlsTrace) else Modifier),
+                    .onSizeChanged { controlsHeight = it.height / density.density },
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -469,7 +459,6 @@ fun HomeDrawer(
             }
             }
         }
-        if (DrawerControlsTrace.IS_TRACED) DrawerControlsTraceView(controlsTrace, keyboardMonitor)
     }
 
     if (hostsDeleteConfirmation) HomeDeleteConfirmation(store)

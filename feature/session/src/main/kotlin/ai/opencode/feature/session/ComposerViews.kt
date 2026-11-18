@@ -162,7 +162,6 @@ object ComposerTunables {
     /** A filled control's visible face (Send, Stop, Call); its target stays 48. */
     const val faceDiameter = 40f
     const val trailingGap = 11f
-    const val micScale = 17f
     const val trailingSpacing = 4f
     const val leadingSpacing = 9f
     const val swipeUpDistance = 18f
@@ -170,9 +169,6 @@ object ComposerTunables {
 
     /** The composer's mic glyph; the Call Tray's Mute wears the same one. */
     const val micSymbol = "mic"
-
-    /** Body medium at the default 17 pt. */
-    val micFont: TextStyle get() = OpenCodeTextStyles.body.copy(fontWeight = FontWeight.Medium)
 }
 
 // region ComposerLayout

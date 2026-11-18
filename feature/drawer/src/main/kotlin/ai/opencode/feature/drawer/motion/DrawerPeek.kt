@@ -3,21 +3,11 @@ package ai.opencode.feature.drawer.motion
 import ai.opencode.core.strings.localized
 import ai.opencode.feature.drawer.R
 import ai.opencode.core.ui.appFormattingLocale
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.size
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.unit.dp
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -28,7 +18,6 @@ import java.time.format.FormatStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.math.max
 import kotlin.math.min
 
 /**
@@ -111,11 +100,6 @@ class DrawerTimeReveal {
     /** The times' opacity. */
     var progress: Float by mutableFloatStateOf(0f)
         private set
-    /** The furthest this drag reached (lab trace). */
-    var peak: Float by mutableFloatStateOf(0f)
-        private set
-    var peakProgress: Float by mutableFloatStateOf(0f)
-        private set
 
     fun update(phase: DrawerRevealPhase, reach: Float, reducedMotion: Boolean) {
         when (phase) {
@@ -129,13 +113,8 @@ class DrawerTimeReveal {
                     offset = offset(translation, reach)
                     progress = min(offset / (reach * 0.8f), 1f)
                 }
-                peak = max(peak, offset)
-                peakProgress = max(peakProgress, progress)
             }
-            DrawerRevealPhase.Began -> {
-                peak = 0f
-                peakProgress = 0f
-            }
+            DrawerRevealPhase.Began -> {}
             DrawerRevealPhase.Ended -> {
                 offset = 0f
                 progress = 0f
@@ -144,14 +123,8 @@ class DrawerTimeReveal {
     }
 
     companion object {
-        /** No launch arguments on Android. */
-        const val IS_TRACED = false
         /** Between a time and the row it belongs to (dp). */
         const val SPACING = 8f
-        /** How far the card-edge fade's mask reaches before a row's leading edge, so the revealed time isn't masked off (dp). */
-        const val FADE_GUTTER = 160f
-        /** Scale by the font scale. */
-        const val REACH = 76f
 
         /** The rows follow the finger until the times are uncovered ([reach]), then rubber-band toward a little further. */
         fun offset(translation: Float, reach: Float): Float {
@@ -163,19 +136,6 @@ class DrawerTimeReveal {
             return reach + limit * (1 - 1 / (excess * 0.55f / limit + 1))
         }
     }
-}
-
-/** `-lab-reveal-trace`: the furthest the last reveal reached and where the rows rest now. */
-@Composable
-fun DrawerRevealTrace(reveal: DrawerTimeReveal) {
-    Box(
-        Modifier
-            .size(1.dp)
-            .testTag("drawer-time-reveal")
-            .semantics {
-                stateDescription = "peak=%.0f progress=%.2f offset=%.0f".format(Locale.US, reveal.peak, reveal.peakProgress, reveal.offset)
-            },
-    )
 }
 
 /**
@@ -190,49 +150,4 @@ class DrawerKeyboardMonitor {
     /** The drawer holds the composer's keyboard ([DrawerKeyboardHold]). */
     var isHoldingKeyboard: Boolean by mutableStateOf(false)
     val isKeyboardOnScreen: Boolean get() = isImeVisible || isHoldingKeyboard
-}
-
-/**
- * `-lab-drawer-controls-trace`: where the drawer's New Session and Settings have stood. [top] is
- * the controls' resting top edge, [highest] the highest it has been laid out, so a test can tell
- * they never rose with the keyboard.
- */
-@Stable
-class DrawerControlsTrace {
-    var top: Float by mutableFloatStateOf(0f)
-        private set
-    var bottom: Float by mutableFloatStateOf(0f)
-        private set
-    var highest: Float by mutableFloatStateOf(Float.POSITIVE_INFINITY)
-        private set
-
-    fun record(minY: Float, maxY: Float) {
-        top = minY
-        bottom = maxY
-        highest = min(highest, minY)
-    }
-
-    companion object {
-        /** No launch arguments on Android. */
-        const val IS_TRACED = false
-    }
-}
-
-/** Records the controls' frame in the root, in px. */
-fun Modifier.drawerControlsTraceProbe(trace: DrawerControlsTrace): Modifier = onGloballyPositioned {
-    val y = it.positionInRoot().y
-    trace.record(y, y + it.size.height)
-}
-
-/** Publishes [DrawerControlsTrace] as the `drawer-controls-trace` element. */
-@Composable
-fun DrawerControlsTraceView(trace: DrawerControlsTrace, monitor: DrawerKeyboardMonitor) {
-    Box(
-        Modifier
-            .size(1.dp)
-            .testTag("drawer-controls-trace")
-            .semantics {
-                stateDescription = "top=%.0f highest=%.0f kbOn=%s".format(Locale.US, trace.top, trace.highest, monitor.isKeyboardOnScreen)
-            },
-    )
 }
