@@ -34,45 +34,18 @@ class TouchRecovery(
     private val release: () -> Unit,
 ) {
     enum class Owner(val rawValue: String) {
-        Transcript("transcript"),
-        Drawer("drawer"),
-        CatchUp("catch_up"),
-        CallOrb("call_orb"),
-        Sheet("sheet"),
-        KeyboardComposer("keyboard_composer"),
-        Zoom("zoom"),
         PlusMenu("plus_menu"),
     }
 
     enum class Reason(val rawValue: String) {
-        Disabled("disabled"),
         Closed("closed"),
-        Detached("detached"),
-        Invisible("invisible"),
-        Migrated("migrated"),
-        Transition("transition"),
-        Stranded("stranded"),
     }
 
-    /**
-     * What holds the touches, and why. [startedAt] (real seconds), if known, starts the grace
-     * there.
-     */
+    /** What holds the touches, and why. */
     class Fault(
         val reason: Reason,
         holder: Any,
-        val grace: Fault.Grace = Fault.Grace.Animation,
-        val startedAt: Double? = null,
     ) {
-        /**
-         * How long a fault may stand. [Animation] is the default grace; [Wall] a hard deadline in
-         * real seconds, which a dead drag can't shorten (a hand-off still inside its longest run).
-         */
-        sealed interface Grace {
-            data object Animation : Grace
-            data class Wall(val seconds: Double) : Grace
-        }
-
         private val identity: Any = holder
         private val holderType: Class<*> = holder.javaClass
 
@@ -84,8 +57,7 @@ class TouchRecovery(
 
         override fun equals(other: Any?): Boolean {
             if (other !is Fault) return false
-            return reason == other.reason && identity === other.identity &&
-                grace == other.grace && startedAt == other.startedAt
+            return reason == other.reason && identity === other.identity
         }
 
         override fun hashCode(): Int = 31 * reason.hashCode() + System.identityHashCode(identity)
@@ -121,27 +93,8 @@ class TouchRecovery(
         val startWall = sinceWall ?: return false
         val held = now - start
         val heldWall = wall - startWall
-        val grace = next.grace
-        if (grace is Fault.Grace.Wall) {
-            if (heldWall <= grace.seconds) return false
-        } else {
-            if (held <= GRACE && heldWall <= WALL_GRACE) return false
-        }
-        return land(next, heldWall, wall, trigger = "grace")
-    }
-
-    /**
-     * A drag at [touchBegan] scrolled nothing: a fault already standing then is released without
-     * waiting out its grace.
-     */
-    fun expedite(touchBegan: Double, now: Double, wall: Double): Boolean {
-        val next = observe(now, wall) ?: return false
-        val startWall = sinceWall ?: return false
-        if (startWall > touchBegan) return false
-        val heldWall = wall - startWall
-        val grace = next.grace
-        if (grace is Fault.Grace.Wall && heldWall <= grace.seconds) return false
-        return land(next, heldWall, wall, trigger = "dead_drag")
+        if (held <= GRACE && heldWall <= WALL_GRACE) return false
+        return land(next, heldWall, wall)
     }
 
     /** The standing fault, its grace restarted when it changed. */
@@ -162,13 +115,13 @@ class TouchRecovery(
         if (next != fault || start == null || startWall == null || now < start || wall < startWall) {
             fault = next
             since = now
-            sinceWall = min(wall, next.startedAt ?: wall)
+            sinceWall = wall
             return null
         }
         return next
     }
 
-    private fun land(next: Fault, heldWall: Double, wall: Double, trigger: String): Boolean {
+    private fun land(next: Fault, heldWall: Double, wall: Double): Boolean {
         release()
         val releasedBefore = lastRelease
         if (releasedBefore != null && wall - releasedBefore > FORGIVE_AFTER) forgive()
@@ -181,7 +134,7 @@ class TouchRecovery(
             val heldText = String.format(Locale.US, "%.2f", heldWall)
             AppLog.app.error(
                 "transcript_touch_recovered owner=${owner.rawValue} reason=${next.reason.rawValue} " +
-                    "holder=${next.kind} held=$heldText streak=$streak trigger=$trigger",
+                    "holder=${next.kind} held=$heldText streak=$streak trigger=grace",
             )
         }
         reset()
@@ -216,8 +169,6 @@ class TouchRecovery(
 fun interface TouchRecoveryClient {
     suspend fun watch(recovery: TouchRecovery)
 
-    fun expedite(touchBegan: Double) {}
-
     fun touched() {}
 
     fun arm() {}
@@ -235,8 +186,6 @@ fun interface TouchRecoveryClient {
                     }
                 }
             }
-
-            override fun expedite(touchBegan: Double) = TouchRecoverySampler.shared.expedite(touchBegan)
 
             override fun touched() = TouchRecoverySampler.shared.touched()
 
@@ -302,12 +251,6 @@ class TouchRecoverySampler(
             if (watch.isPending(wall)) return
         }
         halt()
-    }
-
-    fun expedite(touchBegan: Double) {
-        val time = clock()
-        for (watch in watches.toList()) watch.expedite(touchBegan, time.now, time.wall)
-        arm()
     }
 
     /** Returns the real time sampled at, or null with no watch left. */

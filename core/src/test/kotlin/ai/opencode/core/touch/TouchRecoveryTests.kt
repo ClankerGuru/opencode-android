@@ -51,10 +51,10 @@ class TouchRecoveryTests {
         var inspected = 0
         var releases = 0
         val watch = TouchRecovery(
-            owner = TouchRecovery.Owner.Drawer,
+            owner = TouchRecovery.Owner.PlusMenu,
             inspect = {
                 inspected += 1
-                TouchRecovery.Fault(TouchRecovery.Reason.Disabled, holder)
+                TouchRecovery.Fault(TouchRecovery.Reason.Closed, holder)
             },
             release = { releases += 1 },
         )
@@ -89,8 +89,8 @@ class TouchRecoveryTests {
         val holder = Holder()
         var releases = 0
         val watch = TouchRecovery(
-            owner = TouchRecovery.Owner.Drawer,
-            inspect = { TouchRecovery.Fault(TouchRecovery.Reason.Disabled, holder) },
+            owner = TouchRecovery.Owner.PlusMenu,
+            inspect = { TouchRecovery.Fault(TouchRecovery.Reason.Closed, holder) },
             release = { releases += 1 },
         )
         // At 0.1× animation time crawls; the backoff still runs in real seconds.
@@ -100,30 +100,6 @@ class TouchRecoveryTests {
         assertFalse(watch.sample(now = 1.3, wall = 5.0))
         // The grace is one animation second, but never more than four real ones.
         assertTrue(watch.sample(now = 1.45, wall = 7.1))
-        assertEquals(2, releases)
-    }
-
-    @Test
-    fun deadDragExpeditesOnlyAFaultStandingBeforeTheTouch() {
-        val holder = Holder()
-        var releases = 0
-        var grace: TouchRecovery.Fault.Grace = TouchRecovery.Fault.Grace.Animation
-        val watch = TouchRecovery(
-            owner = TouchRecovery.Owner.Transcript,
-            inspect = { TouchRecovery.Fault(TouchRecovery.Reason.Disabled, holder, grace = grace) },
-            release = { releases += 1 },
-        )
-        assertFalse(watch.sample(now = 10.0, wall = 10.0))
-        assertFalse("The fault came after the finger", watch.expedite(touchBegan = 9.9, now = 10.3, wall = 10.3))
-        assertTrue(watch.expedite(touchBegan = 10.1, now = 10.3, wall = 10.3))
-        assertEquals(1, releases)
-        // Inside its backoff a dead drag changes nothing.
-        assertFalse(watch.expedite(touchBegan = 10.4, now = 11.0, wall = 11.0))
-        // A hard deadline holds against a dead drag.
-        grace = TouchRecovery.Fault.Grace.Wall(3.0)
-        assertFalse(watch.sample(now = 20.0, wall = 20.0))
-        assertFalse(watch.expedite(touchBegan = 21.0, now = 22.0, wall = 22.0))
-        assertTrue(watch.expedite(touchBegan = 21.0, now = 23.1, wall = 23.1))
         assertEquals(2, releases)
     }
 
@@ -162,7 +138,7 @@ class TouchRecoveryTests {
         val rig = SamplerRig()
         var inspected = 0
         val watch = TouchRecovery(
-            owner = TouchRecovery.Owner.Drawer,
+            owner = TouchRecovery.Owner.PlusMenu,
             inspect = {
                 inspected += 1
                 null
@@ -198,7 +174,7 @@ class TouchRecoveryTests {
         var fault: TouchRecovery.Fault? = null
         var releases = 0
         val watch = TouchRecovery(
-            owner = TouchRecovery.Owner.Drawer,
+            owner = TouchRecovery.Owner.PlusMenu,
             inspect = { fault },
             release = {
                 releases += 1
@@ -208,7 +184,7 @@ class TouchRecoveryTests {
         rig.sampler.add(watch)
         rig.run(end = 3.0)
         // A fault born late in the window keeps it open past the window's end.
-        fault = TouchRecovery.Fault(TouchRecovery.Reason.Disabled, holder)
+        fault = TouchRecovery.Fault(TouchRecovery.Reason.Closed, holder)
         rig.run(end = 4.9)
         assertEquals("Released a second after it was first seen", 1, releases)
         assertTrue(rig.sampler.isRunning)
@@ -226,7 +202,7 @@ class TouchRecoveryTests {
         var fault: TouchRecovery.Fault? = null
         var releases = 0
         val watch = TouchRecovery(
-            owner = TouchRecovery.Owner.Transcript,
+            owner = TouchRecovery.Owner.PlusMenu,
             inspect = { fault },
             release = {
                 releases += 1
@@ -237,12 +213,11 @@ class TouchRecoveryTests {
         rig.run(end = 60.0)
         assertFalse(rig.sampler.isRunning)
         // Stranded while nothing was sampling; the finger finds it.
-        fault = TouchRecovery.Fault(TouchRecovery.Reason.Disabled, holder)
+        fault = TouchRecovery.Fault(TouchRecovery.Reason.Closed, holder)
         rig.wall = 100.0
         rig.sampler.touched()
         assertTrue(rig.sampler.isRunning)
-        rig.wall = 100.3
-        rig.sampler.expedite(touchBegan = 100.0)
-        assertEquals("Seen when the finger came down, so a dead drag releases it", 1, releases)
+        rig.run(end = 101.25)
+        assertEquals("Seen when the finger came down, so released a second after it", 1, releases)
     }
 }

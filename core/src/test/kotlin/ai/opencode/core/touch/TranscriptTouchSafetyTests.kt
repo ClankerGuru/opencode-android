@@ -22,29 +22,27 @@ class TranscriptTouchSafetyTests {
         val first = Holder()
         val second = Holder()
         val watch = TouchRecovery(
-            owner = TouchRecovery.Owner.Transcript,
+            owner = TouchRecovery.Owner.PlusMenu,
             inspect = { fault },
             release = {
                 releases += 1
                 fault = null
             },
         )
-        fault = TouchRecovery.Fault(TouchRecovery.Reason.Disabled, first)
+        fault = TouchRecovery.Fault(TouchRecovery.Reason.Closed, first)
         assertFalse(watch.sample(now = 10.0))
         assertFalse("Exactly one second is still a transition", watch.sample(now = 11.0))
         fault = null
         assertFalse("Healthy resets the grace period", watch.sample(now = 11.5))
-        fault = TouchRecovery.Fault(TouchRecovery.Reason.Disabled, first)
+        fault = TouchRecovery.Fault(TouchRecovery.Reason.Closed, first)
         assertFalse(watch.sample(now = 12.0))
-        fault = TouchRecovery.Fault(TouchRecovery.Reason.Disabled, second)
-        assertFalse("A different holder starts over", watch.sample(now = 13.5))
         fault = TouchRecovery.Fault(TouchRecovery.Reason.Closed, second)
-        assertFalse("A different reason starts over", watch.sample(now = 15.0))
+        assertFalse("A different holder starts over", watch.sample(now = 13.5))
         assertEquals(0, releases)
-        assertTrue(watch.sample(now = 16.01))
+        assertTrue(watch.sample(now = 14.51))
         assertEquals(1, releases)
         assertFalse(watch.sample(now = 20.0))
-        fault = TouchRecovery.Fault(TouchRecovery.Reason.Disabled, first)
+        fault = TouchRecovery.Fault(TouchRecovery.Reason.Closed, first)
         assertFalse("A clock that went backwards starts over", watch.sample(now = 30.0))
         assertFalse(watch.sample(now = 5.0))
         assertTrue(watch.sample(now = 6.1))
@@ -53,7 +51,7 @@ class TranscriptTouchSafetyTests {
     @Test
     fun faultsNameTheHolderTypeNotItsContent() {
         val label = SecretLabel("secret message")
-        val fault = TouchRecovery.Fault(TouchRecovery.Reason.Invisible, label)
+        val fault = TouchRecovery.Fault(TouchRecovery.Reason.Closed, label)
         assertEquals("SecretLabel", fault.kind)
         assertFalse(fault.kind.contains("secret"))
     }
