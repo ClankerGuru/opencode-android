@@ -20,6 +20,8 @@ import ai.opencode.core.store.observe
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeIconButton
 import ai.opencode.core.ui.OpenCodeIconButtonStyle
+import ai.opencode.core.ui.OpenCodeNotice
+import ai.opencode.core.ui.OpenCodeNoticePresence
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
@@ -63,7 +65,6 @@ import ai.opencode.feature.drawer.style.DrawerTunables
 import ai.opencode.feature.drawer.switcher.ServerFlowTitle
 import ai.opencode.feature.drawer.switcher.drawerTitleServers
 import ai.opencode.feature.session.ComposerTunables
-import ai.opencode.feature.session.ServerConnectionPillTransition
 import ai.opencode.feature.settings.whatsnew.WhatsNewFeature
 import ai.opencode.feature.voice.FloatingCallCenter
 import ai.opencode.feature.voice.floatingCallDrawerButton
@@ -105,7 +106,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -207,9 +207,6 @@ fun HomeDrawer(
     val disconnected by store.observe { it.connectionStatus == HomeConnectionFeature.State.ConnectionStatus.disconnected }
     val search by store.observe { it.search }
     val failure by store.observe { it.deletionError ?: it.inboxSidebarStatus.archiveError }
-    // The last failure stays drawn while the notice leaves.
-    var shownFailure by remember { mutableStateOf(failure) }
-    if (failure != null) shownFailure = failure
     val inboxSidebarOn = rememberInboxSidebarOn()
     // Server Flow: the title and the list share one swap motion.
     val serverSwap = remember { ServerSwapMotion() }
@@ -424,16 +421,14 @@ fun HomeDrawer(
             },
         )
 
-        AnimatedVisibility(
-            visible = failure != null,
-            enter = ServerConnectionPillTransition.enter(reducedMotion),
-            exit = ServerConnectionPillTransition.exit(reducedMotion),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
+        OpenCodeNoticePresence(
+            failure,
+            Modifier
+                .align(Alignment.BottomStart)
                 .padding(horizontal = DrawerMetrics.rowEdge)
                 .padding(bottom = controlsHeight.dp + insetBottom + footerBottom + 12.dp),
         ) {
-            shownFailure?.let { DrawerFailureNotice(it) }
+            OpenCodeNotice(it.title, detail = it.detail, modifier = Modifier.testTag("drawer-failure-notice"))
         }
 
         // New Session and Settings, pinned to the drawer's bottom; they never move with the keyboard.

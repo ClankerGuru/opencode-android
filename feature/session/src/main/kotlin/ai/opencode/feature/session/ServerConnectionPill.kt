@@ -1,65 +1,27 @@
 package ai.opencode.feature.session
 
 import ai.opencode.core.R as CoreR
-import ai.opencode.core.motion.Motion
-import ai.opencode.core.motion.MotionPhase
-import ai.opencode.core.motion.MotionTransition
-import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.strings.localized
 import ai.opencode.server.OpenCodeClientError
-import ai.opencode.core.ui.OpenCodeShape
-import ai.opencode.core.ui.OpenCodeSurfaces
 import ai.opencode.core.ui.OpenCodeIcon
-import ai.opencode.core.ui.OpenCodeTextStyles
-import ai.opencode.core.ui.OpenCodeTheme
+import ai.opencode.core.ui.OpenCodeNotice
+import ai.opencode.core.ui.OpenCodeNoticeTone
 import ai.opencode.core.ui.SFSymbol
-import ai.opencode.core.ui.openCodeTapTarget
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.VisibilityThreshold
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
-import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.semantics
 
 /**
  * Server Flow's tunables, moved down from the drawer because the session's [ServerConnectionPill]
@@ -165,85 +127,37 @@ data class ServerConnectionNotice(
  * what's happening, and its tap retries (or pairs again, for a sign-in the server refused); a long
  * press offers Edit Server… then.
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ServerConnectionPill(
     notice: ServerConnectionNotice,
     onAction: (ServerConnectionNotice.Action) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val reduceMotion = rememberReduceMotion()
     val offersEdit = notice.kind == ServerConnectionNotice.Kind.signInFailed
     var menuShown by remember { mutableStateOf(false) }
-    val fontScale = LocalDensity.current.fontScale
     val editServerLabel = stringResource(R.string.session_server_edit)
     Box(modifier) {
-        // The desktop's floating chip: flat fill, hairline ring, small radius.
-        Surface(
-            shape = OpenCodeShape.control,
-            color = OpenCodeSurfaces.color,
-            border = OpenCodeSurfaces.border,
-            shadowElevation = OpenCodeSurfaces.raisedShadow,
+        OpenCodeNotice(
+            title = notice.title,
+            detail = notice.detail,
+            tone = when (notice.kind) {
+                ServerConnectionNotice.Kind.reconnecting -> OpenCodeNoticeTone.progress
+                ServerConnectionNotice.Kind.failed -> OpenCodeNoticeTone.failure
+                ServerConnectionNotice.Kind.signInFailed -> OpenCodeNoticeTone.attention
+            },
+            symbol = notice.systemImage,
+            action = notice.action,
+            onClickLabel = notice.actionClickLabel,
+            onLongClick = if (offersEdit) ({ menuShown = true }) else null,
+            onClick = { onAction(notice.primary) },
             modifier = Modifier
-                .clip(OpenCodeShape.control)
-                .combinedClickable(
-                    onClick = { onAction(notice.primary) },
-                    onLongClick = if (offersEdit) ({ menuShown = true }) else null,
-                )
-                .openCodeTapTarget()
-                .clearAndSetSemantics {
-                    contentDescription = notice.title
-                    notice.detail?.let { stateDescription = it }
-                    onClick(label = notice.actionClickLabel) { onAction(notice.primary); true }
+                .semantics {
                     if (offersEdit) {
                         customActions = listOf(CustomAccessibilityAction(editServerLabel) { onAction(ServerConnectionNotice.Action.editServer); true })
                     }
                 }
                 .testTag("server-connection-pill"),
-        ) {
-            AnimatedContent(
-                targetState = notice,
-                transitionSpec = {
-                    val size = SizeTransform(clip = false) { _, _ -> Motion.layout.animation(reduceMotion = reduceMotion, visibilityThreshold = IntSize.VisibilityThreshold) }
-                    MotionTransition.swap(reduceMotion).content.using(size)
-                },
-                contentAlignment = Alignment.CenterStart,
-                label = "serverConnectionPill",
-            ) { shown ->
-                val tint = when (shown.kind) {
-                    ServerConnectionNotice.Kind.reconnecting -> OpenCodeTheme.colors.secondaryText
-                    ServerConnectionNotice.Kind.failed -> OpenCodeTheme.colors.destructive
-                    ServerConnectionNotice.Kind.signInFailed -> Color(0xFFFF9500)
-                }
-                Row(
-                    Modifier.heightIn(min = 44.dp).padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (shown.kind == ServerConnectionNotice.Kind.reconnecting) {
-                        CircularProgressIndicator(Modifier.size((16 * fontScale).dp), color = tint, strokeWidth = 2.dp)
-                    } else {
-                        OpenCodeIcon(shown.systemImage, contentDescription = null, size = (18 * fontScale).dp, tint = tint, modifier = Modifier.width((18 * fontScale).dp))
-                    }
-                    Column(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        Text(
-                            shown.title,
-                            style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium),
-                            color = OpenCodeTheme.colors.text,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        shown.detail?.let {
-                            Text(it, style = OpenCodeTextStyles.caption1, color = OpenCodeTheme.colors.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
-                    shown.action?.let {
-                        Spacer(Modifier.width(8.dp))
-                        Text(it, style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), color = OpenCodeTheme.colors.accent)
-                    }
-                }
-            }
-        }
+        )
         DropdownMenu(expanded = menuShown && offersEdit, onDismissRequest = { menuShown = false }) {
             DropdownMenuItem(
                 text = { Text(editServerLabel) },
@@ -254,30 +168,5 @@ fun ServerConnectionPill(
                 },
             )
         }
-    }
-}
-
-/**
- * The pill's room in the composer's column opens on `layout` and closes on `collapse`, so the
- * composer's top, and the transcript riding it, move with the pill instead of jumping its height in
- * one frame. Under Reduce Motion it cross-fades.
- */
-object ServerConnectionPillTransition {
-    fun enter(reducedMotion: Boolean): EnterTransition {
-        val room = expandVertically(
-            Motion.layout.animation(MotionPhase.Enter, reducedMotion, visibilityThreshold = IntSize.VisibilityThreshold),
-            Alignment.Bottom,
-            clip = false,
-        )
-        return room + MotionTransition.micro(reducedMotion).enter
-    }
-
-    fun exit(reducedMotion: Boolean): ExitTransition {
-        val room = shrinkVertically(
-            Motion.layout.animation(MotionPhase.Exit, reducedMotion, visibilityThreshold = IntSize.VisibilityThreshold),
-            Alignment.Bottom,
-            clip = false,
-        )
-        return room + MotionTransition.micro(reducedMotion).exit
     }
 }

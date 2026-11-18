@@ -63,6 +63,7 @@ fun DesignSystemGallery(
                 ColorsSection()
                 TypeSection()
                 ButtonsSection()
+                NoticesSection()
                 RollingNumberSection()
                 MotionSection()
                 IconsSection()
@@ -220,6 +221,14 @@ private fun ButtonsSection() = Section("Buttons & tap targets") {
         }
     }
     Text("The outlined box is an 18 dp glyph with its 48 dp target.", style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.secondaryText)
+}
+
+@Composable
+private fun NoticesSection() = Section("Notices") {
+    OpenCodeNotice("Reconnecting to Studio...", tone = OpenCodeNoticeTone.progress)
+    OpenCodeNotice("Couldn’t connect to Studio", action = "Try Again", onClick = {})
+    OpenCodeNotice("Couldn’t sign in to Studio", tone = OpenCodeNoticeTone.attention, symbol = SFSymbol.KeyFill, action = "Pair Again", onClick = {})
+    OpenCodeNotice("Couldn’t archive 3 sessions", detail = "Couldn’t reach the OpenCode server")
 }
 
 @Composable
