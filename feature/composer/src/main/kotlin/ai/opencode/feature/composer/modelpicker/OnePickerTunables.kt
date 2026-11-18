@@ -70,12 +70,6 @@ object OnePickerTunables {
     /** "Scroll edge fade" (0…40). */
     const val EDGE_FADE = 24.0
 
-    /** "Backdrop dim" (0…0.45). */
-    const val BACKDROP_DIM = 0.0
-
-    /** "Backdrop blur" (0…20). */
-    const val BACKDROP_BLUR = 0.0
-
     /** "Drag closes past" (32…220). */
     const val DRAG_CLOSES = 88.0
 

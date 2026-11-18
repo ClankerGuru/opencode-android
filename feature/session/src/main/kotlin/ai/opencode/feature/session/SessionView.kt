@@ -132,7 +132,7 @@ import kotlinx.coroutines.flow.map
 // top, the composer (`SessionComposer`, SessionView+Composer's port) over its bottom, and the
 // background-work capsule and panel over both. Sheets follow `activePicker`; lifecycle changes
 // reach the reducer as actions (no side effects here), from `SessionLifecycle`
-// (`SessionViewLifecycle.kt`). The drawer glyph and swap transitions are in `SessionViewChrome.kt`.
+// (`SessionViewLifecycle.kt`).
 //
 // iOS's per-view gesture state (the model list, dictation holds, the
 // request panel's room) belongs to the composer and picker views on Android, each in its own file.

@@ -343,7 +343,7 @@ class SessionAttachmentImporter internal constructor(
     /**
      * iOS `syncPickedPhotos` / `addLibraryPhotos`: photos picked in the system picker attach at
      * once — images on the inline image path, videos as uploads (when the server takes them).
-     * At most [AttachmentPickerButton.MAX_PHOTO_SELECTION] (8), the photo sheet's limit. [onAdded] is `focusComposer`.
+     * At most [AttachmentPickerButton.MAX_PHOTO_SELECTION] (8). [onAdded] is `focusComposer`.
      */
     fun importPickedMedia(uris: List<Uri>, onAdded: (() -> Unit)? = null) {
         if (uris.isEmpty()) return
@@ -500,7 +500,6 @@ fun SessionAttachmentCamera(importer: SessionAttachmentImporter, onDismiss: () -
 
 // region Pending attachments row
 
-/** iOS `PhotoFlights.slotSide` / `slotRadius`. */
 object PendingAttachmentMetrics {
     val slotSide: Dp = 76.dp
     val slotRadius: Dp = 22.dp

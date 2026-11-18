@@ -17,8 +17,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-// The pieces of the deleted Sheet and Grow from Composer pickers that One Picker, the photo sheet
-// and the composer still use. Plus [predictedEndTranslation], a drag's projected end.
+// The pieces of the deleted Sheet and Grow from Composer pickers that One Picker and the composer
+// still use. Plus [predictedEndTranslation], a drag's projected end.
 
 /** One pending "give the message field its keyboard back". */
 class ComposerFocusRestore(private val scope: CoroutineScope) {
@@ -37,41 +37,6 @@ class ComposerFocusRestore(private val scope: CoroutineScope) {
         task?.cancel()
         task = null
     }
-}
-
-/**
- * Full strength at one edge fading out, or a band peaking in the middle. Only its strengths are
- * ported here; Android draws no backdrop blur (Material scrims instead), so the strengths only
- * shape dims.
- */
-sealed interface ProgressiveBlurProfile {
-    /** Strongest at the top ([top]) or the bottom edge. */
-    data class Edge(val top: Boolean) : ProgressiveBlurProfile
-
-    /** Full strength between [lower] and [upper] (fractions of the height), easing out to both edges. */
-    data class Band(val lower: Double, val upper: Double) : ProgressiveBlurProfile
-}
-
-/** The blur's strength top to bottom, smoothstepped. */
-fun progressiveBlurStrengths(profile: ProgressiveBlurProfile, samples: Int = 32): List<Double> {
-    fun smooth(x: Double): Double {
-        val t = x.coerceIn(0.0, 1.0)
-        return t * t * (3 - 2 * t)
-    }
-    val strengths = ArrayList<Double>(samples + 1)
-    for (i in 0..samples) {
-        val t = i.toDouble() / samples
-        val strength = when (profile) {
-            is ProgressiveBlurProfile.Edge -> if (profile.top) smooth(1 - t) else smooth(t)
-            is ProgressiveBlurProfile.Band -> when {
-                t < profile.lower -> smooth(t / max(profile.lower, 0.001))
-                t > profile.upper -> smooth((1 - t) / max(1 - profile.upper, 0.001))
-                else -> 1.0
-            }
-        }
-        strengths.add(strength)
-    }
-    return strengths
 }
 
 /** The level glyph's arc geometry. */

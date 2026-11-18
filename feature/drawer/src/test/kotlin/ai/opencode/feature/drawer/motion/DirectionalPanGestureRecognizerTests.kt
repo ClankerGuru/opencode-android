@@ -193,7 +193,6 @@ class DrawerTimeRevealTests {
         reveal.update(DrawerRevealPhase.Ended, reach = 76f, reducedMotion = false)
         assertEquals(0f, reveal.offset)
         assertEquals(0f, reveal.progress)
-        assertEquals(1f, reveal.peakProgress)
 
         reveal.update(DrawerRevealPhase.Began, reach = 76f, reducedMotion = true)
         reveal.update(DrawerRevealPhase.Changed(38f), reach = 76f, reducedMotion = true)

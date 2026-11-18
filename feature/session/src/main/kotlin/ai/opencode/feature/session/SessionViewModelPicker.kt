@@ -201,9 +201,6 @@ internal class SessionModelPanels(
     /** One Picker owns downward drags. */
     val swipeYields: Boolean get() = onePicker.isShown
 
-    /** One Picker isn't drawn. */
-    val holdsComposerGlass: Boolean get() = onePicker.isOpen || onePicker.isShown
-
     /** The composer is behind One Picker: hidden from TalkBack. */
     val hidesComposer: Boolean get() = onePicker.isOpen
 
