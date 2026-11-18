@@ -18,9 +18,6 @@ import ai.opencode.core.ui.SFSymbol
 import ai.opencode.feature.composer.AttachmentMenuAnchors
 import ai.opencode.feature.composer.AttachmentMenuItem
 import ai.opencode.feature.composer.AttachmentMenuPress
-import ai.opencode.feature.composer.AutocompleteFlightOverlay
-import ai.opencode.feature.composer.AutocompleteMotionController
-import ai.opencode.feature.composer.AutocompleteMotionDriver
 import ai.opencode.feature.composer.ComposerAutocompleteAction
 import ai.opencode.feature.composer.ComposerAutocompletePanel
 import ai.opencode.feature.composer.ComposerAutocompleteState
@@ -44,7 +41,7 @@ import ai.opencode.feature.composer.RequestPanelFit
 import ai.opencode.feature.composer.RequestPanelGesture
 import ai.opencode.feature.composer.RequestPanelReveal
 import ai.opencode.feature.composer.SyncComposerAutocomplete
-import ai.opencode.feature.composer.autocompleteComposerAnchor
+import ai.opencode.feature.composer.rememberAutocompletePanelHeight
 import ai.opencode.feature.composer.composerKeyboardSpacing
 import ai.opencode.feature.composer.layoutProgress
 import ai.opencode.feature.composer.requestPanelCap
@@ -313,11 +310,7 @@ internal class SessionComposerViewState {
     var surfaceBounds by mutableStateOf(Rect.Zero)
     val capsuleSwipeOwnership = ComposerSwipeOwnership()
     var handledFocusRequest by mutableStateOf<Pair<Int, Int>?>(null)
-    /** iOS `autocompleteController` / `autocompleteBridge`. */
-    val autocompleteController = AutocompleteMotionController()
     val autocompleteBridge = ComposerAutocompleteTextBridge()
-    /** The composer surface's size (dp), for the autocomplete simulation. */
-    var surfaceSize by mutableStateOf(androidx.compose.ui.geometry.Size.Zero)
     /** The composer area outside the panel's reserved room (dp), measured in one pass. */
     var requestChromeHeight by mutableFloatStateOf(0f)
     /** Actual room reserved by the capsule this pass; read by its parent after measurement. */
@@ -563,15 +556,10 @@ fun SessionComposer(
         windowSize = LocalWindowInfo.current.containerSize,
     )
 
-    // iOS `attachComposerAutocomplete`: the controller follows the reducer's state and the composer's size.
-    AutocompleteMotionDriver(view.autocompleteController)
     SyncComposerAutocomplete(
         state = autocomplete,
         isEnabled = true,
-        controller = view.autocompleteController,
         bridge = view.autocompleteBridge,
-        composerSize = { view.surfaceSize },
-        reducedMotion = reducedMotion,
         send = { store.send(Action.Autocomplete(it)) },
     )
     host.focusAction = env.focus
@@ -579,7 +567,7 @@ fun SessionComposer(
     host.backgroundWorkAnchor?.motion = { view.requestPanelShown.value * 1000f + view.requestPanelReveal.value }
     host.dismissAction = env.dismissKeyboard
     SideEffect {
-        host.autocompleteCovers = view.autocompleteController.isOpen
+        host.autocompleteCovers = autocomplete.isOpen
     }
     // A request docking, or dictation taking the composer, closes what grew out of it (iOS
     // `closeModelPanels()` on each).
@@ -1285,13 +1273,8 @@ private fun SessionComposerEnv.ComposerCapsule() {
             },
     ) {
         // iOS `composerSurfacePanel`: the request's panel, else the suggestions, on the surface.
-        val controller = view.autocompleteController
-        // The suggestions' frame changes with the composer's size on every keyboard frame, so it's
-        // read in the surface's layout, and only what it shows is read here.
-        val autocompleteExtent = { if (showsAutocomplete) controller.glassExtent.toFloat() else 0f }
-        val autocompleteShown by remember(controller, showsAutocomplete, reducedMotion) {
-            derivedStateOf { showsAutocomplete && (if (reducedMotion) controller.isOpen else controller.isShown) }
-        }
+        val autocompleteHeight = rememberAutocompletePanelHeight(autocomplete)
+        val autocompleteExtent = { if (showsAutocomplete) autocompleteHeight.value else 0f }
         ComposerSurface(
             panel = when {
                 showsRequestPanel || docksRequest -> {
@@ -1300,7 +1283,8 @@ private fun SessionComposerEnv.ComposerCapsule() {
                 showsAutocomplete -> {
                     {
                         ComposerAutocompletePanel(
-                            controller = controller,
+                            state = autocomplete,
+                            height = { autocompleteHeight.value },
                             onSelectRow = { store.send(Action.Autocomplete(ComposerAutocompleteAction.RowChosen(it))) },
                         )
                     }
@@ -1311,7 +1295,7 @@ private fun SessionComposerEnv.ComposerCapsule() {
             panelExtent = { if (showsRequestPanel) activeHeight() else autocompleteExtent() },
             // Under Reduce Motion the surface keeps its reach while the panel fades.
             panelReveal = { if (showsRequestPanel) activeHeight() * view.requestPanelReveal.value else autocompleteExtent() },
-            panelShown = docksRequest || autocompleteShown,
+            panelShown = docksRequest || (showsAutocomplete && autocomplete.isOpen),
         )
     }
 }
@@ -1477,14 +1461,7 @@ private fun SessionComposerEnv.ComposerSurface(
             controlsTakeTouches = composerPresentation.expanded,
             panelHidden = host.floatingCallCovers,
         ) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .autocompleteComposerAnchor(view.autocompleteBridge)
-                    .onSizeChanged { size ->
-                        view.surfaceSize = with(density) { androidx.compose.ui.geometry.Size(size.width.toDp().value, size.height.toDp().value) }
-                    },
-            ) { Composer() }
+            Box(Modifier.fillMaxWidth()) { Composer() }
         }
         // The drop highlight: decoration, taking no touches (iOS accent stroke, 2 pt, on swap).
         val dropAlpha by animateFloatAsState(
@@ -1500,12 +1477,6 @@ private fun SessionComposerEnv.ComposerSurface(
                     .alpha(dropAlpha)
                     .border(2.dp, accent, RoundedCornerShape(ComposerTunables.cornerRadius.dp)),
             )
-        }
-        val hasFlights by remember(view.autocompleteController) {
-            derivedStateOf { view.autocompleteController.currentFrame.flights.isNotEmpty() }
-        }
-        if (hasFlights) {
-            AutocompleteFlightOverlay(view.autocompleteController, Modifier.matchParentSize())
         }
         // Above the surface, so its edge never crosses the hold circle.
         val hold = shownDictationHold
