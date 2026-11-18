@@ -145,8 +145,8 @@ All coordinates live in `gradle/libs.versions.toml`; modules reference catalog e
 Core set: kotlinx.coroutines, kotlinx.serialization, OkHttp (+ okhttp-sse), DataStore, Coil 3,
 Compose/M3 (+ adaptive), Navigation3. Pre-declared for areas: Glance + WorkManager (system),
 CameraX (composer), Media3 + androidx.browser/webkit (media), Stream WebRTC (voice; iOS uses
-Google's libwebrtc), Highlights + jlatexmath (transcript; iOS's Markdown and highlighter are
-self-written, so port them first and use these only where iOS used a library, e.g. SwiftMath →
+Google's libwebrtc), jlatexmath (transcript; iOS's Markdown and highlighter are
+self-written, so port them first and use a library only where iOS did, e.g. SwiftMath →
 jlatexmath), Firebase Messaging (push; keep it behind an interface until credentials exist).
 Add a new library only with a one-line justification here.
 - `com.google.zxing:core` (settings): decodes the pairing QR from CameraX frames, as iOS's

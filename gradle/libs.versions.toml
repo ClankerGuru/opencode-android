@@ -29,8 +29,6 @@ webkit = "1.18.0"
 work = "2.12.0"
 firebaseMessaging = "26.0.1"
 webrtc = "1.3.10"
-commonmark = "0.31.0"
-highlights = "1.1.0"
 jlatexmath = "0.2.0"
 junit = "4.13.2"
 turbine = "1.2.1"
@@ -100,12 +98,7 @@ androidx-webkit = { module = "androidx.webkit:webkit", version.ref = "webkit" }
 webrtc = { module = "io.getstream:stream-webrtc-android", version.ref = "webrtc" }
 
 # :app (Scan Pairing Code)
-# :feature:transcript. iOS's Markdown parser/renderer is self-written
-# (OpenCodeMarkdownBlock); port it. commonmark is a fallback parser only.
-# highlights = syntax highlighting (iOS: self-written CodeHighlighter; port first).
-# jlatexmath = TeX typesetting (iOS: SwiftMath).
-commonmark = { module = "org.commonmark:commonmark", version.ref = "commonmark" }
-highlights = { module = "dev.snipme:highlights", version.ref = "highlights" }
+# :feature:transcript. jlatexmath = TeX typesetting (iOS: SwiftMath).
 jlatexmath-android = { module = "ru.noties:jlatexmath-android", version.ref = "jlatexmath" }
 
 junit = { module = "junit:junit", version.ref = "junit" }
