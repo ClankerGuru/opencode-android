@@ -11,7 +11,6 @@ android {
 dependencies {
     api(project(":feature:media"))
     implementation(libs.coil.compose)
-    implementation(libs.highlights)
     implementation(libs.jlatexmath.android)
     // android.icu (time stamps), MimeTypeMap/Uri/ClipData (drag payloads) in JVM tests.
     testImplementation(libs.robolectric)
