@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">ክፍለ ጊዜውን መጫን አልተቻለም</string>
     <string name="session_location_share_failed_title">አካባቢን ማጋራት አልተቻለም</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">የፓነል መጎተቻ</string>
-    <string name="session_photo_sheet_full_description">ሙሉ</string>
-    <string name="session_photo_sheet_half_description">ግማሽ</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">ይህ ሼል ይቁም?</string>
     <string name="session_shell_stop_confirm_message">ትዕዛዙ አሁን ይቆማል። እዚህ የሚታየው ውጤት እስኪዘጉት ድረስ ይቆያል።</string>

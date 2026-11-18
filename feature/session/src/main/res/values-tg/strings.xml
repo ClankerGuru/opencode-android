@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Сессия бор нашуд</string>
     <string name="session_location_share_failed_title">Ҷойгиршавӣ мубодила нашуд</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Дастаи панел</string>
-    <string name="session_photo_sheet_full_description">Пурра</string>
-    <string name="session_photo_sheet_half_description">Ним</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Ин Shell-ро қатъ мекунед?</string>
     <string name="session_shell_stop_confirm_message">Фармон ҳозир қатъ мешавад. Натиҷаи ин ҷо то пӯшидани он боқӣ мемонад.</string>

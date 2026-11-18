@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Istunnon lataaminen epäonnistui</string>
     <string name="session_location_share_failed_title">Sijainnin jakaminen epäonnistui</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Paneelin vetokahva</string>
-    <string name="session_photo_sheet_full_description">Koko näyttö</string>
-    <string name="session_photo_sheet_half_description">Puoli näyttöä</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Pysäytetäänkö komentotulkki?</string>
     <string name="session_shell_stop_confirm_message">Komento päättyy heti. Tuloste säilyy näkyvissä, kunnes suljet näkymän.</string>

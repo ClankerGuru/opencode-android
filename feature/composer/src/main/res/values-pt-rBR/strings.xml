@@ -137,29 +137,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Opções de anexo</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Todas as fotos</string>
-    <string name="composer_photo_more_options_action">Mais opções</string>
-    <string name="composer_photo_select_more">Selecionar mais fotos…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">Adicionar %1$d foto</item>
-        <item quantity="many">Adicionar %1$d fotos</item>
-        <item quantity="other">Adicionar %1$d fotos</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Tela inteira</string>
-    <string name="composer_photo_sheet_half">Meia tela</string>
-    <string name="composer_photo_grid_description">Fotos</string>
-    <string name="composer_photo_camera_description">Câmera</string>
-    <string name="composer_photo_access_off_title">Acesso às fotos desativado</string>
-    <string name="composer_photo_access_off_message">Permita o acesso nas configurações para selecionar fotos aqui.</string>
-    <string name="composer_photo_return_action">Voltar às opções de anexo</string>
-    <string name="composer_photo_tile_video_description">Vídeo</string>
-    <string name="composer_photo_tile_photo_description">Foto</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Você pode adicionar no máximo %1$d foto</item>
-        <item quantity="many">Você pode adicionar no máximo %1$d fotos</item>
-        <item quantity="other">Você pode adicionar no máximo %1$d fotos</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Ultra-angular</string>
     <string name="composer_camera_lens_wide_description">Grande-angular</string>

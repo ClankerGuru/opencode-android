@@ -131,25 +131,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">添付ファイルのオプション</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">すべての写真</string>
-    <string name="composer_photo_more_options_action">その他のオプション</string>
-    <string name="composer_photo_select_more">写真をさらに選択…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="other">写真を%1$d枚追加</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">全画面</string>
-    <string name="composer_photo_sheet_half">半画面</string>
-    <string name="composer_photo_grid_description">写真</string>
-    <string name="composer_photo_camera_description">カメラ</string>
-    <string name="composer_photo_access_off_title">写真へのアクセスがオフです</string>
-    <string name="composer_photo_access_off_message">ここで写真を選ぶには、設定でアクセスを許可してください。</string>
-    <string name="composer_photo_return_action">添付ファイルのオプションに戻る</string>
-    <string name="composer_photo_tile_video_description">動画</string>
-    <string name="composer_photo_tile_photo_description">写真</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="other">追加できる写真は%1$d枚までです</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">超広角</string>
     <string name="composer_camera_lens_wide_description">広角</string>

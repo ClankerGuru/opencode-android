@@ -135,10 +135,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Không thể tải phiên</string>
     <string name="session_location_share_failed_title">Không thể chia sẻ vị trí</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Thanh kéo bảng</string>
-    <string name="session_photo_sheet_full_description">Toàn màn hình</string>
-    <string name="session_photo_sheet_half_description">Nửa màn hình</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Dừng vỏ bọc này?</string>
     <string name="session_shell_stop_confirm_message">Lệnh sẽ kết thúc ngay. Kết quả ở đây vẫn được giữ cho đến khi bạn đóng.</string>

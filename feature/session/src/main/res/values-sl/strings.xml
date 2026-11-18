@@ -141,10 +141,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Seje ni bilo mogoče naložiti</string>
     <string name="session_location_share_failed_title">Lokacije ni bilo mogoče deliti</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Ročica podokna</string>
-    <string name="session_photo_sheet_full_description">Cel zaslon</string>
-    <string name="session_photo_sheet_half_description">Pol zaslona</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Ustavim to lupino?</string>
     <string name="session_shell_stop_confirm_message">Ukaz se takoj konča. Prikazani izpis ostane, dokler ne zaprete lupine.</string>

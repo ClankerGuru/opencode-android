@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Не успеа вчитувањето на сесијата</string>
     <string name="session_location_share_failed_title">Не успеа споделувањето на локацијата</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Рачка на панелот</string>
-    <string name="session_photo_sheet_full_description">Целосно</string>
-    <string name="session_photo_sheet_half_description">Половина</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Да се запре оваа школка?</string>
     <string name="session_shell_stop_confirm_message">Наредбата завршува веднаш. Прикажаниот излез останува тука додека не го затвориш.</string>

@@ -140,31 +140,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Možnosti prilog</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Vse fotografije</string>
-    <string name="composer_photo_more_options_action">Več možnosti</string>
-    <string name="composer_photo_select_more">Izberite več fotografij…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">Dodaj %1$d fotografijo</item>
-        <item quantity="two">Dodaj %1$d fotografiji</item>
-        <item quantity="few">Dodaj %1$d fotografije</item>
-        <item quantity="other">Dodaj %1$d fotografij</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Cel zaslon</string>
-    <string name="composer_photo_sheet_half">Pol zaslona</string>
-    <string name="composer_photo_grid_description">Fotografije</string>
-    <string name="composer_photo_camera_description">Kamera</string>
-    <string name="composer_photo_access_off_title">Dostop do fotografij je izklopljen</string>
-    <string name="composer_photo_access_off_message">Za izbiro fotografij dovolite dostop v nastavitvah.</string>
-    <string name="composer_photo_return_action">Nazaj na možnosti prilog</string>
-    <string name="composer_photo_tile_video_description">Video</string>
-    <string name="composer_photo_tile_photo_description">Fotografija</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Dodate lahko največ %1$d fotografijo</item>
-        <item quantity="two">Dodate lahko največ %1$d fotografiji</item>
-        <item quantity="few">Dodate lahko največ %1$d fotografije</item>
-        <item quantity="other">Dodate lahko največ %1$d fotografij</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Ultraširokokotni</string>
     <string name="composer_camera_lens_wide_description">Širokokotni</string>

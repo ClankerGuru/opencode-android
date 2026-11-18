@@ -35,6 +35,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -72,8 +73,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -358,6 +362,16 @@ fun RequestDockPrewarm() {
 }
 
 private var requestDockPrewarmed = false
+
+/**
+ * No descendant can take keyboard or D-pad focus: focus moving or requested into the group is
+ * cancelled (`onEnter`, which `requestFocus` on a descendant also goes through), and focus
+ * already inside when it turns inert is cleared.
+ */
+private fun Modifier.inertToFocus(focusManager: FocusManager): Modifier = this
+    .onFocusChanged { if (it.hasFocus) focusManager.clearFocus(force = true) }
+    .focusProperties { onEnter = { cancelFocusChange() } }
+    .focusGroup()
 private const val REQUEST_PREWARM_DELAY_MILLIS = 1_200L
 private const val REQUEST_PREWARM_HOLD_MILLIS = 400L
 

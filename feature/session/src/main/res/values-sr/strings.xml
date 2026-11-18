@@ -139,10 +139,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Није могуће учитати сесију</string>
     <string name="session_location_share_failed_title">Није могуће поделити локацију</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Ручица панела</string>
-    <string name="session_photo_sheet_full_description">Цео екран</string>
-    <string name="session_photo_sheet_half_description">Пола екрана</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Зауставити овај shell?</string>
     <string name="session_shell_stop_confirm_message">Команда се одмах завршава. Приказани излаз остаје док га не затворите.</string>

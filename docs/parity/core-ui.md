@@ -180,7 +180,7 @@ and `ellipsis` (every overflow menu) is the vertical `more_vert`, as on other An
 | `bubble.left.fill` | `chat_bubble` (fill) | `ms_chat_bubble_fill` | `SFSymbol.BubbleLeftFill` | SessionLinkChips |
 | `button.programmable` | `adjust` | `ms_adjust` | `SFSymbol.ButtonProgrammable` | AppShortcuts, ExperimentalFeatures |
 | `calendar` | `calendar_today` | `ms_calendar_today` | `SFSymbol.Calendar` | WhatsNewList |
-| `camera` | `photo_camera` | `ms_photo_camera` | `SFSymbol.Camera` | AttachmentCameraView, AttachmentPicker, OnboardingPlaygroundView, PlusPhotoSheet, ServerConnectView |
+| `camera` | `photo_camera` | `ms_photo_camera` | `SFSymbol.Camera` | AttachmentCameraView, AttachmentPicker, OnboardingPlaygroundView, ServerConnectView |
 | `camera.fill` | `photo_camera` (fill) | `ms_photo_camera_fill` | `SFSymbol.CameraFill` | PairingScanner |
 | `camera.metering.unknown` | `center_focus_weak` | `ms_center_focus_weak` | `SFSymbol.CameraMeteringUnknown` | PairingScanner |
 | `camera.shutter.button` | `photo_camera` | `ms_photo_camera` | `SFSymbol.CameraShutterButton` | WhatsNewList |
@@ -200,7 +200,7 @@ and `ellipsis` (every overflow menu) is the vertical `more_vert`, as on other An
 | `chevron.compact.left` | `chevron_left` | `ms_chevron_left` | `SFSymbol.ChevronCompactLeft` | TuningPanelView |
 | `chevron.compact.right` | `chevron_right` | `ms_chevron_right` | `SFSymbol.ChevronCompactRight` | TuningPanelView |
 | `chevron.down` | `keyboard_arrow_down` | `ms_keyboard_arrow_down` | `SFSymbol.ChevronDown` | AgentPicker, FloatingCall, LinkPreviewViews, ModelPickerOverlays, OnboardingPlaygroundControls, RequestDockView, ServerSwitcher, SessionView+ComposerControls, ShareView, TranscriptUserMessage |
-| `chevron.left` | `chevron_left` | `ms_chevron_left` | `SFSymbol.ChevronLeft` | AttachmentMenu, BrowserView, DictationViews, PlusPhotoSheet, RequestDockView |
+| `chevron.left` | `chevron_left` | `ms_chevron_left` | `SFSymbol.ChevronLeft` | AttachmentMenu, BrowserView, DictationViews, RequestDockView |
 | `chevron.left.forwardslash.chevron.right` | `code` | `ms_code` | `SFSymbol.ChevronLeftForwardslashChevronRight` | AgentFileViewer, AttachmentFileType, MermaidDiagramView |
 | `chevron.right` | `chevron_right` | `ms_chevron_right` | `SFSymbol.ChevronRight` | BackgroundWorkPanel, BrowserView, FileAttachmentViews, ServerDetailsView, ServerTitleView, SessionSheetView, SessionView+ComposerControls, SessionView+Header, SettingsView, TranscriptEntryView, TuningPanelView |
 | `chevron.up` | `keyboard_arrow_up` | `ms_keyboard_arrow_up` | `SFSymbol.ChevronUp` | DictationViews, LinkPreviewViews, OnboardingPlaygroundView, TranscriptUserMessage |
@@ -317,15 +317,15 @@ and `ellipsis` (every overflow menu) is the vertical `more_vert`, as on other An
 | `phone.fill` | `call` (fill) | `ms_call_fill` | `SFSymbol.PhoneFill` | ExperimentalSettingsView, FloatingCall, SessionView+ComposerControls |
 | `photo` | `image` | `ms_image` | `SFSymbol.Photo` | AgentFileReference, AttachmentFileType, ExperimentalFeatures, TranscriptImageViewer, WhatsNewList |
 | `photo.badge.exclamationmark` | `broken_image` | `ms_broken_image` | `SFSymbol.PhotoBadgeExclamationmark` | AgentImageGallery, TranscriptEntryView |
-| `photo.badge.plus` | `add_photo_alternate` | `ms_add_photo_alternate` | `SFSymbol.PhotoBadgePlus` | PlusPhotoSheet |
-| `photo.on.rectangle` | `photo_library` | `ms_photo_library` | `SFSymbol.PhotoOnRectangle` | AttachmentMenu, AttachmentPicker, PlusPhotoSheet, WhatsNewList |
+| `photo.badge.plus` | `add_photo_alternate` | `ms_add_photo_alternate` | `SFSymbol.PhotoBadgePlus` | — |
+| `photo.on.rectangle` | `photo_library` | `ms_photo_library` | `SFSymbol.PhotoOnRectangle` | AttachmentMenu, AttachmentPicker, WhatsNewList |
 | `photo.on.rectangle.angled` | `photo_library` | `ms_photo_library` | `SFSymbol.PhotoOnRectangleAngled` | WhatsNewList |
 | `pin` | `keep` | `ms_keep` | `SFSymbol.Pin` | DrawerStyle, HomeView+Drawer, SessionSheetView, SessionView+Header, VoiceActionClaim, WhatsNewList |
 | `pin.fill` | `keep` (fill) | `ms_keep_fill` | `SFSymbol.PinFill` | DrawerStyle, SessionSheetView |
 | `pin.slash` | `keep_off` | `ms_keep_off` | `SFSymbol.PinSlash` | HomeView+Drawer, SessionView+Header |
 | `pip.enter` | `picture_in_picture_alt` | `ms_picture_in_picture_alt` | `SFSymbol.PipEnter` | AgentFileViewer (AVKit’s Picture in Picture button) |
 | `platter.filled.top.iphone` | `mobile_layout` | `ms_mobile_layout` | `SFSymbol.PlatterFilledTopIphone` | SessionLiveActivityExperiment, WhatsNew/Entries |
-| `play.fill` | `play_arrow` (fill) | `ms_play_arrow_fill` | `SFSymbol.PlayFill` | FileAttachmentViews, LinkPreviewViews, PlusPhotoSheet, RecentPhotoPeek, SettingsView, VoiceCallLogView |
+| `play.fill` | `play_arrow` (fill) | `ms_play_arrow_fill` | `SFSymbol.PlayFill` | FileAttachmentViews, LinkPreviewViews, SettingsView, VoiceCallLogView |
 | `play.rectangle.on.rectangle` | `video_library` | `ms_video_library` | `SFSymbol.PlayRectangleOnRectangle` | DiagnosticsView |
 | `plus` | `add` | `ms_add` | `SFSymbol.Plus` | AppView, AttachmentPicker, FloatingCall, OpenCodeClient+Models, ServerTitleView, SessionSwitcher, ShareView, WhatsNewList |
 | `plus.circle` | `add_circle` | `ms_add_circle` | `SFSymbol.PlusCircle` | ExperimentalFeatures, WhatsNewList |
@@ -398,4 +398,4 @@ and `ellipsis` (every overflow menu) is the vertical `more_vert`, as on other An
 | `wifi.slash` | `wifi_off` | `ms_wifi_off` | `SFSymbol.WifiSlash` | VoiceProviderViews, VoiceProviderPage |
 | `xmark` | `close` | `ms_close` | `SFSymbol.Xmark` | AttachmentCameraView, BrowserView, DrawerSearchPill, OnboardingPlaygroundControls, RequestDockView, RequestReviewView, ServerTitleView, ShareView, ShellOutputView, SinceYouLeft, TranscriptImageViewer, TuningPanelView, VoiceView |
 | `xmark.circle` | `cancel` | `ms_cancel` | `SFSymbol.XmarkCircle` | LinkPreviewViews, TuningPanelView |
-| `xmark.circle.fill` | `cancel` (fill) | `ms_cancel_fill` | `SFSymbol.XmarkCircleFill` | ModelListContent, PhotoFlight, SessionView+Attachments, SharedLocation, ShellOutputView, TranscriptEntryView |
+| `xmark.circle.fill` | `cancel` (fill) | `ms_cancel_fill` | `SFSymbol.XmarkCircleFill` | ModelListContent, SessionView+Attachments, SharedLocation, ShellOutputView, TranscriptEntryView |

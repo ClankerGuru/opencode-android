@@ -141,10 +141,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Relaci se nepodařilo načíst</string>
     <string name="session_location_share_failed_title">Polohu se nepodařilo sdílet</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Úchyt panelu</string>
-    <string name="session_photo_sheet_full_description">Celá výška</string>
-    <string name="session_photo_sheet_half_description">Poloviční výška</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Zastavit tento shell?</string>
     <string name="session_shell_stop_confirm_message">Příkaz se ihned ukončí. Výstup zde zůstane, dokud ho nezavřete.</string>

@@ -134,27 +134,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Viðheftismøguleikar</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Allar myndir</string>
-    <string name="composer_photo_more_options_action">Fleiri møguleikar</string>
-    <string name="composer_photo_select_more">Vel fleiri myndir…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">Legg %1$d mynd afturat</item>
-        <item quantity="other">Legg %1$d myndir afturat</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Full</string>
-    <string name="composer_photo_sheet_half">Hálv</string>
-    <string name="composer_photo_grid_description">Myndir</string>
-    <string name="composer_photo_camera_description">Myndatól</string>
-    <string name="composer_photo_access_off_title">Myndaatgongd er sløkt</string>
-    <string name="composer_photo_access_off_message">Loyv atgongd í innstillingum fyri at velja myndir her.</string>
-    <string name="composer_photo_return_action">Aftur til viðheftismøguleikar</string>
-    <string name="composer_photo_tile_video_description">Sjónband</string>
-    <string name="composer_photo_tile_photo_description">Mynd</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Tú kanst í mesta lagi leggja %1$d mynd afturat</item>
-        <item quantity="other">Tú kanst í mesta lagi leggja %1$d myndir afturat</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Ultravíðvinkul</string>
     <string name="composer_camera_lens_wide_description">Víðvinkul</string>

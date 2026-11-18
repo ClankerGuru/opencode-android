@@ -134,27 +134,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Əlavə seçimləri</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Bütün şəkillər</string>
-    <string name="composer_photo_more_options_action">Daha çox seçim</string>
-    <string name="composer_photo_select_more">Daha çox şəkil seç…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">%1$d şəkil əlavə et</item>
-        <item quantity="other">%1$d şəkil əlavə et</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Tam</string>
-    <string name="composer_photo_sheet_half">Yarım</string>
-    <string name="composer_photo_grid_description">Şəkillər</string>
-    <string name="composer_photo_camera_description">Kamera</string>
-    <string name="composer_photo_access_off_title">Şəkillərə giriş bağlıdır</string>
-    <string name="composer_photo_access_off_message">Burada şəkil seçmək üçün Tənzimləmələrdə girişə icazə verin.</string>
-    <string name="composer_photo_return_action">Əlavə seçimlərinə qayıt</string>
-    <string name="composer_photo_tile_video_description">Video</string>
-    <string name="composer_photo_tile_photo_description">Şəkil</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Ən çox %1$d şəkil əlavə edə bilərsiniz</item>
-        <item quantity="other">Ən çox %1$d şəkil əlavə edə bilərsiniz</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Ultra geniş bucaq</string>
     <string name="composer_camera_lens_wide_description">Geniş bucaq</string>

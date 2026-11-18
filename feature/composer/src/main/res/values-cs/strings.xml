@@ -140,31 +140,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Možnosti příloh</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Všechny fotografie</string>
-    <string name="composer_photo_more_options_action">Více možností</string>
-    <string name="composer_photo_select_more">Vybrat další fotografie…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">Přidat %1$d fotografii</item>
-        <item quantity="few">Přidat %1$d fotografie</item>
-        <item quantity="many">Přidat %1$d fotografie</item>
-        <item quantity="other">Přidat %1$d fotografií</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Celá výška</string>
-    <string name="composer_photo_sheet_half">Poloviční výška</string>
-    <string name="composer_photo_grid_description">Fotografie</string>
-    <string name="composer_photo_camera_description">Fotoaparát</string>
-    <string name="composer_photo_access_off_title">Přístup k fotografiím je vypnutý</string>
-    <string name="composer_photo_access_off_message">Pro výběr fotografií povolte přístup v nastavení.</string>
-    <string name="composer_photo_return_action">Zpět na možnosti příloh</string>
-    <string name="composer_photo_tile_video_description">Video</string>
-    <string name="composer_photo_tile_photo_description">Fotografie</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Lze přidat nejvýše %1$d fotografii</item>
-        <item quantity="few">Lze přidat nejvýše %1$d fotografie</item>
-        <item quantity="many">Lze přidat nejvýše %1$d fotografie</item>
-        <item quantity="other">Lze přidat nejvýše %1$d fotografií</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Ultraširokoúhlý</string>
     <string name="composer_camera_lens_wide_description">Širokoúhlý</string>

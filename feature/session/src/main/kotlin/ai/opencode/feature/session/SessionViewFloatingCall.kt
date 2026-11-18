@@ -47,7 +47,7 @@ internal fun floatingCallCovers(
 
 /**
  * On the screen's watchers: sets [SessionComposerHost.floatingCallCovers], and covered, the
- * composer gives up what it had open (the keyboard, the + menu and its photos, the model panels,
+ * composer gives up what it had open (the keyboard, the + menu, the model panels,
  * autocomplete); none would show, and each would come back stranded when the call shrinks. A docked
  * request shrinks the call back to its orb.
  */
@@ -56,7 +56,7 @@ internal fun SessionFloatingCallCoverage(
     store: StoreOf<State, Action>,
     callStore: VoiceStoreOf?,
     host: SessionComposerHost,
-    photoSheet: SessionPhotoSheetState,
+    attachmentMenu: SessionAttachmentMenuState,
 ) {
     val center = remember { dependency(FloatingCallCenter) }
     val liveStage by remember(callStore) {
@@ -71,12 +71,8 @@ internal fun SessionFloatingCallCoverage(
         lastCovers = covers
         if (!covers) return@LaunchedEffect
         host.dismissComposerKeyboard()
-        photoSheet.attachmentMenuRestoresFocus = false
-        // The photo sheet goes at once: folding, it would land on the hidden composer and hand it
-        // the keyboard.
-        if (photoSheet.morph.isShown) photoSheet.resetPhotoSheet()
-        if (photoSheet.attachmentMenu != AttachmentMenuPhase.Closed) photoSheet.closeAttachmentMenu()
-        photoSheet.recentPeek.hide()
+        attachmentMenu.attachmentMenuRestoresFocus = false
+        if (attachmentMenu.attachmentMenu != AttachmentMenuPhase.Closed) attachmentMenu.closeAttachmentMenu()
         // Cancels the model list's focus restore first.
         host.modelPanels?.closeModelPanels()
         if (store.state.autocomplete.isOpen) store.send(Action.Autocomplete(ComposerAutocompleteAction.Dismissed))

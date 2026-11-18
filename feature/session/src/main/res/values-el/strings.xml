@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Αδυναμία φόρτωσης συνεδρίας</string>
     <string name="session_location_share_failed_title">Αδυναμία κοινοποίησης τοποθεσίας</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Λαβή πλαισίου</string>
-    <string name="session_photo_sheet_full_description">Πλήρες</string>
-    <string name="session_photo_sheet_half_description">Μισό</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Διακοπή αυτού του κελύφους;</string>
     <string name="session_shell_stop_confirm_message">Η εντολή τερματίζεται τώρα. Η έξοδος που εμφανίζεται εδώ παραμένει μέχρι να την κλείσετε.</string>
