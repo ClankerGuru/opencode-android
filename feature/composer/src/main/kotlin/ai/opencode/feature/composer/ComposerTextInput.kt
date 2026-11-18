@@ -2,7 +2,6 @@ package ai.opencode.feature.composer
 
 import ai.opencode.core.diagnostics.PerfFrameLatency
 import ai.opencode.core.motion.MotionSpring
-import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.BackSwipeRules
 import ai.opencode.core.ui.LocalDrawerKeyboardSignals
 import ai.opencode.core.ui.OpenCodeTextStyles
@@ -13,7 +12,6 @@ import android.net.Uri
 import android.os.Process
 import android.os.SystemClock
 import android.view.WindowInsetsController
-import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.content.MediaType
 import androidx.compose.foundation.content.ReceiveContentListener
@@ -56,7 +54,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -87,7 +84,6 @@ import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.findRootCoordinates
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInWindow
@@ -111,8 +107,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.android.awaitFrame
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
@@ -127,7 +121,6 @@ import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.roundToInt
 
 /** How long a recreated window's inherited keys stay up over the restored field before they count as its own. */
 private const val INHERITED_KEYS_SETTLE_MILLIS = 1_000L
@@ -190,36 +183,6 @@ object ComposerTextInputTunables {
 
     /** `composer.lines.grow`: a typed line's growth or shrink (0.28 s, no bounce). */
     val lineGrowth: MotionSpring = MotionSpring(duration = 0.28, bounce = 0.0)
-}
-
-/**
- * The line growth [ComposerTextInput]'s layout follows. Heights and offsets are px; a hold is how
- * far the text (laid out at the target height) sits above the field's top while the field's height
- * springs.
- *
- * Growth doesn't wait out the IME's composing region: Android keyboards compose every Latin word,
- * so it would stop ordinary typing's line growth.
- */
-object ComposerLineGrowth {
-    /**
-     * iOS `lineGrowthAnimation`: the spring a reader's edit from [old] to [new] rides; none under
-     * reduce motion, and none for a Return that sends (it never animates the line it adds).
-     */
-    fun typedLineSpring(old: String, new: String, returnKeySends: Boolean, reduceMotion: Boolean): MotionSpring? =
-        if (reduceMotion || (returnKeySends && new == old + "\n")) null else ComposerTextInputTunables.lineGrowth
-
-    /**
-     * iOS `holdLineGrowth`: while the field is [height] tall on its way to [target], the text is
-     * held to the field's bottom (`target - height` above its top), so the caret's line stays put.
-     * Growing for a word wrapped off an earlier line holds no further than keeps the caret's line
-     * ([caretLineTop], from the text's top, after the field's top inset) in view: the lines below
-     * pass under the bottom edge instead. A shrink holds to the bottom.
-     */
-    fun holdOffset(target: Float, height: Float, caretLineTop: Float?): Float {
-        val y = target - height
-        if (y <= 0f || caretLineTop == null || !caretLineTop.isFinite()) return y
-        return max(0f, min(y, caretLineTop))
-    }
 }
 
 /**
@@ -410,18 +373,6 @@ class ComposerTextInputController {
     }
 
     /**
-     * iOS `beginLineGrowth`: the spring the next height change rides, and the text it was set
-     * for (a measure for any other text takes its height at once).
-     */
-    var heightSpring: MotionSpring? = null
-    var heightSpringText: String? = null
-
-    /** iOS `measuredHeight` (px): the height the field's lines last laid out to, without the top inset. */
-    var measuredHeight: Float? = null
-    var heightAnimation: Job? = null
-    val animatedHeight = Animatable(0f)
-
-    /**
      * iOS `ComposerTextInput.updateUIView`'s text sync: brings the parent's draft into [state].
      * [currentText] reads the parent's draft now, not the [text] an earlier composition captured,
      * so a recomposition that lands between the reader's edit and the parent taking
@@ -430,7 +381,6 @@ class ComposerTextInputController {
      * The caret: a new [focusRequest] (Quote, a restored draft) puts it at the end; otherwise
      * Composer Autocomplete's caret wins (null means the end); otherwise a focused
      * field keeps its selection, clamped to the new text; otherwise the caret goes to the end.
-     * [onNewText] runs for a draft the field hasn't seen yet, before it lands.
      */
     fun syncText(
         state: TextFieldState,
@@ -439,7 +389,6 @@ class ComposerTextInputController {
         focusRequest: Int,
         hasFocus: Boolean,
         bridge: ComposerAutocompleteTextBridge?,
-        onNewText: (String) -> Unit = {},
     ) {
         if (isPublishingText) return
         val draft = currentText?.invoke() ?: text
@@ -448,7 +397,6 @@ class ComposerTextInputController {
         if (externalText == null) externalText = draft
         if (draft == externalText) return
         externalText = draft
-        onNewText(draft)
         if (state.text.toString() == draft) return
         val previous = state.selection
         val preserveSelection = hasFocus && !requestedEnd
@@ -608,10 +556,6 @@ private class ComposerFieldSwipeInput : ComposerSwipeInput {
  *   on the unfocused field pulls it up ([ComposerSwipeDown], via [onDismissKeyboard] /
  *   [onFocusKeyboard]); neither fires while the text itself scrolls that way, nor while a hold
  *   (a held mic, [isHoldingMic]) owns the touch.
- * - **Line growth.** A typed line's growth or shrink rides [ComposerTextInputTunables.lineGrowth]
- *   with the text held to the field's bottom, so the caret's line stays put while the top
- *   moves; none under reduce motion or for a Return that sends. Any other change takes its
- *   height at once.
  * - **Selecting.** A drag the text is selecting with (it starts on or near the selection, or
  *   rests first) is never a swipe ([ComposerSwipeDown.textOwnsDrag]).
  * - **Keyboard insets.** The field only takes and drops focus; the session's composer docks
@@ -702,16 +646,9 @@ fun ComposerTextInput(
     val held by rememberUpdatedState(isKeyboardHeld || drawerHold?.isHeld(fieldKey) == true)
     val holdingMic by rememberUpdatedState(isHoldingMic)
     val currentRefusesFocus by rememberUpdatedState(refusesFocus)
-    val currentReturnKeySends by rememberUpdatedState(returnKeySends)
-    val reduceMotion = rememberReduceMotion()
-    val currentReduceMotion by rememberUpdatedState(reduceMotion)
-    val growthScope = rememberCoroutineScope()
 
     fun syncFromParent() {
-        controller.syncText(state, text, currentText, focusRequest, hasFocus, autocompleteBridge) {
-            controller.heightSpring = null
-            controller.heightSpringText = null
-        }
+        controller.syncText(state, text, currentText, focusRequest, hasFocus, autocompleteBridge)
     }
 
     // Programmatic updates (dictation, a restored draft, Share/Quote) follow the newest text;
@@ -842,12 +779,6 @@ fun ComposerTextInput(
                     revertAllChanges()
                     return
                 }
-                // iOS `lineGrowthAnimation`: a typed line's growth rides its spring, except under
-                // reduce motion and for a Return that sends (it never animates the line it adds).
-                val old = originalText.toString()
-                val new = asCharSequence().toString()
-                controller.heightSpring = ComposerLineGrowth.typedLineSpring(old, new, currentReturnKeySends, currentReduceMotion)
-                controller.heightSpringText = new
             }
         }
     }
@@ -1184,58 +1115,6 @@ fun ComposerTextInput(
 
     Box(
         modifier
-            // iOS `beginLineGrowth`/`holdLineGrowth`: the field's height springs to the laid-out
-            // one with the text held to its bottom; the line coming or going passes under the top.
-            .layout { measurable, constraints ->
-                val placeable = measurable.measure(constraints)
-                val target = placeable.height
-                // The spring rides the lines alone: the top inset is the keyboard morph's, scrubbed
-                // frame by frame (a send that folds the row inline with the keys down), so it moves
-                // on that curve without counting as a new height that would land the spring at once.
-                val inset = insetPx
-                val lines = target - inset
-                val previous = controller.measuredHeight
-                controller.measuredHeight = lines
-                val spring = controller.heightSpring?.takeIf {
-                    controller.heightSpringText == Snapshot.withoutReadObservation { state.text.toString() }
-                }
-                var height = target
-                // Within a pixel is the inset's rounding, not a line.
-                if (previous != null && abs(lines - previous) > 1f) {
-                    controller.heightSpring = null
-                    val running = controller.heightAnimation?.isActive == true
-                    val from = if (running) controller.animatedHeight.value else previous
-                    if (spring != null) {
-                        height = (from + inset).roundToInt()
-                        controller.heightAnimation = growthScope.launch(start = CoroutineStart.UNDISPATCHED) {
-                            // A retarget keeps the running spring's velocity, as SwiftUI's does.
-                            if (!running) controller.animatedHeight.snapTo(from)
-                            controller.animatedHeight.animateTo(lines, spring.spec(visibilityThreshold = 0.5f))
-                        }
-                    } else {
-                        controller.heightAnimation?.cancel()
-                        controller.heightAnimation = null
-                    }
-                } else if (controller.heightAnimation?.isActive == true) {
-                    height = (controller.animatedHeight.value + inset).roundToInt()
-                }
-                val caretLineTop = if (height < target) {
-                    Snapshot.withoutReadObservation {
-                        val layout = controller.layout
-                        val end = state.selection.end
-                        if (layout == null || end > layout.layoutInput.text.length) {
-                            null
-                        } else {
-                            // From the visible text's top: a scrolled field's offset moves the line up.
-                            runCatching { layout.getLineTop(layout.getLineForOffset(end)) - scroll.value }.getOrNull()
-                        }
-                    }
-                } else {
-                    null
-                }
-                val hold = ComposerLineGrowth.holdOffset(target.toFloat(), height.toFloat(), caretLineTop)
-                layout(placeable.width, height) { placeable.place(0, -hold.roundToInt()) }
-            }
             .clipToBounds()
             .heightIn(max = capDp)
             .onPlaced { controller.swipeCoordinates = it }
