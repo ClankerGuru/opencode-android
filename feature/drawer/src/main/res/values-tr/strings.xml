@@ -128,9 +128,21 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">İzin istenemedi. Tekrar deneyin.</string>
     <string name="drawer_notifications_open_settings_error">Ayarlar açılamadı. Android Ayarlarını açıp Bildirimler → OpenCode seçeneğini seçin.</string>
-    <string name="drawer_delete_session_error">“%1$s” silinemedi. %2$s</string>
-    <string name="drawer_archive_error">“%1$s” arşivlenemedi. %2$s</string>
-    <string name="drawer_unarchive_error">“%1$s” arşivden çıkarılamadı. %2$s</string>
+    <string name="drawer_delete_session_error">“%1$s” silinemedi</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">%1$d oturum silinemedi</item>
+        <item quantity="other">%1$d oturum silinemedi</item>
+    </plurals>
+    <string name="drawer_archive_error">“%1$s” arşivlenemedi</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">%1$d oturum arşivlenemedi</item>
+        <item quantity="other">%1$d oturum arşivlenemedi</item>
+    </plurals>
+    <string name="drawer_unarchive_error">“%1$s” arşivden çıkarılamadı</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">%1$d oturum arşivden çıkarılamadı</item>
+        <item quantity="other">%1$d oturum arşivden çıkarılamadı</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Yeni oturum</string>

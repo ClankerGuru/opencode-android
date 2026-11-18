@@ -124,9 +124,18 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">ขอสิทธิ์ไม่ได้ ลองอีกครั้ง</string>
     <string name="drawer_notifications_open_settings_error">เปิดการตั้งค่าไม่ได้ เปิดการตั้งค่า Android แล้วเลือกการแจ้งเตือน → OpenCode</string>
-    <string name="drawer_delete_session_error">ลบ “%1$s” ไม่ได้ %2$s</string>
-    <string name="drawer_archive_error">จัดเก็บ “%1$s” ไม่ได้ %2$s</string>
-    <string name="drawer_unarchive_error">เลิกจัดเก็บ “%1$s” ไม่ได้ %2$s</string>
+    <string name="drawer_delete_session_error">ลบ “%1$s” ไม่ได้</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="other">ลบ %1$d เซสชันไม่ได้</item>
+    </plurals>
+    <string name="drawer_archive_error">จัดเก็บ “%1$s” ไม่ได้</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="other">จัดเก็บ %1$d เซสชันไม่ได้</item>
+    </plurals>
+    <string name="drawer_unarchive_error">เลิกจัดเก็บ “%1$s” ไม่ได้</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="other">เลิกจัดเก็บ %1$d เซสชันไม่ได้</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">เซสชันใหม่</string>

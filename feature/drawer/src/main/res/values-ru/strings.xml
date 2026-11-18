@@ -136,9 +136,27 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Не удалось запросить разрешение. Попробуйте снова.</string>
     <string name="drawer_notifications_open_settings_error">Не удалось открыть настройки. Откройте настройки Android и выберите Уведомления → OpenCode.</string>
-    <string name="drawer_delete_session_error">Не удалось удалить «%1$s». %2$s</string>
-    <string name="drawer_archive_error">Не удалось архивировать «%1$s». %2$s</string>
-    <string name="drawer_unarchive_error">Не удалось извлечь «%1$s» из архива. %2$s</string>
+    <string name="drawer_delete_session_error">Не удалось удалить «%1$s»</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">Не удалось удалить %1$d сессию</item>
+        <item quantity="few">Не удалось удалить %1$d сессии</item>
+        <item quantity="many">Не удалось удалить %1$d сессий</item>
+        <item quantity="other">Не удалось удалить %1$d сессии</item>
+    </plurals>
+    <string name="drawer_archive_error">Не удалось архивировать «%1$s»</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">Не удалось архивировать %1$d сессию</item>
+        <item quantity="few">Не удалось архивировать %1$d сессии</item>
+        <item quantity="many">Не удалось архивировать %1$d сессий</item>
+        <item quantity="other">Не удалось архивировать %1$d сессии</item>
+    </plurals>
+    <string name="drawer_unarchive_error">Не удалось извлечь «%1$s» из архива</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">Не удалось извлечь из архива %1$d сессию</item>
+        <item quantity="few">Не удалось извлечь из архива %1$d сессии</item>
+        <item quantity="many">Не удалось извлечь из архива %1$d сессий</item>
+        <item quantity="other">Не удалось извлечь из архива %1$d сессии</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Новая сессия</string>

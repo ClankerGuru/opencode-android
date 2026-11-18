@@ -159,7 +159,7 @@ class HomeFeature : Reducer<HomeFeature.State, HomeFeature.Action> {
         /** Sends the server's session list has not reflected yet. */
         val localActivity: Map<String, LocalActivity> = emptyMap(),
         val pendingDeletion: OpenCodeSession? = null,
-        val deletionError: String? = null,
+        val deletionError: DrawerFailure? = null,
         val recentlyDeletedIDs: Set<String> = emptySet(),
         /**
          * Settings, pushed full screen over the drawer and the session; Back returns to whichever

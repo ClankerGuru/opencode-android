@@ -136,9 +136,27 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Za dovoljenje ni bilo mogoče zaprositi. Poskusite znova.</string>
     <string name="drawer_notifications_open_settings_error">Nastavitev ni bilo mogoče odpreti. Odprite nastavitve Androida in izberite Obvestila → OpenCode.</string>
-    <string name="drawer_delete_session_error">Seje »%1$s« ni bilo mogoče izbrisati. %2$s</string>
-    <string name="drawer_archive_error">Seje »%1$s« ni bilo mogoče arhivirati. %2$s</string>
-    <string name="drawer_unarchive_error">Seje »%1$s« ni bilo mogoče odstraniti iz arhiva. %2$s</string>
+    <string name="drawer_delete_session_error">Seje »%1$s« ni bilo mogoče izbrisati.</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">%1$d seje ni bilo mogoče izbrisati.</item>
+        <item quantity="two">%1$d sej ni bilo mogoče izbrisati.</item>
+        <item quantity="few">%1$d sej ni bilo mogoče izbrisati.</item>
+        <item quantity="other">%1$d sej ni bilo mogoče izbrisati.</item>
+    </plurals>
+    <string name="drawer_archive_error">Seje »%1$s« ni bilo mogoče arhivirati.</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">%1$d seje ni bilo mogoče arhivirati.</item>
+        <item quantity="two">%1$d sej ni bilo mogoče arhivirati.</item>
+        <item quantity="few">%1$d sej ni bilo mogoče arhivirati.</item>
+        <item quantity="other">%1$d sej ni bilo mogoče arhivirati.</item>
+    </plurals>
+    <string name="drawer_unarchive_error">Seje »%1$s« ni bilo mogoče odstraniti iz arhiva.</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">%1$d seje ni bilo mogoče odstraniti iz arhiva.</item>
+        <item quantity="two">%1$d sej ni bilo mogoče odstraniti iz arhiva.</item>
+        <item quantity="few">%1$d sej ni bilo mogoče odstraniti iz arhiva.</item>
+        <item quantity="other">%1$d sej ni bilo mogoče odstraniti iz arhiva.</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Nova seja</string>

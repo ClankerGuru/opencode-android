@@ -136,9 +136,27 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Nepodařilo se požádat o oprávnění. Zkuste to znovu.</string>
     <string name="drawer_notifications_open_settings_error">Nepodařilo se otevřít nastavení. Otevřete nastavení Androidu a vyberte Oznámení → OpenCode.</string>
-    <string name="drawer_delete_session_error">Nepodařilo se odstranit „%1$s“. %2$s</string>
-    <string name="drawer_archive_error">Nepodařilo se archivovat „%1$s“. %2$s</string>
-    <string name="drawer_unarchive_error">Nepodařilo se obnovit „%1$s“ z archivu. %2$s</string>
+    <string name="drawer_delete_session_error">Nepodařilo se odstranit „%1$s“</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">Nepodařilo se odstranit %1$d relaci</item>
+        <item quantity="few">Nepodařilo se odstranit %1$d relace</item>
+        <item quantity="many">Nepodařilo se odstranit %1$d relace</item>
+        <item quantity="other">Nepodařilo se odstranit %1$d relací</item>
+    </plurals>
+    <string name="drawer_archive_error">Nepodařilo se archivovat „%1$s“</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">Nepodařilo se archivovat %1$d relaci</item>
+        <item quantity="few">Nepodařilo se archivovat %1$d relace</item>
+        <item quantity="many">Nepodařilo se archivovat %1$d relace</item>
+        <item quantity="other">Nepodařilo se archivovat %1$d relací</item>
+    </plurals>
+    <string name="drawer_unarchive_error">Nepodařilo se obnovit „%1$s“ z archivu</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">Nepodařilo se obnovit %1$d relaci z archivu</item>
+        <item quantity="few">Nepodařilo se obnovit %1$d relace z archivu</item>
+        <item quantity="many">Nepodařilo se obnovit %1$d relace z archivu</item>
+        <item quantity="other">Nepodařilo se obnovit %1$d relací z archivu</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Nová relace</string>

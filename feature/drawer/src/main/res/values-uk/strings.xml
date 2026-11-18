@@ -136,9 +136,27 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Не вдалося запитати дозвіл. Спробуйте ще раз.</string>
     <string name="drawer_notifications_open_settings_error">Не вдалося відкрити налаштування. Відкрийте налаштування Android і виберіть Сповіщення → OpenCode.</string>
-    <string name="drawer_delete_session_error">Не вдалося видалити «%1$s». %2$s</string>
-    <string name="drawer_archive_error">Не вдалося архівувати «%1$s». %2$s</string>
-    <string name="drawer_unarchive_error">Не вдалося розархівувати «%1$s». %2$s</string>
+    <string name="drawer_delete_session_error">Не вдалося видалити «%1$s»</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">Не вдалося видалити %1$d сесію</item>
+        <item quantity="few">Не вдалося видалити %1$d сесії</item>
+        <item quantity="many">Не вдалося видалити %1$d сесій</item>
+        <item quantity="other">Не вдалося видалити %1$d сесії</item>
+    </plurals>
+    <string name="drawer_archive_error">Не вдалося архівувати «%1$s»</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">Не вдалося архівувати %1$d сесію</item>
+        <item quantity="few">Не вдалося архівувати %1$d сесії</item>
+        <item quantity="many">Не вдалося архівувати %1$d сесій</item>
+        <item quantity="other">Не вдалося архівувати %1$d сесії</item>
+    </plurals>
+    <string name="drawer_unarchive_error">Не вдалося розархівувати «%1$s»</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">Не вдалося розархівувати %1$d сесію</item>
+        <item quantity="few">Не вдалося розархівувати %1$d сесії</item>
+        <item quantity="many">Не вдалося розархівувати %1$d сесій</item>
+        <item quantity="other">Не вдалося розархівувати %1$d сесії</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Нова сесія</string>

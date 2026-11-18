@@ -124,9 +124,18 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">ခွင့်ပြုချက် မတောင်းနိုင်ပါ။ ပြန်ကြိုးစားပါ။</string>
     <string name="drawer_notifications_open_settings_error">ဆက်တင်များကို မဖွင့်နိုင်ပါ။ Android ဆက်တင်များကို ဖွင့်ပြီး အကြောင်းကြားချက်များ → OpenCode ကို ရွေးပါ။</string>
-    <string name="drawer_delete_session_error">“%1$s” ကို မဖျက်နိုင်ပါ။ %2$s</string>
-    <string name="drawer_archive_error">“%1$s” ကို မှတ်တမ်းမတင်နိုင်ပါ။ %2$s</string>
-    <string name="drawer_unarchive_error">“%1$s” ကို မှတ်တမ်းမှ ပြန်မထုတ်နိုင်ပါ။ %2$s</string>
+    <string name="drawer_delete_session_error">“%1$s” ကို မဖျက်နိုင်ပါ</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="other">စက်ရှင် %1$d ခုကို မဖျက်နိုင်ပါ</item>
+    </plurals>
+    <string name="drawer_archive_error">“%1$s” ကို မှတ်တမ်းမတင်နိုင်ပါ</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="other">စက်ရှင် %1$d ခုကို မှတ်တမ်းမတင်နိုင်ပါ</item>
+    </plurals>
+    <string name="drawer_unarchive_error">“%1$s” ကို မှတ်တမ်းမှ ပြန်မထုတ်နိုင်ပါ</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="other">စက်ရှင် %1$d ခုကို မှတ်တမ်းမှ ပြန်မထုတ်နိုင်ပါ</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">စက်ရှင်အသစ်</string>

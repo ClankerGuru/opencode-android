@@ -124,9 +124,18 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">មិនអាចស្នើសុំការអនុញ្ញាតបាន។ សូមព្យាយាមម្តងទៀត។</string>
     <string name="drawer_notifications_open_settings_error">មិនអាចបើកការកំណត់បាន។ សូមបើកការកំណត់ Android ហើយជ្រើសរើស ការជូនដំណឹង → OpenCode។</string>
-    <string name="drawer_delete_session_error">មិនអាចលុប “%1$s” បាន។ %2$s</string>
-    <string name="drawer_archive_error">មិនអាចដាក់ “%1$s” ក្នុងបណ្ណសារបាន។ %2$s</string>
-    <string name="drawer_unarchive_error">មិនអាចដក “%1$s” ចេញពីបណ្ណសារបាន។ %2$s</string>
+    <string name="drawer_delete_session_error">មិនអាចលុប “%1$s” បាន</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="other">មិនអាចលុបសម័យ %1$d បាន</item>
+    </plurals>
+    <string name="drawer_archive_error">មិនអាចដាក់ “%1$s” ក្នុងបណ្ណសារបាន</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="other">មិនអាចដាក់សម័យ %1$d ក្នុងបណ្ណសារបាន</item>
+    </plurals>
+    <string name="drawer_unarchive_error">មិនអាចដក “%1$s” ចេញពីបណ្ណសារបាន</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="other">មិនអាចដកសម័យ %1$d ចេញពីបណ្ណសារបាន</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">សម័យថ្មី។</string>

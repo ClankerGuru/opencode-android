@@ -136,9 +136,27 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Nepavyko paprašyti leidimo. Bandykite dar kartą.</string>
     <string name="drawer_notifications_open_settings_error">Nepavyko atidaryti nustatymų. Atidarykite Android nustatymus ir pasirinkite Pranešimai → OpenCode.</string>
-    <string name="drawer_delete_session_error">Nepavyko ištrinti „%1$s“. %2$s</string>
-    <string name="drawer_archive_error">Nepavyko suarchyvuoti „%1$s“. %2$s</string>
-    <string name="drawer_unarchive_error">Nepavyko išarchyvuoti „%1$s“. %2$s</string>
+    <string name="drawer_delete_session_error">Nepavyko ištrinti „%1$s“</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">Nepavyko ištrinti %1$d seanso</item>
+        <item quantity="few">Nepavyko ištrinti %1$d seansų</item>
+        <item quantity="many">Nepavyko ištrinti %1$d seanso</item>
+        <item quantity="other">Nepavyko ištrinti %1$d seansų</item>
+    </plurals>
+    <string name="drawer_archive_error">Nepavyko suarchyvuoti „%1$s“</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">Nepavyko suarchyvuoti %1$d seanso</item>
+        <item quantity="few">Nepavyko suarchyvuoti %1$d seansų</item>
+        <item quantity="many">Nepavyko suarchyvuoti %1$d seanso</item>
+        <item quantity="other">Nepavyko suarchyvuoti %1$d seansų</item>
+    </plurals>
+    <string name="drawer_unarchive_error">Nepavyko išarchyvuoti „%1$s“</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">Nepavyko išarchyvuoti %1$d seanso</item>
+        <item quantity="few">Nepavyko išarchyvuoti %1$d seansų</item>
+        <item quantity="many">Nepavyko išarchyvuoti %1$d seanso</item>
+        <item quantity="other">Nepavyko išarchyvuoti %1$d seansų</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Naujas seansas</string>

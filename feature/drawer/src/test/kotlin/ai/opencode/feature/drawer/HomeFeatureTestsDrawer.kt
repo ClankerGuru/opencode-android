@@ -461,18 +461,18 @@ class HomeFeatureTestsDrawer {
                 activeSessionIDs = setOf(session.id),
                 attentionSessionIDs = setOf(session.id),
                 recentlyDeletedIDs = emptySet(),
-                deletionError = "Couldn’t delete “Restore me”. Offline",
+                deletionError = DrawerFailure(DrawerFailure.Action.delete, "Restore me", "Offline"),
             )
         }
         assertEquals(listOf(session, other), store.state.sessions)
-        assertEquals("Couldn’t delete “Restore me”. Offline", store.state.deletionError)
+        assertEquals("Couldn’t delete “Restore me”", store.state.deletionError?.title)
         assertEquals(session, store.state.sessionDetail?.session)
         assertEquals(openItems, store.state.sessionDetail?.items)
         assertEquals(listOf(other.id), h.state { ServerSharedKeys.cachedTranscriptSnapshots().value }.entries.map { it.sessionID })
         assertEquals(listOf(key), store.state.pinnedSessionKeys)
         assertEquals(session.id, store.state.lastViewedSessionIDs[server.persistenceID])
         assertEquals(session.updatedAt, store.state.sessionReadDates[key])
-        clock.advance(3.seconds)
+        clock.advance(5.seconds)
         store.receive(Action.ClearDeletionError) { it.copy(deletionError = null) }
         store.finish()
     }

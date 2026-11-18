@@ -132,9 +132,24 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Não foi possível solicitar permissão. Tente novamente.</string>
     <string name="drawer_notifications_open_settings_error">Não foi possível abrir as configurações. Abra as configurações do Android e selecione Notificações → OpenCode.</string>
-    <string name="drawer_delete_session_error">Não foi possível excluir “%1$s”. %2$s</string>
-    <string name="drawer_archive_error">Não foi possível arquivar “%1$s”. %2$s</string>
-    <string name="drawer_unarchive_error">Não foi possível desarquivar “%1$s”. %2$s</string>
+    <string name="drawer_delete_session_error">Não foi possível excluir “%1$s”</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">Não foi possível excluir %1$d sessão</item>
+        <item quantity="many">Não foi possível excluir %1$d sessões</item>
+        <item quantity="other">Não foi possível excluir %1$d sessões</item>
+    </plurals>
+    <string name="drawer_archive_error">Não foi possível arquivar “%1$s”</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">Não foi possível arquivar %1$d sessão</item>
+        <item quantity="many">Não foi possível arquivar %1$d sessões</item>
+        <item quantity="other">Não foi possível arquivar %1$d sessões</item>
+    </plurals>
+    <string name="drawer_unarchive_error">Não foi possível desarquivar “%1$s”</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">Não foi possível desarquivar %1$d sessão</item>
+        <item quantity="many">Não foi possível desarquivar %1$d sessões</item>
+        <item quantity="other">Não foi possível desarquivar %1$d sessões</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Nova sessão</string>

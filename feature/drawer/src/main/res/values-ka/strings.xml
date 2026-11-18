@@ -128,9 +128,21 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">ნებართვის მოთხოვნა ვერ მოხერხდა. ხელახლა სცადეთ.</string>
     <string name="drawer_notifications_open_settings_error">პარამეტრები ვერ გაიხსნა. გახსენით Android-ის პარამეტრები და აირჩიეთ შეტყობინებები → OpenCode.</string>
-    <string name="drawer_delete_session_error">„%1$s“ ვერ წაიშალა. %2$s</string>
-    <string name="drawer_archive_error">„%1$s“ ვერ დაარქივდა. %2$s</string>
-    <string name="drawer_unarchive_error">„%1$s“ არქივიდან ვერ ამოიღეს. %2$s</string>
+    <string name="drawer_delete_session_error">„%1$s“ ვერ წაიშალა</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">%1$d სესიის წაშლა ვერ მოხერხდა</item>
+        <item quantity="other">%1$d სესიის წაშლა ვერ მოხერხდა</item>
+    </plurals>
+    <string name="drawer_archive_error">„%1$s“ ვერ დაარქივდა</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">%1$d სესიის დაარქივება ვერ მოხერხდა</item>
+        <item quantity="other">%1$d სესიის დაარქივება ვერ მოხერხდა</item>
+    </plurals>
+    <string name="drawer_unarchive_error">„%1$s“ არქივიდან ვერ ამოიღეს</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">%1$d სესიის არქივიდან ამოღება ვერ მოხერხდა</item>
+        <item quantity="other">%1$d სესიის არქივიდან ამოღება ვერ მოხერხდა</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">ახალი სესია</string>
