@@ -32,8 +32,6 @@ object TranscriptTunables {
     object Knobs {
         // Arrivals
         val textFadeDuration = Tunable("transcript.textReveal.duration", "Reveal duration (s)", default = 0.2, range = 0.05..0.8, step = 0.01)
-        val workingFinale = Tunable("transcript.arrivals.workingFinale", "Working finale flash", default = 0.55, range = 0.15..1.4, step = 0.05)
-        val workingHandoff = Tunable("transcript.arrivals.workingHandoff", "Working → Copy handoff", default = 0.34, range = 0.1..1.0, step = 0.02)
 
         // Promotion
         val promotionLabelRise = Tunable("transcript.promotion.labelRise", "Label exit rise (pt)", default = 6f, range = 0.0..20.0, step = 1.0)
@@ -73,8 +71,6 @@ object TranscriptTunables {
 
     // Arrivals
     val textFadeDuration: Double get() = Knobs.textFadeDuration.value
-    val workingFinale: Double get() = Knobs.workingFinale.value
-    val workingHandoff: Double get() = Knobs.workingHandoff.value
 
     // Promotion
     val promotionLabelRise: Float get() = Knobs.promotionLabelRise.value
@@ -157,10 +153,10 @@ object TranscriptTunables {
                     "transcript.arrivals.presets", "Arrivals",
                     listOf(
                         TuningPreset("Native"),
-                        TuningPreset("Snappy", textFadeDuration.preset(0.14), workingFinale.preset(0.4), workingHandoff.preset(0.24)),
-                        TuningPreset("Gentle", textFadeDuration.preset(0.26), workingFinale.preset(0.65), workingHandoff.preset(0.4)),
+                        TuningPreset("Snappy", textFadeDuration.preset(0.14)),
+                        TuningPreset("Gentle", textFadeDuration.preset(0.26)),
                     ),
-                    resetting = listOf(textFadeDuration, workingFinale, workingHandoff).map { it.descriptor },
+                    resetting = listOf(textFadeDuration).map { it.descriptor },
                 ),
                 TuningPresets(
                     "transcript.promotion.presets", "Steering",
@@ -200,7 +196,7 @@ object TranscriptTunables {
     fun register(store: TuningStore = TuningStore.shared) {
         if (!store.isEnabled) return
         with(Knobs) {
-            store.register(textFadeDuration, workingFinale, workingHandoff)
+            store.register(textFadeDuration)
             store.register(promotionLabelRise)
             store.register(agentGlowRise, agentGlowDuration)
             store.register(dividerGlowLift, dividerGlowDuration)

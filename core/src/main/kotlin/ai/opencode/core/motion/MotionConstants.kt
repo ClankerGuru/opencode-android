@@ -118,26 +118,15 @@ object Motion {
 
     // Deprecated: fixed at today's numbers until their call sites move to a role.
 
-    /** Today's 0.34 s / 0.12 panel spring, fixed for the screens that haven't moved to [Motion.panelOpen]. */
-    @Deprecated("Use Motion.panelOpen")
-    val legacyPanelOpen = MotionSpring(0.34, 0.12)
     /** Primary sheet / morph fold (0.34 s, critically damped). */
     @Deprecated("Use Motion.panelClose")
     val morphClose = MotionSpring(0.34, 0.0)
     /** Critically damped layout resize, row promotion, or card settle (0.40 s). */
     @Deprecated("Use Motion.layout or Motion.surface")
     val settle = MotionSpring(0.40, 0.0)
-    /** Disclosure / accordion / inline band expand (0.30 s). */
-    @Deprecated("Use Motion.layout")
-    val disclosureOpen = MotionSpring(0.30, 0.0)
-    /** Disclosure / accordion / inline band collapse (0.24 s). */
-    @Deprecated("Use Motion.collapse")
-    val disclosureClose = MotionSpring(0.24, 0.0)
     /** Small badge, pill, or glyph entrance pop (0.26 s, 0.22 bounce). */
     @Deprecated("Use Motion.microIn")
     val microPop = MotionSpring(0.26, 0.22)
-    @Deprecated("Use Motion.microOut")
-    val microExit: MotionSpring get() = microOut.spring
     @Deprecated("Use Motion.release")
     val drawerSlide: MotionSpring get() = release.spring
 
@@ -150,9 +139,6 @@ object Motion {
     /** Standard incoming content / row fade (0.22 s, ease-out). */
     @Deprecated("Use MotionTunables.swapInDuration", ReplaceWith("MotionTunables.swapInDuration.value"))
     val fadeStandard: Double get() = MotionTunables.swapInDuration.value
-    /** Backdrop / full-bleed dim fade (0.32 s). */
-    @Deprecated("Use MotionTunables.dimDuration", ReplaceWith("MotionTunables.dimDuration.value"))
-    val fadeSlow: Double get() = MotionTunables.dimDuration.value
 
     val EaseInOut = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)
 

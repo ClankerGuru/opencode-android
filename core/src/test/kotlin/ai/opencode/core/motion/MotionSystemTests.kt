@@ -98,12 +98,8 @@ class MotionSystemTests {
     @Suppress("DEPRECATION")
     @Test
     fun deprecatedAliasesKeepTodaysValuesSoNothingVisibleChanges() {
-        assertEquals(MotionSpring(0.34, 0.12), Motion.legacyPanelOpen)
-        assertEquals(MotionSpring(0.34, 0.12).spec<Float>(), Motion.legacyPanelOpen.animation<Float>(reduceMotion = false))
-        assertEquals(tween<Float>(200, easing = Motion.EaseInOut), Motion.legacyPanelOpen.animation<Float>(reduceMotion = true))
         assertEquals(0.22, Motion.fadeStandard, 0.0)
         assertEquals(0.14, Motion.fadeFast, 0.0)
-        assertEquals(0.32, Motion.fadeSlow, 0.0)
         assertEquals(0.20, Motion.reducedFade, 0.0)
         assertEquals(tween<Float>(200, easing = Motion.EaseInOut), Motion.reducedFadeSpec<Float>())
         assertEquals(tween<Float>(220, delayMillis = 50, easing = Motion.EaseOut), Motion.easeOut<Float>(Motion.fadeStandard, Motion.contentDelay))
