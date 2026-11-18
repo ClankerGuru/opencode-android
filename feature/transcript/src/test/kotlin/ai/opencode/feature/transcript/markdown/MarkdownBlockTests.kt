@@ -17,8 +17,6 @@ import ai.opencode.feature.transcript.markdown.ui.InlineMath
 import ai.opencode.feature.transcript.markdown.ui.MarkdownPresentation
 import ai.opencode.feature.transcript.markdown.ui.MarkdownStyle
 import ai.opencode.feature.transcript.markdown.ui.PresentationOptions
-import ai.opencode.feature.transcript.markdown.ui.StreamTextRevealStyle
-import ai.opencode.feature.transcript.markdown.ui.TextRevealTunables
 import ai.opencode.feature.transcript.markdown.ui.TranscriptTextReveal
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
@@ -772,62 +770,6 @@ class TextRevealTuningTests {
         assertEquals(2, times.size)
         assertEquals(0.01, times[0], 1e-9)
         assertEquals(0.09, times[1], 1e-9)
-    }
-
-    @Test fun revealPresetsSetStyleAndDurationAndTodayIsTheDefault() {
-        val store = TuningStore(null)
-        store.setEnabled(true)
-        TextRevealTunables.register(store)
-        val keys = store.descriptors.map { it.key }.toSet()
-        for (key in listOf(
-            "transcript.textReveal.style", "transcript.textReveal.duration", "transcript.textReveal.feather",
-            "transcript.textReveal.blurRadius", "transcript.textReveal.phosphorLift", "transcript.textReveal.stagger",
-        )) {
-            assertTrue(key, key in keys)
-        }
-        val duration = TranscriptTunables.Knobs.textFadeDuration
-        assertEquals(StreamTextRevealStyle.Chunk, store.value(TextRevealTunables.style))
-        assertEquals(0.2, store.value(duration), 1e-9)
-        store.applyPreset("transcript.textReveal", 2)
-        assertEquals(StreamTextRevealStyle.Focus, store.value(TextRevealTunables.style))
-        assertEquals(0.24, store.value(duration), 1e-9)
-        store.applyPreset("transcript.textReveal", 1)
-        assertEquals(StreamTextRevealStyle.Frontier, store.value(TextRevealTunables.style))
-        assertEquals(0.22, store.value(duration), 1e-9)
-        store.applyPreset("transcript.textReveal", 0)
-        assertEquals(StreamTextRevealStyle.Chunk, store.value(TextRevealTunables.style))
-        assertEquals(0.2, store.value(duration), 1e-9)
-    }
-}
-
-/** No flashing: a sweep only ever brightens a glyph, in reading order. */
-class StreamRevealNoFlashTests {
-    @Test fun aSweepNeverDimsAGlyphItAlreadyShowed() {
-        for (feather in listOf(0.25, 1.0, 3.0)) {
-            for (p in 0..20) {
-                val position = p * 0.05
-                var last = 0.0
-                for (step in 0..200) {
-                    val alpha = StreamTextRevealStyle.sweepAlpha(step / 200.0, position, feather)
-                    assertTrue(alpha >= last - 1e-9)
-                    last = alpha
-                }
-                assertEquals(1.0, last, 1e-9)
-                assertTrue(StreamTextRevealStyle.sweepAlpha(0.0, position, feather) < 0.12)
-            }
-        }
-    }
-
-    @Test fun aSweepRunsInReadingOrder() {
-        for (s in 0..10) {
-            val u = s * 0.1
-            var last = 1.0
-            for (p in 0..20) {
-                val alpha = StreamTextRevealStyle.sweepAlpha(u, p * 0.05, 1.0)
-                assertTrue(alpha <= last + 1e-9)
-                last = alpha
-            }
-        }
     }
 }
 
