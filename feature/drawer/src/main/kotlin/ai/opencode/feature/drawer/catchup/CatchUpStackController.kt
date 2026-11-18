@@ -478,8 +478,7 @@ class CatchUpStackController internal constructor() {
     }
 
     /**
-     * For a host that routes the drawer container's pan here (`Modifier.drawerPan(onCardSwipe =
-     * controller::handlePan)`). That pan is horizontal only, so the card gets no vertical rubber
+     * For a host that routes the drawer container's pan here. That pan is horizontal only, so the card gets no vertical rubber
      * band; [CatchUpStack]'s own pan (its default) carries both axes.
      */
     fun handlePan(event: DrawerPanEvent) {
