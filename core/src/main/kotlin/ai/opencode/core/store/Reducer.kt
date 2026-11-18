@@ -168,6 +168,3 @@ fun <S, A, V> Reducer<S, A>.onChange(
         Reduced(changed.state, Effect.merge(reduced.effect, changed.effect))
     }
 }
-
-/** A reducer that does nothing (TCA's `EmptyReducer`). */
-fun <S, A> emptyReducer(): Reducer<S, A> = Reducer { state, _ -> Reduced(state) }

@@ -322,12 +322,6 @@ class TuningStore(
         return synchronized(lock) { state.lastRollBefore[group] != null }
     }
 
-    val undoableRollGroups: List<String>
-        get() {
-            revisionState.intValue
-            return synchronized(lock) { state.lastRollBefore.keys.sorted() }
-        }
-
     /** Rolls every registered tunable in [group] to a random valid value, as one undoable change. */
     fun randomize(group: String, random: Random = Random.Default) {
         val (rows, before) = synchronized(lock) {

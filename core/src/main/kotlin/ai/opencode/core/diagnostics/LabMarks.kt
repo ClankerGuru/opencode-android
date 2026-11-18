@@ -23,8 +23,6 @@ import java.util.concurrent.atomic.AtomicInteger
  * Content-free: names, session IDs and integer values only.
  */
 object LabMarks {
-    private val onceKeys = HashSet<String>()
-
     /** The fixture's marks URL; set once at launch in debug builds. */
     @Volatile var endpoint: URL? = null
         set(value) {
@@ -57,12 +55,6 @@ object LabMarks {
         post(body)
     }
 
-    fun markOnce(name: String, sessionID: String? = null) {
-        val key = "$name:${sessionID ?: "-"}"
-        val inserted = synchronized(onceKeys) { onceKeys.add(key) }
-        if (inserted) mark(name, sessionID)
-    }
-
     /** iOS `physicalFootprintKB`: the process's PSS in KB. */
     fun physicalFootprintKB(): Int = runCatching {
         val info = android.os.Debug.MemoryInfo()
@@ -92,42 +84,6 @@ object LabMarks {
     fun post(event: String, fields: Map<String, Any>) {
         endpoint ?: return
         post(fields + mapOf("name" to event, "t" to System.currentTimeMillis()))
-    }
-
-    /** `lab-promotion-trace`'s frames: `[ms, bubbleY, bubbleAlpha, workingY, offset]`. */
-    fun promotionTrace(sessionID: String?, frames: List<List<Double>>) {
-        endpoint ?: return
-        post(mapOf("name" to "promotion_trace", "t" to System.currentTimeMillis(), "sessionID" to (sessionID ?: ""), "frames" to frames))
-    }
-
-    /**
-     * `lab-working-trace`'s frames: `[ms, row (0 Working, 1 reply end), rowTop, rowHeight,
-     * indicatorBlur, indicatorAlpha, copyBlur, copyAlpha, offset]`.
-     */
-    fun workingTrace(sessionID: String?, frames: List<List<Double>>) {
-        endpoint ?: return
-        post(mapOf("name" to "working_trace", "t" to System.currentTimeMillis(), "sessionID" to (sessionID ?: ""), "frames" to frames))
-    }
-
-    fun transcriptSnapshot(
-        sessionID: String?,
-        ids: List<String>,
-        vanished: List<String>,
-        reappeared: List<String>,
-        rows: List<Map<String, String>> = emptyList(),
-        inserted: List<String> = emptyList(),
-        reconfigured: List<String> = emptyList(),
-        reloaded: List<String> = emptyList(),
-        order: List<String> = emptyList(),
-    ) {
-        endpoint ?: return
-        post(
-            mapOf(
-                "name" to "transcript_snapshot", "t" to System.currentTimeMillis(),
-                "sessionID" to (sessionID ?: ""), "ids" to ids, "vanished" to vanished, "reappeared" to reappeared,
-                "rows" to rows, "insertedIDs" to inserted, "reconfigured" to reconfigured, "reloaded" to reloaded, "order" to order,
-            ),
-        )
     }
 
     private val poster = Executors.newSingleThreadExecutor { Thread(it, "lab-marks").apply { isDaemon = true } }

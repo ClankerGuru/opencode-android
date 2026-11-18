@@ -117,9 +117,6 @@ class TunableSpring(key: String, label: String, duration: Double, bounce: Double
 
     val spring: MotionSpring get() = MotionSpring(duration.value, bounce.value)
 
-    /** The baked spring (defaults), for places that must not observe tuning. */
-    val defaultSpring: MotionSpring get() = MotionSpring(duration.defaultValue, bounce.defaultValue)
-
     fun <T> spec(visibilityThreshold: T? = null): SpringSpec<T> = spring.spec(visibilityThreshold)
 
     fun <T> animation(reduceMotion: Boolean, delaySeconds: Double = 0.0, visibilityThreshold: T? = null): FiniteAnimationSpec<T> =
@@ -308,9 +305,6 @@ data class TunableDescriptor(
             }
             return null
         }
-
-    /** Slider positions for the panel: the step grid's count, or null for a continuous slider. */
-    val sliderSteps: Int? get() = steppedGrid?.count?.takeIf { it >= 0 }
 
     /** Whether this tunable has more than one valid value. */
     val hasMultipleValues: Boolean

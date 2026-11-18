@@ -29,9 +29,6 @@ object SharedKeys {
     /** Developer Mode: upload voice calls and traces to the log server. Off by default. Keeps the voice-only switch's key. */
     val developerMode = SharedKey.appStorage("voice-call-uploads", false)
 
-    /** Touch Probe. Off by default. */
-    val touchProbe = SharedKey.appStorage("diagnostics-touch-probe", false)
-
     /** Demo Mode: voice calls play as media so a recording captures them. Off by default. */
     val voiceDemoMode = SharedKey.appStorage("voice-demo-mode", false)
 

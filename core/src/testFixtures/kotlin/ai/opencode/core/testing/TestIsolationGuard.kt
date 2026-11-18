@@ -211,7 +211,6 @@ object TestIsolationGuard {
         sharedProbe("Shared.favoriteModelIDs", SharedKeys.favoriteModelIDs, "[]"),
         sharedProbe("Shared.appTheme", ThemeSharedKeys.appTheme, "System"),
         sharedProbe("Shared.appearanceColorScheme", ThemeSharedKeys.appearanceColorScheme, "System"),
-        sharedProbe("Shared.touchProbe", SharedKeys.touchProbe, "false"),
         sharedProbe("Shared.returnKeySends", SharedKeys.returnKeySends, "false"),
         sharedProbe("Shared.developerMode", SharedKeys.developerMode, "false"),
         sharedProbe("Shared.voiceDemoMode", SharedKeys.voiceDemoMode, "false"),
