@@ -141,10 +141,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Nie udało się wczytać sesji</string>
     <string name="session_location_share_failed_title">Nie udało się udostępnić lokalizacji</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Uchwyt panelu</string>
-    <string name="session_photo_sheet_full_description">Pełny ekran</string>
-    <string name="session_photo_sheet_half_description">Połowa ekranu</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Zatrzymać ten terminal?</string>
     <string name="session_shell_stop_confirm_message">Polecenie zakończy się teraz. Wynik pozostanie widoczny do zamknięcia terminala.</string>

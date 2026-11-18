@@ -131,25 +131,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">附件选项</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">所有照片</string>
-    <string name="composer_photo_more_options_action">更多选项</string>
-    <string name="composer_photo_select_more">选择更多照片…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="other">添加 %1$d 张照片</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">全屏</string>
-    <string name="composer_photo_sheet_half">半屏</string>
-    <string name="composer_photo_grid_description">照片</string>
-    <string name="composer_photo_camera_description">相机</string>
-    <string name="composer_photo_access_off_title">照片访问权限已关闭</string>
-    <string name="composer_photo_access_off_message">请在设置中允许访问照片，即可在此选择照片。</string>
-    <string name="composer_photo_return_action">返回附件选项</string>
-    <string name="composer_photo_tile_video_description">视频</string>
-    <string name="composer_photo_tile_photo_description">照片</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="other">最多可添加 %1$d 张照片</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">超广角</string>
     <string name="composer_camera_lens_wide_description">广角</string>

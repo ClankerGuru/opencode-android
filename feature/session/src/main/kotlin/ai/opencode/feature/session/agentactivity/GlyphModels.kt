@@ -62,8 +62,6 @@ class AgentActivityGlyphModel {
         val field: GyroField? = null,
         /** Nothing moves until the state changes or an event arrives. */
         val resting: Boolean = false,
-        /** Time moved on since the last frame. */
-        val stepped: Boolean = false,
         val activity: AgentActivity = AgentActivity.idle,
     )
 
@@ -107,7 +105,7 @@ class AgentActivityGlyphModel {
             gyro.step(step)
             remaining -= step
         }
-        frame = Frame(field = gyro.render(GyroCell.seven, dt), resting = gyro.isResting, stepped = dt > 0, activity = activity)
+        frame = Frame(field = gyro.render(GyroCell.seven, dt), resting = gyro.isResting, activity = activity)
         return frame
     }
 }
@@ -126,10 +124,6 @@ class ShellGlyphModel(internal var meter: ShellOutputMeter = ShellOutputMeter.sh
 
     val isLapping: Boolean get() = glyph?.isLapping == true
 
-    /** Time moved on in the last [advance]. */
-    var stepped = false
-        private set
-
     fun advance(now: Double, shellIDs: List<String>, reduceMotion: Boolean): GyroField {
         val reading = meter.reading(shellIDs, now)
         val state = if (reading.isOutput) ShellPromptGlyph.State.output else ShellPromptGlyph.State.idle
@@ -145,7 +139,6 @@ class ShellGlyphModel(internal var meter: ShellOutputMeter = ShellOutputMeter.sh
         // Resuming from a pause steps on from the held pose, at most 1/30 s.
         val rawStep = min(1.0 / 30, max(0.0, now - (last ?: now)))
         pending += AnimationTimeScale.shared.scaledDelta(rawStep)
-        stepped = rawStep > 0
         last = now
         val rate = ShellOutputFeed.chunkRate(reading.bytesPerSecond)
         var steppedTime = 0.0

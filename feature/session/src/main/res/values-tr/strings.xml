@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Oturum yüklenemedi</string>
     <string name="session_location_share_failed_title">Konum paylaşılamadı</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Panel tutamacı</string>
-    <string name="session_photo_sheet_full_description">Tam</string>
-    <string name="session_photo_sheet_half_description">Yarım</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Bu kabuk durdurulsun mu?</string>
     <string name="session_shell_stop_confirm_message">Komut hemen sonlanır. Buradaki çıktı, siz kapatana kadar kalır.</string>

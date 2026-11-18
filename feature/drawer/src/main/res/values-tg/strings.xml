@@ -124,6 +124,8 @@
     <string name="drawer_row_needs_input_state">Ба посухи шумо ниёз дорад</string>
     <string name="drawer_row_working_state">Кор карда истодааст</string>
     <string name="drawer_row_unread_state">Нохонда</string>
+    <string name="drawer_row_unsent_failed_state">Фиристода нашуд</string>
+    <string name="drawer_row_unsent_sending_state">Фиристода мешавад</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Дархости иҷозат нашуд. Аз нав кӯшиш кунед.</string>

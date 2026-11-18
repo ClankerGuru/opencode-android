@@ -139,10 +139,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Impossible de charger la session</string>
     <string name="session_location_share_failed_title">Impossible de partager la position</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Poignée du panneau</string>
-    <string name="session_photo_sheet_full_description">Plein écran</string>
-    <string name="session_photo_sheet_half_description">Demi-écran</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Arrêter ce shell ?</string>
     <string name="session_shell_stop_confirm_message">La commande s’arrête maintenant. La sortie reste affichée ici jusqu’à la fermeture du panneau.</string>

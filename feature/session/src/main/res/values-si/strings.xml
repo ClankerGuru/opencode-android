@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">සැසිය පූරණය කිරීමට නොහැකි විය</string>
     <string name="session_location_share_failed_title">ස්ථානය බෙදාගැනීමට නොහැකි විය</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">පැනලය ඇදීමේ හසුරුව</string>
-    <string name="session_photo_sheet_full_description">සම්පූර්ණ</string>
-    <string name="session_photo_sheet_half_description">අඩක්</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">මෙම ෂෙල් එක නවත්වන්නද?</string>
     <string name="session_shell_stop_confirm_message">විධානය දැන් අවසන් වේ. මෙහි පෙන්වන ප්‍රතිදානය ඔබ එය වසන තෙක් පවතී.</string>

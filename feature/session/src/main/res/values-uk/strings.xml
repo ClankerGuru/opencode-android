@@ -141,10 +141,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Не вдалося завантажити сесію</string>
     <string name="session_location_share_failed_title">Не вдалося поділитися розташуванням</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Маркер перетягування панелі</string>
-    <string name="session_photo_sheet_full_description">На весь екран</string>
-    <string name="session_photo_sheet_half_description">На пів екрана</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Зупинити цю команду?</string>
     <string name="session_shell_stop_confirm_message">Виконання команди завершиться зараз. Вивід залишиться тут, доки ви його не закриєте.</string>

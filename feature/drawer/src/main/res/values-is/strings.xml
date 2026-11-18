@@ -124,6 +124,8 @@
     <string name="drawer_row_needs_input_state">Þarf svar frá þér</string>
     <string name="drawer_row_working_state">Að vinna</string>
     <string name="drawer_row_unread_state">Ólesið</string>
+    <string name="drawer_row_unsent_failed_state">Ekki tókst að senda</string>
+    <string name="drawer_row_unsent_sending_state">Sendir</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Ekki tókst að biðja um leyfi. Reyndu aftur.</string>

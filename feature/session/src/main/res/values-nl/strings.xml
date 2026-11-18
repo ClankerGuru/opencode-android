@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Sessie laden mislukt</string>
     <string name="session_location_share_failed_title">Locatie delen mislukt</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Sleepgreep van paneel</string>
-    <string name="session_photo_sheet_full_description">Volledig</string>
-    <string name="session_photo_sheet_half_description">Half</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Deze shell stoppen?</string>
     <string name="session_shell_stop_confirm_message">De opdracht stopt meteen. De uitvoer blijft hier staan tot je dit venster sluit.</string>

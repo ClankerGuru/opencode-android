@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Kunne ikke laste inn sesjonen</string>
     <string name="session_location_share_failed_title">Kunne ikke dele beliggenhet</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Drahåndtak</string>
-    <string name="session_photo_sheet_full_description">Full høyde</string>
-    <string name="session_photo_sheet_half_description">Halv høyde</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Stoppe dette skallet?</string>
     <string name="session_shell_stop_confirm_message">Kommandoen avsluttes nå. Utdataene som vises her, blir værende til du lukker visningen.</string>

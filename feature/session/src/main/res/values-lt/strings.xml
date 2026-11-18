@@ -141,10 +141,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Nepavyko įkelti seanso</string>
     <string name="session_location_share_failed_title">Nepavyko bendrinti vietos</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Skydelio rankenėlė</string>
-    <string name="session_photo_sheet_full_description">Visas ekranas</string>
-    <string name="session_photo_sheet_half_description">Pusė ekrano</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Stabdyti šį apvalkalą?</string>
     <string name="session_shell_stop_confirm_message">Komanda bus nutraukta dabar. Čia rodoma išvestis liks, kol uždarysite apvalkalą.</string>

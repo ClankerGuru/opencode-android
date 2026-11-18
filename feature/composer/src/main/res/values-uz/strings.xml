@@ -134,27 +134,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Biriktirma variantlari</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Barcha suratlar</string>
-    <string name="composer_photo_more_options_action">Boshqa variantlar</string>
-    <string name="composer_photo_select_more">Yana surat tanlash…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">%1$d ta surat qo\'shish</item>
-        <item quantity="other">%1$d ta surat qo\'shish</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">To\'liq</string>
-    <string name="composer_photo_sheet_half">Yarim</string>
-    <string name="composer_photo_grid_description">Suratlar</string>
-    <string name="composer_photo_camera_description">Kamera</string>
-    <string name="composer_photo_access_off_title">Suratlarga ruxsat berilmagan</string>
-    <string name="composer_photo_access_off_message">Bu yerda surat tanlash uchun sozlamalarda ruxsat bering.</string>
-    <string name="composer_photo_return_action">Biriktirma variantlariga qaytish</string>
-    <string name="composer_photo_tile_video_description">Video</string>
-    <string name="composer_photo_tile_photo_description">Surat</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Ko\'pi bilan %1$d ta surat qo\'shishingiz mumkin</item>
-        <item quantity="other">Ko\'pi bilan %1$d ta surat qo\'shishingiz mumkin</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Ultra keng burchakli</string>
     <string name="composer_camera_lens_wide_description">Keng burchakli</string>

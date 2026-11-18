@@ -139,10 +139,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Neizdevās ielādēt sesiju</string>
     <string name="session_location_share_failed_title">Neizdevās kopīgot atrašanās vietu</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Paneļa rokturis</string>
-    <string name="session_photo_sheet_full_description">Pilns</string>
-    <string name="session_photo_sheet_half_description">Puse</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Apturēt šo čaulu?</string>
     <string name="session_shell_stop_confirm_message">Komanda tiks apturēta uzreiz. Šeit redzamā izvade paliks, līdz to aizvērsi.</string>

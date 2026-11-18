@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Չհաջողվեց բեռնել նիստը</string>
     <string name="session_location_share_failed_title">Չհաջողվեց կիսվել տեղանքով</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Վահանակի բռնակ</string>
-    <string name="session_photo_sheet_full_description">Ամբողջությամբ</string>
-    <string name="session_photo_sheet_half_description">Կիսով չափ</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Կանգնեցնե՞լ այս Shell-ը։</string>
     <string name="session_shell_stop_confirm_message">Հրամանը կավարտվի հիմա։ Այստեղ ցուցադրված արտածումը կմնա, մինչև փակեք այն։</string>

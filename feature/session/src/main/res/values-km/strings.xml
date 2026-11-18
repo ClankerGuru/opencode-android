@@ -135,10 +135,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">មិនអាចផ្ទុកសម័យបាន</string>
     <string name="session_location_share_failed_title">មិនអាចចែករំលែកទីតាំងបាន</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">ចំណុចអូសផ្ទាំង</string>
-    <string name="session_photo_sheet_full_description">ពេញ</string>
-    <string name="session_photo_sheet_half_description">ពាក់កណ្តាល</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">ឈប់សែលនេះ?</string>
     <string name="session_shell_stop_confirm_message">ពាក្យបញ្ជានឹងបញ្ចប់ឥឡូវនេះ។ លទ្ធផលនៅទីនេះនឹងនៅដដែលរហូតដល់អ្នកបិទវា។</string>

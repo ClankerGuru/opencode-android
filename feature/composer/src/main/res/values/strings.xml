@@ -134,27 +134,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Attachment options</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">All Photos</string>
-    <string name="composer_photo_more_options_action">More Options</string>
-    <string name="composer_photo_select_more">Select More Photos…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">Add %1$d Photo</item>
-        <item quantity="other">Add %1$d Photos</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Full</string>
-    <string name="composer_photo_sheet_half">Half</string>
-    <string name="composer_photo_grid_description">Photos</string>
-    <string name="composer_photo_camera_description">Camera</string>
-    <string name="composer_photo_access_off_title">Photo access is off</string>
-    <string name="composer_photo_access_off_message">Allow access in Settings to pick photos here.</string>
-    <string name="composer_photo_return_action">Return to attachment options</string>
-    <string name="composer_photo_tile_video_description">Video</string>
-    <string name="composer_photo_tile_photo_description">Photo</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">%1$d photo is the most you can add</item>
-        <item quantity="other">%1$d photos is the most you can add</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Ultra Wide</string>
     <string name="composer_camera_lens_wide_description">Wide</string>

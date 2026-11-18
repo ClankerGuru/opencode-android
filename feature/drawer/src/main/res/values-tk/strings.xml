@@ -124,6 +124,8 @@
     <string name="drawer_row_needs_input_state">Jogabyňyz gerek</string>
     <string name="drawer_row_working_state">Işleýär</string>
     <string name="drawer_row_unread_state">Okalmadyk</string>
+    <string name="drawer_row_unsent_failed_state">Iberip bolmady</string>
+    <string name="drawer_row_unsent_sending_state">Iberilýär</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Rugsat sorap bolmady. Täzeden synanyş.</string>

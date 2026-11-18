@@ -134,27 +134,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Bilagealternativ</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Alla foton</string>
-    <string name="composer_photo_more_options_action">Fler alternativ</string>
-    <string name="composer_photo_select_more">Välj fler foton…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">Lägg till %1$d foto</item>
-        <item quantity="other">Lägg till %1$d foton</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Hel</string>
-    <string name="composer_photo_sheet_half">Halv</string>
-    <string name="composer_photo_grid_description">Foton</string>
-    <string name="composer_photo_camera_description">Kamera</string>
-    <string name="composer_photo_access_off_title">Fotoåtkomst är avstängd</string>
-    <string name="composer_photo_access_off_message">Tillåt åtkomst i inställningarna för att välja foton här.</string>
-    <string name="composer_photo_return_action">Tillbaka till bilagealternativ</string>
-    <string name="composer_photo_tile_video_description">Video</string>
-    <string name="composer_photo_tile_photo_description">Foto</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Du kan lägga till högst %1$d foto</item>
-        <item quantity="other">Du kan lägga till högst %1$d foton</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Ultravidvinkel</string>
     <string name="composer_camera_lens_wide_description">Vidvinkel</string>

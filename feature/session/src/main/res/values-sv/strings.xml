@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Kunde inte ladda sessionen</string>
     <string name="session_location_share_failed_title">Kunde inte dela platsen</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Panelens draghandtag</string>
-    <string name="session_photo_sheet_full_description">Hel</string>
-    <string name="session_photo_sheet_half_description">Halv</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Stoppa det här skalet?</string>
     <string name="session_shell_stop_confirm_message">Kommandot avslutas nu. Det som visas här finns kvar tills du stänger skalet.</string>

@@ -124,6 +124,8 @@
     <string name="drawer_row_needs_input_state">Beavatkozás szükséges</string>
     <string name="drawer_row_working_state">Dolgozik</string>
     <string name="drawer_row_unread_state">Olvasatlan</string>
+    <string name="drawer_row_unsent_failed_state">Nem sikerült elküldeni</string>
+    <string name="drawer_row_unsent_sending_state">Küldés</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Nem sikerült engedélyt kérni. Próbálja újra.</string>

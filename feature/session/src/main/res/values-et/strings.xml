@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Seansi laadimine ebaõnnestus</string>
     <string name="session_location_share_failed_title">Asukoha jagamine ebaõnnestus</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Paneeli lohistamispide</string>
-    <string name="session_photo_sheet_full_description">Täisekraan</string>
-    <string name="session_photo_sheet_half_description">Pool ekraani</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Kas peatada see shell?</string>
     <string name="session_shell_stop_confirm_message">Käsk lõpeb kohe. Siin kuvatud väljund jääb alles, kuni selle sulged.</string>

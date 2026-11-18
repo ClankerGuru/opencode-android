@@ -135,10 +135,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">无法加载会话</string>
     <string name="session_location_share_failed_title">无法分享位置</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">面板拖动条</string>
-    <string name="session_photo_sheet_full_description">全屏</string>
-    <string name="session_photo_sheet_half_description">半屏</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">停止此 Shell？</string>
     <string name="session_shell_stop_confirm_message">命令将立即结束。此处的输出会保留，直到你关闭它。</string>

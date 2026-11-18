@@ -134,27 +134,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">დანართის პარამეტრები</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">ყველა ფოტო</string>
-    <string name="composer_photo_more_options_action">მეტი პარამეტრები</string>
-    <string name="composer_photo_select_more">მეტი ფოტოს არჩევა…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">%1$d ფოტოს დამატება</item>
-        <item quantity="other">%1$d ფოტოს დამატება</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">სრული</string>
-    <string name="composer_photo_sheet_half">ნახევარი</string>
-    <string name="composer_photo_grid_description">ფოტოები</string>
-    <string name="composer_photo_camera_description">კამერა</string>
-    <string name="composer_photo_access_off_title">ფოტოებზე წვდომა გამორთულია</string>
-    <string name="composer_photo_access_off_message">აქ ფოტოების ასარჩევად დაუშვით წვდომა პარამეტრებში.</string>
-    <string name="composer_photo_return_action">დანართის პარამეტრებზე დაბრუნება</string>
-    <string name="composer_photo_tile_video_description">ვიდეო</string>
-    <string name="composer_photo_tile_photo_description">ფოტო</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">შეგიძლიათ დაამატოთ მაქსიმუმ %1$d ფოტო</item>
-        <item quantity="other">შეგიძლიათ დაამატოთ მაქსიმუმ %1$d ფოტო</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">ულტრაფართოკუთხიანი</string>
     <string name="composer_camera_lens_wide_description">ფართოკუთხიანი</string>

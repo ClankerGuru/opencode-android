@@ -62,8 +62,6 @@ data class ProblemReportBundle(val report: ProblemReport, val files: Map<String,
         const val APP_LOG = "app-log.txt"
         const val PREVIOUS_RUN = "previous-run.txt"
         const val SCREENSHOT = "screenshot.jpg"
-        const val MOTION_JUMPS = "motion-jumps.json"
-        const val MOTION_JUMPS_TEXT = "motion-jumps.txt"
     }
 
     override fun equals(other: Any?): Boolean =
@@ -79,8 +77,6 @@ object ProblemReportBuilder {
     const val TIMELINE_TEXT_LIMIT = 300_000
     const val APP_LOG_LIMIT = 300_000
     const val PREVIOUS_RUN_LIMIT = 150_000
-    const val MOTION_JUMPS_LIMIT = 200_000
-    const val MOTION_JUMPS_TEXT_LIMIT = 40_000
     /** The previous run is attached when it ended this recently, or crashed. */
     const val PREVIOUS_RUN_WINDOW_SECONDS = 900L
 
@@ -95,7 +91,6 @@ object ProblemReportBuilder {
         appLog: List<String> = emptyList(),
         previousRun: List<DiagnosticsEvent> = emptyList(),
         screenshot: ByteArray? = null,
-        motionJumps: List<MotionWatchEvent> = emptyList(),
     ): ProblemReportBundle {
         val safeContext = context.copy(serverID = safeServerID(context.serverID))
         val recorded = if (crashedLastRun && previousRun.isNotEmpty()) previousRun + events else events
@@ -112,10 +107,6 @@ object ProblemReportBuilder {
             files[ProblemReportBundle.File.PREVIOUS_RUN] = tail(DiagnosticsRecorder.exportText(previousRun, wallClock = true), PREVIOUS_RUN_LIMIT).toByteArray()
         }
         if (screenshot != null && screenshot.size <= SCREENSHOT_LIMIT) files[ProblemReportBundle.File.SCREENSHOT] = screenshot
-        if (motionJumps.isNotEmpty()) {
-            files[ProblemReportBundle.File.MOTION_JUMPS] = MotionWatch.boundedJSON(motionJumps, MOTION_JUMPS_LIMIT)
-            files[ProblemReportBundle.File.MOTION_JUMPS_TEXT] = tail(MotionWatch.exportText(motionJumps), MOTION_JUMPS_TEXT_LIMIT).toByteArray()
-        }
         return ProblemReportBundle(report, files)
     }
 
@@ -125,8 +116,7 @@ object ProblemReportBuilder {
             when (event.kind) {
                 DiagnosticsEvent.Kind.Voice, DiagnosticsEvent.Kind.Stream, DiagnosticsEvent.Kind.Lifecycle, DiagnosticsEvent.Kind.Navigation -> true
                 DiagnosticsEvent.Kind.RequestEnd -> (event.errorCategory != null && event.errorCategory != DiagnosticsErrorCategory.Cancelled) || (event.statusCode ?: 200) >= 400
-                DiagnosticsEvent.Kind.Mark -> event.name.startsWith("motion_jump_")
-                DiagnosticsEvent.Kind.RequestStart, DiagnosticsEvent.Kind.NetworkMetrics -> false
+                DiagnosticsEvent.Kind.Mark, DiagnosticsEvent.Kind.RequestStart, DiagnosticsEvent.Kind.NetworkMetrics -> false
             }
         }
         val text = DiagnosticsRecorder.exportText(telling.takeLast(count), wallClock = true)
@@ -212,14 +202,13 @@ object ProblemReportBuilder {
     fun sessionTraceFollowUp(report: ProblemReport, traceURL: String): String =
         "[problem report ${report.shortID} · trace uploaded]\nThe retry uploaded the trace for report ${report.id.toString().uppercase(Locale.ROOT)}: $traceURL"
 
-    /** The report as one Markdown file: the summary, then the timeline, app log, previous run and Motion Watch jumps it carries. */
+    /** The report as one Markdown file: the summary, then the timeline, app log and previous run it carries. */
     fun attachment(bundle: ProblemReportBundle): String {
         val sections = mutableListOf(summary(bundle.report, bundle.files[ProblemReportBundle.File.SCREENSHOT] != null))
         for ((title, name) in listOf(
             "Timeline" to ProblemReportBundle.File.TIMELINE_TEXT,
             "App log" to ProblemReportBundle.File.APP_LOG,
             "Previous run" to ProblemReportBundle.File.PREVIOUS_RUN,
-            "Motion Watch jumps" to ProblemReportBundle.File.MOTION_JUMPS_TEXT,
         )) {
             val data = bundle.files[name]?.takeIf { it.isNotEmpty() } ?: continue
             sections += "## $title\n\n```text\n${String(data).trim('\n')}\n```"

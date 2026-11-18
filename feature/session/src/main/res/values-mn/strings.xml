@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Сессийг ачаалж чадсангүй</string>
     <string name="session_location_share_failed_title">Байршлыг хуваалцаж чадсангүй</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Самбарын бариул</string>
-    <string name="session_photo_sheet_full_description">Бүтэн</string>
-    <string name="session_photo_sheet_half_description">Хагас</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Энэ Shell-ийг зогсоох уу?</string>
     <string name="session_shell_stop_confirm_message">Тушаал одоо зогсоно. Энд харагдаж буй гаралт хаах хүртэл хэвээр үлдэнэ.</string>

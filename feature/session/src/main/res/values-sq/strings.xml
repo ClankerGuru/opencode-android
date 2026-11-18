@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Sesioni nuk u ngarkua dot</string>
     <string name="session_location_share_failed_title">Vendndodhja nuk u nda dot</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Doreza e panelit</string>
-    <string name="session_photo_sheet_full_description">I plotë</string>
-    <string name="session_photo_sheet_half_description">Gjysmë</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Të ndalet kjo guaskë?</string>
     <string name="session_shell_stop_confirm_message">Komanda përfundon tani. Rezultati i shfaqur këtu mbetet derisa ta mbyllësh.</string>

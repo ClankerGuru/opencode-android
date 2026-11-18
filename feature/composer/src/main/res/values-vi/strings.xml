@@ -131,25 +131,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Tùy chọn đính kèm</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Tất cả ảnh</string>
-    <string name="composer_photo_more_options_action">Nhiều lựa chọn hơn</string>
-    <string name="composer_photo_select_more">Chọn thêm ảnh…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="other">Thêm %1$d ảnh</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Toàn màn hình</string>
-    <string name="composer_photo_sheet_half">Nửa màn hình</string>
-    <string name="composer_photo_grid_description">Ảnh</string>
-    <string name="composer_photo_camera_description">Camera</string>
-    <string name="composer_photo_access_off_title">Quyền truy cập ảnh đang tắt</string>
-    <string name="composer_photo_access_off_message">Cho phép truy cập trong cài đặt để chọn ảnh tại đây.</string>
-    <string name="composer_photo_return_action">Quay lại tùy chọn đính kèm</string>
-    <string name="composer_photo_tile_video_description">Video</string>
-    <string name="composer_photo_tile_photo_description">Ảnh</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="other">Bạn chỉ có thể thêm tối đa %1$d ảnh</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Góc siêu rộng</string>
     <string name="composer_camera_lens_wide_description">Góc rộng</string>

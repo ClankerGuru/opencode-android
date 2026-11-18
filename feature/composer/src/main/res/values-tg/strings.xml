@@ -134,27 +134,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Имконоти замима</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Ҳамаи аксҳо</string>
-    <string name="composer_photo_more_options_action">Имконоти бештар</string>
-    <string name="composer_photo_select_more">Аксҳои бештарро интихоб кунед…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">%1$d акс илова кунед</item>
-        <item quantity="other">%1$d акс илова кунед</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Пурра</string>
-    <string name="composer_photo_sheet_half">Ним</string>
-    <string name="composer_photo_grid_description">Аксҳо</string>
-    <string name="composer_photo_camera_description">Камера</string>
-    <string name="composer_photo_access_off_title">Дастрасӣ ба аксҳо хомӯш аст</string>
-    <string name="composer_photo_access_off_message">Барои интихоби аксҳо дар ин ҷо, дар танзимот иҷозати дастрасӣ диҳед.</string>
-    <string name="composer_photo_return_action">Бозгашт ба имконоти замима</string>
-    <string name="composer_photo_tile_video_description">Видео</string>
-    <string name="composer_photo_tile_photo_description">Акс</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">То %1$d акс илова карда метавонед</item>
-        <item quantity="other">То %1$d акс илова карда метавонед</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Кунҷи фавқулвасеъ</string>
     <string name="composer_camera_lens_wide_description">Кунҷи васеъ</string>

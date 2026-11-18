@@ -131,25 +131,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Opsi lampiran</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Semua foto</string>
-    <string name="composer_photo_more_options_action">Opsi lainnya</string>
-    <string name="composer_photo_select_more">Pilih foto lainnya…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="other">Tambah %1$d foto</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Penuh</string>
-    <string name="composer_photo_sheet_half">Setengah</string>
-    <string name="composer_photo_grid_description">Foto</string>
-    <string name="composer_photo_camera_description">Kamera</string>
-    <string name="composer_photo_access_off_title">Akses foto nonaktif</string>
-    <string name="composer_photo_access_off_message">Izinkan akses di Pengaturan untuk memilih foto di sini.</string>
-    <string name="composer_photo_return_action">Kembali ke opsi lampiran</string>
-    <string name="composer_photo_tile_video_description">Video</string>
-    <string name="composer_photo_tile_photo_description">Foto</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="other">Maksimal %1$d foto yang bisa ditambahkan</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Sudut ultra lebar</string>
     <string name="composer_camera_lens_wide_description">Sudut lebar</string>

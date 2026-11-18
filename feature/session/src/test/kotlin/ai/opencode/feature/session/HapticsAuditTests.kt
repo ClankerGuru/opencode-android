@@ -6,17 +6,13 @@ import ai.opencode.core.dependencies.DependencyValues
 import ai.opencode.core.dependencies.PasteboardClient
 import ai.opencode.core.dependencies.TestClock
 import ai.opencode.core.dependencies.UuidClient
-import ai.opencode.core.dependencies.withDependencies
 import ai.opencode.core.haptics.HapticsClient
 import ai.opencode.core.store.TestStore
-import ai.opencode.feature.composer.AttachmentPickerButton
-import ai.opencode.feature.composer.ComposerAttachmentsFeature
 import ai.opencode.feature.composer.DictationClient
 import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.feature.composer.LocationClient
 import ai.opencode.feature.composer.LocationClientError
 import ai.opencode.feature.composer.PendingPrompt
-import ai.opencode.feature.composer.plusmenu.PlusPhotoLibrary
 import ai.opencode.feature.media.LinkMenuAction
 import ai.opencode.feature.media.OpenURLClient
 import ai.opencode.feature.session.SessionFeature.Action
@@ -32,18 +28,13 @@ import ai.opencode.server.OpenCodeClientError
 import ai.opencode.server.OpenCodeServer
 import ai.opencode.server.model.OpenCodeFormRequest
 import ai.opencode.server.model.OpenCodeModel
-import ai.opencode.server.model.OpenCodeOutgoingAttachment
 import ai.opencode.server.model.OpenCodePendingRequests
 import ai.opencode.server.model.OpenCodePermissionReply
 import ai.opencode.server.model.OpenCodePermissionRequest
 import ai.opencode.server.model.OpenCodeProject
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeShell
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -113,67 +104,6 @@ class HapticsAuditTests {
             assertEquals("$action", listOf("tap"), log.names)
             h.skipInFlightEffects()
         }
-    }
-
-    /**
-     * The library's scope binds `Dispatchers.Main` when it's made; these tests never launch on it.
-     */
-    private fun plusPhotoLibrary(log: HapticsRecorder): PlusPhotoLibrary {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
-        try {
-            return withDependencies({ this[HapticsClient] = log.client }) { PlusPhotoLibrary() }
-        } finally {
-            Dispatchers.resetMain()
-        }
-    }
-
-    @Test fun addingPhotosFromTheSheetIsOneHaptic() = sessionTest { h ->
-        val log = HapticsRecorder()
-        val library = plusPhotoLibrary(log)
-        library.toggle("p1")
-        library.toggle("p2")
-        assertEquals("One per pick", listOf("selection", "selection"), log.names)
-        val since = Since(log)
-        library.addPressed()
-        val store = h.sessionStore(null, log)
-        for (byte in listOf<Byte>(1, 2, 3)) {
-            store.send(Action.ComposerAttachments(ComposerAttachmentsFeature.Action.AttachmentLanded(OpenCodeOutgoingAttachment(data = byteArrayOf(byte), mime = "image/jpeg"))))
-        }
-        assertEquals(3, store.state.pendingAttachments.size)
-        assertEquals(listOf("tap"), since.names)
-        // A paste still ticks once as it lands.
-        store.send(Action.attachmentAdded(OpenCodeOutgoingAttachment(data = byteArrayOf(4), mime = "image/jpeg")))
-        assertEquals(listOf("tap", "selection"), since.names)
-        h.skipInFlightEffects()
-    }
-
-    /** Eight photos at most; a tap past it warns instead of silently doing nothing. */
-    @Test fun pickingPastTheLimitWarns() {
-        val log = HapticsRecorder()
-        val library = plusPhotoLibrary(log)
-        assertEquals(8, AttachmentPickerButton.MAX_PHOTO_SELECTION)
-        for (index in 1..8) library.toggle("p$index")
-        assertEquals(8, library.picks.size)
-        val since = Since(log)
-        library.toggle("p9")
-        assertEquals(8, library.picks.size)
-        assertEquals(listOf("warning"), since.names)
-        library.toggle("p3")
-        library.toggle("p9")
-        assertEquals(8, library.order("p9"))
-    }
-
-    /** Back keeps the picks on show (pill and badges) while the sheet folds. */
-    @Test fun backKeepsThePicksShownWhileTheSheetFolds() {
-        val library = plusPhotoLibrary(HapticsRecorder())
-        library.toggle("p1")
-        library.toggle("p2")
-        library.setAsidePicks()
-        assertTrue(library.picks.isEmpty())
-        assertEquals(2, library.shownPickCount)
-        assertEquals(2, library.order("p2"))
-        library.resetClosingPicks()
-        assertNull(library.order("p2"))
     }
 
     @Test fun aFailedSendIsAnError() = sessionTest { h ->

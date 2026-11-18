@@ -135,10 +135,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">စက်ရှင်ကို မဖွင့်နိုင်ပါ</string>
     <string name="session_location_share_failed_title">တည်နေရာ မမျှဝေနိုင်ပါ</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">အကွက် ဆွဲရွှေ့ဘား</string>
-    <string name="session_photo_sheet_full_description">အပြည့်</string>
-    <string name="session_photo_sheet_half_description">တစ်ဝက်</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">ဤ shell ကို ရပ်မလား?</string>
     <string name="session_shell_stop_confirm_message">အမိန့်ကို ယခု ရပ်တန့်ပါမည်။ ဤနေရာရှိ ရလဒ်ကို သင်မပိတ်မချင်း ဆက်ပြထားပါမည်။</string>

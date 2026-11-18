@@ -214,7 +214,6 @@ object TestIsolationGuard {
         sharedProbe("Shared.touchProbe", SharedKeys.touchProbe, "false"),
         sharedProbe("Shared.returnKeySends", SharedKeys.returnKeySends, "false"),
         sharedProbe("Shared.developerMode", SharedKeys.developerMode, "false"),
-        sharedProbe("Shared.motionWatch", SharedKeys.motionWatch, "false"),
         sharedProbe("Shared.voiceDemoMode", SharedKeys.voiceDemoMode, "false"),
         sharedProbe("Shared.voiceModeEnabled", SharedKeys.voiceModeEnabled, "false"),
         sharedProbe("Shared.raiseToTalk", SharedKeys.raiseToTalk, "false"),

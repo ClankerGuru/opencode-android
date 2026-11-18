@@ -134,27 +134,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Опции за прикачване</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Всички снимки</string>
-    <string name="composer_photo_more_options_action">Още опции</string>
-    <string name="composer_photo_select_more">Изберете още снимки…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">Добавете %1$d снимка</item>
-        <item quantity="other">Добавете %1$d снимки</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Цял екран</string>
-    <string name="composer_photo_sheet_half">Половин екран</string>
-    <string name="composer_photo_grid_description">Снимки</string>
-    <string name="composer_photo_camera_description">Камера</string>
-    <string name="composer_photo_access_off_title">Достъпът до снимки е изключен</string>
-    <string name="composer_photo_access_off_message">Разрешете достъпа в настройките, за да избирате снимки тук.</string>
-    <string name="composer_photo_return_action">Назад към опциите за прикачване</string>
-    <string name="composer_photo_tile_video_description">Видео</string>
-    <string name="composer_photo_tile_photo_description">Снимка</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Можете да добавите най-много %1$d снимка</item>
-        <item quantity="other">Можете да добавите най-много %1$d снимки</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Ултраширокоъгълен</string>
     <string name="composer_camera_lens_wide_description">Широкоъгълен</string>

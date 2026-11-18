@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Nem sikerült betölteni a munkamenetet</string>
     <string name="session_location_share_failed_title">Nem sikerült megosztani a helyszínt</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Panel fogantyúja</string>
-    <string name="session_photo_sheet_full_description">Teljes</string>
-    <string name="session_photo_sheet_half_description">Fél</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Leállítja ezt a shellt?</string>
     <string name="session_shell_stop_confirm_message">A parancs most leáll. Az itt látható kimenet a bezárásig megmarad.</string>

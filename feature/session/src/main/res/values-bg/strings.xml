@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Неуспешно зареждане на сесията</string>
     <string name="session_location_share_failed_title">Неуспешно споделяне на местоположението</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Дръжка на панела</string>
-    <string name="session_photo_sheet_full_description">Цял екран</string>
-    <string name="session_photo_sheet_half_description">Половин екран</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Спиране на тази черупка?</string>
     <string name="session_shell_stop_confirm_message">Командата ще приключи веднага. Показаният тук изход ще остане, докато не го затворите.</string>

@@ -135,10 +135,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">ໂຫຼດເຊດຊັນບໍ່ໄດ້</string>
     <string name="session_location_share_failed_title">ແບ່ງປັນສະຖານທີ່ບໍ່ໄດ້</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">ແຖບລາກແຜງ</string>
-    <string name="session_photo_sheet_full_description">ເຕັມຈໍ</string>
-    <string name="session_photo_sheet_half_description">ເຄິ່ງຈໍ</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">ຢຸດ shell ນີ້ບໍ?</string>
     <string name="session_shell_stop_confirm_message">ຄຳສັ່ງຈະຢຸດດຽວນີ້. ຜົນລັບທີ່ສະແດງຢູ່ນີ້ຈະຍັງຢູ່ຈົນກວ່າເຈົ້າຈະປິດ.</string>

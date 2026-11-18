@@ -137,29 +137,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Opțiuni de atașare</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Toate fotografiile</string>
-    <string name="composer_photo_more_options_action">Mai multe opțiuni</string>
-    <string name="composer_photo_select_more">Selectează mai multe fotografii…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">Adaugă %1$d fotografie</item>
-        <item quantity="few">Adaugă %1$d fotografii</item>
-        <item quantity="other">Adaugă %1$d de fotografii</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Ecran întreg</string>
-    <string name="composer_photo_sheet_half">Jumătate de ecran</string>
-    <string name="composer_photo_grid_description">Fotografii</string>
-    <string name="composer_photo_camera_description">Cameră</string>
-    <string name="composer_photo_access_off_title">Accesul la fotografii este dezactivat</string>
-    <string name="composer_photo_access_off_message">Permite accesul în Setări ca să alegi fotografii aici.</string>
-    <string name="composer_photo_return_action">Înapoi la opțiunile de atașare</string>
-    <string name="composer_photo_tile_video_description">Video</string>
-    <string name="composer_photo_tile_photo_description">Fotografie</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Poți adăuga cel mult %1$d fotografie</item>
-        <item quantity="few">Poți adăuga cel mult %1$d fotografii</item>
-        <item quantity="other">Poți adăuga cel mult %1$d de fotografii</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Ultraangular</string>
     <string name="composer_camera_lens_wide_description">Angular</string>
