@@ -1,38 +1,10 @@
 package ai.opencode.feature.composer
 
-/** Where the best match sits. */
-enum class AutocompleteOrder(val rawValue: String) { Top("top"), Bottom("bottom") }
-
-/** How a leaving row goes. */
-enum class AutocompleteExitMode(val rawValue: String) { Fade("fade"), Collapse("collapse") }
-
 /** Whether choosing a `/` command fills it in or runs it. */
 enum class AutocompleteCommandAction(val rawValue: String) { Fill("fill"), Run("run") }
 
 /** Lengths in dp, times in seconds. */
 object ComposerAutocompleteTunables {
-    /** `composer.autocomplete.order` "Best match". */
-    val order = AutocompleteOrder.Bottom
-
-    /** `composer.autocomplete.blur` "Entrance blur (pt)" (0…16). */
-    const val blur = 4.0
-    /** `composer.autocomplete.scale` "Entrance scale" (0.8…1). */
-    const val scale = 0.96
-
-    /** `composer.autocomplete.rowBlur` "New row blur (pt)" (0…8). */
-    const val rowBlur = 0.0
-    /** `composer.autocomplete.rowScale` "Row scale" (0.6…1). */
-    const val rowScale = 1.0
-    /** `composer.autocomplete.exitMode` "Leaving row". */
-    val exitMode = AutocompleteExitMode.Collapse
-    /** `composer.autocomplete.coalesce` "Commit bursts every (s)" (0…0.3). */
-    const val coalesce = 0.0
-
-    /** `composer.autocomplete.keysInstant` "Arrow keys move it at once". */
-    const val keysInstant = true
-
-    /** `composer.autocomplete.flightArc` "Height leads" (1…3). */
-    const val flightArc = 1.4
     /** `composer.autocomplete.commandAction` "A / command". */
     val commandAction = AutocompleteCommandAction.Fill
     /** `composer.autocomplete.runDelay` "Runs after landing (s)" (0…1). */
@@ -50,7 +22,4 @@ object ComposerAutocompleteTunables {
     const val rowInset = 7.0
     /** `composer.autocomplete.edgeFade` "Scroll edge fade (pt)" (0…60). */
     const val edgeFade = 24.0
-
-    /** `ComposerTunables.cornerRadius`, the surface the highlight sits concentric in. */
-    const val composerCornerRadius = 12.0
 }

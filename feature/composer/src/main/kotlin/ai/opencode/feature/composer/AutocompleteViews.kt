@@ -1,16 +1,23 @@
 package ai.opencode.feature.composer
 
 import ai.opencode.core.R as CoreR
-import ai.opencode.core.motion.transitionBlur
-
+import ai.opencode.core.motion.Motion
+import ai.opencode.core.motion.MotionPhase
+import ai.opencode.core.motion.MotionTransition
+import ai.opencode.core.motion.MotionTunables
+import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -23,7 +30,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.OutputTransformation
@@ -33,6 +44,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -44,11 +56,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -56,7 +67,6 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
@@ -68,14 +78,14 @@ import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.onClick
@@ -85,6 +95,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -93,7 +104,6 @@ import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -352,206 +362,200 @@ private fun tone(value: Double): Color {
 
 // MARK: - Panel
 
+/** The panel's height above the composer bar (dp): its rows up to [ComposerAutocompleteTunables.maxRows] and the top inset; 0 when closed. */
+fun autocompletePanelHeight(state: ComposerAutocompleteState): Float {
+    if (!state.isOpen) return 0f
+    val rows = min(state.rows.size.toDouble(), ComposerAutocompleteTunables.maxRows)
+    return (rows * ComposerAutocompleteTunables.rowHeight + ComposerAutocompleteTunables.padding).toFloat()
+}
+
 /**
- * The growing autocomplete list mounted in the composer surface's panel slot. Rows run bottom-up
- * from the composer text; the highlight sits concentric with the glass; edge fades show only where
- * rows overflow. One pointer handler owns the list: a touch scrolls once it passes the tap
- * slop and never picks a row after that; a touch that stays within it picks the row it lifts on.
- * TalkBack activates rows through their click action.
+ * [autocompletePanelHeight] as drawn: it opens and closes on the panel springs and follows
+ * filtering on the layout spring. Under Reduce Motion it never moves; it waits out the fade.
+ */
+@Composable
+fun rememberAutocompletePanelHeight(state: ComposerAutocompleteState): State<Float> {
+    val reduceMotion = rememberReduceMotion()
+    val height = remember { Animatable(0f) }
+    val target = autocompletePanelHeight(state)
+    LaunchedEffect(target, reduceMotion) {
+        val spec: AnimationSpec<Float> = when {
+            reduceMotion && target == 0f -> snap(delayMillis = Motion.millis(MotionTunables.reducedDuration.value))
+            reduceMotion -> snap()
+            target == 0f -> Motion.panelClose.animation(MotionPhase.Exit)
+            height.value == 0f -> Motion.panelOpen.animation(MotionPhase.Enter)
+            else -> Motion.layout.animation(MotionPhase.Enter)
+        }
+        height.animateTo(target, spec)
+    }
+    return height.asState()
+}
+
+/**
+ * The autocomplete list in the composer surface's panel slot, [height] dp tall
+ * ([rememberAutocompletePanelHeight]). The best match sits at the bottom, next to the text; the
+ * list scrolls past [ComposerAutocompleteTunables.maxRows] rows.
  */
 @Composable
 fun ComposerAutocompletePanel(
-    controller: AutocompleteMotionController,
+    state: ComposerAutocompleteState,
+    height: () -> Float,
     onSelectRow: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val density = LocalDensity.current
-    val scale = max(density.density.toDouble(), 1.0)
-    LaunchedEffect(scale) { controller.updateDisplayScale(scale) }
-    val frame = controller.currentFrame
-    val params = controller.simulation.params
-    val panelHeight = AutocompleteSimulation.snapAnchoredSpan(0.0, max(frame.glassLift, frame.restingLift), scale).span
-    val pad = AutocompleteSimulation.snapEdge(frame.padding, scale)
+    val reduceMotion = rememberReduceMotion()
+    var shown by remember { mutableStateOf(state) }
+    if (state.isOpen) shown = state
     val suggestionsDescription = stringResource(R.string.composer_autocomplete_suggestions_description)
     Box(
         modifier
             .fillMaxWidth()
-            .height(panelHeight.dp)
+            .layout { measurable, constraints ->
+                val heightPx = height().dp.roundToPx()
+                val placeable = measurable.measure(constraints.copy(minHeight = heightPx, maxHeight = heightPx))
+                layout(placeable.width, heightPx) { placeable.place(0, 0) }
+            }
             .semantics {
                 isTraversalGroup = true
                 contentDescription = suggestionsDescription
             }
             .testTag("composer-autocomplete-list"),
-        contentAlignment = Alignment.BottomStart,
     ) {
-        if (frame.isShown && frame.listHeight > 0.5) {
-            Box(
-                Modifier
-                    .padding(start = pad.dp, end = pad.dp, top = pad.dp)
-                    .graphicsLayer {
-                        scaleX = frame.contentScale.toFloat()
-                        scaleY = frame.contentScale.toFloat()
-                        transformOrigin = TransformOrigin(0.5f, 1f)
-                        alpha = frame.contentAlpha.toFloat()
-                    }
-                    .then(if (frame.contentBlur > 0.01) Modifier.transitionBlur(frame.contentBlur.dp) else Modifier),
-            ) {
-                AutocompleteListWindow(controller, frame, params, scale, onSelectRow)
-            }
+        val transition = MotionTransition.micro(reduceMotion)
+        AnimatedVisibility(
+            visible = state.isOpen,
+            modifier = Modifier.fillMaxSize(),
+            enter = transition.enter,
+            exit = transition.exit,
+        ) {
+            AutocompleteList(shown, isActive = state.isOpen, reduceMotion, onSelectRow)
         }
     }
 }
 
 @Composable
-private fun AutocompleteListWindow(
-    controller: AutocompleteMotionController,
-    frame: AutocompleteSimulation.Frame,
-    params: AutocompleteParameters,
-    scale: Double,
+private fun AutocompleteList(
+    state: ComposerAutocompleteState,
+    isActive: Boolean,
+    reduceMotion: Boolean,
     onSelectRow: (String) -> Unit,
 ) {
     val isDark = OpenCodeTheme.colors.isDark
-    val listWidth = max(1.0, AutocompleteSimulation.snapEdge(frame.listWidth, scale))
-    val listHeight = max(1.0, AutocompleteSimulation.snapAnchoredSpan(0.0, frame.listHeight, scale).span)
-    val currentOnSelect by rememberUpdatedState(onSelectRow)
-    val edge = frame.edgeFade
-    val fades = edge.topEdgeAlpha < 1 || edge.bottomEdgeAlpha < 1
-    Box(
-        Modifier
-            .requiredSize(listWidth.dp, listHeight.dp)
-            .graphicsLayer {
-                clip = true
-                if (fades) compositingStrategy = CompositingStrategy.Offscreen
-            }
-            .then(
-                if (fades) {
-                    Modifier.drawWithContent {
-                        drawContent()
-                        val h = max(size.height, 1f)
-                        val fade = max(1.0, min(edge.fadeLength * density, h / 2.0)).toFloat()
-                        val topStop = min(0.49f, max(0.001f, fade / h))
-                        val bottomStop = max(0.51f, min(0.999f, 1 - fade / h))
-                        drawRect(
-                            Brush.verticalGradient(
-                                0f to Color.Black.copy(alpha = edge.topEdgeAlpha.toFloat()),
-                                topStop to Color.Black,
-                                bottomStop to Color.Black,
-                                1f to Color.Black.copy(alpha = edge.bottomEdgeAlpha.toFloat()),
-                            ),
-                            blendMode = BlendMode.DstIn,
-                        )
-                    }
-                } else {
-                    Modifier
-                },
-            )
-            .pointerInput(controller) {
-                val tracker = AutocompleteTouchTracker()
-                fun Offset.point() = AutocompletePoint((x / density).toDouble(), (y / density).toDouble())
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    val start = down.position.point()
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull { it.id == down.id }
-                        if (change == null) {
-                            controller.endScroll()
-                            break
-                        }
-                        val location = change.position.point()
-                        if (!change.pressed) {
-                            controller.endScroll()
-                            val tap = tracker.end(start, location)
-                            if (tap != null) {
-                                AutocompleteTouchTracker.selectableRow(tap, controller.currentFrame.rows)?.let { currentOnSelect(it) }
-                            }
-                            change.consume()
-                            break
-                        }
-                        tracker.move(start, location)?.let { controller.scroll(it) }
-                        if (tracker.isScrolling) change.consume()
-                    }
-                }
+    val listState = rememberLazyListState()
+    val rows = state.rows
+
+    val firstID = rows.firstOrNull()?.id
+    var shownFirstID by remember { mutableStateOf(firstID) }
+    if (shownFirstID != firstID) {
+        listState.requestScrollToItem(0)
+        shownFirstID = firstID
+    }
+    LaunchedEffect(state.selectedRowID) {
+        if (state.userMovedSelection) revealRow(listState, rows.indexOfFirst { it.id == state.selectedRowID })
+    }
+
+    val pad = ComposerAutocompleteTunables.padding.dp
+    val fade = ComposerAutocompleteTunables.edgeFade.dp
+    val placementSpec = if (reduceMotion) null else Motion.layout.animation(visibilityThreshold = IntOffset.VisibilityThreshold)
+    LazyColumn(
+        state = listState,
+        reverseLayout = true,
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(start = pad, end = pad, top = pad)
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                val fadeTop = listState.canScrollForward
+                val fadeBottom = listState.canScrollBackward
+                if (!fadeTop && !fadeBottom) return@drawWithContent
+                val stop = min(fade.toPx() / size.height, 0.5f)
+                drawRect(
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = if (fadeTop) 0f else 1f),
+                        stop to Color.Black,
+                        1f - stop to Color.Black,
+                        1f to Color.Black.copy(alpha = if (fadeBottom) 0f else 1f),
+                    ),
+                    blendMode = BlendMode.DstIn,
+                )
             },
     ) {
-        val hi = frame.highlight
-        if (hi != null && hi.alpha > 0.002) {
-            val hiRect = AutocompleteSimulation.snapRectEdges(hi.rect, scale)
-            if (hiRect.width > 0.5 && hiRect.height > 0.5) {
-                Box(
-                    Modifier
-                        .offset(hiRect.minX.dp, hiRect.minY.dp)
-                        .requiredSize(hiRect.width.dp, hiRect.height.dp)
-                        .alpha(hi.alpha.toFloat())
-                        .background(
-                            if (isDark) Color.White.copy(alpha = 0.11f) else Color.Black.copy(alpha = 0.07f),
-                            RoundedCornerShape(hi.cornerRadius.dp),
-                        )
-                        .clearAndSetSemantics {},
-                )
-            }
-        }
-        // Leaving rows draw beneath entering ones.
-        val ordered = frame.rows.filter { it.isLeaving } + frame.rows.filter { !it.isLeaving }
-        for (row in ordered) {
-            if (row.alpha > 0.002 && row.rect.width > 0.2 && row.rect.height > 0.2) {
-                key(row.id) {
-                    AutocompleteRowSlot(row, params, scale, isDark) { currentOnSelect(row.id) }
-                }
-            }
+        items(rows, key = { it.id }) { item ->
+            AutocompleteRow(
+                item = item,
+                isHighlighted = item.id == state.selectedRowID,
+                isActive = isActive,
+                isDark = isDark,
+                reduceMotion = reduceMotion,
+                onSelect = { onSelectRow(item.id) },
+                modifier = Modifier.animateItem(
+                    fadeInSpec = Motion.microIn.animation(MotionPhase.Enter, reduceMotion),
+                    placementSpec = placementSpec,
+                    fadeOutSpec = Motion.microOut.animation(MotionPhase.Exit, reduceMotion),
+                ),
+            )
         }
     }
 }
 
+/** Scrolls the least that brings the row at [index] fully into view. */
+private suspend fun revealRow(listState: LazyListState, index: Int) {
+    if (index < 0) return
+    val info = listState.layoutInfo
+    val row = info.visibleItemsInfo.firstOrNull { it.index == index }
+    if (row == null) {
+        listState.scrollToItem(index)
+        return
+    }
+    val viewportEnd = info.viewportEndOffset - info.afterContentPadding
+    if (row.offset < info.viewportStartOffset) {
+        listState.scrollBy((row.offset - info.viewportStartOffset).toFloat())
+    } else if (row.offset + row.size > viewportEnd) {
+        listState.scrollBy((row.offset + row.size - viewportEnd).toFloat())
+    }
+}
+
 @Composable
-private fun AutocompleteRowSlot(
-    row: AutocompleteSimulation.DrawnRow,
-    params: AutocompleteParameters,
-    scale: Double,
+private fun AutocompleteRow(
+    item: AutocompleteItem,
+    isHighlighted: Boolean,
+    isActive: Boolean,
     isDark: Boolean,
+    reduceMotion: Boolean,
     onSelect: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val slotRect = AutocompleteSimulation.snapRectEdges(row.rect, scale)
-    val fullWidth = max(1.0, AutocompleteSimulation.snapEdge(row.fullSize.width, scale))
-    val fullHeight = max(1.0, AutocompleteSimulation.snapEdge(row.fullSize.height, scale))
-    val innerOffsetX = AutocompleteSimulation.snapEdge((slotRect.width - fullWidth) / 2, scale)
-    val innerOffsetY = AutocompleteSimulation.snapEdge((slotRect.height - fullHeight) / 2, scale)
-    val activatable = row.item.isSelectable && !row.isLeaving
-    val label = row.item.accessibilityLabel
+    val highlight = if (isDark) Color.White.copy(alpha = 0.11f) else Color.Black.copy(alpha = 0.07f)
+    val background by animateColorAsState(
+        if (isHighlighted) highlight else highlight.copy(alpha = 0f),
+        Motion.swap.animation(MotionPhase.Enter, reduceMotion),
+        label = "autocompleteHighlight",
+    )
+    val activatable = item.isSelectable && isActive
+    val label = item.accessibilityLabel
     Box(
-        Modifier
-            .offset(slotRect.minX.dp, slotRect.minY.dp)
-            .requiredSize(slotRect.width.dp, slotRect.height.dp)
-            .clip(RoundedCornerShape(row.cornerRadius.dp))
-            .then(if (row.blur > 0.01) Modifier.transitionBlur(row.blur.dp) else Modifier)
-            .alpha(row.alpha.toFloat())
+        modifier
+            .fillMaxWidth()
+            .height(ComposerAutocompleteTunables.rowHeight.dp)
+            .background(background)
             .clearAndSetSemantics {
                 contentDescription = label
                 if (activatable) {
                     role = Role.Button
-                    selected = row.isHighlighted
+                    selected = isHighlighted
                     onClick { onSelect(); true }
                 }
             }
-            .testTag("autocomplete-row-${row.id}"),
-        contentAlignment = Alignment.TopStart,
+            .clickable(enabled = activatable, interactionSource = null, indication = null, onClick = onSelect)
+            .testTag("autocomplete-row-${item.id}"),
     ) {
-        Box(
-            Modifier
-                .offset(innerOffsetX.dp, innerOffsetY.dp)
-                .requiredSize(fullWidth.dp, fullHeight.dp)
-                .graphicsLayer {
-                    scaleX = row.scale.toFloat()
-                    scaleY = row.scale.toFloat()
-                },
-        ) {
-            AutocompleteRowContent(row.item, params, isDark)
-        }
+        AutocompleteRowContent(item, isDark)
     }
 }
 
 @Composable
-private fun AutocompleteRowContent(item: AutocompleteItem, params: AutocompleteParameters, isDark: Boolean) {
+private fun AutocompleteRowContent(item: AutocompleteItem, isDark: Boolean) {
     val colors = OpenCodeTheme.colors
     val isMuted = item.kind == AutocompleteItem.Kind.Empty
     val iconColor = when {
@@ -566,10 +570,10 @@ private fun AutocompleteRowContent(item: AutocompleteItem, params: AutocompleteP
     }
     val kindColor = if (isDark) rgb(139, 139, 144) else colors.secondaryText
     Row(
-        Modifier.fillMaxSize().padding(horizontal = params.rowInset.dp),
+        Modifier.fillMaxSize().padding(horizontal = ComposerAutocompleteTunables.rowInset.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AutocompleteKindIcon(item.kind, params.iconSize, iconColor)
+        AutocompleteKindIcon(item.kind, ComposerAutocompleteTunables.iconSize, iconColor)
         Spacer(Modifier.width(10.dp))
         // Offers the room to the least flexible text first, an equal share each, so a short command
         // name stays whole and a long description truncates.
@@ -640,89 +644,6 @@ private fun TitleAndLabel(
         layout(width, height) {
             tp.place(0, (height - tp.height) / 2)
             lp.place(width - lp.width, (height - lp.height) / 2)
-        }
-    }
-}
-
-// MARK: - Chip flight
-
-/**
- * Renders in-flight chips lifting off from the chosen highlight row and landing on their inline
- * chip slot in the composer. Solid opaque throughout. Flight rects are composer-local dp (rows sit
- * above, at negative y); the overlay shifts them by where the composer
- * ([AutocompleteMotionController.composerAnchor]) sits inside it, so it can be mounted over the
- * whole surface (the rows included). Never clips; not hit-testable.
- */
-@Composable
-fun AutocompleteFlightOverlay(controller: AutocompleteMotionController, modifier: Modifier = Modifier) {
-    val density = LocalDensity.current
-    val scale = max(density.density.toDouble(), 1.0)
-    val frame = controller.currentFrame
-    val params = controller.simulation.params
-    var origin by remember { mutableStateOf(Offset.Zero) }
-    if (frame.flights.isEmpty()) return
-    Box(
-        modifier
-            .fillMaxSize()
-            .onGloballyPositioned { overlay ->
-                val composer = controller.composerAnchor?.invoke()
-                origin = if (composer != null && overlay.isAttached) overlay.localPositionOf(composer, Offset.Zero) else Offset.Zero
-            }
-            .graphicsLayer { translationX = origin.x; translationY = origin.y }
-            .clearAndSetSemantics {},
-    ) {
-        for (flight in frame.flights) {
-            key(flight.id) { AutocompleteFlightView(flight, params, scale) }
-        }
-    }
-}
-
-@Composable
-private fun AutocompleteFlightView(flight: AutocompleteSimulation.ChipFlight, params: AutocompleteParameters, scale: Double) {
-    val colors = OpenCodeTheme.colors
-    val isDark = colors.isDark
-    val rect = flight.rect(scale)
-    val t = flight.smoothProgress
-    val inset = params.rowInset + (AutocompleteChipMetrics.leadingPad - params.rowInset) * t
-    val iconSize = params.iconSize + (AutocompleteChipMetrics.iconSize - params.iconSize) * t
-    val gap = 10 + (AutocompleteChipMetrics.gap - 10) * t
-    // Body (17) to the chip's 15; sp scales with the font size setting.
-    val fontSize = 17 + (AutocompleteChipMetrics.fontSize - 17) * t
-    val hiTone = if (isDark) AutocompleteChipMetrics.highlightToneDark else AutocompleteChipMetrics.highlightToneLight
-    val chipTone = if (isDark) AutocompleteChipMetrics.chipToneDark else AutocompleteChipMetrics.chipToneLight
-    val fill = tone(hiTone + (chipTone - hiTone) * t)
-    val iconColor = if (isDark) rgb(212, 212, 216) else colors.text.copy(alpha = colors.text.alpha * 0.8f)
-    val textColor = if (isDark) rgb(242, 242, 244) else colors.text
-    val kindColor = if (isDark) rgb(139, 139, 144) else colors.secondaryText
-    Row(
-        Modifier
-            .offset { IntOffset((rect.minX * density).roundToInt(), (rect.minY * density).roundToInt()) }
-            .requiredSize(max(0.0, rect.width).dp, max(0.0, rect.height).dp)
-            .clip(RoundedCornerShape(flight.currentRadius.dp))
-            .background(fill)
-            .padding(start = inset.dp, end = AutocompleteChipMetrics.trailingPad.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        AutocompleteKindIcon(flight.item.kind, iconSize, iconColor)
-        Spacer(Modifier.width(gap.dp))
-        Text(
-            flight.item.title,
-            style = TextStyle(fontSize = fontSize.sp, fontWeight = FontWeight.Medium),
-            color = textColor,
-            maxLines = 1,
-            softWrap = false,
-        )
-        Spacer(Modifier.weight(1f))
-        if (flight.item.label.isNotEmpty() && flight.kindAlpha > 0.01) {
-            Spacer(Modifier.width(gap.dp))
-            Text(
-                flight.item.label,
-                modifier = Modifier.alpha(flight.kindAlpha.toFloat()),
-                style = OpenCodeTextStyles.subheadline,
-                color = kindColor,
-                maxLines = 1,
-                softWrap = false,
-            )
         }
     }
 }
@@ -842,7 +763,6 @@ class ComposerAutocompleteTextBridge {
     var activeTrigger: AutocompleteTrigger? by mutableStateOf(null)
     var chips: List<ComposerAutocompleteChip> by mutableStateOf(emptyList())
     var caretUTF16Offset: Int? = null
-    var motionController: AutocompleteMotionController? = null
 
     var onMoveHighlight: ((Int) -> Unit)? = null
     var onConfirmSelection: (() -> Unit)? = null
@@ -867,9 +787,6 @@ class ComposerAutocompleteTextBridge {
     /** The inner text field's coordinates ([autocompleteTextAnchor]). */
     var textCoordinates: LayoutCoordinates? by mutableStateOf(null)
 
-    /** The composer's coordinates, the origin of flights ([autocompleteComposerAnchor]). */
-    var composerCoordinates: LayoutCoordinates? = null
-
     private var isUpdatingProgrammaticText = false
     private var lastSentCaretOffset: Int? = null
 
@@ -877,7 +794,6 @@ class ComposerAutocompleteTextBridge {
     fun configure(
         state: ComposerAutocompleteState,
         isEnabled: Boolean,
-        motionController: AutocompleteMotionController?,
         send: (ComposerAutocompleteAction) -> Unit,
     ) {
         this.isEnabled = isEnabled
@@ -886,7 +802,6 @@ class ComposerAutocompleteTextBridge {
         activeTrigger = state.activeTrigger
         chips = state.chips
         caretUTF16Offset = state.caretUTF16Offset
-        this.motionController = motionController
         onMoveHighlight = { send(ComposerAutocompleteAction.MoveHighlight(it)) }
         onConfirmSelection = { send(ComposerAutocompleteAction.ConfirmSelection) }
         onDismiss = { send(ComposerAutocompleteAction.Dismissed) }
@@ -1161,39 +1076,16 @@ class ComposerAutocompleteTextBridge {
         val height = (AutocompleteChipMetrics.scaledHeight(chipLineHeightDp) * density.density).toFloat()
         val y = midY - height / 2f
         val clampedX = min(max(0f, minX), max(0f, fieldWidth - width))
-        val scale = density.density.toDouble()
-        val snapped = AutocompleteSimulation.snapRectEdges(
-            AutocompleteRect(clampedX / scale, y / scale, width / scale, height / scale),
-            scale,
-        )
         return Rect(
-            (snapped.minX * scale).toFloat(),
-            (snapped.minY * scale).toFloat(),
-            (snapped.maxX * scale).toFloat(),
-            (snapped.maxY * scale).toFloat(),
+            clampedX.roundToInt().toFloat(),
+            y.roundToInt().toFloat(),
+            (clampedX + width).roundToInt().toFloat(),
+            (y + height).roundToInt().toFloat(),
         )
     }
 
     /** The chip font's line height in dp, measured by [rememberAutocompleteTextStyling]. */
     internal var chipLineHeightDp: Double = 18.0
-
-    /** The chip's slot in composer-local dp for the flight to land on. */
-    fun chipSlotInComposer(chipID: UUID, density: Density): AutocompleteRect? {
-        val layout = textLayout ?: return null
-        val text = textCoordinates?.takeIf { it.isAttached } ?: return null
-        val composer = composerCoordinates?.takeIf { it.isAttached } ?: return null
-        val run = styling?.chips?.firstOrNull { it.chip?.id == chipID } ?: return null
-        val local = chipRectPx(run, layout, density) ?: return null
-        if (local.isEmpty) return null
-        val origin = composer.localPositionOf(text, Offset.Zero)
-        val d = density.density.toDouble()
-        return AutocompleteRect(
-            (local.left + origin.x) / d,
-            (local.top + origin.y) / d,
-            local.width / d,
-            local.height / d,
-        )
-    }
 }
 
 private fun String.toNonBreaking(): String = buildString(length) {
@@ -1211,10 +1103,6 @@ private fun String.toNonBreaking(): String = buildString(length) {
 /** Records the inner text field's coordinates for chip slots (put it on the text field). */
 fun Modifier.autocompleteTextAnchor(bridge: ComposerAutocompleteTextBridge): Modifier =
     onGloballyPositioned { bridge.textCoordinates = it }
-
-/** Records the composer's coordinates, the origin of chip flights (put it on the composer surface). */
-fun Modifier.autocompleteComposerAnchor(bridge: ComposerAutocompleteTextBridge): Modifier =
-    onGloballyPositioned { bridge.composerCoordinates = it }
 
 /**
  * Measures and publishes the draft's styling to [bridge], so its
@@ -1252,7 +1140,7 @@ fun rememberAutocompleteTextStyling(
 
 /**
  * Draws the solid inline chips over their token ranges. Place it in the text field's decoration
- * box, over the inner text field, at its origin. A chip in flight stays hidden until it lands.
+ * box, over the inner text field, at its origin.
  */
 @Composable
 fun AutocompleteInlineChips(bridge: ComposerAutocompleteTextBridge, modifier: Modifier = Modifier) {
@@ -1260,66 +1148,32 @@ fun AutocompleteInlineChips(bridge: ComposerAutocompleteTextBridge, modifier: Mo
     val layout = bridge.textLayout ?: return
     if (!bridge.isEnabled || styling.chips.isEmpty() || layout.layoutInput.text.text != styling.visualText) return
     val density = LocalDensity.current
-    val controller = bridge.motionController
     Box(modifier) {
         for (run in styling.chips) {
             val chip = run.chip ?: continue
             val rect = bridge.chipRectPx(run, layout, density) ?: continue
             if (rect.isEmpty) continue
-            val inFlight = controller?.isChipHidden(chip.id) == true
             key(chip.id) {
                 AutocompleteChip(
                     chip = chip,
                     onActivate = { bridge.onDeleteChip?.invoke(it) },
                     modifier = Modifier
                         .offset { IntOffset(rect.left.roundToInt(), rect.top.roundToInt()) }
-                        .requiredSize(with(density) { rect.width.toDp() }, with(density) { rect.height.toDp() })
-                        .alpha(if (inFlight) 0f else 1f),
+                        .requiredSize(with(density) { rect.width.toDp() }, with(density) { rect.height.toDp() }),
                 )
             }
         }
     }
 }
 
-/**
- * The session view's `syncComposerAutocomplete(state:)`: wires [bridge] and the flight
- * landing slot, then mirrors [state] into [controller] whenever it or the composer's size
- * changes. [composerSize] is the composer's measured size in dp.
- */
+/** The session view's `syncComposerAutocomplete(state:)`: mirrors [state] into [bridge] and routes its callbacks to [send]. */
 @Composable
 fun SyncComposerAutocomplete(
     state: ComposerAutocompleteState,
     isEnabled: Boolean,
-    controller: AutocompleteMotionController,
     bridge: ComposerAutocompleteTextBridge,
-    composerSize: () -> Size,
-    reducedMotion: Boolean,
     send: (ComposerAutocompleteAction) -> Unit,
 ) {
-    // The size is read here, not by the caller: it changes on every frame the composer grows (the
-    // keyboard's morph), and only this small scope should recompose for it.
-    val size = composerSize()
-    val composerWidth = size.width.toDouble()
-    val composerHeight = size.height.toDouble()
-    val density = LocalDensity.current
     val currentSend by rememberUpdatedState(send)
-    val last = remember { arrayOfNulls<Any>(1) }
-    SideEffect {
-        bridge.configure(state, isEnabled, controller) { currentSend(it) }
-        controller.chipSlotProvider = { id -> bridge.chipSlotInComposer(id, density) }
-        controller.composerAnchor = { bridge.composerCoordinates?.takeIf { it.isAttached } }
-        val inputs = listOf(state, isEnabled, composerWidth, composerHeight, density, reducedMotion)
-        if (last[0] == inputs) return@SideEffect
-        val wasEnabled = (last[0] as? List<*>)?.get(1) as? Boolean
-        last[0] = inputs
-        if (wasEnabled == true && !isEnabled) controller.reset()
-        if (!isEnabled) return@SideEffect
-        controller.sync(
-            state = state,
-            composerWidth = if (composerWidth > 40) composerWidth else 350.0,
-            composerHeight = if (composerHeight > 20) composerHeight else 52.0,
-            displayScale = max(density.density.toDouble(), 1.0),
-            reducedMotion = reducedMotion,
-        )
-    }
+    SideEffect { bridge.configure(state, isEnabled) { currentSend(it) } }
 }

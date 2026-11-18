@@ -13,10 +13,8 @@ object AutocompleteChipMetrics {
     const val trailingPad: Double = 8.0
     const val cornerRadius: Double = 7.0
     const val fontSize: Double = 15.0
-    /** Solid opaque dark tone `rgb(56, 56, 59)` and highlight start tone `rgb(48, 48, 51)`. */
-    const val highlightToneDark: Double = 48.0
+    /** Solid opaque dark tone `rgb(56, 56, 59)`. */
     const val chipToneDark: Double = 56.0
-    const val highlightToneLight: Double = 232.0
     const val chipToneLight: Double = 224.0
 
     /**

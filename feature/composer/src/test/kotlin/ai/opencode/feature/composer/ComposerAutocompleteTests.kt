@@ -31,8 +31,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.util.UUID
-import kotlin.math.abs
-import kotlin.math.max
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -58,19 +56,6 @@ class ComposerAutocompleteTests {
         this[UuidClient] = UuidClient.incrementing()
         this[Clock] = clock
         this[OpenCodeClient] = OpenCodeClient.testValue.client()
-    }
-
-    private fun syncMention(simulation: AutocompleteSimulation, query: String = "", items: List<AutocompleteItem>, width: Double) {
-        simulation.sync(
-            isOpen = true,
-            mode = AutocompleteTrigger.Mode.Mention,
-            query = query,
-            key = "at:0",
-            items = items,
-            selectedRowID = items.firstOrNull()?.id,
-            userMoved = false,
-            composerWidth = width,
-        )
     }
 
     @Test fun triggerDetectionMatchesWordStartForAtAndMessageStartForSlash() {
@@ -494,71 +479,6 @@ class ComposerAutocompleteTests {
         assertEquals(listOf(targetChip.id), deletedChipIDs)
     }
 
-    @Test fun simulationGrowsGlassSmoothlyCollapsesSlotsWithoutOverlapAndRespectsEdgeFades() {
-        val simulation = AutocompleteSimulation(AutocompleteParameters())
-        val items = listOf(
-            AutocompleteItem.skill(sampleSkills[0]), AutocompleteItem.skill(sampleSkills[1]), AutocompleteItem.skill(sampleSkills[2]),
-            AutocompleteItem.file(sampleFiles[0]), AutocompleteItem.file(sampleFiles[1]), AutocompleteItem.agent(sampleAgents[0]),
-        )
-
-        val width = 360.0
-        syncMention(simulation, items = items, width = width)
-
-        val dt = 1.0 / 120.0
-        var previousLift = simulation.frame(composerWidth = width).glassLift
-        assertEquals("Glass starts from rest with no initial jump", 0.0, previousLift, 0.0)
-        var maxSyncJump = 0.0
-        var maxPostPeakRise = 0.0
-        var previousStep = 0.0
-        var passedOpeningPeak = false
-        for (stepIndex in 0 until 100) {
-            simulation.step(dt = dt, composerWidth = width)
-            val currentFrame = simulation.frame(composerWidth = width)
-            val signedStep = currentFrame.glassLift - previousLift
-            if (stepIndex < 24) {
-                if (signedStep < previousStep - 0.05) {
-                    passedOpeningPeak = true
-                } else if (passedOpeningPeak && signedStep > previousStep) {
-                    maxPostPeakRise = max(maxPostPeakRise, signedStep - previousStep)
-                }
-                previousStep = signedStep
-            }
-            previousLift = currentFrame.glassLift
-
-            // Narrow the filter mid-flight and verify leaving rows collapse in their own slot without overlap or a glass jump.
-            if (stepIndex == 24) {
-                val liftBeforeSync = simulation.frame(composerWidth = width).glassLift
-                syncMention(simulation, query = "kit", items = listOf(items[0], items[3]), width = width)
-                val liftAfterSync = simulation.frame(composerWidth = width).glassLift
-                maxSyncJump = max(maxSyncJump, abs(liftAfterSync - liftBeforeSync))
-            }
-
-            val sortedRows = currentFrame.rows.sortedBy { it.rect.minY }
-            for (idx in 1 until sortedRows.size) {
-                assertTrue(
-                    "Rows never overlap vertically during slot collapse",
-                    sortedRows[idx].rect.minY >= sortedRows[idx - 1].rect.maxY - 0.5,
-                )
-            }
-        }
-
-        assertTrue("Glass lift never jumps on state sync: $maxSyncJump", maxSyncJump < 1.5)
-        assertTrue("Glass lift grows smoothly with no jump above 1.5 pt: $maxPostPeakRise", maxPostPeakRise < 1.5)
-        val settledTwoRowFrame = simulation.frame(composerWidth = width)
-        // 2 rows * 40 pt + 12 pt padding = 92 pt restingLift.
-        assertTrue(abs(settledTwoRowFrame.glassLift - 92) < 1.5)
-        assertEquals(0.0, settledTwoRowFrame.edgeFade.topHidden, 0.0)
-        assertEquals(0.0, settledTwoRowFrame.edgeFade.bottomHidden, 0.0)
-        assertEquals(16.0, settledTwoRowFrame.highlight?.cornerRadius)
-
-        // With 6 rows past maxRows, overflow enables the top edge fade in bottom order.
-        val overflowSim = AutocompleteSimulation(AutocompleteParameters())
-        syncMention(overflowSim, items = items, width = width)
-        repeat(90) { overflowSim.step(dt = dt, composerWidth = width) }
-        val overflowFrame = overflowSim.frame(composerWidth = width)
-        assertTrue("Top edge fade activates when rows extend past the top of the viewport", overflowFrame.edgeFade.topHidden > 0)
-    }
-
     /** The reducer half (see the class note). */
     @Test fun midDraftChipInsertAndChipDeletePreserveCaretOffset() = runTest {
         val store = makeStore(
@@ -604,98 +524,5 @@ class ComposerAutocompleteTests {
             }
         }
         store.finish()
-    }
-
-    @Test fun growAndCollapseAnimationSnapsBothEdgesKeepingAnchoredEdgesPixelStable() {
-        val items = listOf(
-            AutocompleteItem.skill(sampleSkills[0]), AutocompleteItem.skill(sampleSkills[1]),
-            AutocompleteItem.skill(sampleSkills[2]), AutocompleteItem.file(sampleFiles[0]),
-        )
-        val dt = 1.0 / 120.0
-        val width = 359.3333333
-
-        for (scale in listOf(2.0, 3.0)) {
-            for (composerHeight in listOf(52.0, 52.1666667, 52.5, 53.25)) {
-                val simulation = AutocompleteSimulation(AutocompleteParameters())
-                syncMention(simulation, items = items, width = width)
-
-                val expectedGlassBottom = AutocompleteSimulation.snapEdge(composerHeight, scale)
-                val expectedRow0Height = AutocompleteSimulation.snapEdge(simulation.params.rowHeight, scale)
-                val eps = 1e-5
-
-                for (stepIndex in 0 until 180) {
-                    simulation.step(dt = dt, composerWidth = width)
-
-                    // Narrow at frame 30 (while still mid-open) and widen again at frame 75, then close at frame 120.
-                    when (stepIndex) {
-                        30 -> syncMention(simulation, query = "kit", items = listOf(items[0]), width = width)
-                        75 -> syncMention(simulation, items = listOf(items[0], items[1], items[2]), width = width)
-                        120 -> simulation.sync(
-                            isOpen = false, mode = null, query = "", key = null,
-                            items = emptyList(), selectedRowID = null, userMoved = false, composerWidth = width,
-                        )
-                    }
-
-                    val frame = simulation.frame(composerWidth = width, composerHeight = composerHeight, displayScale = scale)
-                    val where = "scale $scale, composerHeight $composerHeight, step $stepIndex"
-
-                    // 1. Composer glass: both top and height lie on the pixel grid, and the anchored
-                    //    bottom edge never moves from `expectedGlassBottom`.
-                    val snappedGlassTop = AutocompleteSimulation.snapEdge(frame.glassRect.minY, scale)
-                    val snappedGlassHeight = AutocompleteSimulation.snapEdge(frame.glassRect.height, scale)
-                    assertTrue(where, abs(frame.glassRect.minY - snappedGlassTop) < eps)
-                    assertTrue(where, abs(frame.glassRect.height - snappedGlassHeight) < eps)
-                    assertTrue(
-                        "Glass anchored bottom edge must never flicker at $where",
-                        abs((snappedGlassTop + snappedGlassHeight) - expectedGlassBottom) < eps,
-                    )
-                    assertTrue(where, abs(frame.glassRect.maxY - expectedGlassBottom) < eps)
-
-                    // 2. List window: anchored at the composer bar's top (`y = 0`), growing upward to `-listHeight`.
-                    val snappedListTop = AutocompleteSimulation.snapEdge(-frame.listHeight, scale)
-                    val snappedListHeight = AutocompleteSimulation.snapEdge(frame.listHeight, scale)
-                    assertTrue(where, abs(snappedListTop + snappedListHeight) < eps)
-
-                    // 3. Suggestion rows: in bottom order, row 0 sits on the anchored bottom of the list
-                    //    window, and each row above it has its bottom edge on the top edge of the row below.
-                    if (frame.rows.isEmpty()) continue
-                    for (row in frame.rows) {
-                        val rTop = AutocompleteSimulation.snapEdge(row.rect.minY, scale)
-                        val rHeight = AutocompleteSimulation.snapEdge(row.rect.height, scale)
-                        val rBottom = AutocompleteSimulation.snapEdge(row.rect.maxY, scale)
-                        assertTrue(where, abs(row.rect.minY - rTop) < eps)
-                        assertTrue(where, abs(row.rect.height - rHeight) < eps)
-                        assertTrue(where, abs((rTop + rHeight) - rBottom) < eps)
-                    }
-
-                    frame.rows.firstOrNull { it.id == items[0].id }?.let { row0 ->
-                        val row0TopInComposer = AutocompleteSimulation.snapEdge(row0.rect.minY - frame.listHeight, scale)
-                        val row0Height = AutocompleteSimulation.snapEdge(row0.rect.height, scale)
-                        assertTrue(
-                            "Bottom-anchored row 0 bottom edge in composer space must never flicker at $where",
-                            abs(row0TopInComposer + row0Height) < eps,
-                        )
-                    }
-
-                    frame.rows.firstOrNull { it.id == items[1].id && it.rect.height > 0 }?.let { row1 ->
-                        val row1TopInComposer = AutocompleteSimulation.snapEdge(row1.rect.minY - frame.listHeight, scale)
-                        val row1Height = AutocompleteSimulation.snapEdge(row1.rect.height, scale)
-                        val expectedRow1BottomInComposer = -expectedRow0Height
-                        assertTrue(
-                            "Row 1 bottom edge anchored on top of settled row 0 must never flicker while its slot grows/collapses at $where",
-                            abs((row1TopInComposer + row1Height) - expectedRow1BottomInComposer) < eps,
-                        )
-                    }
-
-                    val sortedRows = frame.rows.filter { it.rect.height > 0 }.sortedBy { it.rect.minY }
-                    for (idx in 1 until sortedRows.size) {
-                        assertTrue(
-                            "Adjacent rows share the exact pixel-snapped edge with no 1px gap or overlap at $where",
-                            abs(sortedRows[idx].rect.minY - sortedRows[idx - 1].rect.maxY) < eps,
-                        )
-                    }
-                }
-            }
-        }
     }
 }
