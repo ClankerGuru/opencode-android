@@ -510,7 +510,6 @@ fun DrawerListView(
                         returnFocus = returnFocus.takeIf { item == DrawerListItem.CatchUp },
                     )
                     DrawerListItem.Archived -> ArchivedEntryRow(current.archivedCount, regularList = true, onClick = { currentActions.openArchived() })
-                    DrawerListItem.DeletionError -> DrawerListDeletionErrorRow(current.deletionError.orEmpty())
                     is DrawerListItem.Header -> DrawerListHeaderCell(item.kind, pinDrag)
                     DrawerListItem.Empty -> DrawerListEmptyRow(current.search)
                     DrawerListItem.Footer -> DrawerListFooterRow(
@@ -653,7 +652,6 @@ private fun stabilized(previous: DrawerListModel, next: DrawerListModel): Drawer
 
 private fun contentType(item: DrawerListItem): Int = when (item) {
     DrawerListItem.CatchUp, DrawerListItem.WhatsNew, DrawerListItem.Archived -> 0
-    DrawerListItem.DeletionError -> 1
     is DrawerListItem.Header -> 2
     is DrawerListItem.Session -> 3
     DrawerListItem.Empty -> 4

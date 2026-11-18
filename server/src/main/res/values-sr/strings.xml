@@ -64,6 +64,7 @@
     <string name="server_error_unreachable">Није могуће приступити OpenCode серверу</string>
     <string name="server_error_folder_gone">Фасцикла више не постоји</string>
     <string name="server_error_uploads_unsupported">Овај сервер не подржава прилагање датотека. Ажурирајте OpenCode на рачунару.</string>
+    <string name="server_error_archiving_unsupported">Овај сервер не подржава архивирање. Ажурирајте OpenCode на свом рачунару.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode нема дозволу за приступ уређајима на локалној мрежи. У подешавањима укључите дозволу „Уређаји у близини“ за OpenCode, па покушајте поново.</string>

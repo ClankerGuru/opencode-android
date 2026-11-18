@@ -44,7 +44,7 @@ class InboxSidebarFeature : Reducer<InboxSidebarFeature.State, InboxSidebarFeatu
          * desktop comes back).
          */
         val archivedIDs: Set<String> = emptySet(),
-        val archiveError: String? = null,
+        val archiveError: DrawerFailure? = null,
         /** The server's archived sessions, newest first (the Archived page). */
         val archived: List<OpenCodeSession> = emptyList(),
         /** The Archived page's search, and the server's matches once they land (null while it's empty). */
@@ -112,7 +112,7 @@ class InboxSidebarFeature : Reducer<InboxSidebarFeature.State, InboxSidebarFeatu
                 Reduced(next)
             } else {
                 AppLog.network.notice { "Archive failed: ${error.logSummary}" }
-                failed(next, localized(R.string.drawer_archive_error, action.title, error.message))
+                failed(next, DrawerFailure(DrawerFailure.Action.archive, action.title, error.message))
             }
         }
 
@@ -205,19 +205,19 @@ class InboxSidebarFeature : Reducer<InboxSidebarFeature.State, InboxSidebarFeatu
                 )
             } else {
                 AppLog.network.notice { "Unarchive failed: ${error.logSummary}" }
-                failed(state.copy(status = status), localized(R.string.drawer_unarchive_error, action.title, error.message))
+                failed(state.copy(status = status), DrawerFailure(DrawerFailure.Action.unarchive, action.title, error.message))
             }
         }
     }
 
-    /** Shows [message] over the list for a few seconds. */
-    private fun failed(state: State, message: String): Reduced<State, Action> {
+    /** Shows [failure] above New Session for a few seconds. */
+    private fun failed(state: State, failure: DrawerFailure): Reduced<State, Action> {
         dependency(HapticsClient).play(Haptic.error)
         val clock = dependency(Clock)
         return Reduced(
-            state.copy(status = state.status.copy(archiveError = message)),
+            state.copy(status = state.status.copy(archiveError = failure.joining(state.status.archiveError))),
             Effect.run<Action> { send ->
-                clock.sleep(3.seconds)
+                clock.sleep(5.seconds)
                 send(Action.ArchiveErrorCleared)
             }.cancellable(CancelID.ArchiveError, cancelInFlight = true),
         )

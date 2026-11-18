@@ -232,14 +232,36 @@ class InboxSidebarTests {
             it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedIDs = setOf("working")))
         }
         store.receiveArchiveResponse {
-            it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedIDs = emptySet(), archiveError = "Couldn’t archive “Working title”. Offline"))
+            it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(archivedIDs = emptySet(), archiveError = DrawerFailure(DrawerFailure.Action.archive, "Working title", "Offline")))
         }
         assertTrue(store.state.inboxSidebarRows().any { it.id == "working" })
-        clock.advance(3.seconds)
+        clock.advance(5.seconds)
         store.receiveBounded(
             { ((it as? Action.InboxSidebar)?.action) == InboxSidebarFeature.Action.ArchiveErrorCleared },
             "inboxSidebar.archiveErrorCleared",
         ) { it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(archiveError = null)) }
+    }
+
+    @Test
+    fun archivesThatFailTogetherShareOneError() = homeTest { h ->
+        val gate = Gate()
+        val store = h.store(h.state { state() }) {
+            this[Clock] = TestClock()
+            this[OpenCodeClient] = OpenCodeClient.testValue.copy(
+                archiveSession = { _, _ ->
+                    gate.await()
+                    throw OpenCodeClientError("Offline")
+                },
+            )
+        }
+        store.exhaustive = false
+        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveTapped(sessionID = "working", title = "Working title")))
+        store.send(Action.InboxSidebar(InboxSidebarFeature.Action.ArchiveTapped(sessionID = "read_old", title = "read_old")))
+        gate.finish()
+        store.receiveArchiveResponse()
+        store.receiveArchiveResponse()
+        assertEquals("Couldn’t archive 2 sessions", store.state.inboxSidebarStatus.archiveError?.title)
+        store.skipInFlightEffects()
     }
 
     @Test
@@ -355,9 +377,9 @@ class InboxSidebarTests {
         store.receiveBounded(
             { ((it as? Action.InboxSidebar)?.action) is InboxSidebarFeature.Action.UnarchiveResponse },
             "inboxSidebar.unarchiveResponse",
-        ) { it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(unarchivingIDs = emptySet(), archiveError = "Couldn’t unarchive “Old title”. Offline")) }
+        ) { it.copy(inboxSidebarStatus = it.inboxSidebarStatus.copy(unarchivingIDs = emptySet(), archiveError = DrawerFailure(DrawerFailure.Action.unarchive, "Old title", "Offline"))) }
         assertEquals(listOf("old_archive"), store.state.inboxSidebarArchivedRows().map { it.id })
-        clock.advance(3.seconds)
+        clock.advance(5.seconds)
         store.receiveBounded(
             { ((it as? Action.InboxSidebar)?.action) == InboxSidebarFeature.Action.ArchiveErrorCleared },
             "inboxSidebar.archiveErrorCleared",

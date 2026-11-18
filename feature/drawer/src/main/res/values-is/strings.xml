@@ -128,9 +128,21 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Ekki tókst að biðja um leyfi. Reyndu aftur.</string>
     <string name="drawer_notifications_open_settings_error">Ekki tókst að opna stillingar. Opnaðu stillingar Android og veldu Tilkynningar → OpenCode.</string>
-    <string name="drawer_delete_session_error">Ekki tókst að eyða „%1$s“. %2$s</string>
-    <string name="drawer_archive_error">Ekki tókst að setja „%1$s“ í skjalasafn. %2$s</string>
-    <string name="drawer_unarchive_error">Ekki tókst að taka „%1$s“ úr skjalasafni. %2$s</string>
+    <string name="drawer_delete_session_error">Ekki tókst að eyða „%1$s“</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">Ekki tókst að eyða %1$d setu</item>
+        <item quantity="other">Ekki tókst að eyða %1$d setum</item>
+    </plurals>
+    <string name="drawer_archive_error">Ekki tókst að setja „%1$s“ í skjalasafn</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">Ekki tókst að setja %1$d setu í skjalasafn</item>
+        <item quantity="other">Ekki tókst að setja %1$d setur í skjalasafn</item>
+    </plurals>
+    <string name="drawer_unarchive_error">Ekki tókst að taka „%1$s“ úr skjalasafni</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">Ekki tókst að taka %1$d setu úr skjalasafni</item>
+        <item quantity="other">Ekki tókst að taka %1$d setur úr skjalasafni</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Ný seta</string>

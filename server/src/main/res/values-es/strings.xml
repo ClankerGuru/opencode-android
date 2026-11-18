@@ -64,6 +64,7 @@
     <string name="server_error_unreachable">No se pudo conectar con el servidor de OpenCode</string>
     <string name="server_error_folder_gone">La carpeta ya no existe</string>
     <string name="server_error_uploads_unsupported">Este servidor no admite archivos adjuntos. Actualiza OpenCode en tu ordenador.</string>
+    <string name="server_error_archiving_unsupported">Este servidor no permite archivar. Actualiza OpenCode en tu equipo.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode no tiene permiso para acceder a dispositivos de tu red local. Activa Dispositivos cercanos para OpenCode en Ajustes y vuelve a intentarlo.</string>

@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">Fekk ikki samband við OpenCode-ambætaran</string>
     <string name="server_error_folder_gone">Mappan er burtur</string>
     <string name="server_error_uploads_unsupported">Hesin ambætarin stuðlar ikki viðheftum fílum. Dagfør OpenCode á telduni.</string>
+    <string name="server_error_archiving_unsupported">Hesin ambætarin stuðlar ikki arkivering. Dagfør OpenCode á telduni.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode hevur ikki loyvi at fáa samband við eindir á tínum lokalneti. Slá Eindir í nánd til fyri OpenCode í Innstillingum og royn aftur.</string>

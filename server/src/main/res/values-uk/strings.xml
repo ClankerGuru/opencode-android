@@ -70,6 +70,7 @@
     <string name="server_error_unreachable">Не вдалося з’єднатися із сервером OpenCode</string>
     <string name="server_error_folder_gone">Папки більше немає</string>
     <string name="server_error_uploads_unsupported">Цей сервер не підтримує вкладення файлів. Оновіть OpenCode на комп’ютері.</string>
+    <string name="server_error_archiving_unsupported">Цей сервер не підтримує архівування. Оновіть OpenCode на комп’ютері.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode не має дозволу на доступ до пристроїв у локальній мережі. У налаштуваннях увімкніть для OpenCode дозвіл «Пристрої поблизу» й повторіть спробу.</string>

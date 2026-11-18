@@ -408,22 +408,3 @@ fun DrawerListFooterRow(footer: DrawerListFooter, retry: () -> Unit, modifier: M
         }
     }
 }
-
-/** A deletion that failed, above the sections. */
-@Composable
-fun DrawerListDeletionErrorRow(message: String, modifier: Modifier = Modifier) {
-    val red = OpenCodeTheme.colors.destructive
-    Row(
-        modifier
-            .fillMaxWidth()
-            .padding(horizontal = DrawerMetrics.rowEdge)
-            .heightIn(min = 44.dp)
-            .padding(start = DrawerMetrics.textInset)
-            .testTag("drawer-deletion-error"),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        OpenCodeIcon(SFSymbol.ExclamationmarkTriangle, contentDescription = null, tint = red)
-        Text(message, style = OpenCodeTextStyles.footnote, color = red)
-    }
-}

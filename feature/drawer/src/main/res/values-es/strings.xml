@@ -132,9 +132,24 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">No se pudo solicitar el permiso. Vuelve a intentarlo.</string>
     <string name="drawer_notifications_open_settings_error">No se pudieron abrir los ajustes. Abre los ajustes de Android y elige Notificaciones → OpenCode.</string>
-    <string name="drawer_delete_session_error">No se pudo eliminar «%1$s». %2$s</string>
-    <string name="drawer_archive_error">No se pudo archivar «%1$s». %2$s</string>
-    <string name="drawer_unarchive_error">No se pudo desarchivar «%1$s». %2$s</string>
+    <string name="drawer_delete_session_error">No se pudo eliminar «%1$s»</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">No se pudo eliminar %1$d sesión</item>
+        <item quantity="many">No se pudieron eliminar %1$d sesiones</item>
+        <item quantity="other">No se pudieron eliminar %1$d sesiones</item>
+    </plurals>
+    <string name="drawer_archive_error">No se pudo archivar «%1$s»</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">No se pudo archivar %1$d sesión</item>
+        <item quantity="many">No se pudieron archivar %1$d sesiones</item>
+        <item quantity="other">No se pudieron archivar %1$d sesiones</item>
+    </plurals>
+    <string name="drawer_unarchive_error">No se pudo desarchivar «%1$s»</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">No se pudo desarchivar %1$d sesión</item>
+        <item quantity="many">No se pudieron desarchivar %1$d sesiones</item>
+        <item quantity="other">No se pudieron desarchivar %1$d sesiones</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Nueva sesión</string>

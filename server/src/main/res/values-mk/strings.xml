@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">Не може да се пристапи до серверот OpenCode</string>
     <string name="server_error_folder_gone">Папката повеќе не постои</string>
     <string name="server_error_uploads_unsupported">Овој сервер не поддржува приложување датотеки. Ажурирај го OpenCode на компјутерот.</string>
+    <string name="server_error_archiving_unsupported">Овој сервер не поддржува архивирање. Ажурирај OpenCode на твојот компјутер.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode нема дозвола за пристап до уреди на локалната мрежа. Во Поставки, вклучи „Уреди во близина“ за OpenCode, па обиди се повторно.</string>

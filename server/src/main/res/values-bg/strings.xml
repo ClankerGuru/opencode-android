@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">Няма връзка със сървъра на OpenCode</string>
     <string name="server_error_folder_gone">Папката вече не съществува</string>
     <string name="server_error_uploads_unsupported">Този сървър не поддържа прикачени файлове. Актуализирайте OpenCode на компютъра си.</string>
+    <string name="server_error_archiving_unsupported">Този сървър не поддържа архивиране. Актуализирайте OpenCode на компютъра си.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode няма разрешение за достъп до устройства в локалната ви мрежа. Включете „Устройства в близост“ за OpenCode в настройките и опитайте отново.</string>

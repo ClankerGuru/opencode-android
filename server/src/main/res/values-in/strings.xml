@@ -52,6 +52,7 @@
     <string name="server_error_unreachable">Tidak dapat menjangkau server OpenCode</string>
     <string name="server_error_folder_gone">Folder sudah tidak ada</string>
     <string name="server_error_uploads_unsupported">Server ini tidak mendukung lampiran berkas. Perbarui OpenCode di komputer Anda.</string>
+    <string name="server_error_archiving_unsupported">Server ini tidak mendukung pengarsipan. Perbarui OpenCode di komputer Anda.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode tidak diizinkan mengakses perangkat di jaringan lokal Anda. Aktifkan Perangkat di sekitar untuk OpenCode di Pengaturan, lalu coba lagi.</string>

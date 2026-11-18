@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">OpenCode სერვერთან დაკავშირება ვერ მოხერხდა</string>
     <string name="server_error_folder_gone">საქაღალდე აღარ არსებობს</string>
     <string name="server_error_uploads_unsupported">ამ სერვერს ფაილების მიმაგრების მხარდაჭერა არ აქვს. განაახლეთ OpenCode კომპიუტერზე.</string>
+    <string name="server_error_archiving_unsupported">ამ სერვერს არქივში გადატანის მხარდაჭერა არ აქვს. განაახლეთ OpenCode თქვენს კომპიუტერზე.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode-ს ადგილობრივი ქსელის მოწყობილობებთან წვდომის ნებართვა არ აქვს. პარამეტრებში OpenCode-სთვის ჩართეთ „ახლომდებარე მოწყობილობები“ და ხელახლა სცადეთ.</string>

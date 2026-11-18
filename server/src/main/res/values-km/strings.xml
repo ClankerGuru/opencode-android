@@ -52,6 +52,7 @@
     <string name="server_error_unreachable">មិនអាចភ្ជាប់ទៅម៉ាស៊ីនមេ OpenCode បាន</string>
     <string name="server_error_folder_gone">ថតនេះលែងមានហើយ</string>
     <string name="server_error_uploads_unsupported">ម៉ាស៊ីនមេនេះមិនគាំទ្រឯកសារភ្ជាប់ទេ។ សូមធ្វើបច្ចុប្បន្នភាព OpenCode នៅលើកុំព្យូទ័ររបស់អ្នក។</string>
+    <string name="server_error_archiving_unsupported">ម៉ាស៊ីនមេនេះមិនគាំទ្រការដាក់ក្នុងបណ្ណសារទេ។ សូមធ្វើបច្ចុប្បន្នភាព OpenCode លើកុំព្យូទ័ររបស់អ្នក។</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode មិនត្រូវបានអនុញ្ញាតឱ្យភ្ជាប់ទៅឧបករណ៍នៅលើបណ្តាញមូលដ្ឋានរបស់អ្នកទេ។ សូមបើកសិទ្ធិឧបករណ៍នៅក្បែរសម្រាប់ OpenCode ក្នុងការកំណត់ រួចព្យាយាមម្តងទៀត។</string>

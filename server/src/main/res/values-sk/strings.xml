@@ -70,6 +70,7 @@
     <string name="server_error_unreachable">Nepodarilo sa spojiť so serverom OpenCode</string>
     <string name="server_error_folder_gone">Priečinok už neexistuje</string>
     <string name="server_error_uploads_unsupported">Tento server nepodporuje súborové prílohy. Aktualizujte OpenCode v počítači.</string>
+    <string name="server_error_archiving_unsupported">Tento server nepodporuje archiváciu. Aktualizujte OpenCode v počítači.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode nemá povolený prístup k zariadeniam v miestnej sieti. V nastaveniach povoľte pre OpenCode zariadenia v okolí a skúste znova.</string>

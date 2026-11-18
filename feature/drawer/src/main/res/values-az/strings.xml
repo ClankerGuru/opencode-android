@@ -128,9 +128,21 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">İcazə istənilə bilmədi. Yenidən cəhd edin.</string>
     <string name="drawer_notifications_open_settings_error">Tənzimləmələr açıla bilmədi. Android tənzimləmələrini açın və Bildirişlər → OpenCode seçin.</string>
-    <string name="drawer_delete_session_error">“%1$s” silinə bilmədi. %2$s</string>
-    <string name="drawer_archive_error">“%1$s” arxivlənə bilmədi. %2$s</string>
-    <string name="drawer_unarchive_error">“%1$s” arxivdən çıxarıla bilmədi. %2$s</string>
+    <string name="drawer_delete_session_error">“%1$s” silinə bilmədi</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">%1$d sessiya silinə bilmədi</item>
+        <item quantity="other">%1$d sessiya silinə bilmədi</item>
+    </plurals>
+    <string name="drawer_archive_error">“%1$s” arxivlənə bilmədi</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">%1$d sessiya arxivlənə bilmədi</item>
+        <item quantity="other">%1$d sessiya arxivlənə bilmədi</item>
+    </plurals>
+    <string name="drawer_unarchive_error">“%1$s” arxivdən çıxarıla bilmədi</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">%1$d sessiya arxivdən çıxarıla bilmədi</item>
+        <item quantity="other">%1$d sessiya arxivdən çıxarıla bilmədi</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Yeni sessiya</string>

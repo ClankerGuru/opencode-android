@@ -64,6 +64,7 @@
     <string name="server_error_unreachable">Neizdevās sasniegt OpenCode serveri</string>
     <string name="server_error_folder_gone">Mape vairs nepastāv</string>
     <string name="server_error_uploads_unsupported">Šis serveris neatbalsta failu pielikumus. Atjaunini OpenCode savā datorā.</string>
+    <string name="server_error_archiving_unsupported">Šis serveris neatbalsta arhivēšanu. Atjaunini OpenCode savā datorā.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode nav atļauts piekļūt ierīcēm tavā lokālajā tīklā. Iestatījumos atļauj OpenCode piekļūt tuvumā esošajām ierīcēm un mēģini vēlreiz.</string>

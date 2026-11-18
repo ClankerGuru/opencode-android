@@ -128,9 +128,21 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">අවසර ඉල්ලීමට නොහැකි විය. නැවත උත්සාහ කරන්න.</string>
     <string name="drawer_notifications_open_settings_error">සැකසීම් විවෘත කිරීමට නොහැකි විය. Android සැකසීම් විවෘත කර දැනුම්දීම් → OpenCode තෝරන්න.</string>
-    <string name="drawer_delete_session_error">“%1$s” මැකීමට නොහැකි විය. %2$s</string>
-    <string name="drawer_archive_error">“%1$s” සංරක්ෂිතයට එක් කිරීමට නොහැකි විය. %2$s</string>
-    <string name="drawer_unarchive_error">“%1$s” සංරක්ෂිතයෙන් ඉවත් කිරීමට නොහැකි විය. %2$s</string>
+    <string name="drawer_delete_session_error">“%1$s” මැකීමට නොහැකි විය</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">සැසි %1$dක් මැකීමට නොහැකි විය</item>
+        <item quantity="other">සැසි %1$dක් මැකීමට නොහැකි විය</item>
+    </plurals>
+    <string name="drawer_archive_error">“%1$s” සංරක්ෂිතයට එක් කිරීමට නොහැකි විය</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">සැසි %1$dක් සංරක්ෂිතයට එක් කිරීමට නොහැකි විය</item>
+        <item quantity="other">සැසි %1$dක් සංරක්ෂිතයට එක් කිරීමට නොහැකි විය</item>
+    </plurals>
+    <string name="drawer_unarchive_error">“%1$s” සංරක්ෂිතයෙන් ඉවත් කිරීමට නොහැකි විය</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">සැසි %1$dක් සංරක්ෂිතයෙන් ඉවත් කිරීමට නොහැකි විය</item>
+        <item quantity="other">සැසි %1$dක් සංරක්ෂිතයෙන් ඉවත් කිරීමට නොහැකි විය</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">නව සැසිය</string>

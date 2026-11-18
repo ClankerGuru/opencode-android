@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">OpenCode सर्भरमा जडान गर्न सकिएन</string>
     <string name="server_error_folder_gone">फोल्डर अब छैन</string>
     <string name="server_error_uploads_unsupported">यो सर्भरले फाइल संलग्नकहरू समर्थन गर्दैन। कम्प्युटरमा OpenCode अपडेट गर्नुहोस्।</string>
+    <string name="server_error_archiving_unsupported">यो सर्भरले अभिलेख राख्न समर्थन गर्दैन। आफ्नो कम्प्युटरमा OpenCode अपडेट गर्नुहोस्।</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode लाई तपाईंको स्थानीय नेटवर्कका उपकरणहरूसँग जडान गर्ने अनुमति छैन। सेटिङहरूमा OpenCode का लागि नजिकका उपकरणहरूको अनुमति दिनुहोस्, अनि फेरि प्रयास गर्नुहोस्।</string>

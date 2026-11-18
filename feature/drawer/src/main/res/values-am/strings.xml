@@ -128,9 +128,21 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">ፈቃድ መጠየቅ አልተቻለም። እንደገና ሞክር።</string>
     <string name="drawer_notifications_open_settings_error">ቅንብሮችን መክፈት አልተቻለም። የAndroid ቅንብሮችን ክፈትና ማሳወቂያዎች → OpenCode ምረጥ።</string>
-    <string name="drawer_delete_session_error">“%1$s”ን መሰረዝ አልተቻለም። %2$s</string>
-    <string name="drawer_archive_error">“%1$s”ን በማህደር ማስቀመጥ አልተቻለም። %2$s</string>
-    <string name="drawer_unarchive_error">“%1$s”ን ከማህደር ማውጣት አልተቻለም። %2$s</string>
+    <string name="drawer_delete_session_error">“%1$s”ን መሰረዝ አልተቻለም</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">%1$d ክፍለ ጊዜን መሰረዝ አልተቻለም</item>
+        <item quantity="other">%1$d ክፍለ ጊዜዎችን መሰረዝ አልተቻለም</item>
+    </plurals>
+    <string name="drawer_archive_error">“%1$s”ን በማህደር ማስቀመጥ አልተቻለም</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">%1$d ክፍለ ጊዜን በማህደር ማስቀመጥ አልተቻለም</item>
+        <item quantity="other">%1$d ክፍለ ጊዜዎችን በማህደር ማስቀመጥ አልተቻለም</item>
+    </plurals>
+    <string name="drawer_unarchive_error">“%1$s”ን ከማህደር ማውጣት አልተቻለም</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">%1$d ክፍለ ጊዜን ከማህደር ማውጣት አልተቻለም</item>
+        <item quantity="other">%1$d ክፍለ ጊዜዎችን ከማህደር ማውጣት አልተቻለም</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">አዲስ ክፍለ ጊዜ</string>

@@ -52,6 +52,7 @@
     <string name="server_error_unreachable">OpenCode སར་བར་ལུ་མཐུད་མ་ཚུགས།</string>
     <string name="server_error_folder_gone">སྣོད་འཛིན་འདི་མེདཔ་ཐལ་ནུག།</string>
     <string name="server_error_uploads_unsupported">སར་བར་འདི་གིས་ཡིག་སྣོད་མཉམ་སྦྲགས་ལུ་རྒྱབ་སྐྱོར་མི་འབད། ཁྱོད་རའི་གློག་རིག་གུ་ OpenCode དུས་མཐུན་བཟོ།</string>
+    <string name="server_error_archiving_unsupported">སར་བར་འདི་གིས་གཏན་མཛོད་ནང་བཞག་ནི་ལུ་རྒྱབ་སྐྱོར་མི་འབད། ཁྱོད་ཀྱི་གློག་རིག་གུ་ OpenCode དུས་མཐུན་བཟོ།</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode ལུ་ཁྱོད་ཀྱི་ས་གནས་ཡོངས་འབྲེལ་ནང་གི་ཐབས་འཕྲུལ་ཚུ་ལུ་མཐུད་ནིའི་གནང་བ་མིན་འདུག། སྒྲིག་སྟངས་ཚུ་ནང་ OpenCode གི་དོན་ལུ་ཉེ་འདབས་ཀྱི་ཐབས་འཕྲུལ་ཚུ་ཨོན་འབད་ཞིནམ་ལས་ བསྐྱར་དུ་ཚོད་ལྟ།</string>

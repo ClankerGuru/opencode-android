@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">OpenCode\'i serveriga ei saanud ühendust</string>
     <string name="server_error_folder_gone">Kausta pole enam</string>
     <string name="server_error_uploads_unsupported">See server ei toeta failimanuseid. Uuenda arvutis OpenCode\'i.</string>
+    <string name="server_error_archiving_unsupported">See server ei toeta arhiveerimist. Uuenda OpenCode\'i oma arvutis.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode\'il pole luba kohaliku võrgu seadmetega ühendust luua. Luba seadetes OpenCode\'ile juurdepääs läheduses olevatele seadmetele ja proovi uuesti.</string>

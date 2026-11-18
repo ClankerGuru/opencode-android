@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">Ekki tókst að ná sambandi við OpenCode-netþjóninn</string>
     <string name="server_error_folder_gone">Mappan er ekki lengur til</string>
     <string name="server_error_uploads_unsupported">Þessi netþjónn styður ekki skráaviðhengi. Uppfærðu OpenCode á tölvunni þinni.</string>
+    <string name="server_error_archiving_unsupported">Þessi netþjónn styður ekki vistun í skjalasafn. Uppfærðu OpenCode á tölvunni þinni.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode hefur ekki leyfi til að tengjast tækjum á staðarnetinu þínu. Kveiktu á „Nálæg tæki“ fyrir OpenCode í stillingum og reyndu svo aftur.</string>

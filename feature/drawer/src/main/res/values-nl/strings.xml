@@ -128,9 +128,21 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Toestemming vragen mislukt. Probeer het opnieuw.</string>
     <string name="drawer_notifications_open_settings_error">Instellingen openen mislukt. Open de Android-instellingen en kies Meldingen → OpenCode.</string>
-    <string name="drawer_delete_session_error">“%1$s” verwijderen mislukt. %2$s</string>
-    <string name="drawer_archive_error">“%1$s” archiveren mislukt. %2$s</string>
-    <string name="drawer_unarchive_error">“%1$s” uit het archief halen mislukt. %2$s</string>
+    <string name="drawer_delete_session_error">“%1$s” verwijderen mislukt</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">%1$d sessie verwijderen mislukt</item>
+        <item quantity="other">%1$d sessies verwijderen mislukt</item>
+    </plurals>
+    <string name="drawer_archive_error">“%1$s” archiveren mislukt</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">%1$d sessie archiveren mislukt</item>
+        <item quantity="other">%1$d sessies archiveren mislukt</item>
+    </plurals>
+    <string name="drawer_unarchive_error">“%1$s” uit het archief halen mislukt</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">%1$d sessie uit het archief halen mislukt</item>
+        <item quantity="other">%1$d sessies uit het archief halen mislukt</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Nieuwe sessie</string>

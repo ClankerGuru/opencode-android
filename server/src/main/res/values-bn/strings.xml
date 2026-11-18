@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">OpenCode সার্ভারে সংযোগ করা যায়নি</string>
     <string name="server_error_folder_gone">ফোল্ডারটি আর নেই</string>
     <string name="server_error_uploads_unsupported">এই সার্ভার ফাইল সংযুক্তি সমর্থন করে না। কম্পিউটারে OpenCode আপডেট করুন।</string>
+    <string name="server_error_archiving_unsupported">এই সার্ভারে সংরক্ষণাগারে রাখা যায় না। আপনার কম্পিউটারে OpenCode আপডেট করুন।</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode-এর আপনার স্থানীয় নেটওয়ার্কের ডিভাইসে সংযোগ করার অনুমতি নেই। সেটিংসে OpenCode-এর জন্য কাছাকাছি ডিভাইসের অনুমতি চালু করে আবার চেষ্টা করুন।</string>

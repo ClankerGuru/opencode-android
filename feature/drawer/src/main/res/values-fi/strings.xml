@@ -128,9 +128,21 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Luvan pyytäminen epäonnistui. Yritä uudelleen.</string>
     <string name="drawer_notifications_open_settings_error">Asetusten avaaminen epäonnistui. Avaa Androidin asetukset ja valitse Ilmoitukset → OpenCode.</string>
-    <string name="drawer_delete_session_error">Istunnon ”%1$s” poistaminen epäonnistui. %2$s</string>
-    <string name="drawer_archive_error">Istunnon ”%1$s” arkistointi epäonnistui. %2$s</string>
-    <string name="drawer_unarchive_error">Istunnon ”%1$s” palautus arkistosta epäonnistui. %2$s</string>
+    <string name="drawer_delete_session_error">Istunnon ”%1$s” poistaminen epäonnistui.</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">%1$d istunnon poistaminen epäonnistui</item>
+        <item quantity="other">%1$d istunnon poistaminen epäonnistui</item>
+    </plurals>
+    <string name="drawer_archive_error">Istunnon ”%1$s” arkistointi epäonnistui.</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">%1$d istunnon arkistointi epäonnistui</item>
+        <item quantity="other">%1$d istunnon arkistointi epäonnistui</item>
+    </plurals>
+    <string name="drawer_unarchive_error">Istunnon ”%1$s” palautus arkistosta epäonnistui.</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">%1$d istunnon palautus arkistosta epäonnistui</item>
+        <item quantity="other">%1$d istunnon palautus arkistosta epäonnistui</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Uusi istunto</string>

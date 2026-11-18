@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">OpenCode සේවාදායකයට සම්බන්ධ වීමට නොහැකි වුණා</string>
     <string name="server_error_folder_gone">ෆෝල්ඩරය තවදුරටත් නැහැ</string>
     <string name="server_error_uploads_unsupported">මෙම සේවාදායකය ගොනු ඇමුණුම් සඳහා සහය නොදක්වයි. ඔබේ පරිගණකයේ OpenCode යාවත්කාලීන කරන්න.</string>
+    <string name="server_error_archiving_unsupported">මෙම සේවාදායකය සංරක්ෂණයට සහය නොදක්වයි. ඔබේ පරිගණකයේ OpenCode යාවත්කාලීන කරන්න.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">ඔබේ දේශීය ජාලයේ උපාංග වෙත සම්බන්ධ වීමට OpenCode හට අවසර නැහැ. සැකසීම් තුළ OpenCode සඳහා අවට උපාංග අවසරය සක්‍රිය කර නැවත උත්සාහ කරන්න.</string>

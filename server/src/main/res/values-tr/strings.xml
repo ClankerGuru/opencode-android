@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">OpenCode sunucusuna ulaşılamadı</string>
     <string name="server_error_folder_gone">Klasör artık mevcut değil</string>
     <string name="server_error_uploads_unsupported">Bu sunucu dosya eklerini desteklemiyor. Bilgisayarınızdaki OpenCode\'u güncelleyin.</string>
+    <string name="server_error_archiving_unsupported">Bu sunucu arşivlemeyi desteklemiyor. Bilgisayarınızdaki OpenCode\'u güncelleyin.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode\'un yerel ağınızdaki cihazlara erişim izni yok. Ayarlar\'da OpenCode için Yakındaki cihazlar iznini açıp tekrar deneyin.</string>

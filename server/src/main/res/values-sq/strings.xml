@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">Nuk u arrit dot serveri OpenCode</string>
     <string name="server_error_folder_gone">Dosja nuk ekziston më</string>
     <string name="server_error_uploads_unsupported">Ky server nuk mbështet bashkëngjitjen e skedarëve. Përditëso OpenCode në kompjuter.</string>
+    <string name="server_error_archiving_unsupported">Ky server nuk mbështet arkivimin. Përditëso OpenCode në kompjuterin tënd.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode nuk ka leje të lidhet me pajisjet në rrjetin lokal. Aktivizo Pajisjet në afërsi për OpenCode te Cilësimet, pastaj provo sërish.</string>

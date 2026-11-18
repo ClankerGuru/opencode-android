@@ -132,9 +132,24 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Није могуће затражити дозволу. Покушајте поново.</string>
     <string name="drawer_notifications_open_settings_error">Није могуће отворити подешавања. Отворите подешавања Android система и изаберите Обавештења → OpenCode.</string>
-    <string name="drawer_delete_session_error">Није могуће избрисати „%1$s“. %2$s</string>
-    <string name="drawer_archive_error">Није могуће архивирати „%1$s“. %2$s</string>
-    <string name="drawer_unarchive_error">Није могуће вратити „%1$s“ из архиве. %2$s</string>
+    <string name="drawer_delete_session_error">Није могуће избрисати „%1$s“</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">Није могуће избрисати %1$d сесију</item>
+        <item quantity="few">Није могуће избрисати %1$d сесије</item>
+        <item quantity="other">Није могуће избрисати %1$d сесија</item>
+    </plurals>
+    <string name="drawer_archive_error">Није могуће архивирати „%1$s“</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">Није могуће архивирати %1$d сесију</item>
+        <item quantity="few">Није могуће архивирати %1$d сесије</item>
+        <item quantity="other">Није могуће архивирати %1$d сесија</item>
+    </plurals>
+    <string name="drawer_unarchive_error">Није могуће вратити „%1$s“ из архиве</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">Није могуће вратити %1$d сесију из архиве</item>
+        <item quantity="few">Није могуће вратити %1$d сесије из архиве</item>
+        <item quantity="other">Није могуће вратити %1$d сесија из архиве</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Нова сесија</string>

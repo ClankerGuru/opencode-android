@@ -64,6 +64,7 @@
     <string name="server_error_unreachable">Nije moguće pristupiti OpenCode serveru</string>
     <string name="server_error_folder_gone">Fascikla više ne postoji</string>
     <string name="server_error_uploads_unsupported">Ovaj server ne podržava prilaganje datoteka. Ažuriraj OpenCode na računaru.</string>
+    <string name="server_error_archiving_unsupported">Ovaj server ne podržava arhiviranje. Ažuriraj OpenCode na svom računaru.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode nema dozvolu za pristup uređajima na lokalnoj mreži. U postavkama uključi dozvolu Uređaji u blizini za OpenCode pa pokušaj ponovo.</string>

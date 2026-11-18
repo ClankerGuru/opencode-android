@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">የOpenCode አገልጋይን ማግኘት አልተቻለም</string>
     <string name="server_error_folder_gone">አቃፊው ከእንግዲህ የለም</string>
     <string name="server_error_uploads_unsupported">ይህ አገልጋይ ፋይሎችን ማያያዝ አይደግፍም። በኮምፒውተርዎ ላይ OpenCodeን ያዘምኑ።</string>
+    <string name="server_error_archiving_unsupported">ይህ አገልጋይ በማህደር ማስቀመጥን አይደግፍም። በኮምፒውተርዎ ላይ OpenCodeን ያዘምኑ።</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode በአካባቢዎ አውታረ መረብ ያሉ መሣሪያዎችን እንዲያገኝ አልተፈቀደለትም። በቅንብሮች ውስጥ ለOpenCode በአቅራቢያ ያሉ መሣሪያዎችን ፈቃድ ያብሩ፣ ከዚያ እንደገና ይሞክሩ።</string>

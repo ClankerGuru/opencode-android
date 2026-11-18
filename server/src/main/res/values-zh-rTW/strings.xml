@@ -52,6 +52,7 @@
     <string name="server_error_unreachable">無法連線至 OpenCode 伺服器</string>
     <string name="server_error_folder_gone">資料夾已不存在</string>
     <string name="server_error_uploads_unsupported">此伺服器不支援檔案附件。請更新電腦上的 OpenCode。</string>
+    <string name="server_error_archiving_unsupported">此伺服器不支援封存。請更新電腦上的 OpenCode。</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode 未獲准存取區域網路上的裝置。請在設定中開啟 OpenCode 的「附近的裝置」權限，然後再試一次。</string>

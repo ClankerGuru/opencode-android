@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">OpenCode serverinə qoşulmaq alınmadı</string>
     <string name="server_error_folder_gone">Qovluq artıq mövcud deyil</string>
     <string name="server_error_uploads_unsupported">Bu server fayl əlavələrini dəstəkləmir. Kompüterinizdə OpenCode-u yeniləyin.</string>
+    <string name="server_error_archiving_unsupported">Bu server arxivləməni dəstəkləmir. Kompüterinizdə OpenCode-u yeniləyin.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode-un yerli şəbəkənizdəki cihazlara qoşulmasına icazə verilməyib. Tənzimləmələrdə OpenCode üçün Yaxınlıqdakı cihazlar icazəsini aktivləşdirin və yenidən cəhd edin.</string>

@@ -128,9 +128,21 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Дархости иҷозат нашуд. Аз нав кӯшиш кунед.</string>
     <string name="drawer_notifications_open_settings_error">Кушодани танзимот нашуд. Танзимоти Android-ро кушоед ва Огоҳиҳо → OpenCode-ро интихоб кунед.</string>
-    <string name="drawer_delete_session_error">Нест кардани «%1$s» нашуд. %2$s</string>
-    <string name="drawer_archive_error">Ба архив гузоштани «%1$s» нашуд. %2$s</string>
-    <string name="drawer_unarchive_error">Аз архив баровардани «%1$s» нашуд. %2$s</string>
+    <string name="drawer_delete_session_error">Нест кардани «%1$s» нашуд</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="one">Нест кардани %1$d сессия нашуд</item>
+        <item quantity="other">Нест кардани %1$d сессия нашуд</item>
+    </plurals>
+    <string name="drawer_archive_error">Ба архив гузоштани «%1$s» нашуд</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="one">Ба архив гузоштани %1$d сессия нашуд</item>
+        <item quantity="other">Ба архив гузоштани %1$d сессия нашуд</item>
+    </plurals>
+    <string name="drawer_unarchive_error">Аз архив баровардани «%1$s» нашуд</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="one">Аз архив баровардани %1$d сессия нашуд</item>
+        <item quantity="other">Аз архив баровардани %1$d сессия нашуд</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Сеанси нав</string>

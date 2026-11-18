@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">De OpenCode-server kon niet worden bereikt</string>
     <string name="server_error_folder_gone">De map bestaat niet meer</string>
     <string name="server_error_uploads_unsupported">Deze server ondersteunt geen bestandsbijlagen. Werk OpenCode bij op je computer.</string>
+    <string name="server_error_archiving_unsupported">Deze server ondersteunt archiveren niet. Werk OpenCode bij op je computer.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode mag geen verbinding maken met apparaten op je lokale netwerk. Schakel Apparaten in de buurt in voor OpenCode in Instellingen en probeer het opnieuw.</string>

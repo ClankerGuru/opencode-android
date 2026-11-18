@@ -132,9 +132,24 @@
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Neizdevās pieprasīt atļauju. Mēģini vēlreiz.</string>
     <string name="drawer_notifications_open_settings_error">Neizdevās atvērt iestatījumus. Atver Android iestatījumus un izvēlies Paziņojumi → OpenCode.</string>
-    <string name="drawer_delete_session_error">Neizdevās dzēst “%1$s”. %2$s</string>
-    <string name="drawer_archive_error">Neizdevās arhivēt “%1$s”. %2$s</string>
-    <string name="drawer_unarchive_error">Neizdevās atjaunot “%1$s” no arhīva. %2$s</string>
+    <string name="drawer_delete_session_error">Neizdevās dzēst “%1$s”</string>
+    <plurals name="drawer_delete_sessions_error">
+        <item quantity="zero">Neizdevās dzēst %1$d sesiju</item>
+        <item quantity="one">Neizdevās dzēst %1$d sesiju</item>
+        <item quantity="other">Neizdevās dzēst %1$d sesijas</item>
+    </plurals>
+    <string name="drawer_archive_error">Neizdevās arhivēt “%1$s”</string>
+    <plurals name="drawer_archive_sessions_error">
+        <item quantity="zero">Neizdevās arhivēt %1$d sesiju</item>
+        <item quantity="one">Neizdevās arhivēt %1$d sesiju</item>
+        <item quantity="other">Neizdevās arhivēt %1$d sesijas</item>
+    </plurals>
+    <string name="drawer_unarchive_error">Neizdevās atjaunot “%1$s” no arhīva</string>
+    <plurals name="drawer_unarchive_sessions_error">
+        <item quantity="zero">Neizdevās atjaunot %1$d sesiju no arhīva</item>
+        <item quantity="one">Neizdevās atjaunot %1$d sesiju no arhīva</item>
+        <item quantity="other">Neizdevās atjaunot %1$d sesijas no arhīva</item>
+    </plurals>
 
     <!-- Session activity notification -->
     <string name="drawer_session_activity_new_session">Jauna sesija</string>

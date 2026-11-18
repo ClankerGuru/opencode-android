@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">Ба сервери OpenCode пайваст шудан нашуд</string>
     <string name="server_error_folder_gone">Папка дигар вуҷуд надорад</string>
     <string name="server_error_uploads_unsupported">Ин сервер замимаи файлҳоро дастгирӣ намекунад. OpenCode-ро дар компютератон навсозӣ кунед.</string>
+    <string name="server_error_archiving_unsupported">Ин сервер архивкуниро дастгирӣ намекунад. OpenCode-ро дар компютери худ навсозӣ кунед.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode барои дастрасӣ ба дастгоҳҳои шабакаи маҳаллии шумо иҷозат надорад. Дар танзимотҳо «Дастгоҳҳои наздик»-ро барои OpenCode фаъол кунед ва аз нав кӯшиш кунед.</string>
