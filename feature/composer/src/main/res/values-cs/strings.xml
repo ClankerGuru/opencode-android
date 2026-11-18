@@ -25,7 +25,6 @@
 
     <!-- Composer -->
     <string name="composer_message_placeholder">Zpráva</string>
-    <string name="composer_attachment_photo_description">Fotografie</string>
 
     <!-- Dictation notification -->
     <string name="composer_dictation_channel_name">Nahrávání</string>

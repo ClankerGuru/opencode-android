@@ -25,7 +25,6 @@
 
     <!-- Composer -->
     <string name="composer_message_placeholder">Habar</string>
-    <string name="composer_attachment_photo_description">Surat</string>
 
     <!-- Dictation notification -->
     <string name="composer_dictation_channel_name">Ses ýazgysy</string>

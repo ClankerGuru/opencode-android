@@ -25,7 +25,6 @@
 
     <!-- Composer -->
     <string name="composer_message_placeholder">မက်ဆေ့ဂျ်</string>
-    <string name="composer_attachment_photo_description">ဓာတ်ပုံ</string>
 
     <!-- Dictation notification -->
     <string name="composer_dictation_channel_name">အသံဖမ်းခြင်း</string>

@@ -25,7 +25,6 @@
 
     <!-- Composer -->
     <string name="composer_message_placeholder">Message</string>
-    <string name="composer_attachment_photo_description">Photo</string>
 
     <!-- Dictation notification -->
     <string name="composer_dictation_channel_name">Enregistrement</string>

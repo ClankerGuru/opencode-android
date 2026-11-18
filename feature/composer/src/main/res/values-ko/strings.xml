@@ -25,7 +25,6 @@
 
     <!-- Composer -->
     <string name="composer_message_placeholder">메시지</string>
-    <string name="composer_attachment_photo_description">사진</string>
 
     <!-- Dictation notification -->
     <string name="composer_dictation_channel_name">녹음</string>

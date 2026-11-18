@@ -34,7 +34,6 @@ object TitleLoadingTunables {
     val STYLE = TitleLoadingStyle.Breathing
     const val MIN_OPACITY = 0.45
     const val SWEEP_PERIOD = 1.45
-    const val REPLAY_SECONDS = 4.0
 }
 
 /** Monotonic seconds on the same base as Compose's frame clock (`System.nanoTime`). */

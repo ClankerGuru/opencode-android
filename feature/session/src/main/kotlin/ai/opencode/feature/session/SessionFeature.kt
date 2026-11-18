@@ -36,7 +36,6 @@ import ai.opencode.core.sharing.ExperimentalFeature
 import ai.opencode.core.sharing.ExperimentalFeatures
 import ai.opencode.feature.media.LinkMenuAction
 import ai.opencode.feature.media.LinkProbe
-import ai.opencode.feature.transcript.markdown.MarkdownStreamClient
 import ai.opencode.server.model.ModelVisibility
 import ai.opencode.feature.transcript.list.NewMessagesMark
 import ai.opencode.feature.media.OpenURLClient
@@ -1006,7 +1005,6 @@ class SessionFeature : Reducer<SessionFeature.State, SessionFeature.Action> {
     internal val mediaReferences by Dependency(MediaReferenceClient)
     internal val fileChecks by Dependency(AgentFileChecks)
     internal val sceneWindow by Dependency(SceneWindowClient)
-    internal val markdownStream by Dependency(MarkdownStreamClient)
     internal val dictation by Dependency(DictationClient)
     internal val date by Dependency(DateClient)
     internal val pageReader by Dependency(PageReaderClient)

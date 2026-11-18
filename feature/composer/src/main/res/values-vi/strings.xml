@@ -25,7 +25,6 @@
 
     <!-- Composer -->
     <string name="composer_message_placeholder">Tin nhắn</string>
-    <string name="composer_attachment_photo_description">Ảnh</string>
 
     <!-- Dictation notification -->
     <string name="composer_dictation_channel_name">Ghi âm</string>

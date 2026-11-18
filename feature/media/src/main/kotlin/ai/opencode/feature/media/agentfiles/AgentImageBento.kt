@@ -305,7 +305,6 @@ class AgentImageBento(
         const val ASPECT_MAX = 8.0
         /** A tile cropping more than this shows its image whole instead ([fits]). */
         const val MAX_CROP = 0.3
-        val defaultCornerRadius: Dp = TranscriptMetrics.cardCornerRadius
 
         /** The corners of `frame` that lie on the bento's own corners. */
         fun corners(frame: BentoRect, width: Double, height: Double): BentoCorners {

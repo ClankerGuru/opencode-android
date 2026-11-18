@@ -25,7 +25,6 @@
 
     <!-- Composer -->
     <string name="composer_message_placeholder">පණිවිඩය</string>
-    <string name="composer_attachment_photo_description">ඡායාරූපය</string>
 
     <!-- Dictation notification -->
     <string name="composer_dictation_channel_name">හඬ පටිගත කිරීම</string>
