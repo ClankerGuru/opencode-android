@@ -7,8 +7,6 @@ import ai.opencode.core.sharing.SharedKeys
 import ai.opencode.core.sharing.shared
 import ai.opencode.feature.composer.ComposerAttachmentsFeature
 import ai.opencode.feature.composer.ComposerFileAttachment
-import ai.opencode.feature.composer.ComposerLineGrowth
-import ai.opencode.feature.composer.ComposerTextInputTunables
 import ai.opencode.feature.composer.DictationClient
 import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.feature.session.SessionFeature.Action
@@ -37,7 +35,6 @@ import org.junit.Test
 import java.io.File
 import java.time.Instant
 import java.util.UUID
-import kotlin.math.abs
 
 /**
  * Port of iOS `SessionFeatureTests+Composer.swift`.
@@ -46,13 +43,9 @@ import kotlin.math.abs
  * `ImagePasteTextView`'s `returnKeyType`, `UIKeyCommand`s and `UITextView` paste handling; the
  * Compose composer's key handling has no such view to host in a JVM test.
  *
- * The line-growth tests drive `ImagePasteTextView` frame by frame; here they drive the same rules
- * through [ComposerLineGrowth], which `ComposerTextInput`'s layout follows (heights in px: one
- * line [LINE] tall under a [INSET] top inset; a hold is iOS `contentOffset.y`).
- * `aComposingLineLandsAtOnceAndASendsClearCommitsTheComposition` (60dddffa) is not ported: its
- * first half (no line hold while an IME composes) is n/a on Android (see [ComposerLineGrowth]),
- * and its second half (a send's clear commits the composition) is `TextFieldState.edit`'s own
- * behaviour, which a JVM test can't drive without the IME's input connection.
+ * Not ported: the line-growth tests (`aTypedLineRidesTheLineSpringHeldToTheFieldsBottom`,
+ * `lineGrowthKeepsAnEarlierCaretLineInView`, `aComposingLineLandsAtOnceAndASendsClearCommitsTheComposition`):
+ * the field takes its new height at once and the composer card's `animateContentSize` animates it.
  */
 class SessionFeatureTestsComposer {
     private val server = OpenCodeServer(url = "http://127.0.0.1:9", username = "opencode", password = "pw")
@@ -264,54 +257,6 @@ class SessionFeatureTestsComposer {
         assertTrue(failedFileStore.state.items.isEmpty())
     }
 
-    /**
-     * A typed line grows the field on `ComposerTunables.lineGrowth`, its text held to the field's
-     * bottom frame by frame so the caret's line stays put; Reduce Motion takes the new height at once.
-     */
-    @Test fun aTypedLineRidesTheLineSpringHeldToTheFieldsBottom() {
-        val one = INSET + LINE
-        val two = INSET + 2 * LINE
-        val spring = ComposerLineGrowth.typedLineSpring("One", "One\nTwo", returnKeySends = false, reduceMotion = false)
-        assertEquals(ComposerTextInputTunables.lineGrowth, spring)
-        // The spring takes the frame through every height in between; the caret is on the new line.
-        for (height in listOf(one, (one + two) / 2, two - 2)) {
-            val hold = ComposerLineGrowth.holdOffset(two, height, caretLineTop = LINE)
-            assertTrue("held to the bottom at $height", abs(hold - (two - height)) < 0.5f)
-        }
-        assertTrue(abs(ComposerLineGrowth.holdOffset(two, two, caretLineTop = LINE)) < 0.5f)
-
-        // Deleting the line shrinks it the same way.
-        assertEquals(ComposerTextInputTunables.lineGrowth, ComposerLineGrowth.typedLineSpring("One\nTwo", "One", returnKeySends = false, reduceMotion = false))
-        assertTrue(abs(ComposerLineGrowth.holdOffset(one, two, caretLineTop = 0f) - (one - two)) < 0.5f)
-
-        // Reduce Motion: the new height at once.
-        val reduced = ComposerLineGrowth.typedLineSpring("One", "One\nTwo", returnKeySends = false, reduceMotion = true)
-        assertNull(reduced)
-        // A Return that sends never animates the line it would add.
-        assertNull(ComposerLineGrowth.typedLineSpring("One", "One\n", returnKeySends = true, reduceMotion = false))
-    }
-
-    /**
-     * Growing for a word wrapped off an earlier line keeps the caret's line below the field's top
-     * edge: the hold follows the selection, not the bottom.
-     */
-    @Test fun lineGrowthKeepsAnEarlierCaretLineInView() {
-        val two = INSET + 2 * LINE
-        val three = INSET + 3 * LINE
-        // Typing at the start of the first line wraps its last word; the caret stays on line one.
-        val caretLineTop = 0f
-        for (height in listOf(two, (two + three) / 2, three - 2)) {
-            val hold = ComposerLineGrowth.holdOffset(three, height, caretLineTop)
-            // Its line's top no nearer the top edge than its padding.
-            assertTrue("caret's line in view at $height", INSET + caretLineTop - hold >= INSET - 0.5f)
-        }
-
-        // A caret on the last line still holds to the bottom.
-        val four = INSET + 4 * LINE
-        val height = (three + four) / 2
-        assertTrue(abs(ComposerLineGrowth.holdOffset(four, height, caretLineTop = 3 * LINE) - (four - height)) < 0.5f)
-    }
-
     @Test fun dictationStreamsIntoDraftAfterTypedText() = sessionTest { h ->
         val state = h.sessionState().withDraft("Fix")
         val feed = Channel<String>(Channel.UNLIMITED)
@@ -386,12 +331,6 @@ class SessionFeatureTestsComposer {
             it.copy(optimisticPromptIDs = setOf(sentID)).withDictationPhase(DictationFeature.Phase.Idle).withDraft("")
         }
         assertEquals(listOf(OpenCodeTranscriptItem.UserText(id = sentID, text = "Deploy")), store.state.items)
-    }
-
-    private companion object {
-        /** A line of body text, and the expanded field's top inset (px). */
-        const val LINE = 22f
-        const val INSET = 16f
     }
 }
 
