@@ -64,6 +64,7 @@
     <string name="server_error_unreachable">Impossible de joindre le serveur OpenCode</string>
     <string name="server_error_folder_gone">Le dossier n’existe plus</string>
     <string name="server_error_uploads_unsupported">Ce serveur ne prend pas en charge les pièces jointes. Mettez à jour OpenCode sur votre ordinateur.</string>
+    <string name="server_error_archiving_unsupported">Ce serveur ne prend pas en charge l’archivage. Mettez à jour OpenCode sur votre ordinateur.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode n’a pas l’autorisation d’accéder aux appareils de votre réseau local. Activez « Appareils à proximité » pour OpenCode dans les paramètres, puis réessayez.</string>

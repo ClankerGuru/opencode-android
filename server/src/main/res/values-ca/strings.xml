@@ -64,6 +64,7 @@
     <string name="server_error_unreachable">No s\'ha pogut contactar amb el servidor d\'OpenCode</string>
     <string name="server_error_folder_gone">La carpeta ja no existeix</string>
     <string name="server_error_uploads_unsupported">Aquest servidor no admet fitxers adjunts. Actualitza OpenCode a l\'ordinador.</string>
+    <string name="server_error_archiving_unsupported">Aquest servidor no permet arxivar. Actualitza OpenCode al teu ordinador.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode no té permís per accedir als dispositius de la xarxa local. Activa Dispositius propers per a OpenCode a Configuració i torna-ho a provar.</string>

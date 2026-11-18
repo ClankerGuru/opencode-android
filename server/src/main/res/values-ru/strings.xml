@@ -70,6 +70,7 @@
     <string name="server_error_unreachable">Не удалось подключиться к серверу OpenCode</string>
     <string name="server_error_folder_gone">Папка больше не существует</string>
     <string name="server_error_uploads_unsupported">Этот сервер не поддерживает вложения файлов. Обновите OpenCode на компьютере.</string>
+    <string name="server_error_archiving_unsupported">Этот сервер не поддерживает архивацию. Обновите OpenCode на компьютере.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">У OpenCode нет доступа к устройствам в локальной сети. В настройках разрешите OpenCode доступ к устройствам поблизости и попробуйте снова.</string>

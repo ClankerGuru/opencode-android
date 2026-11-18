@@ -64,6 +64,7 @@
     <string name="server_error_unreachable">Nije moguće pristupiti poslužitelju OpenCode</string>
     <string name="server_error_folder_gone">Mapa više ne postoji</string>
     <string name="server_error_uploads_unsupported">Ovaj poslužitelj ne podržava privitke. Ažurirajte OpenCode na računalu.</string>
+    <string name="server_error_archiving_unsupported">Ovaj poslužitelj ne podržava arhiviranje. Ažurirajte OpenCode na svom računalu.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode nema dopuštenje za pristup uređajima na lokalnoj mreži. U postavkama uključite dopuštenje Uređaji u blizini za OpenCode pa pokušajte ponovno.</string>

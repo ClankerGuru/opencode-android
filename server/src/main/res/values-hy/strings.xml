@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">Չհաջողվեց կապվել OpenCode սերվերին</string>
     <string name="server_error_folder_gone">Թղթապանակն այլևս չկա</string>
     <string name="server_error_uploads_unsupported">Այս սերվերը չի աջակցում ֆայլեր կցելուն։ Թարմացրեք OpenCode-ը ձեր համակարգչում։</string>
+    <string name="server_error_archiving_unsupported">Այս սերվերը չի աջակցում արխիվացմանը։ Թարմացրեք OpenCode-ը ձեր համակարգչում։</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode-ին թույլատրված չէ կապվել ձեր տեղական ցանցի սարքերին։ Կարգավորումներում OpenCode-ի համար միացրեք «Մոտակա սարքեր» թույլտվությունը և կրկին փորձեք։</string>

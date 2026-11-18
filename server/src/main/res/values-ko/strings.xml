@@ -52,6 +52,7 @@
     <string name="server_error_unreachable">OpenCode 서버에 연결할 수 없어요</string>
     <string name="server_error_folder_gone">폴더가 더 이상 없어요</string>
     <string name="server_error_uploads_unsupported">이 서버는 파일 첨부를 지원하지 않아요. 컴퓨터에서 OpenCode를 업데이트해 주세요.</string>
+    <string name="server_error_archiving_unsupported">이 서버는 보관 기능을 지원하지 않아요. 컴퓨터에서 OpenCode를 업데이트해 주세요.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode에 로컬 네트워크 기기 접근 권한이 없어요. 설정에서 OpenCode의 주변 기기 권한을 켠 후 다시 시도해 주세요.</string>

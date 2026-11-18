@@ -52,6 +52,7 @@
     <string name="server_error_unreachable">Tidak dapat menghubungi pelayan OpenCode</string>
     <string name="server_error_folder_gone">Folder sudah tiada</string>
     <string name="server_error_uploads_unsupported">Pelayan ini tidak menyokong lampiran fail. Kemas kini OpenCode pada komputer anda.</string>
+    <string name="server_error_archiving_unsupported">Pelayan ini tidak menyokong pengarkiban. Kemas kini OpenCode pada komputer anda.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode tidak dibenarkan mengakses peranti pada rangkaian setempat anda. Hidupkan Peranti berdekatan untuk OpenCode dalam Tetapan, kemudian cuba lagi.</string>

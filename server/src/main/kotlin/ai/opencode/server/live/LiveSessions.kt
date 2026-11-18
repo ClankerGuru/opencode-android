@@ -176,8 +176,12 @@ internal suspend fun requestMoveSession(server: OpenCodeServer, sessionID: Strin
     )
 }
 
-internal suspend fun requestArchiveSession(server: OpenCodeServer, sessionID: String) =
+internal suspend fun requestArchiveSession(server: OpenCodeServer, sessionID: String) {
     requestSetArchived(server, sessionID, archived = true)
+    // Servers before 2.1.0 answer 204 and leave the session unarchived.
+    val session = request<DataPayload<SessionPayload>>("/api/session/$sessionID", server = server).data
+    if (session.time.archived == null) throw OpenCodeClientError(localized(R.string.server_error_archiving_unsupported))
+}
 
 internal suspend fun requestUnarchiveSession(server: OpenCodeServer, sessionID: String) =
     requestSetArchived(server, sessionID, archived = false)

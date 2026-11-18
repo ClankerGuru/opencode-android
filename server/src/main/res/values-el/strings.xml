@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">Δεν ήταν δυνατή η σύνδεση στον διακομιστή OpenCode</string>
     <string name="server_error_folder_gone">Ο φάκελος δεν υπάρχει πια</string>
     <string name="server_error_uploads_unsupported">Αυτός ο διακομιστής δεν υποστηρίζει συνημμένα αρχεία. Ενημερώστε το OpenCode στον υπολογιστή σας.</string>
+    <string name="server_error_archiving_unsupported">Αυτός ο διακομιστής δεν υποστηρίζει αρχειοθέτηση. Ενημερώστε το OpenCode στον υπολογιστή σας.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">Το OpenCode δεν έχει άδεια πρόσβασης σε συσκευές του τοπικού δικτύου σας. Ενεργοποιήστε την άδεια «Κοντινές συσκευές» για το OpenCode στις Ρυθμίσεις και δοκιμάστε ξανά.</string>

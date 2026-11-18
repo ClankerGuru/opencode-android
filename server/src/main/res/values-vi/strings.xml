@@ -52,6 +52,7 @@
     <string name="server_error_unreachable">Không thể kết nối với máy chủ OpenCode</string>
     <string name="server_error_folder_gone">Thư mục không còn tồn tại</string>
     <string name="server_error_uploads_unsupported">Máy chủ này không hỗ trợ tệp đính kèm. Hãy cập nhật OpenCode trên máy tính.</string>
+    <string name="server_error_archiving_unsupported">Máy chủ này không hỗ trợ lưu trữ. Hãy cập nhật OpenCode trên máy tính của bạn.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode chưa được phép kết nối với thiết bị trên mạng cục bộ. Hãy bật quyền Thiết bị ở gần cho OpenCode trong Cài đặt rồi thử lại.</string>

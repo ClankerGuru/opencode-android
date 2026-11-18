@@ -64,6 +64,7 @@
     <string name="server_error_unreachable">Nu s-a putut contacta serverul OpenCode</string>
     <string name="server_error_folder_gone">Folderul nu mai există</string>
     <string name="server_error_uploads_unsupported">Acest server nu acceptă atașamente. Actualizează OpenCode pe computer.</string>
+    <string name="server_error_archiving_unsupported">Acest server nu acceptă arhivarea. Actualizează OpenCode pe computerul tău.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode nu are permisiunea să acceseze dispozitivele din rețeaua locală. Activează Dispozitive din apropiere pentru OpenCode în Setări, apoi încearcă din nou.</string>

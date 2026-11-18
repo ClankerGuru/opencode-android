@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">Couldn’t reach the OpenCode server</string>
     <string name="server_error_folder_gone">The folder is gone</string>
     <string name="server_error_uploads_unsupported">This server doesn’t support file attachments. Update OpenCode on your computer.</string>
+    <string name="server_error_archiving_unsupported">This server doesn’t support archiving. Update OpenCode on your computer.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode isn’t allowed to reach devices on your local network. Turn on Nearby devices for OpenCode in Settings, then try again.</string>

@@ -58,6 +58,7 @@
     <string name="server_error_unreachable">OpenCode-Server nicht erreichbar</string>
     <string name="server_error_folder_gone">Der Ordner ist nicht mehr vorhanden</string>
     <string name="server_error_uploads_unsupported">Dieser Server unterstützt keine Dateianhänge. Aktualisiere OpenCode auf deinem Computer.</string>
+    <string name="server_error_archiving_unsupported">Dieser Server unterstützt kein Archivieren. Aktualisiere OpenCode auf deinem Computer.</string>
 
     <!-- LocalNetworkPermission.kt -->
     <string name="server_local_network_denied">OpenCode darf nicht auf Geräte in deinem lokalen Netzwerk zugreifen. Aktiviere in den Einstellungen „Geräte in der Nähe“ für OpenCode und versuche es erneut.</string>
