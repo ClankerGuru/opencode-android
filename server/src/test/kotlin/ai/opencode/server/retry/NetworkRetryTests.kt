@@ -834,6 +834,16 @@ class NetworkRetryWireTests {
         }
     }
 
+    @Test
+    fun archivingASessionSucceedsWhenItCannotBeReadBack() = runTest {
+        WireFixture { request ->
+            if (request.route.startsWith("GET")) Reply.Failure(UrlErrorCode.NETWORK_CONNECTION_LOST) else Reply.status(204)
+        }.use { fixture ->
+            client.archiveSession(fixture.server, "ses_1")
+            assertEquals(listOf("PATCH /api/session/ses_1", "GET /api/session/ses_1"), fixture.requests.map { it.route })
+        }
+    }
+
     private fun sessionReply(archived: Boolean): String {
         val time = if (archived) "\"updated\":1000,\"archived\":2000" else "\"updated\":1000"
         return "{\"data\":{\"id\":\"ses_1\",\"projectID\":\"p\",\"location\":{\"directory\":\"/project\"},\"time\":{$time}}}"
