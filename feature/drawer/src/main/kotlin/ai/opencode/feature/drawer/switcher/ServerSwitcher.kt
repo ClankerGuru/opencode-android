@@ -67,8 +67,6 @@ private fun chunks(text: String): List<String> {
  * address. No status shows while all is well; a confirmed outage dims it.
  */
 object DrawerTitle {
-    const val CROSS_FADE_MILLIS = 250
-
     const val TAG = "drawer-title"
 
     /** What the title shows for a server count and connection status. */

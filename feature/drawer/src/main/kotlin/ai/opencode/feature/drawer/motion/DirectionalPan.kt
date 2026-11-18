@@ -52,11 +52,7 @@ object DirectionalPan {
         val onCard: Boolean,
         val scrollerOwnsRightwardDrag: Boolean = false,
         val scrollerOwnsLeftwardDrag: Boolean = false,
-    ) {
-        companion object {
-            val outsideCard = CardSwipeOrigin(onCard = false)
-        }
-    }
+    )
 
     /** A card swipes either way, except while a horizontal scroller under the finger can still move that way. */
     fun cardSwipeDecision(origin: CardSwipeOrigin, dx: Float, dy: Float, decisionDistance: Float): Decision {

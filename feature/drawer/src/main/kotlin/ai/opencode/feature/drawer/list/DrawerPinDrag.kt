@@ -384,16 +384,6 @@ class DrawerPinDrag {
         }
     }
 
-    /** Where a cancelled drag's row returns: its original resting slot. */
-    fun cancelSlotMinY(): Float? {
-        val draggedID = activeSessionID ?: return null
-        visibleItem(ItemKey.Row(draggedID))?.let { return it.minY }
-        val p = pinnedIDs.indexOf(draggedID)
-        if (startedInPinned && p >= 0) return cachedFirstPinnedMinY + p * rowStride
-        val r = recentIDs.indexOf(draggedID).takeIf { it >= 0 } ?: recentInsertionIndex
-        return recentSlotMinY(r, shiftBeforeR = 0f)
-    }
-
     /**
      * Cancels an active or landing drag without mutating pins or playing a commit haptic,
      * springing shifted rows (the lifted one included) and any open empty-pin zone back to rest.

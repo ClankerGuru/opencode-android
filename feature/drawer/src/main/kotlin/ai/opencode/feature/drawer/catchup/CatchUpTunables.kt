@@ -82,13 +82,6 @@ object CatchUpSwipeMath {
         return (initialVelocity / 1_000f) * rate / (1 - rate)
     }
 
-    /** Projected horizontal landing coordinate from [translationX] and [velocityX]. */
-    fun projectedLanding(
-        translationX: Float,
-        velocityX: Float,
-        decelerationRate: Float = CatchUpTunables.decelerationRate,
-    ): Float = translationX + project(velocityX, decelerationRate)
-
     /**
      * Decides whether a drag released at [translation] with [velocity] in a container of [width]
      * commits to `markRead` (right), `keepUnread` (left), or snaps back (`null`). All values in the

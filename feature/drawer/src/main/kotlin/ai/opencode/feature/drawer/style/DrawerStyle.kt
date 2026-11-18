@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.ProvideTextStyle
@@ -177,12 +176,6 @@ enum class DrawerHeaderCase { TitleCase, SmallCaps, Uppercase }
  * white text (an iPad sidebar), an outline, or a bar at the leading edge.
  */
 enum class DrawerSelectionStyle { Fill, Tint, Outline, Bar }
-
-/**
- * How a held row looks while its menu is up: a lifted card, grown and on a raised surface;
- * the row its own size on that surface (shipped); or the row as it is, no surface or shadow.
- */
-enum class DrawerHoldStyle { Card, InPlace, Flat }
 
 /** What sits between the shortcuts, Pinned and Recents: a header, a gap alone, or a hairline. */
 enum class DrawerSectionBreak { Header, Gap, Hairline }
@@ -340,13 +333,6 @@ object DrawerTunables {
     val pinEdgeBand = Tunable("drawer.pin.edgeBand", "Drag scroll edge", default = 64f, range = 24.0..140.0, step = 1.0)
     /** Drag scroll speed, dp/s. */
     val pinEdgeSpeed = Tunable("drawer.pin.edgeSpeed", "Drag scroll speed", default = 900f, range = 100.0..2400.0, step = 10.0)
-    /** Held row. */
-    val holdStyle: DrawerHoldStyle = DrawerHoldStyle.InPlace
-    /**
-     * How much of the system's grow to undo: the held row's preview starts this much smaller. The
-     * system grows a drawer row about 9.2 %, so 1.09 leaves it about 1 %.
-     */
-    const val holdLift: Float = 1.09f
 
     // The drawer's top and bottom edges.
     /** Fade below the title. */
@@ -595,9 +581,6 @@ private fun EmptyPinHeader(progress: Float, headerHeight: Dp) {
         Spacer(Modifier.height(headerHeight))
     }
 }
-
-/** A row highlight's shape at [DrawerMetrics.rowCornerRadius]. */
-val DrawerRowShape: RoundedCornerShape get() = RoundedCornerShape(DrawerMetrics.rowCornerRadius)
 
 /** Where shortcut symbols stop growing. */
 internal const val XXXL_FONT_SCALE = 23f / 17f

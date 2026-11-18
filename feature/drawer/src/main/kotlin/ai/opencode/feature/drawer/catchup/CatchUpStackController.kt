@@ -20,7 +20,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import kotlinx.coroutines.CancellationException
@@ -76,16 +75,6 @@ data class CatchUpPose(val tx: Float = 0f, val ty: Float = 0f, val rotation: Flo
 class CatchUpCardLayer {
     var pose by mutableStateOf(CatchUpPose.Identity)
     var alpha by mutableFloatStateOf(1f)
-
-    internal fun applyTo(scope: GraphicsLayerScope) = with(scope) {
-        val p = pose
-        translationX = p.tx * density
-        translationY = p.ty * density
-        rotationZ = Math.toDegrees(p.rotation.toDouble()).toFloat()
-        scaleX = p.scale
-        scaleY = p.scale
-        this.alpha = this@CatchUpCardLayer.alpha
-    }
 }
 
 /**
@@ -318,11 +307,6 @@ class CatchUpStackController internal constructor() {
         }
     }
 
-    fun refreshPreviewAppearance() {
-        if (isPreviewLocked) return
-        setPreviewDepth(0f)
-    }
-
     // Geometry
 
     private val dimAlpha: Float get() = if (isDark) 0.62f else 0.24f
@@ -524,8 +508,6 @@ class CatchUpStackController internal constructor() {
             }
         }
     }
-
-    fun cancelPendingAnimations() = finishTransition(syncingPreview = false)
 
     /**
      * Catch Up ended under the finger: the rest of the drag, or the snap-back it started, moves
