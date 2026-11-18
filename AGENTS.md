@@ -135,6 +135,39 @@ already wired by its parent; keep those names.
   English UI text, run `python3 scripts/translate.py all` for the new strings (with `--redo
   <name>` when the meaning changed) and `python3 scripts/translations.py all`.
 
+## Motion
+
+Most of the app shouldn't move. Before adding an animation, ask how often someone will see it;
+a one-frame change is not a bug by itself.
+
+- **Frequency decides.** Seen hundreds of times a day (scrolling, selecting a row, switching
+  sessions): no motion. Tens of times a day: barely noticeable, or none. Occasional (a dialog, a
+  sheet, a card docking above the composer): the standard roles. Rare or first-time (pairing,
+  onboarding): the place to spend craft.
+- **Direct input is never animated.** Typing, pasting, dragging and search filtering apply on the
+  next frame.
+- **Nothing animates at load.** Content that is there when a screen opens, or comes from a cache,
+  starts at rest. A row scrolling back into view doesn't replay an entrance.
+- **Animate layout that something else moves.** When a card, pill, notice or section arrives or
+  leaves, its neighbours slide instead of jumping, and the leaving one keeps drawing its last
+  content until it's gone.
+- **Switching views is instant.** Sessions, tabs and the content behind a segmented control swap
+  on the next frame; only the indicator moves. Pushed pages, sheets, menus and dialogs keep
+  Material's and the platform's own motion.
+- **Lists animate only what the person just did.** Archive, delete and pin slide the neighbours.
+  Loading, re-sorting and search results don't animate rows.
+- **Press scale is for buttons** (`motionPress`). Rows, tabs and bubbles answer with their
+  highlight.
+- **Fix a jump with layout before motion.** A busy button keeps its width, an image reserves its
+  box, and a placeholder has the size of what replaces it.
+- **Reduce Motion keeps a short fade** (`Motion.reducedFadeSpec()`): drop travel and scale, but
+  don't cut.
+- **Use the vocabulary.** Specs come from `MotionRole`/`Motion`, never raw `tween` or `spring`
+  numbers. An interrupted animation continues from where it is, and an exit is shorter than its
+  entrance.
+
+A PR that adds motion says how often the moment happens.
+
 ## Comments
 
 - Default to no comment. Never explain a fix, a past bug or what the code used to do
