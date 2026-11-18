@@ -493,7 +493,7 @@ private fun rememberSettledSpokenWord(word: String): String {
 /** The status colour: red for an alert, else secondary. */
 @Composable
 private fun ConnectionStatusPresentation.foreground(): Color =
-    if (isAlert) OpenCodeTheme.colors.destructive else OpenCodeTheme.colors.secondaryText
+    if (isAlert) OpenCodeTheme.colors.danger else OpenCodeTheme.colors.secondaryText
 
 /** The round trip rolls on the layout role. */
 private val millisecondsRoll = RollingNumberStyle(duration = MotionTunables.layoutSpring.duration.value, bounce = 0.0)

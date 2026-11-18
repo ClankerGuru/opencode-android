@@ -63,6 +63,7 @@ fun DesignSystemGallery(
                 ColorsSection()
                 TypeSection()
                 ButtonsSection()
+                NoticesSection()
                 RollingNumberSection()
                 MotionSection()
                 IconsSection()
@@ -134,7 +135,7 @@ private fun ColorsSection() = Section("Colors") {
         "userBubble" to c.userBubble, "codeBand" to c.codeBand, "inlineCodeFill" to c.inlineCodeFill,
         "text" to c.text, "secondaryText" to c.secondaryText, "tertiaryText" to c.tertiaryText,
         "border" to c.border, "accent" to c.accent, "link" to c.link, "signal" to c.signal,
-        "sendButton" to c.sendButtonBackground, "destructive" to c.destructive, "danger" to c.danger,
+        "sendButton" to c.sendButtonBackground, "destructive" to c.destructive, "danger" to c.danger, "warning" to c.warning,
         "syntaxKeyword" to c.syntaxKeyword, "syntaxString" to c.syntaxString, "syntaxNumber" to c.syntaxNumber,
         "syntaxComment" to c.syntaxComment, "syntaxType" to c.syntaxType,
         "diffAddedFill" to c.diffAddedFill, "diffRemovedFill" to c.diffRemovedFill,
@@ -220,6 +221,14 @@ private fun ButtonsSection() = Section("Buttons & tap targets") {
         }
     }
     Text("The outlined box is an 18 dp glyph with its 48 dp target.", style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.secondaryText)
+}
+
+@Composable
+private fun NoticesSection() = Section("Notices") {
+    OpenCodeNotice("Reconnecting to Studio...", tone = OpenCodeNoticeTone.progress)
+    OpenCodeNotice("Couldn’t connect to Studio", action = "Try Again", onClick = {})
+    OpenCodeNotice("Couldn’t sign in to Studio", tone = OpenCodeNoticeTone.attention, symbol = SFSymbol.KeyFill, action = "Pair Again", onClick = {})
+    OpenCodeNotice("Couldn’t archive 3 sessions", detail = "Couldn’t reach the OpenCode server")
 }
 
 @Composable

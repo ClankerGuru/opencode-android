@@ -2,6 +2,8 @@ package ai.opencode.feature.session
 
 import ai.opencode.core.R as CoreR
 import ai.opencode.core.motion.MotionTransition
+import ai.opencode.core.ui.OpenCodeContentUnavailable
+import ai.opencode.core.ui.OpenCodeErrorText
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.store.StoreOf
@@ -290,17 +292,7 @@ private fun Content(state: ShellOutputFeature.State, isFollowing: Boolean, jumpR
 
 @Composable
 private fun EmptyState(title: String, description: String?) {
-    Column(
-        Modifier.fillMaxSize().padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
-    ) {
-        OpenCodeIcon(SFSymbol.Terminal, contentDescription = null, size = 48.dp, tint = OpenCodeTheme.colors.secondaryText)
-        Text(title, style = OpenCodeTextStyles.title3.copy(fontWeight = FontWeight.Bold), color = OpenCodeTheme.colors.text, textAlign = TextAlign.Center)
-        if (description != null) {
-            Text(description, style = OpenCodeTextStyles.callout, color = OpenCodeTheme.colors.secondaryText, textAlign = TextAlign.Center)
-        }
-    }
+    OpenCodeContentUnavailable(SFSymbol.Terminal, title, Modifier.fillMaxSize(), description = description)
 }
 
 /** One output line and its absolute byte offset, its stable key: trimming or loading earlier keeps the reader's place. */
@@ -489,7 +481,6 @@ private fun StatusBar(state: ShellOutputFeature.State, runningGlyph: @Composable
 }
 
 private val successGreen = Color(0xFF34C759)
-private val warningOrange = Color(0xFFFF9500)
 
 /** “Running · 1:23”, “Exited with code 1”, “Interrupted”: sentence-case status. */
 @Composable
@@ -510,10 +501,10 @@ private fun ShellStatusLabel(state: ShellOutputFeature.State, runningGlyph: @Com
                 shell.status == OpenCodeShell.Status.Running || shell.status == OpenCodeShell.Status.Killed ->
                     OpenCodeIcon(SFSymbol.HandRaisedFill, contentDescription = null, size = 18.dp, tint = OpenCodeTheme.colors.secondaryText)
                 shell.status == OpenCodeShell.Status.Timeout ->
-                    OpenCodeIcon(SFSymbol.ClockBadgeExclamationmark, contentDescription = null, size = 18.dp, tint = warningOrange)
+                    OpenCodeIcon(SFSymbol.ClockBadgeExclamationmark, contentDescription = null, size = 18.dp, tint = OpenCodeTheme.colors.warning)
                 (shell.exitCode ?: 0) == 0 ->
                     OpenCodeIcon(SFSymbol.CheckmarkCircleFill, contentDescription = null, size = 18.dp, tint = successGreen)
-                else -> OpenCodeIcon(SFSymbol.XmarkCircleFill, contentDescription = null, size = 18.dp, tint = OpenCodeTheme.colors.destructive)
+                else -> OpenCodeIcon(SFSymbol.XmarkCircleFill, contentDescription = null, size = 18.dp, tint = OpenCodeTheme.colors.danger)
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
@@ -526,7 +517,7 @@ private fun ShellStatusLabel(state: ShellOutputFeature.State, runningGlyph: @Com
                     ElapsedTime(startedAt, if (shell.status == OpenCodeShell.Status.Running) null else shell.completedAt, labelStyle)
                 }
             }
-            state.errorMessage?.let { Text(it, style = OpenCodeTextStyles.caption1, color = OpenCodeTheme.colors.destructive) }
+            state.errorMessage?.let { OpenCodeErrorText(it, style = OpenCodeTextStyles.caption1) }
         }
     }
 }

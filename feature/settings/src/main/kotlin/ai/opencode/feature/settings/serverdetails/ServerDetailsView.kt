@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings.serverdetails
 
+import ai.opencode.core.ui.OpenCodeContentUnavailable
 import ai.opencode.core.ui.OpenCodeTextField
 import ai.opencode.core.ui.OpenCodeRadius
 import ai.opencode.core.diagnostics.HidesFromScreenshots
@@ -33,7 +34,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -82,7 +82,6 @@ import ai.opencode.core.ui.OpenCodeFonts
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.animation.core.VisibilityThreshold
@@ -168,13 +167,13 @@ fun ServerDetailsPage(store: SettingsStore) {
                     }
                 }
                 state.error != null -> item(key = "error") {
-                    ServerDetailsUnavailable(
+                    OpenCodeContentUnavailable(
                         symbol = SFSymbol.ExclamationmarkTriangle,
                         title = "Couldn’t Load Server Details",
+                        modifier = Modifier.fillMaxWidth().padding(top = 48.dp),
                         description = state.error,
-                        actionTitle = "Try Again",
+                        action = "Try Again",
                         onAction = { send(ServerDetailsFeature.Action.RefreshPulled) },
-                        modifier = Modifier.padding(top = 80.dp),
                     )
                 }
                 else -> item(key = "loading") {
@@ -480,31 +479,6 @@ internal fun CapsuleAction(title: String, kind: CapsuleKind, onClick: () -> Unit
 @Composable
 internal fun tertiarySystemFill(): Color =
     Color(0x76, 0x76, 0x80).copy(alpha = if (OpenCodeTheme.colors.isDark) 0.24f else 0.12f)
-
-/** A symbol, a title, an optional description and action. */
-@Composable
-internal fun ServerDetailsUnavailable(
-    symbol: SFSymbol,
-    title: String,
-    modifier: Modifier = Modifier,
-    description: String? = null,
-    actionTitle: String? = null,
-    onAction: () -> Unit = {},
-) {
-    Column(
-        modifier.fillMaxWidth().padding(horizontal = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        OpenCodeIcon(symbol, contentDescription = null, size = 44.dp, tint = OpenCodeTheme.colors.secondaryText)
-        Spacer(Modifier.height(4.dp))
-        Text(title, style = OpenCodeTextStyles.title3.copy(fontWeight = FontWeight.SemiBold), color = OpenCodeTheme.colors.text, textAlign = TextAlign.Center)
-        if (description != null) {
-            Text(description, style = OpenCodeTextStyles.subheadline, color = OpenCodeTheme.colors.secondaryText, textAlign = TextAlign.Center)
-        }
-        if (actionTitle != null) TextButton(onClick = onAction) { Text(actionTitle) }
-    }
-}
 
 /** A soft right edge for text that runs past its tile (no hard crops). */
 internal fun Modifier.trailingFade(): Modifier = graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }

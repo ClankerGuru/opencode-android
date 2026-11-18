@@ -88,6 +88,8 @@ class OpenCodeColors(
      * deeper than [destructive] in light and softer in dark. Not for fills behind white labels.
      */
     val danger: Color,
+    /** Needs attention without having failed: a rejected sign-in, a weak connection, a paste that didn't work. */
+    val warning: Color,
     private val bodyTextResolver: (Double) -> Color,
 ) {
     /** Prose at [tone] (`0..1`) between canvas and text, mixed in OKLab. */
@@ -166,6 +168,7 @@ class OpenCodeColors(
                 diffRemovedText = (if (system) label else v.diffRemovedText).color,
                 destructive = SystemColors.red(isDark).color,
                 danger = (if (system) SystemColors.red(isDark) else v.diffRemovedText).color,
+                warning = SystemColors.orange(isDark).color,
                 bodyTextResolver = bodyResolver,
             )
         }
@@ -188,6 +191,7 @@ internal object DesktopAccent {
 /** System colours the System theme reads that have no field in [ThemeVariant]. */
 internal object SystemColors {
     fun red(isDark: Boolean) = if (isDark) ThemeRGBA(1.0, 0.2706, 0.2275) else ThemeRGBA(1.0, 0.2314, 0.1882)
+    fun orange(isDark: Boolean) = if (isDark) ThemeRGBA(1.0, 0.6235, 0.0392) else ThemeRGBA(1.0, 0.5843, 0.0)
     fun green(isDark: Boolean) = if (isDark) ThemeRGBA(0.1882, 0.8196, 0.3451) else ThemeRGBA(0.2039, 0.7804, 0.349)
 
     /** `UIColor.tertiarySystemFill`: rgba(118,118,128) at 0.12 light / 0.24 dark. */

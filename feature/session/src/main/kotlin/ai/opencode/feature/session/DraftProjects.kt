@@ -1,6 +1,7 @@
 package ai.opencode.feature.session
 
 import ai.opencode.core.R as CoreR
+import ai.opencode.core.ui.OpenCodeContentUnavailable
 import ai.opencode.core.ui.OpenCodeSearchField
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeShape
@@ -81,7 +82,6 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.text.Normalizer
@@ -631,14 +631,16 @@ fun FolderBrowserView(store: StoreOf<FolderBrowserFeature.State, FolderBrowserFe
             }
             when (listing) {
                 null, FolderBrowserFeature.Listing.Loading -> Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                is FolderBrowserFeature.Listing.Failed -> Unavailable(
+                is FolderBrowserFeature.Listing.Failed -> OpenCodeContentUnavailable(
                     symbol = SFSymbol.ExclamationmarkTriangle,
                     title = stringResource(R.string.session_folder_open_failed_title),
+                    modifier = Modifier.fillMaxSize(),
                     description = listing.message,
-                    action = stringResource(CoreR.string.common_try_again) to { store.send(FolderBrowserFeature.Action.RetryTapped(route)) },
+                    action = stringResource(CoreR.string.common_try_again),
+                    onAction = { store.send(FolderBrowserFeature.Action.RetryTapped(route)) },
                 )
                 is FolderBrowserFeature.Listing.Loaded -> if (folders.isEmpty()) {
-                    if (filter.isEmpty()) Unavailable(SFSymbol.Folder, stringResource(R.string.session_folder_empty_title)) else SearchUnavailable(filter)
+                    if (filter.isEmpty()) OpenCodeContentUnavailable(SFSymbol.Folder, stringResource(R.string.session_folder_empty_title), Modifier.fillMaxSize()) else SearchUnavailable(filter)
                 }
             }
         }
@@ -699,19 +701,10 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
 
 @Composable
 private fun SearchUnavailable(text: String) {
-    Unavailable(SFSymbol.Magnifyingglass, stringResource(R.string.session_folder_search_empty_title, text), stringResource(R.string.session_folder_search_empty_message))
-}
-
-@Composable
-private fun Unavailable(symbol: SFSymbol, title: String, description: String? = null, action: Pair<String, () -> Unit>? = null) {
-    Column(
-        Modifier.fillMaxSize().padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
-    ) {
-        OpenCodeIcon(symbol, contentDescription = null, size = 48.dp, tint = OpenCodeTheme.colors.secondaryText)
-        Text(title, style = OpenCodeTextStyles.title3.copy(fontWeight = FontWeight.Bold), color = OpenCodeTheme.colors.text, textAlign = TextAlign.Center)
-        if (description != null) Text(description, style = OpenCodeTextStyles.callout, color = OpenCodeTheme.colors.secondaryText, textAlign = TextAlign.Center)
-        if (action != null) Button(onClick = action.second, shape = OpenCodeShape.control) { Text(action.first) }
-    }
+    OpenCodeContentUnavailable(
+        SFSymbol.Magnifyingglass,
+        stringResource(R.string.session_folder_search_empty_title, text),
+        Modifier.fillMaxSize(),
+        description = stringResource(R.string.session_folder_search_empty_message),
+    )
 }

@@ -3,6 +3,7 @@ package ai.opencode.feature.system.intents
 import ai.opencode.core.R as CoreR
 import ai.opencode.core.ui.OpenCodeTextField
 import ai.opencode.core.ui.OpenCodeSurfaces
+import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.feature.system.LeftToRight
 import ai.opencode.feature.system.R
 import ai.opencode.feature.system.SessionDirectory
@@ -226,7 +227,7 @@ private fun AskOpenCodeView(
                     Text(
                         result,
                         style = MaterialTheme.typography.bodyLarge,
-                        color = if (state.failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                        color = if (state.failed) OpenCodeTheme.colors.danger else MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                     )
                     if (state.failed) {

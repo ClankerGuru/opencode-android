@@ -5,13 +5,15 @@ import ai.opencode.core.R as CoreR
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionSpring
-import ai.opencode.core.motion.MotionTransition
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.sharing.shared
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.core.ui.LocalDrawerKeyboardSignals
+import ai.opencode.core.ui.OpenCodeErrorText
 import ai.opencode.core.ui.OpenCodeIcon
+import ai.opencode.core.ui.OpenCodeNotice
+import ai.opencode.core.ui.OpenCodeNoticePresence
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
@@ -1005,23 +1007,11 @@ private fun SessionComposerEnv.ComposerAreaContent(modifier: Modifier) {
             ) {
                 HiddenUnderComposerPanel(host.composerPanelCovers) { ComposerPills() }
             }
-            val error = s.settledRequestLoadError
-            // The last error stays drawn while the banner leaves.
-            var shownError by remember { mutableStateOf(error) }
-            if (error != null) shownError = error
-            AnimatedVisibility(
-                visible = error != null,
-                enter = expandVertically(composerColumnAnimation(opening = true, IntSize.VisibilityThreshold), Alignment.Bottom, clip = false) +
-                    MotionTransition.micro(reducedMotion).enter,
-                exit = shrinkVertically(composerColumnAnimation(opening = false, IntSize.VisibilityThreshold), Alignment.Bottom, clip = false) +
-                    MotionTransition.micro(reducedMotion).exit,
-            ) {
+            OpenCodeNoticePresence(s.settledRequestLoadError) { error ->
                 HiddenUnderComposerPanel(host.composerPanelCovers) {
-                    ComposerBanner(
-                        symbol = SFSymbol.ExclamationmarkTriangleFill,
-                        iconTint = androidx.compose.ui.graphics.Color(0xFFFF9500),
+                    OpenCodeNotice(
                         title = stringResource(R.string.session_requests_load_failed_title),
-                        detail = shownError.orEmpty(),
+                        detail = error,
                         action = stringResource(CoreR.string.common_retry),
                         onClick = { store.send(Action.refreshRequestsTapped) },
                         modifier = Modifier.semantics { testTag = "request-load-error" },
@@ -1068,17 +1058,7 @@ private fun SessionComposerEnv.ComposerAreaContent(modifier: Modifier) {
 /** Server Flow: iOS `ServerConnectionPill` above the capsule while the session's server is away. */
 @Composable
 private fun SessionComposerEnv.ServerConnection() {
-    val connection = host.connection
-    // The last notice stays drawn while the pill leaves.
-    var shown by remember { mutableStateOf(connection) }
-    if (connection != null) shown = connection
-    val transition = ServerConnectionPillTransition
-    AnimatedVisibility(
-        visible = connection != null,
-        enter = transition.enter(reducedMotion),
-        exit = transition.exit(reducedMotion),
-    ) {
-        val notice = shown ?: return@AnimatedVisibility
+    OpenCodeNoticePresence(host.connection) { notice ->
         HiddenUnderComposerPanel(host.composerPanelCovers) {
             ServerConnectionPill(notice, host.onConnectionAction)
         }
@@ -1890,12 +1870,7 @@ private fun SessionComposerEnv.Composer() {
             } else {
                 val error = s.dictationError
                 if (error != null) {
-                    Text(
-                        error,
-                        style = OpenCodeTextStyles.footnote,
-                        color = OpenCodeTheme.colors.destructive,
-                        modifier = Modifier.composerFolds().padding(horizontal = 14.dp),
-                    )
+                    OpenCodeErrorText(error, Modifier.composerFolds().padding(horizontal = 14.dp))
                 }
             }
         }

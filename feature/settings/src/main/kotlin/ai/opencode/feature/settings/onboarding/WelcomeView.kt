@@ -1,6 +1,7 @@
 package ai.opencode.feature.settings.onboarding
 
 import ai.opencode.core.R as CoreR
+import ai.opencode.core.ui.OpenCodeErrorText
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import androidx.compose.foundation.layout.width
@@ -91,10 +92,6 @@ object WelcomeCopy {
     const val PAIR_COMMAND = "opencode pair --remote"
     const val INSTALL_COMMAND = "curl -fsSL https://opencode.ai/v2/install | bash"
 }
-
-/** System orange for the problem line and paste errors. */
-@Composable
-private fun systemOrange(): Color = if (OpenCodeTheme.colors.isDark) Color(0xFFFF9F0A) else Color(0xFFFF9500)
 
 /**
  * The first-run welcome: the mark, the headline and the laptop-and-phone scene, then one pairing
@@ -257,7 +254,7 @@ private fun Copy(pairing: Boolean, problem: String?, reduced: Boolean, modifier:
                 modifier = Modifier.semantics { heading() },
             )
             if (problem != null) {
-                Text(problem, style = OpenCodeTextStyles.footnote, color = systemOrange(), textAlign = TextAlign.Center)
+                OpenCodeErrorText(problem, color = OpenCodeTheme.colors.warning, textAlign = TextAlign.Center)
             }
         }
     }
@@ -350,7 +347,7 @@ private fun WelcomeOtherWays(pasteError: String?, send: (WelcomeFeature.Action) 
             OtherWaysSection(header = stringResource(R.string.settings_onboarding_other_ways_terminal_header), footer = stringResource(R.string.settings_onboarding_other_ways_terminal_footer)) {
                 WelcomeCommand(WelcomeCopy.PAIR_COMMAND) { send(WelcomeFeature.Action.CopyTapped(it)) }
             }
-            OtherWaysSection(header = null, footer = pasteError, footerColor = systemOrange()) {
+            OtherWaysSection(header = null, footer = pasteError, footerColor = OpenCodeTheme.colors.warning) {
                 OtherWaysButton(stringResource(R.string.settings_onboarding_other_ways_paste_link), SFSymbol.DocOnClipboard) { send(WelcomeFeature.Action.PasteTapped) }
                 OtherWaysButton(stringResource(R.string.settings_onboarding_other_ways_enter_address), SFSymbol.Keyboard) { send(WelcomeFeature.Action.EnterAddressTapped) }
             }

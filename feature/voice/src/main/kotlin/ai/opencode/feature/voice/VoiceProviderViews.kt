@@ -36,10 +36,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -148,7 +150,7 @@ fun VoiceProviderStatus(state: VoiceProviderState, modifier: Modifier = Modifier
     val symbol = state.symbol ?: return
     val color = when (state) {
         VoiceProviderState.ready -> VoiceProviderColors.green
-        VoiceProviderState.noKey -> VoiceCallSurfaceDefaults.orange
+        VoiceProviderState.noKey -> OpenCodeTheme.colors.warning
         VoiceProviderState.needsUpdate -> VoiceProviderColors.blue
         VoiceProviderState.offline, VoiceProviderState.unknown -> OpenCodeTheme.colors.secondaryText
     }
@@ -241,7 +243,7 @@ fun VoiceProviderFailureCard(
                         .align(Alignment.BottomEnd)
                         .offset(offset.dp, offset.dp)
                         .size(badge.dp)
-                        .background(VoiceCallSurfaceDefaults.orange, CircleShape)
+                        .background(OpenCodeTheme.colors.warning, CircleShape)
                         .border(2.dp, OpenCodeTheme.colors.canvas, CircleShape)
                         .clearAndSetSemantics {},
                     contentAlignment = Alignment.Center,
@@ -253,7 +255,7 @@ fun VoiceProviderFailureCard(
                 Text(
                     stringResource(R.string.voice_failure_start_title),
                     style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
-                    modifier = Modifier.semantics { heading() },
+                    modifier = Modifier.semantics { heading(); liveRegion = LiveRegionMode.Polite },
                 )
                 SelectionContainer {
                     Text(

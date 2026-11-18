@@ -1,6 +1,7 @@
 package ai.opencode.feature.voice
 
 import ai.opencode.core.R as CoreR
+import ai.opencode.core.ui.OpenCodeContentUnavailable
 import ai.opencode.core.ui.OpenCodeTopBar
 import ai.opencode.core.ui.OpenCodeTopBarBackButton
 import ai.opencode.core.ui.rememberOverscrollIfContentScrolls
@@ -33,7 +34,6 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -182,22 +182,12 @@ fun VoiceCallLogList(
         },
     ) { padding ->
         if (logs.isEmpty()) {
-            Column(
-                Modifier.fillMaxSize().padding(padding).padding(horizontal = 32.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                OpenCodeIcon(SFSymbol.Waveform, null, size = OpenCodeIconSize.hero, tint = OpenCodeTheme.colors.secondaryText)
-                Spacer(Modifier.height(12.dp))
-                Text(stringResource(R.string.voice_call_history_empty_title), style = OpenCodeTextStyles.title2.copy(fontWeight = FontWeight.Bold), color = OpenCodeTheme.colors.text, textAlign = TextAlign.Center)
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    stringResource(R.string.voice_call_history_empty_message),
-                    style = OpenCodeTextStyles.callout,
-                    color = OpenCodeTheme.colors.secondaryText,
-                    textAlign = TextAlign.Center,
-                )
-            }
+            OpenCodeContentUnavailable(
+                symbol = SFSymbol.Waveform,
+                title = stringResource(R.string.voice_call_history_empty_title),
+                modifier = Modifier.fillMaxSize().padding(padding),
+                description = stringResource(R.string.voice_call_history_empty_message),
+            )
         } else {
             val historyList = rememberLazyListState()
             LazyColumn(

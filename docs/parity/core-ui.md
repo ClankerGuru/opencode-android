@@ -37,6 +37,16 @@ the OpenCode desktop design system (`packages/ui`, theme `oc-2`), not iOS's SF /
   capsules (grabbers, dots, avatars).
 - Surfaces (`ui/OpenCodeSurfaces.kt`): floating fill + 1 dp hairline (`openCodeHairline`)
   + small shadow; `OpenCodeAlertDialog` (desktop dialog over Material's `AlertDialog`).
+- Errors use one of four shapes. In a form or next to what failed: `OpenCodeErrorText`
+  (`danger`, read out by TalkBack) or `OpenCodeTextField`'s error state. A pane that has nothing
+  to show (failed to load, empty, no results): `OpenCodeContentUnavailable`, a 48 dp glyph, a
+  bold `title3`, a `subheadline` description and a primary action. Needing a decision:
+  `OpenCodeAlertDialog`. Anything else: a notice (below). `OpenCodeColors.warning` (systemOrange)
+  colours what needs attention without having failed. Android-only; iOS draws each by hand.
+- Notices (`ui/OpenCodeNotice.kt`): `OpenCodeNotice` is how a failure outside a form or a dialog
+  is shown: a floating chip with a glyph (`danger` for a failure), what failed, why, and an
+  action word. `OpenCodeNoticePresence` brings it in and out. Android-only; the session's
+  connection pill, its request-load error and the drawer's failure notice use it.
 - Controls: buttons 48 dp, 8 dp corners; `OpenCodeSecondaryButton` is the neutral hairline
   button; `OpenCodeIconButton(style = Circle)` is a 10 dp rounded square with a hairline.
   `OpenCodeSwitch` (`ui/OpenCodeFormControls.kt`) is the desktop switch (`forms/switch`): a
@@ -109,7 +119,7 @@ Paths below are relative to `core/src/main/kotlin/ai/opencode/core/`.
 - Theme: wrap each window's root in `OpenCodeAppTheme { }` (reads the persisted choice); previews use `OpenCodeTheme(theme, appearance) { }`. Colours: `OpenCodeTheme.colors.<iOS name>` (e.g. `groupedCard`, `secondaryText`, `bodyText(0.92)`, `syntaxKeyword`); Material roles: `MaterialTheme.colorScheme` (mapping table in `OpenCodeColors.kt`).
 - Type: `MaterialTheme.typography.*` (role mapping in `OpenCodeTypography.kt`) or the iOS names in `OpenCodeTextStyles` (`footnote`, `subheadline`, …), Inter at desktop sizes; code in `OpenCodeFonts.monospace` (IBM Plex Mono). `OpenCodeFonts.berkeleyMono` only for the wordmark.
 - Shapes and spacing: `OpenCodeShape.control` for controls, `capsule/circle` for true capsules, `card/panel/sheet`, `OpenCodeRadius.*`, `OpenCodeSpacing.*`.
-- Surfaces: `OpenCodeSurfaces.color/border/dialogShape/popoverShape/raisedShadow/popoverShadow`, `Modifier.openCodeHairline(shape)`, `OpenCodeAlertDialog` instead of `AlertDialog`; Material `Button`s take `shape = OpenCodeShape.control`.
+- Surfaces: `OpenCodeSurfaces.color/border/dialogShape/popoverShape/raisedShadow/popoverShadow`, `Modifier.openCodeHairline(shape)`, `OpenCodeAlertDialog` instead of `AlertDialog`; Material `Button`s take `shape = OpenCodeShape.control`. Failures outside a form or dialog: `OpenCodeNotice` in an `OpenCodeNoticePresence`.
 - Motion: `Motion.<name>.spec()` / `.animation(reduceMotion)`, `Motion.easeOut(Motion.fadeStandard, …)`, `rememberReduceMotion()`, `SpringSolver` + `motionFrameLoop {}` for custom drivers, `MotionPresence`, `Modifier.motionBlurReveal`.
 - Title bars: `OpenCodeTopBar(title = { Text(...) }, navigation = { OpenCodeTopBarBackButton(onBack) }, actions = { ... }, centerTitle, scrollBehavior)` or `OpenCodeLargeTopBar("Title", rememberOpenCodeLargeTopBarScrollBehavior(listState))` (lists also take `overscrollEffect = rememberOverscrollIfContentScrolls(listState)`) instead of Material `TopAppBar`s; put the behaviour's `nestedScrollConnection` on the `Scaffold`.
 - Controls: `OpenCodePrimaryButton` / `OpenCodeSecondaryButton` (`role = Destructive` for red), `OpenCodeIconButton(SFSymbol.X, "Label", onClick)`, `Modifier.openCodeTapTarget()` after `clickable`; `OpenCodeSwitch(checked, onCheckedChange)` instead of Material's `Switch` (pass `null` when the row is the toggleable); sheets take `dragHandle = { OpenCodeSheetHandle() }` and `shape = OpenCodeShape.sheetTop` (both the default in `OpenCodeBottomSheet`); `OpenCodeTextField(value, onValueChange, label = "…", placeholder = "…")` and `OpenCodeSearchField` instead of Material's `OutlinedTextField` / `TextField`.

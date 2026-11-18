@@ -1,5 +1,6 @@
 package ai.opencode.feature.settings.serverdetails
 
+import ai.opencode.core.ui.OpenCodeContentUnavailable
 import ai.opencode.core.ui.OpenCodeSearchField
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeSheetHandle
@@ -277,7 +278,7 @@ private fun MCPServerTray(
     Column(Modifier.fillMaxWidth()) {
         TrayHeader(null, null, close, onBack)
         if (mcp == null) {
-            ServerDetailsUnavailable(SFSymbol.ServerRack, "Server Removed", Modifier.padding(vertical = 48.dp))
+            OpenCodeContentUnavailable(SFSymbol.ServerRack, "Server Removed", Modifier.fillMaxWidth().padding(vertical = 16.dp))
             return@Column
         }
         val brand = ServerBrand.mcp(mcp.name)
@@ -362,7 +363,7 @@ private fun AccountsTray(accounts: List<OpenCodeAccount>, close: () -> Unit) {
     Column(Modifier.fillMaxWidth()) {
         TrayHeader("Accounts", "Sign-ins this server holds", close)
         if (accounts.isEmpty()) {
-            ServerDetailsUnavailable(SFSymbol.PersonCropCircle, "No Accounts", Modifier.padding(vertical = 48.dp))
+            OpenCodeContentUnavailable(SFSymbol.PersonCropCircle, "No Accounts", Modifier.fillMaxWidth().padding(vertical = 16.dp))
             return@Column
         }
         LazyColumn(contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)) {
@@ -437,7 +438,7 @@ private fun SkillsTray(skills: List<OpenCodeAutocompleteSkill>, close: () -> Uni
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
         )
         if (shown.isEmpty()) {
-            ServerDetailsUnavailable(SFSymbol.BookClosed, if (query.isEmpty()) "No Skills" else "No Results", Modifier.padding(vertical = 48.dp))
+            OpenCodeContentUnavailable(SFSymbol.BookClosed, if (query.isEmpty()) "No Skills" else "No Results", Modifier.fillMaxWidth().padding(vertical = 16.dp))
             return@Column
         }
         LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)) {
