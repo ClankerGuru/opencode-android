@@ -102,8 +102,8 @@ sealed interface DrawerPanEvent {
 
 /**
  * The layout nodes the drawer pan tests touches against. Register them with [drawerPanDrawer],
- * [drawerPanList], [drawerPanCard], [drawerPanDragCard], [drawerPanHorizontalScroller] and
- * [drawerPanClaimsDrag]; provide it as `LocalDrawerPanExclusion` so the card's controls can use
+ * [drawerPanList], [drawerPanCard], [drawerPanDragCard] and [drawerPanHorizontalScroller];
+ * provide it as `LocalDrawerPanExclusion` so the card's controls can use
  * `Modifier.excludedFromDrawerPan()`.
  */
 @Stable
@@ -198,13 +198,6 @@ fun Modifier.drawerPanHorizontalScroller(
 ): Modifier = region(regions) { id, c ->
     if (c == null) regions.scrollers.remove(id) else regions.scrollers[id] = DrawerPanRegions.Scroller(c, canScrollBackward, canScrollForward)
 }
-
-/**
- * A control that tracks a sideways drag (a slider, a switch): keeps its touch away from the leading
- * edge.
- */
-fun Modifier.drawerPanClaimsDrag(regions: DrawerPanRegions): Modifier =
-    region(regions) { id, c -> if (c == null) regions.claims.remove(id) else regions.claims[id] = c }
 
 /**
  * The drawer's pan over the whole drawer container (put it on the untransformed root that holds
@@ -339,46 +332,4 @@ fun Modifier.drawerDirectionalPan(
                 }
             }
         }
-}
-
-/**
- * Catch Up's card swipe goes to [onCardSwipe]; a reveal goes to [onReveal]; anything else drags
- * [motion]'s card under the finger and releases it onto its spring.
- */
-fun Modifier.drawerPan(
-    motion: DrawerMotionState,
-    regions: DrawerPanRegions,
-    onReveal: (DrawerRevealPhase) -> Unit,
-    isCardSwipe: () -> Boolean = { false },
-    isContentPushed: () -> Boolean = { false },
-    enabled: () -> Boolean = { true },
-    onCardSwipe: (DrawerPanEvent) -> Unit = {},
-): Modifier = drawerDirectionalPan(
-    regions = regions,
-    isDrawerPresented = { motion.isPresented },
-    isCardSwipe = isCardSwipe,
-    isContentPushed = isContentPushed,
-    enabled = enabled,
-    onTouchDown = motion::touchDown,
-) { event ->
-    if (isCardSwipe()) {
-        onCardSwipe(event)
-        return@drawerDirectionalPan
-    }
-    when (event) {
-        is DrawerPanEvent.Began -> if (event.isRevealingTimes) {
-            onReveal(DrawerRevealPhase.Began)
-            onReveal(DrawerRevealPhase.Changed(event.translation))
-        } else {
-            motion.beginDrag()
-            motion.drag(event.fingerTranslation)
-        }
-        is DrawerPanEvent.Changed -> if (event.isRevealingTimes) {
-            onReveal(DrawerRevealPhase.Changed(event.translation))
-        } else {
-            motion.drag(event.fingerTranslation)
-        }
-        is DrawerPanEvent.Ended -> if (event.isRevealingTimes) onReveal(DrawerRevealPhase.Ended) else motion.endDrag(event.velocity)
-        is DrawerPanEvent.Cancelled -> if (event.isRevealingTimes) onReveal(DrawerRevealPhase.Ended) else motion.cancelDrag()
-    }
 }
