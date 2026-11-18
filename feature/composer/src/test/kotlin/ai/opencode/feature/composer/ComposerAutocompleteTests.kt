@@ -258,6 +258,13 @@ class ComposerAutocompleteTests {
         store.finish()
     }
 
+    @Test fun fileMentionOnAWindowsServerUsesADriveLetterURI() {
+        assertEquals(
+            "file:///C:/Users/kit/my%20code/src/main.ts",
+            ComposerAutocompleteDraftResolution.fileURI("C:\\Users\\kit\\my code/src\\main.ts"),
+        )
+    }
+
     @Test fun choosingChipsMapsSkillFileAndAgentMentionsIntoPromptResolution() {
         val skillChip = chip(101, AutocompleteItem.skill(sampleSkills[0]))
         val fileChip = chip(102, AutocompleteItem.file(sampleFiles[0]))

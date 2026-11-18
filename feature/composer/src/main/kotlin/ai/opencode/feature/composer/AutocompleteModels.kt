@@ -603,9 +603,15 @@ sealed interface ComposerAutocompleteDraftResolution {
             return OpenCodeAutocompleteMentions(fileMentions, agentMentions, skillMentions) to sent.toString()
         }
 
-        /** `URL(fileURLWithPath:).absoluteString`: `file://` and the percent-encoded absolute path. */
+        private val windowsDrivePath = Regex("^[A-Za-z]:[\\\\/]")
+
+        /** `file://` and the percent-encoded absolute path; a Windows drive path becomes `file:///C:/…`. */
         internal fun fileURI(path: String): String {
-            val absolute = if (path.startsWith("/")) path else File(path).absolutePath
+            val absolute = when {
+                windowsDrivePath.containsMatchIn(path) -> "/" + path.replace('\\', '/')
+                path.startsWith("/") -> path
+                else -> File(path).absolutePath
+            }
             val out = StringBuilder("file://")
             val allowed = "-._~!$&'()*+,;=:@/"
             for (byte in absolute.toByteArray(Charsets.UTF_8)) {
