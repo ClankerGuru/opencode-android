@@ -134,27 +134,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Opsionet e bashkëngjitjes</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Të gjitha fotot</string>
-    <string name="composer_photo_more_options_action">Më shumë opsione</string>
-    <string name="composer_photo_select_more">Zgjidh më shumë foto…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">Shto %1$d foto</item>
-        <item quantity="other">Shto %1$d foto</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">I plotë</string>
-    <string name="composer_photo_sheet_half">Gjysmë</string>
-    <string name="composer_photo_grid_description">Fotot</string>
-    <string name="composer_photo_camera_description">Kamera</string>
-    <string name="composer_photo_access_off_title">Qasja te fotot është çaktivizuar</string>
-    <string name="composer_photo_access_off_message">Lejo qasjen te Cilësimet për të zgjedhur foto këtu.</string>
-    <string name="composer_photo_return_action">Kthehu te opsionet e bashkëngjitjes</string>
-    <string name="composer_photo_tile_video_description">Video</string>
-    <string name="composer_photo_tile_photo_description">Foto</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Mund të shtosh më së shumti %1$d foto</item>
-        <item quantity="other">Mund të shtosh më së shumti %1$d foto</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Kënd shumë i gjerë</string>
     <string name="composer_camera_lens_wide_description">Kënd i gjerë</string>

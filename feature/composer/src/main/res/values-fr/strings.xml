@@ -137,29 +137,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Options de pièce jointe</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Toutes les photos</string>
-    <string name="composer_photo_more_options_action">Plus d’options</string>
-    <string name="composer_photo_select_more">Sélectionner d’autres photos…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">Ajouter %1$d photo</item>
-        <item quantity="many">Ajouter %1$d photos</item>
-        <item quantity="other">Ajouter %1$d photos</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Plein écran</string>
-    <string name="composer_photo_sheet_half">Demi-écran</string>
-    <string name="composer_photo_grid_description">Photos</string>
-    <string name="composer_photo_camera_description">Appareil photo</string>
-    <string name="composer_photo_access_off_title">Accès aux photos désactivé</string>
-    <string name="composer_photo_access_off_message">Autorisez l’accès dans les paramètres pour sélectionner des photos ici.</string>
-    <string name="composer_photo_return_action">Retour aux options de pièce jointe</string>
-    <string name="composer_photo_tile_video_description">Vidéo</string>
-    <string name="composer_photo_tile_photo_description">Photo</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Vous pouvez ajouter %1$d photo au maximum</item>
-        <item quantity="many">Vous pouvez ajouter %1$d photos au maximum</item>
-        <item quantity="other">Vous pouvez ajouter %1$d photos au maximum</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Ultra grand-angle</string>
     <string name="composer_camera_lens_wide_description">Grand-angle</string>

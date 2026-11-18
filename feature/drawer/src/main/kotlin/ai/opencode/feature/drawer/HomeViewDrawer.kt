@@ -200,9 +200,6 @@ fun HomeDrawer(
     val controlsTrace = remember { DrawerControlsTrace() }
 
     val isDrawerVisible = rememberIsDrawerVisible(store, viewState)
-    if (viewState.shortcutMotion == null) {
-        LaunchedEffect(isDrawerVisible) { if (!isDrawerVisible) localShortcutMotion.drawerDidHide() }
-    }
     val selectedSessionID by store.observe { viewState.drawerSelectedSessionID(it) }
     val disconnected by store.observe { it.connectionStatus == HomeConnectionFeature.State.ConnectionStatus.disconnected }
     val search by store.observe { it.search }

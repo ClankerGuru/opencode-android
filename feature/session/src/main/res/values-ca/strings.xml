@@ -139,10 +139,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">No s\'ha pogut carregar la sessió</string>
     <string name="session_location_share_failed_title">No s\'ha pogut compartir la ubicació</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Tirador del panell</string>
-    <string name="session_photo_sheet_full_description">Pantalla completa</string>
-    <string name="session_photo_sheet_half_description">Mitja pantalla</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Vols aturar aquest intèrpret d\'ordres?</string>
     <string name="session_shell_stop_confirm_message">L\'ordre s\'atura ara. La sortida es manté aquí fins que la tanquis.</string>

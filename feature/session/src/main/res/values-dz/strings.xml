@@ -135,10 +135,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">ལཱ་ཡུན་མངོན་གསལ་འབད་མ་ཚུགས།</string>
     <string name="session_location_share_failed_title">ས་གནས་བགོ་བཤའ་རྐྱབ་མ་ཚུགས།</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">ཤོག་ལེབ་འཐེན་ས།</string>
-    <string name="session_photo_sheet_full_description">ཆ་ཚང་།</string>
-    <string name="session_photo_sheet_half_description">ཕྱེད་ཀ།</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">ཤལ་འདི་བཀག་ནི་ཨིན་ན?</string>
     <string name="session_shell_stop_confirm_message">བརྡ་བཀོད་ད་ལྟོ་རང་མཇུག་བསྡུ་འོང་། ནཱ་སྟོན་ཡོད་མི་ཐོན་འབྲས་འདི་ ཁྱོད་ཀྱིས་ཁ་མ་བསྡམས་ཚུན་སྡོད་འོང་།</string>

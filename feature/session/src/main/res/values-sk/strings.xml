@@ -141,10 +141,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Reláciu sa nepodarilo načítať</string>
     <string name="session_location_share_failed_title">Polohu sa nepodarilo zdieľať</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Úchyt panela</string>
-    <string name="session_photo_sheet_full_description">Celá obrazovka</string>
-    <string name="session_photo_sheet_half_description">Polovica obrazovky</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Zastaviť tento shell?</string>
     <string name="session_shell_stop_confirm_message">Príkaz sa hneď ukončí. Zobrazený výstup tu zostane, kým ho nezavriete.</string>

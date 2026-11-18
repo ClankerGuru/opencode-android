@@ -140,31 +140,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Priedų parinktys</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Visos nuotraukos</string>
-    <string name="composer_photo_more_options_action">Daugiau parinkčių</string>
-    <string name="composer_photo_select_more">Pasirinkti daugiau nuotraukų…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">Pridėti %1$d nuotrauką</item>
-        <item quantity="few">Pridėti %1$d nuotraukas</item>
-        <item quantity="many">Pridėti %1$d nuotraukos</item>
-        <item quantity="other">Pridėti %1$d nuotraukų</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Visas ekranas</string>
-    <string name="composer_photo_sheet_half">Pusė ekrano</string>
-    <string name="composer_photo_grid_description">Nuotraukos</string>
-    <string name="composer_photo_camera_description">Kamera</string>
-    <string name="composer_photo_access_off_title">Prieiga prie nuotraukų išjungta</string>
-    <string name="composer_photo_access_off_message">Leiskite prieigą nustatymuose, kad čia galėtumėte pasirinkti nuotraukas.</string>
-    <string name="composer_photo_return_action">Grįžti į priedų parinktis</string>
-    <string name="composer_photo_tile_video_description">Vaizdo įrašas</string>
-    <string name="composer_photo_tile_photo_description">Nuotrauka</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Galite pridėti daugiausia %1$d nuotrauką</item>
-        <item quantity="few">Galite pridėti daugiausia %1$d nuotraukas</item>
-        <item quantity="many">Galite pridėti daugiausia %1$d nuotraukos</item>
-        <item quantity="other">Galite pridėti daugiausia %1$d nuotraukų</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Itin plataus kampo</string>
     <string name="composer_camera_lens_wide_description">Plataus kampo</string>

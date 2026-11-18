@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Sessiyani yuklab bo‘lmadi</string>
     <string name="session_location_share_failed_title">Joylashuvni ulashib bo‘lmadi</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Panel tutqichi</string>
-    <string name="session_photo_sheet_full_description">To\'liq</string>
-    <string name="session_photo_sheet_half_description">Yarim</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Bu Shell to‘xtatilsinmi?</string>
     <string name="session_shell_stop_confirm_message">Buyruq hozir to‘xtaydi. Bu yerdagi natija uni yopmaguningizcha qoladi.</string>

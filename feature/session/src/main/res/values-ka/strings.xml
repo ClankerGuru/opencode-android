@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">სესიის ჩატვირთვა ვერ მოხერხდა</string>
     <string name="session_location_share_failed_title">მდებარეობის გაზიარება ვერ მოხერხდა</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">პანელის სახელური</string>
-    <string name="session_photo_sheet_full_description">სრული</string>
-    <string name="session_photo_sheet_half_description">ნახევარი</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">შეჩერდეს ეს გარსი?</string>
     <string name="session_shell_stop_confirm_message">ბრძანება ახლავე დასრულდება. აქ ნაჩვენები შედეგი დახურვამდე დარჩება.</string>

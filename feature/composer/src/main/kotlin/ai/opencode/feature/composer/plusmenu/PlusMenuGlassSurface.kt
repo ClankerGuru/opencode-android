@@ -74,9 +74,6 @@ import kotlin.math.roundToInt
  *
  * [AttachmentMenuMeasure] measures the rows and publishes
  * [anchors]; this draws them. Put it in a full-screen box over the session.
- *
- * @param handsOff the photo sheet took the glass: the menu leaves at once, and the next open
- *   (Back from the sheet) starts already open rather than growing from the + again.
  */
 @Composable
 fun PlusMenuGlassSurface(
@@ -88,7 +85,6 @@ fun PlusMenuGlassSurface(
     onPaste: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
-    handsOff: Boolean = false,
 ) {
     val reduceMotion = rememberReduceMotion()
     val density = LocalDensity.current
@@ -99,25 +95,7 @@ fun PlusMenuGlassSurface(
 
     /** The host is up: drawn while open and until the close has retired it. */
     var hosted by remember { mutableStateOf(false) }
-    var handedOff by remember { mutableStateOf(false) }
-    var resumes by remember { mutableStateOf(false) }
-
-    // The host's lifetime.
-    if (handsOff) {
-        if (hosted || !handedOff) {
-            handedOff = true
-            hosted = false
-            resumes = false
-        }
-    } else {
-        if (!isOpen && !hosted && handedOff) handedOff = false
-        if (isOpen && !hosted) {
-            hosted = true
-            // Back from the photo sheet: take over its fold already open.
-            resumes = handedOff
-            handedOff = false
-        }
-    }
+    if (isOpen && !hosted) hosted = true
 
     // Touch ownership follows intent, even during a zero-sized layout. A close that loses its
     // geometry can't run its collapse to retire, so it retires now.
@@ -134,7 +112,7 @@ fun PlusMenuGlassSurface(
     rememberTouchRecovery(
         owner = TouchRecovery.Owner.PlusMenu,
         inspect = {
-            if (hosted && !isOpen && !handsOff) TouchRecovery.Fault(TouchRecovery.Reason.Closed, host) else null
+            if (hosted && !isOpen) TouchRecovery.Fault(TouchRecovery.Reason.Closed, host) else null
         },
         release = { hosted = false },
     )
@@ -163,7 +141,6 @@ fun PlusMenuGlassSurface(
             menu = menu,
             seed = anchors.seed.translate(-origin),
             isOpen = isOpen,
-            resumes = resumes,
             items = items,
             buttonCenterX = anchors.buttonCenterXInMenu,
             highlighted = highlighted,
@@ -175,7 +152,7 @@ fun PlusMenuGlassSurface(
         )
     }
     // System Back closes it.
-    BackHandler(enabled = isOpen && !handsOff) { onDismiss() }
+    BackHandler(enabled = isOpen) { onDismiss() }
 }
 
 @Composable
@@ -183,7 +160,6 @@ private fun PlusMenuWindowContent(
     menu: Rect,
     seed: Rect,
     isOpen: Boolean,
-    resumes: Boolean,
     items: List<AttachmentMenuItem>,
     buttonCenterX: Float,
     highlighted: AttachmentMenuItem?,
@@ -195,9 +171,9 @@ private fun PlusMenuWindowContent(
 ) {
     val density = LocalDensity.current
     // `expanded`, animated: 0 at the shrunk + disc, 1 at the menu.
-    val expanded = remember { Animatable(if (resumes && isOpen) 1f else 0f) }
+    val expanded = remember { Animatable(0f) }
     /** The glass's opacity: Liquid Glass's materialize transition, a fade here. */
-    val glass = remember { Animatable(if (resumes && isOpen) 1f else 0f) }
+    val glass = remember { Animatable(0f) }
     var generation by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(isOpen) {

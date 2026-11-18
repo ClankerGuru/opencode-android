@@ -13,7 +13,7 @@ import ai.opencode.feature.drawer.SessionPagesAction
 import ai.opencode.feature.drawer.icons.OpenCodeProjectLookup
 import ai.opencode.feature.drawer.isPinned
 import ai.opencode.feature.drawer.motion.DrawerPanRegions
-import ai.opencode.feature.drawer.motion.DrawerShortcutInputs
+import ai.opencode.feature.drawer.motion.DrawerMotionTunables
 import ai.opencode.feature.drawer.motion.DrawerShortcutMotion
 import ai.opencode.feature.drawer.motion.DrawerTimeReveal
 import ai.opencode.feature.drawer.motion.DrawerTimestamp
@@ -191,11 +191,6 @@ fun DrawerListView(
     val timeContext = LocalContext.current
     val hour24 = remember(timeContext) { android.text.format.DateFormat.is24HourFormat(timeContext) }
 
-    // Catch Up and What’s New stay in the list while they fold away.
-    val catchUpMounted = shortcutMotion.isCatchUpMounted(fallback = holder.model.shortcuts.showsCatchUp)
-    val whatsNewMounted = shortcutMotion.isWhatsNewMounted(fallback = holder.model.shortcuts.showsWhatsNew)
-    val mounted = rememberUpdatedState(catchUpMounted to whatsNewMounted)
-
     // While the drawer is hidden this reads nothing but the flag, so Home's changes don't rebuild it.
     val drawerHidden = LocalDrawerHidden.current
     val model by remember {
@@ -209,8 +204,6 @@ fun DrawerListView(
                     state = state,
                     inputs = currentInputs.value,
                     liftedID = liftedID.value,
-                    catchUpMounted = mounted.value.first,
-                    whatsNewMounted = mounted.value.second,
                     now = Instant.now(),
                     timestamp = { date, _ -> day.text(date) },
                     project = { session, _ -> projects.resolved(session) },
@@ -230,26 +223,15 @@ fun DrawerListView(
         hasApplied[0] = true
     }
 
-    // The shortcut rows' spring follows what the list shows.
-    val shortcutInputs = DrawerShortcutInputs(
-        showsCatchUp = model.shortcuts.showsCatchUp,
-        catchUpCount = model.shortcuts.catchUpCount,
-        catchUpFinish = model.shortcuts.catchUpFinish,
-        canMarkAllRead = model.shortcuts.canMarkAllRead,
-        showsWhatsNew = model.shortcuts.showsWhatsNew,
-        searchIsEmpty = model.search.isEmpty(),
-        serverID = model.serverID,
-        isSettingsShown = isSettingsShown,
-        // What changed while the drawer was hidden lands in place on reveal.
-        isDrawerVisible = isDrawerVisible && !holder.isRevealing,
-        reducedMotion = model.reducedMotion,
-    )
-    val lastShortcutInputs = remember { arrayOfNulls<DrawerShortcutInputs>(1) }
+    // What changed while the drawer was hidden lands in place on reveal.
+    val shortcutsAnimate = isDrawerVisible && !holder.isRevealing
+    val settingsWasShown = remember { booleanArrayOf(false) }
+    val whatsNewExitDelay = remember(model.shortcuts.showsWhatsNew) {
+        if (settingsWasShown[0] && !isSettingsShown) DrawerMotionTunables.SHORTCUT_CLOSE_DELAY else 0.0
+    }
     SideEffect {
-        if (shortcutInputs != lastShortcutInputs[0]) {
-            lastShortcutInputs[0] = shortcutInputs
-            shortcutMotion.sync(shortcutInputs)
-        }
+        shortcutMotion.sync(model.shortcuts, searchIsEmpty = model.search.isEmpty(), isDrawerVisible = shortcutsAnimate)
+        settingsWasShown[0] = isSettingsShown
         holder.isRevealing = false
     }
 
@@ -355,7 +337,7 @@ fun DrawerListView(
             pinnedIDs = sessions.pinned.map { it.id },
             recentIDs = sessions.recents.map { it.id },
             unpinnedRecentsIndex = unpinnedOrder.indexOf(id).coerceAtLeast(0),
-            showsShortcuts = state.search.isEmpty() && (mounted.value.first || mounted.value.second),
+            showsShortcuts = state.search.isEmpty() && (model.shortcuts.showsCatchUp || model.shortcuts.showsWhatsNew),
             reducedMotion = currentInputs.value.reducedMotion,
             fingerY = fingerY,
             onZoneCrossed = { store.send(HomeFeature.Action.DrawerPinZoneCrossed(it)) },
@@ -382,7 +364,7 @@ fun DrawerListView(
         catchUpReturn = null
     }
     val returnFocus = rememberAccessibilityFocusRequest(catchUpReturn)
-    val returnsToCatchUp = DrawerListItem.CatchUp in model.items
+    val returnsToCatchUp = model.search.isEmpty() && model.shortcuts.showsCatchUp
 
     // Server Flow's switch leaves the old server's rows hanging off its name as it goes
     // (`swapRows`); otherwise another server's Home arriving in place, or Server Flow's ghost rows
@@ -502,6 +484,8 @@ fun DrawerListView(
                         kind = if (item == DrawerListItem.CatchUp) DrawerListShortcutKind.CatchUp else DrawerListShortcutKind.WhatsNew,
                         motion = shortcutMotion,
                         shortcuts = current.shortcuts,
+                        animates = shortcutsAnimate,
+                        exitDelay = if (item == DrawerListItem.WhatsNew) whatsNewExitDelay else 0.0,
                         reducedMotion = current.reducedMotion,
                         openCatchUp = { currentActions.openCatchUp() },
                         markAllRead = { store.send(HomeFeature.Action.CatchUp(ai.opencode.feature.drawer.catchup.CatchUpFeature.Action.MarkAllReadTapped)) },

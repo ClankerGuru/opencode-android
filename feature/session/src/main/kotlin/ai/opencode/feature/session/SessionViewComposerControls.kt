@@ -209,8 +209,7 @@ private fun SessionComposerEnv.AttachmentButton() {
     val press = host.attachmentPress ?: return
     val hold = s.dictationHold
     val pose = hold?.let { dictationPose(it) }
-    // New Plus Menu: a hold on + peeks at the newest photos (iOS `peek`, `showRecentPhotos`, `addLibraryPhotos`).
-    val photoSheet = LocalSessionPhotoSheet.current
+    val menu = LocalSessionAttachmentMenu.current
     AttachmentPickerButton(
         isLoading = host.isImportingAttachments,
         isOpen = host.isAttachmentMenuOpen,
@@ -223,11 +222,8 @@ private fun SessionComposerEnv.AttachmentButton() {
         onCancelDictation = { store.send(Action.micPressCancelled) },
         // Its ink as far from the surface's leading edge as from its top; the expanded text inset starts on the same line.
         glyphOffset = ComposerTunables.plusInkOffset,
-        peek = photoSheet?.recentPeek,
-        onHoldPeek = { photoSheet?.showRecentPhotos() == true },
-        onPeekChoose = { id -> photoSheet?.addLibraryPhotos(listOf(id)) },
-        // iOS `popsOnClose`: the New Plus Menu collapses back into + and the glyph pops.
-        popsOnClose = photoSheet != null && photoSheet.attachmentMenu == AttachmentMenuPhase.Menu && !photoSheet.morph.isShown,
+        // iOS `popsOnClose`: the + menu collapses back into + and the glyph pops.
+        popsOnClose = menu != null && menu.attachmentMenu == AttachmentMenuPhase.Menu,
         // Sliding from + to the rows must not open the drawer; loading, or as the recording's ×, it takes no slide.
         modifier = Modifier.excludedFromDrawerPan(!host.isImportingAttachments && hold == null),
     )

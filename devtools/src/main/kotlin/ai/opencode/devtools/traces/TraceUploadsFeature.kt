@@ -7,7 +7,6 @@ import ai.opencode.core.dependencies.PasteboardClient
 import ai.opencode.core.dependencies.UuidClient
 import ai.opencode.core.dependencies.dependency
 import ai.opencode.core.diagnostics.DiagnosticsRecorder
-import ai.opencode.core.diagnostics.MotionWatch
 import ai.opencode.core.diagnostics.ProblemReport
 import ai.opencode.core.diagnostics.ProblemReportBuilder
 import ai.opencode.core.diagnostics.ProblemReportBundle
@@ -201,7 +200,6 @@ class TraceUploadsFeature : Reducer<TraceUploadsFeature.State, TraceUploadsFeatu
         val capture = dependency(ProblemReportCapture)
         val devTools = dependency(DevToolsClient)
         val client = dependency(OpenCodeClient)
-        val motionWatch = dependency(MotionWatch)
         return Reduced(
             state.copy(report = snapshot),
             Effect.run<Action> { send ->
@@ -219,7 +217,6 @@ class TraceUploadsFeature : Reducer<TraceUploadsFeature.State, TraceUploadsFeatu
                         appLog = devTools.appLog(),
                         previousRun = recorder.previousRunEvents(),
                         screenshot = screenshot,
-                        motionJumps = motionWatch.snapshot(),
                     )
                 }
                 val ok = NetworkRetry.policy.withValue(NetworkRetry.currentPolicy(RETRY_POLICY)) { uploader.upload(bundle) }

@@ -140,31 +140,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Варианты вложений</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Все фото</string>
-    <string name="composer_photo_more_options_action">Дополнительные опции</string>
-    <string name="composer_photo_select_more">Выбрать ещё фото…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">Добавить %1$d фото</item>
-        <item quantity="few">Добавить %1$d фото</item>
-        <item quantity="many">Добавить %1$d фото</item>
-        <item quantity="other">Добавить %1$d фото</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">На весь экран</string>
-    <string name="composer_photo_sheet_half">На полэкрана</string>
-    <string name="composer_photo_grid_description">Фото</string>
-    <string name="composer_photo_camera_description">Камера</string>
-    <string name="composer_photo_access_off_title">Доступ к фото отключён</string>
-    <string name="composer_photo_access_off_message">Разрешите доступ в настройках, чтобы выбирать фото здесь.</string>
-    <string name="composer_photo_return_action">Вернуться к вариантам вложений</string>
-    <string name="composer_photo_tile_video_description">Видео</string>
-    <string name="composer_photo_tile_photo_description">Фото</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Можно добавить не больше %1$d фото</item>
-        <item quantity="few">Можно добавить не больше %1$d фото</item>
-        <item quantity="many">Можно добавить не больше %1$d фото</item>
-        <item quantity="other">Можно добавить не больше %1$d фото</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Сверхширокоугольный</string>
     <string name="composer_camera_lens_wide_description">Широкоугольный</string>

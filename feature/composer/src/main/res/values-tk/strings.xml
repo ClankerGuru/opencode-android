@@ -134,27 +134,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Goşundy opsiýalary</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Ähli suratlar</string>
-    <string name="composer_photo_more_options_action">Has köp wariant</string>
-    <string name="composer_photo_select_more">Has köp surat saýlaň…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">%1$d surat goş</item>
-        <item quantity="other">%1$d surat goş</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Doly</string>
-    <string name="composer_photo_sheet_half">Ýarym</string>
-    <string name="composer_photo_grid_description">Suratlar</string>
-    <string name="composer_photo_camera_description">Kamera</string>
-    <string name="composer_photo_access_off_title">Suratlara giriş ýapyk</string>
-    <string name="composer_photo_access_off_message">Bu ýerde surat saýlamak üçin Sazlamalarda giriş rugsadyny beriň.</string>
-    <string name="composer_photo_return_action">Goşundy opsiýalaryna dolan</string>
-    <string name="composer_photo_tile_video_description">Wideo</string>
-    <string name="composer_photo_tile_photo_description">Surat</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Iň köp %1$d surat goşup bilersiňiz</item>
-        <item quantity="other">Iň köp %1$d surat goşup bilersiňiz</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Örän giň burçly</string>
     <string name="composer_camera_lens_wide_description">Giň burçly</string>

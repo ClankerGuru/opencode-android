@@ -134,27 +134,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">संलग्नकका विकल्पहरू</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">सबै फोटोहरू</string>
-    <string name="composer_photo_more_options_action">थप विकल्पहरू</string>
-    <string name="composer_photo_select_more">थप फोटोहरू छान्नुहोस्…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">%1$d फोटो थप्नुहोस्</item>
-        <item quantity="other">%1$d फोटोहरू थप्नुहोस्</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">पूरा</string>
-    <string name="composer_photo_sheet_half">आधा</string>
-    <string name="composer_photo_grid_description">फोटोहरू</string>
-    <string name="composer_photo_camera_description">क्यामेरा</string>
-    <string name="composer_photo_access_off_title">फोटोको पहुँच बन्द छ</string>
-    <string name="composer_photo_access_off_message">यहाँ फोटो छान्न सेटिङहरूमा पहुँचको अनुमति दिनुहोस्।</string>
-    <string name="composer_photo_return_action">संलग्नकका विकल्पहरूमा फर्कनुहोस्</string>
-    <string name="composer_photo_tile_video_description">भिडियो</string>
-    <string name="composer_photo_tile_photo_description">फोटो</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">बढीमा %1$d फोटो थप्न सक्नुहुन्छ</item>
-        <item quantity="other">बढीमा %1$d फोटोहरू थप्न सक्नुहुन्छ</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">अल्ट्रा वाइड</string>
     <string name="composer_camera_lens_wide_description">वाइड</string>

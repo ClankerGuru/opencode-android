@@ -649,7 +649,6 @@ internal fun HomeLifecycle(store: StoreOf<HomeFeature.State, HomeFeature.Action>
     val selectedSessionID by store.observe { it.sessionDetail?.session?.id }
     val server by store.observe { it.server }
     val isVoiceAvailable = rememberVoiceAvailable(server)
-    val isDrawerVisible by store.observe { view.isDrawerVisible(it) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
 
     // Keyed by the server: a switch from the drawer swaps Home's state in place, and the new
@@ -680,9 +679,6 @@ internal fun HomeLifecycle(store: StoreOf<HomeFeature.State, HomeFeature.Action>
             // A new visit to the drawer starts from the session on screen.
             if (open) view.chosenSessionID = null
         }
-    }
-    LaunchedEffect(isDrawerVisible, view.isSessionDrawerPresented, view.isSceneActive) {
-        if (!view.isDrawerVisible()) view.shortcutMotion?.drawerDidHide()
     }
     LaunchedEffect(selectedSessionID) {
         if (selectedSessionID != null && selectedSessionID == view.chosenSessionID) view.chosenSessionID = null

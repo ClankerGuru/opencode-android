@@ -135,10 +135,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">세션을 불러올 수 없어요</string>
     <string name="session_location_share_failed_title">위치를 공유할 수 없어요</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">시트 조절 핸들</string>
-    <string name="session_photo_sheet_full_description">전체 화면</string>
-    <string name="session_photo_sheet_half_description">절반 화면</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">이 셸을 중지할까요?</string>
     <string name="session_shell_stop_confirm_message">명령어가 즉시 종료돼요. 여기에 표시된 출력은 창을 닫을 때까지 남아 있어요.</string>

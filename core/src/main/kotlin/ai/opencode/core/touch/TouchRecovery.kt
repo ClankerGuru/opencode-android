@@ -41,7 +41,6 @@ class TouchRecovery(
         Sheet("sheet"),
         KeyboardComposer("keyboard_composer"),
         Zoom("zoom"),
-        Browser("browser"),
         PlusMenu("plus_menu"),
     }
 

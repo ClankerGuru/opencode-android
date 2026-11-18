@@ -7,7 +7,6 @@ import ai.opencode.core.diagnostics.LabMarks
 import ai.opencode.core.haptics.Haptic
 import ai.opencode.core.haptics.HapticEffect
 import ai.opencode.core.haptics.HapticsClient
-import ai.opencode.core.log.AppLog
 import ai.opencode.core.motion.Motion
 import ai.opencode.core.motion.MotionFrameAction
 import ai.opencode.core.motion.MotionPhase
@@ -31,7 +30,6 @@ import ai.opencode.core.ui.appFormattingLocale
 import ai.opencode.core.ui.rememberAccessibilityFocusRequest
 import ai.opencode.feature.transcript.list.TranscriptBorrowedDrag
 import ai.opencode.feature.transcript.list.passesDragsToTranscript
-import ai.opencode.feature.voice.VoiceLabEnvironment
 import ai.opencode.server.model.OpenCodeSession
 import ai.opencode.server.model.OpenCodeShell
 import androidx.activity.compose.BackHandler
@@ -81,7 +79,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -136,7 +133,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import java.time.Duration
 import java.time.Instant
-import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -502,32 +498,6 @@ fun BackgroundWorkPresentation(
     var origin by remember { mutableStateOf(Offset.Zero) }
     var overlayWidth by remember { mutableFloatStateOf(0f) }
 
-    // The surface's path through each morph, and each stage it passed through and why it closed
-    // without landing (`fade`, `reset`).
-    val trace = remember { GlassMorphTrace() }
-    val dragTrace = remember { GlassMorphTrace() }
-    val stageLog = remember { ArrayList<String>() }
-    var countChanges by remember { mutableIntStateOf(0) }
-    val traced = remember { TracedFrames() }
-
-    fun follow(glass: GlassMorphTrace, generation: Int) {
-        if (!GlassMorphTrace.isEnabled) return
-        scope.launch {
-            while (withFrameNanos { glass.tick(generation, it, traced.surface) }) Unit
-        }
-    }
-
-    fun logStage(entry: String) {
-        if (!GlassMorphTrace.isEnabled) return
-        stageLog += entry
-        AppLog.app.debug { "background-work-stages " + stageLog.joinToString(" ") }
-    }
-
-    fun traceClose() {
-        val start = if (traced.placed != Rect.Zero) traced.placed else traced.panel
-        follow(trace, trace.begin("close", region = traced.pill.union(traced.panel).union(start), followingGlyphs = true))
-    }
-
     val latestPresented by rememberUpdatedState(isPresented)
     val latestHasWork by rememberUpdatedState(hasWork)
     val latestSession by rememberUpdatedState(sessionID)
@@ -567,7 +537,6 @@ fun BackgroundWorkPresentation(
 
     // The drawer swaps sessions in place: nothing of the last session's surface, mid-morph or measured, carries over to the next.
     fun reset() {
-        if (stage != BackgroundWorkStage.closed) logStage("reset")
         motion += 1
         dragController.reset()
         scope.launch { scrollState.scrollTo(0) }
@@ -622,7 +591,6 @@ fun BackgroundWorkPresentation(
         motion += 1
         val current = motion
         if (!latestHasWork) {
-            logStage("fade")
             // The panel's frame and rows are kept (stage `capsule`) until it has left.
             stage = BackgroundWorkStage.capsule
             capsuleShown = false
@@ -663,7 +631,6 @@ fun BackgroundWorkPresentation(
     fun finishDrag(velocity: Float, remainingDistance: Float? = null) {
         dragController.end(velocity) { releaseVelocity ->
             val remaining = remainingDistance ?: max(40f, (contentHeight ?: 180f) - dragController.drag.offset)
-            traceClose()
             close(releaseVelocity, remaining)
             onPresentedChange(false)
         }
@@ -672,20 +639,10 @@ fun BackgroundWorkPresentation(
     OnChange(isPresented) { _, presented ->
         if (presented) {
             if (stage != BackgroundWorkStage.panel) {
-                follow(trace, trace.begin("open", region = traced.pill.union(traced.panel), followingGlyphs = true))
                 open()
             }
         } else if (stage == BackgroundWorkStage.panel) {
-            traceClose()
             close()
-        }
-    }
-    OnChange(stage) { _, new -> logStage(new.name) }
-    // `-lab-count-trace`: each change of counts with the capsule at rest, as `count-<n>`, follows its surface resizing.
-    OnChange(agents.size to shells.size) { _, _ ->
-        if (GlassMorphTrace.tracesCounts && stage == BackgroundWorkStage.closed && traced.pill != Rect.Zero && abs(traced.pill.left - 20f) < 2f) {
-            countChanges += 1
-            follow(trace, trace.begin("count-$countChanges", region = traced.pill, matchingCorner = true))
         }
     }
     OnChange(hasWork) { _, work ->
@@ -778,11 +735,6 @@ fun BackgroundWorkPresentation(
         val widthDp = overlayWidth / density.density
         val panel = Rect(pill.left, pill.bottom - height, pill.left + max(pill.width, widthDp - 2 * pill.left), pill.bottom)
         val isScrollable = (contentHeight ?: 0f) > maxHeight + 0.5f
-        if (GlassMorphTrace.isEnabled) {
-            val o = Offset(origin.x / density.density, origin.y / density.density)
-            traced.pill = pill.translate(o)
-            traced.panel = panel.translate(o)
-        }
         // Like the pills it grows from, it hides under a panel grown out of the composer.
         val hidden = isCovered
         val hiddenAlpha by androidx.compose.animation.core.animateFloatAsState(if (hidden) 0f else 1f, Motion.reducedFadeSpec(), label = "hidden")
@@ -799,12 +751,7 @@ fun BackgroundWorkPresentation(
                 override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                     if (source != NestedScrollSource.UserInput || stage != BackgroundWorkStage.panel) return Offset.Zero
                     translation += available.y / density.density
-                    val wasDragging = dragController.drag.isDragging
                     dragController.update(translation, 0f, scrollState.value / density.density, isScrollable)
-                    if (!wasDragging && dragController.drag.isDragging && GlassMorphTrace.isEnabled) {
-                        val area = traced.pill.union(traced.panel)
-                        follow(dragTrace, dragTrace.begin("drag", region = Rect(area.left - 40f, area.top - 80f, area.right + 40f, area.bottom + 80f)))
-                    }
                     return if (dragController.drag.isDragging) available else Offset.Zero
                 }
 
@@ -834,11 +781,6 @@ fun BackgroundWorkPresentation(
                     val w = max(0, ((right - left) * density.density).roundToInt())
                     val h = max(0, ((bottom - top) * density.density).roundToInt())
                     val placeable = measurable.measure(Constraints.fixed(w, h))
-                    if (GlassMorphTrace.isEnabled) {
-                        val o = Offset(origin.x / density.density, origin.y / density.density)
-                        if (stage != BackgroundWorkStage.closed) traced.placed = placed.translate(o)
-                        traced.surface = Rect(left, top, right, bottom).translate(o) to hiddenAlpha * max(capsuleAlpha.value, progress.value)
-                    }
                     layout(0, 0) { placeable.place((left * density.density).roundToInt(), (top * density.density).roundToInt()) }
                 }
                 // At rest, the capsule rides its place in the frame the place moves: the bounds
@@ -888,9 +830,7 @@ fun BackgroundWorkPresentation(
                     contentAlignment = Alignment.CenterStart,
                 ) {
                     BackgroundWorkCapsuleLabel(rowAgents.size, rowShells.size, Modifier.clearAndSetSemantics { }) {
-                        CompositionLocalProvider(LocalGlyphStepTrace provides if (GlassMorphTrace.isEnabled) "capsule" else null) {
-                            BackgroundWorkGlyph(rowAgents, rowShells, waitingSessionIDs, probe, isPaused = !labelShown)
-                        }
+                        BackgroundWorkGlyph(rowAgents, rowShells, waitingSessionIDs, probe, isPaused = !labelShown)
                     }
                 }
             }
@@ -922,7 +862,6 @@ fun BackgroundWorkPresentation(
                         .then(if (settled && !hidden) Modifier.testTag("background-work-panel") else Modifier.clearAndSetSemantics { }),
                     contentAlignment = Alignment.BottomStart,
                 ) {
-                    CompositionLocalProvider(LocalGlyphStepTrace provides if (GlassMorphTrace.isEnabled) "rows" else null) {
                     BackgroundWorkPanel(
                         agents = rowAgents,
                         waitingSessionIDs = waitingSessionIDs,
@@ -946,7 +885,6 @@ fun BackgroundWorkPresentation(
                             }
                         },
                     )
-                    }
                 }
             }
         }
@@ -1189,164 +1127,4 @@ object ShellElapsedTimeFormat {
             else -> localized(R.string.session_list_three, parts[0], parts[1], parts[2])
         }
     }
-}
-
-// MARK: Debug traces
-
-/**
- * The orbs and shell glyphs inside count their steps under this name ([GlyphAdvanceProbe]) while
- * [GlassMorphTrace] is enabled.
- */
-val LocalGlyphStepTrace = compositionLocalOf<String?> { null }
-
-/**
- * Counts the steps the background-work surface's orbs and shell glyphs take on a running frame
- * loop, so a trace can tell whether they moved while the surface morphed. Main thread only.
- */
-internal object GlyphAdvanceProbe {
-    val steps = HashMap<String, Int>()
-
-    fun stepped(name: String) {
-        steps[name] = (steps[name] ?: 0) + 1
-    }
-}
-
-/**
- * Follows the background-work surface through a morph, frame by frame, and writes what it saw
- * (`open: x,y,w,h@ms …|open-coverage: …|open-glyphs: …`) to [AppLog] under
- * `background-work-glass-trace`. Android draws the surface itself, so the shape followed is the
- * surface's own placed bounds (root dp, opacity-weighted) instead of a walk of the layer tree.
- * Debug builds only. The `-ink` probe (a window readback of the words' reach) is not taken.
- */
-internal class GlassMorphTrace(private val identifier: String = "background-work-glass-trace") {
-    companion object {
-        /** The lab's `debug.opencode.glass_trace=1` (debug builds only). */
-        val isEnabled: Boolean by lazy { VoiceLabEnvironment.flag("OPENCODE_LAB_GLASS_TRACE") }
-
-        /**
-         * Also follows the capsule resizing as its counts change (`debug.opencode.count_trace=1`).
-         */
-        val tracesCounts: Boolean by lazy { isEnabled && VoiceLabEnvironment.flag("OPENCODE_LAB_COUNT_TRACE") }
-    }
-
-    var summary = ""
-        private set
-    private var phase = ""
-    private var started = 0L
-    private var path = ArrayList<Pair<Rect, Double>>()
-    private val phases = ArrayList<String>()
-    private var region: Rect? = null
-    private var coverage = ArrayList<Float>()
-    private var ticks = 0
-    private var lockedAt: Int? = null
-    private var shortLived = false
-    private var followsGlyphs = false
-    private var glyphSteps: Map<String, Int> = emptyMap()
-    private var glyphMoves = HashMap<String, ArrayList<Double>>()
-    private var glyphCallbacks = ArrayList<Double>()
-    private var generation = 0
-
-    /**
-     * Starts following the surface and measuring it inside [region] (`<phase>-coverage: min
-     * area,frames,the frame it was first found on`); [followingGlyphs] adds `<phase>-glyphs:
-     * frames the orbs moved on, frames, the longest stretch in ms they held still`.
-     * [matchingCorner] (the counts trace) follows for 0.8 s instead of 2 s.
-     */
-    fun begin(phase: String, region: Rect? = null, matchingCorner: Boolean = false, followingGlyphs: Boolean = false): Int {
-        if (!isEnabled) return generation
-        finish()
-        this.phase = phase
-        this.region = region?.inflate(4f)
-        shortLived = matchingCorner
-        followsGlyphs = followingGlyphs
-        glyphSteps = HashMap(GlyphAdvanceProbe.steps)
-        glyphMoves = HashMap()
-        glyphCallbacks = ArrayList()
-        coverage = ArrayList()
-        ticks = 0
-        lockedAt = null
-        path = ArrayList()
-        started = System.nanoTime()
-        return ++generation
-    }
-
-    /** One frame: the surface's bounds (root dp) and opacity, or null where it isn't drawn. Returns false once the phase is over. */
-    fun tick(generation: Int, frameNanos: Long, surface: Pair<Rect, Float>?): Boolean {
-        if (generation != this.generation || phase.isEmpty()) return false
-        if ((System.nanoTime() - started) / 1e9 >= if (shortLived) 0.8 else 2.0) {
-            finish()
-            return false
-        }
-        val time = (frameNanos - started) / 1e9
-        val next = surface?.takeIf { it.second > 0.01f && it.first.width > 1f && it.first.height > 1f }
-        region?.let { region ->
-            if (lockedAt == null && next != null) lockedAt = ticks
-            if (lockedAt != null) {
-                val inside = next?.first?.takeIf { it.overlaps(region) }?.intersect(region)
-                coverage += if (inside == null) 0f else inside.width * inside.height * next.second
-            }
-        }
-        ticks += 1
-        if (followsGlyphs) {
-            glyphCallbacks += time
-            for ((name, steps) in GlyphAdvanceProbe.steps) {
-                if (steps != glyphSteps[name]) glyphMoves.getOrPut(name) { ArrayList() } += time
-            }
-            glyphSteps = HashMap(GlyphAdvanceProbe.steps)
-        }
-        if (next != null) path += next.first to time
-        return true
-    }
-
-    private fun finish() {
-        if (phase.isEmpty()) return
-        fun f1(value: Float) = String.format(java.util.Locale.ROOT, "%.1f", value)
-        val frames = path.joinToString(" ") { (rect, time) ->
-            listOf(rect.left, rect.top, rect.width, rect.height).joinToString(",") { f1(it) } + "@" + String.format(java.util.Locale.ROOT, "%.1f", time * 1000)
-        }
-        phases.removeAll { it.startsWith("$phase:") || it.startsWith("$phase-coverage:") }
-        phases += "$phase: $frames"
-        if (region != null) {
-            phases += "$phase-coverage: " + String.format(java.util.Locale.ROOT, "%.0f,%d,%d", coverage.minOrNull() ?: 0f, coverage.size, lockedAt ?: -1)
-        }
-        if (followsGlyphs) {
-            // Per group, the longest stretch with no step: from the phase's start to its first
-            // step, then between steps. A group that leaves stops stepping, so nothing after its
-            // last step counts; one that never stepped held still throughout.
-            val end = glyphCallbacks.lastOrNull() ?: 0.0
-            var worst = Triple("none", 0, 0.0)
-            for (name in listOf("capsule", "rows")) {
-                val moves = glyphMoves[name].orEmpty()
-                var still = if (moves.isEmpty()) end else 0.0
-                var from = 0.0
-                for (time in moves) {
-                    still = max(still, time - from)
-                    from = time
-                }
-                if (still >= worst.third) worst = Triple(name, moves.size, still)
-            }
-            phases.removeAll { it.startsWith("$phase-glyphs:") }
-            phases += "$phase-glyphs: " + String.format(java.util.Locale.ROOT, "%d,%d,%.0f,", worst.second, glyphCallbacks.size, worst.third * 1000) + worst.first
-        }
-        summary = phases.joinToString("|")
-        phase = ""
-        AppLog.app.debug { "$identifier $summary" }
-    }
-}
-
-/**
- * Root-dp frames of the capsule's surface, the panel and where the panel is placed, for the trace.
- */
-private class TracedFrames {
-    var pill: Rect = Rect.Zero
-    var panel: Rect = Rect.Zero
-    var placed: Rect = Rect.Zero
-    /** The surface as last laid out (root dp) and drawn (opacity). */
-    var surface: Pair<Rect, Float>? = null
-}
-
-private fun Rect.union(other: Rect): Rect = when {
-    this == Rect.Zero -> other
-    other == Rect.Zero -> this
-    else -> Rect(min(left, other.left), min(top, other.top), max(right, other.right), max(bottom, other.bottom))
 }

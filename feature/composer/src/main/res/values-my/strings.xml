@@ -131,25 +131,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">ပူးတွဲဖိုင် ရွေးချယ်စရာများ</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">ဓာတ်ပုံအားလုံး</string>
-    <string name="composer_photo_more_options_action">နောက်ထပ် ရွေးချယ်စရာများ</string>
-    <string name="composer_photo_select_more">ဓာတ်ပုံများ ထပ်ရွေးပါ…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="other">ဓာတ်ပုံ %1$d ပုံ ထည့်ပါ</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">အပြည့်</string>
-    <string name="composer_photo_sheet_half">တစ်ဝက်</string>
-    <string name="composer_photo_grid_description">ဓာတ်ပုံများ</string>
-    <string name="composer_photo_camera_description">ကင်မရာ</string>
-    <string name="composer_photo_access_off_title">ဓာတ်ပုံ ဝင်ကြည့်ခွင့် ပိတ်ထားသည်</string>
-    <string name="composer_photo_access_off_message">ဤနေရာတွင် ဓာတ်ပုံရွေးရန် ဆက်တင်များတွင် ဝင်ကြည့်ခွင့်ပြုပါ။</string>
-    <string name="composer_photo_return_action">ပူးတွဲဖိုင် ရွေးချယ်စရာများသို့ ပြန်သွားပါ</string>
-    <string name="composer_photo_tile_video_description">ဗီဒီယို</string>
-    <string name="composer_photo_tile_photo_description">ဓာတ်ပုံ</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="other">ဓာတ်ပုံ အများဆုံး %1$d ပုံ ထည့်နိုင်သည်</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">မြင်ကွင်း အလွန်ကျယ်</string>
     <string name="composer_camera_lens_wide_description">မြင်ကွင်းကျယ်</string>

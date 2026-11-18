@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Ekki tókst að hlaða setu</string>
     <string name="session_location_share_failed_title">Ekki tókst að deila staðsetningu</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Draghandfang spjalds</string>
-    <string name="session_photo_sheet_full_description">Full stærð</string>
-    <string name="session_photo_sheet_half_description">Hálf stærð</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Stöðva þessa skel?</string>
     <string name="session_shell_stop_confirm_message">Skipuninni lýkur núna. Úttakið hér helst þar til þú lokar því.</string>

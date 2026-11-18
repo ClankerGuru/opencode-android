@@ -137,29 +137,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Opcije privitaka</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Sve fotografije</string>
-    <string name="composer_photo_more_options_action">Više opcija</string>
-    <string name="composer_photo_select_more">Odaberi još fotografija…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">Dodaj %1$d fotografiju</item>
-        <item quantity="few">Dodaj %1$d fotografije</item>
-        <item quantity="other">Dodaj %1$d fotografija</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Cijeli zaslon</string>
-    <string name="composer_photo_sheet_half">Pola zaslona</string>
-    <string name="composer_photo_grid_description">Fotografije</string>
-    <string name="composer_photo_camera_description">Kamera</string>
-    <string name="composer_photo_access_off_title">Pristup fotografijama je isključen</string>
-    <string name="composer_photo_access_off_message">Dopustite pristup u postavkama da biste ovdje odabrali fotografije.</string>
-    <string name="composer_photo_return_action">Povratak na opcije privitaka</string>
-    <string name="composer_photo_tile_video_description">Video</string>
-    <string name="composer_photo_tile_photo_description">Fotografija</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Možete dodati najviše %1$d fotografiju</item>
-        <item quantity="few">Možete dodati najviše %1$d fotografije</item>
-        <item quantity="other">Možete dodati najviše %1$d fotografija</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Ultraširokokutni</string>
     <string name="composer_camera_lens_wide_description">Širokokutni</string>

@@ -3,16 +3,13 @@ package ai.opencode.feature.drawer.motion
 import ai.opencode.core.diagnostics.PerfTimeline
 import ai.opencode.core.log.AppLog
 import ai.opencode.core.motion.MotionFrameAction
-import ai.opencode.core.motion.MotionPhase
 import ai.opencode.core.motion.MotionRelease
 import ai.opencode.core.motion.MotionRole
-import ai.opencode.core.motion.PresenceGate
 import ai.opencode.core.motion.SpringSolver
-import ai.opencode.core.motion.retarget
 import ai.opencode.core.motion.motionFrameLoop
 import ai.opencode.core.motion.rememberFrameDurationSeconds
+import ai.opencode.feature.drawer.list.DrawerListShortcuts
 import android.view.RoundedCorner
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.Stable
@@ -24,31 +21,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.pow
 
 /**
  * Port of `OpenCode/Drawer/DrawerMotion.swift`: the card that recedes. Plain state holders own
  * every per-frame value (iOS keeps them in UIKit outside SwiftUI); Compose reads them only in
- * layout/draw lambdas ([drawerCard], [drawerRecede], [drawerListDim], [drawerCardScrim]), so a
- * drag never recomposes the session or the drawer list. The reducer hears only settled
+ * layout/draw lambdas, so a drag never recomposes the session or the drawer list. The reducer hears only settled
  * open/shut ([DrawerMotionState.Callbacks.onArrived]).
  *
  * Units: iOS points map 1:1 to dp. Every distance in this file is in dp, velocities in dp/s.
@@ -68,8 +56,6 @@ object DrawerMotionTunables {
     const val DIM_LIGHT = 0.6f
     /** List dim falloff power (iOS `drawer.dim.power`, 1.3). */
     const val DIM_POWER = 1.3f
-    /** Shortcut exit blur (iOS `drawer.shortcuts.blur`, 6). */
-    val shortcutBlur: Dp = 6.dp
     /** Shortcut exit scale (iOS `drawer.shortcuts.scale`, 0.96). */
     const val SHORTCUT_SCALE = 0.96f
     /** Shortcut exit delay after a page close (iOS `drawer.shortcuts.closeDelay`, 0.12 s). */
@@ -82,123 +68,12 @@ object DrawerMotionTunables {
     const val BACK_PREVIEW_TRAVEL = 0.25f
 }
 
-/** Inputs driving the drawer's Catch Up and What’s New shortcut presence (iOS `DrawerShortcutInputs`). */
-data class DrawerShortcutInputs(
-    val showsCatchUp: Boolean,
-    val catchUpCount: Int,
-    /** Catch Up just finished with nothing left (`CatchUpFinish`): that finish's identity, so the row plays each finish once. */
-    val catchUpFinish: Int?,
-    val canMarkAllRead: Boolean,
-    val showsWhatsNew: Boolean,
-    val searchIsEmpty: Boolean,
-    val serverID: String,
-    val isSettingsShown: Boolean,
-    val isDrawerVisible: Boolean,
-    val reducedMotion: Boolean,
-)
-
 /**
- * One shortcut row's [PresenceGate] + analytical [SpringSolver] (`0..1`), keeping the row
- * mounted while its height and insets collapse to zero and preserving velocity across
- * mid-flight reversals (iOS `DrawerShortcutSlot`; mutable like the Swift value it ports).
- */
-class DrawerShortcutSlot(isOpen: Boolean = false) {
-    var gate: PresenceGate = PresenceGate(isOpen)
-        private set
-    var solver: SpringSolver = makeSolver(if (isOpen) 1.0 else 0.0)
-        private set
-    /** Internal setter: tests clear it as iOS's do (`slot.generation = nil`). */
-    var generation: Int? = null
-        internal set
-    var delayRemaining: Double = 0.0
-        private set
-
-    val isMounted: Boolean get() = gate.isMounted
-    val wantsOpen: Boolean get() = gate.wantsOpen
-    val progress: Float get() = min(1.0, max(0.0, solver.value)).toFloat()
-    val isSettled: Boolean
-        get() = delayRemaining <= 0 && solver.isSettled && (gate.wantsOpen || !gate.isMounted)
-
-    fun needsSnap(open: Boolean): Boolean =
-        gate.wantsOpen != open || gate.isMounted != open || !isSettled
-
-    fun needsRetarget(open: Boolean): Boolean =
-        open != gate.wantsOpen || (open && !gate.isPresented)
-
-    fun snap(open: Boolean) {
-        gate = PresenceGate(open)
-        solver = makeSolver(if (open) 1.0 else 0.0)
-        generation = null
-        delayRemaining = 0.0
-    }
-
-    fun retarget(open: Boolean, delay: Double = 0.0, reducedMotion: Boolean) {
-        if (!(open != gate.wantsOpen || (open && !gate.isPresented))) return
-        val (requested, token) = gate.request(open)
-        gate = requested
-        if (token != null) {
-            generation = token
-        } else {
-            val (began, began2) = gate.beginAnimation(open)
-            gate = began
-            if (began2 != null) generation = began2
-        }
-        delayRemaining = max(0.0, delay)
-        // Opens on layout, closes on collapse.
-        solver.retarget(if (open) 1.0 else 0.0, role = MotionRole.Layout, phase = if (open) MotionPhase.Enter else MotionPhase.Exit, reduceMotion = reducedMotion)
-    }
-
-    /** Advances [dt] seconds; returns whether the slot is settled. */
-    fun step(dt: Double): Boolean {
-        if (delayRemaining > 0) {
-            delayRemaining = max(0.0, delayRemaining - dt)
-            return false
-        }
-        val result = solver.step(dt, snapWhenSettled = true)
-        if (result.isSettled) {
-            val gen = generation
-            if (gen != null) {
-                gate = gate.complete(gen).first
-                generation = null
-            } else if (!gate.wantsOpen && gate.isMounted) {
-                gate = gate.complete(gate.generation).first
-                if (gate.isMounted) gate = PresenceGate(false)
-            }
-        }
-        return isSettled
-    }
-
-    private companion object {
-        fun makeSolver(value: Double) = SpringSolver(
-            MotionRole.Layout,
-            value = value,
-            target = value,
-            positionEpsilon = 0.004,
-            velocityEpsilon = 0.04,
-        )
-    }
-}
-
-/**
- * Steps Catch Up and What’s New on one frame loop so their height, insets, scale and blur move
- * on one spring with the session rows below them (iOS `DrawerShortcutMotion`).
- *
- * Rows read [catchUpProgress] / [whatsNewProgress] (snapshot state) in layout or draw lambdas.
- * [scope] must carry a frame clock: use [rememberDrawerShortcutMotion].
+ * What the Catch Up row keeps while it folds away: the count it showed, and when the drawer first
+ * showed Catch Up finished.
  */
 @Stable
-class DrawerShortcutMotion(private val scope: CoroutineScope, var frameDurationSeconds: Double = 1.0 / 60.0) {
-    internal val catchUp = DrawerShortcutSlot()
-    internal val whatsNew = DrawerShortcutSlot()
-
-    private var catchUpMountedState by mutableStateOf(false)
-    private var catchUpWantsOpenState by mutableStateOf(false)
-    private var catchUpProgressState by mutableFloatStateOf(0f)
-    private var whatsNewMountedState by mutableStateOf(false)
-    private var whatsNewWantsOpenState by mutableStateOf(false)
-    private var whatsNewProgressState by mutableFloatStateOf(0f)
-
-    /** The count Catch Up's row shows; kept while it folds away. */
+class DrawerShortcutMotion {
     var displayedCatchUpCount: Int = 1
         private set
     var displayedCanMarkAllRead: Boolean = false
@@ -212,125 +87,25 @@ class DrawerShortcutMotion(private val scope: CoroutineScope, var frameDurationS
         private set
 
     /** The finish the row has played; search, a hidden drawer or a fold resume its clock, never restart it. */
-    var playedFinish: Int? = null
-        private set
+    private var playedFinish: Int? = null
 
-    private var job: Job? = null
-    private var hasSyncedInitial = false
-    private var lastServerID: String? = null
-    private var lastSearchEmpty = true
-    private var lastSettingsShown = false
-
-    val isRunning: Boolean get() = job?.isActive == true
-
-    fun drawerDidHide() {
-        stop()
-        snapSlots(catchUp.wantsOpen, whatsNew.wantsOpen)
-    }
-
-    fun isCatchUpMounted(fallback: Boolean): Boolean = if (hasSyncedInitial) catchUpMountedState else fallback
-    fun catchUpProgress(fallback: Boolean): Float = if (hasSyncedInitial) catchUpProgressState else if (fallback) 1f else 0f
-    fun catchUpWantsOpen(fallback: Boolean): Boolean = if (hasSyncedInitial) catchUpWantsOpenState else fallback
-    fun isWhatsNewMounted(fallback: Boolean): Boolean = if (hasSyncedInitial) whatsNewMountedState else fallback
-    fun whatsNewProgress(fallback: Boolean): Float = if (hasSyncedInitial) whatsNewProgressState else if (fallback) 1f else 0f
-    fun whatsNewWantsOpen(fallback: Boolean): Boolean = if (hasSyncedInitial) whatsNewWantsOpenState else fallback
-
-    fun sync(inputs: DrawerShortcutInputs) {
-        if (inputs.catchUpCount > 0) {
-            displayedCatchUpCount = inputs.catchUpCount
-            displayedCanMarkAllRead = inputs.canMarkAllRead
+    fun sync(shortcuts: DrawerListShortcuts, searchIsEmpty: Boolean, isDrawerVisible: Boolean) {
+        if (shortcuts.catchUpCount > 0) {
+            displayedCatchUpCount = shortcuts.catchUpCount
+            displayedCanMarkAllRead = shortcuts.canMarkAllRead
         } else {
             displayedCanMarkAllRead = false
         }
-        val wantsCatchUp = inputs.searchIsEmpty && inputs.showsCatchUp
-        val wantsWhatsNew = inputs.searchIsEmpty && inputs.showsWhatsNew
-        syncFinish(inputs, wantsCatchUp)
-        if (!hasSyncedInitial || inputs.serverID != lastServerID || inputs.searchIsEmpty != lastSearchEmpty) {
-            hasSyncedInitial = true
-            lastServerID = inputs.serverID
-            lastSearchEmpty = inputs.searchIsEmpty
-            lastSettingsShown = inputs.isSettingsShown
-            stop()
-            snapSlots(wantsCatchUp, wantsWhatsNew)
-            publish()
-            return
-        }
-        val wasSettingsShown = lastSettingsShown
-        lastSettingsShown = inputs.isSettingsShown
-        if (!inputs.isDrawerVisible) {
-            stop()
-            snapSlots(wantsCatchUp, wantsWhatsNew)
-            return
-        }
-        val whatsNewDelay =
-            if (wasSettingsShown && !inputs.isSettingsShown && !wantsWhatsNew && !inputs.reducedMotion) {
-                DrawerMotionTunables.SHORTCUT_CLOSE_DELAY
-            } else {
-                0.0
-            }
-        if (catchUp.needsRetarget(wantsCatchUp)) catchUp.retarget(wantsCatchUp, 0.0, inputs.reducedMotion)
-        if (whatsNew.needsRetarget(wantsWhatsNew)) whatsNew.retarget(wantsWhatsNew, whatsNewDelay, inputs.reducedMotion)
-        publish()
-        if (!catchUp.isSettled || !whatsNew.isSettled) start() else stop()
-    }
-
-    /** The finished row arrives in place with the drawer and starts its clock once per finish. */
-    private fun syncFinish(inputs: DrawerShortcutInputs, wantsCatchUp: Boolean) {
-        val finish = inputs.catchUpFinish
-        if (finish == null) {
-            if (inputs.catchUpCount > 0) finishStart = null
-            return
-        }
-        if (finish == playedFinish || !wantsCatchUp || !inputs.isDrawerVisible) return
+        if (shortcuts.catchUpCount > 0) finishStart = null
+        val finish = shortcuts.catchUpFinish ?: return
+        if (finish == playedFinish || !searchIsEmpty || !isDrawerVisible) return
         playedFinish = finish
-        if (catchUp.needsSnap(true)) catchUp.snap(true)
-        publish()
         finishStart = System.nanoTime() / 1e9
     }
-
-    private fun snapSlots(wantsCatchUp: Boolean, wantsWhatsNew: Boolean) {
-        val snapCatchUp = catchUp.needsSnap(wantsCatchUp)
-        val snapWhatsNew = whatsNew.needsSnap(wantsWhatsNew)
-        if (!snapCatchUp && !snapWhatsNew) return
-        if (snapCatchUp) catchUp.snap(wantsCatchUp)
-        if (snapWhatsNew) whatsNew.snap(wantsWhatsNew)
-        publish()
-    }
-
-    private fun publish() {
-        catchUpMountedState = catchUp.isMounted
-        catchUpWantsOpenState = catchUp.wantsOpen
-        catchUpProgressState = catchUp.progress
-        whatsNewMountedState = whatsNew.isMounted
-        whatsNewWantsOpenState = whatsNew.wantsOpen
-        whatsNewProgressState = whatsNew.progress
-    }
-
-    private fun start() {
-        if (isRunning) return
-        job = scope.launch {
-            motionFrameLoop(frameDurationSeconds) { tick ->
-                val catchUpDone = catchUp.step(tick.dt)
-                val whatsNewDone = whatsNew.step(tick.dt)
-                publish()
-                if (catchUpDone && whatsNewDone) MotionFrameAction.Stop else MotionFrameAction.Continue
-            }
-        }
-    }
-
-    private fun stop() {
-        job?.cancel()
-        job = null
-    }
 }
 
-/** A [DrawerShortcutMotion] on this composition's frame clock. */
 @Composable
-fun rememberDrawerShortcutMotion(): DrawerShortcutMotion {
-    val scope = rememberCoroutineScope()
-    val frame = rememberFrameDurationSeconds()
-    return remember(scope) { DrawerShortcutMotion(scope, frame) }.also { it.frameDurationSeconds = frame }
-}
+fun rememberDrawerShortcutMotion(): DrawerShortcutMotion = remember { DrawerShortcutMotion() }
 
 /**
  * The drawer's settle (iOS `DrawerSpring`): a critically damped spring (no bounce) stepped each
@@ -447,7 +222,7 @@ fun rememberDisplayCornerRadius(): Dp {
  * The card's offset and the drawer's open state, owned outside composition (iOS
  * `SessionDrawerViewController`'s drag, settle and `apply(offset:)`).
  *
- * - The pan feeds [beginDrag] / [drag] / [endDrag] / [cancelDrag] (see `Modifier.drawerPan`).
+ * - The pan feeds [beginDrag] / [drag] / [endDrag] / [cancelDrag].
  * - The drawer button calls [setPresented]; a tap on the card or Escape calls [close].
  * - Release: one commit rule (`MotionRelease.shouldCommit`): a flick decides, otherwise the
  *   halfway mark; the card then
@@ -798,42 +573,4 @@ fun rememberDrawerMotionState(initiallyPresented: Boolean = false): DrawerMotion
     val scope = rememberCoroutineScope()
     val frame = rememberFrameDurationSeconds()
     return remember(scope) { DrawerMotionState(scope, initiallyPresented) }.also { it.frameDurationSeconds = frame }
-}
-
-/**
- * The session card: slides by the drawer's offset (mirrored in RTL) and takes the display's
- * corner radius while it moves or rests aside (iOS `apply(offset:)` on `cardView`). Read in the
- * layer block only, so dragging never recomposes the card.
- */
-fun Modifier.drawerCard(state: DrawerMotionState, displayCornerRadius: Dp): Modifier = composed {
-    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    graphicsLayer {
-        val offset = state.offset
-        translationX = offset.dp.toPx() * if (rtl) -1 else 1
-        val radius = DrawerCorner.radius(state.isCardMoving, offset, displayCornerRadius.value)
-        shape = if (radius > 0) RoundedCornerShape(radius.dp) else RectangleShape
-        clip = radius > 0
-    }
-}
-
-/** The drawer recedes behind the closing card (iOS `drawerHost.view.transform`, [DrawerDepth]). */
-fun Modifier.drawerRecede(state: DrawerMotionState): Modifier = graphicsLayer {
-    val scale = DrawerDepth.scale(state.progress, state.reducedMotion || !state.recedes)
-    scaleX = scale
-    scaleY = scale
-    transformOrigin = TransformOrigin.Center
-}
-
-/** Black over the drawer list, deeper the more shut it is (iOS `drawerDimView`, [DrawerDim]). */
-fun Modifier.drawerListDim(state: DrawerMotionState, isDark: Boolean): Modifier = drawWithContent {
-    drawContent()
-    val alpha = DrawerDim.alpha(state.progress, DrawerDim.maximum(isDark))
-    if (alpha > 0f) drawRect(DrawerDim.color, alpha = alpha)
-}
-
-/** The scrim over the card, its alpha the drawer's progress (iOS `dimmingView`; colour from `DrawerScrim`). */
-fun Modifier.drawerCardScrim(state: DrawerMotionState, color: Color): Modifier = drawWithContent {
-    drawContent()
-    val alpha = state.progress
-    if (alpha > 0f) drawRect(color, alpha = alpha)
 }

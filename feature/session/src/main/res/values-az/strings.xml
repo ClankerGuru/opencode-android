@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Sessiyanı yükləmək mümkün olmadı</string>
     <string name="session_location_share_failed_title">Yeri paylaşmaq mümkün olmadı</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Panel tutacağı</string>
-    <string name="session_photo_sheet_full_description">Tam</string>
-    <string name="session_photo_sheet_half_description">Yarım</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Bu Shell dayandırılsın?</string>
     <string name="session_shell_stop_confirm_message">Əmr indi dayandırılacaq. Burada göstərilən çıxış siz bağlayanadək qalacaq.</string>

@@ -2,7 +2,6 @@ package ai.opencode.devtools
 
 import ai.opencode.core.diagnostics.DiagnosticsRecorder
 import ai.opencode.core.diagnostics.LabMarks
-import ai.opencode.core.diagnostics.MotionWatch
 import ai.opencode.core.diagnostics.PerfFrameSampler
 import ai.opencode.core.diagnostics.PerfTimeline
 import ai.opencode.core.log.AppLog
@@ -45,8 +44,8 @@ object DevTools {
 
     /**
      * Debug lab extras: `tuning-enabled`, `tuning-as-release`, `lab-time-scale`, `lab-marks-url`,
-     * `diagnostics-enabled`, `lab-tuning-perf`, `tuning-panel`, `perf-signposts`, `perf-frames`,
-     * `lab-crash-report` and `lab-motion-watch`.
+     * `diagnostics-enabled`, `lab-tuning-perf`, `tuning-panel`, `perf-signposts`, `perf-frames`
+     * and `lab-crash-report`.
      */
     fun handleLaunchIntent(intent: Intent?) {
         intent ?: return
@@ -57,7 +56,6 @@ object DevTools {
         if (intent.getBooleanExtra("lab-crash-report", false)) TraceUploadsFeature.labCrashReport = true
         if (intent.getBooleanExtra("perf-signposts", false)) PerfTimeline.signpostsRequested = true
         if (intent.getBooleanExtra("perf-frames", false)) PerfFrameSampler.framesRequested = true
-        if (intent.getBooleanExtra("lab-motion-watch", false)) MotionWatch.enableForLab()
         AnimationTimeScale.requestedLabScale(intent.getStringExtra("lab-time-scale"))?.let {
             AnimationTimeScale.shared.setScale(it, bypassAccessCheck = true)
         }
@@ -97,7 +95,6 @@ object DevTools {
 
     /** Developer Mode changed: outside debug builds, tuning and slow motion leave with it. */
     fun accessChanged() {
-        MotionWatch.shared.accessChanged()
         if (!TuningAccess.isAvailable) {
             if (TuningStore.shared.isEnabled) setTuningEnabled(false)
             AnimationTimeScale.shared.reset()

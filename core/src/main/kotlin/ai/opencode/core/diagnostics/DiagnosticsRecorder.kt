@@ -421,20 +421,6 @@ class DiagnosticsRecorder(
         )
     }
 
-    /** One live Motion Watch jump (kind, row kinds, stable IDs and detail only; never message text). */
-    fun recordMotionJump(kind: String, sessionID: String?, rowKinds: List<String>, rows: List<String>, detail: String) {
-        val name = "motion_jump_" + kind.replace("-", "_")
-        val kinds = if (rowKinds.isEmpty()) "transcript" else rowKinds.joinToString(",")
-        val ids = if (rows.isEmpty()) "—" else rows.joinToString(",")
-        val summary = "kinds=$kinds rows=$ids $detail"
-        record { now, wall ->
-            DiagnosticsEvent(
-                kind = DiagnosticsEvent.Kind.Mark, monotonicSeconds = now, wallDate = wall, name = name,
-                sessionID = sessionID ?: state.currentSessionID, navigationEpoch = state.currentNavigationEpoch, reason = summary,
-            )
-        }
-    }
-
     /** One mark on a voice call's turn timeline; [excerpt] is dropped unless Include Transcripts is on. */
     fun recordVoice(name: String, sessionID: String?, detail: String? = null, excerpt: String? = null) {
         val cut = excerpt?.let(::excerpt)
@@ -658,7 +644,7 @@ class DiagnosticsRecorder(
                     event.durationMilliseconds?.let { pieces += String.format(Locale.ROOT, "%.0fms", it) }
                     event.statusCode?.let { pieces += "status=$it" }
                     event.errorCategory?.let { pieces += "error=${it.description}" }
-                    if ((event.kind == DiagnosticsEvent.Kind.Stream || event.kind == DiagnosticsEvent.Kind.Voice || event.name.startsWith("motion_jump_") || event.name == TOUCH_PROBE_EVENT_NAME) && event.reason != null) {
+                    if ((event.kind == DiagnosticsEvent.Kind.Stream || event.kind == DiagnosticsEvent.Kind.Voice || event.name == TOUCH_PROBE_EVENT_NAME) && event.reason != null) {
                         pieces += event.reason
                     }
                     event.excerpt?.let { pieces += "“$it”" }

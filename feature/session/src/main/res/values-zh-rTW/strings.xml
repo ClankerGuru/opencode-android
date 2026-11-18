@@ -135,10 +135,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">無法載入工作階段</string>
     <string name="session_location_share_failed_title">無法分享位置</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">面板拖曳列</string>
-    <string name="session_photo_sheet_full_description">全螢幕</string>
-    <string name="session_photo_sheet_half_description">半螢幕</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">停止此 Shell？</string>
     <string name="session_shell_stop_confirm_message">命令會立即結束。此處的輸出會保留，直到你關閉為止。</string>

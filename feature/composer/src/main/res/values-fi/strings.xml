@@ -134,27 +134,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Liitevalinnat</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Kaikki valokuvat</string>
-    <string name="composer_photo_more_options_action">Lisää vaihtoehtoja</string>
-    <string name="composer_photo_select_more">Valitse lisää valokuvia…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">Lisää %1$d valokuva</item>
-        <item quantity="other">Lisää %1$d valokuvaa</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Koko näyttö</string>
-    <string name="composer_photo_sheet_half">Puoli näyttöä</string>
-    <string name="composer_photo_grid_description">Valokuvat</string>
-    <string name="composer_photo_camera_description">Kamera</string>
-    <string name="composer_photo_access_off_title">Ei pääsyä valokuviin</string>
-    <string name="composer_photo_access_off_message">Salli pääsy asetuksissa, jotta voit valita valokuvia tässä.</string>
-    <string name="composer_photo_return_action">Palaa liitevalintoihin</string>
-    <string name="composer_photo_tile_video_description">Video</string>
-    <string name="composer_photo_tile_photo_description">Valokuva</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Voit lisätä enintään %1$d valokuvan</item>
-        <item quantity="other">Voit lisätä enintään %1$d valokuvaa</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Ultralaajakulma</string>
     <string name="composer_camera_lens_wide_description">Laajakulma</string>

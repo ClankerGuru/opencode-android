@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Sitzung konnte nicht geladen werden</string>
     <string name="session_location_share_failed_title">Standort konnte nicht geteilt werden</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Ziehgriff</string>
-    <string name="session_photo_sheet_full_description">Vollbild</string>
-    <string name="session_photo_sheet_half_description">Halbansicht</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Diese Shell stoppen?</string>
     <string name="session_shell_stop_confirm_message">Der Befehl wird jetzt beendet. Die Ausgabe bleibt sichtbar, bis du die Ansicht schließt.</string>

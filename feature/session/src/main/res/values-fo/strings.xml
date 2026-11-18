@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Kundi ikki heinta setuna</string>
     <string name="session_location_share_failed_title">Kundi ikki deila staðseting</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Dragihandtak</string>
-    <string name="session_photo_sheet_full_description">Full</string>
-    <string name="session_photo_sheet_half_description">Hálv</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Steðga hesum shelli?</string>
     <string name="session_shell_stop_confirm_message">Skipanin endar nú. Úttakið verður verandi her, til tú letur tað aftur.</string>

@@ -134,27 +134,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Anhangoptionen</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Alle Fotos</string>
-    <string name="composer_photo_more_options_action">Weitere Optionen</string>
-    <string name="composer_photo_select_more">Weitere Fotos auswählen…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">%1$d Foto hinzufügen</item>
-        <item quantity="other">%1$d Fotos hinzufügen</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Vollbild</string>
-    <string name="composer_photo_sheet_half">Halbansicht</string>
-    <string name="composer_photo_grid_description">Fotos</string>
-    <string name="composer_photo_camera_description">Kamera</string>
-    <string name="composer_photo_access_off_title">Fotozugriff deaktiviert</string>
-    <string name="composer_photo_access_off_message">Erlaube den Zugriff in den Einstellungen, um hier Fotos auszuwählen.</string>
-    <string name="composer_photo_return_action">Zurück zu den Anhangoptionen</string>
-    <string name="composer_photo_tile_video_description">Video</string>
-    <string name="composer_photo_tile_photo_description">Foto</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Du kannst höchstens %1$d Foto hinzufügen</item>
-        <item quantity="other">Du kannst höchstens %1$d Fotos hinzufügen</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Ultraweitwinkel</string>
     <string name="composer_camera_lens_wide_description">Weitwinkel</string>

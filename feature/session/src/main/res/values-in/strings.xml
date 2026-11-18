@@ -135,10 +135,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Gagal memuat sesi</string>
     <string name="session_location_share_failed_title">Gagal membagikan lokasi</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Pegangan panel</string>
-    <string name="session_photo_sheet_full_description">Penuh</string>
-    <string name="session_photo_sheet_half_description">Setengah</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Hentikan shell ini?</string>
     <string name="session_shell_stop_confirm_message">Perintah akan langsung dihentikan. Keluaran di sini tetap ada hingga Anda menutupnya.</string>

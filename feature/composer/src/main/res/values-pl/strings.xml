@@ -140,31 +140,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Opcje załączników</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Wszystkie zdjęcia</string>
-    <string name="composer_photo_more_options_action">Więcej opcji</string>
-    <string name="composer_photo_select_more">Wybierz więcej zdjęć…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">Dodaj %1$d zdjęcie</item>
-        <item quantity="few">Dodaj %1$d zdjęcia</item>
-        <item quantity="many">Dodaj %1$d zdjęć</item>
-        <item quantity="other">Dodaj %1$d zdjęcia</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Pełny ekran</string>
-    <string name="composer_photo_sheet_half">Połowa ekranu</string>
-    <string name="composer_photo_grid_description">Zdjęcia</string>
-    <string name="composer_photo_camera_description">Aparat</string>
-    <string name="composer_photo_access_off_title">Dostęp do zdjęć jest wyłączony</string>
-    <string name="composer_photo_access_off_message">Zezwól na dostęp w ustawieniach, aby wybierać tu zdjęcia.</string>
-    <string name="composer_photo_return_action">Wróć do opcji załączników</string>
-    <string name="composer_photo_tile_video_description">Wideo</string>
-    <string name="composer_photo_tile_photo_description">Zdjęcie</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Możesz dodać najwyżej %1$d zdjęcie</item>
-        <item quantity="few">Możesz dodać najwyżej %1$d zdjęcia</item>
-        <item quantity="many">Możesz dodać najwyżej %1$d zdjęć</item>
-        <item quantity="other">Możesz dodać najwyżej %1$d zdjęcia</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Ultraszerokokątny</string>
     <string name="composer_camera_lens_wide_description">Szerokokątny</string>

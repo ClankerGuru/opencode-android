@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Couldn’t Load Session</string>
     <string name="session_location_share_failed_title">Couldn’t Share Location</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Sheet Grabber</string>
-    <string name="session_photo_sheet_full_description">Full</string>
-    <string name="session_photo_sheet_half_description">Half</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Stop This Shell?</string>
     <string name="session_shell_stop_confirm_message">The command ends now. The output shown here stays until you close it.</string>

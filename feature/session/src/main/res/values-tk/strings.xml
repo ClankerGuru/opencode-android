@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Sessiýany ýükläp bolmady</string>
     <string name="session_location_share_failed_title">Ýerleşişi paýlaşyp bolmady</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Paneliň tutawajy</string>
-    <string name="session_photo_sheet_full_description">Doly</string>
-    <string name="session_photo_sheet_half_description">Ýarym</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Bu Shell duruzylsynmy?</string>
     <string name="session_shell_stop_confirm_message">Buýruk häzir tamamlanar. Bu ýerde görkezilen netije ony ýapýançaňyz galar.</string>

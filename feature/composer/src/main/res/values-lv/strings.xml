@@ -137,29 +137,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Pielikumu opcijas</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Visi fotoattēli</string>
-    <string name="composer_photo_more_options_action">Vairāk opciju</string>
-    <string name="composer_photo_select_more">Atlasīt vēl fotoattēlus…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="zero">Pievienot %1$d fotoattēlu</item>
-        <item quantity="one">Pievienot %1$d fotoattēlu</item>
-        <item quantity="other">Pievienot %1$d fotoattēlus</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Pilns</string>
-    <string name="composer_photo_sheet_half">Puse</string>
-    <string name="composer_photo_grid_description">Fotoattēli</string>
-    <string name="composer_photo_camera_description">Kamera</string>
-    <string name="composer_photo_access_off_title">Piekļuve fotoattēliem ir izslēgta</string>
-    <string name="composer_photo_access_off_message">Atļauj piekļuvi iestatījumos, lai šeit atlasītu fotoattēlus.</string>
-    <string name="composer_photo_return_action">Atgriezties pie pielikumu opcijām</string>
-    <string name="composer_photo_tile_video_description">Video</string>
-    <string name="composer_photo_tile_photo_description">Fotoattēls</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="zero">Var pievienot ne vairāk kā %1$d fotoattēlu</item>
-        <item quantity="one">Var pievienot ne vairāk kā %1$d fotoattēlu</item>
-        <item quantity="other">Var pievienot ne vairāk kā %1$d fotoattēlus</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Īpaši platleņķa</string>
     <string name="composer_camera_lens_wide_description">Platleņķa</string>

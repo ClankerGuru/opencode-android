@@ -134,27 +134,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Опции за прилози</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Сите фотографии</string>
-    <string name="composer_photo_more_options_action">Повеќе опции</string>
-    <string name="composer_photo_select_more">Избери повеќе фотографии…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">Додадете %1$d фотографија</item>
-        <item quantity="other">Додадете %1$d фотографии</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Целосно</string>
-    <string name="composer_photo_sheet_half">Половина</string>
-    <string name="composer_photo_grid_description">Фотографии</string>
-    <string name="composer_photo_camera_description">Камера</string>
-    <string name="composer_photo_access_off_title">Пристапот до фотографии е исклучен</string>
-    <string name="composer_photo_access_off_message">Дозволи пристап во Поставки за да избираш фотографии тука.</string>
-    <string name="composer_photo_return_action">Назад кон опциите за прилози</string>
-    <string name="composer_photo_tile_video_description">Видео</string>
-    <string name="composer_photo_tile_photo_description">Фотографија</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Можеш да додадеш најмногу %1$d фотографија</item>
-        <item quantity="other">Можеш да додадеш најмногу %1$d фотографии</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Ултраширокоаголен</string>
     <string name="composer_camera_lens_wide_description">Широкоаголен</string>
