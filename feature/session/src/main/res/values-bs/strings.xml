@@ -139,10 +139,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Nije moguće učitati sesiju</string>
     <string name="session_location_share_failed_title">Nije moguće podijeliti lokaciju</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Ručica panela</string>
-    <string name="session_photo_sheet_full_description">Cijeli ekran</string>
-    <string name="session_photo_sheet_half_description">Pola ekrana</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Zaustaviti ovu ljusku?</string>
     <string name="session_shell_stop_confirm_message">Komanda se odmah završava. Prikazani izlaz ostaje dok ga ne zatvoriš.</string>

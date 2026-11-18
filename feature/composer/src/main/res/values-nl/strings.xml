@@ -134,27 +134,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Bijlageopties</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Alle foto\'s</string>
-    <string name="composer_photo_more_options_action">Meer opties</string>
-    <string name="composer_photo_select_more">Meer foto\'s selecteren…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">%1$d foto toevoegen</item>
-        <item quantity="other">%1$d foto\'s toevoegen</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Volledig</string>
-    <string name="composer_photo_sheet_half">Half</string>
-    <string name="composer_photo_grid_description">Foto\'s</string>
-    <string name="composer_photo_camera_description">Camera</string>
-    <string name="composer_photo_access_off_title">Fototoegang staat uit</string>
-    <string name="composer_photo_access_off_message">Sta toegang toe in Instellingen om hier foto\'s te kiezen.</string>
-    <string name="composer_photo_return_action">Terug naar bijlageopties</string>
-    <string name="composer_photo_tile_video_description">Video</string>
-    <string name="composer_photo_tile_photo_description">Foto</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Je kunt maximaal %1$d foto toevoegen</item>
-        <item quantity="other">Je kunt maximaal %1$d foto\'s toevoegen</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Ultragroothoek</string>
     <string name="composer_camera_lens_wide_description">Groothoek</string>

@@ -50,12 +50,12 @@ object DockedKeyboard {
     }
 
     /**
-     * The keyboard's own spring (`Motion.keyboard`, [ComposerMorphTunables.keyboard]) for what
+     * The keyboard's own spring (`Motion.keyboard`) for what
      * moves with it, or null (no animation) under Reduce Motion or while the card lays out without
      * the keyboard (`excludesKeyboard`).
      */
     fun focusAnimation(reduceMotion: Boolean, excludesKeyboard: Boolean): FiniteAnimationSpec<Float>? =
-        if (reduceMotion || excludesKeyboard) null else ComposerMorphTunables.keyboard()
+        if (reduceMotion || excludesKeyboard) null else Motion.keyboard.animation()
 }
 
 /**

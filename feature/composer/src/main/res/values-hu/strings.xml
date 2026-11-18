@@ -134,27 +134,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Mellékletbeállítások</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Összes fotó</string>
-    <string name="composer_photo_more_options_action">További lehetőségek</string>
-    <string name="composer_photo_select_more">További fotók kiválasztása…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">%1$d fotó hozzáadása</item>
-        <item quantity="other">%1$d fotó hozzáadása</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Teljes</string>
-    <string name="composer_photo_sheet_half">Fél</string>
-    <string name="composer_photo_grid_description">Fotók</string>
-    <string name="composer_photo_camera_description">Kamera</string>
-    <string name="composer_photo_access_off_title">A fotóhozzáférés ki van kapcsolva</string>
-    <string name="composer_photo_access_off_message">Fotók kiválasztásához engedélyezze a hozzáférést a beállításokban.</string>
-    <string name="composer_photo_return_action">Vissza a mellékletbeállításokhoz</string>
-    <string name="composer_photo_tile_video_description">Videó</string>
-    <string name="composer_photo_tile_photo_description">Fotó</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Legfeljebb %1$d fotót adhat hozzá</item>
-        <item quantity="other">Legfeljebb %1$d fotót adhat hozzá</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Ultraszéles látószög</string>
     <string name="composer_camera_lens_wide_description">Széles látószög</string>

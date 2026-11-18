@@ -131,25 +131,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">ជម្រើសឯកសារភ្ជាប់</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">រូបថតទាំងអស់</string>
-    <string name="composer_photo_more_options_action">ជម្រើសច្រើនទៀត</string>
-    <string name="composer_photo_select_more">ជ្រើសរើសរូបថតបន្ថែម…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="other">បន្ថែមរូបថត %1$d សន្លឹក</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">ពេញ</string>
-    <string name="composer_photo_sheet_half">ពាក់កណ្តាល</string>
-    <string name="composer_photo_grid_description">រូបថត</string>
-    <string name="composer_photo_camera_description">កាមេរ៉ា</string>
-    <string name="composer_photo_access_off_title">ការចូលប្រើរូបថតត្រូវបានបិទ</string>
-    <string name="composer_photo_access_off_message">អនុញ្ញាតការចូលប្រើក្នុងការកំណត់ ដើម្បីជ្រើសរើសរូបថតនៅទីនេះ។</string>
-    <string name="composer_photo_return_action">ត្រឡប់ទៅជម្រើសឯកសារភ្ជាប់</string>
-    <string name="composer_photo_tile_video_description">វីដេអូ</string>
-    <string name="composer_photo_tile_photo_description">រូបថត</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="other">អ្នកអាចបន្ថែមរូបថតបានច្រើនបំផុត %1$d សន្លឹក</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">មុំទូលាយខ្លាំង</string>
     <string name="composer_camera_lens_wide_description">មុំទូលាយ</string>

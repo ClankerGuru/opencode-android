@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">सत्र लोड गर्न सकिएन</string>
     <string name="session_location_share_failed_title">स्थान साझा गर्न सकिएन</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">पाना तान्ने ह्यान्डल</string>
-    <string name="session_photo_sheet_full_description">पूरा</string>
-    <string name="session_photo_sheet_half_description">आधा</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">यो शेल रोक्ने?</string>
     <string name="session_shell_stop_confirm_message">आदेश अहिले नै समाप्त हुन्छ। यहाँ देखाइएको आउटपुट तपाईंले बन्द नगरेसम्म रहन्छ।</string>

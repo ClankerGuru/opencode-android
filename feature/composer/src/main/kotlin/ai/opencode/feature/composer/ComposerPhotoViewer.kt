@@ -8,7 +8,7 @@ import ai.opencode.core.store.Store
 import ai.opencode.core.strings.localized
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.SFSymbol
-import ai.opencode.feature.composer.plusmenu.LibraryPhoto
+import ai.opencode.feature.composer.plusmenu.formatVideoDuration
 import ai.opencode.feature.media.CachedImage
 import ai.opencode.feature.media.ImageDrawingAdd
 import ai.opencode.feature.media.MediaFlightAccessory
@@ -105,7 +105,7 @@ object ComposerPhotoViewer {
         }
         attachment.videoDuration?.let { duration ->
             val fontScale = context.resources.configuration.fontScale
-            renderVideoDurationBadge(context, LibraryPhoto.formatDuration(duration), density, fontScale)?.let { image ->
+            renderVideoDurationBadge(context, formatVideoDuration(duration), density, fontScale)?.let { image ->
                 accessories += MediaFlightAccessory(image = image, corner = MediaFlightAccessory.Corner.BottomLeading)
             }
         }

@@ -141,10 +141,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Не удалось загрузить сессию</string>
     <string name="session_location_share_failed_title">Не удалось поделиться местоположением</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Ручка панели</string>
-    <string name="session_photo_sheet_full_description">На весь экран</string>
-    <string name="session_photo_sheet_half_description">На пол-экрана</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Остановить эту оболочку?</string>
     <string name="session_shell_stop_confirm_message">Выполнение команды прекратится. Вывод останется здесь, пока вы его не закроете.</string>

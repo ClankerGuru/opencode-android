@@ -135,10 +135,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">セッションを読み込めませんでした</string>
     <string name="session_location_share_failed_title">位置情報を共有できませんでした</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">シートのドラッグハンドル</string>
-    <string name="session_photo_sheet_full_description">全画面</string>
-    <string name="session_photo_sheet_half_description">半画面</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">このシェルを停止しますか？</string>
     <string name="session_shell_stop_confirm_message">コマンドを今すぐ終了します。ここに表示されている出力は、閉じるまで残ります。</string>

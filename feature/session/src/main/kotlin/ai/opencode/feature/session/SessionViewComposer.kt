@@ -15,7 +15,6 @@ import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.SFSymbol
-import ai.opencode.feature.composer.AttachmentMenuAnchorHold
 import ai.opencode.feature.composer.AttachmentMenuAnchors
 import ai.opencode.feature.composer.AttachmentMenuItem
 import ai.opencode.feature.composer.AttachmentMenuPress
@@ -36,7 +35,6 @@ import ai.opencode.feature.composer.ComposerTextInput
 import ai.opencode.feature.composer.DictationDrag
 import ai.opencode.feature.composer.DictationFeature
 import ai.opencode.feature.composer.DictationLatency
-import ai.opencode.feature.composer.LocalAttachmentMenuAnchorHold
 import ai.opencode.feature.composer.LocalComposerKeyboardMorph
 import ai.opencode.feature.composer.QueuedMessagesSheet
 import ai.opencode.feature.composer.RequestBar
@@ -46,12 +44,9 @@ import ai.opencode.feature.composer.RequestPanelFit
 import ai.opencode.feature.composer.RequestPanelGesture
 import ai.opencode.feature.composer.RequestPanelReveal
 import ai.opencode.feature.composer.SyncComposerAutocomplete
-import ai.opencode.feature.composer.attachmentMenuAnchorHold
 import ai.opencode.feature.composer.autocompleteComposerAnchor
 import ai.opencode.feature.composer.composerKeyboardSpacing
-import ai.opencode.feature.composer.handsGlassOver
 import ai.opencode.feature.composer.layoutProgress
-import ai.opencode.feature.composer.plusmenu.PhotoFlightTunables
 import ai.opencode.feature.composer.requestPanelCap
 import ai.opencode.feature.media.LocalMediaPresenter
 import ai.opencode.feature.media.MediaReferenceResolver
@@ -112,7 +107,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -167,7 +161,6 @@ import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.offset
 import kotlin.math.abs
-import kotlin.math.max
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -566,7 +559,7 @@ fun SessionComposer(
         callStore = callStore,
         holdsClientToolCard = holdsClientToolCard,
         callOwnsAudio = callStore != null && !callShowsCard,
-        photoSheet = LocalSessionPhotoSheet.current,
+        attachmentMenu = LocalSessionAttachmentMenu.current,
         windowSize = LocalWindowInfo.current.containerSize,
     )
 
@@ -733,8 +726,8 @@ internal class SessionComposerEnv(
     val holdsClientToolCard: Boolean = false,
     /** iOS `callOwnsAudio`: the screen's call (its own or its root's) owns audio. */
     val callOwnsAudio: Boolean = false,
-    /** The New Plus Menu's sheet and flights (iOS `photoSheet…`), null outside a session screen. */
-    val photoSheet: SessionPhotoSheetState? = null,
+    /** The + menu's state, null outside a session screen. */
+    val attachmentMenu: SessionAttachmentMenuState? = null,
     /** The window's size (px): a sent photo's copy flies only from a thumbnail on screen. */
     val windowSize: IntSize = IntSize.Zero,
 ) {
@@ -761,8 +754,7 @@ internal class SessionComposerEnv(
     val canSend: Boolean get() = s.hasPromptContent && !s.hasFailedFiles
 
     internal val hasComposerAttachments: Boolean
-        get() = s.hasNonLocationAttachments || s.wantsLocationAttachment ||
-            photoSheet?.flights?.reservedAttachments?.isNotEmpty() == true
+        get() = s.hasNonLocationAttachments || s.wantsLocationAttachment
 
     /** iOS `callLanding`: a hung-up floating call's shape is still flying into the call button. */
     val callLanding: Boolean get() = FloatingCallCenter.shared.isLanding
@@ -787,22 +779,19 @@ internal class SessionComposerEnv(
             val dictationActive = (s.isDictating || s.isFinishingDictation) && !holding
             // Answering a request, the field stays on the control row; a draft keeps its control
             // row showing, so the model is at hand.
-            val sheet = photoSheet
             val expanded = !s.isAnsweringRequest && (
                 s.isDraft || messageFieldFocused || dictationActive || !s.draftShape.isEmpty ||
                     hasComposerAttachments || s.dictationError != null || panelsHoldExpanded
                 )
-            // Photos still decoding already count: their slots are in the row.
-            val hasReservedPhotos = sheet != null && sheet.flights.reservedAttachments.isNotEmpty()
             var controls = ComposerControls.make(
                 isDictating = s.isDictating && !holding,
                 isFinishing = s.isFinishingDictation && !holding,
                 isRunning = s.isRunning,
-                canSend = canSend || (hasReservedPhotos && !s.hasFailedFiles),
+                canSend = canSend,
                 expanded = expanded,
-                canCall = showsVoiceControl && !s.hasPromptContent && !hasReservedPhotos,
-                keepsSendVisible = sheet != null,
-                isInCall = sheet != null && callOwnsAudio,
+                canCall = showsVoiceControl && !s.hasPromptContent,
+                keepsSendVisible = attachmentMenu != null,
+                isInCall = attachmentMenu != null && callOwnsAudio,
             )
             // A floating call holds the mic: the composer offers only typing.
             val holdsMic = callOwnsAudio || callLanding
@@ -815,15 +804,14 @@ internal class SessionComposerEnv(
 
     /**
      * The model controls live in the expanded composer: it stays expanded while their panels
-     * are drawn, the + menu that will hand the keyboard back, or New Plus Menu's photo sheet.
+     * are drawn, or the + menu that will hand the keyboard back.
      */
     private val panelsHoldExpanded: Boolean
         get() {
-            val sheet = photoSheet
+            val menu = attachmentMenu
             // The + menu keeps the composer open only when it'll hand the keyboard back.
-            val menuKeepsOpen = host.isAttachmentMenuOpen && (sheet == null || sheet.attachmentMenuRestoresFocus)
-            return host.keepsComposerExpanded || menuKeepsOpen ||
-                (sheet != null && ((sheet.morph.isShown && sheet.restoresFocus) || sheet.flights.isFlying))
+            val menuKeepsOpen = host.isAttachmentMenuOpen && (menu == null || menu.attachmentMenuRestoresFocus)
+            return host.keepsComposerExpanded || menuKeepsOpen
         }
 
     /**
@@ -876,11 +864,8 @@ internal class SessionComposerEnv(
     val isComposingDraft: Boolean
         get() {
             if (s.hasCall) return false
-            // Picks still decoding (or flying in) are already the draft's: the list stays folded
-            // rather than opening between the sheet closing and the photos arriving.
-            val photosArriving = photoSheet != null && (photoSheet.flights.reservedAttachments.isNotEmpty() || photoSheet.flights.isFlying)
             return messageFieldFocused || s.hasPromptContent || s.dictationHold != null || s.isDictating ||
-                s.isFinishingDictation || host.isAttachmentMenuOpen || host.keepsComposerExpanded || photosArriving
+                s.isFinishingDictation || host.isAttachmentMenuOpen || host.keepsComposerExpanded
         }
 
     /** iOS `composerSwipeYields(from:)`: a touch another control owns. */
@@ -1062,24 +1047,8 @@ private fun SessionComposerEnv.ComposerAreaContent(modifier: Modifier) {
                 hidden = docksRequest,
                 reduceMotion = reducedMotion,
             )
-            // iOS `.handsGlassOver(to: photoSheet, …, sinksUnderSheet: true, pulledDown:)` and its
-            // `attachmentMenuAnchorHold`: under the New Plus Menu's photo sheet the composer sinks
-            // and fades, rising back with the sheet's pull; the + menu's anchors hold while it folds.
-            val sheet = photoSheet
-            CompositionLocalProvider(
-                LocalAttachmentMenuAnchorHold provides (sheet?.morph?.attachmentMenuAnchorHold(reducedMotion) ?: AttachmentMenuAnchorHold.Follows),
-            ) {
-                Box(
-                    if (sheet == null) Modifier else Modifier.handsGlassOver(
-                        sheet.morph,
-                        reduceMotion = reducedMotion,
-                        returnsImmediately = true,
-                        sinksUnderSheet = true,
-                        pulledDown = { max(0f, sheet.top.value + sheet.morph.drag - sheet.detent.compactTop) },
-                    ),
-                ) {
-                    ComposerCapsule()
-                }
+            Box {
+                ComposerCapsule()
             }
         }
         // Without pills, the jump button floats where their row would be, so showing it never
@@ -1284,7 +1253,6 @@ private fun SessionComposerEnv.ComposerCapsule() {
     // With no panel, Composer Autocomplete's suggestions grow there instead.
     val showsAutocomplete = !showsRequestPanel
     SideEffect { if (host.showsAutocomplete != showsAutocomplete) host.showsAutocomplete = showsAutocomplete }
-    val photoSheet = LocalSessionPhotoSheet.current
     // Read where it's used (layout, or the panel's own scope), never here: the room under the
     // header changes on every frame of the keyboard's animation.
     val cap = { requestPanelCap() }
@@ -1794,19 +1762,6 @@ private fun SessionComposerEnv.Composer() {
     val morphMoving by remember(morph) {
         derivedStateOf { morph != null && (morph.keyboard.isAnimating || morph.expansion > 0f && morph.expansion < 1f) }
     }
-    // iOS `opensNonLocationAttachments`: reserved photos held for their first frame
-    // (`PhotoFlights.holdsReservedRow`) mount the row collapsed and open it on the next frame, so
-    // its spring starts on a drawn frame rather than inside the stall the mount causes.
-    val flights = photoSheet?.flights
-    val holdsRow = flights?.holdsReservedRow == true && !s.hasNonLocationAttachments &&
-        !s.wantsLocationAttachment && !reducedMotion
-    val rowReveal = remember { Animatable(1f) }
-    val heldByFlights = flights?.holdsReservedRow == true
-    LaunchedEffect(flights, heldByFlights) { if (heldByFlights) flights?.revealHeldRow() }
-    LaunchedEffect(holdsRow) {
-        if (holdsRow) rowReveal.snapTo(0f)
-        else if (rowReveal.value < 1f) rowReveal.animateTo(1f, PhotoFlightTunables.rowAnimation())
-    }
     // A drawing added from the full-screen viewer opens the row on its flight's spring.
     val presenter = LocalMediaPresenter.current
     val hasAttachments = hasComposerAttachments
@@ -1816,7 +1771,7 @@ private fun SessionComposerEnv.Composer() {
     LaunchedEffect(handOffReveal) {
         if (handOffReveal.value < 1f) handOffReveal.animateTo(1f, Motion.flight.animation(reduceMotion = reducedMotion))
     }
-    val attachmentReveal = if (holdsRow) 0f else rowReveal.value * handOffReveal.value
+    val attachmentReveal = handOffReveal.value
     val sendReset = host.sendReset
     sendReset.Animate()
     val current by rememberUpdatedState(this)
@@ -1834,7 +1789,7 @@ private fun SessionComposerEnv.Composer() {
             }
             .composerSendReset(sendReset)
             .then(
-                    if (reducedMotion || (morphMoving && !sendReset.isResetting) || holdsRow || rowReveal.isRunning) Modifier
+                    if (reducedMotion || (morphMoving && !sendReset.isResetting)) Modifier
                 else Modifier.animateContentSize(
                     (if (sendReset.isResetting) SEND_RESET_SLIDE else MotionSpring(0.25)).spec(),
                     alignment = Alignment.BottomStart,
@@ -2048,7 +2003,7 @@ private fun SessionComposerEnv.ComposerInput(expanded: Boolean, recording: Boole
             fieldLink = host.fieldLink,
             // One Picker in the keyboard's place keeps the field from taking it back.
             refusesFocus = { host.modelPanels?.onePicker?.isOpen == true },
-            // The + menu and its photo sheet draw over the field, which keeps the keyboard.
+            // The + menu draws over the field, which keeps the keyboard.
             isCovered = host.isAttachmentMenuOpen,
         )
     }
@@ -2072,9 +2027,6 @@ private fun SessionComposerEnv.onDraftEdited(
     } else {
         store.send(Action.Autocomplete(ComposerAutocompleteAction.TextEdited(new, caret)))
     }
-    // The photo sheet rests on the keyboard over the field: typing folds it away so the text shows
-    // where it lands.
-    if (photoSheet?.morph?.isOpen == true) photoSheet.closePhotoSheet()
     val state = store.state
     if (!returnKeySends || state.nonSendNewlineDraft == new || new != old + "\n") return
     if (state.isAnsweringRequest) store.send(Action.ReturnKeyTapped) else sendMessage(Action.ReturnKeyTapped)

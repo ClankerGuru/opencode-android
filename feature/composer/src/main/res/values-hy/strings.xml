@@ -134,27 +134,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Կցորդի ընտրանքներ</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Բոլոր լուսանկարները</string>
-    <string name="composer_photo_more_options_action">Լրացուցիչ ընտրանքներ</string>
-    <string name="composer_photo_select_more">Ընտրել այլ լուսանկարներ…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">Ավելացնել %1$d լուսանկար</item>
-        <item quantity="other">Ավելացնել %1$d լուսանկար</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Ամբողջությամբ</string>
-    <string name="composer_photo_sheet_half">Կիսով չափ</string>
-    <string name="composer_photo_grid_description">Լուսանկարներ</string>
-    <string name="composer_photo_camera_description">Տեսախցիկ</string>
-    <string name="composer_photo_access_off_title">Լուսանկարների հասանելիությունն անջատված է</string>
-    <string name="composer_photo_access_off_message">Այստեղ լուսանկարներ ընտրելու համար թույլատրեք հասանելիությունը կարգավորումներում։</string>
-    <string name="composer_photo_return_action">Վերադառնալ կցորդի ընտրանքներին</string>
-    <string name="composer_photo_tile_video_description">Տեսանյութ</string>
-    <string name="composer_photo_tile_photo_description">Լուսանկար</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Կարող եք ավելացնել առավելագույնը %1$d լուսանկար</item>
-        <item quantity="other">Կարող եք ավելացնել առավելագույնը %1$d լուսանկար</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Գերլայնանկյուն</string>
     <string name="composer_camera_lens_wide_description">Լայնանկյուն</string>

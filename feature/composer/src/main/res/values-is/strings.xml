@@ -134,27 +134,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Valkostir viðhengja</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Allar ljósmyndir</string>
-    <string name="composer_photo_more_options_action">Fleiri valkostir</string>
-    <string name="composer_photo_select_more">Velja fleiri ljósmyndir…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">Bæta við %1$d ljósmynd</item>
-        <item quantity="other">Bæta við %1$d ljósmyndum</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Full stærð</string>
-    <string name="composer_photo_sheet_half">Hálf stærð</string>
-    <string name="composer_photo_grid_description">Ljósmyndir</string>
-    <string name="composer_photo_camera_description">Myndavél</string>
-    <string name="composer_photo_access_off_title">Slökkt á aðgangi að ljósmyndum</string>
-    <string name="composer_photo_access_off_message">Leyfðu aðgang í stillingum til að velja ljósmyndir hér.</string>
-    <string name="composer_photo_return_action">Til baka í valkosti viðhengja</string>
-    <string name="composer_photo_tile_video_description">Myndband</string>
-    <string name="composer_photo_tile_photo_description">Ljósmynd</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Þú getur mest bætt við %1$d ljósmynd</item>
-        <item quantity="other">Þú getur mest bætt við %1$d ljósmyndum</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Ofurvíðlinsa</string>
     <string name="composer_camera_lens_wide_description">Víðlinsa</string>

@@ -134,27 +134,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">የአባሪ አማራጮች</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">ሁሉም ፎቶዎች</string>
-    <string name="composer_photo_more_options_action">ተጨማሪ አማራጮች</string>
-    <string name="composer_photo_select_more">ተጨማሪ ፎቶዎችን ምረጥ…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">%1$d ፎቶ አክል</item>
-        <item quantity="other">%1$d ፎቶዎችን አክል</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">ሙሉ</string>
-    <string name="composer_photo_sheet_half">ግማሽ</string>
-    <string name="composer_photo_grid_description">ፎቶዎች</string>
-    <string name="composer_photo_camera_description">ካሜራ</string>
-    <string name="composer_photo_access_off_title">የፎቶ መዳረሻ ጠፍቷል</string>
-    <string name="composer_photo_access_off_message">እዚህ ፎቶዎችን ለመምረጥ በቅንብሮች ውስጥ መዳረሻ ይፍቀዱ።</string>
-    <string name="composer_photo_return_action">ወደ አባሪ አማራጮች ተመለስ</string>
-    <string name="composer_photo_tile_video_description">ቪዲዮ</string>
-    <string name="composer_photo_tile_photo_description">ፎቶ</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">ቢበዛ %1$d ፎቶ ማከል ይችላሉ</item>
-        <item quantity="other">ቢበዛ %1$d ፎቶዎችን ማከል ይችላሉ</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">እጅግ ሰፊ</string>
     <string name="composer_camera_lens_wide_description">ሰፊ</string>

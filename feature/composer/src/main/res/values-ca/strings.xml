@@ -137,29 +137,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Opcions d\'adjunts</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Totes les fotos</string>
-    <string name="composer_photo_more_options_action">Més opcions</string>
-    <string name="composer_photo_select_more">Selecciona més fotos…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">Afegeix %1$d foto</item>
-        <item quantity="many">Afegeix %1$d fotos</item>
-        <item quantity="other">Afegeix %1$d fotos</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Pantalla completa</string>
-    <string name="composer_photo_sheet_half">Mitja pantalla</string>
-    <string name="composer_photo_grid_description">Fotos</string>
-    <string name="composer_photo_camera_description">Càmera</string>
-    <string name="composer_photo_access_off_title">L\'accés a les fotos està desactivat</string>
-    <string name="composer_photo_access_off_message">Permet l\'accés a Configuració per triar fotos aquí.</string>
-    <string name="composer_photo_return_action">Torna a les opcions d\'adjunts</string>
-    <string name="composer_photo_tile_video_description">Vídeo</string>
-    <string name="composer_photo_tile_photo_description">Foto</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Pots afegir com a màxim %1$d foto</item>
-        <item quantity="many">Pots afegir com a màxim %1$d fotos</item>
-        <item quantity="other">Pots afegir com a màxim %1$d fotos</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Ultra gran angular</string>
     <string name="composer_camera_lens_wide_description">Gran angular</string>

@@ -134,27 +134,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">ඇමුණුම් විකල්ප</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">සියලු ඡායාරූප</string>
-    <string name="composer_photo_more_options_action">තවත් විකල්ප</string>
-    <string name="composer_photo_select_more">තවත් ඡායාරූප තෝරන්න…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">ඡායාරූප %1$dක් එකතු කරන්න</item>
-        <item quantity="other">ඡායාරූප %1$dක් එකතු කරන්න</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">සම්පූර්ණ</string>
-    <string name="composer_photo_sheet_half">අඩක්</string>
-    <string name="composer_photo_grid_description">ඡායාරූප</string>
-    <string name="composer_photo_camera_description">කැමරාව</string>
-    <string name="composer_photo_access_off_title">ඡායාරූප ප්‍රවේශය අක්‍රියයි</string>
-    <string name="composer_photo_access_off_message">මෙහි ඡායාරූප තෝරන්න සැකසීම් තුළින් ප්‍රවේශයට ඉඩ දෙන්න.</string>
-    <string name="composer_photo_return_action">ඇමුණුම් විකල්ප වෙත ආපසු</string>
-    <string name="composer_photo_tile_video_description">වීඩියෝ</string>
-    <string name="composer_photo_tile_photo_description">ඡායාරූපය</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">එකතු කළ හැක්කේ උපරිම ඡායාරූප %1$dක් පමණයි</item>
-        <item quantity="other">එකතු කළ හැක්කේ උපරිම ඡායාරූප %1$dක් පමණයි</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">අති පුළුල්</string>
     <string name="composer_camera_lens_wide_description">පුළුල්</string>

@@ -134,27 +134,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Ek seçenekleri</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Tüm fotoğraflar</string>
-    <string name="composer_photo_more_options_action">Daha fazla seçenek</string>
-    <string name="composer_photo_select_more">Daha fazla fotoğraf seç…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">%1$d fotoğraf ekle</item>
-        <item quantity="other">%1$d fotoğraf ekle</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Tam</string>
-    <string name="composer_photo_sheet_half">Yarım</string>
-    <string name="composer_photo_grid_description">Fotoğraflar</string>
-    <string name="composer_photo_camera_description">Kamera</string>
-    <string name="composer_photo_access_off_title">Fotoğraf erişimi kapalı</string>
-    <string name="composer_photo_access_off_message">Buradan fotoğraf seçmek için Ayarlar\'dan erişim izni verin.</string>
-    <string name="composer_photo_return_action">Ek seçeneklerine dön</string>
-    <string name="composer_photo_tile_video_description">Video</string>
-    <string name="composer_photo_tile_photo_description">Fotoğraf</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">En fazla %1$d fotoğraf ekleyebilirsiniz</item>
-        <item quantity="other">En fazla %1$d fotoğraf ekleyebilirsiniz</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Ultra geniş açı</string>
     <string name="composer_camera_lens_wide_description">Geniş açı</string>

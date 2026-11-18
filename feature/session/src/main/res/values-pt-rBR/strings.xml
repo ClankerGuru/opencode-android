@@ -139,10 +139,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Não foi possível carregar a sessão</string>
     <string name="session_location_share_failed_title">Não foi possível compartilhar a localização</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Alça do painel</string>
-    <string name="session_photo_sheet_full_description">Tela inteira</string>
-    <string name="session_photo_sheet_half_description">Meia tela</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Parar este shell?</string>
     <string name="session_shell_stop_confirm_message">O comando termina agora. A saída exibida aqui fica até você fechar.</string>

@@ -83,8 +83,6 @@ import kotlin.math.roundToInt
 enum class AttachmentMenuPhase {
     Closed,
     Menu,
-    /** The lab's photo-card fixture; the Plus Menu opens the photo sheet from [Menu] and never stands here. */
-    Photos,
 }
 
 /** The menu's curves. */
@@ -116,23 +114,9 @@ object PlusMenuTunables {
     /** A row's reveal spans this much of the open (× open). */
     const val ROW_SPAN = 0.65f
     const val HOLD_DURATION = 0.18
-    /** Peek backdrop blur (dp). Not drawn on Android, which dims the band with a scrim. */
-    const val PEEK_BLUR = 10f
-    const val PEEK_DIM = 0f
-    const val PEEK_FEATHER = 56f
     const val VIDEO_BADGE_INSET = 6f
     const val VIDEO_BADGE_RADIUS = 6f
     const val VIDEO_BADGE_OPACITY = 0.58
-    /** Rim inset around the photo grid inside the photo sheet. */
-    const val GRID_INSET = 0f
-    const val SELECTION_DIM = 0.18
-    /** The unpicked photos' wash once the limit is picked. */
-    const val LIMIT_DIM = 0.5
-    const val SELECTION_BADGE_SIZE = 24f
-    const val SELECTION_BADGE_INSET = 6f
-    /** A picked photo draws this far inside its tile, rounded (dp): the system photo picker's selection. */
-    const val SELECTED_TILE_INSET = 10f
-    const val SELECTED_TILE_RADIUS = 12f
     /** How far the menu's foot sits below the composer's. */
     const val MENU_DROP = 80f
     /** The menu's width, × the screen's. */
@@ -343,7 +327,7 @@ fun AttachmentMenuMeasure(
         )
     }
 
-    // Publish what the + and the photo sheet lay out against.
+    // Publish what the + lays out against.
     LaunchedEffect(frames.menu, rowFrames.toMap(), items, origin) {
         val menuOrigin = frames.menu.topLeft + origin
         val resting = HashMap<AttachmentMenuItem, Rect>()

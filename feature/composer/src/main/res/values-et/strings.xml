@@ -134,27 +134,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Manuse valikud</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Kõik fotod</string>
-    <string name="composer_photo_more_options_action">Rohkem valikuid</string>
-    <string name="composer_photo_select_more">Vali veel fotosid…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">Lisa %1$d foto</item>
-        <item quantity="other">Lisa %1$d fotot</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Täisekraan</string>
-    <string name="composer_photo_sheet_half">Pool ekraani</string>
-    <string name="composer_photo_grid_description">Fotod</string>
-    <string name="composer_photo_camera_description">Kaamera</string>
-    <string name="composer_photo_access_off_title">Juurdepääs fotodele on väljas</string>
-    <string name="composer_photo_access_off_message">Siin fotode valimiseks luba seadetes neile juurdepääs.</string>
-    <string name="composer_photo_return_action">Tagasi manuse valikute juurde</string>
-    <string name="composer_photo_tile_video_description">Video</string>
-    <string name="composer_photo_tile_photo_description">Foto</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Saad lisada kuni %1$d foto</item>
-        <item quantity="other">Saad lisada kuni %1$d fotot</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Ülilainurk</string>
     <string name="composer_camera_lens_wide_description">Lainurk</string>

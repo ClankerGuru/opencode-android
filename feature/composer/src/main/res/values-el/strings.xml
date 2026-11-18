@@ -134,27 +134,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">Επιλογές συνημμένων</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">Όλες οι φωτογραφίες</string>
-    <string name="composer_photo_more_options_action">Περισσότερες επιλογές</string>
-    <string name="composer_photo_select_more">Επιλογή περισσότερων φωτογραφιών…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="one">Προσθήκη %1$d φωτογραφίας</item>
-        <item quantity="other">Προσθήκη %1$d φωτογραφιών</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">Πλήρες</string>
-    <string name="composer_photo_sheet_half">Μισό</string>
-    <string name="composer_photo_grid_description">Φωτογραφίες</string>
-    <string name="composer_photo_camera_description">Κάμερα</string>
-    <string name="composer_photo_access_off_title">Η πρόσβαση στις φωτογραφίες είναι ανενεργή</string>
-    <string name="composer_photo_access_off_message">Επιτρέψτε την πρόσβαση στις Ρυθμίσεις για να επιλέξετε φωτογραφίες εδώ.</string>
-    <string name="composer_photo_return_action">Επιστροφή στις επιλογές συνημμένων</string>
-    <string name="composer_photo_tile_video_description">Βίντεο</string>
-    <string name="composer_photo_tile_photo_description">Φωτογραφία</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="one">Μπορείτε να προσθέσετε έως %1$d φωτογραφία</item>
-        <item quantity="other">Μπορείτε να προσθέσετε έως %1$d φωτογραφίες</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">Υπερευρυγώνιος</string>
     <string name="composer_camera_lens_wide_description">Ευρυγώνιος</string>

@@ -35,9 +35,8 @@ import ai.opencode.feature.composer.ComposerPickers
 import ai.opencode.feature.composer.PastedTextCard
 import ai.opencode.feature.composer.PlusMenuTunables
 import ai.opencode.feature.composer.SharedLocation
-import ai.opencode.feature.composer.plusmenu.LibraryPhoto
-import ai.opencode.feature.composer.plusmenu.PhotoFlights
 import ai.opencode.feature.composer.plusmenu.VideoDurationBadge
+import ai.opencode.feature.composer.plusmenu.formatVideoDuration
 import ai.opencode.feature.media.FileAttachmentCard
 import ai.opencode.feature.media.ImageDrawingAdd
 import ai.opencode.feature.media.MediaFlightAccessory
@@ -53,12 +52,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
-import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.FiniteAnimationSpec
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.VisibilityThreshold
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -91,7 +85,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.layout.layout
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -121,7 +114,6 @@ import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalGraphicsContext
@@ -234,8 +226,7 @@ class SessionAttachmentImporter internal constructor(
                     }
                 }
             },
-            // iOS `maxPhotoSelection(plusMenu: usesPlusMenuSheet)`; the session always uses the
-            // New Plus Menu (`SessionPhotoSheetState.usesPlusMenuSheet`), so its sheet's 8.
+            // iOS `maxPhotoSelection(plusMenu: true)`: the + menu's 8.
             limit = AttachmentPickerButton.MAX_PHOTO_SELECTION,
         )
     }
@@ -574,12 +565,6 @@ fun PendingAttachmentsRow(
     onOpenPastedText: (OpenCodeOutgoingAttachment) -> Unit,
     onOpenLocation: (String) -> Unit,
     modifier: Modifier = Modifier,
-    /**
-     * The New Plus Menu's flights (iOS `usesPlusMenuSheet ? photoFlights`): thumbnails report their
-     * slots and hide while their photo is in the air, and reserved slots stand in for photos the
-     * importer is still decoding.
-     */
-    flights: PhotoFlights? = null,
     /** iOS `presentComposerPhoto(id)`: a tap opens the pending photo full screen. */
     onOpenPhoto: ((String) -> Unit)? = null,
     /** iOS `composerExpanded`: the composer pads its content at the top only when collapsed. */
@@ -593,29 +578,23 @@ fun PendingAttachmentsRow(
 ) {
     val reduceMotion = rememberReduceMotion()
     val openedQuoteID = commentingQuoteID
-    // iOS `usesPlusMenuSheet`: the New Plus Menu's removal is `AttachmentRemoval`'s.
-    val usesPlusMenuSheet = flights != null
-    // iOS `styled`: with New Plus Menu the tiles sit `attachmentInset` from the surface's top and
-    // leading edges and stand as tall as the row's location or file; off, the row is main's.
-    val styled = usesPlusMenuSheet
+    // iOS `styled`: the tiles sit `attachmentInset` from the surface's top and leading edges and
+    // stand as tall as the row's location or file.
     val inset = ComposerTunables.attachmentInset.dp
-    val inner = if (styled) ComposerTunables.innerHorizontal.dp else 0.dp
+    val inner = ComposerTunables.innerHorizontal.dp
     val parentTop = if (composerExpanded) 0.dp else ComposerTunables.innerVertical.dp
     val radius = ComposerTunables.attachmentRadius.dp
     val locationHeight = SharedLocationCard.compactMapHeight + SharedLocationCard.compactFooterHeight()
-    val present = attachments.map { it.id }.toSet()
-    val reserved = flights?.reservedAttachments?.filter { it.toString() !in present }.orEmpty()
     val quoteHeight = quoteCardHeight()
     // Quotes alone keep the row as short as their cards; beside tiles they sit at the tiles' top.
-    val onlyQuotes = attachments.isEmpty() && reserved.isEmpty() && files.isEmpty() && !showsLocation
+    val onlyQuotes = attachments.isEmpty() && files.isEmpty() && !showsLocation
     val rowHeightTarget = when {
         onlyQuotes -> quoteHeight
-        !styled -> maxOf(PendingAttachmentMetrics.slotSide, quoteHeight)
         else -> maxOf(PendingAttachmentMetrics.slotSide, ComposerFileChip.height, quoteHeight, if (showsLocation) locationHeight else 0.dp)
     }
     val rowHeight by animateDpAsState(
         rowHeightTarget,
-        if (!styled) snap() else Motion.layout.animation(if (showsLocation) MotionPhase.Enter else MotionPhase.Exit, reduceMotion),
+        Motion.layout.animation(if (showsLocation) MotionPhase.Enter else MotionPhase.Exit, reduceMotion),
         label = "attachmentRowHeight",
     )
     val listState = rememberLazyListState()
@@ -626,7 +605,6 @@ fun PendingAttachmentsRow(
     val tileHeight = maxOf(rowHeight, PendingAttachmentMetrics.slotSide)
     val itemKeys = buildList {
         for (attachment in attachments) add("attachment-${attachment.id}")
-        for (id in reserved) add("reserved-$id")
         for (file in files) add("file-${file.id}")
         for (quote in quotes) add("quote-${quote.id}")
         if (showsLocation) add("location")
@@ -659,12 +637,11 @@ fun PendingAttachmentsRow(
         }
     }
     val departing = rememberDepartingAttachments()
-    val placement: FiniteAnimationSpec<IntOffset> =
-        if (usesPlusMenuSheet) AttachmentRemoval.animation(reduceMotion) else DepartingAttachments.defaultPlacement
+    val placement: FiniteAnimationSpec<IntOffset> = AttachmentRemoval.animation(reduceMotion)
     fun LazyItemScope.itemMotion(key: String): Modifier =
         Modifier.animateItem(fadeInSpec = null, placementSpec = placement, fadeOutSpec = null).then(departing.retained(key))
     fun removing(key: String, remove: () -> Unit): () -> Unit = {
-        departing.depart(key, usesPlusMenuSheet, reduceMotion)
+        departing.depart(key, reduceMotion)
         remove()
     }
     Box(modifier) {
@@ -673,18 +650,14 @@ fun PendingAttachmentsRow(
     LazyRow(
         state = listState,
         // Room for the remove buttons, which sit over the top trailing corner.
-        contentPadding = if (styled) {
-            PaddingValues(top = (inset - parentTop).coerceAtLeast(0.dp), start = maxOf(inset, inner), end = maxOf(8.dp + inner, RemoveTargetReach))
-        } else {
-            PaddingValues(top = 8.dp, end = 8.dp)
-        },
+        contentPadding = PaddingValues(top = (inset - parentTop).coerceAtLeast(0.dp), start = maxOf(inset, inner), end = maxOf(8.dp + inner, RemoveTargetReach)),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = if (styled) Alignment.Bottom else Alignment.Top,
+        verticalAlignment = Alignment.Bottom,
         modifier = Modifier
             // Edge to edge in the card, fading where photos run under its edges.
             .outsetHorizontally(inner)
             .drawerPanHorizontalScroller({ listState.canScrollBackward }, { listState.canScrollForward })
-            .horizontalScrollEdgeFade(listState, isEnabled = styled)
+            .horizontalScrollEdgeFade(listState)
             .onGloballyPositioned { departing.row = it },
     ) {
         itemsIndexed(attachments, key = { _, attachment -> "attachment-${attachment.id}" }) { index, attachment ->
@@ -694,9 +667,6 @@ fun PendingAttachmentsRow(
             val summary = attachment.pasted
             when {
                 attachment.isImage -> {
-                    // A photo flying in draws itself here until it lands (`PhotoFlights`).
-                    val id = remember(attachment.id) { runCatching { UUID.fromString(attachment.id) }.getOrNull() }
-                    val arriving = flights != null && id != null && flights.hidesAttachment(id)
                     // Out of the composer while it's up full screen, like a transcript image.
                     val viewing = ComposerPhotoViewer.isShowing(attachment.id)
                     RemovableAttachment(
@@ -704,7 +674,6 @@ fun PendingAttachmentsRow(
                         identifier = "remove-pending-attachment-$index",
                         reduceMotion = reduceMotion,
                         onRemove = removing(key) { onRemoveAttachment(index) },
-                        arriving = arriving,
                         viewing = viewing,
                         modifier = item,
                     ) {
@@ -712,12 +681,10 @@ fun PendingAttachmentsRow(
                             attachment,
                             index,
                             Modifier
-                                .then(if (flights != null && id != null) Modifier.onGloballyPositioned { flights.slot(id, it.boundsOnScreen()) } else Modifier)
                                 .mediaZoomSource(ComposerPhotoViewer.mediaID(attachment.id), radius, showsMedia = true)
-                                // The image waits for its flight to land (~0.3 s), or shows full screen.
-                                .alpha(if (arriving || viewing) 0f else 1f),
+                                .alpha(if (viewing) 0f else 1f),
                             // No press effect: the photo flies out of the tile exactly as drawn.
-                            onOpen = onOpenPhoto?.takeIf { !arriving }?.let { open -> { open(attachment.id) } },
+                            onOpen = onOpenPhoto?.let { open -> { open(attachment.id) } },
                             height = { tileHeight },
                             radius = radius,
                             server = server,
@@ -770,21 +737,6 @@ fun PendingAttachmentsRow(
                         }
                     }
                 }
-            }
-        }
-        if (flights != null) {
-            items(reserved, key = { "reserved-$it" }) { id ->
-                Box(
-                    Modifier
-                        .width(PendingAttachmentMetrics.slotSide)
-                        .layout { measurable, constraints ->
-                            val side = tileHeight.roundToPx()
-                            val placeable = measurable.measure(constraints.copy(minHeight = side, maxHeight = side))
-                            layout(placeable.width, placeable.height) { placeable.place(0, 0) }
-                        }
-                        .onGloballyPositioned { flights.slot(id, it.boundsOnScreen()) }
-                        .clearAndSetSemantics { },
-                )
             }
         }
         items(files, key = { "file-${it.id}" }) { file ->
@@ -869,28 +821,15 @@ private class DepartingAttachments(private val graphics: GraphicsContext, privat
     private fun Modifier.releasing(key: String): Modifier = this.then(ReleaseOnDetach { drop(key) })
 
     /** The × was tapped: [key]'s last frame plays the exit where it sat. */
-    fun depart(key: String, usesPlusMenuSheet: Boolean, reduceMotion: Boolean) {
+    fun depart(key: String, reduceMotion: Boolean) {
         val layer = layers.remove(key) ?: return
         val position = positions.remove(key)
-        val spec: FiniteAnimationSpec<Float>? = when {
-            usesPlusMenuSheet -> AttachmentRemoval.exitAnimation(reduceMotion)
-            reduceMotion -> null
-            else -> tween(durationMillis = DEFAULT_EXIT_MILLIS, easing = EaseOut)
-        }
-        if (spec == null || position == null) {
+        if (position == null) {
             graphics.releaseGraphicsLayer(layer)
             return
         }
-        val pose: GraphicsLayer.(Float) -> Unit = if (usesPlusMenuSheet) {
-            { exit -> attachmentRemovalExit(exit, reduceMotion, density) }
-        } else {
-            { exit ->
-                alpha = 1f - exit
-                val scale = 1f + (DEFAULT_EXIT_SCALE - 1f) * exit
-                scaleX = scale
-                scaleY = scale
-            }
-        }
+        val spec: FiniteAnimationSpec<Float> = AttachmentRemoval.exitAnimation(reduceMotion)
+        val pose: GraphicsLayer.(Float) -> Unit = { exit -> attachmentRemovalExit(exit, reduceMotion, density) }
         val ghost = Ghost(layer, position, Animatable(0f), pose)
         ghosts += ghost
         scope.launch {
@@ -913,16 +852,6 @@ private class DepartingAttachments(private val graphics: GraphicsContext, privat
     private fun drop(key: String) {
         layers.remove(key)?.let(graphics::releaseGraphicsLayer)
         positions.remove(key)
-    }
-
-    companion object {
-        /** iOS `.easeOut(duration: 0.2)` with `.scale(scale: 0.72).combined(with: .opacity)`. */
-        const val DEFAULT_EXIT_MILLIS = 200
-        const val DEFAULT_EXIT_SCALE = 0.72f
-
-        /** `animateItem`'s own placement spring, outside the New Plus Menu. */
-        val defaultPlacement: FiniteAnimationSpec<IntOffset> =
-            spring(stiffness = Spring.StiffnessMediumLow, visibilityThreshold = IntOffset.VisibilityThreshold)
     }
 }
 
@@ -950,8 +879,7 @@ private class ReleaseOnDetach(val onDetach: () -> Unit) : ModifierNodeElement<Re
 
 /**
  * iOS `removableAttachment`: [content] with a remove button (×) over its top trailing corner,
- * entering scaled from 0.72 with a fade (a fade under reduce motion). [arriving]: a photo flying
- * into it hasn't landed; its remove button hides until it does.
+ * entering scaled from 0.72 with a fade (a fade under reduce motion).
  */
 @Composable
 fun RemovableAttachment(
@@ -960,7 +888,6 @@ fun RemovableAttachment(
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
     reduceMotion: Boolean = rememberReduceMotion(),
-    arriving: Boolean = false,
     /** Full screen, the viewer's flight carries the × (`ComposerPhotoViewer.flightAccessories`), so this one stands aside. */
     viewing: Boolean = false,
     content: @Composable () -> Unit,
@@ -980,7 +907,7 @@ fun RemovableAttachment(
         },
     ) {
         content()
-        if (!arriving && !viewing) {
+        if (!viewing) {
             Box(
                 Modifier
                     .align(Alignment.TopEnd)
@@ -1053,7 +980,7 @@ private fun AttachmentThumbnail(
             )
             .semantics {
                 contentDescription = if (attachment.videoDuration == null) imageDescription else videoDescription
-                attachment.videoDuration?.let { stateDescription = LibraryPhoto.formatDuration(it) }
+                attachment.videoDuration?.let { stateDescription = formatVideoDuration(it) }
             }
             .testTag("pending-attachment-$index"),
     ) {
@@ -1062,7 +989,7 @@ private fun AttachmentThumbnail(
             Image(bitmap, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         }
         attachment.videoDuration?.let { duration ->
-            VideoDurationBadge(LibraryPhoto.formatDuration(duration), modifier = Modifier.align(Alignment.BottomStart).padding(PlusMenuTunables.VIDEO_BADGE_INSET.dp))
+            VideoDurationBadge(formatVideoDuration(duration), modifier = Modifier.align(Alignment.BottomStart).padding(PlusMenuTunables.VIDEO_BADGE_INSET.dp))
         }
     }
 }
@@ -1097,6 +1024,3 @@ private fun decodeThumbnail(data: ByteArray, target: Int): ImageBitmap? = try {
 
 // endregion
 
-/** The element's bounds in screen px, where [PhotoFlights] works. */
-private fun androidx.compose.ui.layout.LayoutCoordinates.boundsOnScreen(): androidx.compose.ui.geometry.Rect =
-    androidx.compose.ui.geometry.Rect(positionOnScreen(), androidx.compose.ui.geometry.Size(size.width.toFloat(), size.height.toFloat()))

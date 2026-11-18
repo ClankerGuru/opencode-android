@@ -1,14 +1,9 @@
 package ai.opencode.feature.composer.plusmenu
 
 import ai.opencode.core.testing.TestIsolationRule
-import ai.opencode.feature.composer.AttachmentMenuAnchorHold
-import ai.opencode.feature.composer.AttachmentMenuAnchorSample
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -39,25 +34,5 @@ class PlusMenuPlacementTests {
         val fallback = PlusMenuPlacement.visibleMenu(menu, keyboardTop = 600f, coversKeyboard = false)
         assertEquals(590f, fallback.bottom)
         assertEquals(Size(260f, 240f), fallback.size)
-    }
-
-    @Test fun anchorSamplesWriteOnlyWhatTheHoldAllows() {
-        fun sample(hold: AttachmentMenuAnchorHold, width: Float = 400f, height: Float = 800f, keys: Float = 300f, y: Float = 0f) =
-            AttachmentMenuAnchorSample(
-                hold = hold, viewportWidth = width, viewportHeight = height, keyboardHeight = keys, frame = rect(0f, y, 10f, 10f),
-            )
-        val resting = AttachmentMenuAnchorHold.Resting
-        val follows = AttachmentMenuAnchorHold.Follows
-        val folding = AttachmentMenuAnchorHold.Folding
-        assertTrue(sample(resting, y = 0f).isEquivalent(sample(resting, y = 40f)))
-        assertFalse(sample(resting).isEquivalent(sample(resting, keys = 200f)))
-        assertNotEquals(sample(resting), sample(resting, keys = 200f))
-        assertTrue(AttachmentMenuAnchorSample.writes(sample(resting), sample(resting, height = 700f)))
-        assertFalse(AttachmentMenuAnchorSample.writes(sample(follows), sample(resting)))
-        assertTrue(AttachmentMenuAnchorSample.writes(sample(resting), sample(resting, width = 900f)))
-        assertTrue(AttachmentMenuAnchorSample.writes(sample(resting), sample(resting, keys = 200f)))
-        assertFalse(AttachmentMenuAnchorSample.writes(sample(resting), sample(folding, width = 900f)))
-        assertFalse(AttachmentMenuAnchorSample.writes(sample(folding), sample(folding, width = 900f)))
-        assertTrue(AttachmentMenuAnchorSample.writes(sample(folding), sample(follows)))
     }
 }

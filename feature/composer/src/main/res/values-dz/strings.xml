@@ -131,25 +131,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">མཉམ་སྦྲགས་ཀྱི་གདམ་ཁ།</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">པར་ཆ་མཉམ།</string>
-    <string name="composer_photo_more_options_action">གདམ་ཁ་མང་བ།</string>
-    <string name="composer_photo_select_more">པར་མངམ་སེལ་འཐུ་འབད…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="other">པར་ %1$d ཁ་སྐོང་འབད།</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">ཆ་ཚང་།</string>
-    <string name="composer_photo_sheet_half">ཕྱེད་ཀ།</string>
-    <string name="composer_photo_grid_description">པར་ཚུ།</string>
-    <string name="composer_photo_camera_description">པར་ཆས།</string>
-    <string name="composer_photo_access_off_title">པར་ལག་ལེན་གྱི་གནང་བ་བཀག་ཡོད།</string>
-    <string name="composer_photo_access_off_message">ནཱ་ལས་པར་གདམ་ནི་ལུ་ སྒྲིག་སྟངས་ནང་ལག་ལེན་གྱི་གནང་བ་བྱིན།</string>
-    <string name="composer_photo_return_action">མཉམ་སྦྲགས་ཀྱི་གདམ་ཁ་ལུ་ལོག</string>
-    <string name="composer_photo_tile_video_description">གློག༌བརྙན༌</string>
-    <string name="composer_photo_tile_photo_description">པར།</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="other">པར་མང་ཤོས་ར་ %1$d ཁ་སྐོང་འབད་ཚུགས།</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">རྒྱ་ཆེ་ཤོས།</string>
     <string name="composer_camera_lens_wide_description">རྒྱ་ཆེ།</string>

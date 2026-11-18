@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">সেশন লোড করা যায়নি</string>
     <string name="session_location_share_failed_title">অবস্থান শেয়ার করা যায়নি</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">শিট টানার হাতল</string>
-    <string name="session_photo_sheet_full_description">পুরো</string>
-    <string name="session_photo_sheet_half_description">অর্ধেক</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">এই শেল বন্ধ করবেন?</string>
     <string name="session_shell_stop_confirm_message">কমান্ডটি এখনই শেষ হবে। এটি বন্ধ না করা পর্যন্ত এখানে দেখানো আউটপুট থাকবে।</string>

@@ -131,25 +131,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">ตัวเลือกไฟล์แนบ</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">รูปถ่ายทั้งหมด</string>
-    <string name="composer_photo_more_options_action">ตัวเลือกเพิ่มเติม</string>
-    <string name="composer_photo_select_more">เลือกรูปถ่ายเพิ่มเติม…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="other">เพิ่มรูปถ่าย %1$d รูป</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">เต็มจอ</string>
-    <string name="composer_photo_sheet_half">ครึ่งจอ</string>
-    <string name="composer_photo_grid_description">รูปถ่าย</string>
-    <string name="composer_photo_camera_description">กล้อง</string>
-    <string name="composer_photo_access_off_title">ปิดการเข้าถึงรูปถ่ายอยู่</string>
-    <string name="composer_photo_access_off_message">อนุญาตการเข้าถึงในการตั้งค่าเพื่อเลือกรูปถ่ายที่นี่</string>
-    <string name="composer_photo_return_action">กลับไปที่ตัวเลือกไฟล์แนบ</string>
-    <string name="composer_photo_tile_video_description">วิดีโอ</string>
-    <string name="composer_photo_tile_photo_description">รูปถ่าย</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="other">เพิ่มรูปถ่ายได้สูงสุด %1$d รูป</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">มุมกว้างพิเศษ</string>
     <string name="composer_camera_lens_wide_description">มุมกว้าง</string>

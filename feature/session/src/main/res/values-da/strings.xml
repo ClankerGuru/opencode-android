@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Kunne ikke indlæse session</string>
     <string name="session_location_share_failed_title">Kunne ikke dele beliggenhed</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Panelhåndtag</string>
-    <string name="session_photo_sheet_full_description">Fuld</string>
-    <string name="session_photo_sheet_half_description">Halv</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Stop denne shell?</string>
     <string name="session_shell_stop_confirm_message">Kommandoen afsluttes nu. Outputtet bliver vist her, indtil du lukker det.</string>

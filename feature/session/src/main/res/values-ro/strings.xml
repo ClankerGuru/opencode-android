@@ -139,10 +139,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">Sesiunea nu a putut fi încărcată</string>
     <string name="session_location_share_failed_title">Locația nu a putut fi distribuită</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">Mânerul panoului</string>
-    <string name="session_photo_sheet_full_description">Ecran întreg</string>
-    <string name="session_photo_sheet_half_description">Jumătate de ecran</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">Oprești acest shell?</string>
     <string name="session_shell_stop_confirm_message">Comanda se oprește acum. Rezultatul afișat aici rămâne până când închizi panoul.</string>

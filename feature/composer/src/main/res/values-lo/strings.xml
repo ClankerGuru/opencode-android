@@ -131,25 +131,6 @@
     <!-- Plus menu -->
     <string name="composer_plus_menu_title">ຕົວເລືອກໄຟລ໌ແນບ</string>
 
-    <!-- Photo picker -->
-    <string name="composer_photo_all_photos">ຮູບຖ່າຍທັງໝົດ</string>
-    <string name="composer_photo_more_options_action">ທາງເລືອກເພີ່ມເຕີມ</string>
-    <string name="composer_photo_select_more">ເລືອກຮູບຖ່າຍເພີ່ມ…</string>
-    <plurals name="composer_photo_add_title">
-        <item quantity="other">ເພີ່ມຮູບຖ່າຍ %1$d ຮູບ</item>
-    </plurals>
-    <string name="composer_photo_sheet_full">ເຕັມຈໍ</string>
-    <string name="composer_photo_sheet_half">ເຄິ່ງຈໍ</string>
-    <string name="composer_photo_grid_description">ຮູບຖ່າຍ</string>
-    <string name="composer_photo_camera_description">ກ້ອງ</string>
-    <string name="composer_photo_access_off_title">ປິດການເຂົ້າເຖິງຮູບຖ່າຍຢູ່</string>
-    <string name="composer_photo_access_off_message">ອະນຸຍາດການເຂົ້າເຖິງໃນການຕັ້ງຄ່າ ເພື່ອເລືອກຮູບຖ່າຍຢູ່ທີ່ນີ້.</string>
-    <string name="composer_photo_return_action">ກັບໄປທີ່ຕົວເລືອກໄຟລ໌ແນບ</string>
-    <string name="composer_photo_tile_video_description">ວິດີໂອ</string>
-    <string name="composer_photo_tile_photo_description">ຮູບຖ່າຍ</string>
-    <plurals name="composer_photo_limit">
-        <item quantity="other">ເພີ່ມຮູບຖ່າຍໄດ້ສູງສຸດ %1$d ຮູບ</item>
-    </plurals>
     <!-- Camera lenses and flash (AttachmentCameraLenses) -->
     <string name="composer_camera_lens_ultra_wide_description">ມຸມກວ້າງພິເສດ</string>
     <string name="composer_camera_lens_wide_description">ມຸມກວ້າງ</string>

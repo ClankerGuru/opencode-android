@@ -135,10 +135,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">โหลดเซสชันไม่ได้</string>
     <string name="session_location_share_failed_title">แชร์ตำแหน่งไม่ได้</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">แถบลากแผง</string>
-    <string name="session_photo_sheet_full_description">เต็มจอ</string>
-    <string name="session_photo_sheet_half_description">ครึ่งจอ</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">หยุดเชลล์นี้ไหม?</string>
     <string name="session_shell_stop_confirm_message">คำสั่งจะจบทันที ผลลัพธ์ที่แสดงที่นี่จะยังอยู่จนกว่าคุณจะปิด</string>

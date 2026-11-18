@@ -137,10 +137,6 @@
     <!-- Session screen -->
     <string name="session_load_failed_title">सेशन लोड नहीं कर सके</string>
     <string name="session_location_share_failed_title">जगह शेयर नहीं कर सके</string>
-    <!-- Photo sheet -->
-    <string name="session_photo_sheet_grabber_description">शीट खींचने का हैंडल</string>
-    <string name="session_photo_sheet_full_description">पूरा</string>
-    <string name="session_photo_sheet_half_description">आधा</string>
     <!-- Shell output -->
     <string name="session_shell_stop_confirm_title">यह शेल रोकें?</string>
     <string name="session_shell_stop_confirm_message">कमांड अभी बंद हो जाएगी। यहाँ दिख रहा आउटपुट तब तक रहेगा जब तक आप इसे बंद नहीं करते।</string>
