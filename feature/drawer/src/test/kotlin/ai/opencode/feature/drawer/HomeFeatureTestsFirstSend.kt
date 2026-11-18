@@ -104,7 +104,7 @@ class FirstSendSurvivesNavigationTests {
     }
 
     @Test
-    fun aSendThatFailsAfterItsScreenLeftComesBackAsAFailedMessage() = homeTest { h ->
+    fun aSendThatFailsAfterItsScreenLeftWaitsInTheSessionListAsAnUnsentSession() = homeTest { h ->
         val createStarted = Gate()
         val createGate = Gate()
         val store = h.makeStore(
@@ -118,6 +118,7 @@ class FirstSendSurvivesNavigationTests {
         )
 
         store.send(Action.NewSessionTapped)
+        store.send(detail(SessionFeature.Action.Task))
         store.send(detail(SessionFeature.Action.Binding(BindingAction.Draft("Keep this draft"))))
         store.send(detail(SessionFeature.Action.SendTapped))
         createStarted.await()
@@ -125,13 +126,21 @@ class FirstSendSurvivesNavigationTests {
         store.send(Action.NewSessionTapped)
         createGate.yield()
         createGate.finish()
-        // The next new-session screen shows the message as failed, ready to retry, whenever the failed create lands.
         repeat(40) {
-            if (store.state.sessionDetail?.failedSends?.isEmpty() != false) {
+            if (store.state.unsentDrafts.firstOrNull()?.isFailed != true) {
                 settle(1)
-                store.send(detail(SessionFeature.Action.Task))
+                store.send(Action.UnsentDraftsChanged)
             }
         }
+        // The new session stays blank, and the failed one waits in the list.
+        store.send(detail(SessionFeature.Action.Task))
+        assertEquals(emptyList<String>(), store.state.sessionDetail?.failedSends?.map { it.pending.text })
+        val unsent = store.state.unsentDrafts.single()
+        assertEquals("Keep this draft", unsent.title)
+        assertTrue(unsent.isFailed)
+
+        store.send(Action.SessionTapped(unsent.sessionID))
+        store.send(detail(SessionFeature.Action.Task))
         assertEquals(listOf("Keep this draft"), store.state.sessionDetail?.failedSends?.map { it.pending.text })
         assertTrue(store.state.sessionDetail?.items?.any { it is OpenCodeTranscriptItem.UserText && it.text == "Keep this draft" } == true)
         h.skipInFlightEffects()

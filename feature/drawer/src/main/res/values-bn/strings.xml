@@ -124,6 +124,8 @@
     <string name="drawer_row_needs_input_state">আপনার ইনপুট প্রয়োজন</string>
     <string name="drawer_row_working_state">কাজ চলছে</string>
     <string name="drawer_row_unread_state">অপঠিত</string>
+    <string name="drawer_row_unsent_failed_state">পাঠানো যায়নি</string>
+    <string name="drawer_row_unsent_sending_state">পাঠানো হচ্ছে</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">অনুমতি চাওয়া যায়নি। আবার চেষ্টা করুন।</string>

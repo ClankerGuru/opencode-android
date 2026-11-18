@@ -120,6 +120,8 @@
     <string name="drawer_row_needs_input_state">ຕ້ອງການຄຳຕອບຈາກເຈົ້າ</string>
     <string name="drawer_row_working_state">ເຮັດວຽກ</string>
     <string name="drawer_row_unread_state">ຍັງບໍ່ອ່ານ</string>
+    <string name="drawer_row_unsent_failed_state">ສົ່ງບໍ່ໄດ້</string>
+    <string name="drawer_row_unsent_sending_state">ກຳລັງສົ່ງ</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">ຂໍການອະນຸຍາດບໍ່ໄດ້. ລອງໃໝ່.</string>

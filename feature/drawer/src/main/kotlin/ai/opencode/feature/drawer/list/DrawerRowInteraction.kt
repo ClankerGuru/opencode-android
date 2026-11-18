@@ -46,6 +46,8 @@ class DrawerRowInteraction(
     val sessionID: String,
     /** Session rows lift by a long-press drag; other rows are only chosen. */
     val reorderable: Boolean,
+    /** Whether a hold chooses the row. */
+    val holdable: Boolean = true,
     val isPinnedSection: Boolean = false,
     val select: () -> Unit,
     /**
@@ -153,7 +155,7 @@ fun Modifier.drawerRowInteraction(
                 current.select()
                 return@awaitEachGesture
             }
-            if (touch == DrawerRowTouch.Taken) return@awaitEachGesture
+            if (touch == DrawerRowTouch.Taken || !current.holdable) return@awaitEachGesture
 
             // The hold: the row chosen.
             haptics.play(Haptic.tap)

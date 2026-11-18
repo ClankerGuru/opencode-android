@@ -132,6 +132,8 @@
     <string name="drawer_row_needs_input_state">Je potrebný váš vstup</string>
     <string name="drawer_row_working_state">Pracuje</string>
     <string name="drawer_row_unread_state">Neprečítané</string>
+    <string name="drawer_row_unsent_failed_state">Nepodarilo sa odoslať</string>
+    <string name="drawer_row_unsent_sending_state">Odosiela sa</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Nepodarilo sa požiadať o povolenie. Skúste znova.</string>

@@ -124,6 +124,8 @@
     <string name="drawer_row_needs_input_state">Sinua tarvitaan</string>
     <string name="drawer_row_working_state">Työskennellään</string>
     <string name="drawer_row_unread_state">Lukematon</string>
+    <string name="drawer_row_unsent_failed_state">Lähetys epäonnistui</string>
+    <string name="drawer_row_unsent_sending_state">Lähetetään</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Luvan pyytäminen epäonnistui. Yritä uudelleen.</string>

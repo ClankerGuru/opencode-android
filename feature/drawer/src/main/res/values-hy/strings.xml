@@ -124,6 +124,8 @@
     <string name="drawer_row_needs_input_state">Ձեր արձագանքն է պետք</string>
     <string name="drawer_row_working_state">Աշխատում է</string>
     <string name="drawer_row_unread_state">Չընթերցված</string>
+    <string name="drawer_row_unsent_failed_state">Չհաջողվեց ուղարկել</string>
+    <string name="drawer_row_unsent_sending_state">Ուղարկվում է</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Չհաջողվեց թույլտվություն խնդրել։ Կրկին փորձեք։</string>

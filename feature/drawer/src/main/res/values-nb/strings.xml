@@ -124,6 +124,8 @@
     <string name="drawer_row_needs_input_state">Trenger svar fra deg</string>
     <string name="drawer_row_working_state">Arbeider</string>
     <string name="drawer_row_unread_state">Ulest</string>
+    <string name="drawer_row_unsent_failed_state">Kunne ikke sende</string>
+    <string name="drawer_row_unsent_sending_state">Sender</string>
 
     <!-- Errors -->
     <string name="drawer_notifications_request_error">Kunne ikke be om tillatelse. Prøv igjen.</string>
