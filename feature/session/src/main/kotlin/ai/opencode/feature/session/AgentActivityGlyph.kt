@@ -77,8 +77,6 @@ fun AgentActivityGlyph(
     val lab = AgentActivityLab.override
     val currentSource by rememberUpdatedState(source)
     val currentLab by rememberUpdatedState(lab)
-    // DEBUG glass trace: counts this glyph's steps under the surface's group.
-    val stepTrace by rememberUpdatedState(LocalGlyphStepTrace.current)
     // Bumped per drawn frame: only the Canvas's draw reads it, so frames never recompose.
     var tick by remember { mutableLongStateOf(0L) }
     var shown by remember { mutableStateOf(source.activity(AgentActivityClock.now(), lab)) }
@@ -87,7 +85,6 @@ fun AgentActivityGlyph(
         fun draw(now: Double) {
             val previousField = model.frame.field
             val frame = model.advance(now, currentSource, currentLab, still)
-            if (frame.stepped && !isPaused && active) stepTrace?.let(GlyphAdvanceProbe::stepped)
             if (previousField == null || !still || !frame.resting || frame.activity != shown) tick += 1
             if (frame.activity != shown) shown = frame.activity
         }
