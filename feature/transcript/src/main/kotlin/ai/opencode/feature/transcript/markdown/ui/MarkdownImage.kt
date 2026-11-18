@@ -138,7 +138,9 @@ fun MarkdownImage(
         val loaded: ImageBitmap? = withContext(Dispatchers.IO) {
             runCatching {
                 val bitmap = if (source.startsWith("http://", ignoreCase = true) || source.startsWith("https://", ignoreCase = true)) {
-                    val result = SingletonImageLoader.get(context).execute(ImageRequest.Builder(context).data(source).build())
+                    val result = SingletonImageLoader.get(context).execute(
+                        ImageRequest.Builder(context).data(source).memoryCacheKey(DecodedImageCache.memoryKey(cacheKey)).build(),
+                    )
                     (result as? SuccessResult)?.image?.toBitmap()
                 } else {
                     val bytes = client.cachedMarkdownImage(cacheKey)
