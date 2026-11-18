@@ -121,9 +121,6 @@ interface DrawerListRevealValues {
 object DrawerListSessionCell {
     /** The status slot (ring or dot). */
     val indicatorSize: Dp = 18.dp
-
-    /** The dot of a session that needs your input. */
-    fun attentionColor(isDark: Boolean): Color = if (isDark) Color(0xFFFF9F0A) else Color(0xFFFF9500)
 }
 
 @Composable
@@ -414,14 +411,14 @@ fun DrawerListSessionCell(
                         SFSymbol.CircleFill,
                         contentDescription = null,
                         size = (11 * density.fontScale).dp,
-                        tint = if (row.indicator == Indicator.attention) DrawerListSessionCell.attentionColor(colors.isDark) else colors.signal,
+                        tint = if (row.indicator == Indicator.attention) colors.warning else colors.signal,
                         modifier = Modifier.graphicsLayer { alpha = dotAlpha },
                     )
                     OpenCodeIcon(
                         "exclamationmark.circle.fill",
                         contentDescription = null,
                         size = (15 * density.fontScale).dp,
-                        tint = colors.destructive,
+                        tint = colors.danger,
                         modifier = Modifier.graphicsLayer { alpha = failedAlpha },
                     )
                 }

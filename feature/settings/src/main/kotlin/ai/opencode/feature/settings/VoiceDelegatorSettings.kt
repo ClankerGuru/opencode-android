@@ -145,7 +145,7 @@ internal fun VoiceDelegatorSettingsPage(store: SettingsStore) {
                 DelegatorNote(
                     stringResource(R.string.settings_delegator_other_server_note, otherServerPick.displayTitle),
                     SFSymbol.ExclamationmarkTriangle,
-                    SettingsTint.Orange.color(),
+                    OpenCodeTheme.colors.warning,
                 )
             }
         }

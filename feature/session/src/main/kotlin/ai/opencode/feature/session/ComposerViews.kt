@@ -9,7 +9,6 @@ import ai.opencode.core.motion.motionBlurReveal
 import ai.opencode.core.motion.rememberReduceMotion
 import ai.opencode.core.ui.OpenCodeIcon
 import ai.opencode.core.ui.OpenCodeShape
-import ai.opencode.core.ui.OpenCodeShapeGeometry
 import ai.opencode.core.ui.OpenCodeTextStyles
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.RollingNumber
@@ -52,20 +51,15 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -880,45 +874,6 @@ fun JumpToLatestPill(
 /** [JumpToLatestPill]'s slot gap; it scales and fades in and out on `microIn` and `microOut`. */
 object JumpToLatestPillMotion {
     const val gap = 8f
-}
-
-/** A full-width bar that takes the composer's place, on its same surface. */
-@Composable
-fun ComposerBanner(
-    symbol: SFSymbol,
-    title: String,
-    action: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    iconTint: Color = OpenCodeTheme.colors.secondaryText,
-    detail: String? = null,
-) {
-    // The composer's (desktop dock's) radius, clamped to fit even the minimum-height banner.
-    val radius = OpenCodeShapeGeometry.radius(ComposerTunables.cornerRadius, 52f)
-    Surface(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth().heightIn(min = 52.dp),
-        shape = RoundedCornerShape(radius.dp),
-        color = OpenCodeSurfaces.color,
-        border = OpenCodeSurfaces.border,
-        shadowElevation = OpenCodeSurfaces.raisedShadow,
-    ) {
-        Row(
-            Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            OpenCodeIcon(symbol, contentDescription = null, size = 18.dp, tint = iconTint, modifier = Modifier.width(18.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium), color = OpenCodeTheme.colors.text)
-                if (detail != null) {
-                    Text(detail, style = OpenCodeTextStyles.caption1, color = OpenCodeTheme.colors.secondaryText, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                }
-            }
-            Spacer(Modifier.widthIn(min = 8.dp))
-            Text(action, style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.SemiBold), color = MaterialTheme.colorScheme.primary)
-        }
-    }
 }
 
 // endregion

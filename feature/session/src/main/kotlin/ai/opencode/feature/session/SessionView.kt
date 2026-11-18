@@ -4,6 +4,7 @@ package ai.opencode.feature.session
 
 import ai.opencode.core.strings.localized
 import ai.opencode.core.R as CoreR
+import ai.opencode.core.ui.OpenCodeContentUnavailable
 import ai.opencode.core.ui.inContainer
 import ai.opencode.feature.composer.composerWindowTouches
 import ai.opencode.core.dependencies.dependency
@@ -18,9 +19,6 @@ import ai.opencode.core.store.PresentationAction
 import ai.opencode.core.store.StoreOf
 import ai.opencode.core.store.observe
 import ai.opencode.core.store.scope
-import ai.opencode.core.ui.OpenCodeIcon
-import ai.opencode.core.ui.OpenCodeIconSize
-import ai.opencode.core.ui.OpenCodeSecondaryButton
 import ai.opencode.core.ui.OpenCodeTheme
 import ai.opencode.core.ui.ProviderIcon
 import ai.opencode.core.ui.SFSymbol
@@ -65,7 +63,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -84,7 +81,6 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import ai.opencode.core.ui.OpenCodeAlertDialog
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -123,7 +119,6 @@ import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.traversalIndex
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.offset
@@ -907,19 +902,16 @@ private fun BoxScope.ComposedAfterComposer(content: @Composable BoxScope.() -> U
     }
 }
 
-/** iOS `ContentUnavailableView` for a session that couldn't load. */
 @Composable
 private fun LoadFailure(message: String, onRetry: () -> Unit) {
-    Column(
-        Modifier.fillMaxSize().padding(horizontal = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        OpenCodeIcon(SFSymbol.ExclamationmarkTriangle, contentDescription = null, size = OpenCodeIconSize.hero, tint = OpenCodeTheme.colors.secondaryText)
-        Text(stringResource(R.string.session_load_failed_title), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
-        Text(message, style = MaterialTheme.typography.bodyMedium, color = OpenCodeTheme.colors.secondaryText, textAlign = TextAlign.Center)
-        OpenCodeSecondaryButton(stringResource(CoreR.string.common_try_again), onClick = onRetry)
-    }
+    OpenCodeContentUnavailable(
+        symbol = SFSymbol.ExclamationmarkTriangle,
+        title = stringResource(R.string.session_load_failed_title),
+        modifier = Modifier.fillMaxSize(),
+        description = message,
+        action = stringResource(CoreR.string.common_try_again),
+        onAction = onRetry,
+    )
 }
 
 /**

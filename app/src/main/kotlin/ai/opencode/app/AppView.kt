@@ -1,6 +1,7 @@
 package ai.opencode.app
 
 import ai.opencode.core.R as CoreR
+import ai.opencode.core.ui.OpenCodeErrorText
 import ai.opencode.core.ui.OpenCodeShape
 import ai.opencode.core.ui.OpenCodeSheetHandle
 import ai.opencode.core.ui.OpenCodeSurfaces
@@ -241,10 +242,6 @@ private fun ErrorAlert(title: String, message: String, onDismiss: () -> Unit) {
 @Composable
 private fun isAccessibilitySize(): Boolean = LocalDensity.current.fontScale > 1.5f
 
-/** System orange for the error card title and paste errors. */
-@Composable
-private fun systemOrange(): Color = if (OpenCodeTheme.colors.isDark) Color(0xFFFF9F0A) else Color(0xFFFF9500)
-
 /** The saved servers, pairing and the manual form. */
 @Composable
 private fun ConnectionView(store: StoreOf<AppFeature.State, AppFeature.Action>) {
@@ -432,7 +429,7 @@ private fun PasteRow(store: StoreOf<AppFeature.State, AppFeature.Action>) {
         Text(
             pasteError ?: stringResource(R.string.app_setup_paste_prompt),
             style = OpenCodeTextStyles.footnote,
-            color = if (pasteError != null) systemOrange() else OpenCodeTheme.colors.secondaryText,
+            color = if (pasteError != null) OpenCodeTheme.colors.warning else OpenCodeTheme.colors.secondaryText,
             // Paste's failure replaces the prompt and is read out; the prompt itself isn't.
             modifier = modifier.semantics { if (pasteError != null) liveRegion = LiveRegionMode.Polite },
         )
@@ -666,8 +663,8 @@ private fun ConnectionErrorCard(store: StoreOf<AppFeature.State, AppFeature.Acti
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.semantics(mergeDescendants = true) { heading() }.then(readsOut),
             ) {
-                OpenCodeIcon(SFSymbol.ExclamationmarkTriangleFill, contentDescription = null, tint = systemOrange(), size = 20.dp)
-                Text(title, style = OpenCodeTextStyles.headline, color = systemOrange())
+                OpenCodeIcon(SFSymbol.ExclamationmarkTriangleFill, contentDescription = null, tint = OpenCodeTheme.colors.warning, size = 20.dp)
+                Text(title, style = OpenCodeTextStyles.headline, color = OpenCodeTheme.colors.warning)
             }
             SelectionContainer {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -1007,11 +1004,11 @@ private fun HeaderFields(
             Spacer(Modifier.width(6.dp))
             Text(stringResource(R.string.app_server_form_header_add), style = OpenCodeTextStyles.subheadline.copy(fontWeight = FontWeight.Medium))
         }
-        Text(
-            headerProblem ?: stringResource(R.string.app_server_form_headers_detail),
-            style = OpenCodeTextStyles.footnote,
-            color = if (headerProblem == null) OpenCodeTheme.colors.secondaryText else OpenCodeTheme.colors.destructive,
-        )
+        if (headerProblem != null) {
+            OpenCodeErrorText(headerProblem)
+        } else {
+            Text(stringResource(R.string.app_server_form_headers_detail), style = OpenCodeTextStyles.footnote, color = OpenCodeTheme.colors.secondaryText)
+        }
     }
 }
 

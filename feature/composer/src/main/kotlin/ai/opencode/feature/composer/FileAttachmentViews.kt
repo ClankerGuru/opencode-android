@@ -114,9 +114,9 @@ fun ComposerFileChip(
                     if (canRetry) SFSymbol.ArrowClockwise else SFSymbol.ExclamationmarkTriangle,
                     contentDescription = null,
                     size = 14.dp,
-                    tint = OpenCodeTheme.colors.destructive,
+                    tint = OpenCodeTheme.colors.danger,
                 )
-                FileAttachmentDetail(status.message, color = OpenCodeTheme.colors.destructive)
+                FileAttachmentDetail(status.message, color = OpenCodeTheme.colors.danger)
             }
         }
     }
