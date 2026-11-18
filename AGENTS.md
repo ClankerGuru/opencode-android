@@ -42,6 +42,9 @@ by hand (`gh workflow run scheduled-release.yml`) to release sooner ([docs/relea
 - The composer's autocomplete list motion (opening, filtering, scrolling, the highlight, picking a row) is
   Android-native on purpose: a `LazyColumn` with `animateItem` in `AutocompleteViews.kt`. Don't port iOS's
   autocomplete simulation or chip flight; the list's rows, ordering, selection and copy still follow iOS.
+- The session's page stack (subagent and browser pages) is Android-native on purpose: one animated
+  shared-axis move in `SessionPageStack.kt` and system predictive back. Don't port iOS's full-width
+  back pan or its stack motion; covered pages still stay composed so they keep their state.
 
 ## Modules (fixed; never edit `settings.gradle.kts`)
 
@@ -148,8 +151,8 @@ All coordinates live in `gradle/libs.versions.toml`; modules reference catalog e
 Core set: kotlinx.coroutines, kotlinx.serialization, OkHttp (+ okhttp-sse), DataStore, Coil 3,
 Compose/M3 (+ adaptive), Navigation3. Pre-declared for areas: Glance + WorkManager (system),
 CameraX (composer), Media3 + androidx.browser/webkit (media), Stream WebRTC (voice; iOS uses
-Google's libwebrtc), Highlights + jlatexmath (transcript; iOS's Markdown and highlighter are
-self-written, so port them first and use these only where iOS used a library, e.g. SwiftMath →
+Google's libwebrtc), jlatexmath (transcript; iOS's Markdown and highlighter are
+self-written, so port them first and use a library only where iOS did, e.g. SwiftMath →
 jlatexmath), Firebase Messaging (push; keep it behind an interface until credentials exist).
 Add a new library only with a one-line justification here.
 - `com.google.zxing:core` (settings): decodes the pairing QR from CameraX frames, as iOS's

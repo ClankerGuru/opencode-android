@@ -89,15 +89,6 @@ class HomeViewState internal constructor(
     val selectedSessionID: String? get() = state.sessionDetail?.session?.id
 
     /**
-     * The drawer can be seen: in the foreground, not catching up, and open (or, beside a sidebar,
-     * the sidebar showing).
-     */
-    fun isDrawerVisible(state: HomeFeature.State = this.state): Boolean =
-        isSceneActive &&
-            state.catchUp == null &&
-            (if (state.showsDrawerLabel) (isSessionDrawerPresented || state.isDrawerOpen) else state.isSidebarShown)
-
-    /**
      * The row the drawer highlights. Catch Up shows its cards in the session's place, but the
      * drawer behind it still belongs to the session it was opened from.
      */

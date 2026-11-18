@@ -87,7 +87,7 @@ class DrawerSessionPagesReviewTests {
         val inputs = DrawerListInputs(selectedSessionID = null, reducedMotion = false, increasedContrast = false)
         fun model(): DrawerListModel = h.state {
             DrawerListModel.build(
-                state = store.state, inputs = inputs, liftedID = null, catchUpMounted = false, whatsNewMounted = false,
+                state = store.state, inputs = inputs, liftedID = null,
                 now = Instant.ofEpochSecond(100), timestamp = { _, _ -> "" }, project = { _, _ -> null },
             )
         }

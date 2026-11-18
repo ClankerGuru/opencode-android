@@ -561,8 +561,6 @@ class CatchUpTests {
             state = state,
             inputs = DrawerListInputs(selectedSessionID = null, reducedMotion = false, increasedContrast = false),
             liftedID = null,
-            catchUpMounted = true,
-            whatsNewMounted = false,
             now = Instant.ofEpochSecond(100),
             timestamp = { _, _ -> "" },
             project = { _, _ -> null },
