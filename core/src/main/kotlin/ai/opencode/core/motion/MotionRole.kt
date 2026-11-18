@@ -17,7 +17,6 @@ enum class MotionPhase { Enter, Exit }
 sealed interface MotionCurve {
     val duration: Double
     val bounce: Double get() = 0.0
-    val isSpring: Boolean get() = this is Spring
 
     /** The `(ω, ζ)` a [SpringSolver] uses for this curve; an ease is treated as a critically damped spring of the same duration. */
     val springParameters: SpringSolver.Parameters get() = SpringSolver.parameters(duration, bounce)
