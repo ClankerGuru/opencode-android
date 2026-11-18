@@ -156,12 +156,6 @@ object ComposerUriStaging {
  * the screen launches these intents and routes the result [uris].
  */
 object ComposerPickers {
-    /** Files: any document, several at once. */
-    fun filesIntent(): Intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
-        .addCategory(Intent.CATEGORY_OPENABLE)
-        .setType("*/*")
-        .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
-
     /**
      * The system photo picker, up to [maxItems]. Videos upload as files, so they appear only
      * when the server takes uploads ([includesVideos]). Needs no storage permission.

@@ -25,7 +25,6 @@
 
     <!-- Composer -->
     <string name="composer_message_placeholder">འཕྲིན་དོན།</string>
-    <string name="composer_attachment_photo_description">པར།</string>
 
     <!-- Dictation notification -->
     <string name="composer_dictation_channel_name">སྐད་བཟུང་དོ།</string>

@@ -25,7 +25,6 @@
 
     <!-- Composer -->
     <string name="composer_message_placeholder">संदेश</string>
-    <string name="composer_attachment_photo_description">फ़ोटो</string>
 
     <!-- Dictation notification -->
     <string name="composer_dictation_channel_name">रिकॉर्डिंग</string>

@@ -25,7 +25,6 @@
 
     <!-- Composer -->
     <string name="composer_message_placeholder">Паём</string>
-    <string name="composer_attachment_photo_description">Акс</string>
 
     <!-- Dictation notification -->
     <string name="composer_dictation_channel_name">Сабт</string>

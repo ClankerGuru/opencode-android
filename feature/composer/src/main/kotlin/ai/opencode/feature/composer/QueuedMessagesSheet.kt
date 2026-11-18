@@ -175,10 +175,6 @@ object QueuedMessagesSheetMetrics {
     val listTop = 4.dp
     val listBottom = 12.dp
 
-    /** What a row is taken to be before it has been measured. */
-    val estimatedRowHeight = 76.dp
-
-
     /** Just short of the full sheet: past it, the rows scroll. */
     fun maximumHeight(screenHeight: androidx.compose.ui.unit.Dp) = maxOf(screenHeight - 110.dp, 320.dp)
 }

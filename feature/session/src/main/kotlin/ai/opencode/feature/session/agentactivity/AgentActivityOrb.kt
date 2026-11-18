@@ -91,8 +91,7 @@ object AgentActivityOrb {
         ),
     )
 
-    // The layer's look: glow sigma (cells), unlit grid, dot scale, glow strength and its light-mode share.
-    const val SIGMA = 2.2
+    // The layer's look: unlit grid, dot scale, glow strength and its light-mode share.
     const val UNLIT = 1.0
     const val DOT_SCALE = 1.0
     const val GLOW_STRENGTH = 1.5

@@ -25,7 +25,6 @@
 
     <!-- Composer -->
     <string name="composer_message_placeholder">Мессеж</string>
-    <string name="composer_attachment_photo_description">Зураг</string>
 
     <!-- Dictation notification -->
     <string name="composer_dictation_channel_name">Дуу бичлэг</string>

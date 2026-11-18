@@ -44,7 +44,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -522,15 +521,4 @@ class AttachmentMenuAnchors {
     var menu: Rect by mutableStateOf(Rect.Zero)
     /** Horizontal offset (px) of the + glyph's center from the menu's leading edge. */
     var buttonCenterXInMenu: Float by mutableFloatStateOf(0f)
-}
-
-/** Records this element's frame (root coordinates) into [anchors]. */
-fun Modifier.attachmentMenuAnchor(set: (Rect) -> Unit): Modifier = composed {
-    val last = remember { arrayOfNulls<Rect>(1) }
-    onGloballyPositioned {
-        val frame = Rect(it.positionInRoot(), it.size.toSize())
-        if (frame == last[0]) return@onGloballyPositioned
-        last[0] = frame
-        set(frame)
-    }
 }
