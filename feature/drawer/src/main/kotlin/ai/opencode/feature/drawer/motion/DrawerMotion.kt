@@ -12,7 +12,6 @@ import ai.opencode.core.motion.retarget
 import ai.opencode.core.motion.motionFrameLoop
 import ai.opencode.core.motion.rememberFrameDurationSeconds
 import android.view.RoundedCorner
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.Stable
@@ -24,17 +23,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -47,8 +39,7 @@ import kotlin.math.pow
 /**
  * Port of `OpenCode/Drawer/DrawerMotion.swift`: the card that recedes. Plain state holders own
  * every per-frame value (iOS keeps them in UIKit outside SwiftUI); Compose reads them only in
- * layout/draw lambdas ([drawerCard], [drawerRecede], [drawerListDim], [drawerCardScrim]), so a
- * drag never recomposes the session or the drawer list. The reducer hears only settled
+ * layout/draw lambdas, so a drag never recomposes the session or the drawer list. The reducer hears only settled
  * open/shut ([DrawerMotionState.Callbacks.onArrived]).
  *
  * Units: iOS points map 1:1 to dp. Every distance in this file is in dp, velocities in dp/s.
@@ -447,7 +438,7 @@ fun rememberDisplayCornerRadius(): Dp {
  * The card's offset and the drawer's open state, owned outside composition (iOS
  * `SessionDrawerViewController`'s drag, settle and `apply(offset:)`).
  *
- * - The pan feeds [beginDrag] / [drag] / [endDrag] / [cancelDrag] (see `Modifier.drawerPan`).
+ * - The pan feeds [beginDrag] / [drag] / [endDrag] / [cancelDrag].
  * - The drawer button calls [setPresented]; a tap on the card or Escape calls [close].
  * - Release: one commit rule (`MotionRelease.shouldCommit`): a flick decides, otherwise the
  *   halfway mark; the card then
@@ -798,42 +789,4 @@ fun rememberDrawerMotionState(initiallyPresented: Boolean = false): DrawerMotion
     val scope = rememberCoroutineScope()
     val frame = rememberFrameDurationSeconds()
     return remember(scope) { DrawerMotionState(scope, initiallyPresented) }.also { it.frameDurationSeconds = frame }
-}
-
-/**
- * The session card: slides by the drawer's offset (mirrored in RTL) and takes the display's
- * corner radius while it moves or rests aside (iOS `apply(offset:)` on `cardView`). Read in the
- * layer block only, so dragging never recomposes the card.
- */
-fun Modifier.drawerCard(state: DrawerMotionState, displayCornerRadius: Dp): Modifier = composed {
-    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    graphicsLayer {
-        val offset = state.offset
-        translationX = offset.dp.toPx() * if (rtl) -1 else 1
-        val radius = DrawerCorner.radius(state.isCardMoving, offset, displayCornerRadius.value)
-        shape = if (radius > 0) RoundedCornerShape(radius.dp) else RectangleShape
-        clip = radius > 0
-    }
-}
-
-/** The drawer recedes behind the closing card (iOS `drawerHost.view.transform`, [DrawerDepth]). */
-fun Modifier.drawerRecede(state: DrawerMotionState): Modifier = graphicsLayer {
-    val scale = DrawerDepth.scale(state.progress, state.reducedMotion || !state.recedes)
-    scaleX = scale
-    scaleY = scale
-    transformOrigin = TransformOrigin.Center
-}
-
-/** Black over the drawer list, deeper the more shut it is (iOS `drawerDimView`, [DrawerDim]). */
-fun Modifier.drawerListDim(state: DrawerMotionState, isDark: Boolean): Modifier = drawWithContent {
-    drawContent()
-    val alpha = DrawerDim.alpha(state.progress, DrawerDim.maximum(isDark))
-    if (alpha > 0f) drawRect(DrawerDim.color, alpha = alpha)
-}
-
-/** The scrim over the card, its alpha the drawer's progress (iOS `dimmingView`; colour from `DrawerScrim`). */
-fun Modifier.drawerCardScrim(state: DrawerMotionState, color: Color): Modifier = drawWithContent {
-    drawContent()
-    val alpha = state.progress
-    if (alpha > 0f) drawRect(color, alpha = alpha)
 }
