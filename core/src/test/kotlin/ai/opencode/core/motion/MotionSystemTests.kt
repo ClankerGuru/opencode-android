@@ -334,53 +334,7 @@ class MotionSystemTests {
     }
 
     @Test
-    fun presenceGateAndMotionBlurRevealRespectGenerationAndBounds() {
-        // Android's gate is immutable (reducer state): each call returns the next gate.
-        var gate = PresenceGate(isOpen = false)
-        fun request(open: Boolean): Int? = gate.request(open).let { (next, token) -> gate = next; token }
-        fun beginAnimation(open: Boolean): Int? = gate.beginAnimation(open).let { (next, token) -> gate = next; token }
-        fun complete(generation: Int): Boolean = gate.complete(generation).let { (next, unmounted) -> gate = next; unmounted }
-
-        assertTrue(!gate.isMounted && !gate.isPresented)
-
-        // Requesting open while unmounted mounts first and returns null so onAppear starts the animation.
-        assertNull(request(true))
-        assertTrue(gate.isMounted && !gate.isPresented)
-
-        // Cancelling before onAppear ever started an intro unmounts immediately.
-        assertNull(request(false))
-        assertTrue(!gate.isMounted && !gate.isPresented)
-
-        // Mount and start intro (gen 1).
-        assertNull(request(true))
-        val openGen = beginAnimation(true)
-        assertEquals(1, openGen)
-        assertTrue(gate.isMounted && gate.isPresented)
-
-        // Start closing (gen 2); repeated request(false) during outro must be idempotent
-        // and keep the view mounted until complete(generation: 2) runs.
-        val closeGen = request(false)
-        assertEquals(2, closeGen)
-        assertTrue(gate.isMounted && !gate.isPresented)
-        assertNull(request(false))
-        assertTrue(gate.isMounted && !gate.isPresented && gate.generation == 2)
-
-        // Reopen (gen 3) before gen 2 completes.
-        val reopenGen = request(true)
-        assertEquals(3, reopenGen)
-
-        // Stale close completion must not unmount the reopened surface.
-        assertFalse(complete(2))
-        assertTrue(gate.isMounted && gate.isPresented)
-
-        // Final close completion unmounts cleanly.
-        val finalCloseGen = request(false)
-        assertEquals(4, finalCloseGen)
-        assertNull(request(false))
-        assertTrue(gate.isMounted)
-        assertTrue(complete(4))
-        assertTrue(!gate.isMounted && !gate.isPresented)
-
+    fun motionBlurRevealRespectsBounds() {
         // MotionBlurReveal gates blur to 0 at >= 0.98 (resting open) and under Reduce Motion,
         // while keeping blur through 0 so the filter group never tears down mid-collapse.
         assertEquals(14f, MotionBlurReveal.blurRadius(progress = 0f, maxBlur = 14f, reduceMotion = false), 0f)

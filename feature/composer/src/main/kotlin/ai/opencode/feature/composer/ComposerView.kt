@@ -316,8 +316,6 @@ private fun AttachmentsRow(state: ComposerFeature.State, send: (ComposerFeature.
             ComposerLocationAttachment(
                 location = attachments.pendingLocation,
                 isLocating = attachments.isLocating,
-                gateProgress = 1f,
-                onAppear = {},
                 onRemove = { send(ComposerFeature.Action.Attachments(ComposerAttachmentsFeature.Action.LocationRemoved)) },
                 onOpen = {},
             )

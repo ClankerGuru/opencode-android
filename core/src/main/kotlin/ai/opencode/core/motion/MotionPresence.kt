@@ -1,10 +1,10 @@
 package ai.opencode.core.motion
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -12,72 +12,13 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-
-/**
- * Generation-guarded mount/unmount gate: unmounts only when the latest generation's outro completes
- * while still closed, so a quick reopen never unmounts. For custom drivers; `AnimatedVisibility`
- * already does this.
- */
-data class PresenceGate(
-    val wantsOpen: Boolean,
-    val isPresented: Boolean,
-    val isMounted: Boolean,
-    val generation: Int = 0,
-    /** True while an outro is in flight waiting for [complete]. */
-    private val isClosing: Boolean = false,
-) {
-    constructor(isOpen: Boolean = false) : this(wantsOpen = isOpen, isPresented = isOpen, isMounted = isOpen)
-
-    /**
-     * Prepares the gate for [open]. A null token means just mounted (call [beginAnimation] on its
-     * first frame) or no transition needed; otherwise pass it to [complete].
-     */
-    fun request(open: Boolean): Pair<PresenceGate, Int?> {
-        if (open && !isMounted) {
-            return copy(wantsOpen = true, isMounted = true, isClosing = false) to null
-        }
-        return copy(wantsOpen = open).beginAnimation(open)
-    }
-
-    /**
-     * Starts or retargets the presentation toward [open], returning the new generation if a
-     * transition is needed. Repeated `false` calls during an outro are no-ops.
-     */
-    fun beginAnimation(open: Boolean): Pair<PresenceGate, Int?> {
-        val wanting = copy(wantsOpen = open)
-        if (isPresented == open) {
-            // Unmount at once only if mounted by request(true) and cancelled before any intro began.
-            val next = if (!open && !isClosing) wanting.copy(isMounted = false) else wanting
-            return next to null
-        }
-        val nextGeneration = generation + 1
-        return wanting.copy(generation = nextGeneration, isPresented = open, isClosing = !open) to nextGeneration
-    }
-
-    /** Call when the animation for [completedGeneration] finishes. Returns whether it unmounted. */
-    fun complete(completedGeneration: Int?): Pair<PresenceGate, Boolean> {
-        if (completedGeneration != generation || wantsOpen) return this to false
-        return copy(isMounted = false, isClosing = false) to true
-    }
-}
 
 /**
  * Blur, opacity and optional rise for content entering a morphing surface. Blur runs only for 0.02
@@ -118,8 +59,8 @@ object MotionBlurReveal {
 // Presence
 
 /**
- * Mounts [content] through a [PresenceGate] and animates it in and out on [role]. A leaving view
- * takes no touches and is hidden from accessibility.
+ * Shows [content] while [isOpen], fading and scaling it in and out on [role] (a fade alone under
+ * Reduce Motion).
  */
 @Composable
 fun MotionPresence(
@@ -129,41 +70,17 @@ fun MotionPresence(
     reduceMotion: Boolean = rememberReduceMotion(),
     content: @Composable () -> Unit,
 ) {
-    var gate by remember { mutableStateOf(PresenceGate(isOpen)) }
-    val progress = remember { Animatable(if (isOpen) 1f else 0f) }
-    LaunchedEffect(isOpen) {
-        val (requested, requestToken) = gate.request(isOpen)
-        gate = requested
-        var token = requestToken
-        if (isOpen && requested.isMounted && !requested.isPresented) {
-            // Just mounted at its entering pose: start the entrance on the next frame.
-            withFrameNanos { }
-            val (begun, beginToken) = gate.beginAnimation(true)
-            gate = begun
-            token = beginToken
-        }
-        if (token == null) return@LaunchedEffect
-        val phase = if (isOpen) MotionPhase.Enter else MotionPhase.Exit
-        progress.animateTo(if (isOpen) 1f else 0f, role.animation(phase, reduceMotion))
-        gate = gate.complete(token).first
+    val enterSpec = role.animation<Float>(MotionPhase.Enter, reduceMotion)
+    val exitSpec = role.animation<Float>(MotionPhase.Exit, reduceMotion)
+    val entering = MotionPose.entering(role)
+    val leaving = MotionPose.leaving(role)
+    var enter = fadeIn(enterSpec, initialAlpha = entering.opacity)
+    var exit = fadeOut(exitSpec, targetAlpha = leaving.opacity)
+    if (!reduceMotion) {
+        enter += scaleIn(enterSpec, initialScale = entering.scale)
+        exit += scaleOut(exitSpec, targetScale = leaving.scale)
     }
-    if (!gate.isMounted) return
-    val resting = if (gate.wantsOpen) MotionPose.entering(role) else MotionPose.leaving(role)
-    val pose = resting.scaled(by = 1f - progress.value)
-    var boxModifier = modifier.motionPose(pose, reduceMotion)
-    if (!gate.wantsOpen) {
-        boxModifier = boxModifier
-            .clearAndSetSemantics { }
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Initial)
-                        for (change in event.changes) change.consume()
-                    }
-                }
-            }
-    }
-    Box(boxModifier) { content() }
+    AnimatedVisibility(isOpen, modifier, enter = enter, exit = exit) { content() }
 }
 
 // Transitions

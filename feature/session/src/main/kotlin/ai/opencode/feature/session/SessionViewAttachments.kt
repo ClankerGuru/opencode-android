@@ -86,7 +86,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.layout.layout
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.mutableStateOf
@@ -773,13 +772,9 @@ fun PendingAttachmentsRow(
         }
         if (showsLocation) {
             item(key = "location") {
-                // iOS `locationGate`: mounted hidden, presented once it appears.
-                var gate by remember { mutableFloatStateOf(0f) }
                 ComposerLocationAttachment(
                     location = location,
                     isLocating = isLocating,
-                    gateProgress = gate,
-                    onAppear = { gate = 1f },
                     onRemove = onRemoveLocation,
                     onOpen = onOpenLocation,
                     modifier = Modifier.animateItem(fadeInSpec = null, placementSpec = placement, fadeOutSpec = null),
