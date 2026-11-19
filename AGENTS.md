@@ -222,6 +222,7 @@ Add a new library only with a one-line justification here.
   commit to `dev` directly), one coherent change per commit. The message says what changed,
   why, and what was verified (commands run, emulator checks); call out removed or replaced
   behaviour.
+- PRs that change visuals should include videos or images of the change.
 - In this shared checkout stage only the files you own (`git add <paths>`), never `git add -A`.
   Don't amend, rebase, stash, or reset other agents' work.
 - Never commit secrets, `local.properties`, `google-services.json`, keystores, or private
