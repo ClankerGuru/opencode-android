@@ -146,7 +146,9 @@ internal fun SessionFeature.reduceModelsAndFamily(state: State, action: Action):
     Action.FamilyRefreshRequested -> {
         val family = refreshFamily(state)
         val shells = refreshShells(family.state)
-        Reduced(shells.state, Effect.merge(family.effect, shells.effect))
+        // Home asks for this on reconnect too, when job events may have been missed.
+        val jobs = refreshJobs(shells.state)
+        Reduced(jobs.state, Effect.merge(family.effect, shells.effect, jobs.effect))
     }
 
     is Action.ShellsResponse -> {
@@ -413,8 +415,9 @@ private fun SessionFeature.familyPicked(id: String, state: State): Reduced<State
     if (selectedItems != null) next = next.noteOpening(seen = null)
     val abandon = abandonRefresh(next)
     val requests = startPendingWork(abandon.state, RequestDockFeature.State.LoadAttempt.Initial)
-    val shells = refreshShells(requests.state)
-    val watchdog = watchdog(shells.state)
+    val shells = refreshShells(requests.state.copy(jobs = emptyMap(), stoppingIDs = emptySet()))
+    val jobs = refreshJobs(shells.state)
+    val watchdog = watchdog(jobs.state)
     return Reduced(
         watchdog.state,
         Effect.merge(
@@ -437,6 +440,7 @@ private fun SessionFeature.familyPicked(id: String, state: State): Reduced<State
             Effect.send(Action.RefreshRequested(RefreshReason.Open)),
             requests.effect,
             shells.effect,
+            jobs.effect,
             watchdog.effect,
             outbox.effect,
         ),
